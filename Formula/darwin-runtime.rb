@@ -22,12 +22,12 @@ class DarwinRuntime < Formula
 
     # Install binary crates via cargo install
     %w[runtime-shell macho-inspect].each do |crate|
-      system "cargo", "install", *std_cargo_args, "--path", "crates/#{crate}"
+      system "cargo", "install", *std_cargo_args(path: "crates/#{crate}")
     end
 
     # Install demo apps
     %w[hello-darwin control-gallery foundation-explorer].each do |app|
-      system "cargo", "install", *std_cargo_args, "--path", "apps/#{app}"
+      system "cargo", "install", *std_cargo_args(path: "apps/#{app}")
     end
 
     # ── Library ───────────────────────────────────────────────────────
