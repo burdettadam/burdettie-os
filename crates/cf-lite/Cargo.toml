@@ -1,0 +1,20 @@
+[package]
+name         = "cf-lite"
+description  = "Foundation/CoreFoundation shims for darwin-loader-lab"
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+rust-version.workspace = true
+
+[dependencies]
+libsystem-shims = { workspace = true }
+objc-runtime    = { workspace = true }
+platform-core   = { workspace = true }
+log             = { workspace = true }
+libc            = { workspace = true }
+
+[build-dependencies]
+cc = "1"
+
+[lints]
+workspace = true

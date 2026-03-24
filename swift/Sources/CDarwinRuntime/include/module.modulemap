@@ -1,0 +1,5 @@
+module CDarwinRuntime {
+    header "shim.h"
+    link "darwin_runtime_ffi"
+    export *
+}

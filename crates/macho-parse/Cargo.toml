@@ -1,0 +1,23 @@
+[package]
+name        = "macho-parse"
+description = "Mach-O binary parser — bytes in, ParsedMachO out"
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+rust-version.workspace = true
+
+[dependencies]
+macho-types = { workspace = true }
+platform-core = { workspace = true }
+thiserror   = { workspace = true }
+serde       = { workspace = true }
+log         = { workspace = true }
+
+[dev-dependencies]
+serde_json      = { workspace = true }
+macho-types     = { workspace = true }
+macho-objc      = { path = "../macho-objc" }
+macho-fixtures  = { path = "../macho-fixtures" }
+
+[lints]
+workspace = true

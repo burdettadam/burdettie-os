@@ -1,0 +1,20 @@
+[package]
+name        = "trust-policy"
+description = "Security gate traits and mock policies for Mach-O loader"
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+rust-version.workspace = true
+
+[dependencies]
+macho-types = { workspace = true }
+serde       = { workspace = true }
+serde_json  = { workspace = true }
+
+[dev-dependencies]
+serde_json    = { workspace = true }
+macho-parse   = { workspace = true }
+macho-run-plan = { workspace = true }
+
+[lints]
+workspace = true

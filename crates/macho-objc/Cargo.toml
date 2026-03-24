@@ -1,0 +1,18 @@
+[package]
+name        = "macho-objc"
+description = "Objective-C metadata detection and inspection for Mach-O binaries"
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+rust-version.workspace = true
+
+[dependencies]
+macho-types = { workspace = true }
+macho-parse = { workspace = true }
+serde       = { workspace = true }
+
+[dev-dependencies]
+serde_json  = { workspace = true }
+
+[lints]
+workspace = true

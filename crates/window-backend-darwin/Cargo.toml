@@ -1,0 +1,17 @@
+[package]
+name = "window-backend-darwin"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+graphics-core  = { workspace = true }
+window-backend = { workspace = true }
+ui-controls    = { workspace = true }
+ui-view        = { workspace = true }
+winit      = "0.30"
+softbuffer = "0.4"
+
+[lints]
+workspace = true

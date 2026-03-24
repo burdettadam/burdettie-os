@@ -1,0 +1,12 @@
+[package]
+name        = "graphics-core"
+description = "2D drawing primitives and renderer trait for darwin-loader-lab GUI framework"
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+rust-version.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true

@@ -1,0 +1,21 @@
+[package]
+name = "foundation-explorer"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "foundation-explorer"
+path = "src/main.rs"
+
+[dependencies]
+graphics-core         = { workspace = true }
+window-backend        = { workspace = true }
+window-backend-darwin = { workspace = true }
+ui-controls           = { workspace = true }
+objc-runtime          = { workspace = true }
+cf-lite               = { workspace = true }
+
+[lints]
+workspace = true

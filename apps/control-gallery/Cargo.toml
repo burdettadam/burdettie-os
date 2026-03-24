@@ -1,0 +1,19 @@
+[package]
+name = "control-gallery"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "control-gallery"
+path = "src/main.rs"
+
+[dependencies]
+graphics-core         = { workspace = true }
+window-backend        = { workspace = true }
+window-backend-darwin = { workspace = true }
+ui-controls           = { workspace = true }
+
+[lints]
+workspace = true

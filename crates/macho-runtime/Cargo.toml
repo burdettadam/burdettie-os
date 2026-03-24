@@ -1,0 +1,33 @@
+[package]
+name         = "macho-runtime"
+description  = "Runtime orchestration for darwin-loader-lab — load, shim, and run Mach-O binaries"
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+rust-version.workspace = true
+
+[dependencies]
+macho-types    = { workspace = true }
+macho-parse    = { workspace = true }
+macho-map      = { workspace = true }
+macho-resolve  = { workspace = true }
+macho-objc     = { workspace = true }
+macho-exec     = { workspace = true }
+trust-policy   = { workspace = true }
+libsystem-shims = { workspace = true }
+objc-runtime   = { workspace = true }
+cf-lite        = { workspace = true }
+platform-core  = { workspace = true }
+platform-darwin-host = { workspace = true }
+log            = { workspace = true }
+serde          = { workspace = true }
+serde_json     = { workspace = true }
+thiserror      = { workspace = true }
+
+[dev-dependencies]
+macho-fixtures = { workspace = true }
+objc-runtime   = { workspace = true }
+env_logger     = { workspace = true }
+
+[lints]
+workspace = true

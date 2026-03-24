@@ -1,0 +1,24 @@
+[package]
+name        = "runtime-shell"
+description = "Interactive demo shell for the darwin-loader-lab runtime"
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+rust-version.workspace = true
+
+[[bin]]
+name = "runtime-shell"
+path = "src/main.rs"
+
+[dependencies]
+macho-runtime  = { workspace = true }
+runtime-demo   = { workspace = true }
+platform-core  = { workspace = true }
+platform-darwin-host = { workspace = true }
+trust-policy   = { workspace = true }
+serde_json     = { workspace = true }
+log            = { workspace = true }
+env_logger     = { workspace = true }
+
+[lints]
+workspace = true

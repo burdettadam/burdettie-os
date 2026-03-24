@@ -1,0 +1,39 @@
+# docker/Dockerfile.demo — Distributable image with runtime + fixtures.
+#
+# This image packages pre-built binaries and fixtures for distribution.
+# It does NOT build from source — use the macOS build pipeline first,
+# then copy the dist/ directory (created by bundle-runtime.sh) as the
+# Docker build context.
+#
+# Usage:
+#   # 1. Build on macOS first:
+#   ./packaging/build.sh --release
+#   ./packaging/bundle-runtime.sh --release
+#
+#   # 2. Build demo image from the bundle:
+#   docker build -f docker/Dockerfile.demo -t darwin-loader-demo dist/
+#
+#   # 3. Explore the image contents:
+#   docker run --rm darwin-loader-demo ls /opt/darwin-loader/fixtures/
+
+FROM debian:bookworm-slim
+
+LABEL maintainer="darwin-loader-lab"
+LABEL description="darwin-loader-lab runtime + fixtures bundle"
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    file \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY . /opt/darwin-loader/
+
+# Make binaries accessible
+ENV PATH="/opt/darwin-loader/bin:${PATH}"
+
+WORKDIR /opt/darwin-loader
+
+# Set runtime root for fixture discovery
+ENV DARWIN_LOADER_ROOT="/opt/darwin-loader"
+
+# Default: launch the interactive runtime shell (falls back to info if no TTY)
+CMD ["sh", "-c", "if [ -t 0 ]; then runtime-shell; else echo 'darwin-loader-lab demo image' && echo '' && echo 'Binaries:' && ls bin/ && echo '' && echo 'Fixtures:' && ls fixtures/ && echo '' && echo 'Run interactively: docker run -it darwin-loader-demo'; fi"]

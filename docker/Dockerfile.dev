@@ -1,0 +1,47 @@
+# docker/Dockerfile.dev — Build & lint image for darwin-loader-lab.
+#
+# Builds the cross-platform subset of crates (Mach-O parsing, analysis,
+# run-plan, diff, trust-policy). macOS-only crates (objc-runtime, cf-lite,
+# libsystem-shims, platform-darwin-host, macho-runtime, macho-inspect)
+# require ARM64 macOS and are excluded.
+#
+# Usage:
+#   docker build -f docker/Dockerfile.dev -t darwin-loader-dev .
+#   docker run --rm darwin-loader-dev cargo test --workspace --lib
+
+FROM rust:1.82-bookworm
+
+RUN rustup component add clippy rustfmt
+
+WORKDIR /workspace
+COPY . .
+
+# Build only the cross-platform crates (excludes macOS-only crates).
+# This validates that the parsing/analysis stack compiles on Linux.
+RUN cargo build \
+    -p platform-core \
+    -p macho-types \
+    -p macho-parse \
+    -p macho-map \
+    -p macho-objc \
+    -p macho-resolve \
+    -p macho-run-plan \
+    -p macho-diff \
+    -p trust-policy \
+    -p macho-fixtures \
+    -p test-harness
+
+# Default: run clippy on cross-platform crates
+CMD ["cargo", "clippy", \
+     "-p", "platform-core", \
+     "-p", "macho-types", \
+     "-p", "macho-parse", \
+     "-p", "macho-map", \
+     "-p", "macho-objc", \
+     "-p", "macho-resolve", \
+     "-p", "macho-run-plan", \
+     "-p", "macho-diff", \
+     "-p", "trust-policy", \
+     "-p", "macho-fixtures", \
+     "-p", "test-harness", \
+     "--all-targets", "--", "-D", "warnings"]

@@ -1,0 +1,21 @@
+[package]
+name        = "test-harness"
+description = "End-to-end test orchestration for the Mach-O loader lab"
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+rust-version.workspace = true
+
+[dependencies]
+macho-types    = { workspace = true }
+macho-parse    = { workspace = true }
+macho-map      = { workspace = true }
+macho-resolve  = { workspace = true }
+macho-run-plan = { workspace = true }
+macho-diff     = { workspace = true }
+macho-fixtures = { workspace = true }
+serde          = { workspace = true }
+serde_json     = { workspace = true }
+
+[lints]
+workspace = true

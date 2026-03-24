@@ -1,0 +1,20 @@
+[package]
+name        = "macho-run-plan"
+description = "Top-level execution plan generator combining parse, map, and resolve"
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+rust-version.workspace = true
+
+[dependencies]
+macho-types   = { workspace = true }
+macho-parse   = { workspace = true }
+macho-map     = { workspace = true }
+macho-resolve = { workspace = true }
+macho-objc    = { workspace = true }
+trust-policy  = { workspace = true }
+serde         = { workspace = true }
+serde_json    = { workspace = true }
+
+[lints]
+workspace = true

@@ -1,0 +1,15 @@
+[package]
+name         = "platform-darwin-host"
+description  = "macOS host implementation of platform-core traits"
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+rust-version.workspace = true
+
+[dependencies]
+platform-core = { path = "../platform-core" }
+libc          = { workspace = true }
+log           = { workspace = true }
+
+[lints]
+workspace = true

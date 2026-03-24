@@ -1,0 +1,23 @@
+/target
+**/*.rs.bk
+*.swp
+*.swo
+.DS_Store
+
+# Built fixture binaries
+fixtures/*/build/
+fixtures/*/app
+fixtures/**/*.dylib
+fixtures/**/*.o
+
+# Host observation captures
+observed/
+
+# Build artifacts
+dist/
+*.dmg
+darwin-loader.tar.gz
+
+# Swift build artifacts
+vm-image/.build/
+vm-image/.swiftpm/

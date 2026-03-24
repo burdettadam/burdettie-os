@@ -1,0 +1,10 @@
+prefix=@PREFIX@
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: darwin-runtime
+Description: C-ABI interface to the darwin-loader-lab Mach-O runtime
+Version: @VERSION@
+Libs: -L${libdir} -ldarwin_runtime_ffi
+Cflags: -I${includedir}

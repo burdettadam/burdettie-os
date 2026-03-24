@@ -1,0 +1,6 @@
+╔═══════════════════════════════════════════════════╗
+║  darwin-loader-lab Runtime Environment v0.1       ║
+║  Compatibility: 62/62 (100%)                      ║
+║  Foundation classes: 40 | Shim functions: 59      ║
+║  Type 'help' for commands, 'gui' for GUI demos    ║
+╚═══════════════════════════════════════════════════╝

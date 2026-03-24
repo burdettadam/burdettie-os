@@ -1,0 +1,12 @@
+{
+  "name": "dylib_chain",
+  "binary_path": "fixtures/dylib_chain/app",
+  "description": "app -> liba.dylib -> libb.dylib — dependency graph, rpath, init order",
+  "expected_dylibs": [
+    "@rpath/liba.dylib",
+    "/usr/lib/libSystem.B.dylib"
+  ],
+  "expected_entry_type": "LC_MAIN",
+  "expected_segments": ["__PAGEZERO", "__TEXT", "__DATA_CONST", "__DATA", "__LINKEDIT"],
+  "tags": ["phase2", "dependency", "constructor"]
+}

@@ -1,0 +1,193 @@
+{
+  "version": "0.1.0",
+  "cli_demos": [
+    {
+      "name": "hello",
+      "fixture": "simple_cli",
+      "category": "Basic",
+      "description": "Hello world — minimal C executable",
+      "expected_exit": 0
+    },
+    {
+      "name": "return42",
+      "fixture": "return42",
+      "category": "Basic",
+      "description": "Return non-zero exit code",
+      "expected_exit": 42
+    },
+    {
+      "name": "constructor",
+      "fixture": "constructor_test",
+      "category": "Basic",
+      "description": "Constructor/destructor lifecycle",
+      "expected_exit": 0
+    },
+    {
+      "name": "fat",
+      "fixture": "fat_binary",
+      "category": "Basic",
+      "description": "Universal (fat) binary — ARM64 slice extraction",
+      "expected_exit": 0
+    },
+    {
+      "name": "process",
+      "fixture": "process_info",
+      "category": "Basic",
+      "description": "Process info — argc, argv, environ",
+      "expected_exit": 0
+    },
+    {
+      "name": "tlv",
+      "fixture": "tlv_basic",
+      "category": "Basic",
+      "description": "Thread-local variable support",
+      "expected_exit": 0
+    },
+    {
+      "name": "dylib",
+      "fixture": "dylib_chain",
+      "category": "DynamicLinking",
+      "description": "Chained dylib loading (A → B → C)",
+      "expected_exit": 0
+    },
+    {
+      "name": "framework",
+      "fixture": "framework_style",
+      "category": "DynamicLinking",
+      "description": "Framework-style bundle loading",
+      "expected_exit": 0
+    },
+    {
+      "name": "weak",
+      "fixture": "weak_dylib",
+      "category": "DynamicLinking",
+      "description": "Weak dylib reference handling",
+      "expected_exit": 0
+    },
+    {
+      "name": "objc",
+      "fixture": "objc_classes",
+      "category": "ObjC",
+      "description": "ObjC class registration and messaging",
+      "expected_exit": 0
+    },
+    {
+      "name": "objc-minimal",
+      "fixture": "objc_minimal",
+      "category": "ObjC",
+      "description": "Minimal ObjC — alloc/init/release",
+      "expected_exit": 0
+    },
+    {
+      "name": "objc-inherit",
+      "fixture": "objc_inherit",
+      "category": "ObjC",
+      "description": "ObjC class inheritance chain",
+      "expected_exit": 0
+    },
+    {
+      "name": "objc-super",
+      "fixture": "objc_super",
+      "category": "ObjC",
+      "description": "ObjC super dispatch",
+      "expected_exit": 0
+    },
+    {
+      "name": "objc-category",
+      "fixture": "objc_category",
+      "category": "ObjC",
+      "description": "ObjC category method merging",
+      "expected_exit": 0
+    },
+    {
+      "name": "foundation",
+      "fixture": "objc_foundation",
+      "category": "Foundation",
+      "description": "Foundation basics — NSString, NSLog",
+      "expected_exit": 0
+    },
+    {
+      "name": "nsstring",
+      "fixture": "nsstring_ops",
+      "category": "Foundation",
+      "description": "NSString operations",
+      "expected_exit": 0
+    },
+    {
+      "name": "nsarray",
+      "fixture": "nsarray_basics",
+      "category": "Foundation",
+      "description": "NSArray creation and enumeration",
+      "expected_exit": 0
+    },
+    {
+      "name": "nsdict",
+      "fixture": "nsdictionary_basics",
+      "category": "Foundation",
+      "description": "NSDictionary key-value operations",
+      "expected_exit": 0
+    },
+    {
+      "name": "nsnumber",
+      "fixture": "nsnumber_basics",
+      "category": "Foundation",
+      "description": "NSNumber boxing and unboxing",
+      "expected_exit": 0
+    },
+    {
+      "name": "nsdate",
+      "fixture": "nsdata_basics",
+      "category": "Foundation",
+      "description": "NSData byte buffer operations",
+      "expected_exit": 0
+    },
+    {
+      "name": "nsuuid",
+      "fixture": "nsprocessinfo_basics",
+      "category": "Foundation",
+      "description": "NSProcessInfo and environment",
+      "expected_exit": 0
+    },
+    {
+      "name": "dispatch",
+      "fixture": "dispatch_test",
+      "category": "Integration",
+      "description": "Grand Central Dispatch basics",
+      "expected_exit": 0
+    },
+    {
+      "name": "blocks",
+      "fixture": "block_basics",
+      "category": "Integration",
+      "description": "Block literals and invocation",
+      "expected_exit": 0
+    },
+    {
+      "name": "autorelease",
+      "fixture": "autorelease",
+      "category": "Integration",
+      "description": "Autorelease pool lifecycle",
+      "expected_exit": 0
+    }
+  ],
+  "gui_demos": [
+    {
+      "name": "hello-darwin",
+      "binary": "hello-darwin",
+      "description": "Minimal lifecycle demo — fixture scorecard runner",
+      "features": ["labels", "buttons", "runtime integration"]
+    },
+    {
+      "name": "control-gallery",
+      "binary": "control-gallery",
+      "description": "Widget exercise — text input, buttons, label updates",
+      "features": ["textfield", "buttons", "labels", "keyboard input"]
+    },
+    {
+      "name": "foundation-explorer",
+      "binary": "foundation-explorer",
+      "description": "Browse registered Foundation classes and methods",
+      "features": ["scrollable list", "pagination", "runtime introspection"]
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+[package]
+name        = "runloop-core"
+description = "Event loop and timer infrastructure for darwin-loader-lab GUI framework"
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+rust-version.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true

@@ -1,0 +1,108 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/macho-types",
+    "crates/macho-parse",
+    "crates/macho-inspect",
+    "crates/macho-map",
+    "crates/macho-resolve",
+    "crates/macho-objc",
+    "crates/macho-run-plan",
+    "crates/macho-diff",
+    "crates/macho-fixtures",
+    "crates/macho-exec",
+    "crates/test-harness",
+    "crates/trust-policy",
+    "crates/libsystem-shims",
+    "crates/objc-runtime",
+    "crates/cf-lite",
+    "crates/macho-runtime",
+    "crates/platform-core",
+    "crates/platform-darwin-host",
+    "crates/runtime-demo",
+    "crates/runtime-shell",
+    "crates/graphics-core",
+    "crates/window-backend",
+    "crates/runloop-core",
+    "crates/app-kit-lite",
+    "crates/ui-view",
+    "crates/ui-controls",
+    "crates/window-backend-darwin",
+    "crates/darwin-runtime-ffi",
+    "apps/hello-darwin",
+    "apps/control-gallery",
+    "apps/foundation-explorer",
+]
+
+[workspace.package]
+version      = "0.1.0"
+edition      = "2021"
+license      = "MIT OR Apache-2.0"
+rust-version = "1.82"
+
+[workspace.dependencies]
+# Internal crates
+macho-types    = { path = "crates/macho-types" }
+macho-parse    = { path = "crates/macho-parse" }
+macho-inspect  = { path = "crates/macho-inspect" }
+macho-map      = { path = "crates/macho-map" }
+macho-resolve  = { path = "crates/macho-resolve" }
+macho-objc     = { path = "crates/macho-objc" }
+macho-run-plan = { path = "crates/macho-run-plan" }
+macho-diff     = { path = "crates/macho-diff" }
+macho-fixtures = { path = "crates/macho-fixtures" }
+macho-exec     = { path = "crates/macho-exec" }
+test-harness   = { path = "crates/test-harness" }
+trust-policy   = { path = "crates/trust-policy" }
+libsystem-shims = { path = "crates/libsystem-shims" }
+objc-runtime   = { path = "crates/objc-runtime" }
+cf-lite         = { path = "crates/cf-lite" }
+macho-runtime  = { path = "crates/macho-runtime" }
+platform-core  = { path = "crates/platform-core" }
+platform-darwin-host = { path = "crates/platform-darwin-host" }
+runtime-demo   = { path = "crates/runtime-demo" }
+runtime-shell  = { path = "crates/runtime-shell" }
+graphics-core  = { path = "crates/graphics-core" }
+window-backend = { path = "crates/window-backend" }
+runloop-core   = { path = "crates/runloop-core" }
+app-kit-lite   = { path = "crates/app-kit-lite" }
+ui-view        = { path = "crates/ui-view" }
+ui-controls    = { path = "crates/ui-controls" }
+window-backend-darwin = { path = "crates/window-backend-darwin" }
+darwin-runtime-ffi    = { path = "crates/darwin-runtime-ffi" }
+hello-darwin          = { path = "apps/hello-darwin" }
+control-gallery       = { path = "apps/control-gallery" }
+foundation-explorer   = { path = "apps/foundation-explorer" }
+
+# External
+bitflags  = "2"
+thiserror = "2"
+serde     = { version = "1", features = ["derive"] }
+serde_json = "1"
+clap      = { version = "4", features = ["derive"] }
+log       = "0.4"
+env_logger = "0.11"
+libc      = "0.2"
+tempfile  = "3"
+
+# ── Workspace-wide lints ────────────────────────────────────────────
+# Inherited by every crate via `[lints] workspace = true`.
+[workspace.lints.rust]
+# Error handling & correctness
+unused_must_use        = "deny"    # never silently drop Result / must_use
+unreachable_patterns   = "warn"
+
+[workspace.lints.clippy]
+# Error handling
+manual_let_else          = "warn"    # prefer `let ... else { return }` pattern
+
+# Style & clarity
+needless_pass_by_value   = "warn"    # take &T when T is only read
+manual_strip             = "warn"    # use str::strip_prefix instead of slicing
+new_without_default      = "warn"    # impl Default when you have fn new()
+redundant_else           = "warn"    # remove else after diverging if
+cloned_instead_of_copied = "warn"    # prefer .copied() on Copy types
+vec_init_then_push       = "warn"    # prefer vec![] macro
+identity_op              = "warn"    # operations that have no effect
+unnecessary_cast         = "warn"    # remove casts to same type
+fn_to_numeric_cast       = "warn"    # prefer `as usize` for function pointers

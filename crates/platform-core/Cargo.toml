@@ -1,0 +1,12 @@
+[package]
+name         = "platform-core"
+description  = "Platform abstraction traits for darwin-loader-lab"
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+rust-version.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true

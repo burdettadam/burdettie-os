@@ -1,0 +1,29 @@
+[package]
+name        = "macho-inspect"
+description = "CLI tool for human-readable Mach-O binary inspection"
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+rust-version.workspace = true
+
+[[bin]]
+name = "macho-inspect"
+path = "src/main.rs"
+
+[dependencies]
+macho-types    = { workspace = true }
+macho-parse    = { workspace = true }
+macho-resolve  = { workspace = true }
+macho-run-plan = { workspace = true }
+macho-exec     = { workspace = true }
+macho-objc     = { workspace = true }
+macho-map      = { workspace = true }
+platform-core  = { workspace = true }
+platform-darwin-host = { workspace = true }
+trust-policy   = { workspace = true }
+clap           = { workspace = true }
+serde_json     = { workspace = true }
+serde          = { workspace = true }
+
+[lints]
+workspace = true

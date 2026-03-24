@@ -1,0 +1,216 @@
+use serde::{Deserialize, Serialize};
+
+/// Known load command types.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[repr(u32)]
+pub enum LoadCommandType {
+    Segment = 0x1,
+    Symtab = 0x2,
+    UnixThread = 0x5,
+    Dysymtab = 0xB,
+    LoadDylib = 0xC,
+    IdDylib = 0xD,
+    LoadDylinker = 0xE,
+    IdDylinker = 0xF,
+    Segment64 = 0x19,
+    Uuid = 0x1B,
+    CodeSignature = 0x1D,
+    SegmentSplitInfo = 0x1E,
+    DyldInfo = 0x22,
+    VersionMinMacOS = 0x24,
+    VersionMinIOS = 0x25,
+    FunctionStarts = 0x26,
+    DyldEnvironment = 0x27,
+    DataInCode = 0x29,
+    SourceVersion = 0x2A,
+    LinkerOption = 0x2D,
+    VersionMinTvOS = 0x2F,
+    VersionMinWatchOS = 0x30,
+    Note = 0x31,
+    BuildVersion = 0x32,
+    LazyLoadDylib = 0x20,
+    EncryptionInfo = 0x21,
+    EncryptionInfo64 = 0x2C,
+    LoadWeakDylib = 0x8000_0018,
+    Rpath = 0x8000_001C,
+    ReexportDylib = 0x8000_001F,
+    DyldInfoOnly = 0x8000_0022,
+    LoadUpwardDylib = 0x8000_0023,
+    Main = 0x8000_0028,
+    DyldExportsTrie = 0x8000_0033,
+    DyldChainedFixups = 0x8000_0034,
+    Unknown(u32),
+}
+
+impl From<u32> for LoadCommandType {
+    fn from(v: u32) -> Self {
+        match v {
+            0x1 => Self::Segment,
+            0x19 => Self::Segment64,
+            0x2 => Self::Symtab,
+            0xB => Self::Dysymtab,
+            0xC => Self::LoadDylib,
+            0xD => Self::IdDylib,
+            0xE => Self::LoadDylinker,
+            0x8000_0018 => Self::LoadWeakDylib,
+            0xF => Self::IdDylinker,
+            0x1B => Self::Uuid,
+            0x8000_001C => Self::Rpath,
+            0x1D => Self::CodeSignature,
+            0x1E => Self::SegmentSplitInfo,
+            0x8000_0028 => Self::Main,
+            0x2A => Self::SourceVersion,
+            0x22 => Self::DyldInfo,
+            0x20 => Self::LazyLoadDylib,
+            0x21 => Self::EncryptionInfo,
+            0x2C => Self::EncryptionInfo64,
+            0x8000_001F => Self::ReexportDylib,
+            0x8000_0022 => Self::DyldInfoOnly,
+            0x8000_0023 => Self::LoadUpwardDylib,
+            0x26 => Self::FunctionStarts,
+            0x29 => Self::DataInCode,
+            0x32 => Self::BuildVersion,
+            0x8000_0033 => Self::DyldExportsTrie,
+            0x8000_0034 => Self::DyldChainedFixups,
+            0x5 => Self::UnixThread,
+            0x24 => Self::VersionMinMacOS,
+            0x25 => Self::VersionMinIOS,
+            0x27 => Self::DyldEnvironment,
+            0x2D => Self::LinkerOption,
+            0x2F => Self::VersionMinTvOS,
+            0x30 => Self::VersionMinWatchOS,
+            0x31 => Self::Note,
+            other => Self::Unknown(other),
+        }
+    }
+}
+
+/// A parsed load command with its type-specific payload.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoadCommand {
+    pub cmd: LoadCommandType,
+    pub cmd_size: u32,
+    pub payload: LoadCommandPayload,
+}
+
+/// Type-specific data for each load command variant.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum LoadCommandPayload {
+    Segment(super::segment::Segment),
+    Symtab {
+        sym_off: u32,
+        nsyms: u32,
+        str_off: u32,
+        str_size: u32,
+    },
+    LoadDylib(super::dylib::DylibRef),
+    LoadWeakDylib(super::dylib::DylibRef),
+    ReexportDylib(super::dylib::DylibRef),
+    LazyLoadDylib(super::dylib::DylibRef),
+    LoadUpwardDylib(super::dylib::DylibRef),
+    IdDylib(super::dylib::DylibRef),
+    EncryptionInfo {
+        crypt_off: u32,
+        crypt_size: u32,
+        crypt_id: u32,
+    },
+    LoadDylinker {
+        name: String,
+    },
+    Rpath {
+        path: String,
+    },
+    Main {
+        entry_offset: u64,
+        stack_size: u64,
+    },
+    Uuid {
+        uuid: [u8; 16],
+    },
+    BuildVersion {
+        platform: u32,
+        minos: u32,
+        sdk: u32,
+        ntools: u32,
+    },
+    DyldInfo {
+        rebase_off: u32,
+        rebase_size: u32,
+        bind_off: u32,
+        bind_size: u32,
+        weak_bind_off: u32,
+        weak_bind_size: u32,
+        lazy_bind_off: u32,
+        lazy_bind_size: u32,
+        export_off: u32,
+        export_size: u32,
+    },
+    LinkEdit {
+        data_off: u32,
+        data_size: u32,
+    },
+    UnixThread {
+        /// The instruction pointer / program counter from the thread state.
+        entry_address: u64,
+    },
+    VersionMin {
+        version: u32,
+        sdk: u32,
+    },
+    DyldEnvironment {
+        name: String,
+    },
+    SourceVersion {
+        version: u64,
+    },
+    Dysymtab {
+        ilocalsym: u32,
+        nlocalsym: u32,
+        iextdefsym: u32,
+        nextdefsym: u32,
+        iundefsym: u32,
+        nundefsym: u32,
+        indirectsymoff: u32,
+        nindirectsyms: u32,
+    },
+    /// Catch-all for unrecognised commands — stores raw bytes.
+    Unknown(Vec<u8>),
+}
+
+/// Decode a packed macOS/iOS version (e.g. from LC_BUILD_VERSION minos/sdk
+/// or LC_VERSION_MIN_*) into "major.minor.patch" string.
+pub fn decode_version(v: u32) -> String {
+    let major = (v >> 16) & 0xFFFF;
+    let minor = (v >> 8) & 0xFF;
+    let patch = v & 0xFF;
+    format!("{major}.{minor}.{patch}")
+}
+
+/// Decode platform integer from LC_BUILD_VERSION to a human-readable name.
+pub fn platform_name(platform: u32) -> &'static str {
+    match platform {
+        1 => "macOS",
+        2 => "iOS",
+        3 => "tvOS",
+        4 => "watchOS",
+        5 => "bridgeOS",
+        6 => "macCatalyst",
+        7 => "iOSSimulator",
+        8 => "tvOSSimulator",
+        9 => "watchOSSimulator",
+        10 => "driverKit",
+        11 => "visionOS",
+        12 => "visionOSSimulator",
+        _ => "unknown",
+    }
+}
+
+/// Decode LC_SOURCE_VERSION packed u64 into "a.b.c.d.e" string.
+pub fn decode_source_version(v: u64) -> String {
+    let a = (v >> 40) & 0xFFFFFF;
+    let b = (v >> 30) & 0x3FF;
+    let c = (v >> 20) & 0x3FF;
+    let d = (v >> 10) & 0x3FF;
+    let e = v & 0x3FF;
+    format!("{a}.{b}.{c}.{d}.{e}")
+}

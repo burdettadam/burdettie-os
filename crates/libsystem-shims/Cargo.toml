@@ -1,0 +1,17 @@
+[package]
+name        = "libsystem-shims"
+description = "Controlled system library shims for darwin-loader-lab runtime"
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+rust-version.workspace = true
+
+[dependencies]
+log       = { workspace = true }
+libc      = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+
+[lints]
+workspace = true

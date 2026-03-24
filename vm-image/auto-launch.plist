@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  auto-launch.plist — LaunchAgent for the VM guest.
+
+  Install inside the guest:
+    cp /Volumes/darwin-runtime/config/auto-launch.plist ~/Library/LaunchAgents/com.darwin-loader.runtime.plist
+    launchctl load ~/Library/LaunchAgents/com.darwin-loader.runtime.plist
+
+  This opens a Terminal window on login that sources the runtime environment.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.darwin-loader.runtime</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/open</string>
+        <string>-a</string>
+        <string>Terminal</string>
+        <string>/Volumes/darwin-runtime/config/runtime-env.sh</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/tmp/darwin-loader-launch.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/darwin-loader-launch.log</string>
+</dict>
+</plist>

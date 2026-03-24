@@ -1,0 +1,11 @@
+{
+  "name": "simple_cli",
+  "binary_path": "fixtures/simple_cli/app",
+  "description": "Minimal C program — basic Mach-O parsing, one entry point, minimal deps",
+  "expected_dylibs": [
+    "/usr/lib/libSystem.B.dylib"
+  ],
+  "expected_entry_type": "LC_MAIN",
+  "expected_segments": ["__PAGEZERO", "__TEXT", "__DATA_CONST", "__DATA", "__LINKEDIT"],
+  "tags": ["phase1", "basic"]
+}

@@ -1,0 +1,28 @@
+[package]
+name        = "macho-exec"
+description = "In-process Mach-O segment mapping, fixup application, and controlled entry"
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+rust-version.workspace = true
+
+[dependencies]
+macho-types    = { workspace = true }
+macho-parse    = { workspace = true }
+macho-map      = { workspace = true }
+macho-resolve  = { workspace = true }
+macho-objc     = { workspace = true }
+trust-policy   = { workspace = true }
+platform-core  = { workspace = true }
+thiserror      = { workspace = true }
+log            = { workspace = true }
+libc           = { workspace = true }
+
+[dev-dependencies]
+macho-fixtures     = { workspace = true }
+macho-run-plan     = { workspace = true }
+platform-darwin-host = { workspace = true }
+serde_json         = { workspace = true }
+
+[lints]
+workspace = true

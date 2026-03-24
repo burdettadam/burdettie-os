@@ -1,0 +1,13 @@
+[package]
+name        = "window-backend"
+description = "Windowing abstraction trait for darwin-loader-lab GUI framework"
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+rust-version.workspace = true
+
+[dependencies]
+graphics-core = { workspace = true }
+
+[lints]
+workspace = true
