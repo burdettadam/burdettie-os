@@ -11,6 +11,24 @@
 const NSDATA_LENGTH_OFF: usize = 8;
 const NSDATA_BYTES_OFF: usize = 16;
 
+/// Create an NSData from a byte slice.
+pub fn make_nsdata(bytes: &[u8]) -> u64 {
+    let obj = unsafe { libc::calloc(1, 24) } as u64;
+    if obj == 0 { return 0; }
+    unsafe {
+        *(obj as *mut u64) = crate::nsobj::nsdata_class_addr();
+        *((obj as usize + NSDATA_LENGTH_OFF) as *mut u64) = bytes.len() as u64;
+    }
+    if !bytes.is_empty() {
+        let buf = unsafe { libc::malloc(bytes.len()) };
+        if !buf.is_null() {
+            unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), buf as *mut u8, bytes.len()); }
+        }
+        unsafe { *((obj as usize + NSDATA_BYTES_OFF) as *mut u64) = buf as u64; }
+    }
+    obj
+}
+
 /// `+[NSData dataWithBytes:length:]`
 pub extern "C" fn shim_nsdata_data_with_bytes_length(
     _cls: u64,

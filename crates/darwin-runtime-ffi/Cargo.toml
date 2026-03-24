@@ -1,6 +1,6 @@
 [package]
 name        = "darwin-runtime-ffi"
-description = "C-ABI FFI wrapper for the darwin-loader-lab runtime"
+description = "C-ABI FFI wrapper for the burdetty-os runtime"
 version.workspace     = true
 edition.workspace     = true
 license.workspace     = true

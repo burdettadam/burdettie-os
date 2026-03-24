@@ -1,6 +1,6 @@
 [package]
 name        = "app-kit-lite"
-description = "Application object, responder chain, and event types for darwin-loader-lab GUI framework"
+description = "Application object, responder chain, and event types for burdetty-os GUI framework"
 version.workspace      = true
 edition.workspace      = true
 license.workspace      = true

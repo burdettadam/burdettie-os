@@ -159,7 +159,7 @@ fn build_hello_app(scorecard_fn: impl FnMut() -> String + 'static) -> HeadlessAp
     // Title label (index 0)
     app.add_label(Label::new(
         Rect::new(30.0, 25.0, 460.0, 24.0),
-        "Running on darwin-loader-lab runtime v0.1",
+        "Running on burdetty-os runtime v0.1",
     ));
     // Result label (index 1)
     app.add_label(Label::new(
@@ -194,7 +194,7 @@ fn hello_app_initial_state() {
     assert_eq!(app.button_count(), 2);
     assert_eq!(
         app.label_text(0),
-        "Running on darwin-loader-lab runtime v0.1"
+        "Running on burdetty-os runtime v0.1"
     );
     assert_eq!(app.label_text(1), "Press a button to begin.");
     assert_eq!(app.button_title(0), "Run Scorecard");

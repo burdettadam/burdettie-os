@@ -21,6 +21,8 @@ pub struct ShimSet {
     pub mach: bool,
     /// Install lifecycle shims (atexit, __cxa_atexit)
     pub lifecycle: bool,
+    /// Install pointer authentication shims (ptrauth_strip, ptrauth_sign_unauthenticated)
+    pub ptrauth: bool,
     /// Install ObjC runtime shims (objc_msgSend, objc_getClass, etc.)
     pub objc: bool,
     /// Install Foundation/CF-lite shims (NSLog, NSObject class, CFConstantString)
@@ -36,6 +38,7 @@ impl Default for ShimSet {
             pthread: true,
             mach: true,
             lifecycle: true,
+            ptrauth: true,
             objc: true,
             foundation: true,
         }

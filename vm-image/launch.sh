@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# launch.sh — One-command VM launcher for darwin-loader-lab.
+# launch.sh — One-command VM launcher for burdetty-os.
 #
 # Usage:
 #   ./vm-image/launch.sh                # boot existing VM (or install if first run)
@@ -51,7 +51,7 @@ fi
 
 # ── Auto-detect: install vs boot ───────────────────────────────────
 if [ "$COMMAND" = "auto" ]; then
-    VM_BUNDLE="${VM_BUNDLE:-$HOME/.darwin-loader/vm-bundle}"
+    VM_BUNDLE="${VM_BUNDLE:-$HOME/.burdetty-os/vm-bundle}"
     if [ -f "$VM_BUNDLE/disk.img" ]; then
         COMMAND="boot"
     else

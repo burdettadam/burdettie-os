@@ -1,4 +1,4 @@
-//! ObjC runtime for darwin-loader-lab.
+//! ObjC runtime for burdetty-os.
 //!
 //! Provides class registration, selector interning, method dispatch
 //! (`objc_msgSend`), and object allocation for Mach-O binaries with
@@ -21,3 +21,6 @@ pub use shims::{
     shim_nsobject_autorelease, shim_nsobject_dealloc, shim_nsobject_release, shim_nsobject_retain,
     shim_nsobject_retain_count, shim_objc_exception_throw,
 };
+
+// Re-export for KVC/KVO dispatch — allows calling guest methods through the trampoline.
+pub use shims::objc_msg_send_addr;

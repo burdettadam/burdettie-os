@@ -404,6 +404,106 @@ define_class_pair!(child NSCONDITIONLOCK_CLASS_DATA, NSCONDITIONLOCK_METACLASS_D
     parent_class: nsobject_class_addr,
     parent_meta: nsobject_metaclass_addr);
 
+define_class_pair!(child NSMETHODSIGNATURE_CLASS_DATA, NSMETHODSIGNATURE_METACLASS_DATA, NSMETHODSIGNATURE_INIT,
+    ensure: ensure_nsmethodsignature_init,
+    class_addr: nsmethodsignature_class_addr,
+    meta_addr: nsmethodsignature_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSINVOCATION_CLASS_DATA, NSINVOCATION_METACLASS_DATA, NSINVOCATION_INIT,
+    ensure: ensure_nsinvocation_init,
+    class_addr: nsinvocation_class_addr,
+    meta_addr: nsinvocation_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+// ── Phase B6 Foundation classes ────────────────────────────────────
+
+define_class_pair!(child NSREGULAREXPRESSION_CLASS_DATA, NSREGULAREXPRESSION_METACLASS_DATA, NSREGULAREXPRESSION_INIT,
+    ensure: ensure_nsregularexpression_init,
+    class_addr: nsregularexpression_class_addr,
+    meta_addr: nsregularexpression_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSPREDICATE_CLASS_DATA, NSPREDICATE_METACLASS_DATA, NSPREDICATE_INIT,
+    ensure: ensure_nspredicate_init,
+    class_addr: nspredicate_class_addr,
+    meta_addr: nspredicate_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSATTRIBUTEDSTRING_CLASS_DATA, NSATTRIBUTEDSTRING_METACLASS_DATA, NSATTRIBUTEDSTRING_INIT,
+    ensure: ensure_nsattributedstring_init,
+    class_addr: nsattributedstring_class_addr,
+    meta_addr: nsattributedstring_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSMUTABLEATTRIBUTEDSTRING_CLASS_DATA, NSMUTABLEATTRIBUTEDSTRING_METACLASS_DATA, NSMUTABLEATTRIBUTEDSTRING_INIT,
+    ensure: ensure_nsmutableattributedstring_init,
+    class_addr: nsmutableattributedstring_class_addr,
+    meta_addr: nsmutableattributedstring_metaclass_addr,
+    parent_class: nsattributedstring_class_addr,
+    parent_meta: nsattributedstring_metaclass_addr);
+
+define_class_pair!(child NSCACHE_CLASS_DATA, NSCACHE_METACLASS_DATA, NSCACHE_INIT,
+    ensure: ensure_nscache_init,
+    class_addr: nscache_class_addr,
+    meta_addr: nscache_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSMAPTABLE_CLASS_DATA, NSMAPTABLE_METACLASS_DATA, NSMAPTABLE_INIT,
+    ensure: ensure_nsmaptable_init,
+    class_addr: nsmaptable_class_addr,
+    meta_addr: nsmaptable_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSHASHTABLE_CLASS_DATA, NSHASHTABLE_METACLASS_DATA, NSHASHTABLE_INIT,
+    ensure: ensure_nshashtable_init,
+    class_addr: nshashtable_class_addr,
+    meta_addr: nshashtable_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSOPERATIONQUEUE_CLASS_DATA, NSOPERATIONQUEUE_METACLASS_DATA, NSOPERATIONQUEUE_INIT,
+    ensure: ensure_nsoperationqueue_init,
+    class_addr: nsoperationqueue_class_addr,
+    meta_addr: nsoperationqueue_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSOPERATION_CLASS_DATA, NSOPERATION_METACLASS_DATA, NSOPERATION_INIT,
+    ensure: ensure_nsoperation_init,
+    class_addr: nsoperation_class_addr,
+    meta_addr: nsoperation_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSBLOCKOPERATION_CLASS_DATA, NSBLOCKOPERATION_METACLASS_DATA, NSBLOCKOPERATION_INIT,
+    ensure: ensure_nsblockoperation_init,
+    class_addr: nsblockoperation_class_addr,
+    meta_addr: nsblockoperation_metaclass_addr,
+    parent_class: nsoperation_class_addr,
+    parent_meta: nsoperation_metaclass_addr);
+
+define_class_pair!(child NSJSONSERIALIZATION_CLASS_DATA, NSJSONSERIALIZATION_METACLASS_DATA, NSJSONSERIALIZATION_INIT,
+    ensure: ensure_nsjsonserialization_init,
+    class_addr: nsjsonserialization_class_addr,
+    meta_addr: nsjsonserialization_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSPROPERTYLISTSERIALIZATION_CLASS_DATA, NSPROPERTYLISTSERIALIZATION_METACLASS_DATA, NSPROPERTYLISTSERIALIZATION_INIT,
+    ensure: ensure_nspropertylistserialization_init,
+    class_addr: nspropertylistserialization_class_addr,
+    meta_addr: nspropertylistserialization_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
 // ── NSObject instance method shims ─────────────────────────────────
 //
 // These are `extern "C"` functions matching the ObjC calling convention:
@@ -519,6 +619,114 @@ pub extern "C" fn shim_nsobject_class_alloc(cls: u64, _cmd: u64) -> u64 {
 /// `+[NSObject new]` — alloc + init.
 pub extern "C" fn shim_nsobject_class_new(cls: u64, cmd: u64) -> u64 {
     shim_nsobject_class_alloc(cls, cmd)
+}
+
+// ── NSObject forwarding methods ────────────────────────────────────
+
+/// `-[NSObject methodSignatureForSelector:]`
+///
+/// Looks up the type encoding for the given selector in the runtime
+/// and returns an NSMethodSignature, or 0 (nil) if not found.
+pub extern "C" fn shim_nsobject_method_signature_for_selector(
+    obj: u64,
+    _cmd: u64,
+    sel: u64,
+) -> u64 {
+    if obj == 0 || sel == 0 {
+        return 0;
+    }
+
+    let isa = unsafe { *(obj as *const u64) };
+    let sel_str = unsafe {
+        std::ffi::CStr::from_ptr(sel as *const std::ffi::c_char)
+            .to_str()
+            .unwrap_or("")
+    };
+
+    let guard = match objc_runtime::OBJC_RUNTIME.lock() {
+        Ok(g) => g,
+        Err(e) => e.into_inner(),
+    };
+    let Some(rt) = guard.as_ref() else { return 0 };
+
+    if let Some(entry) = rt.lookup_method_entry(isa, sel_str) {
+        let encoding = entry.type_encoding.clone();
+        drop(guard);
+        crate::nsmethodsignature::create_method_signature(&encoding)
+    } else {
+        0
+    }
+}
+
+/// `+[NSObject methodSignatureForSelector:]` (class method variant)
+pub extern "C" fn shim_nsobject_class_method_signature_for_selector(
+    cls: u64,
+    _cmd: u64,
+    sel: u64,
+) -> u64 {
+    // For a class object, look up in its metaclass's class_methods
+    // Reuse the instance method version — ISA of the class is the metaclass
+    shim_nsobject_method_signature_for_selector(cls, _cmd, sel)
+}
+
+/// `-[NSObject forwardInvocation:]`
+///
+/// Default implementation: logs and does nothing.
+/// Subclasses override this to implement forwarding.
+pub extern "C" fn shim_nsobject_forward_invocation(obj: u64, _cmd: u64, invocation: u64) {
+    if obj == 0 || invocation == 0 {
+        return;
+    }
+    // Get the selector from the invocation for the error message
+    let sel_ptr = unsafe { *((invocation + 24) as *const u64) };
+    let sel_str = if sel_ptr != 0 {
+        unsafe {
+            std::ffi::CStr::from_ptr(sel_ptr as *const std::ffi::c_char)
+                .to_str()
+                .unwrap_or("<unknown>")
+        }
+    } else {
+        "<unknown>"
+    };
+    eprintln!(
+        "-[NSObject forwardInvocation:]: unrecognized selector '{}' sent to instance {:#x}",
+        sel_str, obj
+    );
+}
+
+/// `-[NSObject doesNotRecognizeSelector:]`
+pub extern "C" fn shim_nsobject_does_not_recognize_selector(obj: u64, _cmd: u64, sel: u64) {
+    let sel_str = if sel != 0 {
+        unsafe {
+            std::ffi::CStr::from_ptr(sel as *const std::ffi::c_char)
+                .to_str()
+                .unwrap_or("<unknown>")
+        }
+    } else {
+        "<unknown>"
+    };
+    eprintln!(
+        "-[NSObject doesNotRecognizeSelector:]: '{}' sent to instance {:#x}",
+        sel_str, obj
+    );
+}
+
+/// `+[NSObject resolveInstanceMethod:]` — default returns NO.
+pub extern "C" fn shim_nsobject_resolve_instance_method(
+    _cls: u64,
+    _cmd: u64,
+    _sel: u64,
+) -> u8 {
+    0 // NO
+}
+
+/// `+[NSObject resolveClassMethod:]` — default returns NO.
+pub extern "C" fn shim_nsobject_resolve_class_method(
+    _cls: u64,
+    _cmd: u64,
+    _sel: u64,
+) -> u8 {
+    0 // NO
 }
 
 #[cfg(test)]

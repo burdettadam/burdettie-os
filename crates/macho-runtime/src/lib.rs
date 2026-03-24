@@ -1,4 +1,4 @@
-//! Runtime orchestration for darwin-loader-lab.
+//! Runtime orchestration for burdetty-os.
 //!
 //! `macho-runtime` provides a single entry point — `Runtime::load_and_run` —
 //! that takes a Mach-O binary path and a configuration, then drives the
@@ -288,9 +288,23 @@ impl Runtime {
                 cf_lite::FoundationShims::register_nsrecursivelock_class(&mut objc_rt);
                 cf_lite::FoundationShims::register_nscondition_class(&mut objc_rt);
                 cf_lite::FoundationShims::register_nsconditionlock_class(&mut objc_rt);
+                cf_lite::FoundationShims::register_nsmethodsignature_class(&mut objc_rt);
+                cf_lite::FoundationShims::register_nsinvocation_class(&mut objc_rt);
+                cf_lite::FoundationShims::register_nsregularexpression_class(&mut objc_rt);
+                cf_lite::FoundationShims::register_nspredicate_class(&mut objc_rt);
+                cf_lite::FoundationShims::register_nsattributedstring_class(&mut objc_rt);
+                cf_lite::FoundationShims::register_nsmutableattributedstring_class(&mut objc_rt);
+                cf_lite::FoundationShims::register_nscache_class(&mut objc_rt);
+                cf_lite::FoundationShims::register_nsmaptable_class(&mut objc_rt);
+                cf_lite::FoundationShims::register_nshashtable_class(&mut objc_rt);
+                cf_lite::FoundationShims::register_nsoperation_class(&mut objc_rt);
+                cf_lite::FoundationShims::register_nsblockoperation_class(&mut objc_rt);
+                cf_lite::FoundationShims::register_nsoperationqueue_class(&mut objc_rt);
+                cf_lite::FoundationShims::register_nsjsonserialization_class(&mut objc_rt);
+                cf_lite::FoundationShims::register_nspropertylistserialization_class(&mut objc_rt);
                 tracer.record(
                     EventKind::ClassRegistration,
-                    "40 synthetic Foundation classes registered",
+                    "54 synthetic Foundation classes registered",
                 );
             }
 

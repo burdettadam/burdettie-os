@@ -81,7 +81,7 @@ fn print_banner(session: &Session) {
 
     println!();
     println!("╔══════════════════════════════════════════════════════╗");
-    println!("║           darwin-loader-lab runtime shell            ║");
+    println!("║           burdetty-os runtime shell            ║");
     println!("╠══════════════════════════════════════════════════════╣");
     println!("║                                                      ║");
     println!(

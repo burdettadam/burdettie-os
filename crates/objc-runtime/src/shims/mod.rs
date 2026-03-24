@@ -14,21 +14,28 @@ mod lifecycle;
 
 use libsystem_shims::table::ShimTable;
 
-use dispatch::{objc_msg_send_addr, objc_msg_send_super2_addr, objc_msg_send_super_addr};
+use dispatch::{objc_msg_send_super2_addr, objc_msg_send_super_addr};
+
+// Re-export for KVC/KVO dispatch + internal use.
+pub use dispatch::objc_msg_send_addr;
 use lifecycle::{
     shim_class_add_method, shim_class_copy_ivar_list, shim_class_copy_method_list,
     shim_class_copy_property_list, shim_class_create_instance, shim_class_get_instance_method,
+    shim_class_replace_method,
     shim_class_get_instance_size, shim_class_get_instance_variable,
     shim_class_get_method_implementation, shim_class_get_name, shim_class_get_property,
     shim_class_get_superclass, shim_class_is_meta_class, shim_class_responds_to_selector,
     shim_ivar_get_name, shim_ivar_get_offset, shim_ivar_get_type_encoding,
-    shim_method_get_implementation, shim_method_get_name, shim_method_get_number_of_arguments,
+    shim_method_exchange_implementations, shim_method_get_implementation, shim_method_get_name,
+    shim_method_get_number_of_arguments, shim_method_set_implementation,
     shim_method_get_type_encoding, shim_objc_alloc, shim_objc_alloc_init, shim_objc_autorelease,
     shim_objc_autorelease_pool_pop, shim_objc_autorelease_pool_push,
     shim_objc_autorelease_return_value, shim_objc_begin_catch, shim_objc_end_catch,
-    shim_objc_exception_rethrow, shim_objc_get_class, shim_objc_lookup_class, shim_objc_opt_self,
+    shim_objc_exception_rethrow, shim_objc_get_class, shim_objc_lookup_class,
+    shim_objc_opt_class, shim_objc_opt_responds_to_selector, shim_objc_opt_self,
     shim_objc_release, shim_objc_retain, shim_objc_retain_autorelease,
-    shim_objc_retain_autoreleased_return_value, shim_objc_store_strong, shim_objc_sync_enter,
+    shim_objc_retain_autoreleased_return_value, shim_objc_store_strong,
+    shim_objc_set_property_nonatomic, shim_objc_sync_enter,
     shim_objc_sync_exit, shim_objc_terminate, shim_objc_unsafe_claim_autoreleased_return_value,
     shim_object_get_class, shim_object_get_ivar, shim_object_set_ivar,
     shim_property_get_attributes, shim_property_get_name, shim_sel_get_name, shim_sel_is_equal,
@@ -123,6 +130,11 @@ impl ObjcShims {
             "objc_storeStrong → direct store",
         );
         table.register(
+            "_objc_setProperty_nonatomic",
+            shim_objc_set_property_nonatomic as u64,
+            "objc_setProperty_nonatomic → direct ivar store",
+        );
+        table.register(
             "_objc_alloc",
             shim_objc_alloc as u64,
             "objc_alloc → allocate via guest runtime",
@@ -136,6 +148,16 @@ impl ObjcShims {
             "_objc_opt_self",
             shim_objc_opt_self as u64,
             "objc_opt_self → return self",
+        );
+        table.register(
+            "_objc_opt_class",
+            shim_objc_opt_class as u64,
+            "objc_opt_class → return ISA (fast [obj class])",
+        );
+        table.register(
+            "_objc_opt_respondsToSelector",
+            shim_objc_opt_responds_to_selector as u64,
+            "objc_opt_respondsToSelector → fast respondsToSelector:",
         );
         table.register(
             "_objc_autorelease",
@@ -252,6 +274,21 @@ impl ObjcShims {
             "_method_getImplementation",
             shim_method_get_implementation as u64,
             "method_getImplementation → IMP function pointer",
+        );
+        table.register(
+            "_method_setImplementation",
+            shim_method_set_implementation as u64,
+            "method_setImplementation → replace IMP, return old",
+        );
+        table.register(
+            "_method_exchangeImplementations",
+            shim_method_exchange_implementations as u64,
+            "method_exchangeImplementations → swap two IMPs",
+        );
+        table.register(
+            "_class_replaceMethod",
+            shim_class_replace_method as u64,
+            "class_replaceMethod → replace or add method",
         );
         table.register(
             "_method_getNumberOfArguments",
@@ -374,7 +411,7 @@ impl ObjcShims {
             "objc_sync_exit → @synchronized unlock",
         );
 
-        log::debug!("ObjcShims: registered 60 ObjC runtime shims");
+        log::debug!("ObjcShims: registered 66 ObjC runtime shims");
     }
 }
 
@@ -448,6 +485,12 @@ mod tests {
         assert!(table.resolve("_objc_end_catch").is_some());
         assert!(table.resolve("_objc_exception_rethrow").is_some());
         assert!(table.resolve("_objc_terminate").is_some());
-        assert_eq!(table.len(), 60);
+        assert!(table.resolve("_objc_setProperty_nonatomic").is_some());
+        assert!(table.resolve("_method_setImplementation").is_some());
+        assert!(table.resolve("_method_exchangeImplementations").is_some());
+        assert!(table.resolve("_class_replaceMethod").is_some());
+        assert!(table.resolve("_objc_opt_class").is_some());
+        assert!(table.resolve("_objc_opt_respondsToSelector").is_some());
+        assert_eq!(table.len(), 66);
     }
 }

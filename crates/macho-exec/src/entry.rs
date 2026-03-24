@@ -13,6 +13,7 @@
 
 use macho_types::EntryPoint;
 
+use crate::ptrauth;
 use crate::{ExecError, MappedImage};
 
 /// Result of calling a binary's entry point.
@@ -55,8 +56,9 @@ pub fn call_entry(image: &MappedImage, entry: &EntryPoint) -> Result<EntryResult
             // Cast to extern "C" fn() -> i32 and call
             // The simple_cli fixture's main() takes argc/argv but we pass
             // a minimal environment: argc=1, argv=["app", NULL]
+            let stripped = ptrauth::ptrauth_strip(entry_addr as u64) as *const u8;
             let entry_fn: extern "C" fn(i32, *const *const u8) -> i32 =
-                unsafe { std::mem::transmute(entry_addr) };
+                unsafe { std::mem::transmute(stripped) };
 
             let arg0 = c"app".as_ptr().cast::<u8>();
             let argv: [*const u8; 2] = [arg0, std::ptr::null()];

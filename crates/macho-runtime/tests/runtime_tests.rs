@@ -62,11 +62,11 @@ fn context_installs_all_shims() {
     let shim_set = ShimSet::default();
     let ctx = RuntimeContext::new(&config, &shim_set);
 
-    // 5 process + 2 TLS + 5 dispatch + 42 pthread + 3 mach + 2 lifecycle + 60 objc + 77 foundation = 196 shims (macOS)
+    // 5 process + 2 TLS + 5 dispatch + 42 pthread + 3 mach + 2 ptrauth + 2 lifecycle + 66 objc + 105 foundation = 232 shims (macOS)
     #[cfg(target_os = "macos")]
-    assert_eq!(ctx.shim_table.len(), 196);
+    assert_eq!(ctx.shim_table.len(), 232);
     #[cfg(not(target_os = "macos"))]
-    assert_eq!(ctx.shim_table.len(), 195);
+    assert_eq!(ctx.shim_table.len(), 225);
 }
 
 #[test]
@@ -82,6 +82,7 @@ fn context_respects_shim_set() {
         pthread: false,
         mach: false,
         lifecycle: false,
+        ptrauth: false,
         objc: false,
         foundation: false,
     };
@@ -409,11 +410,11 @@ fn runtime_shim_count_with_all_categories() {
     let config = RuntimeConfig::permissive(&fixture);
     let result = Runtime::load_and_run(&fixture, &config).expect("runtime execution failed");
 
-    // With all shim categories: 5+2+5+42+3+2+60+77 = 196 (macOS)
+    // With all shim categories: 5+2+5+42+3+2+2+66+105 = 232 (macOS)
     #[cfg(target_os = "macos")]
-    assert_eq!(result.shims_installed, 196, "expected 196 shims installed");
+    assert_eq!(result.shims_installed, 232, "expected 232 shims installed");
     #[cfg(not(target_os = "macos"))]
-    assert_eq!(result.shims_installed, 195, "expected 195 shims installed");
+    assert_eq!(result.shims_installed, 221, "expected 221 shims installed");
 }
 
 // ── ObjC runtime tests ─────────────────────────────────────────────
@@ -3229,4 +3230,401 @@ fn runtime_tracing_collects_pipeline_events() {
         !image_events.is_empty(),
         "should have at least one ImageLoad event"
     );
+}
+
+// ── KVO (Key-Value Observing) tests (Phase B1) ────────────────────
+
+#[test]
+fn runtime_kvo_basics_exit_zero() {
+    let _lock = RUNTIME_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let fixture = fixtures_dir().join("kvo_basics/app");
+    if !fixture.exists() {
+        eprintln!("Skipping: fixture not found at {}", fixture.display());
+        return;
+    }
+
+    let config = RuntimeConfig::permissive(&fixture);
+    let result = Runtime::load_and_run(&fixture, &config).expect("kvo_basics should run");
+
+    assert_eq!(result.exit_code, 0, "kvo_basics should exit 0");
+}
+
+#[test]
+fn runtime_kvo_basics_nsobject_has_kvo_methods() {
+    let _lock = RUNTIME_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let fixture = fixtures_dir().join("kvo_basics/app");
+    if !fixture.exists() {
+        eprintln!("Skipping: fixture not found at {}", fixture.display());
+        return;
+    }
+
+    let config = RuntimeConfig::permissive(&fixture);
+    let _result = Runtime::load_and_run(&fixture, &config).expect("kvo_basics should run");
+
+    let guard = objc_runtime::OBJC_RUNTIME.lock().unwrap();
+    if let Some(rt) = guard.as_ref() {
+        let nsobject = rt.get_class("NSObject").expect("NSObject should exist");
+        let kvo_methods = [
+            "addObserver:forKeyPath:options:context:",
+            "removeObserver:forKeyPath:",
+            "willChangeValueForKey:",
+            "didChangeValueForKey:",
+            "observeValueForKeyPath:ofObject:change:context:",
+        ];
+        for sel in &kvo_methods {
+            assert!(
+                nsobject.methods.iter().any(|m| m.selector == *sel),
+                "NSObject should have KVO method '{sel}'"
+            );
+        }
+    }
+}
+
+#[test]
+fn runtime_kvo_multiple_observers_exit_zero() {
+    let _lock = RUNTIME_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let fixture = fixtures_dir().join("kvo_multiple_observers/app");
+    if !fixture.exists() {
+        eprintln!("Skipping: fixture not found at {}", fixture.display());
+        return;
+    }
+
+    let config = RuntimeConfig::permissive(&fixture);
+    let result =
+        Runtime::load_and_run(&fixture, &config).expect("kvo_multiple_observers should run");
+
+    assert_eq!(
+        result.exit_code, 0,
+        "kvo_multiple_observers should exit 0"
+    );
+}
+
+// ── KVC tests ──────────────────────────────────────────────────────
+
+#[test]
+fn runtime_kvc_basics_exit_zero() {
+    let _lock = RUNTIME_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let fixture = fixtures_dir().join("kvc_basics/app");
+    if !fixture.exists() {
+        eprintln!("Skipping: fixture not found at {}", fixture.display());
+        return;
+    }
+
+    let config = RuntimeConfig::permissive(&fixture);
+    let result = Runtime::load_and_run(&fixture, &config).expect("kvc_basics should run");
+
+    assert_eq!(result.exit_code, 0, "kvc_basics should exit 0");
+}
+
+#[test]
+fn runtime_kvc_nsobject_has_kvc_methods() {
+    let _lock = RUNTIME_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let fixture = fixtures_dir().join("kvc_basics/app");
+    if !fixture.exists() {
+        eprintln!("Skipping: fixture not found at {}", fixture.display());
+        return;
+    }
+
+    let config = RuntimeConfig::permissive(&fixture);
+    let _result = Runtime::load_and_run(&fixture, &config).expect("kvc_basics should run");
+
+    let guard = objc_runtime::OBJC_RUNTIME
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    if let Some(rt) = guard.as_ref() {
+        let nsobject = rt.get_class("NSObject").expect("NSObject should exist");
+        let kvc_methods = [
+            "valueForKey:",
+            "setValue:forKey:",
+            "valueForKeyPath:",
+            "setValue:forKeyPath:",
+            "valueForUndefinedKey:",
+            "setValue:forUndefinedKey:",
+        ];
+        for sel in &kvc_methods {
+            assert!(
+                nsobject.methods.iter().any(|m| m.selector == *sel),
+                "NSObject should have KVC method '{sel}'"
+            );
+        }
+    }
+}
+
+#[test]
+fn runtime_kvc_simple_exit_zero() {
+    let _lock = RUNTIME_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let fixture = fixtures_dir().join("kvc_simple/app");
+    if !fixture.exists() {
+        eprintln!("Skipping: fixture not found at {}", fixture.display());
+        return;
+    }
+
+    let config = RuntimeConfig::permissive(&fixture);
+    let result = Runtime::load_and_run(&fixture, &config).expect("kvc_simple should run");
+
+    assert_eq!(result.exit_code, 0, "kvc_simple should exit 0");
+}
+
+// ── Method Swizzling tests ─────────────────────────────────────────
+
+#[test]
+fn runtime_swizzle_basics_exit_zero() {
+    let _lock = RUNTIME_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let fixture = fixtures_dir().join("swizzle_basics/app");
+    if !fixture.exists() {
+        eprintln!("Skipping: fixture not found at {}", fixture.display());
+        return;
+    }
+
+    let config = RuntimeConfig::permissive(&fixture);
+    let result =
+        Runtime::load_and_run(&fixture, &config).expect("swizzle_basics should run");
+
+    assert_eq!(result.exit_code, 0, "swizzle_basics should exit 0");
+}
+
+#[test]
+fn runtime_swizzle_restore_exit_zero() {
+    let _lock = RUNTIME_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let fixture = fixtures_dir().join("swizzle_restore/app");
+    if !fixture.exists() {
+        eprintln!("Skipping: fixture not found at {}", fixture.display());
+        return;
+    }
+
+    let config = RuntimeConfig::permissive(&fixture);
+    let result =
+        Runtime::load_and_run(&fixture, &config).expect("swizzle_restore should run");
+
+    assert_eq!(result.exit_code, 0, "swizzle_restore should exit 0");
+}
+
+#[test]
+fn runtime_swizzle_shims_registered() {
+    let _lock = RUNTIME_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+
+    use libsystem_shims::ShimConfig;
+    use macho_runtime::RuntimeContext;
+    let config = ShimConfig::default();
+    let shim_set = ShimSet::default();
+    let ctx = RuntimeContext::new(&config, &shim_set);
+
+    // All three swizzling APIs should be in the shim table
+    assert!(
+        ctx.shim_table.resolve("_method_exchangeImplementations").is_some(),
+        "method_exchangeImplementations should be registered"
+    );
+    assert!(
+        ctx.shim_table.resolve("_method_setImplementation").is_some(),
+        "method_setImplementation should be registered"
+    );
+    assert!(
+        ctx.shim_table.resolve("_class_replaceMethod").is_some(),
+        "class_replaceMethod should be registered"
+    );
+}
+
+// ── Phase B4: NSInvocation & Dynamic Method Resolution ─────────────
+
+#[test]
+fn runtime_nsinvocation_basics_exit_zero() {
+    let _lock = RUNTIME_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let fixture = fixtures_dir().join("nsinvocation_basics/app");
+    if !fixture.exists() {
+        eprintln!("Skipping: fixture not found at {}", fixture.display());
+        return;
+    }
+
+    let config = RuntimeConfig::permissive(&fixture);
+    let result =
+        Runtime::load_and_run(&fixture, &config).expect("nsinvocation_basics should run");
+
+    assert_eq!(
+        result.exit_code, 0,
+        "nsinvocation_basics fixture should exit 0"
+    );
+}
+
+#[test]
+fn runtime_forwarding_basics_exit_zero() {
+    let _lock = RUNTIME_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let fixture = fixtures_dir().join("forwarding_basics/app");
+    if !fixture.exists() {
+        eprintln!("Skipping: fixture not found at {}", fixture.display());
+        return;
+    }
+
+    let config = RuntimeConfig::permissive(&fixture);
+    let result =
+        Runtime::load_and_run(&fixture, &config).expect("forwarding_basics should run");
+
+    assert_eq!(
+        result.exit_code, 0,
+        "forwarding_basics fixture should exit 0"
+    );
+}
+
+#[test]
+fn runtime_nsinvocation_data_symbols_registered() {
+    let _lock = RUNTIME_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+
+    use libsystem_shims::ShimConfig;
+    use macho_runtime::RuntimeContext;
+    let config = ShimConfig::default();
+    let shim_set = ShimSet::default();
+    let ctx = RuntimeContext::new(&config, &shim_set);
+
+    assert!(
+        ctx.shim_table.resolve("_OBJC_CLASS_$_NSMethodSignature").is_some(),
+        "NSMethodSignature class data symbol should be registered"
+    );
+    assert!(
+        ctx.shim_table.resolve("_OBJC_METACLASS_$_NSMethodSignature").is_some(),
+        "NSMethodSignature metaclass data symbol should be registered"
+    );
+    assert!(
+        ctx.shim_table.resolve("_OBJC_CLASS_$_NSInvocation").is_some(),
+        "NSInvocation class data symbol should be registered"
+    );
+    assert!(
+        ctx.shim_table.resolve("_OBJC_METACLASS_$_NSInvocation").is_some(),
+        "NSInvocation metaclass data symbol should be registered"
+    );
+}
+
+// ── ARM64e / PAC tests ─────────────────────────────────────────────
+
+#[test]
+fn runtime_arm64e_basic_exit_zero() {
+    let _lock = RUNTIME_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let fixture = fixtures_dir().join("arm64e_basic/app");
+    if !fixture.exists() {
+        eprintln!("Skipping: fixture not found at {}", fixture.display());
+        return;
+    }
+
+    let config = RuntimeConfig::permissive(&fixture);
+    let result = Runtime::load_and_run(&fixture, &config).expect("arm64e runtime execution failed");
+
+    assert_eq!(result.exit_code, 0, "arm64e_basic should exit with code 0");
+    assert!(result.shims_installed > 0);
+}
+
+#[test]
+fn ptrauth_shims_are_registered() {
+    use libsystem_shims::ShimConfig;
+    use macho_runtime::RuntimeContext;
+
+    let config = ShimConfig::default();
+    let shim_set = ShimSet::default();
+    let ctx = RuntimeContext::new(&config, &shim_set);
+
+    assert!(
+        ctx.shim_table.resolve("_ptrauth_strip").is_some(),
+        "ptrauth_strip shim should be registered"
+    );
+    assert!(
+        ctx.shim_table.resolve("_ptrauth_sign_unauthenticated").is_some(),
+        "ptrauth_sign_unauthenticated shim should be registered"
+    );
+}
+
+// ── Phase B6: Additional Foundation Classes ────────────────────────
+
+#[test]
+fn runtime_nsjson_basics_exit_zero() {
+    let _lock = RUNTIME_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let fixture = fixtures_dir().join("nsjson_basics/app");
+    if !fixture.exists() {
+        eprintln!("Skipping: fixture not found at {}", fixture.display());
+        return;
+    }
+
+    let config = RuntimeConfig::permissive(&fixture);
+    let result =
+        Runtime::load_and_run(&fixture, &config).expect("nsjson_basics should run");
+
+    assert_eq!(
+        result.exit_code, 0,
+        "nsjson_basics fixture should exit 0"
+    );
+}
+
+#[test]
+fn runtime_nsregex_basics_exit_zero() {
+    let _lock = RUNTIME_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let fixture = fixtures_dir().join("nsregex_basics/app");
+    if !fixture.exists() {
+        eprintln!("Skipping: fixture not found at {}", fixture.display());
+        return;
+    }
+
+    let config = RuntimeConfig::permissive(&fixture);
+    let result =
+        Runtime::load_and_run(&fixture, &config).expect("nsregex_basics should run");
+
+    assert_eq!(
+        result.exit_code, 0,
+        "nsregex_basics fixture should exit 0"
+    );
+}
+
+#[test]
+fn runtime_nscache_basics_exit_zero() {
+    let _lock = RUNTIME_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let fixture = fixtures_dir().join("nscache_basics/app");
+    if !fixture.exists() {
+        eprintln!("Skipping: fixture not found at {}", fixture.display());
+        return;
+    }
+
+    let config = RuntimeConfig::permissive(&fixture);
+    let result =
+        Runtime::load_and_run(&fixture, &config).expect("nscache_basics should run");
+
+    assert_eq!(
+        result.exit_code, 0,
+        "nscache_basics fixture should exit 0"
+    );
+}
+
+#[test]
+fn runtime_b6_data_symbols_registered() {
+    let _lock = RUNTIME_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+
+    use libsystem_shims::ShimConfig;
+    use macho_runtime::RuntimeContext;
+    let config = ShimConfig::default();
+    let shim_set = ShimSet::default();
+    let ctx = RuntimeContext::new(&config, &shim_set);
+
+    let classes = [
+        "NSRegularExpression",
+        "NSPredicate",
+        "NSAttributedString",
+        "NSMutableAttributedString",
+        "NSCache",
+        "NSMapTable",
+        "NSHashTable",
+        "NSOperationQueue",
+        "NSOperation",
+        "NSBlockOperation",
+        "NSJSONSerialization",
+        "NSPropertyListSerialization",
+    ];
+
+    for name in &classes {
+        let class_sym = format!("_OBJC_CLASS_$_{}", name);
+        let meta_sym = format!("_OBJC_METACLASS_$_{}", name);
+        assert!(
+            ctx.shim_table.resolve(&class_sym).is_some(),
+            "{} class data symbol should be registered",
+            name
+        );
+        assert!(
+            ctx.shim_table.resolve(&meta_sym).is_some(),
+            "{} metaclass data symbol should be registered",
+            name
+        );
+    }
 }

@@ -4,15 +4,15 @@
   auto-launch.plist — LaunchAgent for the VM guest.
 
   Install inside the guest:
-    cp /Volumes/darwin-runtime/config/auto-launch.plist ~/Library/LaunchAgents/com.darwin-loader.runtime.plist
-    launchctl load ~/Library/LaunchAgents/com.darwin-loader.runtime.plist
+    cp /Volumes/darwin-runtime/config/auto-launch.plist ~/Library/LaunchAgents/com.burdetty-os.runtime.plist
+    launchctl load ~/Library/LaunchAgents/com.burdetty-os.runtime.plist
 
   This opens a Terminal window on login that sources the runtime environment.
 -->
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.darwin-loader.runtime</string>
+    <string>com.burdetty-os.runtime</string>
     <key>ProgramArguments</key>
     <array>
         <string>/usr/bin/open</string>
@@ -23,8 +23,8 @@
     <key>RunAtLoad</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>/tmp/darwin-loader-launch.log</string>
+    <string>/tmp/burdetty-os-launch.log</string>
     <key>StandardErrorPath</key>
-    <string>/tmp/darwin-loader-launch.log</string>
+    <string>/tmp/burdetty-os-launch.log</string>
 </dict>
 </plist>

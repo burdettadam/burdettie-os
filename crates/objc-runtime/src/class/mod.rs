@@ -88,6 +88,16 @@ impl ObjcRuntime {
             .and_then(|name| self.classes_by_name.get(name))
     }
 
+    /// Check if an ISA pointer belongs to our runtime (class or metaclass).
+    pub fn is_known_isa(&self, isa: u64) -> bool {
+        self.classes_by_addr.contains_key(&isa) || self.metaclass_addrs.contains(&isa)
+    }
+
+    /// Check if an address is a registered metaclass.
+    pub fn is_metaclass(&self, addr: u64) -> bool {
+        self.metaclass_addrs.contains(&addr)
+    }
+
     /// Intern a selector string, returning a stable pointer to the C string.
     pub fn intern_selector(&mut self, name: &str) -> usize {
         if let Some(&ptr) = self.selectors.get(name) {
@@ -119,6 +129,11 @@ impl ObjcRuntime {
     /// Iterate over all registered classes by name.
     pub fn classes_by_name_iter(&self) -> impl Iterator<Item = (&String, &ClassInfo)> {
         self.classes_by_name.iter()
+    }
+
+    /// Iterate over all registered classes mutably (values only).
+    pub fn classes_by_name_iter_mut(&mut self) -> impl Iterator<Item = &mut ClassInfo> {
+        self.classes_by_name.values_mut()
     }
 
     /// Get mutable access to a class by name.

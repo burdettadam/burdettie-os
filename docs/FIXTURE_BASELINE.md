@@ -1,6 +1,6 @@
 # Fixture Baseline — v0.1.0
 
-> The v1 compatibility baseline for darwin-loader-lab.
+> The v1 compatibility baseline for burdetty-os.
 > Every fixture listed here must pass all pipeline stages and exit
 > with the correct code at all times.  The `compat_score_regression_gate`
 > test enforces this automatically.

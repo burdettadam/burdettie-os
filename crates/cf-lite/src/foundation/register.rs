@@ -7,11 +7,14 @@ use objc_runtime::{ClassInfo, MethodEntry};
 
 use super::cfconstant_string_class_addr;
 use crate::{
-    cfstring, nsarray, nsbundle, nscalendar, nscharacterset, nsdata, nsdate, nsdateformatter,
-    nsdictionary, nsenumerator, nserror, nsexception, nsfilemanager, nsindexset, nslocale, nslock,
-    nsmutablearray, nsmutabledict, nsmutableset, nsmutablestring, nsnotificationcenter, nsnull,
-    nsnumber, nsnumberformatter, nsobj, nsprocessinfo, nsset, nssortdescriptor, nsthread, nstimer,
-    nstimezone, nsurl, nsuserdefaults, nsuuid, nsvalue,
+    cfstring, nsinvocation, nskeyvalueobserving, nskeyvaluecoding, nsarray, nsattributedstring,
+    nsbundle, nscache, nscalendar, nscharacterset, nsdata, nsdate,
+    nsdateformatter, nsdictionary, nsenumerator, nserror, nsexception, nsfilemanager, nshashtable,
+    nsindexset, nsjsonserialization,
+    nslocale, nslock, nsmaptable, nsmethodsignature, nsmutablearray, nsmutabledict, nsmutableset,
+    nsmutablestring, nsnotificationcenter, nsnull, nsnumber, nsnumberformatter, nsobj, nsoperation,
+    nspredicate, nsprocessinfo, nspropertylistserialization, nsregularexpression, nsset,
+    nssortdescriptor, nsthread, nstimer, nstimezone, nsurl, nsuserdefaults, nsuuid, nsvalue,
 };
 
 /// Concise constructor for `MethodEntry`.
@@ -265,10 +268,98 @@ pub fn register_nsobject_class(rt: &mut objc_runtime::ObjcRuntime) {
                 "Q@:",
             ),
             me("dealloc", objc_runtime::shim_nsobject_dealloc as u64, "v@:"),
+            // KVO methods
+            me(
+                "addObserver:forKeyPath:options:context:",
+                nskeyvalueobserving::shim_nsobject_add_observer as u64,
+                "v@:@@Q^v",
+            ),
+            me(
+                "removeObserver:forKeyPath:",
+                nskeyvalueobserving::shim_nsobject_remove_observer as u64,
+                "v@:@@",
+            ),
+            me(
+                "willChangeValueForKey:",
+                nskeyvalueobserving::shim_nsobject_will_change_value_for_key as u64,
+                "v@:@",
+            ),
+            me(
+                "didChangeValueForKey:",
+                nskeyvalueobserving::shim_nsobject_did_change_value_for_key as u64,
+                "v@:@",
+            ),
+            me(
+                "observeValueForKeyPath:ofObject:change:context:",
+                nskeyvalueobserving::shim_nsobject_observe_value as u64,
+                "v@:@@@^v",
+            ),
+            // KVC methods
+            me(
+                "valueForKey:",
+                nskeyvaluecoding::shim_value_for_key as u64,
+                "@@:@",
+            ),
+            me(
+                "setValue:forKey:",
+                nskeyvaluecoding::shim_set_value_for_key as u64,
+                "v@:@@",
+            ),
+            me(
+                "valueForKeyPath:",
+                nskeyvaluecoding::shim_value_for_key_path as u64,
+                "@@:@",
+            ),
+            me(
+                "setValue:forKeyPath:",
+                nskeyvaluecoding::shim_set_value_for_key_path as u64,
+                "v@:@@",
+            ),
+            me(
+                "valueForUndefinedKey:",
+                nskeyvaluecoding::shim_value_for_undefined_key_method as u64,
+                "@@:@",
+            ),
+            me(
+                "setValue:forUndefinedKey:",
+                nskeyvaluecoding::shim_set_value_for_undefined_key_method as u64,
+                "v@:@@",
+            ),
+            // Forwarding methods
+            me(
+                "methodSignatureForSelector:",
+                nsobj::shim_nsobject_method_signature_for_selector as u64,
+                "@@::",
+            ),
+            me(
+                "forwardInvocation:",
+                nsobj::shim_nsobject_forward_invocation as u64,
+                "v@:@",
+            ),
+            me(
+                "doesNotRecognizeSelector:",
+                nsobj::shim_nsobject_does_not_recognize_selector as u64,
+                "v@::",
+            ),
         ],
         class_methods: vec![
             me("alloc", nsobj::shim_nsobject_class_alloc as u64, "@@:"),
             me("new", nsobj::shim_nsobject_class_new as u64, "@@:"),
+            me(
+                "resolveInstanceMethod:",
+                nsobj::shim_nsobject_resolve_instance_method as u64,
+                "B@::",
+            ),
+            me(
+                "resolveClassMethod:",
+                nsobj::shim_nsobject_resolve_class_method as u64,
+                "B@::",
+            ),
+            me(
+                "methodSignatureForSelector:",
+                nsobj::shim_nsobject_class_method_signature_for_selector as u64,
+                "@@::",
+            ),
         ],
         ivars: vec![],
         properties: vec![],
@@ -2379,4 +2470,498 @@ pub fn register_nsconditionlock_class(rt: &mut objc_runtime::ObjcRuntime) {
     };
     rt.register_synthetic_class(info);
     rt.register_metaclass_addr(metaclass_addr, "NSConditionLock");
+}
+
+/// Register `NSMethodSignature` with type encoding queries.
+pub fn register_nsmethodsignature_class(rt: &mut objc_runtime::ObjcRuntime) {
+    let class_addr = nsobj::nsmethodsignature_class_addr();
+    let metaclass_addr = nsobj::nsmethodsignature_metaclass_addr();
+
+    let info = ClassInfo {
+        name: "NSMethodSignature".to_string(),
+        mapped_addr: class_addr,
+        methods: vec![
+            me(
+                "numberOfArguments",
+                nsmethodsignature::shim_number_of_arguments as u64,
+                "Q@:",
+            ),
+            me(
+                "methodReturnType",
+                nsmethodsignature::shim_method_return_type as u64,
+                "r*@:",
+            ),
+            me(
+                "methodReturnLength",
+                nsmethodsignature::shim_method_return_length as u64,
+                "Q@:",
+            ),
+            me(
+                "getArgumentTypeAtIndex:",
+                nsmethodsignature::shim_get_argument_type_at_index as u64,
+                "r*@:Q",
+            ),
+            me(
+                "frameLength",
+                nsmethodsignature::shim_frame_length as u64,
+                "Q@:",
+            ),
+            me(
+                "dealloc",
+                nsmethodsignature::shim_dealloc as u64,
+                "v@:",
+            ),
+        ],
+        class_methods: vec![me(
+            "signatureWithObjCTypes:",
+            nsmethodsignature::shim_signature_with_objc_types as u64,
+            "@@:r*",
+        )],
+        ivars: vec![],
+        properties: vec![],
+        instance_size: nsmethodsignature::INSTANCE_SIZE,
+        is_root: false,
+        is_meta: false,
+        superclass_addr: Some(nsobj::nsobject_class_addr()),
+    };
+    rt.register_synthetic_class(info);
+    rt.register_metaclass_addr(metaclass_addr, "NSMethodSignature");
+}
+
+/// Register `NSInvocation` with argument/invoke/return value methods.
+pub fn register_nsinvocation_class(rt: &mut objc_runtime::ObjcRuntime) {
+    let class_addr = nsobj::nsinvocation_class_addr();
+    let metaclass_addr = nsobj::nsinvocation_metaclass_addr();
+
+    let info = ClassInfo {
+        name: "NSInvocation".to_string(),
+        mapped_addr: class_addr,
+        methods: vec![
+            me(
+                "methodSignature",
+                nsinvocation::shim_method_signature as u64,
+                "@@:",
+            ),
+            me("target", nsinvocation::shim_target as u64, "@@:"),
+            me("setTarget:", nsinvocation::shim_set_target as u64, "v@:@"),
+            me("selector", nsinvocation::shim_selector as u64, ":@:"),
+            me(
+                "setSelector:",
+                nsinvocation::shim_set_selector as u64,
+                "v@::",
+            ),
+            me(
+                "setArgument:atIndex:",
+                nsinvocation::shim_set_argument_at_index as u64,
+                "v@:^vq",
+            ),
+            me(
+                "getArgument:atIndex:",
+                nsinvocation::shim_get_argument_at_index as u64,
+                "v@:^vq",
+            ),
+            me("invoke", nsinvocation::shim_invoke as u64, "v@:"),
+            me(
+                "invokeWithTarget:",
+                nsinvocation::shim_invoke_with_target as u64,
+                "v@:@",
+            ),
+            me(
+                "getReturnValue:",
+                nsinvocation::shim_get_return_value as u64,
+                "v@:^v",
+            ),
+            me(
+                "setReturnValue:",
+                nsinvocation::shim_set_return_value as u64,
+                "v@:^v",
+            ),
+            me(
+                "retainArguments",
+                nsinvocation::shim_retain_arguments as u64,
+                "v@:",
+            ),
+            me(
+                "argumentsRetained",
+                nsinvocation::shim_arguments_retained as u64,
+                "B@:",
+            ),
+            me("dealloc", nsinvocation::shim_dealloc as u64, "v@:"),
+        ],
+        class_methods: vec![me(
+            "invocationWithMethodSignature:",
+            nsinvocation::shim_invocation_with_method_signature as u64,
+            "@@:@",
+        )],
+        ivars: vec![],
+        properties: vec![],
+        instance_size: nsinvocation::INSTANCE_SIZE,
+        is_root: false,
+        is_meta: false,
+        superclass_addr: Some(nsobj::nsobject_class_addr()),
+    };
+    rt.register_synthetic_class(info);
+    rt.register_metaclass_addr(metaclass_addr, "NSInvocation");
+}
+
+// ── Phase B6 Foundation classes ────────────────────────────────────
+
+/// Register `NSRegularExpression`.
+pub fn register_nsregularexpression_class(rt: &mut objc_runtime::ObjcRuntime) {
+    let class_addr = nsobj::nsregularexpression_class_addr();
+    let metaclass_addr = nsobj::nsregularexpression_metaclass_addr();
+
+    let info = ClassInfo {
+        name: "NSRegularExpression".to_string(),
+        mapped_addr: class_addr,
+        methods: vec![
+            me("pattern", nsregularexpression::shim_regex_pattern as u64, "@@:"),
+            me("options", nsregularexpression::shim_regex_options as u64, "Q@:"),
+            me("numberOfMatchesInString:options:range:", nsregularexpression::shim_regex_number_of_matches as u64, "Q@:@Q{_NSRange=QQ}"),
+            me("firstMatchInString:options:range:", nsregularexpression::shim_regex_first_match as u64, "@@:@Q{_NSRange=QQ}"),
+            me("stringByReplacingMatchesInString:options:range:withTemplate:", nsregularexpression::shim_regex_replace as u64, "@@:@Q{_NSRange=QQ}@"),
+            me("description", nsregularexpression::shim_regex_description as u64, "@@:"),
+        ],
+        class_methods: vec![
+            me("regularExpressionWithPattern:options:error:", nsregularexpression::shim_regex_with_pattern as u64, "@@:@Q^@"),
+        ],
+        ivars: vec![],
+        properties: vec![],
+        instance_size: nsregularexpression::INSTANCE_SIZE,
+        is_root: false,
+        is_meta: false,
+        superclass_addr: Some(nsobj::nsobject_class_addr()),
+    };
+    rt.register_synthetic_class(info);
+    rt.register_metaclass_addr(metaclass_addr, "NSRegularExpression");
+}
+
+/// Register `NSPredicate`.
+pub fn register_nspredicate_class(rt: &mut objc_runtime::ObjcRuntime) {
+    let class_addr = nsobj::nspredicate_class_addr();
+    let metaclass_addr = nsobj::nspredicate_metaclass_addr();
+
+    let info = ClassInfo {
+        name: "NSPredicate".to_string(),
+        mapped_addr: class_addr,
+        methods: vec![
+            me("evaluateWithObject:", nspredicate::shim_predicate_evaluate as u64, "B@:@"),
+            me("predicateFormat", nspredicate::shim_predicate_format as u64, "@@:"),
+            me("description", nspredicate::shim_predicate_description as u64, "@@:"),
+        ],
+        class_methods: vec![
+            me("predicateWithFormat:", nspredicate::shim_predicate_with_format as u64, "@@:@"),
+            me("predicateWithValue:", nspredicate::shim_predicate_with_value as u64, "@@:B"),
+        ],
+        ivars: vec![],
+        properties: vec![],
+        instance_size: nspredicate::INSTANCE_SIZE,
+        is_root: false,
+        is_meta: false,
+        superclass_addr: Some(nsobj::nsobject_class_addr()),
+    };
+    rt.register_synthetic_class(info);
+    rt.register_metaclass_addr(metaclass_addr, "NSPredicate");
+}
+
+/// Register `NSAttributedString`.
+pub fn register_nsattributedstring_class(rt: &mut objc_runtime::ObjcRuntime) {
+    let class_addr = nsobj::nsattributedstring_class_addr();
+    let metaclass_addr = nsobj::nsattributedstring_metaclass_addr();
+
+    let info = ClassInfo {
+        name: "NSAttributedString".to_string(),
+        mapped_addr: class_addr,
+        methods: vec![
+            me("initWithString:", nsattributedstring::shim_attrstr_init_with_string as u64, "@@:@"),
+            me("initWithString:attributes:", nsattributedstring::shim_attrstr_init_with_string_attributes as u64, "@@:@@"),
+            me("string", nsattributedstring::shim_attrstr_string as u64, "@@:"),
+            me("length", nsattributedstring::shim_attrstr_length as u64, "Q@:"),
+            me("attributesAtIndex:effectiveRange:", nsattributedstring::shim_attrstr_attributes_at_index as u64, "@@:Q^{_NSRange=QQ}"),
+            me("description", nsattributedstring::shim_attrstr_description as u64, "@@:"),
+        ],
+        class_methods: vec![
+            me("alloc", nsattributedstring::shim_attrstr_alloc as u64, "@@:"),
+        ],
+        ivars: vec![],
+        properties: vec![],
+        instance_size: nsattributedstring::INSTANCE_SIZE,
+        is_root: false,
+        is_meta: false,
+        superclass_addr: Some(nsobj::nsobject_class_addr()),
+    };
+    rt.register_synthetic_class(info);
+    rt.register_metaclass_addr(metaclass_addr, "NSAttributedString");
+}
+
+/// Register `NSMutableAttributedString`.
+pub fn register_nsmutableattributedstring_class(rt: &mut objc_runtime::ObjcRuntime) {
+    let class_addr = nsobj::nsmutableattributedstring_class_addr();
+    let metaclass_addr = nsobj::nsmutableattributedstring_metaclass_addr();
+
+    let info = ClassInfo {
+        name: "NSMutableAttributedString".to_string(),
+        mapped_addr: class_addr,
+        methods: vec![
+            me("initWithString:", nsattributedstring::shim_mutable_attrstr_init_with_string as u64, "@@:@"),
+            me("string", nsattributedstring::shim_attrstr_string as u64, "@@:"),
+            me("length", nsattributedstring::shim_attrstr_length as u64, "Q@:"),
+            me("addAttribute:value:range:", nsattributedstring::shim_mutable_attrstr_add_attribute as u64, "v@:@@{_NSRange=QQ}"),
+            me("replaceCharactersInRange:withString:", nsattributedstring::shim_mutable_attrstr_replace_chars as u64, "v@:{_NSRange=QQ}@"),
+            me("description", nsattributedstring::shim_attrstr_description as u64, "@@:"),
+        ],
+        class_methods: vec![
+            me("alloc", nsattributedstring::shim_mutable_attrstr_alloc as u64, "@@:"),
+        ],
+        ivars: vec![],
+        properties: vec![],
+        instance_size: nsattributedstring::INSTANCE_SIZE,
+        is_root: false,
+        is_meta: false,
+        superclass_addr: Some(nsobj::nsattributedstring_class_addr()),
+    };
+    rt.register_synthetic_class(info);
+    rt.register_metaclass_addr(metaclass_addr, "NSMutableAttributedString");
+}
+
+/// Register `NSCache`.
+pub fn register_nscache_class(rt: &mut objc_runtime::ObjcRuntime) {
+    let class_addr = nsobj::nscache_class_addr();
+    let metaclass_addr = nsobj::nscache_metaclass_addr();
+
+    let info = ClassInfo {
+        name: "NSCache".to_string(),
+        mapped_addr: class_addr,
+        methods: vec![
+            me("init", nscache::shim_nscache_init as u64, "@@:"),
+            me("objectForKey:", nscache::shim_nscache_object_for_key as u64, "@@:@"),
+            me("setObject:forKey:", nscache::shim_nscache_set_object as u64, "v@:@@"),
+            me("setObject:forKey:cost:", nscache::shim_nscache_set_object_cost as u64, "v@:@@Q"),
+            me("removeObjectForKey:", nscache::shim_nscache_remove_object as u64, "v@:@"),
+            me("removeAllObjects", nscache::shim_nscache_remove_all as u64, "v@:"),
+            me("setCountLimit:", nscache::shim_nscache_set_count_limit as u64, "v@:Q"),
+            me("countLimit", nscache::shim_nscache_count_limit as u64, "Q@:"),
+            me("setName:", nscache::shim_nscache_set_name as u64, "v@:@"),
+            me("name", nscache::shim_nscache_name as u64, "@@:"),
+            me("description", nscache::shim_nscache_description as u64, "@@:"),
+        ],
+        class_methods: vec![
+            me("alloc", nscache::shim_nscache_alloc as u64, "@@:"),
+        ],
+        ivars: vec![],
+        properties: vec![],
+        instance_size: nscache::INSTANCE_SIZE,
+        is_root: false,
+        is_meta: false,
+        superclass_addr: Some(nsobj::nsobject_class_addr()),
+    };
+    rt.register_synthetic_class(info);
+    rt.register_metaclass_addr(metaclass_addr, "NSCache");
+}
+
+/// Register `NSMapTable`.
+pub fn register_nsmaptable_class(rt: &mut objc_runtime::ObjcRuntime) {
+    let class_addr = nsobj::nsmaptable_class_addr();
+    let metaclass_addr = nsobj::nsmaptable_metaclass_addr();
+
+    let info = ClassInfo {
+        name: "NSMapTable".to_string(),
+        mapped_addr: class_addr,
+        methods: vec![
+            me("objectForKey:", nsmaptable::shim_maptable_object_for_key as u64, "@@:@"),
+            me("setObject:forKey:", nsmaptable::shim_maptable_set_object as u64, "v@:@@"),
+            me("removeObjectForKey:", nsmaptable::shim_maptable_remove_object as u64, "v@:@"),
+            me("removeAllObjects", nsmaptable::shim_maptable_remove_all as u64, "v@:"),
+            me("count", nsmaptable::shim_maptable_count as u64, "Q@:"),
+            me("description", nsmaptable::shim_maptable_description as u64, "@@:"),
+        ],
+        class_methods: vec![
+            me("mapTableWithKeyOptions:valueOptions:", nsmaptable::shim_maptable_with_options as u64, "@@:QQ"),
+            me("strongToStrongObjectsMapTable", nsmaptable::shim_maptable_strong_strong as u64, "@@:"),
+            me("weakToStrongObjectsMapTable", nsmaptable::shim_maptable_weak_strong as u64, "@@:"),
+            me("strongToWeakObjectsMapTable", nsmaptable::shim_maptable_strong_weak as u64, "@@:"),
+        ],
+        ivars: vec![],
+        properties: vec![],
+        instance_size: nsmaptable::INSTANCE_SIZE,
+        is_root: false,
+        is_meta: false,
+        superclass_addr: Some(nsobj::nsobject_class_addr()),
+    };
+    rt.register_synthetic_class(info);
+    rt.register_metaclass_addr(metaclass_addr, "NSMapTable");
+}
+
+/// Register `NSHashTable`.
+pub fn register_nshashtable_class(rt: &mut objc_runtime::ObjcRuntime) {
+    let class_addr = nsobj::nshashtable_class_addr();
+    let metaclass_addr = nsobj::nshashtable_metaclass_addr();
+
+    let info = ClassInfo {
+        name: "NSHashTable".to_string(),
+        mapped_addr: class_addr,
+        methods: vec![
+            me("addObject:", nshashtable::shim_hashtable_add_object as u64, "v@:@"),
+            me("removeObject:", nshashtable::shim_hashtable_remove_object as u64, "v@:@"),
+            me("removeAllObjects", nshashtable::shim_hashtable_remove_all as u64, "v@:"),
+            me("containsObject:", nshashtable::shim_hashtable_contains as u64, "B@:@"),
+            me("count", nshashtable::shim_hashtable_count as u64, "Q@:"),
+            me("allObjects", nshashtable::shim_hashtable_all_objects as u64, "@@:"),
+            me("description", nshashtable::shim_hashtable_description as u64, "@@:"),
+        ],
+        class_methods: vec![
+            me("hashTableWithOptions:", nshashtable::shim_hashtable_with_options as u64, "@@:Q"),
+            me("weakObjectsHashTable", nshashtable::shim_hashtable_weak_objects as u64, "@@:"),
+        ],
+        ivars: vec![],
+        properties: vec![],
+        instance_size: nshashtable::INSTANCE_SIZE,
+        is_root: false,
+        is_meta: false,
+        superclass_addr: Some(nsobj::nsobject_class_addr()),
+    };
+    rt.register_synthetic_class(info);
+    rt.register_metaclass_addr(metaclass_addr, "NSHashTable");
+}
+
+/// Register `NSOperation`.
+pub fn register_nsoperation_class(rt: &mut objc_runtime::ObjcRuntime) {
+    let class_addr = nsobj::nsoperation_class_addr();
+    let metaclass_addr = nsobj::nsoperation_metaclass_addr();
+
+    let info = ClassInfo {
+        name: "NSOperation".to_string(),
+        mapped_addr: class_addr,
+        methods: vec![
+            me("init", nsoperation::shim_nsoperation_init as u64, "@@:"),
+            me("start", nsoperation::shim_nsoperation_start as u64, "v@:"),
+            me("main", nsoperation::shim_nsoperation_main as u64, "v@:"),
+            me("cancel", nsoperation::shim_nsoperation_cancel as u64, "v@:"),
+            me("isCancelled", nsoperation::shim_nsoperation_is_cancelled as u64, "B@:"),
+            me("isFinished", nsoperation::shim_nsoperation_is_finished as u64, "B@:"),
+        ],
+        class_methods: vec![
+            me("alloc", nsoperation::shim_nsoperation_alloc as u64, "@@:"),
+        ],
+        ivars: vec![],
+        properties: vec![],
+        instance_size: nsoperation::OP_INSTANCE_SIZE,
+        is_root: false,
+        is_meta: false,
+        superclass_addr: Some(nsobj::nsobject_class_addr()),
+    };
+    rt.register_synthetic_class(info);
+    rt.register_metaclass_addr(metaclass_addr, "NSOperation");
+}
+
+/// Register `NSBlockOperation`.
+pub fn register_nsblockoperation_class(rt: &mut objc_runtime::ObjcRuntime) {
+    let class_addr = nsobj::nsblockoperation_class_addr();
+    let metaclass_addr = nsobj::nsblockoperation_metaclass_addr();
+
+    let info = ClassInfo {
+        name: "NSBlockOperation".to_string(),
+        mapped_addr: class_addr,
+        methods: vec![
+            me("start", nsoperation::shim_block_op_start as u64, "v@:"),
+            me("cancel", nsoperation::shim_nsoperation_cancel as u64, "v@:"),
+            me("isCancelled", nsoperation::shim_nsoperation_is_cancelled as u64, "B@:"),
+            me("isFinished", nsoperation::shim_nsoperation_is_finished as u64, "B@:"),
+        ],
+        class_methods: vec![
+            me("blockOperationWithBlock:", nsoperation::shim_block_op_with_block as u64, "@@:@?"),
+        ],
+        ivars: vec![],
+        properties: vec![],
+        instance_size: nsoperation::BLOCK_OP_INSTANCE_SIZE,
+        is_root: false,
+        is_meta: false,
+        superclass_addr: Some(nsobj::nsoperation_class_addr()),
+    };
+    rt.register_synthetic_class(info);
+    rt.register_metaclass_addr(metaclass_addr, "NSBlockOperation");
+}
+
+/// Register `NSOperationQueue`.
+pub fn register_nsoperationqueue_class(rt: &mut objc_runtime::ObjcRuntime) {
+    let class_addr = nsobj::nsoperationqueue_class_addr();
+    let metaclass_addr = nsobj::nsoperationqueue_metaclass_addr();
+
+    let info = ClassInfo {
+        name: "NSOperationQueue".to_string(),
+        mapped_addr: class_addr,
+        methods: vec![
+            me("init", nsoperation::shim_queue_init as u64, "@@:"),
+            me("addOperation:", nsoperation::shim_queue_add_operation as u64, "v@:@"),
+            me("addOperationWithBlock:", nsoperation::shim_queue_add_block as u64, "v@:@?"),
+            me("setSuspended:", nsoperation::shim_queue_set_suspended as u64, "v@:B"),
+            me("isSuspended", nsoperation::shim_queue_is_suspended as u64, "B@:"),
+            me("setName:", nsoperation::shim_queue_set_name as u64, "v@:@"),
+            me("name", nsoperation::shim_queue_name as u64, "@@:"),
+            me("setMaxConcurrentOperationCount:", nsoperation::shim_queue_set_max_concurrent as u64, "v@:q"),
+            me("maxConcurrentOperationCount", nsoperation::shim_queue_max_concurrent as u64, "q@:"),
+            me("description", nsoperation::shim_queue_description as u64, "@@:"),
+        ],
+        class_methods: vec![
+            me("alloc", nsoperation::shim_queue_alloc as u64, "@@:"),
+        ],
+        ivars: vec![],
+        properties: vec![],
+        instance_size: nsoperation::QUEUE_INSTANCE_SIZE,
+        is_root: false,
+        is_meta: false,
+        superclass_addr: Some(nsobj::nsobject_class_addr()),
+    };
+    rt.register_synthetic_class(info);
+    rt.register_metaclass_addr(metaclass_addr, "NSOperationQueue");
+}
+
+/// Register `NSJSONSerialization`.
+pub fn register_nsjsonserialization_class(rt: &mut objc_runtime::ObjcRuntime) {
+    let class_addr = nsobj::nsjsonserialization_class_addr();
+    let metaclass_addr = nsobj::nsjsonserialization_metaclass_addr();
+
+    let info = ClassInfo {
+        name: "NSJSONSerialization".to_string(),
+        mapped_addr: class_addr,
+        methods: vec![],
+        class_methods: vec![
+            me("JSONObjectWithData:options:error:", nsjsonserialization::shim_json_object_with_data as u64, "@@:@Q^@"),
+            me("dataWithJSONObject:options:error:", nsjsonserialization::shim_data_with_json_object as u64, "@@:@Q^@"),
+            me("isValidJSONObject:", nsjsonserialization::shim_is_valid_json_object as u64, "B@:@"),
+        ],
+        ivars: vec![],
+        properties: vec![],
+        instance_size: 8,
+        is_root: false,
+        is_meta: false,
+        superclass_addr: Some(nsobj::nsobject_class_addr()),
+    };
+    rt.register_synthetic_class(info);
+    rt.register_metaclass_addr(metaclass_addr, "NSJSONSerialization");
+}
+
+/// Register `NSPropertyListSerialization`.
+pub fn register_nspropertylistserialization_class(rt: &mut objc_runtime::ObjcRuntime) {
+    let class_addr = nsobj::nspropertylistserialization_class_addr();
+    let metaclass_addr = nsobj::nspropertylistserialization_metaclass_addr();
+
+    let info = ClassInfo {
+        name: "NSPropertyListSerialization".to_string(),
+        mapped_addr: class_addr,
+        methods: vec![],
+        class_methods: vec![
+            me("dataWithPropertyList:format:options:error:", nspropertylistserialization::shim_plist_data_with_object as u64, "@@:@QQ^@"),
+            me("propertyListWithData:options:format:error:", nspropertylistserialization::shim_plist_with_data as u64, "@@:@Q^Q^@"),
+            me("propertyList:isValidForFormat:", nspropertylistserialization::shim_plist_is_valid as u64, "B@:@Q"),
+        ],
+        ivars: vec![],
+        properties: vec![],
+        instance_size: 8,
+        is_root: false,
+        is_meta: false,
+        superclass_addr: Some(nsobj::nsobject_class_addr()),
+    };
+    rt.register_synthetic_class(info);
+    rt.register_metaclass_addr(metaclass_addr, "NSPropertyListSerialization");
 }

@@ -23,7 +23,7 @@ fn main() {
     // Title label
     let mut title = Label::new(
         Rect::new(30.0, 25.0, 460.0, 24.0),
-        "Running on darwin-loader-lab runtime v0.1",
+        "Running on burdetty-os runtime v0.1",
     );
     title.set_text_color(Color::new(0.1, 0.1, 0.3, 1.0));
     app.add_label(title);

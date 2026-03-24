@@ -1,4 +1,4 @@
-# darwin-loader-lab
+# burdetty-os
 
 A Rust-based non-GUI macOS runtime for studying, reproducing, and executing macOS Mach-O binaries.
 
@@ -104,15 +104,15 @@ To package as a bootable demo image:
 ```bash
 ./packaging/build.sh --release
 ./packaging/bundle-runtime.sh --release
-./packaging/make-vm-image.sh          # creates darwin-loader.dmg
+./packaging/make-vm-image.sh          # creates burdetty-os.dmg
 ```
 
 Or build a Docker image (CLI only):
 
 ```bash
 ./packaging/bundle-runtime.sh --release
-docker build -f docker/Dockerfile.demo -t darwin-loader-demo dist/
-docker run -it --rm darwin-loader-demo
+docker build -f docker/Dockerfile.demo -t burdetty-os-demo dist/
+docker run -it --rm burdetty-os-demo
 ```
 
 See [docs/DEMO.md](docs/DEMO.md) for the full demo guide.
@@ -140,3 +140,47 @@ See [docs/roadmap.md](docs/roadmap.md) for the full roadmap and target matrix.
 - macOS 13+ (Ventura or later)
 - Rust stable (see `rust-toolchain.toml`)
 - Xcode Command Line Tools (`xcode-select --install`)
+
+## Use as a library
+
+The runtime exposes a C-ABI dynamic library (`libdarwin_runtime_ffi.dylib`) that
+can be called from C, Swift, Python, or any language with C FFI support.
+
+### Install
+
+```bash
+# From source
+./packaging/install.sh
+
+# Or via Homebrew
+brew install --build-from-source burdetty-os/tap/darwin-runtime
+```
+
+### C
+
+```c
+#include <darwin_runtime.h>
+
+DarwinVersion v = darwin_runtime_version();
+printf("darwin-runtime %u.%u.%u\n", v.major, v.minor, v.patch);
+
+DarwinRuntimeResult r = darwin_runtime_run("/path/to/binary");
+printf("exit code: %d, images: %zu\n", r.exit_code, r.images_loaded);
+```
+
+Build with `cc -o app app.c $(pkg-config --cflags --libs darwin-runtime)`.
+
+### Swift
+
+```swift
+import DarwinRuntime
+
+let v = DarwinRuntime.version
+let result = try DarwinRuntime.run(path: "/path/to/binary")
+print("Classes: \(ObjCRuntime.classCount)")
+```
+
+Add the `swift/` directory as an SPM dependency.
+
+See [docs/FFI_GUIDE.md](docs/FFI_GUIDE.md) for the full API reference, Python
+examples, memory management rules, and thread safety notes.

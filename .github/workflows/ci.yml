@@ -51,7 +51,7 @@ jobs:
       - name: Upload bundle artifact
         uses: actions/upload-artifact@v4
         with:
-          name: darwin-loader-bundle
+          name: burdetty-os-bundle
           path: dist/
           retention-days: 14
 
@@ -62,14 +62,59 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build dev image
-        run: docker build -f docker/Dockerfile.dev -t darwin-loader-dev .
+        run: docker build -f docker/Dockerfile.dev -t burdetty-os-dev .
 
       - name: Run checks in container
         run: |
-          docker run --rm darwin-loader-dev
-          docker run --rm darwin-loader-dev cargo test \
+          docker run --rm burdetty-os-dev
+          docker run --rm burdetty-os-dev cargo test \
             -p platform-core -p macho-types -p macho-parse \
             -p macho-map -p macho-objc -p macho-resolve \
             -p macho-run-plan -p macho-diff -p trust-policy \
             -p macho-fixtures -p test-harness \
             --lib
+
+  ffi-interop:
+    name: FFI Interop (C + Swift)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build FFI crate
+        run: cargo build --release -p darwin-runtime-ffi
+
+      - name: Run FFI tests
+        run: cargo test -p darwin-runtime-ffi -- --test-threads=1
+
+      - name: Install library to temp prefix
+        run: |
+          chmod +x packaging/install.sh
+          ./packaging/install.sh --prefix /tmp/darwin-runtime-ci
+
+      - name: Build and run C client
+        run: |
+          cc examples/c-client/test_darwin_runtime.c \
+            -I/tmp/darwin-runtime-ci/include \
+            -L/tmp/darwin-runtime-ci/lib \
+            -ldarwin_runtime_ffi \
+            -o /tmp/test_c_client
+          /tmp/test_c_client
+
+      - name: Build Swift package
+        working-directory: swift
+        run: swift build
+
+      - name: Run Swift tests
+        working-directory: swift
+        env:
+          DARWIN_LOADER_ROOT: ${{ github.workspace }}
+        run: swift test
+
+      - name: Build Swift client example
+        working-directory: examples/swift-client
+        run: swift build

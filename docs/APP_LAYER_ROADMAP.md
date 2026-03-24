@@ -699,7 +699,7 @@ abstraction keeps the door open for Metal/Vulkan later.
 
 #### App 1: "Hello Darwin" — minimal lifecycle
 - Window with title "Hello Darwin"
-- Label: "Running on darwin-loader-lab runtime v0.1"
+- Label: "Running on burdetty-os runtime v0.1"
 - Button: "Run Scorecard" → runs compat_score, shows result in label
 - Button: "Quit" → `NSApplication::terminate(0)`
 
@@ -761,7 +761,7 @@ abstraction keeps the door open for Metal/Vulkan later.
 3. Boot banner displays:
    ```
    ╔═══════════════════════════════════════════════════╗
-   ║  darwin-loader-lab Runtime Environment v0.1       ║
+   ║  burdetty-os Runtime Environment v0.1       ║
    ║  Compatibility: 62/62 (100%)                      ║
    ║  Foundation classes: 35 | Shim functions: 344     ║
    ║  Type 'help' for commands, 'gui' for GUI demos    ║
@@ -867,7 +867,7 @@ CocoaPods requires Xcode integration. If SPM works, these are additive.
 ## Workspace layout (target state)
 
 ```
-darwin-loader-lab/
+burdetty-os/
   Cargo.toml                    (workspace root — 26+ members)
   crates/
     # ── Core loader (stable, frozen) ──

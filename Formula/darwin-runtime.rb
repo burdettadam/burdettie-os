@@ -1,17 +1,17 @@
 class DarwinRuntime < Formula
   desc "ARM64 Mach-O loader with ObjC/Foundation runtime — C-ABI library and tools"
-  homepage "https://github.com/example/darwin-loader-lab"
+  homepage "https://github.com/example/burdetty-os"
   version "0.1.0"
   license any_of: ["MIT", "Apache-2.0"]
 
   # For local development, install with:
-  #   brew install --build-from-source darwin-loader/tap/darwin-runtime --HEAD
+  #   brew install --build-from-source burdetty-os/tap/darwin-runtime --HEAD
   #
   # When a release tarball exists, uncomment and fill in:
-  # url "https://github.com/example/darwin-loader-lab/archive/refs/tags/v0.1.0.tar.gz"
+  # url "https://github.com/example/burdetty-os/archive/refs/tags/v0.1.0.tar.gz"
   # sha256 "PLACEHOLDER"
 
-  head "https://github.com/example/darwin-loader-lab.git", branch: "main"
+  head "https://github.com/example/burdetty-os.git", branch: "main"
 
   depends_on "rust" => :build
   depends_on :macos

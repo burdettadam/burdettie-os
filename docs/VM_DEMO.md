@@ -67,8 +67,8 @@ To have Terminal open automatically on login with the runtime environment:
 
 ```bash
 cp /Volumes/darwin-runtime/config/auto-launch.plist \
-   ~/Library/LaunchAgents/com.darwin-loader.runtime.plist
-launchctl load ~/Library/LaunchAgents/com.darwin-loader.runtime.plist
+   ~/Library/LaunchAgents/com.burdetty-os.runtime.plist
+launchctl load ~/Library/LaunchAgents/com.burdetty-os.runtime.plist
 ```
 
 ## Configuration
@@ -77,12 +77,12 @@ All settings are controlled via environment variables:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `VM_IPSW` | `~/.darwin-loader/RestoreImage.ipsw` | Path to macOS restore image |
+| `VM_IPSW` | `~/.burdetty-os/RestoreImage.ipsw` | Path to macOS restore image |
 | `VM_SHARED_DIR` | `./dist` | Directory shared with guest |
 | `VM_CPUS` | `2` | Number of virtual CPUs |
 | `VM_MEMORY_GB` | `4` | Memory allocation in GB |
-| `VM_BUNDLE` | `~/.darwin-loader/vm-bundle` | VM persistent state directory |
-| `DARWIN_LOADER_ROOT` | Current directory | Project root |
+| `VM_BUNDLE` | `~/.burdetty-os/vm-bundle` | VM persistent state directory |
+| `BURDETTY_OS_ROOT` | Current directory | Project root |
 
 Example with custom settings:
 

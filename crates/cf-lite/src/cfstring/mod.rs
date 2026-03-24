@@ -1,4 +1,4 @@
-//! CFString / NSString implementation for darwin-loader-lab.
+//! CFString / NSString implementation for burdetty-os.
 //!
 //! Layout matches Apple's CFConstantString (32 bytes):
 //!   offset  0: isa          (u64)

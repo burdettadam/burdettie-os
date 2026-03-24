@@ -20,6 +20,34 @@ const COUNT_OFF: usize = 8;
 const KEYS_OFF: usize = 16;
 const VALS_OFF: usize = 24;
 
+/// Create an NSDictionary from parallel key/value slices.
+pub fn make_nsdictionary(keys: &[u64], vals: &[u64]) -> u64 {
+    let cnt = keys.len().min(vals.len());
+    let obj = unsafe { libc::calloc(1, 32) } as u64;
+    if obj == 0 { return 0; }
+    unsafe {
+        *(obj as *mut u64) = nsobj::nsdictionary_class_addr();
+        *((obj as usize + COUNT_OFF) as *mut u64) = cnt as u64;
+    }
+    if cnt > 0 {
+        let key_buf = unsafe { libc::malloc(cnt * 8) } as *mut u64;
+        let val_buf = unsafe { libc::malloc(cnt * 8) } as *mut u64;
+        if !key_buf.is_null() && !val_buf.is_null() {
+            for i in 0..cnt {
+                unsafe {
+                    key_buf.add(i).write(keys[i]);
+                    val_buf.add(i).write(vals[i]);
+                }
+            }
+        }
+        unsafe {
+            *((obj as usize + KEYS_OFF) as *mut u64) = key_buf as u64;
+            *((obj as usize + VALS_OFF) as *mut u64) = val_buf as u64;
+        }
+    }
+    obj
+}
+
 // ── Helpers ────────────────────────────────────────────────────────
 
 /// Read count from an NSDictionary object.

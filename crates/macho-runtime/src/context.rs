@@ -34,6 +34,9 @@ impl RuntimeContext {
         if shim_set.lifecycle {
             libsystem_shims::LifecycleShims::install(&mut table);
         }
+        if shim_set.ptrauth {
+            libsystem_shims::PtrauthShims::install(&mut table);
+        }
         if shim_set.objc {
             objc_runtime::ObjcShims::install(&mut table);
         }

@@ -1,6 +1,6 @@
 [package]
 name        = "ui-view"
-description = "View tree, layout, and hit testing for darwin-loader-lab GUI framework"
+description = "View tree, layout, and hit testing for burdetty-os GUI framework"
 version.workspace      = true
 edition.workspace      = true
 license.workspace      = true

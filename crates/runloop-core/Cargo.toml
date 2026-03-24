@@ -1,6 +1,6 @@
 [package]
 name        = "runloop-core"
-description = "Event loop and timer infrastructure for darwin-loader-lab GUI framework"
+description = "Event loop and timer infrastructure for burdetty-os GUI framework"
 version.workspace      = true
 edition.workspace      = true
 license.workspace      = true

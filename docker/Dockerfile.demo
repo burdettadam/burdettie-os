@@ -11,29 +11,29 @@
 #   ./packaging/bundle-runtime.sh --release
 #
 #   # 2. Build demo image from the bundle:
-#   docker build -f docker/Dockerfile.demo -t darwin-loader-demo dist/
+#   docker build -f docker/Dockerfile.demo -t burdetty-os-demo dist/
 #
 #   # 3. Explore the image contents:
-#   docker run --rm darwin-loader-demo ls /opt/darwin-loader/fixtures/
+#   docker run --rm burdetty-os-demo ls /opt/burdetty-os/fixtures/
 
 FROM debian:bookworm-slim
 
-LABEL maintainer="darwin-loader-lab"
-LABEL description="darwin-loader-lab runtime + fixtures bundle"
+LABEL maintainer="burdetty-os"
+LABEL description="burdetty-os runtime + fixtures bundle"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     file \
     && rm -rf /var/lib/apt/lists/*
 
-COPY . /opt/darwin-loader/
+COPY . /opt/burdetty-os/
 
 # Make binaries accessible
-ENV PATH="/opt/darwin-loader/bin:${PATH}"
+ENV PATH="/opt/burdetty-os/bin:${PATH}"
 
-WORKDIR /opt/darwin-loader
+WORKDIR /opt/burdetty-os
 
 # Set runtime root for fixture discovery
-ENV DARWIN_LOADER_ROOT="/opt/darwin-loader"
+ENV BURDETTY_OS_ROOT="/opt/burdetty-os"
 
 # Default: launch the interactive runtime shell (falls back to info if no TTY)
-CMD ["sh", "-c", "if [ -t 0 ]; then runtime-shell; else echo 'darwin-loader-lab demo image' && echo '' && echo 'Binaries:' && ls bin/ && echo '' && echo 'Fixtures:' && ls fixtures/ && echo '' && echo 'Run interactively: docker run -it darwin-loader-demo'; fi"]
+CMD ["sh", "-c", "if [ -t 0 ]; then runtime-shell; else echo 'burdetty-os demo image' && echo '' && echo 'Binaries:' && ls bin/ && echo '' && echo 'Fixtures:' && ls fixtures/ && echo '' && echo 'Run interactively: docker run -it burdetty-os-demo'; fi"]

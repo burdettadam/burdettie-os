@@ -1,4 +1,4 @@
-//! CF-lite: Foundation and CoreFoundation shims for darwin-loader-lab.
+//! CF-lite: Foundation and CoreFoundation shims for burdetty-os.
 //!
 //! Provides the minimum set of Foundation/CF symbols needed to run
 //! ObjC binaries that use NSLog, NSObject, and @"..." string literals.
@@ -15,7 +15,9 @@ pub(crate) mod cfstring;
 pub(crate) mod format;
 pub(crate) mod foundation;
 pub(crate) mod nsarray;
+pub(crate) mod nsattributedstring;
 pub(crate) mod nsbundle;
+pub(crate) mod nscache;
 pub(crate) mod nscalendar;
 pub(crate) mod nscharacterset;
 pub(crate) mod nsdata;
@@ -26,20 +28,31 @@ pub(crate) mod nsenumerator;
 pub(crate) mod nserror;
 pub(crate) mod nsexception;
 pub(crate) mod nsfilemanager;
+pub(crate) mod nshashtable;
 pub(crate) mod nsindexset;
+pub(crate) mod nsinvocation;
+pub(crate) mod nsjsonserialization;
 pub(crate) mod nslocale;
 pub(crate) mod nslock;
 pub mod nslog;
+pub(crate) mod nsmaptable;
 pub(crate) mod nsmutablearray;
 pub(crate) mod nsmutabledict;
 pub(crate) mod nsmutableset;
 pub(crate) mod nsmutablestring;
 pub(crate) mod nsnotificationcenter;
+pub(crate) mod nskeyvalueobserving;
+pub(crate) mod nskeyvaluecoding;
+pub(crate) mod nsmethodsignature;
 pub(crate) mod nsnull;
 pub(crate) mod nsnumber;
 pub(crate) mod nsnumberformatter;
 pub mod nsobj;
+pub(crate) mod nsoperation;
+pub(crate) mod nspredicate;
 pub(crate) mod nsprocessinfo;
+pub(crate) mod nspropertylistserialization;
+pub(crate) mod nsregularexpression;
 pub(crate) mod nsset;
 pub(crate) mod nssortdescriptor;
 pub(crate) mod nsthread;

@@ -16,8 +16,12 @@ observed/
 # Build artifacts
 dist/
 *.dmg
-darwin-loader.tar.gz
+burdetty-os.tar.gz
 
 # Swift build artifacts
 vm-image/.build/
 vm-image/.swiftpm/
+swift/.build/
+swift/.swiftpm/
+examples/swift-client/.build/
+examples/swift-client/.swiftpm/

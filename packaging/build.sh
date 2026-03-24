@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# build.sh — Full build + test + package pipeline for darwin-loader-lab.
+# build.sh — Full build + test + package pipeline for burdetty-os.
 #
 # Usage:
 #   ./packaging/build.sh              # default: debug build + tests
@@ -40,7 +40,7 @@ for arg in "$@"; do
 done
 
 echo "╔══════════════════════════════════════════════════════╗"
-echo "║  darwin-loader-lab — build pipeline                 ║"
+echo "║  burdetty-os — build pipeline                 ║"
 echo "║  profile: $PROFILE                                      ║"
 echo "╚══════════════════════════════════════════════════════╝"
 echo ""

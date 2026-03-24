@@ -147,6 +147,80 @@ pub extern "C" fn objc_msg_lookup_imp(obj: u64, sel: u64) -> LookupResult {
             }
         }
         None => {
+            // Check if the ISA belongs to our runtime
+            if rt.is_known_isa(isa) {
+                // Try dynamic method resolution first:
+                // For instance methods, call +resolveInstanceMethod: on the class
+                // For class methods, call +resolveClassMethod: on the metaclass
+                let is_meta = rt.is_metaclass(isa);
+                let resolve_sel_name = if is_meta {
+                    "resolveClassMethod:"
+                } else {
+                    "resolveInstanceMethod:"
+                };
+
+                // Look up the class's metaclass to find the resolve method
+                let resolve_isa = if is_meta {
+                    // For metaclass dispatch, the resolver is on the metaclass itself
+                    isa
+                } else {
+                    // For instance dispatch, the resolver is a class method → on the metaclass
+                    // ISA is the class addr; read the class's ISA to get the metaclass
+                    unsafe { *(isa as *const u64) }
+                };
+
+                if let Some(resolve_imp) = rt.msg_lookup(resolve_isa, resolve_sel_name) {
+                    // Drop the lock before calling the IMP
+                    drop(guard);
+
+                    // Call +resolveInstanceMethod: or +resolveClassMethod:
+                    // Args: (class_or_meta, _cmd, selector_to_resolve)
+                    let resolve_fn: extern "C" fn(u64, u64, u64) -> u8 =
+                        unsafe { std::mem::transmute(resolve_imp) };
+                    let resolved = resolve_fn(isa, 0, sel);
+
+                    if resolved != 0 {
+                        // Re-acquire lock and retry lookup
+                        let guard2 = match OBJC_RUNTIME.lock() {
+                            Ok(g) => g,
+                            Err(e) => e.into_inner(),
+                        };
+                        if let Some(rt2) = guard2.as_ref() {
+                            if let Some(imp) = rt2.msg_lookup(isa, sel_str) {
+                                log::trace!(
+                                    "objc_msgSend: [{sel_str}] resolved dynamically → imp={imp:#x}"
+                                );
+                                return LookupResult {
+                                    imp,
+                                    translated_sel: 0,
+                                };
+                            }
+                        }
+                    }
+
+                    // Resolution failed — try the forwarding chain
+                    // Return the forwarding trampoline; it will handle
+                    // methodSignatureForSelector: and forwardInvocation:
+                    log::debug!(
+                        "objc_msgSend: forwarding '{sel_str}' on {obj:#x} (isa={isa:#x})"
+                    );
+                    return LookupResult {
+                        imp: forwarding_trampoline as u64,
+                        translated_sel: 0,
+                    };
+                }
+
+                // No resolve method found — return forwarding trampoline
+                drop(guard);
+                log::debug!(
+                    "objc_msgSend: forwarding '{sel_str}' on {obj:#x} (isa={isa:#x})"
+                );
+                return LookupResult {
+                    imp: forwarding_trampoline as u64,
+                    translated_sel: 0,
+                };
+            }
+
             // ISA not known to our runtime — this may be a host ObjC object
             // (e.g., a real NSException caught via @catch). Fall back to the
             // host's objc_msgSend. Translate our selector to the host's
@@ -355,4 +429,173 @@ extern "C" fn shim_objc_msg_send_super2_rust(
     let f: extern "C" fn(u64, u64, u64, u64, u64, u64, u64, u64) -> u64 =
         unsafe { std::mem::transmute(imp) };
     f(receiver, a1, a2, a3, a4, a5, a6, a7)
+}
+
+// ── Forwarding trampoline ──────────────────────────────────────────
+
+/// Forwarding trampoline: called when a known ISA has no method for the selector.
+///
+/// Implements the ObjC forwarding chain:
+/// 1. Call `-methodSignatureForSelector:` on the receiver
+/// 2. If non-nil, create an `NSInvocation` and call `-forwardInvocation:`
+/// 3. Return the invocation's return value (or 0)
+extern "C" fn forwarding_trampoline(
+    obj: u64,
+    sel: u64,
+    a2: u64,
+    a3: u64,
+    a4: u64,
+    a5: u64,
+    a6: u64,
+    a7: u64,
+) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
+
+    let isa = unsafe { *(obj as *const u64) };
+    let sel_str = unsafe {
+        CStr::from_ptr(sel as *const c_char)
+            .to_str()
+            .unwrap_or("")
+    };
+
+    // Step 1: Look up methodSignatureForSelector: IMP
+    let sig_imp = {
+        let guard = match OBJC_RUNTIME.lock() {
+            Ok(g) => g,
+            Err(e) => e.into_inner(),
+        };
+        let Some(rt) = guard.as_ref() else { return 0 };
+        rt.msg_lookup(isa, "methodSignatureForSelector:")
+    };
+
+    let Some(sig_imp) = sig_imp else {
+        // No methodSignatureForSelector: — nothing we can do
+        eprintln!(
+            "objc_msgSend: unrecognized selector '{}' sent to instance {:#x} (no forwarding)",
+            sel_str, obj
+        );
+        return 0;
+    };
+
+    // Call methodSignatureForSelector: with the original selector
+    let sig_fn: extern "C" fn(u64, u64, u64) -> u64 = unsafe { std::mem::transmute(sig_imp) };
+    let signature = sig_fn(obj, 0, sel);
+
+    if signature == 0 {
+        // No signature — the class doesn't know about this selector
+        // Try doesNotRecognizeSelector:
+        let dnr_imp = {
+            let guard = match OBJC_RUNTIME.lock() {
+                Ok(g) => g,
+                Err(e) => e.into_inner(),
+            };
+            let Some(rt) = guard.as_ref() else { return 0 };
+            rt.msg_lookup(isa, "doesNotRecognizeSelector:")
+        };
+        if let Some(dnr_imp) = dnr_imp {
+            let dnr_fn: extern "C" fn(u64, u64, u64) =
+                unsafe { std::mem::transmute(dnr_imp) };
+            dnr_fn(obj, 0, sel);
+        } else {
+            eprintln!(
+                "objc_msgSend: unrecognized selector '{}' sent to instance {:#x}",
+                sel_str, obj
+            );
+        }
+        return 0;
+    }
+
+    // Step 2: Create NSInvocation with the signature and arguments
+    // Read numberOfArguments from the signature (offset 16)
+    let num_args = unsafe { *((signature + 16) as *const u64) } as usize;
+
+    // Allocate invocation: ISA(8) + sig(8) + target(8) + sel(8) + argBuf(8) + retBuf(8) = 48
+    let inv = unsafe { libc::calloc(1, 48) as u64 };
+    if inv == 0 {
+        return 0;
+    }
+
+    // Look up the NSInvocation class address
+    let inv_isa = {
+        let guard = match OBJC_RUNTIME.lock() {
+            Ok(g) => g,
+            Err(e) => e.into_inner(),
+        };
+        let Some(rt) = guard.as_ref() else { return 0 };
+        if let Some(cls) = rt.get_class("NSInvocation") {
+            cls.mapped_addr
+        } else {
+            return 0;
+        }
+    };
+
+    // Set up the invocation manually
+    unsafe {
+        *(inv as *mut u64) = inv_isa;           // ISA
+        *((inv + 8) as *mut u64) = signature;   // methodSignature
+        *((inv + 16) as *mut u64) = obj;        // target
+        *((inv + 24) as *mut u64) = sel;        // selector
+
+        // Allocate and populate argument buffer
+        let arg_buf = libc::calloc(8, 8) as u64; // 8 args max
+        *((inv + 32) as *mut u64) = arg_buf;
+
+        if arg_buf != 0 {
+            let buf = arg_buf as *mut u64;
+            *buf = obj;         // arg[0] = self
+            *buf.add(1) = sel;  // arg[1] = _cmd
+            if num_args > 2 { *buf.add(2) = a2; }
+            if num_args > 3 { *buf.add(3) = a3; }
+            if num_args > 4 { *buf.add(4) = a4; }
+            if num_args > 5 { *buf.add(5) = a5; }
+            if num_args > 6 { *buf.add(6) = a6; }
+            if num_args > 7 { *buf.add(7) = a7; }
+        }
+
+        // Allocate return buffer
+        let ret_buf = libc::calloc(1, 8) as u64;
+        *((inv + 40) as *mut u64) = ret_buf;
+    }
+
+    // Step 3: Look up and call forwardInvocation:
+    let fwd_imp = {
+        let guard = match OBJC_RUNTIME.lock() {
+            Ok(g) => g,
+            Err(e) => e.into_inner(),
+        };
+        let Some(rt) = guard.as_ref() else { return 0 };
+        rt.msg_lookup(isa, "forwardInvocation:")
+    };
+
+    if let Some(fwd_imp) = fwd_imp {
+        let fwd_fn: extern "C" fn(u64, u64, u64) = unsafe { std::mem::transmute(fwd_imp) };
+        fwd_fn(obj, 0, inv);
+    }
+
+    // Step 4: Extract return value
+    let result = unsafe {
+        let ret_buf = *((inv + 40) as *const u64);
+        if ret_buf != 0 {
+            *(ret_buf as *const u64)
+        } else {
+            0
+        }
+    };
+
+    // Clean up the invocation buffers (but not the signature — caller may still need it)
+    unsafe {
+        let arg_buf = *((inv + 32) as *const u64);
+        if arg_buf != 0 {
+            libc::free(arg_buf as *mut libc::c_void);
+        }
+        let ret_buf = *((inv + 40) as *const u64);
+        if ret_buf != 0 {
+            libc::free(ret_buf as *mut libc::c_void);
+        }
+        libc::free(inv as *mut libc::c_void);
+    }
+
+    result
 }

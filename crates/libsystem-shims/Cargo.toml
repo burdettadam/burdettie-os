@@ -1,6 +1,6 @@
 [package]
 name        = "libsystem-shims"
-description = "Controlled system library shims for darwin-loader-lab runtime"
+description = "Controlled system library shims for burdetty-os runtime"
 version.workspace      = true
 edition.workspace      = true
 license.workspace      = true

@@ -487,6 +487,56 @@ impl FoundationShims {
             "NSTimer metaclass data symbol",
         );
 
+        // NSMethodSignature class/metaclass data symbols
+        table.register(
+            "_OBJC_CLASS_$_NSMethodSignature",
+            nsobj::nsmethodsignature_class_addr(),
+            "NSMethodSignature class data symbol",
+        );
+        table.register(
+            "_OBJC_METACLASS_$_NSMethodSignature",
+            nsobj::nsmethodsignature_metaclass_addr(),
+            "NSMethodSignature metaclass data symbol",
+        );
+
+        // NSInvocation class/metaclass data symbols
+        table.register(
+            "_OBJC_CLASS_$_NSInvocation",
+            nsobj::nsinvocation_class_addr(),
+            "NSInvocation class data symbol",
+        );
+        table.register(
+            "_OBJC_METACLASS_$_NSInvocation",
+            nsobj::nsinvocation_metaclass_addr(),
+            "NSInvocation metaclass data symbol",
+        );
+
+        // Phase B6 Foundation classes
+        table.register("_OBJC_CLASS_$_NSRegularExpression", nsobj::nsregularexpression_class_addr(), "NSRegularExpression class data symbol");
+        table.register("_OBJC_METACLASS_$_NSRegularExpression", nsobj::nsregularexpression_metaclass_addr(), "NSRegularExpression metaclass data symbol");
+        table.register("_OBJC_CLASS_$_NSPredicate", nsobj::nspredicate_class_addr(), "NSPredicate class data symbol");
+        table.register("_OBJC_METACLASS_$_NSPredicate", nsobj::nspredicate_metaclass_addr(), "NSPredicate metaclass data symbol");
+        table.register("_OBJC_CLASS_$_NSAttributedString", nsobj::nsattributedstring_class_addr(), "NSAttributedString class data symbol");
+        table.register("_OBJC_METACLASS_$_NSAttributedString", nsobj::nsattributedstring_metaclass_addr(), "NSAttributedString metaclass data symbol");
+        table.register("_OBJC_CLASS_$_NSMutableAttributedString", nsobj::nsmutableattributedstring_class_addr(), "NSMutableAttributedString class data symbol");
+        table.register("_OBJC_METACLASS_$_NSMutableAttributedString", nsobj::nsmutableattributedstring_metaclass_addr(), "NSMutableAttributedString metaclass data symbol");
+        table.register("_OBJC_CLASS_$_NSCache", nsobj::nscache_class_addr(), "NSCache class data symbol");
+        table.register("_OBJC_METACLASS_$_NSCache", nsobj::nscache_metaclass_addr(), "NSCache metaclass data symbol");
+        table.register("_OBJC_CLASS_$_NSMapTable", nsobj::nsmaptable_class_addr(), "NSMapTable class data symbol");
+        table.register("_OBJC_METACLASS_$_NSMapTable", nsobj::nsmaptable_metaclass_addr(), "NSMapTable metaclass data symbol");
+        table.register("_OBJC_CLASS_$_NSHashTable", nsobj::nshashtable_class_addr(), "NSHashTable class data symbol");
+        table.register("_OBJC_METACLASS_$_NSHashTable", nsobj::nshashtable_metaclass_addr(), "NSHashTable metaclass data symbol");
+        table.register("_OBJC_CLASS_$_NSOperation", nsobj::nsoperation_class_addr(), "NSOperation class data symbol");
+        table.register("_OBJC_METACLASS_$_NSOperation", nsobj::nsoperation_metaclass_addr(), "NSOperation metaclass data symbol");
+        table.register("_OBJC_CLASS_$_NSBlockOperation", nsobj::nsblockoperation_class_addr(), "NSBlockOperation class data symbol");
+        table.register("_OBJC_METACLASS_$_NSBlockOperation", nsobj::nsblockoperation_metaclass_addr(), "NSBlockOperation metaclass data symbol");
+        table.register("_OBJC_CLASS_$_NSOperationQueue", nsobj::nsoperationqueue_class_addr(), "NSOperationQueue class data symbol");
+        table.register("_OBJC_METACLASS_$_NSOperationQueue", nsobj::nsoperationqueue_metaclass_addr(), "NSOperationQueue metaclass data symbol");
+        table.register("_OBJC_CLASS_$_NSJSONSerialization", nsobj::nsjsonserialization_class_addr(), "NSJSONSerialization class data symbol");
+        table.register("_OBJC_METACLASS_$_NSJSONSerialization", nsobj::nsjsonserialization_metaclass_addr(), "NSJSONSerialization metaclass data symbol");
+        table.register("_OBJC_CLASS_$_NSPropertyListSerialization", nsobj::nspropertylistserialization_class_addr(), "NSPropertyListSerialization class data symbol");
+        table.register("_OBJC_METACLASS_$_NSPropertyListSerialization", nsobj::nspropertylistserialization_metaclass_addr(), "NSPropertyListSerialization metaclass data symbol");
+
         // NSException EHTYPE — used by __objc_personality_v0 for @catch type matching.
         // Must resolve to the host Foundation's EHTYPE so that exceptions thrown
         // via host libobjc's objc_exception_throw can be caught by @catch(NSException *).
@@ -683,6 +733,62 @@ impl FoundationShims {
     pub fn register_nsconditionlock_class(rt: &mut objc_runtime::ObjcRuntime) {
         register::register_nsconditionlock_class(rt);
     }
+
+    pub fn register_nsmethodsignature_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsmethodsignature_class(rt);
+    }
+
+    pub fn register_nsinvocation_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsinvocation_class(rt);
+    }
+
+    pub fn register_nsregularexpression_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsregularexpression_class(rt);
+    }
+
+    pub fn register_nspredicate_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nspredicate_class(rt);
+    }
+
+    pub fn register_nsattributedstring_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsattributedstring_class(rt);
+    }
+
+    pub fn register_nsmutableattributedstring_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsmutableattributedstring_class(rt);
+    }
+
+    pub fn register_nscache_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nscache_class(rt);
+    }
+
+    pub fn register_nsmaptable_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsmaptable_class(rt);
+    }
+
+    pub fn register_nshashtable_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nshashtable_class(rt);
+    }
+
+    pub fn register_nsoperation_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsoperation_class(rt);
+    }
+
+    pub fn register_nsblockoperation_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsblockoperation_class(rt);
+    }
+
+    pub fn register_nsoperationqueue_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsoperationqueue_class(rt);
+    }
+
+    pub fn register_nsjsonserialization_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsjsonserialization_class(rt);
+    }
+
+    pub fn register_nspropertylistserialization_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nspropertylistserialization_class(rt);
+    }
 }
 
 #[cfg(test)]
@@ -781,11 +887,17 @@ mod tests {
             .is_some());
         assert!(table.resolve("_OBJC_CLASS_$_NSTimer").is_some());
         assert!(table.resolve("_OBJC_METACLASS_$_NSTimer").is_some());
-        // 76 base shims + 1 EHTYPE on macOS
+        assert!(table.resolve("_OBJC_CLASS_$_NSMethodSignature").is_some());
+        assert!(table
+            .resolve("_OBJC_METACLASS_$_NSMethodSignature")
+            .is_some());
+        assert!(table.resolve("_OBJC_CLASS_$_NSInvocation").is_some());
+        assert!(table.resolve("_OBJC_METACLASS_$_NSInvocation").is_some());
+        // 104 base shims + 1 EHTYPE on macOS
         #[cfg(target_os = "macos")]
-        assert_eq!(table.len(), 77);
+        assert_eq!(table.len(), 105);
         #[cfg(not(target_os = "macos"))]
-        assert_eq!(table.len(), 76);
+        assert_eq!(table.len(), 104);
     }
 
     #[test]

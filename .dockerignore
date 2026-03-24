@@ -1,0 +1,9 @@
+target/
+.git/
+*.dmg
+burdetty-os.tar.gz
+dist/
+observed/
+vm-image/.build/
+vm-image/.swiftpm/
+.DS_Store

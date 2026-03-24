@@ -12,6 +12,7 @@
 
 use macho_objc::InitializerInfo;
 
+use crate::ptrauth;
 use crate::{ExecError, MappedImage};
 
 /// Call all constructors for a mapped image.
@@ -35,7 +36,8 @@ pub fn call_constructors(image: &MappedImage, inits: &InitializerInfo) -> Result
             ctor.address, ctor.source
         );
 
-        let ctor_fn: extern "C" fn() = unsafe { std::mem::transmute(in_process_addr) };
+        let stripped = ptrauth::ptrauth_strip(in_process_addr);
+        let ctor_fn: extern "C" fn() = unsafe { std::mem::transmute(stripped) };
         ctor_fn();
         count += 1;
     }

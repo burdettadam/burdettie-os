@@ -1,4 +1,4 @@
-//! Platform abstraction traits for darwin-loader-lab.
+//! Platform abstraction traits for burdetty-os.
 //!
 //! Defines the interfaces that the runtime needs from the host platform.
 //! All host-specific implementations live in `platform-darwin-host`

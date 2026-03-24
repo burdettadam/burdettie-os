@@ -13,6 +13,26 @@ use crate::cfstring;
 const NSARRAY_COUNT_OFF: usize = 8;
 const NSARRAY_ELEMS_OFF: usize = 16;
 
+/// Create an NSArray from a slice of object pointers.
+pub fn make_nsarray(items: &[u64]) -> u64 {
+    let obj = unsafe { libc::calloc(1, 24) } as u64;
+    if obj == 0 { return 0; }
+    unsafe {
+        *(obj as *mut u64) = crate::nsobj::nsarray_class_addr();
+        *((obj as usize + NSARRAY_COUNT_OFF) as *mut u64) = items.len() as u64;
+    }
+    if !items.is_empty() {
+        let buf = unsafe { libc::malloc(items.len() * 8) } as *mut u64;
+        if !buf.is_null() {
+            for (i, &item) in items.iter().enumerate() {
+                unsafe { buf.add(i).write(item); }
+            }
+        }
+        unsafe { *((obj as usize + NSARRAY_ELEMS_OFF) as *mut u64) = buf as u64; }
+    }
+    obj
+}
+
 /// `+[NSArray arrayWithObjects:count:]`
 ///
 /// Class factory: creates immutable array from a C array of object pointers.

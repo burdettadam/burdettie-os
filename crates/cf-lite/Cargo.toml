@@ -1,6 +1,6 @@
 [package]
 name         = "cf-lite"
-description  = "Foundation/CoreFoundation shims for darwin-loader-lab"
+description  = "Foundation/CoreFoundation shims for burdetty-os"
 version.workspace      = true
 edition.workspace      = true
 license.workspace      = true
@@ -12,6 +12,8 @@ objc-runtime    = { workspace = true }
 platform-core   = { workspace = true }
 log             = { workspace = true }
 libc            = { workspace = true }
+regex           = { workspace = true }
+serde_json      = { workspace = true }
 
 [build-dependencies]
 cc = "1"

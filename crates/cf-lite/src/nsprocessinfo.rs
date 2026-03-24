@@ -69,7 +69,7 @@ pub extern "C" fn shim_nsprocessinfo_arguments(obj: u64, _cmd: u64) -> u64 {
     // Build a minimal NSArray with the process name as argv[0]
     let name = libsystem_shims::process::process_name()
         .map(|s| s.to_string())
-        .unwrap_or_else(|| "darwin-loader-lab".to_string());
+        .unwrap_or_else(|| "burdetty-os".to_string());
 
     let cstr = std::ffi::CString::new(name).unwrap_or_default();
     let nsstr = crate::cfstring::alloc_nsstring_from_cstr(cstr.as_ptr());

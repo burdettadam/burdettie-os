@@ -5,7 +5,7 @@
 #   ./packaging/make-vm-image.sh                   # uses dist/ as input
 #   ./packaging/make-vm-image.sh --input /tmp/pkg   # custom input dir
 #
-# Output: darwin-loader.dmg (macOS disk image)
+# Output: burdetty-os.dmg (macOS disk image)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -13,7 +13,7 @@ ROOT="$SCRIPT_DIR/.."
 cd "$ROOT"
 
 INPUT_DIR="$ROOT/dist"
-OUTPUT="$ROOT/darwin-loader.dmg"
+OUTPUT="$ROOT/burdetty-os.dmg"
 
 for arg in "$@"; do
     case "$arg" in
@@ -47,7 +47,7 @@ if command -v hdiutil &>/dev/null; then
     [ -f "$OUTPUT" ] && rm "$OUTPUT"
 
     hdiutil create \
-        -volname "darwin-loader-lab" \
+        -volname "burdetty-os" \
         -srcfolder "$INPUT_DIR" \
         -ov \
         -format UDZO \
@@ -57,7 +57,7 @@ if command -v hdiutil &>/dev/null; then
     ls -lh "$OUTPUT"
 else
     # Fallback: create a tar.gz archive
-    OUTPUT="$ROOT/darwin-loader.tar.gz"
+    OUTPUT="$ROOT/burdetty-os.tar.gz"
     tar -czf "$OUTPUT" -C "$INPUT_DIR" .
     echo "✓ Created: $OUTPUT (hdiutil not available, used tar.gz)"
     ls -lh "$OUTPUT"

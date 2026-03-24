@@ -1,6 +1,6 @@
 # Mach-O Test Suite Inventory
 
-> **Purpose**: Comprehensive catalog of publicly available test suites and test cases for Mach-O binary parsing and dynamic loading, mapped to `darwin-loader-lab` crates for porting to Rust.
+> **Purpose**: Comprehensive catalog of publicly available test suites and test cases for Mach-O binary parsing and dynamic loading, mapped to `burdetty-os` crates for porting to Rust.
 >
 > **Scope**: Research only — no code produced. Each entry identifies the source project, file path/URL, what the test validates, expected behavior, fixture requirements, and target crate.
 

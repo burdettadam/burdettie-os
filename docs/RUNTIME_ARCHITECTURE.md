@@ -1,4 +1,4 @@
-# Runtime Architecture — darwin-loader-lab
+# Runtime Architecture — burdetty-os
 
 > *Build the smallest usable macOS runtime layer above an already-strong
 > loader, and let real binaries decide what comes next.*

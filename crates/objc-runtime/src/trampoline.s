@@ -1,4 +1,4 @@
-// ARM64 objc_msgSend trampoline for darwin-loader-lab.
+// ARM64 objc_msgSend trampoline for burdetty-os.
 //
 // Preserves the entire argument register file (x0-x7, d0-d7) across
 // the class-table lookup, then tail-calls the resolved IMP. This is

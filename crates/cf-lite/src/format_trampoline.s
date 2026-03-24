@@ -1,4 +1,4 @@
-// ARM64 stringWithFormat: variadic trampoline for darwin-loader-lab.
+// ARM64 stringWithFormat: variadic trampoline for burdetty-os.
 //
 // When the ObjC runtime dispatches +[NSString stringWithFormat:], the
 // IMP is called with the standard ARM64 ObjC calling convention:

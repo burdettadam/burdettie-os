@@ -1,4 +1,4 @@
-//! Controlled system library shims for the darwin-loader-lab runtime.
+//! Controlled system library shims for the burdetty-os runtime.
 //!
 //! Each shim is a Rust function with `extern "C"` ABI that can be
 //! registered in the `ShimTable` and resolved by the runtime's symbol
@@ -20,6 +20,7 @@ pub(crate) mod dispatch;
 pub(crate) mod lifecycle;
 pub(crate) mod mach;
 pub mod process;
+pub(crate) mod ptrauth;
 pub(crate) mod pthread;
 pub mod table;
 pub(crate) mod tls;
@@ -28,6 +29,7 @@ pub use dispatch::DispatchShims;
 pub use lifecycle::LifecycleShims;
 pub use mach::MachShims;
 pub use process::ProcessShims;
+pub use ptrauth::PtrauthShims;
 pub use pthread::PthreadShims;
 pub use table::{ShimEntry, ShimTable};
 pub use tls::TlsShims;
@@ -40,6 +42,7 @@ pub fn install_default_shims(table: &mut ShimTable, config: &ShimConfig) {
     DispatchShims::install(table);
     PthreadShims::install(table);
     MachShims::install(table);
+    PtrauthShims::install(table);
     LifecycleShims::install(table);
 }
 
@@ -61,7 +64,7 @@ pub struct ShimConfig {
 impl Default for ShimConfig {
     fn default() -> Self {
         Self {
-            process_name: "darwin-loader-lab".to_string(),
+            process_name: "burdetty-os".to_string(),
             executable_path: "/usr/local/bin/app".to_string(),
             argc: 1,
             argv: vec!["app".to_string()],

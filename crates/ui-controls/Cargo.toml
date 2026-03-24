@@ -1,6 +1,6 @@
 [package]
 name        = "ui-controls"
-description = "Concrete UI controls (Label, Button, TextField) for darwin-loader-lab GUI framework"
+description = "Concrete UI controls (Label, Button, TextField) for burdetty-os GUI framework"
 version.workspace      = true
 edition.workspace      = true
 license.workspace      = true

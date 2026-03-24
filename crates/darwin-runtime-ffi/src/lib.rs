@@ -1,4 +1,4 @@
-//! C-ABI FFI wrapper for the darwin-loader-lab runtime.
+//! C-ABI FFI wrapper for the burdetty-os runtime.
 //!
 //! Exposes the runtime's core functionality through stable `extern "C"` functions
 //! that can be called from C, Swift, Python, or any language with C FFI support.

@@ -292,6 +292,8 @@ dependencies = [
  "log",
  "objc-runtime",
  "platform-core",
+ "regex",
+ "serde_json",
 ]
 
 [[package]]

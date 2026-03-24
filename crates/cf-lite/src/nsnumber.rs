@@ -31,6 +31,21 @@ pub fn alloc_nsnumber(tag: u64, raw_value: u64) -> u64 {
     obj
 }
 
+/// Create an NSNumber wrapping an i64.
+pub fn make_nsnumber_int(value: i64) -> u64 {
+    alloc_nsnumber(TAG_INT, value as u64)
+}
+
+/// Create an NSNumber wrapping an f64.
+pub fn make_nsnumber_double(value: f64) -> u64 {
+    alloc_nsnumber(TAG_DOUBLE, value.to_bits())
+}
+
+/// Create an NSNumber wrapping a bool.
+pub fn make_nsnumber_bool(value: bool) -> u64 {
+    alloc_nsnumber(TAG_BOOL, u64::from(value))
+}
+
 // ── Class methods ──────────────────────────────────────────────────
 
 /// `+[NSNumber numberWithInt:]`

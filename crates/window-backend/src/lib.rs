@@ -25,7 +25,7 @@ pub struct WindowConfig {
 impl Default for WindowConfig {
     fn default() -> Self {
         Self {
-            title: "darwin-loader-lab".to_string(),
+            title: "burdetty-os".to_string(),
             width: 800.0,
             height: 600.0,
             resizable: true,

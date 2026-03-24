@@ -4,6 +4,7 @@ use macho_parse::ParsedMachO;
 use macho_types::load_command::{LoadCommandPayload, LoadCommandType};
 
 use super::resolver::SymbolResolver;
+use crate::ptrauth::AuthMetadata;
 use crate::{ExecError, MappedImage, MappedSegment};
 
 /// A parsed import entry from the chained fixups imports table.
@@ -252,6 +253,14 @@ fn walk_chain(
                         (ord, n)
                     };
 
+                    if is_auth {
+                        let meta = AuthMetadata::from_auth_bind(raw);
+                        log::trace!(
+                            "arm64e auth-bind at +{offset:#x}: ordinal={ordinal}, key={}, addrDiv={}, diversity={:#06x}",
+                            meta.key, meta.addr_diversity, meta.diversity
+                        );
+                    }
+
                     if resolve_and_write_bind(seg, offset, ordinal, 0, imports, resolver) {
                         binds += 1;
                     }
@@ -267,6 +276,11 @@ fn walk_chain(
                     };
 
                     let target = if is_auth {
+                        let meta = AuthMetadata::from_auth_entry(raw);
+                        log::trace!(
+                            "arm64e auth-rebase at +{offset:#x}: target={:#x}, key={}, addrDiv={}, diversity={:#06x}",
+                            raw & 0xFFFFFFFF, meta.key, meta.addr_diversity, meta.diversity
+                        );
                         (raw & 0xFFFFFFFF) as i64 + slide
                     } else {
                         let target43 = raw & 0x7FF_FFFF_FFFF;
