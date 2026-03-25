@@ -48,6 +48,7 @@ pub fn set_host_symbols(resolver: Arc<dyn platform_core::symbols::HostSymbolReso
 }
 
 /// Get the global host symbol resolver.
+#[allow(dead_code)]
 pub(crate) fn host_symbols() -> Option<&'static Arc<dyn platform_core::symbols::HostSymbolResolver>> {
     HOST_SYMBOLS.get()
 }

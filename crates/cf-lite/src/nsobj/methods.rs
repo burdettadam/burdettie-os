@@ -186,6 +186,8 @@ pub extern "C" fn shim_nsobject_forward_invocation(obj: u64, _cmd: u64, invocati
 }
 
 /// `-[NSObject doesNotRecognizeSelector:]`
+///
+/// Throws an `NSInvalidArgumentException` (matching Apple's behaviour).
 pub extern "C" fn shim_nsobject_does_not_recognize_selector(obj: u64, _cmd: u64, sel: u64) {
     let sel_str = if sel != 0 {
         unsafe {
@@ -196,10 +198,44 @@ pub extern "C" fn shim_nsobject_does_not_recognize_selector(obj: u64, _cmd: u64,
     } else {
         "<unknown>"
     };
-    eprintln!(
-        "-[NSObject doesNotRecognizeSelector:]: '{}' sent to instance {:#x}",
-        sel_str, obj
+
+    // Resolve the class name for the error message.
+    let class_name = {
+        let guard = match objc_runtime::OBJC_RUNTIME.lock() {
+            Ok(g) => g,
+            Err(e) => e.into_inner(),
+        };
+        guard
+            .as_ref()
+            .and_then(|rt| {
+                let isa = unsafe { *(obj as *const u64) } & 0x007ffffffffffff8;
+                rt.get_class_by_addr(isa).map(|c| c.name.clone())
+            })
+            .unwrap_or_else(|| format!("{:#x}", obj))
+    };
+
+    let reason = format!(
+        "-[{} {}]: unrecognized selector sent to instance {:#x}",
+        class_name, sel_str, obj
     );
+    log::error!("{}", reason);
+
+    // Build an NSException and throw it.
+    let name_str = crate::cfstring::alloc_nsstring_from_cstr(
+        c"NSInvalidArgumentException".as_ptr(),
+    );
+    let reason_cstr = std::ffi::CString::new(reason).unwrap_or_default();
+    let reason_str = crate::cfstring::alloc_nsstring_from_cstr(reason_cstr.as_ptr());
+
+    let exc = crate::nsexception::shim_nsexception_exception_with_name_reason_userinfo(
+        crate::nsobj::nsexception_class_addr(),
+        0,
+        name_str,
+        reason_str,
+        0,
+    );
+
+    objc_runtime::shim_objc_exception_throw(exc);
 }
 
 /// `+[NSObject resolveInstanceMethod:]` — default returns NO.

@@ -12,4 +12,9 @@ fn main() {
         println!("cargo:rustc-link-lib=static=objc_trampoline");
         println!("cargo:rerun-if-changed=src/trampoline.s");
     }
+
+    // Link libc++abi for __cxa_throw / __cxa_begin_catch / etc.
+    if target_os == "macos" {
+        println!("cargo:rustc-link-lib=c++abi");
+    }
 }

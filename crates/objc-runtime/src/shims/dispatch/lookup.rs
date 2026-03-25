@@ -14,18 +14,44 @@ pub extern "C" fn objc_msg_lookup_imp(obj: u64, sel: u64) -> u64 {
         return 0;
     }
 
-    if obj & (1u64 << 63) != 0 || obj % 8 != 0 {
+    if obj & (1u64 << 63) != 0 {
+        // Tagged pointer — look up class from tagged pointer ISA table.
+        let sel_str = unsafe { CStr::from_ptr(sel as *const c_char) }
+            .to_str()
+            .unwrap_or("");
+        let guard = match OBJC_RUNTIME.lock() {
+            Ok(g) => g,
+            Err(e) => e.into_inner(),
+        };
+        let Some(rt) = guard.as_ref() else {
+            return unrecognized_selector_stub as u64;
+        };
+        if let Some(isa) = rt.tagged_class_for_pointer(obj) {
+            if let Some(imp) = rt.msg_lookup(isa, sel_str) {
+                log::trace!(
+                    "objc_msgSend: tagged [{sel_str}] on {obj:#x} (isa={isa:#x}) → imp={imp:#x}"
+                );
+                return imp;
+            }
+        }
+        log::debug!(
+            "objc_msgSend: unhandled tagged pointer {obj:#x} for '{sel_str}'"
+        );
+        runtime_diagnostics::emit(DiagEvent::HostFallback {
+            reason: "tagged pointer — no handler".into(),
+            selector: sel_str.into(),
+            receiver: obj,
+        });
+        return unrecognized_selector_stub as u64;
+    }
+
+    if obj % 8 != 0 {
         let sel_str = unsafe { CStr::from_ptr(sel as *const c_char) }
             .to_str()
             .unwrap_or("");
         log::warn!(
-            "objc_msgSend: tagged/unaligned pointer {obj:#x} for '{sel_str}' — not supported"
+            "objc_msgSend: unaligned pointer {obj:#x} for '{sel_str}'"
         );
-        runtime_diagnostics::emit(DiagEvent::HostFallback {
-            reason: "tagged/unaligned pointer".into(),
-            selector: sel_str.into(),
-            receiver: obj,
-        });
         return unrecognized_selector_stub as u64;
     }
 

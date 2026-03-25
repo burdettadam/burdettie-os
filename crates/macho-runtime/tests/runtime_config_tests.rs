@@ -49,11 +49,11 @@ fn context_installs_all_shims() {
     let shim_set = ShimSet::default();
     let ctx = RuntimeContext::new(&config, &shim_set);
 
-    // 5 process + 2 TLS + 5 dispatch + 42 pthread + 3 mach + 2 ptrauth + 2 lifecycle + 78 objc + 108 foundation = 247 shims (macOS)
+    // Shim count (updated after D1: self-hosted NSConstant* + EHTYPE across all platforms).
     #[cfg(target_os = "macos")]
-    assert_eq!(ctx.shim_table.len(), 247);
+    assert_eq!(ctx.shim_table.len(), 267);
     #[cfg(not(target_os = "macos"))]
-    assert_eq!(ctx.shim_table.len(), 237);
+    assert_eq!(ctx.shim_table.len(), 267);
 }
 
 #[test]

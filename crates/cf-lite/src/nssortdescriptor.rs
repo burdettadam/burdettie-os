@@ -18,20 +18,18 @@ use crate::nsobj;
 
 const NSSORTDESCRIPTOR_SIZE: usize = 24;
 
-/// Forward `compare:` to the host's `objc_msgSend`.
-fn host_compare(a: u64, b: u64) -> i64 {
-    type SelRegFn = unsafe extern "C" fn(*const i8) -> u64;
-    type MsgSend3 = unsafe extern "C" fn(u64, u64, u64) -> i64;
-    let symbols = crate::pal_symbols();
-    let sel_reg = symbols.resolve("sel_registerName");
-    let msg_send = symbols.resolve("objc_msgSend");
-    if let (Some(sel_reg_ptr), Some(msg_send_ptr)) = (sel_reg, msg_send) {
-        let sel_fn: SelRegFn = unsafe { std::mem::transmute(sel_reg_ptr) };
-        let send_fn: MsgSend3 = unsafe { std::mem::transmute(msg_send_ptr) };
-        let sel = unsafe { sel_fn(c"compare:".as_ptr()) };
-        unsafe { send_fn(a, sel, b) }
+/// Resolve the ISA for an object, handling tagged pointers via the runtime's
+/// tagged class table and applying the ARM64 ISA mask for heap objects.
+fn resolve_isa(rt: &objc_runtime::ObjcRuntime, obj: u64) -> Option<u64> {
+    if obj == 0 {
+        return None;
+    }
+    if obj & (1u64 << 63) != 0 {
+        rt.tagged_class_for_pointer(obj)
+    } else if obj % 8 == 0 {
+        Some(unsafe { *(obj as *const u64) } & 0x007ffffffffffff8)
     } else {
-        0
+        None
     }
 }
 
@@ -119,9 +117,7 @@ pub extern "C" fn shim_nssortdescriptor_compare_object(obj: u64, _cmd: u64, a: u
     let key = read_key(obj);
     let ascending = unsafe { *((obj as *const u64).add(2)) } != 0;
 
-    // Look up the key getter on both objects via the ObjC runtime.
-    // Tagged pointers (bit 63 set) can only be dispatched by the host runtime.
-    // For key=="self" we short-circuit, so tagged pointers are fine there.
+    // ── 1. Resolve property values via key getter ──────────────────
     let (val_a, val_b) = {
         let guard = objc_runtime::OBJC_RUNTIME
             .lock()
@@ -130,93 +126,49 @@ pub extern "C" fn shim_nssortdescriptor_compare_object(obj: u64, _cmd: u64, a: u
             let va = if key == "self" || key.is_empty() {
                 a
             } else {
-                // Skip ISA deref on tagged pointers — fall back to identity
-                #[cfg(all(target_arch = "aarch64", target_os = "macos"))]
-                if a & (1u64 << 63) != 0 {
-                    a
-                } else {
-                    let isa_a = unsafe { *(a as *const u64) };
-                    rt.msg_lookup(isa_a, key)
-                        .map(|imp| {
-                            let f: extern "C" fn(u64, u64) -> u64 =
-                                unsafe { std::mem::transmute(imp) };
-                            f(a, 0)
-                        })
-                        .unwrap_or(a)
-                }
-                #[cfg(not(all(target_arch = "aarch64", target_os = "macos")))]
-                {
-                    let isa_a = unsafe { *(a as *const u64) };
-                    rt.msg_lookup(isa_a, key)
-                        .map(|imp| {
-                            let f: extern "C" fn(u64, u64) -> u64 =
-                                unsafe { std::mem::transmute(imp) };
-                            f(a, 0)
-                        })
-                        .unwrap_or(a)
-                }
+                resolve_isa(rt, a)
+                    .and_then(|isa| rt.msg_lookup(isa, key))
+                    .map(|imp| {
+                        let f: extern "C" fn(u64, u64) -> u64 =
+                            unsafe { std::mem::transmute(imp) };
+                        f(a, 0)
+                    })
+                    .unwrap_or(a)
             };
-
             let vb = if key == "self" || key.is_empty() {
                 b
             } else {
-                #[cfg(all(target_arch = "aarch64", target_os = "macos"))]
-                if b & (1u64 << 63) != 0 {
-                    b
-                } else {
-                    let isa_b = unsafe { *(b as *const u64) };
-                    rt.msg_lookup(isa_b, key)
-                        .map(|imp| {
-                            let f: extern "C" fn(u64, u64) -> u64 =
-                                unsafe { std::mem::transmute(imp) };
-                            f(b, 0)
-                        })
-                        .unwrap_or(b)
-                }
-                #[cfg(not(all(target_arch = "aarch64", target_os = "macos")))]
-                {
-                    let isa_b = unsafe { *(b as *const u64) };
-                    rt.msg_lookup(isa_b, key)
-                        .map(|imp| {
-                            let f: extern "C" fn(u64, u64) -> u64 =
-                                unsafe { std::mem::transmute(imp) };
-                            f(b, 0)
-                        })
-                        .unwrap_or(b)
-                }
+                resolve_isa(rt, b)
+                    .and_then(|isa| rt.msg_lookup(isa, key))
+                    .map(|imp| {
+                        let f: extern "C" fn(u64, u64) -> u64 =
+                            unsafe { std::mem::transmute(imp) };
+                        f(b, 0)
+                    })
+                    .unwrap_or(b)
             };
-
             (va, vb)
         } else {
             (a, b)
         }
     };
 
-    // Now compare: send `compare:` to val_a with val_b
+    // ── 2. Send `compare:` to val_a ────────────────────────────────
     let cmp = {
-        // Tagged pointer check: bit 63 set = host runtime tagged object.
-        // Cannot dereference to read ISA — forward to host objc_msgSend.
-        #[cfg(all(target_arch = "aarch64", target_os = "macos"))]
-        if val_a & (1u64 << 63) != 0 {
-            let result = host_compare(val_a, val_b);
-            return if ascending { result } else { -result };
-        }
-
         let guard = objc_runtime::OBJC_RUNTIME
             .lock()
             .unwrap_or_else(|e| e.into_inner());
         if let Some(rt) = guard.as_ref() {
-            let isa_a = unsafe { *(val_a as *const u64) };
-            if let Some(imp) = rt.msg_lookup(isa_a, "compare:") {
-                let f: extern "C" fn(u64, u64, u64) -> i64 = unsafe { std::mem::transmute(imp) };
-                f(val_a, 0, val_b)
-            } else {
-                // ISA not known or compare: not found — forward to host objc_msgSend
-                drop(guard);
-                host_compare(val_a, val_b)
-            }
+            resolve_isa(rt, val_a)
+                .and_then(|isa| rt.msg_lookup(isa, "compare:"))
+                .map(|imp| {
+                    let f: extern "C" fn(u64, u64, u64) -> i64 =
+                        unsafe { std::mem::transmute(imp) };
+                    f(val_a, 0, val_b)
+                })
+                .unwrap_or(0)
         } else {
-            host_compare(val_a, val_b)
+            0
         }
     };
 

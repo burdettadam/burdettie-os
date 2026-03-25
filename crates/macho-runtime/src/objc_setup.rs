@@ -75,4 +75,7 @@ pub(crate) fn register_foundation_classes(
     // Register host ISA aliases so constant objects
     // (@[], @{}, @(int)) dispatch through our shims.
     cf_lite::FoundationShims::register_host_isa_aliases(objc_rt);
+
+    // Register tagged pointer class table (NSNumber=2, NSString=3, NSDate=6).
+    cf_lite::FoundationShims::register_tagged_classes(objc_rt);
 }

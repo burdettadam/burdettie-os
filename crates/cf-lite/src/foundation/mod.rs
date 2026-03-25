@@ -233,6 +233,20 @@ impl FoundationShims {
         register::register_nspropertylistserialization_class(rt);
     }
 
+    /// Register tagged pointer class table entries.
+    ///
+    /// On arm64, tagged pointers encode a 3-bit class index in bits 60-62.
+    /// Apple's canonical mapping: 2 = NSNumber, 3 = NSString, 6 = NSDate.
+    pub fn register_tagged_classes(rt: &mut objc_runtime::ObjcRuntime) {
+        use crate::nsobj;
+        rt.register_tagged_class(2, nsobj::nsnumber_class_addr());
+        rt.register_tagged_class(3, nsobj::nsstring_class_addr());
+        rt.register_tagged_class(6, nsobj::nsdate_class_addr());
+        log::debug!(
+            "FoundationShims: registered tagged pointer classes (NSNumber=2, NSString=3, NSDate=6)"
+        );
+    }
+
     /// Register host Foundation ISA addresses as aliases for our shim classes.
     ///
     /// The compiler embeds constant objects (`@[]`, `@{}`, `@(int)`) with ISA

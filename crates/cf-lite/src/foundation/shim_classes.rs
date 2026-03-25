@@ -50,33 +50,85 @@ pub(super) fn install_class_symbols(table: &mut ShimTable) {
     register_class!(table, "NSJSONSerialization", nsobj::nsjsonserialization_class_addr(), nsobj::nsjsonserialization_metaclass_addr());
     register_class!(table, "NSPropertyListSerialization", nsobj::nspropertylistserialization_class_addr(), nsobj::nspropertylistserialization_metaclass_addr());
 
-    // NSException EHTYPE — used by __objc_personality_v0 for @catch type matching.
-    #[cfg(target_os = "macos")]
+    // ── Synthetic _OBJC_EHTYPE_$_NSException ──────────────────────────
+    // On macOS, @catch(NSException *) uses the personality function
+    // __objc_personality_v0, which requires an objc_ehtype_t struct whose
+    // vtable == &objc_ehtype_vtable[2].  We create a static struct with
+    // the right layout and lazily initialise the vtable + class pointers.
     {
-        let symbols = crate::pal_symbols();
-        let fnd_path = "/System/Library/Frameworks/Foundation.framework/Foundation";
-        if let Some(handle) = symbols.open_library(fnd_path) {
-            if let Some(sym) = symbols.resolve_in(handle, "OBJC_EHTYPE_$_NSException") {
-                table.register(
-                    "_OBJC_EHTYPE_$_NSException",
-                    sym as u64,
-                    "NSException EHTYPE (host Foundation, for @catch matching)",
-                );
+        use std::cell::UnsafeCell;
+        use std::sync::Once;
+
+        #[repr(C)]
+        struct SyntheticEhtype {
+            vtable: u64,
+            name: u64,
+            cls: u64,
+        }
+        struct SyncEhtype(UnsafeCell<SyntheticEhtype>);
+        unsafe impl Sync for SyncEhtype {}
+
+        static EHTYPE: SyncEhtype = SyncEhtype(UnsafeCell::new(SyntheticEhtype {
+            vtable: 0,
+            name: 0,
+            cls: 0,
+        }));
+        static EHTYPE_INIT: Once = Once::new();
+
+        EHTYPE_INIT.call_once(|| {
+            static NSEXCEPTION_NAME: &[u8] = b"NSException\0";
+            let vtable: u64;
+
+            #[cfg(target_os = "macos")]
+            {
+                let sym = unsafe {
+                    libc::dlsym(
+                        libc::RTLD_DEFAULT as *mut std::ffi::c_void,
+                        c"objc_ehtype_vtable".as_ptr(),
+                    )
+                };
+                vtable = if sym.is_null() {
+                    0
+                } else {
+                    unsafe { (sym as *const *const u8).add(2) as u64 }
+                };
+            }
+            #[cfg(not(target_os = "macos"))]
+            {
+                vtable = 0;
             }
 
-            for (sym_name, desc) in [
-                ("OBJC_CLASS_$_NSConstantArray", "NSConstantArray class (host, for @[] literals)"),
-                ("OBJC_CLASS_$_NSConstantDictionary", "NSConstantDictionary class (host, for @{} literals)"),
-                ("OBJC_CLASS_$_NSConstantIntegerNumber", "NSConstantIntegerNumber class (host, for @(int) literals)"),
-            ] {
-                if let Some(addr) = symbols.resolve_in(handle, sym_name) {
-                    table.register(
-                        &format!("_{sym_name}"),
-                        addr as u64,
-                        desc,
-                    );
-                }
+            unsafe {
+                let p = EHTYPE.0.get();
+                (*p).vtable = vtable;
+                (*p).name = NSEXCEPTION_NAME.as_ptr() as u64;
+                (*p).cls = nsobj::nsexception_class_addr();
             }
-        }
+        });
+
+        table.register(
+            "_OBJC_EHTYPE_$_NSException",
+            EHTYPE.0.get() as u64,
+            "NSException EHTYPE (synthetic, for @catch matching)",
+        );
     }
+
+    // ── NSConstant* class symbols (self-hosted) ────────────────────
+    // The compiler embeds constant objects (@[], @{}, @(int)) whose ISA
+    // points to these symbols.  We map them to our own classes.
+    table.register(
+        "_OBJC_CLASS_$_NSConstantArray",
+        nsobj::nsarray_class_addr(),
+        "NSConstantArray class (self-hosted, for @[] literals)",
+    );
+    table.register(
+        "_OBJC_CLASS_$_NSConstantDictionary",
+        nsobj::nsdictionary_class_addr(),
+        "NSConstantDictionary class (self-hosted, for @{} literals)",
+    );
+    table.register(
+        "_OBJC_CLASS_$_NSConstantIntegerNumber",
+        nsobj::nsnumber_class_addr(),
+        "NSConstantIntegerNumber class (self-hosted, for @(int) literals)",
+    );
 }

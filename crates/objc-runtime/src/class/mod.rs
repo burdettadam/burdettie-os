@@ -102,6 +102,10 @@ pub struct ObjcRuntime {
     protocols_by_name: HashMap<String, ProtocolInfo>,
     selectors: HashMap<String, usize>,
     selector_storage: Vec<std::ffi::CString>,
+    /// Tagged pointer class table: tag index (0-6) → class address.
+    /// On arm64, tagged pointers have bit 63 set and encode the tag class
+    /// in bits 60-62 (basic tags). Tag 0 is reserved.
+    tagged_classes: [u64; 7],
 }
 
 impl Default for ObjcRuntime {
@@ -120,6 +124,7 @@ impl ObjcRuntime {
             protocols_by_name: HashMap::new(),
             selectors: HashMap::new(),
             selector_storage: Vec::new(),
+            tagged_classes: [0u64; 7],
         }
     }
 
@@ -311,6 +316,36 @@ impl ObjcRuntime {
         self.metaclass_addrs.remove(&addr);
         log::debug!("ObjcRuntime: removed class '{}' at {:#x}", name, addr);
         true
+    }
+
+    // ── Tagged pointer support ─────────────────────────────────────
+
+    /// Register a class address for a tagged pointer tag index (0-6).
+    ///
+    /// On arm64, tagged pointers (bit 63 set) encode the class in bits 60-62.
+    /// This table maps those tag indices to our synthetic class addresses
+    /// so dispatch works without the host runtime.
+    pub fn register_tagged_class(&mut self, tag: u8, class_addr: u64) {
+        if (tag as usize) < self.tagged_classes.len() {
+            self.tagged_classes[tag as usize] = class_addr;
+            log::debug!(
+                "ObjcRuntime: registered tagged class index {} → {:#x}",
+                tag,
+                class_addr
+            );
+        }
+    }
+
+    /// Look up the class address for a tagged pointer.
+    /// Returns None if the tag is out of range or unregistered.
+    pub fn tagged_class_for_pointer(&self, obj: u64) -> Option<u64> {
+        // ARM64 tagged pointer: bits 60-62 = tag class index
+        let tag = ((obj >> 60) & 0x7) as usize;
+        if tag < self.tagged_classes.len() && self.tagged_classes[tag] != 0 {
+            Some(self.tagged_classes[tag])
+        } else {
+            None
+        }
     }
 }
 

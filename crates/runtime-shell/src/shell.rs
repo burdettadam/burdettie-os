@@ -14,6 +14,8 @@ pub struct Session {
     pub trace_enabled: bool,
     /// Security policy mode.
     pub policy_mode: PolicyMode,
+    /// Whether to allow host fallback for unresolved symbols.
+    pub host_fallback: bool,
     /// Serialization lock for runtime calls (global ObjC state).
     pub runtime_lock: Mutex<()>,
 }
@@ -123,6 +125,7 @@ pub fn run() {
         fixtures_root: find_fixtures_root(),
         trace_enabled: false,
         policy_mode: PolicyMode::Permissive,
+        host_fallback: true,
         runtime_lock: Mutex::new(()),
     };
 
@@ -176,6 +179,7 @@ pub fn run() {
             "score" | "scorecard" => commands::scorecard(&session),
             "trace" => commands::trace(args, &mut session),
             "policy" => commands::policy(args, &mut session),
+            "hostfallback" => commands::host_fallback(args, &mut session),
             "info" => commands::info(&session),
             "banner" => print_banner(&session),
             "gui" => commands::gui(args, &session),
