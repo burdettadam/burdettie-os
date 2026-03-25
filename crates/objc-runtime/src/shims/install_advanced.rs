@@ -19,6 +19,10 @@ use super::lifecycle::{
     shim_objc_store_weak, shim_objc_sync_enter, shim_objc_sync_exit, shim_objc_terminate,
     shim_object_get_ivar, shim_object_set_ivar, shim_property_get_attributes,
     shim_property_get_name,
+    // Dynamic class creation shims
+    shim_objc_allocate_class_pair, shim_objc_register_class_pair,
+    shim_objc_dispose_class_pair, shim_objc_duplicate_class,
+    shim_class_add_ivar, shim_class_add_property,
     // Protocol shims
     shim_objc_get_protocol, shim_protocol_get_name, shim_protocol_is_equal,
     shim_class_conforms_to_protocol, shim_protocol_conforms_to_protocol,
@@ -103,6 +107,18 @@ pub(super) fn install_protocol_shims(table: &mut ShimTable) {
         ("_protocol_getMethodDescription", shim_protocol_get_method_description as u64, "protocol_getMethodDescription → single method description"),
         ("_protocol_copyPropertyList", shim_protocol_copy_property_list as u64, "protocol_copyPropertyList → protocol properties"),
         ("_protocol_getProperty", shim_protocol_get_property as u64, "protocol_getProperty → single protocol property"),
+    );
+}
+
+/// Dynamic class creation: allocate, register, dispose, duplicate, addIvar, addProperty.
+pub(super) fn install_dynamic_class_shims(table: &mut ShimTable) {
+    register_shims!(table,
+        ("_objc_allocateClassPair", shim_objc_allocate_class_pair as u64, "objc_allocateClassPair → create new class+metaclass"),
+        ("_objc_registerClassPair", shim_objc_register_class_pair as u64, "objc_registerClassPair → finalize dynamic class"),
+        ("_objc_disposeClassPair", shim_objc_dispose_class_pair as u64, "objc_disposeClassPair → destroy dynamic class"),
+        ("_objc_duplicateClass", shim_objc_duplicate_class as u64, "objc_duplicateClass → clone class for KVO"),
+        ("_class_addIvar", shim_class_add_ivar as u64, "class_addIvar → add ivar to unregistered class"),
+        ("_class_addProperty", shim_class_add_property as u64, "class_addProperty → add property to class"),
     );
 }
 

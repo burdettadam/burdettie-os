@@ -88,5 +88,12 @@ fn objc_shims_registered() {
     assert!(table.resolve("_protocol_getMethodDescription").is_some());
     assert!(table.resolve("_protocol_copyPropertyList").is_some());
     assert!(table.resolve("_protocol_getProperty").is_some());
-    assert_eq!(table.len(), 92);
+    // Dynamic class creation shims
+    assert!(table.resolve("_objc_allocateClassPair").is_some());
+    assert!(table.resolve("_objc_registerClassPair").is_some());
+    assert!(table.resolve("_objc_disposeClassPair").is_some());
+    assert!(table.resolve("_objc_duplicateClass").is_some());
+    assert!(table.resolve("_class_addIvar").is_some());
+    assert!(table.resolve("_class_addProperty").is_some());
+    assert_eq!(table.len(), 98);
 }

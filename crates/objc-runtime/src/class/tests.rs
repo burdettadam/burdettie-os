@@ -377,3 +377,66 @@ fn register_image_with_protocols() {
     assert_eq!(cls.protocol_names, vec!["Codable".to_string()]);
     assert!(rt.class_conforms_to_protocol("MyClass", "Codable"));
 }
+
+// ── Dynamic class tests ────────────────────────────────────────────
+
+#[test]
+fn register_synthetic_class_and_lookup() {
+    let mut rt = ObjcRuntime::new();
+    let info = ClassInfo {
+        name: "DynClass".to_string(),
+        mapped_addr: 0xD000_0000_0001_0000,
+        methods: vec![MethodEntry {
+            selector: "hello".to_string(),
+            imp: 0xBEEF,
+            type_encoding: "v@:".to_string(),
+        }],
+        class_methods: vec![],
+        ivars: vec![],
+        properties: vec![],
+        protocol_names: vec![],
+        instance_size: 16,
+        is_root: false,
+        is_meta: false,
+        superclass_addr: None,
+        method_index: HashMap::new(),
+        class_method_index: HashMap::new(),
+    };
+    rt.register_synthetic_class(info);
+
+    assert!(rt.get_class("DynClass").is_some());
+    assert!(rt.get_class_by_addr(0xD000_0000_0001_0000).is_some());
+    assert_eq!(rt.msg_lookup(0xD000_0000_0001_0000, "hello"), Some(0xBEEF));
+}
+
+#[test]
+fn remove_class_by_addr_works() {
+    let mut rt = ObjcRuntime::new();
+    let info = ClassInfo {
+        name: "Removable".to_string(),
+        mapped_addr: 0xD000_0000_0002_0000,
+        methods: vec![],
+        class_methods: vec![],
+        ivars: vec![],
+        properties: vec![],
+        protocol_names: vec![],
+        instance_size: 8,
+        is_root: true,
+        is_meta: false,
+        superclass_addr: None,
+        method_index: HashMap::new(),
+        class_method_index: HashMap::new(),
+    };
+    rt.register_synthetic_class(info);
+    assert!(rt.get_class("Removable").is_some());
+
+    assert!(rt.remove_class_by_addr(0xD000_0000_0002_0000));
+    assert!(rt.get_class("Removable").is_none());
+    assert!(rt.get_class_by_addr(0xD000_0000_0002_0000).is_none());
+}
+
+#[test]
+fn remove_nonexistent_class_returns_false() {
+    let mut rt = ObjcRuntime::new();
+    assert!(!rt.remove_class_by_addr(0xFFFF));
+}

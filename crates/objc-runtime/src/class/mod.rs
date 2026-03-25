@@ -300,6 +300,18 @@ impl ObjcRuntime {
     pub fn protocols_iter(&self) -> impl Iterator<Item = (&String, &ProtocolInfo)> {
         self.protocols_by_name.iter()
     }
+
+    /// Remove a dynamically-created class by its address.
+    /// Returns true if the class was found and removed.
+    pub fn remove_class_by_addr(&mut self, addr: u64) -> bool {
+        let Some(name) = self.classes_by_addr.remove(&addr) else {
+            return false;
+        };
+        self.classes_by_name.remove(&name);
+        self.metaclass_addrs.remove(&addr);
+        log::debug!("ObjcRuntime: removed class '{}' at {:#x}", name, addr);
+        true
+    }
 }
 
 #[cfg(test)]

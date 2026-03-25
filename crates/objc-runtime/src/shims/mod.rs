@@ -50,6 +50,7 @@ impl ObjcShims {
         install_advanced::install_exception_shims(table);
         install_advanced::install_associated_shims(table);
         install_advanced::install_protocol_shims(table);
-        log::debug!("ObjcShims: registered 92 ObjC runtime shims");
+        install_advanced::install_dynamic_class_shims(table);
+        log::debug!("ObjcShims: registered 98 ObjC runtime shims");
     }
 }

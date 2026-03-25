@@ -120,6 +120,9 @@ impl StubResolver {
             | "objc_getProtocol" | "objc_allocateProtocol" | "objc_registerProtocol"
             | "class_conformsToProtocol" | "class_copyProtocolList"
             | "class_addProtocol"
+            | "objc_allocateClassPair" | "objc_registerClassPair"
+            | "objc_disposeClassPair" | "objc_duplicateClass"
+            | "class_addIvar" | "class_addProperty"
             // Blocks runtime
             | "_Block_copy" | "_Block_release"
             | "_Block_object_assign" | "_Block_object_dispose"

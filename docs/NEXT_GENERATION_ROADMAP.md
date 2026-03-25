@@ -102,32 +102,32 @@ Protocols are used everywhere in real apps (`NSCoding`, `NSCopying`,
 
 ---
 
-### Phase C2 — Dynamic Class Creation
+### Phase C2 — Dynamic Class Creation ✅
 
 Many frameworks (including parts of KVO, CoreData, SwiftUI bridging) create
 classes at runtime. Required for any non-trivial app.
 
 #### Tasks
 
-- [ ] Implement `objc_allocateClassPair(superclass, name, extraBytes)` — allocate new class + metaclass
-- [ ] Implement `objc_registerClassPair(cls)` — finalize and register in class table
-- [ ] Implement `objc_disposeClassPair(cls)` — remove if no instances exist
-- [ ] Implement `objc_duplicateClass(original, name, extraBytes)` — for KVO isa-swizzle
-- [ ] Support `class_addMethod` on unregistered class pairs (already partially exists)
-- [ ] Support `class_addIvar` on unregistered class pairs (before registration)
-- [ ] Support `class_addProperty` on unregistered class pairs
-- [ ] Support `class_addProtocol` on unregistered class pairs
-- [ ] Implement `object_setClass` for isa-swizzling (KVO uses this)
-- [ ] Wire dynamic class creation into the runtime class table with proper superclass chain
-- [ ] Create `dynamic_class` fixture — create class at runtime, add methods, instantiate, call methods
-- [ ] Create `kvo_isa_swizzle` fixture — KVO with automatic isa-swizzling
-- [ ] Write unit tests
+- [x] Implement `objc_allocateClassPair(superclass, name, extraBytes)` — allocate new class + metaclass
+- [x] Implement `objc_registerClassPair(cls)` — finalize and register in class table
+- [x] Implement `objc_disposeClassPair(cls)` — remove if no instances exist
+- [x] Implement `objc_duplicateClass(original, name, extraBytes)` — for KVO isa-swizzle
+- [x] Support `class_addMethod` on unregistered class pairs (already existed)
+- [x] Support `class_addIvar` on unregistered class pairs (before registration)
+- [x] Support `class_addProperty` on unregistered class pairs
+- [x] Support `class_addProtocol` on unregistered class pairs (already existed from C1)
+- [x] Implement `object_setClass` for isa-swizzling (already existed)
+- [x] Wire dynamic class creation into the runtime class table with proper superclass chain
+- [x] Create `dynamic_class` fixture — create class at runtime, add methods, instantiate, call methods
+- [x] Create `kvo_isa_swizzle` fixture — KVO with automatic isa-swizzling
+- [x] Write unit tests
 
 #### Acceptance
 
-- [ ] Dynamically created classes are visible to `objc_getClass`
-- [ ] Instances of dynamic classes dispatch methods correctly
-- [ ] Dynamic classes support ivar layout and property metadata
+- [x] Dynamically created classes are visible to `objc_getClass`
+- [x] Instances of dynamic classes dispatch methods correctly
+- [x] Dynamic classes support ivar layout and property metadata
 
 ---
 
