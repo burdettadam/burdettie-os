@@ -7,20 +7,20 @@
 
 ---
 
-## Current State (Post-Phase D4)
+## Current State (Post-Phase C4)
 
 | Metric | Value |
 |---|---|
 | Workspace members | 34 (31 crates + 3 GUI apps) |
-| Rust LOC | ~62,000 + 281 lines ARM64 assembly |
+| Rust LOC | ~63,000 + 281 lines ARM64 assembly |
 | Foundation classes | 47 (substantive implementations) |
-| ObjC runtime shims | 78 functions |
-| Foundation method shims | 108+ |
-| libsystem shims | 65 (was 59; +dispatch_get_global_queue, +arc4random/buf/uniform, +random category) |
-| Fixture binaries | 81 directories, 62 compat-scored |
+| ObjC runtime shims | 102 functions |
+| Foundation method shims | 141 |
+| libsystem shims | 65 (+dispatch, +arc4random, +random) |
+| Fixture binaries | 82 directories, 63 compat-scored |
 | Corpus programs | 12/12 passing |
-| Tests | 1,044+ passing, 0 failing |
-| Total installed shims | 271 (was 247 pre-D1) |
+| Tests | 1,100+ passing, 0 failing |
+| Total installed shims | 308 (was 279 pre-C4) |
 | GUI apps | 3 (hello-darwin, control-gallery, foundation-explorer) |
 | PAL traits | 10 defined, macOS impl complete, Linux stub crate created |
 
@@ -32,6 +32,8 @@
 - **D2** — Pure Rust Crypto ✅ (CommonCrypto → sha2 crate)
 - **D3** — Pure Rust Unwind Registration ✅ (compact→eh_frame converter, platform-linux crate)
 - **D4** — Self-Contained libsystem ✅ (portable mach/pthread/dispatch/arc4random shims)
+- **C3** — Struct Return & Extended ABI ✅ (x8 save/restore, stret/fp2ret aliases, CG types, NSValue)
+- **C4** — CoreFoundation Toll-Free Bridging ✅ (CFRetain/Release/Equal/Hash, CFArray/Dict/Data/URL/Bundle)
 
 ### What Works Today
 
@@ -53,9 +55,7 @@
 
 - No real macOS `.app` bundles can run (missing AppKit, CoreGraphics, CoreFoundation depth)
 - No Linux or x86_64 support (ARM64 assembly, PAL Linux stubs but no end-to-end)
-- ObjC runtime gaps: no struct returns (`objc_msgSend_stret`)
 - GUI is software-rendered (no GPU, no text layout engine, no images)
-- No CoreFoundation toll-free bridging
 
 ---
 
@@ -170,7 +170,7 @@ variants constantly—`CGRect`, `NSRange`, `NSPoint`, `NSSize`, etc.
 
 ---
 
-### Phase C4 — CoreFoundation Toll-Free Bridging
+### Phase C4 — CoreFoundation Toll-Free Bridging ✅
 
 Many real apps mix `CF*` and `NS*` types interchangeably. CoreFoundation
 types like `CFString`, `CFArray`, `CFDictionary` must bridge to their
@@ -178,24 +178,25 @@ Foundation counterparts.
 
 #### Tasks
 
-- [ ] Implement toll-free bridging infrastructure: CF types share ISA with NS counterparts
-- [ ] Implement `CFStringRef` ↔ `NSString` bridging (same object, different type)
-- [ ] Implement `CFArrayRef` ↔ `NSArray` bridging
-- [ ] Implement `CFDictionaryRef` ↔ `NSDictionary` bridging
-- [ ] Implement `CFDataRef` ↔ `NSData` bridging
-- [ ] Implement `CFURLRef` ↔ `NSURL` bridging
-- [ ] Implement core CF functions: `CFRetain`, `CFRelease`, `CFGetTypeID`, `CFEqual`, `CFHash`, `CFCopyDescription`
-- [ ] Implement `CFStringCreateWithCString`, `CFStringGetCStringPtr`, `CFStringGetLength`
-- [ ] Implement `CFBundleGetMainBundle`, `CFBundleCopyBundleURL`
-- [ ] Add CF function shims to `libsystem-shims` or a new `cf-shims` module
-- [ ] Create `cf_bridging` fixture — create CF objects, pass to NS APIs, verify identity
-- [ ] Write unit tests
+- [x] Implement toll-free bridging infrastructure: CF types share ISA with NS counterparts
+- [x] Implement `CFStringRef` ↔ `NSString` bridging (same object, different type)
+- [x] Implement `CFArrayRef` ↔ `NSArray` bridging
+- [x] Implement `CFDictionaryRef` ↔ `NSDictionary` bridging
+- [x] Implement `CFDataRef` ↔ `NSData` bridging
+- [x] Implement `CFURLRef` ↔ `NSURL` bridging
+- [x] Implement core CF functions: `CFRetain`, `CFRelease`, `CFGetTypeID`, `CFEqual`, `CFHash`, `CFCopyDescription`
+- [x] Implement `CFStringCreateWithCString`, `CFStringGetCStringPtr`, `CFStringGetLength`
+- [x] Implement `CFBundleGetMainBundle`, `CFBundleCopyBundleURL`
+- [x] Add CF function shims to foundation shim_core.rs (29 new shim registrations)
+- [x] Create `cf_bridging` fixture — create CF objects, pass to NS APIs, verify identity
+- [x] Write unit tests (11 cf_core tests + 2 runtime exec tests)
 
 #### Acceptance
 
-- [ ] `(__bridge NSString *)cfString` produces a valid NSString
-- [ ] CF retain/release interoperates with ObjC retain/release
-- [ ] CF fixture passes through runtime pipeline
+- [x] `(__bridge NSString *)cfString` produces a valid NSString
+- [x] CF retain/release interoperates with ObjC retain/release
+- [x] CF fixture passes through runtime pipeline
+- [x] Shim count: 279 → 308 (+29 CF shims)
 
 ---
 
@@ -632,7 +633,7 @@ can render AppKit-compatible UIs at native quality on any platform.
 | 3 | **C3** — Struct return ABI | ✅ Done |
 | 4 | **D1** — Kill host fallback | ✅ Done |
 | 5 | **D2** — Pure Rust crypto | ✅ Done |
-| 6 | **C4** — CF bridging | Nearly every app uses CF functions |
+| 6 | **C4** — CF bridging | ✅ Done |
 | 7 | **C5** — AppKit bootstrap | The big milestone: NSApp launches |
 | 8 | **F1** — Text layout | GUI needs real fonts to be useful |
 | 9 | **C6** — Real CLI tools | First "real app works!" moment |

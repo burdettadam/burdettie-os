@@ -19,6 +19,7 @@
 //! - `___CFConstantStringClassReference` → fake class data for @"..." literals
 //! - `_OBJC_CLASS_$_NSObject` / `_OBJC_METACLASS_$_NSObject` → minimal class stubs
 
+pub mod cf_core;
 pub(crate) mod cfstring;
 pub mod cg_types;
 pub(crate) mod format;

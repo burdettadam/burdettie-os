@@ -375,11 +375,11 @@ mod tests {
             .is_some());
         assert!(table.resolve("_OBJC_CLASS_$_NSInvocation").is_some());
         assert!(table.resolve("_OBJC_METACLASS_$_NSInvocation").is_some());
-        // 104 base shims + 1 EHTYPE + 3 NSConstant{Array,Dictionary,IntegerNumber} on macOS
+        // 104 base shims + 1 EHTYPE + 3 NSConstant{Array,Dictionary,IntegerNumber} on macOS + 29 CF toll-free bridging + 4 CF data symbols
         #[cfg(target_os = "macos")]
-        assert_eq!(table.len(), 108);
+        assert_eq!(table.len(), 141);
         #[cfg(not(target_os = "macos"))]
-        assert_eq!(table.len(), 104);
+        assert_eq!(table.len(), 137);
     }
 
     #[test]

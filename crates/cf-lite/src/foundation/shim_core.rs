@@ -3,7 +3,7 @@
 use libsystem_shims::register_shims;
 use libsystem_shims::table::ShimTable;
 
-use crate::{cfstring, nslog, nsobj, nsvalue};
+use crate::{cf_core, cfstring, nslog, nsobj, nsvalue};
 use super::cfconstant_string::cfconstant_string_class_addr;
 
 /// Register core CF/Foundation shims and the first group of class data symbols.
@@ -132,5 +132,66 @@ pub(super) fn install_core_shims(table: &mut ShimTable) {
         ("_NSStringFromSize", nsvalue::shim_nsstringfromsize as u64, "NSStringFromSize → format CGSize as NSString"),
         ("_NSStringFromRect", nsvalue::shim_nsstringfromrect as u64, "NSStringFromRect → format CGRect as NSString"),
         ("_NSStringFromRange", nsvalue::shim_nsstringfromrange as u64, "NSStringFromRange → format NSRange as NSString"),
+    );
+
+    // CoreFoundation core functions
+    register_shims!(table,
+        ("_CFRetain", cf_core::shim_cf_retain as u64, "CFRetain shim"),
+        ("_CFGetTypeID", cf_core::shim_cf_get_type_id as u64, "CFGetTypeID shim"),
+        ("_CFEqual", cf_core::shim_cf_equal as u64, "CFEqual shim"),
+        ("_CFHash", cf_core::shim_cf_hash as u64, "CFHash shim"),
+        ("_CFCopyDescription", cf_core::shim_cf_copy_description as u64, "CFCopyDescription shim"),
+    );
+
+    // CF type ID getters
+    register_shims!(table,
+        ("_CFStringGetTypeID", cf_core::shim_cf_string_get_type_id as u64, "CFStringGetTypeID shim"),
+        ("_CFArrayGetTypeID", cf_core::shim_cf_array_get_type_id as u64, "CFArrayGetTypeID shim"),
+        ("_CFDictionaryGetTypeID", cf_core::shim_cf_dictionary_get_type_id as u64, "CFDictionaryGetTypeID shim"),
+        ("_CFDataGetTypeID", cf_core::shim_cf_data_get_type_id as u64, "CFDataGetTypeID shim"),
+        ("_CFURLGetTypeID", cf_core::shim_cf_url_get_type_id as u64, "CFURLGetTypeID shim"),
+        ("_CFBooleanGetTypeID", cf_core::shim_cf_boolean_get_type_id as u64, "CFBooleanGetTypeID shim"),
+        ("_CFNumberGetTypeID", cf_core::shim_cf_number_get_type_id as u64, "CFNumberGetTypeID shim"),
+        ("_CFNullGetTypeID", cf_core::shim_cf_null_get_type_id as u64, "CFNullGetTypeID shim"),
+    );
+
+    // CFArray C functions
+    register_shims!(table,
+        ("_CFArrayCreate", cf_core::shim_cf_array_create as u64, "CFArrayCreate shim"),
+        ("_CFArrayGetCount", cf_core::shim_cf_array_get_count as u64, "CFArrayGetCount shim"),
+        ("_CFArrayGetValueAtIndex", cf_core::shim_cf_array_get_value_at_index as u64, "CFArrayGetValueAtIndex shim"),
+    );
+
+    // CFDictionary C functions
+    register_shims!(table,
+        ("_CFDictionaryCreate", cf_core::shim_cf_dictionary_create as u64, "CFDictionaryCreate shim"),
+        ("_CFDictionaryGetCount", cf_core::shim_cf_dictionary_get_count as u64, "CFDictionaryGetCount shim"),
+        ("_CFDictionaryGetValue", cf_core::shim_cf_dictionary_get_value as u64, "CFDictionaryGetValue shim"),
+    );
+
+    // CFData C functions
+    register_shims!(table,
+        ("_CFDataCreate", cf_core::shim_cf_data_create as u64, "CFDataCreate shim"),
+        ("_CFDataGetBytePtr", cf_core::shim_cf_data_get_byte_ptr as u64, "CFDataGetBytePtr shim"),
+        ("_CFDataGetLength", cf_core::shim_cf_data_get_length as u64, "CFDataGetLength shim"),
+    );
+
+    // CFURL C functions
+    register_shims!(table,
+        ("_CFURLCreateWithString", cf_core::shim_cf_url_create_with_string as u64, "CFURLCreateWithString shim"),
+        ("_CFURLGetString", cf_core::shim_cf_url_get_string as u64, "CFURLGetString shim"),
+        ("_CFURLCreateWithFileSystemPath", cf_core::shim_cf_url_create_with_file_system_path as u64, "CFURLCreateWithFileSystemPath shim"),
+    );
+
+    // CFBundle C functions
+    register_shims!(table,
+        ("_CFBundleGetMainBundle", cf_core::shim_cf_bundle_get_main_bundle as u64, "CFBundleGetMainBundle shim"),
+        ("_CFBundleCopyBundleURL", cf_core::shim_cf_bundle_copy_bundle_url as u64, "CFBundleCopyBundleURL shim"),
+    );
+
+    // CF boolean/null data symbols
+    register_shims!(table,
+        ("_kCFBooleanTrue", cf_core::kcf_boolean_true_addr(), "kCFBooleanTrue data symbol"),
+        ("_kCFBooleanFalse", cf_core::kcf_boolean_false_addr(), "kCFBooleanFalse data symbol"),
     );
 }
