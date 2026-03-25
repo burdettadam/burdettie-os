@@ -18,6 +18,7 @@ mod entry;
 mod fixup;
 mod initializer;
 mod mapped;
+pub mod compact_to_ehframe;
 pub mod ptrauth;
 mod registry;
 mod security;

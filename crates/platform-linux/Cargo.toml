@@ -1,0 +1,15 @@
+[package]
+name         = "platform-linux"
+description  = "Linux host implementation of platform-core traits (stub)"
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+rust-version.workspace = true
+
+[dependencies]
+platform-core = { path = "../platform-core" }
+macho-exec    = { path = "../macho-exec" }
+log           = { workspace = true }
+
+[lints]
+workspace = true

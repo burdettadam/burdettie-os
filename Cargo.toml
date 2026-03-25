@@ -19,6 +19,7 @@ members = [
     "crates/macho-runtime",
     "crates/platform-core",
     "crates/platform-darwin-host",
+    "crates/platform-linux",
     "crates/runtime-demo",
     "crates/runtime-shell",
     "crates/runtime-diagnostics",
@@ -62,6 +63,7 @@ cf-lite         = { path = "crates/cf-lite" }
 macho-runtime  = { path = "crates/macho-runtime" }
 platform-core  = { path = "crates/platform-core" }
 platform-darwin-host = { path = "crates/platform-darwin-host" }
+platform-linux       = { path = "crates/platform-linux" }
 runtime-demo   = { path = "crates/runtime-demo" }
 runtime-shell  = { path = "crates/runtime-shell" }
 runtime-diagnostics = { path = "crates/runtime-diagnostics" }

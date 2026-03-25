@@ -334,25 +334,42 @@ on the host. On Linux there is no host ObjC. Remove this dependency.
 
 ---
 
-### Phase D3 — Pure Rust Unwind Registration
+### Phase D3 — Pure Rust Unwind Registration ✅
 
 Replace macOS-specific `__unw_add_find_dynamic_unwind_sections` with a
 portable approach.
 
 #### Tasks
 
-- [ ] Implement `.eh_frame` generation from compact unwind info
-- [ ] On macOS: continue using `__unw_add_find_dynamic_unwind_sections` (it works)
-- [ ] On Linux: register via `__register_frame` / `__deregister_frame` (libgcc/LLVM)
-- [ ] Abstract behind `UnwindRegistry` PAL trait (already defined)
-- [ ] Create `platform-linux` stub for `UnwindRegistry`
-- [ ] Test exception unwinding through mapped code on macOS (existing tests)
+- [x] Implement `.eh_frame` generation from compact unwind info
+- [x] On macOS: continue using `__unw_add_find_dynamic_unwind_sections` (it works)
+- [x] On Linux: register via `__register_frame` / `__deregister_frame` (libgcc/LLVM)
+- [x] Abstract behind `UnwindRegistry` PAL trait (already defined)
+- [x] Create `platform-linux` stub for `UnwindRegistry`
+- [x] Test exception unwinding through mapped code on macOS (existing tests)
+
+#### Implementation Notes
+
+- `macho-exec::compact_to_ehframe` module: parses `__unwind_info` section
+  (version 1 format with regular + compressed second-level pages) into
+  per-function entries, then generates DWARF `.eh_frame` (CIE + FDEs).
+- ARM64 FRAME mode: CFA=FP+16, FP/LR + callee-saved register pairs (X19-X28,
+  D8-D15) with correct slot ordering.
+- ARM64 FRAMELESS mode: CFA=SP+stack_size from compact encoding.
+- `platform-linux` crate: `LinuxUnwindRegistry` stores generated `.eh_frame`
+  buffers, calls `__register_frame`/`__deregister_frame` on Linux, no-ops
+  on other platforms (compiles on macOS for development).
+- `UnwindRegistry` PAL trait was already in place from Phase 43; macOS path
+  (`DarwinUnwindRegistry`) unchanged.
+- 11 unit tests for compact parsing + eh_frame generation + LEB128 encoding.
+- 3 integration tests on real fixture binaries (simple_cli, exception_basics,
+  autorelease).
 
 #### Acceptance
 
-- [ ] Unwind registration is fully behind PAL trait
-- [ ] macOS path unchanged, Linux path compiles
-- [ ] Exception handling tests still pass
+- [x] Unwind registration is fully behind PAL trait
+- [x] macOS path unchanged, Linux path compiles
+- [x] Exception handling tests still pass
 
 ---
 
