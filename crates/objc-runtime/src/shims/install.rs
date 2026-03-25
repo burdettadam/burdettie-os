@@ -3,7 +3,11 @@
 use libsystem_shims::register_shims;
 use libsystem_shims::table::ShimTable;
 
-use super::dispatch::{objc_msg_send_addr, objc_msg_send_super2_addr, objc_msg_send_super_addr};
+use super::dispatch::{
+    objc_msg_send_addr, objc_msg_send_fp2ret_addr, objc_msg_send_stret_addr,
+    objc_msg_send_super2_addr, objc_msg_send_super2_stret_addr, objc_msg_send_super_addr,
+    objc_msg_send_super_stret_addr,
+};
 use super::lifecycle::{
     shim_class_create_instance, shim_class_get_instance_size, shim_class_get_name,
     shim_class_get_superclass, shim_class_is_meta_class, shim_class_responds_to_selector,
@@ -19,12 +23,16 @@ use super::lifecycle::{
 };
 use super::EMPTY_CACHE;
 
-/// Message dispatch: objc_msgSend, objc_msgSendSuper, objc_msgSendSuper2.
+/// Message dispatch: objc_msgSend and all ABI variants (stret, fp2ret, super).
 pub(super) fn install_dispatch_shims(table: &mut ShimTable) {
     register_shims!(table,
         ("_objc_msgSend", objc_msg_send_addr(), "objc_msgSend → ARM64 trampoline dispatch"),
+        ("_objc_msgSend_stret", objc_msg_send_stret_addr(), "objc_msgSend_stret → struct return dispatch (alias on ARM64)"),
+        ("_objc_msgSend_fp2ret", objc_msg_send_fp2ret_addr(), "objc_msgSend_fp2ret → fp return dispatch (alias on ARM64)"),
         ("_objc_msgSendSuper", objc_msg_send_super_addr(), "objc_msgSendSuper → super dispatch trampoline"),
+        ("_objc_msgSendSuper_stret", objc_msg_send_super_stret_addr(), "objc_msgSendSuper_stret → super struct return dispatch"),
         ("_objc_msgSendSuper2", objc_msg_send_super2_addr(), "objc_msgSendSuper2 → super2 dispatch trampoline"),
+        ("_objc_msgSendSuper2_stret", objc_msg_send_super2_stret_addr(), "objc_msgSendSuper2_stret → super2 struct return dispatch"),
     );
 }
 

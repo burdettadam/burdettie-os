@@ -185,11 +185,11 @@ fn runtime_dylib_chain_images_counted() {
 fn runtime_shim_count_with_all_categories() {
     let Some(result) = common::run_fixture("return42/return42") else { return };
 
-    // Shim count with all categories (updated after D4: +dispatch_get_global_queue, +arc4random/buf/uniform).
+    // Shim count with all categories (updated after C3: +stret/fp2ret/super_stret, +NSStringFrom*).
     #[cfg(target_os = "macos")]
-    assert_eq!(result.shims_installed, 271, "expected 271 shims installed");
+    assert_eq!(result.shims_installed, 279, "expected 279 shims installed");
     #[cfg(not(target_os = "macos"))]
-    assert_eq!(result.shims_installed, 271, "expected 271 shims installed");
+    assert_eq!(result.shims_installed, 279, "expected 279 shims installed");
 }
 
 // ── Tracing tests ──────────────────────────────────────────────────
@@ -250,4 +250,21 @@ fn runtime_tracing_collects_pipeline_events() {
         !image_events.is_empty(),
         "should have at least one ImageLoad event"
     );
+}
+
+// ── Struct return ABI tests (Phase C3) ─────────────────────────────
+
+#[test]
+fn runtime_struct_return_exit_zero() {
+    let Some(result) = common::run_fixture("struct_return/app") else { return };
+    assert_eq!(result.exit_code, 0, "struct_return fixture should exit 0");
+}
+
+#[test]
+fn runtime_struct_return_shims_resolved() {
+    let Some(result) = common::run_fixture("struct_return/app") else { return };
+    assert_eq!(result.exit_code, 0);
+    // The fixture uses objc_msgSend (and implicitly objc_msgSend_stret for CGRect).
+    // If it exits 0, both regular and struct-returning dispatch worked.
+    assert!(result.shims_installed >= 279, "should have all shims");
 }

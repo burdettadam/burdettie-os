@@ -49,11 +49,11 @@ fn context_installs_all_shims() {
     let shim_set = ShimSet::default();
     let ctx = RuntimeContext::new(&config, &shim_set);
 
-    // Shim count (updated after D4: +dispatch_get_global_queue, +arc4random/buf/uniform).
+    // Shim count (updated after C3: +stret/fp2ret/super_stret variants, +NSStringFrom*)
     #[cfg(target_os = "macos")]
-    assert_eq!(ctx.shim_table.len(), 271);
+    assert_eq!(ctx.shim_table.len(), 279);
     #[cfg(not(target_os = "macos"))]
-    assert_eq!(ctx.shim_table.len(), 271);
+    assert_eq!(ctx.shim_table.len(), 279);
 }
 
 #[test]

@@ -1,33 +1,46 @@
 // ARM64 objc_msgSend trampoline for burdetty-os.
 //
-// Preserves the entire argument register file (x0-x7, d0-d7) across
+// Preserves the entire argument register file (x0-x7, x8, d0-d7) across
 // the class-table lookup, then tail-calls the resolved IMP. This is
 // required for correct calling-convention behavior — a Rust
 // `extern "C"` function cannot preserve floating-point registers or
 // guarantee the stack frame matches what the caller constructed.
 //
+// x8 is the "indirect result location register" in the ARM64 ABI.
+// Methods returning large structs (>16 bytes, e.g. CGRect) receive
+// the caller's return-buffer pointer in x8. We must preserve it
+// across the lookup so the IMP writes to the correct address.
+//
 // Flow:
-//   1. Save x0-x7, d0-d7, lr to stack (192 bytes)
+//   1. Save x0-x7, x8, d0-d7, lr to stack (176 bytes)
 //   2. Call _objc_msg_lookup_imp(x0=self, x1=sel) → returns IMP in x0
 //   3. Move IMP to x16 (scratch register per ARM64 ABI)
-//   4. Restore x0-x7, d0-d7, lr
+//   4. Restore x0-x7, x8, d0-d7, lr
 //   5. Branch to x16 (tail call — IMP sees original args)
+//
+// On ARM64, objc_msgSend_stret is identical to objc_msgSend because
+// x8 is preserved through the trampoline. Apple defines it as an alias.
+// Similarly, objc_msgSend_fp2ret is identical (fp2ret only matters on x86).
 
 .global _shim_objc_msg_send_asm
+.global _shim_objc_msg_send_stret_asm
+.global _shim_objc_msg_send_fp2ret_asm
 .p2align 4
 
 _shim_objc_msg_send_asm:
+_shim_objc_msg_send_stret_asm:
+_shim_objc_msg_send_fp2ret_asm:
     // ── nil check ──────────────────────────────────────────
     cbz     x0, .Lnil_return
 
     // ── save state ─────────────────────────────────────────
-    // 192 bytes: 8 x-regs (64) + 8 d-regs (64) + lr + pad (16) = 144
-    // But we need 16-byte alignment, so we use a 176-byte frame:
-    //   sp+0..63:    x0-x7 (64 bytes)
-    //   sp+64..127:  d0-d7 (64 bytes)
-    //   sp+128..143: x30(lr) + x16(pad) (16 bytes)
-    // Total = 144 bytes, round up to 160 for 16-byte alignment
-    sub     sp, sp, #160
+    // 176 bytes (16-byte aligned):
+    //   sp+0..63:    x0-x7    (64 bytes, 4 stp)
+    //   sp+64..127:  d0-d7    (64 bytes, 4 stp)
+    //   sp+128..143: x30(lr) + x8(struct return ptr) (16 bytes)
+    //   sp+144..159: padding  (16 bytes)
+    // Total = 176 bytes
+    sub     sp, sp, #176
 
     // Save integer argument registers
     stp     x0, x1, [sp, #0]
@@ -41,8 +54,8 @@ _shim_objc_msg_send_asm:
     stp     d4, d5, [sp, #96]
     stp     d6, d7, [sp, #112]
 
-    // Save link register
-    stp     x30, xzr, [sp, #128]
+    // Save link register and x8 (indirect result / struct return pointer)
+    stp     x30, x8, [sp, #128]
 
     // ── lookup ─────────────────────────────────────────────
     // x0 = self (already in x0)
@@ -55,8 +68,8 @@ _shim_objc_msg_send_asm:
     mov     x16, x0
 
     // ── restore state ──────────────────────────────────────
-    // Restore link register
-    ldp     x30, xzr, [sp, #128]
+    // Restore link register and x8 (struct return pointer)
+    ldp     x30, x8, [sp, #128]
 
     // Restore floating-point argument registers
     ldp     d0, d1, [sp, #64]
@@ -70,7 +83,7 @@ _shim_objc_msg_send_asm:
     ldp     x4, x5, [sp, #32]
     ldp     x6, x7, [sp, #48]
 
-    add     sp, sp, #160
+    add     sp, sp, #176
 
     // ── tail call ──────────────────────────────────────────
     // Branch to IMP. The IMP sees the original caller's register
@@ -91,23 +104,25 @@ _shim_objc_msg_send_asm:
 //
 // Flow:
 //   1. Read receiver and super_class from the struct.
-//   2. Save argument registers.
+//   2. Save argument registers (including x8 for struct returns).
 //   3. Call _objc_msg_super_lookup_imp(receiver, super_class, sel) → IMP.
 //   4. Restore argument registers, but replace x0 with receiver (not the
 //      struct pointer — the IMP's self parameter must be the object).
 //   5. Tail-call the IMP.
 
 .global _shim_objc_msg_send_super_asm
+.global _shim_objc_msg_send_super_stret_asm
 .p2align 4
 
 _shim_objc_msg_send_super_asm:
+_shim_objc_msg_send_super_stret_asm:
     // Read objc_super struct *before* saving registers.
     // x9 = receiver, x10 = super_class
     ldr     x9,  [x0, #0]      // receiver = objc_super->receiver
     ldr     x10, [x0, #8]      // super_class = objc_super->super_class
 
     // ── save state ─────────────────────────────────────────
-    sub     sp, sp, #176
+    sub     sp, sp, #192
 
     // Save original x0-x7 (caller's args)
     stp     x0, x1, [sp, #0]
@@ -123,8 +138,8 @@ _shim_objc_msg_send_super_asm:
 
     // Save lr + the receiver (x9) for restore
     stp     x30, x9, [sp, #128]
-    // Save x10 (super_class) too
-    stp     x10, xzr, [sp, #144]
+    // Save x10 (super_class) + x8 (struct return pointer)
+    stp     x10, x8, [sp, #144]
 
     // ── lookup ─────────────────────────────────────────────
     // Call: extern "C" fn(receiver: u64, super_class: u64, sel: u64) -> u64
@@ -139,6 +154,7 @@ _shim_objc_msg_send_super_asm:
 
     // ── restore state ──────────────────────────────────────
     ldp     x30, x9, [sp, #128]
+    ldp     x10, x8, [sp, #144]
 
     ldp     d0, d1, [sp, #64]
     ldp     d2, d3, [sp, #80]
@@ -151,7 +167,7 @@ _shim_objc_msg_send_super_asm:
     ldp     x4, x5, [sp, #32]
     ldp     x6, x7, [sp, #48]
 
-    add     sp, sp, #176
+    add     sp, sp, #192
 
     // x0 = receiver (the IMP expects self, not the struct pointer)
     mov     x0, x9
@@ -169,15 +185,17 @@ _shim_objc_msg_send_super_asm:
 // x1 = SEL
 
 .global _shim_objc_msg_send_super2_asm
+.global _shim_objc_msg_send_super2_stret_asm
 .p2align 4
 
 _shim_objc_msg_send_super2_asm:
+_shim_objc_msg_send_super2_stret_asm:
     // Read objc_super struct
     ldr     x9,  [x0, #0]      // receiver
     ldr     x10, [x0, #8]      // current_class (NOT the super)
 
     // ── save state ─────────────────────────────────────────
-    sub     sp, sp, #176
+    sub     sp, sp, #192
 
     stp     x0, x1, [sp, #0]
     stp     x2, x3, [sp, #16]
@@ -190,7 +208,7 @@ _shim_objc_msg_send_super2_asm:
     stp     d6, d7, [sp, #112]
 
     stp     x30, x9, [sp, #128]
-    stp     x10, xzr, [sp, #144]
+    stp     x10, x8, [sp, #144]
 
     // ── lookup ─────────────────────────────────────────────
     // Call: extern "C" fn(receiver, current_class, sel) -> IMP
@@ -203,6 +221,7 @@ _shim_objc_msg_send_super2_asm:
 
     // ── restore state ──────────────────────────────────────
     ldp     x30, x9, [sp, #128]
+    ldp     x10, x8, [sp, #144]
 
     ldp     d0, d1, [sp, #64]
     ldp     d2, d3, [sp, #80]
@@ -214,7 +233,7 @@ _shim_objc_msg_send_super2_asm:
     ldp     x4, x5, [sp, #32]
     ldp     x6, x7, [sp, #48]
 
-    add     sp, sp, #176
+    add     sp, sp, #192
 
     mov     x0, x9
 

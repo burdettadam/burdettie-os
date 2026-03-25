@@ -3,7 +3,7 @@
 use libsystem_shims::register_shims;
 use libsystem_shims::table::ShimTable;
 
-use crate::{cfstring, nslog, nsobj};
+use crate::{cfstring, nslog, nsobj, nsvalue};
 use super::cfconstant_string::cfconstant_string_class_addr;
 
 /// Register core CF/Foundation shims and the first group of class data symbols.
@@ -124,5 +124,13 @@ pub(super) fn install_core_shims(table: &mut ShimTable) {
     register_shims!(table,
         ("_OBJC_CLASS_$_NSNull", nsobj::nsnull_class_addr(), "NSNull class data symbol"),
         ("_OBJC_METACLASS_$_NSNull", nsobj::nsnull_metaclass_addr(), "NSNull metaclass data symbol"),
+    );
+
+    // NSStringFrom* geometry formatting functions
+    register_shims!(table,
+        ("_NSStringFromPoint", nsvalue::shim_nsstringfrompoint as u64, "NSStringFromPoint → format CGPoint as NSString"),
+        ("_NSStringFromSize", nsvalue::shim_nsstringfromsize as u64, "NSStringFromSize → format CGSize as NSString"),
+        ("_NSStringFromRect", nsvalue::shim_nsstringfromrect as u64, "NSStringFromRect → format CGRect as NSString"),
+        ("_NSStringFromRange", nsvalue::shim_nsstringfromrange as u64, "NSStringFromRange → format NSRange as NSString"),
     );
 }

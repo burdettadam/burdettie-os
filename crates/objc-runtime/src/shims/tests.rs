@@ -95,5 +95,10 @@ fn objc_shims_registered() {
     assert!(table.resolve("_objc_duplicateClass").is_some());
     assert!(table.resolve("_class_addIvar").is_some());
     assert!(table.resolve("_class_addProperty").is_some());
-    assert_eq!(table.len(), 98);
+    // Struct return / extended ABI shims (C3)
+    assert!(table.resolve("_objc_msgSend_stret").is_some());
+    assert!(table.resolve("_objc_msgSend_fp2ret").is_some());
+    assert!(table.resolve("_objc_msgSendSuper_stret").is_some());
+    assert!(table.resolve("_objc_msgSendSuper2_stret").is_some());
+    assert_eq!(table.len(), 102);
 }

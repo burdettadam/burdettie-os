@@ -20,6 +20,7 @@
 //! - `_OBJC_CLASS_$_NSObject` / `_OBJC_METACLASS_$_NSObject` → minimal class stubs
 
 pub(crate) mod cfstring;
+pub mod cg_types;
 pub(crate) mod format;
 pub(crate) mod foundation;
 pub(crate) mod nsarray;
