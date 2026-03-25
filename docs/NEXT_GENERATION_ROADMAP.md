@@ -306,22 +306,31 @@ on the host. On Linux there is no host ObjC. Remove this dependency.
 
 ---
 
-### Phase D2 — Replace CommonCrypto with Pure Rust
+### Phase D2 — Replace CommonCrypto with Pure Rust ✅
 
 #### Tasks
 
-- [ ] Add `sha2` crate (pure Rust, `no_std` compatible) as dependency
-- [ ] Replace `CC_SHA256` in `platform-darwin-host` hasher with `sha2::Sha256`
-- [ ] Remove `CC_SHA256` fallback in `macho-parse/src/codesig.rs`
-- [ ] Remove CommonCrypto link dependency
-- [ ] Verify code signature hashing produces identical CDHash values
-- [ ] Run page hash verification tests
+- [x] Add `sha2` crate (pure Rust, `no_std` compatible) as dependency
+- [x] Replace `CC_SHA256` in `platform-darwin-host` hasher with `sha2::Sha256`
+- [x] Remove `CC_SHA256` fallback in `macho-parse/src/codesig.rs`
+- [x] Remove CommonCrypto link dependency
+- [x] Verify code signature hashing produces identical CDHash values
+- [x] Run page hash verification tests
+
+#### Implementation Notes
+
+- `sha2 v0.10` added as workspace dependency; used by `platform-darwin-host` and
+  `macho-parse` (fallback path).
+- CDHash values verified identical via `simple_cli_cd_hash_matches_codesign` test
+  which compares against `codesign` tool output.
+- All 15 codesig tests pass (page hash verification, tamper detection, etc.).
+- Zero `extern "C" { CC_SHA256(...) }` calls remain in the codebase.
 
 #### Acceptance
 
-- [ ] Code signature verification still works identically
-- [ ] No CommonCrypto dependency in `cargo tree`
-- [ ] All codesig tests pass
+- [x] Code signature verification still works identically
+- [x] No CommonCrypto dependency in `cargo tree`
+- [x] All codesig tests pass
 
 ---
 

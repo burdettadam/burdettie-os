@@ -190,18 +190,12 @@ fn read_cstring(data: &[u8], offset: usize) -> String {
 
 /// Compute SHA-256 hash via the platform hasher.
 fn sha256(data: &[u8]) -> Vec<u8> {
-    // Use the global platform hasher if set, otherwise fall back to CC_SHA256
+    // Use the global platform hasher if set, otherwise use sha2 crate directly
     if let Some(hasher) = crate::platform_hasher() {
         hasher.sha256(data).to_vec()
     } else {
-        extern "C" {
-            fn CC_SHA256(data: *const u8, len: u32, md: *mut u8) -> *mut u8;
-        }
-        let mut hash = [0u8; 32];
-        unsafe {
-            CC_SHA256(data.as_ptr(), data.len() as u32, hash.as_mut_ptr());
-        }
-        hash.to_vec()
+        use sha2::Digest;
+        sha2::Sha256::digest(data).to_vec()
     }
 }
 

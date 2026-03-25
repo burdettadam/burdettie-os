@@ -82,6 +82,7 @@ foundation-explorer   = { path = "apps/foundation-explorer" }
 bitflags  = "2"
 thiserror = "2"
 regex     = "1"
+sha2      = "0.10"
 serde     = { version = "1", features = ["derive"] }
 serde_json = "1"
 clap      = { version = "4", features = ["derive"] }

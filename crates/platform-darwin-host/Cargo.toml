@@ -8,6 +8,7 @@ rust-version.workspace = true
 
 [dependencies]
 platform-core = { path = "../platform-core" }
+sha2          = { workspace = true }
 libc          = { workspace = true }
 log           = { workspace = true }
 
