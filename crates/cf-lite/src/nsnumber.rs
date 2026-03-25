@@ -19,7 +19,7 @@ const VALUE_OFF: usize = 16;
 
 /// Allocate and initialize an NSNumber with the given tag and raw value bits.
 pub fn alloc_nsnumber(tag: u64, raw_value: u64) -> u64 {
-    let obj = unsafe { libc::calloc(1, 24) } as u64;
+    let obj = crate::pal_alloc().calloc(1, 24) as u64;
     if obj == 0 {
         return 0;
     }
@@ -66,6 +66,51 @@ pub extern "C" fn shim_nsnumber_number_with_double(_cls: u64, _cmd: u64, value: 
 /// `+[NSNumber numberWithBool:]`
 pub extern "C" fn shim_nsnumber_number_with_bool(_cls: u64, _cmd: u64, value: u8) -> u64 {
     alloc_nsnumber(TAG_BOOL, if value != 0 { 1 } else { 0 })
+}
+
+/// `+[NSNumber numberWithInteger:]` (NSInteger = i64 on 64-bit)
+pub extern "C" fn shim_nsnumber_number_with_integer(_cls: u64, _cmd: u64, value: i64) -> u64 {
+    alloc_nsnumber(TAG_INT, value as u64)
+}
+
+/// `+[NSNumber numberWithLong:]`
+pub extern "C" fn shim_nsnumber_number_with_long(_cls: u64, _cmd: u64, value: i64) -> u64 {
+    alloc_nsnumber(TAG_INT, value as u64)
+}
+
+/// `+[NSNumber numberWithLongLong:]`
+pub extern "C" fn shim_nsnumber_number_with_long_long(_cls: u64, _cmd: u64, value: i64) -> u64 {
+    alloc_nsnumber(TAG_INT, value as u64)
+}
+
+/// `+[NSNumber numberWithFloat:]`
+pub extern "C" fn shim_nsnumber_number_with_float(_cls: u64, _cmd: u64, value: f32) -> u64 {
+    alloc_nsnumber(TAG_DOUBLE, (value as f64).to_bits())
+}
+
+/// `+[NSNumber numberWithUnsignedInt:]`
+pub extern "C" fn shim_nsnumber_number_with_unsigned_int(_cls: u64, _cmd: u64, value: u32) -> u64 {
+    alloc_nsnumber(TAG_INT, value as u64)
+}
+
+/// `+[NSNumber numberWithUnsignedInteger:]`
+pub extern "C" fn shim_nsnumber_number_with_unsigned_integer(_cls: u64, _cmd: u64, value: u64) -> u64 {
+    alloc_nsnumber(TAG_INT, value)
+}
+
+/// `+[NSNumber numberWithShort:]`
+pub extern "C" fn shim_nsnumber_number_with_short(_cls: u64, _cmd: u64, value: i16) -> u64 {
+    alloc_nsnumber(TAG_INT, value as i64 as u64)
+}
+
+/// `+[NSNumber numberWithChar:]`
+pub extern "C" fn shim_nsnumber_number_with_char(_cls: u64, _cmd: u64, value: i8) -> u64 {
+    alloc_nsnumber(TAG_INT, value as i64 as u64)
+}
+
+/// `+[NSNumber numberWithUnsignedChar:]`
+pub extern "C" fn shim_nsnumber_number_with_unsigned_char(_cls: u64, _cmd: u64, value: u8) -> u64 {
+    alloc_nsnumber(TAG_INT, value as u64)
 }
 
 // ── Instance methods ───────────────────────────────────────────────
@@ -148,6 +193,76 @@ pub extern "C" fn shim_nsnumber_integer_value(obj: u64, _cmd: u64) -> i64 {
     }
 }
 
+/// `-[NSNumber longLongValue]`
+pub extern "C" fn shim_nsnumber_long_long_value(obj: u64, _cmd: u64) -> i64 {
+    shim_nsnumber_integer_value(obj, _cmd)
+}
+
+/// `-[NSNumber longValue]`
+pub extern "C" fn shim_nsnumber_long_value(obj: u64, _cmd: u64) -> i64 {
+    shim_nsnumber_integer_value(obj, _cmd)
+}
+
+/// `-[NSNumber floatValue]`
+pub extern "C" fn shim_nsnumber_float_value(obj: u64, _cmd: u64) -> f32 {
+    shim_nsnumber_double_value(obj, 0) as f32
+}
+
+/// `-[NSNumber unsignedIntegerValue]`
+pub extern "C" fn shim_nsnumber_unsigned_integer_value(obj: u64, _cmd: u64) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
+    let tag = unsafe { *((obj as usize + TYPE_TAG_OFF) as *const u64) };
+    let raw = unsafe { *((obj as usize + VALUE_OFF) as *const u64) };
+    match tag {
+        TAG_INT => raw,
+        TAG_DOUBLE => f64::from_bits(raw) as u64,
+        TAG_BOOL => raw,
+        _ => 0,
+    }
+}
+
+/// `-[NSNumber unsignedIntValue]`
+pub extern "C" fn shim_nsnumber_unsigned_int_value(obj: u64, _cmd: u64) -> u32 {
+    shim_nsnumber_unsigned_integer_value(obj, _cmd) as u32
+}
+
+/// `-[NSNumber shortValue]`
+pub extern "C" fn shim_nsnumber_short_value(obj: u64, _cmd: u64) -> i16 {
+    shim_nsnumber_integer_value(obj, _cmd) as i16
+}
+
+/// `-[NSNumber charValue]`
+pub extern "C" fn shim_nsnumber_char_value(obj: u64, _cmd: u64) -> i8 {
+    shim_nsnumber_integer_value(obj, _cmd) as i8
+}
+
+/// `-[NSNumber unsignedCharValue]`
+pub extern "C" fn shim_nsnumber_unsigned_char_value(obj: u64, _cmd: u64) -> u8 {
+    shim_nsnumber_unsigned_integer_value(obj, _cmd) as u8
+}
+
+/// `-[NSNumber stringValue]`
+pub extern "C" fn shim_nsnumber_string_value(obj: u64, _cmd: u64) -> u64 {
+    shim_nsnumber_description(obj, _cmd)
+}
+
+/// `-[NSNumber isEqual:]` — delegates to isEqualToNumber: if other is NSNumber
+pub extern "C" fn shim_nsnumber_is_equal(obj: u64, _cmd: u64, other: u64) -> u8 {
+    if obj == 0 || other == 0 {
+        return 0;
+    }
+    // Check if other object's ISA is NSNumber
+    let other_isa = unsafe { *(other as *const u64) };
+    if other_isa == crate::nsobj::nsnumber_class_addr() {
+        shim_nsnumber_is_equal_to_number(obj, _cmd, other)
+    } else {
+        // Pointer equality
+        if obj == other { 1 } else { 0 }
+    }
+}
+
 /// `-[NSNumber isEqualToNumber:]`
 pub extern "C" fn shim_nsnumber_is_equal_to_number(obj: u64, _cmd: u64, other: u64) -> u8 {
     if obj == 0 || other == 0 {
@@ -199,7 +314,7 @@ pub extern "C" fn shim_nsnumber_description(obj: u64, _cmd: u64) -> u64 {
         _ => format!("<NSNumber tag={}>", tag),
     };
 
-    let c_str = std::ffi::CString::new(desc).unwrap();
+    let c_str = std::ffi::CString::new(desc).unwrap_or_default();
     cfstring::shim_cf_string_create_with_cstring(0, c_str.as_ptr(), 0)
 }
 
@@ -214,9 +329,7 @@ mod tests {
         assert_eq!(shim_nsnumber_int_value(obj, 0), 42);
         assert_eq!(shim_nsnumber_double_value(obj, 0), 42.0);
         assert_eq!(shim_nsnumber_bool_value(obj, 0), 1);
-        unsafe {
-            libc::free(obj as *mut libc::c_void);
-        }
+        crate::pal_alloc().free(obj as *mut u8);
     }
 
     #[test]
@@ -225,9 +338,7 @@ mod tests {
         assert_ne!(obj, 0);
         assert_eq!(shim_nsnumber_double_value(obj, 0), 2.72);
         assert_eq!(shim_nsnumber_int_value(obj, 0), 2); // truncated
-        unsafe {
-            libc::free(obj as *mut libc::c_void);
-        }
+        crate::pal_alloc().free(obj as *mut u8);
     }
 
     #[test]
@@ -238,10 +349,8 @@ mod tests {
         assert_eq!(shim_nsnumber_bool_value(no, 0), 0);
         assert_eq!(shim_nsnumber_int_value(yes, 0), 1);
         assert_eq!(shim_nsnumber_int_value(no, 0), 0);
-        unsafe {
-            libc::free(yes as *mut libc::c_void);
-            libc::free(no as *mut libc::c_void);
-        }
+        crate::pal_alloc().free(yes as *mut u8);
+        crate::pal_alloc().free(no as *mut u8);
     }
 
     #[test]
@@ -260,10 +369,8 @@ mod tests {
         let dbl43 = alloc_nsnumber(TAG_DOUBLE, 43.0f64.to_bits());
         assert_eq!(shim_nsnumber_is_equal_to_number(int42, 0, dbl43), 0);
 
-        unsafe {
-            libc::free(int42 as *mut libc::c_void);
-            libc::free(dbl42 as *mut libc::c_void);
-            libc::free(dbl43 as *mut libc::c_void);
-        }
+        crate::pal_alloc().free(int42 as *mut u8);
+        crate::pal_alloc().free(dbl42 as *mut u8);
+        crate::pal_alloc().free(dbl43 as *mut u8);
     }
 }

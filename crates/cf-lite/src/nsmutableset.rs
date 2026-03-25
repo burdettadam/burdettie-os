@@ -50,7 +50,7 @@ fn contains(obj: u64, needle: u64) -> bool {
 
 /// `+[NSMutableSet set]` — empty mutable set.
 pub extern "C" fn shim_nsmutableset_set(_cls: u64, _cmd: u64) -> u64 {
-    let obj = unsafe { libc::calloc(1, 24) } as u64;
+    let obj = crate::pal_alloc().calloc(1, 24) as u64;
     if obj == 0 {
         return 0;
     }
@@ -79,7 +79,7 @@ pub extern "C" fn shim_nsmutableset_add_object(obj: u64, _cmd: u64, element: u64
     let count = set_count(obj) as usize;
     let old_elems = set_elems(obj);
     let new_count = count + 1;
-    let new_buf = unsafe { libc::malloc(new_count * 8) } as u64;
+    let new_buf = crate::pal_alloc().malloc(new_count * 8) as u64;
     if new_buf == 0 {
         return;
     }
@@ -97,9 +97,7 @@ pub extern "C" fn shim_nsmutableset_add_object(obj: u64, _cmd: u64, element: u64
 
     // Free old buffer
     if old_elems != 0 {
-        unsafe {
-            libc::free(old_elems as *mut libc::c_void);
-        }
+        crate::pal_alloc().free(old_elems as *mut u8);
     }
 
     unsafe {
@@ -160,9 +158,7 @@ pub extern "C" fn shim_nsmutableset_remove_all_objects(obj: u64, _cmd: u64) {
     }
     let elems = set_elems(obj);
     if elems != 0 {
-        unsafe {
-            libc::free(elems as *mut libc::c_void);
-        }
+        crate::pal_alloc().free(elems as *mut u8);
     }
     unsafe {
         *((obj as usize + COUNT_OFF) as *mut u64) = 0;
@@ -208,9 +204,7 @@ pub extern "C" fn shim_nsmutableset_intersect_set(obj: u64, _cmd: u64, other: u6
 
     // Rebuild the elements buffer
     if elems != 0 {
-        unsafe {
-            libc::free(elems as *mut libc::c_void);
-        }
+        crate::pal_alloc().free(elems as *mut u8);
     }
     if keep.is_empty() {
         unsafe {
@@ -218,7 +212,7 @@ pub extern "C" fn shim_nsmutableset_intersect_set(obj: u64, _cmd: u64, other: u6
             *((obj as usize + ELEMS_OFF) as *mut u64) = 0;
         }
     } else {
-        let buf = unsafe { libc::malloc(keep.len() * 8) } as u64;
+        let buf = crate::pal_alloc().malloc(keep.len() * 8) as u64;
         if buf != 0 {
             for (i, &e) in keep.iter().enumerate() {
                 unsafe {

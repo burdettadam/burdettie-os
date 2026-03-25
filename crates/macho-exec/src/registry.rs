@@ -13,6 +13,7 @@ use macho_parse::{
     extract_exports, extract_fixups, parse, ExportedSymbol, FixupModel, ParsedMachO,
 };
 use platform_core::memory::MemoryMapper;
+use platform_core::unwind::UnwindRegistry;
 
 use crate::{ExecError, MappedImage, SymbolResolver};
 
@@ -30,14 +31,16 @@ pub struct ImageRegistry {
     images: Vec<LoadedImage>,
     name_index: HashMap<String, usize>,
     mapper: Arc<dyn MemoryMapper>,
+    unwind: Arc<dyn UnwindRegistry>,
 }
 
 impl ImageRegistry {
-    pub fn new(mapper: Arc<dyn MemoryMapper>) -> Self {
+    pub fn new(mapper: Arc<dyn MemoryMapper>, unwind: Arc<dyn UnwindRegistry>) -> Self {
         Self {
             images: Vec::new(),
             name_index: HashMap::new(),
             mapper,
+            unwind,
         }
     }
 
@@ -49,7 +52,11 @@ impl ImageRegistry {
             reason: format!("parse failed: {e}"),
         })?;
         let plan = MappingPlan::from_parsed(&parsed);
-        let image = MappedImage::map(&plan, &data, self.mapper.clone())?;
+        let image = MappedImage::map(&plan, &data, self.mapper.clone(), self.unwind.clone())?;
+
+        // Register unwind info so @try/@catch works for this image
+        crate::unwind::register_unwind_info(&parsed.segments, image.slide, &*self.unwind);
+
         let exports = extract_exports(&parsed, &data);
 
         let idx = self.images.len();

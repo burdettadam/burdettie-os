@@ -7,6 +7,9 @@ license.workspace      = true
 rust-version.workspace = true
 
 [dependencies]
+ab_glyph = "0.2"
+unicode-normalization = "0.1"
+unicode-segmentation = "1.11"
 
 [lints]
 workspace = true

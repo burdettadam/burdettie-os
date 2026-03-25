@@ -1,0 +1,28 @@
+[package]
+name         = "compat-runner"
+description  = "Compatibility testing runner — runs binaries under the Darwin runtime and reports gaps"
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+rust-version.workspace = true
+
+[[bin]]
+name = "darwin-compat"
+path = "src/main.rs"
+
+[dependencies]
+macho-runtime  = { workspace = true }
+macho-parse    = { workspace = true }
+macho-types    = { workspace = true }
+serde          = { workspace = true }
+serde_json     = { workspace = true }
+clap           = { workspace = true }
+log            = { workspace = true }
+env_logger     = { workspace = true }
+
+[dev-dependencies]
+tempfile       = { workspace = true }
+macho-fixtures = { workspace = true }
+
+[lints]
+workspace = true

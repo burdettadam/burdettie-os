@@ -15,10 +15,15 @@ pub struct ClassInfo {
     pub class_methods: Vec<MethodEntry>,
     pub ivars: Vec<IvarEntry>,
     pub properties: Vec<PropertyEntry>,
+    pub protocol_names: Vec<String>,
     pub instance_size: u32,
     pub is_root: bool,
     pub is_meta: bool,
     pub superclass_addr: Option<u64>,
+    /// Selector → index in `methods` for O(1) instance method lookup.
+    pub method_index: HashMap<String, usize>,
+    /// Selector → index in `class_methods` for O(1) class method lookup.
+    pub class_method_index: HashMap<String, usize>,
 }
 
 /// A registered method.
@@ -45,15 +50,56 @@ pub struct PropertyEntry {
     pub attributes: String,
 }
 
+/// A registered ObjC protocol.
+#[derive(Debug, Clone)]
+pub struct ProtocolInfo {
+    pub name: String,
+    pub instance_methods: Vec<MethodEntry>,
+    pub class_methods: Vec<MethodEntry>,
+    pub optional_instance_methods: Vec<MethodEntry>,
+    pub optional_class_methods: Vec<MethodEntry>,
+    pub properties: Vec<PropertyEntry>,
+    pub adopted_protocols: Vec<String>,
+}
+
+impl ClassInfo {
+    /// Rebuild the selector → index maps from the current method vectors.
+    pub fn rebuild_indices(&mut self) {
+        self.method_index.clear();
+        for (i, m) in self.methods.iter().enumerate() {
+            self.method_index.insert(m.selector.clone(), i);
+        }
+        self.class_method_index.clear();
+        for (i, m) in self.class_methods.iter().enumerate() {
+            self.class_method_index.insert(m.selector.clone(), i);
+        }
+    }
+
+    /// Look up an instance method by selector in O(1) via the index.
+    pub fn find_method(&self, selector: &str) -> Option<&MethodEntry> {
+        self.method_index
+            .get(selector)
+            .and_then(|&idx| self.methods.get(idx))
+    }
+
+    /// Look up a class method by selector in O(1) via the index.
+    pub fn find_class_method(&self, selector: &str) -> Option<&MethodEntry> {
+        self.class_method_index
+            .get(selector)
+            .and_then(|&idx| self.class_methods.get(idx))
+    }
+}
+
 /// Global ObjC runtime state — populated after fixups, before constructors.
 pub static OBJC_RUNTIME: Mutex<Option<ObjcRuntime>> = Mutex::new(None);
 
-/// Minimal ObjC runtime: class table + selector table.
+/// Minimal ObjC runtime: class table + selector table + protocol registry.
 #[derive(Debug)]
 pub struct ObjcRuntime {
     classes_by_name: HashMap<String, ClassInfo>,
     classes_by_addr: HashMap<u64, String>,
     metaclass_addrs: HashSet<u64>,
+    protocols_by_name: HashMap<String, ProtocolInfo>,
     selectors: HashMap<String, usize>,
     selector_storage: Vec<std::ffi::CString>,
 }
@@ -71,6 +117,7 @@ impl ObjcRuntime {
             classes_by_name: HashMap::new(),
             classes_by_addr: HashMap::new(),
             metaclass_addrs: HashSet::new(),
+            protocols_by_name: HashMap::new(),
             selectors: HashMap::new(),
             selector_storage: Vec::new(),
         }
@@ -147,6 +194,33 @@ impl ObjcRuntime {
         self.classes_by_name.get_mut(&name)
     }
 
+    /// Register a host ISA address as an alias for an existing class.
+    ///
+    /// This allows objects whose ISA comes from the host runtime (e.g.,
+    /// `NSConstantArray` embedded in `__DATA` by the compiler) to dispatch
+    /// through our shim implementations for the corresponding class.
+    pub fn register_isa_alias(&mut self, host_addr: u64, class_name: &str) {
+        if self.classes_by_name.contains_key(class_name) {
+            self.classes_by_addr.insert(host_addr, class_name.to_string());
+            log::debug!(
+                "ObjcRuntime: registered ISA alias {host_addr:#x} → '{class_name}'"
+            );
+        } else {
+            log::warn!(
+                "ObjcRuntime: cannot alias {host_addr:#x} → '{class_name}': class not registered"
+            );
+        }
+    }
+
+    /// Rebuild method lookup indices for a class after methods are added.
+    pub fn rebuild_method_index(&mut self, class_addr: u64) {
+        if let Some(name) = self.classes_by_addr.get(&class_addr).cloned() {
+            if let Some(info) = self.classes_by_name.get_mut(&name) {
+                info.rebuild_indices();
+            }
+        }
+    }
+
     /// Add a method to an existing class. Returns true if the method was
     /// added (selector not already present), false if it already existed.
     pub fn add_method_to_class(&mut self, class_addr: u64, entry: MethodEntry) -> bool {
@@ -158,255 +232,75 @@ impl ObjcRuntime {
         if class.methods.iter().any(|m| m.selector == entry.selector) {
             return false;
         }
+        let idx = class.methods.len();
+        let sel = entry.selector.clone();
         class.methods.push(entry);
+        class.method_index.insert(sel, idx);
         true
+    }
+
+    // ── Protocol registry ──────────────────────────────────────────
+
+    /// Register a protocol in the runtime.
+    pub fn register_protocol(&mut self, info: ProtocolInfo) {
+        log::debug!("ObjcRuntime: registered protocol '{}'", info.name);
+        self.protocols_by_name.insert(info.name.clone(), info);
+    }
+
+    /// Look up a protocol by name.
+    pub fn get_protocol(&self, name: &str) -> Option<&ProtocolInfo> {
+        self.protocols_by_name.get(name)
+    }
+
+    /// Number of registered protocols.
+    pub fn protocol_count(&self) -> usize {
+        self.protocols_by_name.len()
+    }
+
+    /// Check if a class conforms to a protocol, walking the superclass chain.
+    pub fn class_conforms_to_protocol(&self, class_name: &str, protocol_name: &str) -> bool {
+        let mut current = Some(class_name.to_string());
+        let mut depth = 0;
+        while let Some(name) = current {
+            if depth > 64 {
+                break;
+            }
+            if let Some(class) = self.classes_by_name.get(&name) {
+                if class.protocol_names.iter().any(|p| p == protocol_name) {
+                    return true;
+                }
+                current = class
+                    .superclass_addr
+                    .and_then(|addr| self.classes_by_addr.get(&addr))
+                    .cloned();
+            } else {
+                break;
+            }
+            depth += 1;
+        }
+        false
+    }
+
+    /// Check if a protocol conforms to another protocol (recursive).
+    pub fn protocol_conforms_to_protocol(&self, proto: &str, other: &str) -> bool {
+        if proto == other {
+            return true;
+        }
+        if let Some(info) = self.protocols_by_name.get(proto) {
+            for adopted in &info.adopted_protocols {
+                if self.protocol_conforms_to_protocol(adopted, other) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    /// Iterate over all registered protocols.
+    pub fn protocols_iter(&self) -> impl Iterator<Item = (&String, &ProtocolInfo)> {
+        self.protocols_by_name.iter()
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    use macho_objc::{ObjcClassRef, ObjcMethodInfo};
-
-    fn make_metadata(name: &str, methods: Vec<(&str, u64)>) -> macho_objc::ObjcMetadata {
-        let class_ref = ObjcClassRef {
-            pointer_addr: 0x1000,
-            class_data_addr: 0x2000,
-            name: Some(name.to_string()),
-            methods: methods
-                .into_iter()
-                .map(|(sel, imp)| ObjcMethodInfo {
-                    selector: sel.to_string(),
-                    type_encoding: "v@:".to_string(),
-                    imp_vmaddr: imp,
-                })
-                .collect(),
-            class_methods: vec![],
-            ivars: vec![],
-            properties: vec![],
-            instance_size: 16,
-            ro_flags: 0x02,
-            superclass_addr: 0,
-            metaclass_addr: 0,
-        };
-        macho_objc::ObjcMetadata {
-            presence: macho_objc::ObjcPresence {
-                has_objc: true,
-                sections_found: vec!["__objc_classlist".to_string()],
-            },
-            class_refs: vec![class_ref],
-            categories: vec![],
-            category_count: 0,
-            protocol_count: 0,
-            selectors: vec![],
-            selref_addrs: vec![],
-            image_info: None,
-        }
-    }
-
-    #[test]
-    fn register_and_lookup_class() {
-        let mut rt = ObjcRuntime::new();
-        let meta = make_metadata("MyClass", vec![("doStuff", 0x1234)]);
-        rt.register_image(&meta, 0);
-
-        assert_eq!(rt.class_count(), 1);
-        let cls = rt.get_class("MyClass").unwrap();
-        assert_eq!(cls.name, "MyClass");
-        assert_eq!(cls.methods.len(), 1);
-        assert!(cls.is_root);
-    }
-
-    #[test]
-    fn lookup_class_by_addr() {
-        let mut rt = ObjcRuntime::new();
-        let meta = make_metadata("Answer", vec![("value", 0x5678)]);
-        rt.register_image(&meta, 0x100);
-
-        let cls = rt.get_class_by_addr(0x2100).unwrap();
-        assert_eq!(cls.name, "Answer");
-    }
-
-    #[test]
-    fn msg_lookup_finds_method() {
-        let mut rt = ObjcRuntime::new();
-        let meta = make_metadata("Answer", vec![("value", 0x5678)]);
-        rt.register_image(&meta, 0x100);
-
-        let imp = rt.msg_lookup(0x2100, "value").unwrap();
-        assert_eq!(imp, 0x5778);
-    }
-
-    #[test]
-    fn msg_lookup_unknown_class_returns_none() {
-        let rt = ObjcRuntime::new();
-        assert!(rt.msg_lookup(0xDEAD, "value").is_none());
-    }
-
-    #[test]
-    fn msg_lookup_unknown_selector_returns_none() {
-        let mut rt = ObjcRuntime::new();
-        let meta = make_metadata("Answer", vec![("value", 0x5678)]);
-        rt.register_image(&meta, 0);
-
-        assert!(rt.msg_lookup(0x2000, "nonexistent").is_none());
-    }
-
-    #[test]
-    fn selector_interning() {
-        let mut rt = ObjcRuntime::new();
-        let p1 = rt.intern_selector("value");
-        let p2 = rt.intern_selector("value");
-        assert_eq!(p1, p2);
-        assert_eq!(rt.selector_count(), 1);
-
-        rt.intern_selector("init");
-        assert_eq!(rt.selector_count(), 2);
-    }
-
-    #[test]
-    fn root_class_zero_size_gets_eight() {
-        let mut rt = ObjcRuntime::new();
-        let class_ref = ObjcClassRef {
-            pointer_addr: 0x1000,
-            class_data_addr: 0x2000,
-            name: Some("Root".to_string()),
-            methods: vec![],
-            class_methods: vec![],
-            ivars: vec![],
-            properties: vec![],
-            instance_size: 0,
-            ro_flags: 0x02,
-            superclass_addr: 0,
-            metaclass_addr: 0,
-        };
-        let meta = macho_objc::ObjcMetadata {
-            presence: macho_objc::ObjcPresence {
-                has_objc: true,
-                sections_found: vec![],
-            },
-            class_refs: vec![class_ref],
-            categories: vec![],
-            category_count: 0,
-            protocol_count: 0,
-            selectors: vec![],
-            selref_addrs: vec![],
-            image_info: None,
-        };
-        rt.register_image(&meta, 0);
-        assert_eq!(rt.get_class("Root").unwrap().instance_size, 8);
-    }
-
-    #[test]
-    fn category_methods_merged_into_class() {
-        let mut rt = ObjcRuntime::new();
-        let meta = make_metadata("Greeter", vec![("greet", 0x1000)]);
-        rt.register_image(&meta, 0);
-
-        let cat_meta = macho_objc::ObjcMetadata {
-            presence: macho_objc::ObjcPresence {
-                has_objc: true,
-                sections_found: vec!["__objc_catlist".to_string()],
-            },
-            class_refs: vec![],
-            categories: vec![macho_objc::ObjcCategoryRef {
-                name: Some("Extras".to_string()),
-                class_vmaddr: 0x2000,
-                cat_struct_vmaddr: 0x3000,
-                instance_methods: vec![ObjcMethodInfo {
-                    selector: "farewell".to_string(),
-                    type_encoding: "v@:".to_string(),
-                    imp_vmaddr: 0x2000,
-                }],
-                class_methods: vec![],
-            }],
-            category_count: 1,
-            protocol_count: 0,
-            selectors: vec![],
-            selref_addrs: vec![],
-            image_info: None,
-        };
-        rt.register_image(&cat_meta, 0);
-
-        let cls = rt.get_class("Greeter").unwrap();
-        assert_eq!(cls.methods.len(), 2);
-        assert!(cls.methods.iter().any(|m| m.selector == "greet"));
-        assert!(cls.methods.iter().any(|m| m.selector == "farewell"));
-    }
-
-    #[test]
-    fn category_class_methods_merged_into_class() {
-        let mut rt = ObjcRuntime::new();
-        let meta = make_metadata("Counter", vec![("increment", 0x1000)]);
-        rt.register_image(&meta, 0);
-
-        let cat_meta = macho_objc::ObjcMetadata {
-            presence: macho_objc::ObjcPresence {
-                has_objc: true,
-                sections_found: vec!["__objc_catlist".to_string()],
-            },
-            class_refs: vec![],
-            categories: vec![macho_objc::ObjcCategoryRef {
-                name: Some("Singleton".to_string()),
-                class_vmaddr: 0x2000,
-                cat_struct_vmaddr: 0x3000,
-                instance_methods: vec![],
-                class_methods: vec![ObjcMethodInfo {
-                    selector: "sharedInstance".to_string(),
-                    type_encoding: "@@:".to_string(),
-                    imp_vmaddr: 0x4000,
-                }],
-            }],
-            category_count: 1,
-            protocol_count: 0,
-            selectors: vec![],
-            selref_addrs: vec![],
-            image_info: None,
-        };
-        rt.register_image(&cat_meta, 0);
-
-        let cls = rt.get_class("Counter").unwrap();
-        assert_eq!(cls.class_methods.len(), 1);
-        assert!(cls
-            .class_methods
-            .iter()
-            .any(|m| m.selector == "sharedInstance"));
-        assert_eq!(cls.class_methods[0].imp, 0x4000);
-    }
-
-    #[test]
-    fn category_class_methods_collected_as_load() {
-        let mut rt = ObjcRuntime::new();
-        let meta = make_metadata("Widget", vec![("draw", 0x1000)]);
-        rt.register_image(&meta, 0);
-
-        let cat_meta = macho_objc::ObjcMetadata {
-            presence: macho_objc::ObjcPresence {
-                has_objc: true,
-                sections_found: vec!["__objc_catlist".to_string()],
-            },
-            class_refs: vec![],
-            categories: vec![macho_objc::ObjcCategoryRef {
-                name: Some("Startup".to_string()),
-                class_vmaddr: 0x2000,
-                cat_struct_vmaddr: 0x3000,
-                instance_methods: vec![],
-                class_methods: vec![ObjcMethodInfo {
-                    selector: "load".to_string(),
-                    type_encoding: "v@:".to_string(),
-                    imp_vmaddr: 0x5000,
-                }],
-            }],
-            category_count: 1,
-            protocol_count: 0,
-            selectors: vec![],
-            selref_addrs: vec![],
-            image_info: None,
-        };
-        rt.register_image(&cat_meta, 0);
-
-        let loads = rt.collect_load_methods();
-        assert!(loads.iter().any(|(name, _)| name == "Widget"));
-    }
-}
+mod tests;

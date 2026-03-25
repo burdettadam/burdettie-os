@@ -25,6 +25,17 @@ pub struct EntryResult {
     pub entry_address: u64,
 }
 
+/// Configuration for entry arguments passed to main().
+#[derive(Debug, Clone, Default)]
+pub struct EntryArgs {
+    /// Program name (argv[0]).
+    pub program_name: String,
+    /// Additional arguments (argv[1..]).
+    pub args: Vec<String>,
+    /// Environment variables as "KEY=VALUE" pairs.
+    pub env: Vec<String>,
+}
+
 /// Call the mapped binary's entry point.
 ///
 /// Computes the entry address from the MappedImage's __TEXT base address
@@ -38,6 +49,15 @@ pub struct EntryResult {
 /// This function is inherently unsafe — it executes arbitrary mapped code.
 /// Only call with known fixture binaries.
 pub fn call_entry(image: &MappedImage, entry: &EntryPoint) -> Result<EntryResult, ExecError> {
+    call_entry_with_args(image, entry, None)
+}
+
+/// Call the entry point with custom arguments.
+pub fn call_entry_with_args(
+    image: &MappedImage,
+    entry: &EntryPoint,
+    args: Option<&EntryArgs>,
+) -> Result<EntryResult, ExecError> {
     match entry {
         EntryPoint::Main { entry_offset, .. } => {
             let text_base = image.text_base()?;
@@ -53,19 +73,58 @@ pub fn call_entry(image: &MappedImage, entry: &EntryPoint) -> Result<EntryResult
             // This makes __TEXT RX (not RW) and __DATA_CONST R (not RW).
             image.protect()?;
 
-            // Cast to extern "C" fn() -> i32 and call
-            // The simple_cli fixture's main() takes argc/argv but we pass
-            // a minimal environment: argc=1, argv=["app", NULL]
+            // Cast to extern "C" fn() -> i32 and call.
+            // Build argv from EntryArgs if provided, otherwise minimal default.
             let stripped = ptrauth::ptrauth_strip(entry_addr as u64) as *const u8;
-            let entry_fn: extern "C" fn(i32, *const *const u8) -> i32 =
+
+            // Build CString args to keep them alive for the call
+            let default_name = std::ffi::CString::new("app").unwrap();
+            let (c_program, c_args, c_env): (
+                std::ffi::CString,
+                Vec<std::ffi::CString>,
+                Vec<std::ffi::CString>,
+            ) = if let Some(a) = args {
+                let prog = std::ffi::CString::new(a.program_name.as_str())
+                    .unwrap_or_else(|_| default_name.clone());
+                let extra: Vec<_> = a
+                    .args
+                    .iter()
+                    .filter_map(|s| std::ffi::CString::new(s.as_str()).ok())
+                    .collect();
+                let env: Vec<_> = a
+                    .env
+                    .iter()
+                    .filter_map(|s| std::ffi::CString::new(s.as_str()).ok())
+                    .collect();
+                (prog, extra, env)
+            } else {
+                (default_name, Vec::new(), Vec::new())
+            };
+
+            // Build argv array: [program, args..., NULL]
+            let mut argv_ptrs: Vec<*const u8> = Vec::with_capacity(2 + c_args.len());
+            argv_ptrs.push(c_program.as_ptr().cast::<u8>());
+            for a in &c_args {
+                argv_ptrs.push(a.as_ptr().cast::<u8>());
+            }
+            argv_ptrs.push(std::ptr::null());
+
+            // Build envp array: [env..., NULL]
+            let mut envp_ptrs: Vec<*const u8> = Vec::with_capacity(1 + c_env.len());
+            for e in &c_env {
+                envp_ptrs.push(e.as_ptr().cast::<u8>());
+            }
+            envp_ptrs.push(std::ptr::null());
+
+            let argc = (argv_ptrs.len() - 1) as i32; // exclude NULL
+
+            // main(argc, argv, envp, apple[])
+            let entry_fn: extern "C" fn(i32, *const *const u8, *const *const u8) -> i32 =
                 unsafe { std::mem::transmute(stripped) };
 
-            let arg0 = c"app".as_ptr().cast::<u8>();
-            let argv: [*const u8; 2] = [arg0, std::ptr::null()];
+            log::debug!("calling entry at {entry_addr_u64:#x} (argc={argc})");
 
-            log::debug!("calling entry at {entry_addr_u64:#x}");
-
-            let exit_code = entry_fn(1, argv.as_ptr());
+            let exit_code = entry_fn(argc, argv_ptrs.as_ptr(), envp_ptrs.as_ptr());
 
             log::debug!("entry returned {exit_code}");
 

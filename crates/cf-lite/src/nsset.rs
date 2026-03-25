@@ -56,7 +56,7 @@ pub(crate) fn contains(obj: u64, needle: u64) -> bool {
 
 /// Allocate a set from a C array, deduplicating entries.
 fn alloc_set(isa: u64, objects: u64, cnt: u64) -> u64 {
-    let obj = unsafe { libc::calloc(1, 24) } as u64;
+    let obj = crate::pal_alloc().calloc(1, 24) as u64;
     if obj == 0 {
         return 0;
     }
@@ -97,7 +97,7 @@ fn alloc_set(isa: u64, objects: u64, cnt: u64) -> u64 {
     }
 
     let unique_count = unique.len();
-    let buf = unsafe { libc::malloc(unique_count * 8) } as u64;
+    let buf = crate::pal_alloc().malloc(unique_count * 8) as u64;
     if buf != 0 {
         for (i, &elem) in unique.iter().enumerate() {
             unsafe {
@@ -291,7 +291,7 @@ pub extern "C" fn shim_nsset_description(obj: u64, _cmd: u64) -> u64 {
         parts.push(s);
     }
     let desc = format!("{{({})}}", parts.join(", "));
-    let c_str = std::ffi::CString::new(desc).unwrap();
+    let c_str = std::ffi::CString::new(desc).unwrap_or_default();
     cfstring::shim_cf_string_create_with_cstring(0, c_str.as_ptr(), 0)
 }
 

@@ -38,14 +38,14 @@ fn detect_system_timezone() -> (String, i64) {
 }
 
 fn alloc_nstimezone(name: &str, offset: i64) -> u64 {
-    let obj = unsafe { libc::calloc(1, NSTIMEZONE_SIZE) } as *mut u64;
+    let obj = crate::pal_alloc().calloc(1, NSTIMEZONE_SIZE) as *mut u64;
     if obj.is_null() {
         return 0;
     }
     let c_name = std::ffi::CString::new(name).unwrap_or_default();
     let name_ptr = unsafe {
         let len = c_name.as_bytes_with_nul().len();
-        let buf = libc::malloc(len) as *mut u8;
+        let buf = crate::pal_alloc().malloc(len);
         if !buf.is_null() {
             std::ptr::copy_nonoverlapping(c_name.as_ptr() as *const u8, buf, len);
         }

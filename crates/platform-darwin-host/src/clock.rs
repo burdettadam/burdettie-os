@@ -107,4 +107,16 @@ impl Clock for DarwinClock {
         components.yday = tm.tm_yday;
         result
     }
+
+    fn sleep_secs(&self, seconds: f64) {
+        if seconds > 0.0 {
+            let secs = seconds as u64;
+            let nanos = ((seconds - secs as f64) * 1_000_000_000.0) as i64;
+            let ts = libc::timespec {
+                tv_sec: secs as libc::time_t,
+                tv_nsec: nanos,
+            };
+            unsafe { libc::nanosleep(&ts, std::ptr::null_mut()) };
+        }
+    }
 }

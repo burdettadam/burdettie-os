@@ -5,6 +5,7 @@
 //! (or future platform crates).  Core crates depend only on these traits,
 //! making the runtime portable in theory.
 
+pub mod alloc;
 pub mod clock;
 pub mod fs;
 pub mod hash;
@@ -12,6 +13,7 @@ pub mod memory;
 pub mod process;
 pub mod rng;
 pub mod symbols;
+pub mod threading;
 pub mod unwind;
 
 use std::fmt;
@@ -82,6 +84,7 @@ impl Protection {
 /// Implementors supply all the host services the runtime needs via
 /// a single trait object.
 pub trait PlatformProvider: Send + Sync {
+    fn alloc(&self) -> &dyn alloc::Allocator;
     fn memory(&self) -> Arc<dyn memory::MemoryMapper>;
     fn symbols(&self) -> &dyn symbols::HostSymbolResolver;
     fn unwind(&self) -> &dyn unwind::UnwindRegistry;
@@ -90,4 +93,5 @@ pub trait PlatformProvider: Send + Sync {
     fn process(&self) -> &dyn process::ProcessInfo;
     fn fs(&self) -> &dyn fs::FilesystemProvider;
     fn hash(&self) -> &dyn hash::Hasher;
+    fn threading(&self) -> &dyn threading::Threading;
 }

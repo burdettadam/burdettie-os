@@ -1,0 +1,57 @@
+# ── cargo-deny configuration ─────────────────────────────────────────
+# Run:  cargo deny check
+# Docs: https://embarkstudios.github.io/cargo-deny/
+
+[graph]
+targets = [
+    { triple = "aarch64-apple-darwin" },
+    { triple = "x86_64-apple-darwin" },
+]
+
+# ── Advisories ──────────────────────────────────────────────────────
+# Checks crates against the RustSec advisory database for known vulns.
+[advisories]
+ignore = []
+
+# ── Licenses ────────────────────────────────────────────────────────
+# Ensures all dependencies use acceptable open-source licenses.
+[licenses]
+confidence-threshold = 0.8
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "MPL-2.0",
+    "Zlib",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+]
+
+[licenses.private]
+ignore = true   # workspace crates are private, skip license check for them
+
+# ── Bans ────────────────────────────────────────────────────────────
+# Prevent duplicate versions and blacklisted crates.
+[bans]
+multiple-versions = "warn"     # warn if same crate pulled at 2+ versions
+wildcards         = "allow"    # workspace deps use path = "..." (no version)
+highlight         = "all"
+
+deny = [
+    # Crates with known security issues or better alternatives
+    #{ crate = "openssl", reason = "prefer rustls" },
+]
+
+skip = []
+skip-tree = []
+
+# ── Sources ─────────────────────────────────────────────────────────
+# Only allow crates from crates.io (no unknown git deps).
+[sources]
+unknown-registry = "deny"
+unknown-git      = "deny"
+allow-registry   = ["https://github.com/rust-lang/crates.io-index"]
+allow-git        = []

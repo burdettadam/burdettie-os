@@ -21,3 +21,22 @@ pub trait UnwindRegistry: Send + Sync {
     /// Deregister unwind sections for an image whose __TEXT starts at `text_start`.
     fn unregister(&self, text_start: usize) -> Result<(), PalError>;
 }
+
+/// No-op unwind registry for use in tests and non-macOS platforms.
+pub struct NoopUnwindRegistry;
+
+impl UnwindRegistry for NoopUnwindRegistry {
+    fn register(
+        &self,
+        _text_start: usize,
+        _text_end: usize,
+        _compact_unwind: Option<(usize, usize)>,
+        _eh_frame: Option<(usize, usize)>,
+    ) -> Result<(), PalError> {
+        Ok(())
+    }
+
+    fn unregister(&self, _text_start: usize) -> Result<(), PalError> {
+        Ok(())
+    }
+}

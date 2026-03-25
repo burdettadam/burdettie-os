@@ -7,23 +7,10 @@
 
 #[cfg(test)]
 mod tests {
+    use macho_fixtures::read_fixture;
     use macho_map::{MapRegion, MappingPlan};
     use macho_parse::parse;
     use macho_types::segment::VmProt;
-    use std::path::PathBuf;
-
-    fn fixtures_dir() -> PathBuf {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .join("fixtures")
-    }
-
-    fn read_fixture(name: &str) -> Option<Vec<u8>> {
-        std::fs::read(fixtures_dir().join(name)).ok()
-    }
 
     // ── Mapping plan from simple_cli ────────────────────────────────
 
@@ -221,22 +208,9 @@ mod tests {
 
 #[cfg(test)]
 mod phase17_map_tests {
+    use macho_fixtures::read_fixture;
     use macho_map::MappingPlan;
     use macho_parse::parse;
-    use std::path::PathBuf;
-
-    fn fixtures_dir() -> PathBuf {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .join("fixtures")
-    }
-
-    fn read_fixture(name: &str) -> Option<Vec<u8>> {
-        std::fs::read(fixtures_dir().join(name)).ok()
-    }
 
     #[test]
     fn mapping_plan_has_max_protection() {

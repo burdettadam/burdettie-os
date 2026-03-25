@@ -54,10 +54,10 @@ pub extern "C" fn shim_attrstr_init_with_string_attributes(
 
     if attrs != 0 && str_len > 0 {
         // Single run spanning the whole string
-        let run_buf = unsafe { libc::calloc(1, ATTR_RUN_SIZE) } as u64;
+        let run_buf = crate::pal_alloc().calloc(1, ATTR_RUN_SIZE) as u64;
         unsafe {
             *(run_buf as *mut u64) = 0;                   // location
-            *((run_buf + 8) as *mut u64) = str_len as u64; // length
+            *((run_buf + 8) as *mut u64) = str_len; // length
             *((run_buf + 16) as *mut u64) = attrs;        // dict
             *((obj + 16) as *mut u64) = 1;                // attrs_count
             *((obj + 24) as *mut u64) = run_buf;          // attrs_ptr
@@ -69,7 +69,7 @@ pub extern "C" fn shim_attrstr_init_with_string_attributes(
 
 /// `+[NSAttributedString alloc]`
 pub extern "C" fn shim_attrstr_alloc(_cls: u64, _cmd: u64) -> u64 {
-    let obj = unsafe { libc::calloc(1, INSTANCE_SIZE as usize) } as u64;
+    let obj = crate::pal_alloc().calloc(1, INSTANCE_SIZE as usize) as u64;
     if obj != 0 {
         unsafe { *(obj as *mut u64) = nsobj::nsattributedstring_class_addr(); }
     }
@@ -78,7 +78,7 @@ pub extern "C" fn shim_attrstr_alloc(_cls: u64, _cmd: u64) -> u64 {
 
 /// `+[NSMutableAttributedString alloc]`
 pub extern "C" fn shim_mutable_attrstr_alloc(_cls: u64, _cmd: u64) -> u64 {
-    let obj = unsafe { libc::calloc(1, INSTANCE_SIZE as usize) } as u64;
+    let obj = crate::pal_alloc().calloc(1, INSTANCE_SIZE as usize) as u64;
     if obj != 0 {
         unsafe { *(obj as *mut u64) = nsobj::nsmutableattributedstring_class_addr(); }
     }
@@ -172,7 +172,7 @@ pub extern "C" fn shim_mutable_attrstr_add_attribute(
     let vals = [value];
     let dict = crate::nsdictionary::make_nsdictionary(&keys, &vals);
 
-    let run_buf = unsafe { libc::calloc(1, ATTR_RUN_SIZE) } as u64;
+    let run_buf = crate::pal_alloc().calloc(1, ATTR_RUN_SIZE) as u64;
     unsafe {
         *(run_buf as *mut u64) = range_loc;
         *((run_buf + 8) as *mut u64) = range_len;

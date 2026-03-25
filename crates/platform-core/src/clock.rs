@@ -22,6 +22,9 @@ pub trait Clock: Send + Sync {
 
     /// Convert local calendar components back to a Unix timestamp.
     fn mktime(&self, components: &mut CalendarComponents) -> i64;
+
+    /// Sleep the calling thread for the given number of fractional seconds.
+    fn sleep_secs(&self, seconds: f64);
 }
 
 /// Calendar date/time components (equivalent to `struct tm`).

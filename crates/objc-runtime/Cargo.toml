@@ -6,11 +6,14 @@ license.workspace      = true
 rust-version.workspace = true
 
 [dependencies]
-macho-objc     = { path = "../macho-objc" }
-macho-parse    = { path = "../macho-parse" }
-libsystem-shims = { path = "../libsystem-shims" }
-log             = { workspace = true }
-libc            = { workspace = true }
+macho-objc          = { path = "../macho-objc" }
+macho-parse         = { path = "../macho-parse" }
+libsystem-shims     = { path = "../libsystem-shims" }
+runtime-diagnostics = { workspace = true }
+platform-core       = { workspace = true }
+platform-darwin-host = { workspace = true }
+log                 = { workspace = true }
+libc                = { workspace = true }
 
 [build-dependencies]
 cc = "1"

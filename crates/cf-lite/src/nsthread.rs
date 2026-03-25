@@ -6,7 +6,8 @@
 //!   - [16..24) is_main_thread flag (u64: 1 = main, 0 = not)
 //!
 //! NSThread wraps POSIX threads and provides ObjC-level thread
-//! management. The main thread is identified via `pthread_main_np()`.
+//! management. The main thread is identified via the platform's
+//! `ProcessInfo::is_main_thread()`.
 
 use crate::cfstring;
 use crate::nsobj;
@@ -19,25 +20,24 @@ const NSTHREAD_SIZE: usize = 24;
 /// `+[NSThread currentThread]` — returns an NSThread for the calling thread.
 ///
 /// Each call allocates a new NSThread object (no caching). The is_main
-/// flag is set based on `pthread_main_np()`.
+/// flag is set based on `ProcessInfo::is_main_thread()`.
 pub extern "C" fn shim_nsthread_current_thread(_cls: u64, _cmd: u64) -> u64 {
-    let obj = unsafe { libc::calloc(1, NSTHREAD_SIZE) } as u64;
+    let obj = crate::pal_alloc().calloc(1, NSTHREAD_SIZE) as u64;
     if obj == 0 {
         return 0;
     }
+    let is_main = crate::platform().process().is_main_thread();
     unsafe {
         *(obj as *mut u64) = nsobj::nsthread_class_addr();
         // is_main_thread at offset 16
-        let is_main = libc::pthread_main_np();
-        *((obj as usize + 16) as *mut u64) = if is_main != 0 { 1 } else { 0 };
+        *((obj as usize + 16) as *mut u64) = if is_main { 1 } else { 0 };
     }
     obj
 }
 
 /// `+[NSThread isMainThread]` — returns YES if called from the main thread.
 pub extern "C" fn shim_nsthread_is_main_thread_class(_cls: u64, _cmd: u64) -> u8 {
-    let is_main = unsafe { libc::pthread_main_np() };
-    if is_main != 0 {
+    if crate::platform().process().is_main_thread() {
         1
     } else {
         0
@@ -55,15 +55,7 @@ pub extern "C" fn shim_nsthread_sleep_for_time_interval(
     _cmd: u64,
     interval: f64,
 ) -> u64 {
-    if interval > 0.0 {
-        let secs = interval as u64;
-        let nanos = ((interval - secs as f64) * 1_000_000_000.0) as i64;
-        let ts = libc::timespec {
-            tv_sec: secs as libc::time_t,
-            tv_nsec: nanos,
-        };
-        unsafe { libc::nanosleep(&ts, std::ptr::null_mut()) };
-    }
+    crate::platform().clock().sleep_secs(interval);
     0 // void return through u64
 }
 

@@ -21,7 +21,7 @@ pub extern "C" fn shim_nsexception_exception_with_name_reason_userinfo(
     reason: u64,
     user_info: u64,
 ) -> u64 {
-    let obj = unsafe { libc::calloc(1, 32) } as u64;
+    let obj = crate::pal_alloc().calloc(1, 32) as u64;
     if obj == 0 {
         return 0;
     }

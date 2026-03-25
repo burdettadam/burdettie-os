@@ -174,7 +174,7 @@ mod tests {
     fn auth_metadata_from_rebase() {
         // Simulate: key=IA (0), addrDiv=1, diversity=0x1234
         // Bits 43-44 = 0b00, bit 45 = 1, bits 46-61 = 0x1234
-        let raw: u64 = (0u64 << 43) | (1u64 << 45) | (0x1234u64 << 46) | (1u64 << 63);
+        let raw: u64 = (1u64 << 45) | (0x1234u64 << 46) | (1u64 << 63);
         let meta = AuthMetadata::from_auth_entry(raw);
         assert_eq!(meta.key, PacKey::IA);
         assert!(meta.addr_diversity);
@@ -184,7 +184,7 @@ mod tests {
     #[test]
     fn auth_metadata_from_bind() {
         // Simulate auth bind: key=IA (0), addrDiv=1, diversity at bits 16-31 = 0x0000
-        let raw: u64 = (0u64 << 43) | (1u64 << 45) | (1u64 << 63) | (1u64 << 62);
+        let raw: u64 = (1u64 << 45) | (1u64 << 63) | (1u64 << 62);
         let meta = AuthMetadata::from_auth_bind(raw);
         assert_eq!(meta.key, PacKey::IA);
         assert!(meta.addr_diversity);

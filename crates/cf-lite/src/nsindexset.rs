@@ -15,7 +15,7 @@ const NSINDEXSET_SIZE: usize = 24;
 
 /// Allocate an NSIndexSet from a sorted slice of unique indexes.
 fn alloc_nsindexset(indexes: &[u64], mutable: bool) -> u64 {
-    let obj = unsafe { libc::calloc(1, NSINDEXSET_SIZE) } as *mut u64;
+    let obj = crate::pal_alloc().calloc(1, NSINDEXSET_SIZE) as *mut u64;
     if obj.is_null() {
         return 0;
     }
@@ -28,7 +28,7 @@ fn alloc_nsindexset(indexes: &[u64], mutable: bool) -> u64 {
     let data_ptr = if indexes.is_empty() {
         std::ptr::null_mut::<u64>()
     } else {
-        let buf = unsafe { libc::malloc(indexes.len() * 8) } as *mut u64;
+        let buf = crate::pal_alloc().malloc(indexes.len() * 8) as *mut u64;
         if !buf.is_null() {
             unsafe {
                 std::ptr::copy_nonoverlapping(indexes.as_ptr(), buf, indexes.len());
@@ -65,16 +65,14 @@ fn modify_indexes<F: FnOnce(&mut Vec<u64>)>(obj: u64, f: F) {
     // Free old buffer
     let old_ptr = unsafe { *((obj as *const u64).add(2)) } as *mut u8;
     if !old_ptr.is_null() {
-        unsafe {
-            libc::free(old_ptr as *mut libc::c_void);
-        }
+        crate::pal_alloc().free(old_ptr);
     }
 
     let count = indexes.len() as u64;
     let new_ptr = if indexes.is_empty() {
         std::ptr::null_mut::<u64>()
     } else {
-        let buf = unsafe { libc::malloc(indexes.len() * 8) } as *mut u64;
+        let buf = crate::pal_alloc().malloc(indexes.len() * 8) as *mut u64;
         if !buf.is_null() {
             unsafe {
                 std::ptr::copy_nonoverlapping(indexes.as_ptr(), buf, indexes.len());

@@ -13,6 +13,7 @@ macho-map      = { workspace = true }
 macho-resolve  = { workspace = true }
 macho-objc     = { workspace = true }
 trust-policy   = { workspace = true }
+runtime-diagnostics = { workspace = true }
 platform-core  = { workspace = true }
 thiserror      = { workspace = true }
 log            = { workspace = true }

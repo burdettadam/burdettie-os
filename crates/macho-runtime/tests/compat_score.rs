@@ -7,18 +7,11 @@
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
+use macho_fixtures::fixtures_dir;
 use macho_runtime::{Runtime, RuntimeConfig};
 
 /// Serializes load_and_run calls (global ObjC state is process-wide).
 static RUNTIME_LOCK: Mutex<()> = Mutex::new(());
-
-fn fixtures_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(|p| p.parent())
-        .map(|root| root.join("fixtures"))
-        .unwrap_or_else(|| PathBuf::from("fixtures"))
-}
 
 /// Per-fixture compatibility score.
 struct FixtureScore {

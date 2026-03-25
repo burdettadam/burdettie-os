@@ -20,6 +20,7 @@ use std::sync::Arc;
 use macho_map::{MapRegion, MappingPlan};
 use macho_types::segment::VmProt;
 use platform_core::memory::MemoryMapper;
+use platform_core::unwind::UnwindRegistry;
 use platform_core::Protection;
 
 use crate::ExecError;
@@ -61,6 +62,8 @@ pub struct MappedImage {
     alloc_size: usize,
     /// Memory mapper for cleanup on drop.
     mapper: Arc<dyn MemoryMapper>,
+    /// Unwind registry for cleanup on drop.
+    unwind: Arc<dyn UnwindRegistry>,
 }
 
 // MappedImage contains a raw pointer but is single-owner and thread-confined.
@@ -81,6 +84,7 @@ impl MappedImage {
         plan: &MappingPlan,
         binary_data: &[u8],
         mapper: Arc<dyn MemoryMapper>,
+        unwind: Arc<dyn UnwindRegistry>,
     ) -> Result<Self, ExecError> {
         let page_size = mapper.page_size();
 
@@ -98,6 +102,7 @@ impl MappedImage {
                 alloc_base: ptr::null_mut(),
                 alloc_size: 0,
                 mapper,
+                unwind,
             });
         }
 
@@ -117,8 +122,16 @@ impl MappedImage {
         }
 
         // Compute the virtual address range
-        let min_vmaddr = regions.iter().map(|r| r.vmaddr).min().unwrap();
-        let max_vm_end = regions.iter().map(|r| r.vmaddr + r.vmsize).max().unwrap();
+        let min_vmaddr = regions.iter().map(|r| r.vmaddr).min()
+            .ok_or_else(|| ExecError::MmapFailed {
+                segment: "contiguous_region".to_string(),
+                source: std::io::Error::other("no loadable segments found"),
+            })?;
+        let max_vm_end = regions.iter().map(|r| r.vmaddr + r.vmsize).max()
+            .ok_or_else(|| ExecError::MmapFailed {
+                segment: "contiguous_region".to_string(),
+                source: std::io::Error::other("no loadable segments found"),
+            })?;
         let total_vm_span = (max_vm_end - min_vmaddr) as usize;
 
         // Round up to page boundary
@@ -167,6 +180,7 @@ impl MappedImage {
             alloc_base,
             alloc_size,
             mapper,
+            unwind,
         })
     }
 
@@ -221,11 +235,16 @@ impl Drop for MappedImage {
     fn drop(&mut self) {
         // Unregister any unwind sections for this image before unmapping
         if let Some(text_seg) = self.segments.iter().find(|s| s.name == "__TEXT") {
-            crate::unwind::unregister_unwind_info_by_addr(text_seg.base as usize);
+            if let Err(e) = self.unwind.unregister(text_seg.base as usize) {
+                log::warn!("MappedImage Drop: failed to unregister unwind info: {}", e);
+            }
         }
 
         if !self.alloc_base.is_null() && self.alloc_size > 0 {
-            let _ = self.mapper.unmap(self.alloc_base, self.alloc_size);
+            if let Err(e) = self.mapper.unmap(self.alloc_base, self.alloc_size) {
+                log::warn!("MappedImage Drop: failed to unmap {:#x} ({} bytes): {}",
+                    self.alloc_base as usize, self.alloc_size, e);
+            }
         }
     }
 }

@@ -120,7 +120,7 @@ pub extern "C" fn shim_block_copy(block: u64) -> u64 {
         MIN_BLOCK_SIZE
     };
 
-    let heap = unsafe { libc::malloc(size) } as u64;
+    let heap = crate::pal_alloc().malloc(size) as u64;
     if heap == 0 {
         return 0;
     }
@@ -201,7 +201,7 @@ pub extern "C" fn shim_block_release(block: u64) {
             }
         }
         log::debug!("_Block_release: freed malloc block {:#x}", block);
-        unsafe { libc::free(block as *mut libc::c_void) };
+        crate::pal_alloc().free(block as *mut u8);
     }
 }
 

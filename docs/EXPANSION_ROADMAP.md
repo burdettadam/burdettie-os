@@ -190,9 +190,10 @@ Programmatic property access by name string. Foundation of KVO, bindings, and Co
 - [x] KVC accessor pattern detection: `<key>`, `is<Key>`, `_<key>`, `_is<Key>`
 - [x] KVC setter pattern detection: `set<Key>:`, `_set<Key>:`
 - [x] Auto-boxing: wrap/unwrap NSNumber for scalar properties
-- [ ] Collection operators: `@count`, `@sum`, `@avg`, `@min`, `@max` (stub only)
+- [x] Collection operators: `@count`, `@sum`, `@avg`, `@min`, `@max`, `@unionOfObjects`, `@distinctUnionOfObjects`
 - [x] Create `kvc_basics` fixture — get/set by key, key path, all 7 tests pass
 - [x] Create `kvc_simple` fixture — basic valueForKey/setValue:forKey with int
+- [x] Create `kvc_operators` fixture — @count, @sum, @avg, @min, @max, @unionOfObjects, @distinctUnionOfObjects (7 tests)
 - [x] Write unit tests for accessor pattern matching and auto-boxing
 - [x] Add `objc_setProperty_nonatomic` shim for `@property (nonatomic, retain)` setters
 
@@ -202,7 +203,8 @@ Programmatic property access by name string. Foundation of KVO, bindings, and Co
 - [x] `setValue:forKey:` finds setter methods and ivars
 - [x] Key path traversal works across object graphs
 - [x] Undefined key logs warning (exception stub)
-- [x] KVC fixtures pass through runtime pipeline (kvc_simple + kvc_basics)
+- [x] KVC fixtures pass through runtime pipeline (kvc_simple + kvc_basics + kvc_operators)
+- [x] Collection operators `@count`, `@sum`, `@avg`, `@min`, `@max`, `@unionOfObjects`, `@distinctUnionOfObjects` all produce correct results
 
 ---
 

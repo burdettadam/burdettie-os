@@ -13,16 +13,16 @@ const NSDATA_BYTES_OFF: usize = 16;
 
 /// Create an NSData from a byte slice.
 pub fn make_nsdata(bytes: &[u8]) -> u64 {
-    let obj = unsafe { libc::calloc(1, 24) } as u64;
+    let obj = crate::pal_alloc().calloc(1, 24) as u64;
     if obj == 0 { return 0; }
     unsafe {
         *(obj as *mut u64) = crate::nsobj::nsdata_class_addr();
         *((obj as usize + NSDATA_LENGTH_OFF) as *mut u64) = bytes.len() as u64;
     }
     if !bytes.is_empty() {
-        let buf = unsafe { libc::malloc(bytes.len()) };
+        let buf = crate::pal_alloc().malloc(bytes.len());
         if !buf.is_null() {
-            unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), buf as *mut u8, bytes.len()); }
+            unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), buf, bytes.len()); }
         }
         unsafe { *((obj as usize + NSDATA_BYTES_OFF) as *mut u64) = buf as u64; }
     }
@@ -36,7 +36,7 @@ pub extern "C" fn shim_nsdata_data_with_bytes_length(
     bytes: u64,
     length: u64,
 ) -> u64 {
-    let obj = unsafe { libc::calloc(1, 24) } as u64;
+    let obj = crate::pal_alloc().calloc(1, 24) as u64;
     if obj == 0 {
         return 0;
     }
@@ -49,7 +49,7 @@ pub extern "C" fn shim_nsdata_data_with_bytes_length(
     }
 
     if length > 0 && bytes != 0 {
-        let buf = unsafe { libc::malloc(length as usize) } as u64;
+        let buf = crate::pal_alloc().malloc(length as usize) as u64;
         if buf != 0 {
             unsafe {
                 std::ptr::copy_nonoverlapping(bytes as *const u8, buf as *mut u8, length as usize);
@@ -70,7 +70,7 @@ pub extern "C" fn shim_nsdata_data_with_bytes_length(
 
 /// `+[NSData data]` — empty data.
 pub extern "C" fn shim_nsdata_data(_cls: u64, _cmd: u64) -> u64 {
-    let obj = unsafe { libc::calloc(1, 24) } as u64;
+    let obj = crate::pal_alloc().calloc(1, 24) as u64;
     if obj == 0 {
         return 0;
     }

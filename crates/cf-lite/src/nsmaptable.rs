@@ -32,7 +32,7 @@ pub extern "C" fn shim_maptable_with_options(
     key_opts: u64,
     val_opts: u64,
 ) -> u64 {
-    let obj = unsafe { libc::calloc(1, INSTANCE_SIZE as usize) } as u64;
+    let obj = crate::pal_alloc().calloc(1, INSTANCE_SIZE as usize) as u64;
     if obj == 0 { return 0; }
     unsafe {
         *(obj as *mut u64) = nsobj::nsmaptable_class_addr();

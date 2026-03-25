@@ -50,7 +50,8 @@ pub struct RuntimeConfig {
     /// Security policy to evaluate before execution.
     /// `None` means skip security evaluation entirely.
     pub security_policy: Option<TrustPolicy>,
-    /// Whether to allow dlsym fallback to the host process.
+    /// Whether to allow dlsym fallback to the host process for symbol resolution.
+    /// When true, unresolved symbols are looked up via the StubResolver safe-list.
     pub host_fallback: bool,
     /// Which shim categories to install.
     pub shim_set: ShimSet,

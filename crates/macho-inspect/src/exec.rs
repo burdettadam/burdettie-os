@@ -10,7 +10,8 @@ pub fn print_exec(parsed: &ParsedMachO, data: &[u8], binary_path: &std::path::Pa
     println!("=== In-Process Execution ===");
 
     let mapper = std::sync::Arc::new(platform_darwin_host::DarwinMemoryMapper);
-    let mut registry = ImageRegistry::new(mapper);
+    let unwind = std::sync::Arc::new(platform_darwin_host::DarwinUnwindRegistry);
+    let mut registry = ImageRegistry::new(mapper, unwind);
     let binary_dir = binary_path.parent().unwrap_or(std::path::Path::new("."));
 
     // Recursively load dylib dependencies (breadth-first).

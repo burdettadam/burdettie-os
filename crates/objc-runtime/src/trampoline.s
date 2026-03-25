@@ -47,18 +47,12 @@ _shim_objc_msg_send_asm:
     // ── lookup ─────────────────────────────────────────────
     // x0 = self (already in x0)
     // x1 = SEL  (already in x1)
-    // Call Rust lookup: extern "C" fn(self: u64, sel: u64) -> (u64, u64)
-    //   Returns: x0 = IMP, x1 = translated selector (0 if no translation)
+    // Call Rust lookup: extern "C" fn(self: u64, sel: u64) -> u64
+    //   Returns: x0 = IMP
     bl      _objc_msg_lookup_imp
 
     // IMP is now in x0 — move to x16 (intra-procedure-call scratch)
     mov     x16, x0
-
-    // If x1 != 0, the lookup translated the selector for host fallback.
-    // Overwrite the saved SEL on the stack so the restore picks it up.
-    cbz     x1, .Lno_sel_xlat
-    str     x1, [sp, #8]
-.Lno_sel_xlat:
 
     // ── restore state ──────────────────────────────────────
     // Restore link register

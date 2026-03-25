@@ -3,14 +3,18 @@
 use graphics_core::Point;
 use window_backend::KeyCode;
 
+use crate::menu::ModifierFlags;
+
 /// An input event dispatched through the responder chain.
 #[derive(Debug, Clone)]
 pub enum Event {
     KeyDown {
         key: KeyCode,
+        modifiers: ModifierFlags,
     },
     KeyUp {
         key: KeyCode,
+        modifiers: ModifierFlags,
     },
     MouseDown {
         location: Point,

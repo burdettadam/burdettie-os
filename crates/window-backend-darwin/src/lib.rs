@@ -1,15 +1,22 @@
 //! Host-backed GUI backend using `winit` + `softbuffer`.
 //!
 //! Provides [`GuiApp`] — a convenience wrapper that opens a native window,
-//! renders [`Label`]s and [`Button`]s through the `graphics-core` software
-//! renderer, and handles mouse and keyboard input.
+//! renders controls through the `graphics-core` software renderer, and
+//! handles mouse and keyboard input.
+//!
+//! Internally delegates rendering and interaction to [`AppScene`] from
+//! `ui-controls` — the same backend-agnostic kernel used by `HeadlessApp`
+//! for testing.
+
+mod keymap;
 
 use std::num::NonZeroU32;
 use std::sync::Arc;
 
-use graphics_core::{Color, Point, Renderer as _, SoftwareRenderer, Surface};
-use ui_controls::{Button, Label, TextField};
+use graphics_core::Color;
+use ui_controls::{AppScene, Button, Label, TextField};
 use window_backend::KeyCode;
+use app_kit_lite::menu::{ModifierFlags, NSMenu};
 
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
@@ -18,119 +25,46 @@ use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::keyboard::PhysicalKey;
 use winit::window::{Window, WindowId};
 
+pub use keymap::{map_winit_key, map_winit_mouse};
 pub use graphics_core::Rect;
 pub use window_backend::WindowConfig;
 
-// ── Key / mouse mapping ───────────────────────────────────────────
-
-/// Map a `winit` physical key code to our [`KeyCode`].
-pub fn map_winit_key(key: winit::keyboard::KeyCode) -> KeyCode {
-    use winit::keyboard::KeyCode as WK;
-    match key {
-        WK::KeyA => KeyCode::A,
-        WK::KeyB => KeyCode::B,
-        WK::KeyC => KeyCode::C,
-        WK::KeyD => KeyCode::D,
-        WK::KeyE => KeyCode::E,
-        WK::KeyF => KeyCode::F,
-        WK::KeyG => KeyCode::G,
-        WK::KeyH => KeyCode::H,
-        WK::KeyI => KeyCode::I,
-        WK::KeyJ => KeyCode::J,
-        WK::KeyK => KeyCode::K,
-        WK::KeyL => KeyCode::L,
-        WK::KeyM => KeyCode::M,
-        WK::KeyN => KeyCode::N,
-        WK::KeyO => KeyCode::O,
-        WK::KeyP => KeyCode::P,
-        WK::KeyQ => KeyCode::Q,
-        WK::KeyR => KeyCode::R,
-        WK::KeyS => KeyCode::S,
-        WK::KeyT => KeyCode::T,
-        WK::KeyU => KeyCode::U,
-        WK::KeyV => KeyCode::V,
-        WK::KeyW => KeyCode::W,
-        WK::KeyX => KeyCode::X,
-        WK::KeyY => KeyCode::Y,
-        WK::KeyZ => KeyCode::Z,
-        WK::Digit0 => KeyCode::Num0,
-        WK::Digit1 => KeyCode::Num1,
-        WK::Digit2 => KeyCode::Num2,
-        WK::Digit3 => KeyCode::Num3,
-        WK::Digit4 => KeyCode::Num4,
-        WK::Digit5 => KeyCode::Num5,
-        WK::Digit6 => KeyCode::Num6,
-        WK::Digit7 => KeyCode::Num7,
-        WK::Digit8 => KeyCode::Num8,
-        WK::Digit9 => KeyCode::Num9,
-        WK::Space => KeyCode::Space,
-        WK::Enter => KeyCode::Return,
-        WK::Escape => KeyCode::Escape,
-        WK::Tab => KeyCode::Tab,
-        WK::Backspace => KeyCode::Backspace,
-        WK::Delete => KeyCode::Delete,
-        WK::ArrowLeft => KeyCode::Left,
-        WK::ArrowRight => KeyCode::Right,
-        WK::ArrowUp => KeyCode::Up,
-        WK::ArrowDown => KeyCode::Down,
-        other => KeyCode::Unknown(other as u32),
-    }
-}
-
-/// Map a `winit` mouse button to our [`MouseButton`](window_backend::MouseButton).
-pub fn map_winit_mouse(button: winit::event::MouseButton) -> window_backend::MouseButton {
-    match button {
-        winit::event::MouseButton::Left => window_backend::MouseButton::Left,
-        winit::event::MouseButton::Right => window_backend::MouseButton::Right,
-        winit::event::MouseButton::Middle => window_backend::MouseButton::Middle,
-        _ => window_backend::MouseButton::Left,
-    }
-}
-
 // ── GuiApp ─────────────────────────────────────────────────────────
 
-/// Button click handler: receives button index and mutable access to labels/textfields.
-type ButtonClickHandler = Box<dyn FnMut(usize, &mut Vec<Label>, &mut Vec<TextField>)>;
-
 /// A simple GUI application backed by a native window.
+///
+/// Internally delegates rendering and interaction to [`AppScene`] — the
+/// same backend-agnostic kernel used by `HeadlessApp` for testing.
 ///
 /// Add labels and buttons, set a click handler, then call [`run()`](GuiApp::run)
 /// to enter the event loop.
 pub struct GuiApp {
     config: WindowConfig,
-    background: Color,
-    labels: Vec<Label>,
-    buttons: Vec<Button>,
-    textfields: Vec<TextField>,
-    on_button_click: Option<ButtonClickHandler>,
+    scene: AppScene,
 }
 
 impl GuiApp {
     pub fn new(config: WindowConfig) -> Self {
         Self {
             config,
-            background: Color::WHITE,
-            labels: Vec::new(),
-            buttons: Vec::new(),
-            textfields: Vec::new(),
-            on_button_click: None,
+            scene: AppScene::new(),
         }
     }
 
     pub fn set_background(&mut self, color: Color) {
-        self.background = color;
+        self.scene.set_background(color);
     }
 
     pub fn add_label(&mut self, label: Label) {
-        self.labels.push(label);
+        self.scene.add_label(label);
     }
 
     pub fn add_button(&mut self, button: Button) {
-        self.buttons.push(button);
+        self.scene.add_button(button);
     }
 
     pub fn add_textfield(&mut self, tf: TextField) {
-        self.textfields.push(tf);
+        self.scene.add_textfield(tf);
     }
 
     /// Register a handler called when any button is clicked.
@@ -141,7 +75,22 @@ impl GuiApp {
         &mut self,
         handler: impl FnMut(usize, &mut Vec<Label>, &mut Vec<TextField>) + 'static,
     ) {
-        self.on_button_click = Some(Box::new(handler));
+        self.scene.on_button_click(handler);
+    }
+
+    /// Set the main menu bar.
+    pub fn set_main_menu(&mut self, menu: NSMenu) {
+        self.scene.set_main_menu(menu);
+    }
+
+    /// Access the underlying scene.
+    pub fn scene(&self) -> &AppScene {
+        &self.scene
+    }
+
+    /// Mutable access to the underlying scene.
+    pub fn scene_mut(&mut self) -> &mut AppScene {
+        &mut self.scene
     }
 
     /// Enter the main event loop. This blocks until the window is closed.
@@ -149,12 +98,7 @@ impl GuiApp {
         let event_loop = EventLoop::new().expect("failed to create event loop");
         let mut state = AppState {
             config: self.config,
-            background: self.background,
-            labels: self.labels,
-            buttons: self.buttons,
-            textfields: self.textfields,
-            on_button_click: self.on_button_click,
-            focused_textfield: None,
+            scene: self.scene,
             window: None,
             _context: None,
             sb_surface: None,
@@ -168,12 +112,7 @@ impl GuiApp {
 
 struct AppState {
     config: WindowConfig,
-    background: Color,
-    labels: Vec<Label>,
-    buttons: Vec<Button>,
-    textfields: Vec<TextField>,
-    on_button_click: Option<ButtonClickHandler>,
-    focused_textfield: Option<usize>,
+    scene: AppScene,
 
     // winit / softbuffer state
     window: Option<Arc<Window>>,
@@ -220,10 +159,14 @@ impl ApplicationHandler for AppState {
             WindowEvent::Resized(size) => {
                 if size.width > 0 && size.height > 0 {
                     if let Some(ref mut surface) = self.sb_surface {
-                        let _ = surface.resize(
-                            NonZeroU32::new(size.width).unwrap(),
-                            NonZeroU32::new(size.height).unwrap(),
-                        );
+                        if let (Some(w), Some(h)) = (
+                            NonZeroU32::new(size.width),
+                            NonZeroU32::new(size.height),
+                        ) {
+                            if let Err(e) = surface.resize(w, h) {
+                                log::warn!("softbuffer resize failed: {}", e);
+                            }
+                        }
                     }
                     if let Some(ref window) = self.window {
                         window.request_redraw();
@@ -246,13 +189,22 @@ impl ApplicationHandler for AppState {
                     self.handle_key_input(&event);
                 }
             }
+            WindowEvent::ModifiersChanged(modifiers) => {
+                let state = modifiers.state();
+                self.scene.set_modifier_flags(ModifierFlags {
+                    command: state.super_key(),
+                    shift: state.shift_key(),
+                    option: state.alt_key(),
+                    control: state.control_key(),
+                });
+            }
             _ => {}
         }
     }
 }
 
 impl AppState {
-    /// Render all views into the software surface and present.
+    /// Render using AppScene and present to softbuffer.
     fn redraw(&mut self) {
         let Some(ref window) = self.window else {
             return;
@@ -271,35 +223,32 @@ impl AppState {
         let lw = (pw as f64 / scale) as u32;
         let lh = (ph as f64 / scale) as u32;
 
-        // Render at logical resolution
-        let mut surface = Surface::new(lw, lh);
-        {
-            let mut renderer = SoftwareRenderer::new(&mut surface);
-            renderer.clear(self.background);
-
-            for label in &mut self.labels {
-                label.draw(&mut renderer);
-            }
-            for button in &mut self.buttons {
-                button.draw(&mut renderer);
-            }
-            for tf in &mut self.textfields {
-                tf.draw(&mut renderer);
-            }
-        }
+        // Render at logical resolution via AppScene
+        let surface = self.scene.render(lw, lh);
 
         // Present to softbuffer
-        let _ = sb_surface.resize(NonZeroU32::new(pw).unwrap(), NonZeroU32::new(ph).unwrap());
-        let mut buffer = sb_surface.buffer_mut().expect("failed to get buffer");
+        if let (Some(w), Some(h)) = (NonZeroU32::new(pw), NonZeroU32::new(ph)) {
+            if let Err(e) = sb_surface.resize(w, h) {
+                log::warn!("softbuffer resize failed during redraw: {}", e);
+                return;
+            }
+        } else {
+            return;
+        }
+        let mut buffer = match sb_surface.buffer_mut() {
+            Ok(buf) => buf,
+            Err(e) => {
+                log::warn!("failed to get softbuffer: {}", e);
+                return;
+            }
+        };
         let src = surface.pixels();
 
         if lw == pw && lh == ph {
-            // 1:1 — direct copy (strip alpha for softbuffer's 0x00RRGGBB format)
             for (dst, &pixel) in buffer.iter_mut().zip(src.iter()) {
                 *dst = pixel & 0x00FF_FFFF;
             }
         } else {
-            // HiDPI — nearest-neighbour scale-up
             for py in 0..ph {
                 for px in 0..pw {
                     let lx = ((px as f64 / scale) as u32).min(lw.saturating_sub(1));
@@ -311,65 +260,48 @@ impl AppState {
             }
         }
 
-        buffer.present().expect("failed to present buffer");
+        if let Err(e) = buffer.present() {
+            log::warn!("failed to present buffer: {}", e);
+        }
     }
 
     /// Find which button the cursor is over and fire its action.
     fn handle_click(&mut self) {
-        let point = Point::new(self.cursor_pos.0, self.cursor_pos.1);
-
-        // Check textfield focus
-        self.focused_textfield = self.textfields.iter().enumerate().find_map(|(i, tf)| {
-            if tf.is_editable() && tf.view().frame.contains(point) {
-                Some(i)
-            } else {
-                None
-            }
-        });
-
-        let clicked_idx = self.buttons.iter().enumerate().find_map(|(i, btn)| {
-            if btn.is_enabled() && btn.view().frame.contains(point) {
-                Some(i)
-            } else {
-                None
-            }
-        });
-
-        if let Some(idx) = clicked_idx {
-            self.buttons[idx].perform_click();
-
-            if let Some(ref mut handler) = self.on_button_click {
-                handler(idx, &mut self.labels, &mut self.textfields);
-            }
-
+        let point = graphics_core::Point::new(self.cursor_pos.0, self.cursor_pos.1);
+        if self.scene.handle_click(point) {
             if let Some(ref window) = self.window {
                 window.request_redraw();
             }
         }
     }
 
-    /// Handle keyboard input — dispatch to focused text field.
+    /// Handle keyboard input — check menu shortcuts first, then dispatch to focused text field.
     fn handle_key_input(&mut self, event: &winit::event::KeyEvent) {
-        let Some(idx) = self.focused_textfield else {
-            return;
-        };
-        if idx >= self.textfields.len() {
-            return;
+        // Check menu key equivalents first
+        if let PhysicalKey::Code(code) = event.physical_key {
+            let key = map_winit_key(code);
+            if self.scene.handle_key_down(key) {
+                if let Some(ref window) = self.window {
+                    window.request_redraw();
+                }
+                return;
+            }
         }
 
-        // Try logical text first
+        // Character input to focused text field
+        let mut consumed = false;
         if let winit::keyboard::Key::Character(ref text) = event.logical_key {
-            for ch in text.chars() {
-                self.textfields[idx].insert_char(ch);
-            }
+            consumed = self.scene.handle_character_input(text);
         } else if let PhysicalKey::Code(code) = event.physical_key {
             if map_winit_key(code) == KeyCode::Backspace {
-                self.textfields[idx].delete_backward();
+                consumed = self.scene.handle_backspace();
             }
         }
 
-        if let Some(ref window) = self.window {
-            window.request_redraw();
+        if consumed {
+            if let Some(ref window) = self.window {
+                window.request_redraw();
+            }
         }
     }
 }
@@ -381,58 +313,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn map_key_letters() {
-        use winit::keyboard::KeyCode as WK;
-        assert_eq!(map_winit_key(WK::KeyA), KeyCode::A);
-        assert_eq!(map_winit_key(WK::KeyZ), KeyCode::Z);
-    }
-
-    #[test]
-    fn map_key_digits() {
-        use winit::keyboard::KeyCode as WK;
-        assert_eq!(map_winit_key(WK::Digit0), KeyCode::Num0);
-        assert_eq!(map_winit_key(WK::Digit9), KeyCode::Num9);
-    }
-
-    #[test]
-    fn map_key_special() {
-        use winit::keyboard::KeyCode as WK;
-        assert_eq!(map_winit_key(WK::Space), KeyCode::Space);
-        assert_eq!(map_winit_key(WK::Enter), KeyCode::Return);
-        assert_eq!(map_winit_key(WK::Escape), KeyCode::Escape);
-        assert_eq!(map_winit_key(WK::Tab), KeyCode::Tab);
-        assert_eq!(map_winit_key(WK::Backspace), KeyCode::Backspace);
-        assert_eq!(map_winit_key(WK::Delete), KeyCode::Delete);
-        assert_eq!(map_winit_key(WK::ArrowLeft), KeyCode::Left);
-        assert_eq!(map_winit_key(WK::ArrowRight), KeyCode::Right);
-        assert_eq!(map_winit_key(WK::ArrowUp), KeyCode::Up);
-        assert_eq!(map_winit_key(WK::ArrowDown), KeyCode::Down);
-    }
-
-    #[test]
-    fn map_mouse_buttons() {
-        use window_backend::MouseButton;
-        assert_eq!(
-            map_winit_mouse(winit::event::MouseButton::Left),
-            MouseButton::Left
-        );
-        assert_eq!(
-            map_winit_mouse(winit::event::MouseButton::Right),
-            MouseButton::Right
-        );
-        assert_eq!(
-            map_winit_mouse(winit::event::MouseButton::Middle),
-            MouseButton::Middle
-        );
-    }
-
-    #[test]
     fn gui_app_builder() {
         let mut app = GuiApp::new(WindowConfig::default());
         app.set_background(Color::WHITE);
         app.add_label(Label::new(Rect::new(0.0, 0.0, 100.0, 20.0), "Test"));
         app.add_button(Button::new(Rect::new(0.0, 30.0, 80.0, 25.0), "OK"));
-        assert_eq!(app.labels.len(), 1);
-        assert_eq!(app.buttons.len(), 1);
+        assert_eq!(app.scene().label_count(), 1);
+        assert_eq!(app.scene().button_count(), 1);
     }
 }

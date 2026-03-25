@@ -42,7 +42,7 @@ pub extern "C" fn shim_nscache_init(obj: u64, _cmd: u64) -> u64 {
 
 /// `+[NSCache alloc]`
 pub extern "C" fn shim_nscache_alloc(_cls: u64, _cmd: u64) -> u64 {
-    let obj = unsafe { libc::calloc(1, INSTANCE_SIZE as usize) } as u64;
+    let obj = crate::pal_alloc().calloc(1, INSTANCE_SIZE as usize) as u64;
     if obj != 0 {
         unsafe { *(obj as *mut u64) = nsobj::nscache_class_addr(); }
     }

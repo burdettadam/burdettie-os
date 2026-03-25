@@ -12,7 +12,7 @@ static DEFAULT_MANAGER: OnceLock<u64> = OnceLock::new();
 
 fn get_or_create_default_manager() -> u64 {
     *DEFAULT_MANAGER.get_or_init(|| {
-        let obj = unsafe { libc::calloc(1, 8) } as u64;
+        let obj = crate::pal_alloc().calloc(1, 8) as u64;
         if obj != 0 {
             unsafe {
                 *(obj as *mut u64) = crate::nsobj::nsfilemanager_class_addr();

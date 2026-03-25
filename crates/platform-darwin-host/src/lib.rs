@@ -4,6 +4,7 @@
 //! crates depend only on `platform-core` traits and receive a
 //! `DarwinHostPlatform` via dependency injection.
 
+mod alloc;
 mod clock;
 mod fs;
 mod hash;
@@ -11,8 +12,10 @@ mod memory;
 mod process;
 mod rng;
 mod symbols;
+mod threading;
 mod unwind;
 
+pub use alloc::DarwinAllocator;
 pub use clock::DarwinClock;
 pub use fs::DarwinFilesystem;
 pub use hash::DarwinHasher;
@@ -20,12 +23,14 @@ pub use memory::DarwinMemoryMapper;
 pub use process::DarwinProcessInfo;
 pub use rng::DarwinRng;
 pub use symbols::DarwinSymbolResolver;
+pub use threading::PosixThreading;
 pub use unwind::DarwinUnwindRegistry;
 
 use std::sync::Arc;
 
 /// Bundle of all macOS host platform services.
 pub struct DarwinHostPlatform {
+    alloc: DarwinAllocator,
     symbols: DarwinSymbolResolver,
     unwind: DarwinUnwindRegistry,
     clock: DarwinClock,
@@ -33,11 +38,13 @@ pub struct DarwinHostPlatform {
     process: DarwinProcessInfo,
     fs: DarwinFilesystem,
     hash: DarwinHasher,
+    threading: PosixThreading,
 }
 
 impl DarwinHostPlatform {
     pub fn new() -> Self {
         Self {
+            alloc: DarwinAllocator,
             symbols: DarwinSymbolResolver::new(),
             unwind: DarwinUnwindRegistry,
             clock: DarwinClock,
@@ -45,6 +52,7 @@ impl DarwinHostPlatform {
             process: DarwinProcessInfo,
             fs: DarwinFilesystem,
             hash: DarwinHasher,
+            threading: PosixThreading,
         }
     }
 }
@@ -56,6 +64,9 @@ impl Default for DarwinHostPlatform {
 }
 
 impl platform_core::PlatformProvider for DarwinHostPlatform {
+    fn alloc(&self) -> &dyn platform_core::alloc::Allocator {
+        &self.alloc
+    }
     fn memory(&self) -> Arc<dyn platform_core::memory::MemoryMapper> {
         Arc::new(DarwinMemoryMapper)
     }
@@ -79,5 +90,8 @@ impl platform_core::PlatformProvider for DarwinHostPlatform {
     }
     fn hash(&self) -> &dyn platform_core::hash::Hasher {
         &self.hash
+    }
+    fn threading(&self) -> &dyn platform_core::threading::Threading {
+        &self.threading
     }
 }

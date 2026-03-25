@@ -4,6 +4,7 @@ use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 use std::sync::Mutex;
 
 use crate::event::Event;
+use crate::menu::{ModifierFlags, NSMenu};
 use crate::responder::Responder;
 use runloop_core::RunLoop;
 use window_backend::{WindowBackend, WindowEvent};
@@ -29,6 +30,8 @@ pub struct NSApplication {
     exit_code: AtomicI32,
     /// Callbacks invoked for each event (for headless testing).
     event_handlers: Mutex<Vec<EventHandler>>,
+    /// The application-level menu bar.
+    main_menu: Mutex<Option<NSMenu>>,
 }
 
 impl NSApplication {
@@ -41,17 +44,18 @@ impl NSApplication {
             running: AtomicBool::new(false),
             exit_code: AtomicI32::new(0),
             event_handlers: Mutex::new(Vec::new()),
+            main_menu: Mutex::new(None),
         }
     }
 
     /// Set the application delegate.
     pub fn set_delegate(&self, delegate: Box<dyn AppDelegate>) {
-        *self.delegate.lock().unwrap() = Some(delegate);
+        *self.delegate.lock().unwrap_or_else(|e| e.into_inner()) = Some(delegate);
     }
 
     /// Set the window backend.
     pub fn set_backend(&self, backend: Box<dyn WindowBackend>) {
-        *self.backend.lock().unwrap() = Some(backend);
+        *self.backend.lock().unwrap_or_else(|e| e.into_inner()) = Some(backend);
     }
 
     /// Access the run loop.
@@ -61,7 +65,31 @@ impl NSApplication {
 
     /// Add an event handler (for testing / headless use).
     pub fn add_event_handler(&self, handler: impl FnMut(&Event) + Send + 'static) {
-        self.event_handlers.lock().unwrap().push(Box::new(handler));
+        self.event_handlers.lock().unwrap_or_else(|e| e.into_inner()).push(Box::new(handler));
+    }
+
+    /// Set the main menu bar.
+    pub fn set_main_menu(&self, menu: NSMenu) {
+        *self.main_menu.lock().unwrap_or_else(|e| e.into_inner()) = Some(menu);
+    }
+
+    /// Access the main menu (returns lock guard).
+    pub fn main_menu(&self) -> std::sync::MutexGuard<'_, Option<NSMenu>> {
+        self.main_menu.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Try to dispatch a key as a menu shortcut. Returns true if handled.
+    pub fn perform_key_equivalent(
+        &self,
+        key: window_backend::KeyCode,
+        modifiers: ModifierFlags,
+    ) -> bool {
+        let mut menu = self.main_menu.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(ref mut m) = *menu {
+            m.perform_key_equivalent(key, modifiers)
+        } else {
+            false
+        }
     }
 
     /// Enter the main run loop. Blocks until `terminate()` is called.
@@ -69,7 +97,7 @@ impl NSApplication {
         self.running.store(true, Ordering::SeqCst);
 
         // Notify delegate
-        if let Some(delegate) = self.delegate.lock().unwrap().as_ref() {
+        if let Some(delegate) = self.delegate.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
             delegate.application_did_finish_launching();
         }
 
@@ -85,7 +113,7 @@ impl NSApplication {
         }
 
         // Notify delegate
-        if let Some(delegate) = self.delegate.lock().unwrap().as_ref() {
+        if let Some(delegate) = self.delegate.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
             delegate.application_will_terminate();
         }
     }
@@ -127,7 +155,7 @@ impl NSApplication {
 
     fn poll_window_events(&self) {
         let events = {
-            let backend = self.backend.lock().unwrap();
+            let backend = self.backend.lock().unwrap_or_else(|e| e.into_inner());
             match backend.as_ref() {
                 Some(b) => b.poll_events(),
                 None => return,
@@ -140,12 +168,25 @@ impl NSApplication {
                     self.terminate(0);
                 }
                 WindowEvent::KeyDown(_, key) => {
-                    let event = Event::KeyDown { key };
-                    self.dispatch_event(&event);
+                    let modifiers = ModifierFlags::default();
+                    // Try menu key equivalents first
+                    if !self.perform_key_equivalent(key, modifiers) {
+                        let event = Event::KeyDown { key, modifiers };
+                        self.dispatch_event(&event);
+                    }
                 }
                 WindowEvent::KeyUp(_, key) => {
-                    let event = Event::KeyUp { key };
+                    let event = Event::KeyUp {
+                        key,
+                        modifiers: ModifierFlags::default(),
+                    };
                     self.dispatch_event(&event);
+                }
+                WindowEvent::CharacterInput(_, _) => {
+                    // Character input is handled by the view layer
+                }
+                WindowEvent::ModifiersChanged(_, _) => {
+                    // Modifier state is tracked by the backend/view layer
                 }
                 WindowEvent::MouseDown(_, x, y, button) => {
                     let event = Event::MouseDown {
@@ -167,6 +208,9 @@ impl NSApplication {
                     };
                     self.dispatch_event(&event);
                 }
+                WindowEvent::ScrollWheel(_, _, _) => {
+                    // Scroll events are handled by the view layer
+                }
                 WindowEvent::Resized(_, _, _) | WindowEvent::RedrawRequested(_) => {
                     // Handled by the view layer
                 }
@@ -175,7 +219,7 @@ impl NSApplication {
     }
 
     fn dispatch_event(&self, event: &Event) {
-        let mut handlers = self.event_handlers.lock().unwrap();
+        let mut handlers = self.event_handlers.lock().unwrap_or_else(|e| e.into_inner());
         for handler in handlers.iter_mut() {
             handler(event);
         }
@@ -241,7 +285,7 @@ mod tests {
 
         // Manually run the app lifecycle instead of app.run()
         app.running.store(true, Ordering::SeqCst);
-        if let Some(delegate) = app.delegate.lock().unwrap().as_ref() {
+        if let Some(delegate) = app.delegate.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
             delegate.application_did_finish_launching();
         }
 
@@ -251,7 +295,7 @@ mod tests {
         }
 
         app.running.store(false, Ordering::SeqCst);
-        if let Some(delegate) = app.delegate.lock().unwrap().as_ref() {
+        if let Some(delegate) = app.delegate.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
             delegate.application_will_terminate();
         }
 

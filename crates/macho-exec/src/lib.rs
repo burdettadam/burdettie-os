@@ -23,7 +23,7 @@ mod registry;
 mod security;
 mod unwind;
 
-pub use entry::{call_entry, EntryResult};
+pub use entry::{call_entry, call_entry_with_args, EntryArgs, EntryResult};
 pub use fixup::{apply_binds, apply_chained_fixups, apply_rebases, StubResolver, SymbolResolver};
 pub use initializer::call_constructors;
 pub use mapped::{MappedImage, MappedSegment};
@@ -31,8 +31,6 @@ pub use registry::{ImageRegistry, LoadedImage, RegistryResolver};
 #[doc(hidden)]
 pub use security::checked_entry;
 pub use unwind::register_unwind_info;
-#[doc(hidden)]
-pub use unwind::unregister_unwind_info;
 
 use thiserror::Error;
 

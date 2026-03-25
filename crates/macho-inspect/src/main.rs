@@ -10,6 +10,7 @@ use serde::Serialize;
 mod exec;
 mod print_info;
 mod print_text;
+mod why_failed;
 
 #[derive(Parser)]
 #[command(name = "macho-inspect", about = "Inspect Mach-O binary structure")]
@@ -80,6 +81,10 @@ struct Cli {
     /// Show verbose rebase entries (segment, offset, type).
     #[arg(long)]
     rebase: bool,
+
+    /// Diagnose why a binary would fail at runtime.
+    #[arg(long)]
+    why_failed: bool,
 
     /// CPU architecture to select from fat/universal binaries (arm64, x86_64).
     #[arg(long, value_parser = parse_cpu_type)]
@@ -163,6 +168,8 @@ fn main() {
             eprintln!("error: --exec is only supported on macOS");
             std::process::exit(1);
         }
+    } else if cli.why_failed {
+        why_failed::print_why_failed(&parsed, &abs_path, &data);
     } else if cli.plan {
         print_info::print_plan(&parsed, &abs_path, &data);
     } else if cli.resolve {

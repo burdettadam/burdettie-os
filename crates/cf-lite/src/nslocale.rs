@@ -28,14 +28,14 @@ fn system_locale_identifier() -> String {
 }
 
 fn alloc_nslocale(identifier: &str) -> u64 {
-    let obj = unsafe { libc::calloc(1, NSLOCALE_SIZE) } as *mut u64;
+    let obj = crate::pal_alloc().calloc(1, NSLOCALE_SIZE) as *mut u64;
     if obj.is_null() {
         return 0;
     }
     let c_id = std::ffi::CString::new(identifier).unwrap_or_default();
     let id_ptr = unsafe {
         let len = c_id.as_bytes_with_nul().len();
-        let buf = libc::malloc(len) as *mut u8;
+        let buf = crate::pal_alloc().malloc(len);
         if !buf.is_null() {
             std::ptr::copy_nonoverlapping(c_id.as_ptr() as *const u8, buf, len);
         }

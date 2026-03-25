@@ -22,12 +22,12 @@ const NSSORTDESCRIPTOR_SIZE: usize = 24;
 fn host_compare(a: u64, b: u64) -> i64 {
     type SelRegFn = unsafe extern "C" fn(*const i8) -> u64;
     type MsgSend3 = unsafe extern "C" fn(u64, u64, u64) -> i64;
-    let rtld = (-2isize) as *mut libc::c_void;
-    let sel_reg = unsafe { libc::dlsym(rtld, c"sel_registerName".as_ptr()) };
-    let msg_send = unsafe { libc::dlsym(rtld, c"objc_msgSend".as_ptr()) };
-    if !sel_reg.is_null() && !msg_send.is_null() {
-        let sel_fn: SelRegFn = unsafe { std::mem::transmute(sel_reg) };
-        let send_fn: MsgSend3 = unsafe { std::mem::transmute(msg_send) };
+    let symbols = crate::pal_symbols();
+    let sel_reg = symbols.resolve("sel_registerName");
+    let msg_send = symbols.resolve("objc_msgSend");
+    if let (Some(sel_reg_ptr), Some(msg_send_ptr)) = (sel_reg, msg_send) {
+        let sel_fn: SelRegFn = unsafe { std::mem::transmute(sel_reg_ptr) };
+        let send_fn: MsgSend3 = unsafe { std::mem::transmute(msg_send_ptr) };
         let sel = unsafe { sel_fn(c"compare:".as_ptr()) };
         unsafe { send_fn(a, sel, b) }
     } else {
@@ -36,14 +36,14 @@ fn host_compare(a: u64, b: u64) -> i64 {
 }
 
 fn alloc_nssortdescriptor(key: &str, ascending: bool) -> u64 {
-    let obj = unsafe { libc::calloc(1, NSSORTDESCRIPTOR_SIZE) } as *mut u64;
+    let obj = crate::pal_alloc().calloc(1, NSSORTDESCRIPTOR_SIZE) as *mut u64;
     if obj.is_null() {
         return 0;
     }
     let c_key = std::ffi::CString::new(key).unwrap_or_default();
     let key_ptr = unsafe {
         let len = c_key.as_bytes_with_nul().len();
-        let buf = libc::malloc(len) as *mut u8;
+        let buf = crate::pal_alloc().malloc(len);
         if !buf.is_null() {
             std::ptr::copy_nonoverlapping(c_key.as_ptr() as *const u8, buf, len);
         }

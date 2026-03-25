@@ -14,7 +14,7 @@ static NULL_SINGLETON: OnceLock<u64> = OnceLock::new();
 
 fn get_singleton() -> u64 {
     *NULL_SINGLETON.get_or_init(|| {
-        let obj = unsafe { libc::calloc(1, 8) } as u64;
+        let obj = crate::pal_alloc().calloc(1, 8) as u64;
         unsafe {
             *(obj as *mut u64) = nsobj::nsnull_class_addr();
         }

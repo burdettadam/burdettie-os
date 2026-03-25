@@ -5,22 +5,9 @@
 
 #[cfg(test)]
 mod tests {
+    use macho_fixtures::{fixtures_dir, read_fixture};
     use macho_parse::parse;
     use macho_resolve::{bind_symbols, BindingReport, ResolutionPlan, SymbolBinding};
-    use std::path::PathBuf;
-
-    fn fixtures_dir() -> PathBuf {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .join("fixtures")
-    }
-
-    fn read_fixture(name: &str) -> Option<Vec<u8>> {
-        std::fs::read(fixtures_dir().join(name)).ok()
-    }
 
     // ── simple_cli binding ──────────────────────────────────────────
 

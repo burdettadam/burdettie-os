@@ -18,6 +18,7 @@ macho-run-plan = { workspace = true }
 macho-exec     = { workspace = true }
 macho-objc     = { workspace = true }
 macho-map      = { workspace = true }
+runtime-diagnostics = { workspace = true }
 platform-core  = { workspace = true }
 platform-darwin-host = { workspace = true }
 trust-policy   = { workspace = true }

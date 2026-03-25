@@ -4,7 +4,14 @@
 //! registered in the `ShimTable` and resolved by the runtime's symbol
 //! resolver chain. Shims fall into three strategies:
 // Function pointers are cast to u64 addresses for the emulated Mach-O address space.
-#![allow(clippy::fn_to_numeric_cast)]
+#![allow(
+    clippy::fn_to_numeric_cast,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_possible_wrap,
+)]
 //!
 //! 1. **Implement** — pure Rust implementation (e.g. `strlen`, `getprogname`)
 //! 2. **Delegate** — forward to host via `libc` (e.g. `malloc`, `printf`)

@@ -21,6 +21,7 @@ members = [
     "crates/platform-darwin-host",
     "crates/runtime-demo",
     "crates/runtime-shell",
+    "crates/runtime-diagnostics",
     "crates/graphics-core",
     "crates/window-backend",
     "crates/runloop-core",
@@ -28,6 +29,7 @@ members = [
     "crates/ui-view",
     "crates/ui-controls",
     "crates/window-backend-darwin",
+    "crates/compat-runner",
     "crates/darwin-runtime-ffi",
     "apps/hello-darwin",
     "apps/control-gallery",
@@ -62,6 +64,7 @@ platform-core  = { path = "crates/platform-core" }
 platform-darwin-host = { path = "crates/platform-darwin-host" }
 runtime-demo   = { path = "crates/runtime-demo" }
 runtime-shell  = { path = "crates/runtime-shell" }
+runtime-diagnostics = { path = "crates/runtime-diagnostics" }
 graphics-core  = { path = "crates/graphics-core" }
 window-backend = { path = "crates/window-backend" }
 runloop-core   = { path = "crates/runloop-core" }
@@ -69,6 +72,7 @@ app-kit-lite   = { path = "crates/app-kit-lite" }
 ui-view        = { path = "crates/ui-view" }
 ui-controls    = { path = "crates/ui-controls" }
 window-backend-darwin = { path = "crates/window-backend-darwin" }
+compat-runner         = { path = "crates/compat-runner" }
 darwin-runtime-ffi    = { path = "crates/darwin-runtime-ffi" }
 hello-darwin          = { path = "apps/hello-darwin" }
 control-gallery       = { path = "apps/control-gallery" }
@@ -94,10 +98,19 @@ unused_must_use        = "deny"    # never silently drop Result / must_use
 unreachable_patterns   = "warn"
 
 [workspace.lints.clippy]
-# Error handling
-manual_let_else          = "warn"    # prefer `let ... else { return }` pattern
+# ── Error handling (deny — these hide bugs) ──────────────────────
+unwrap_used              = "warn"    # prefer expect(), ?, or unwrap_or
+expect_used              = "warn"    # prefer ? or unwrap_or for recoverable paths
 
-# Style & clarity
+# ── Correctness & safety ────────────────────────────────────────
+cast_possible_truncation = "warn"    # flag `as i32` etc. that may lose data
+cast_sign_loss           = "warn"    # flag unsigned→signed cast surprises
+cast_possible_wrap       = "warn"    # flag wrapping casts
+cast_lossless            = "warn"    # prefer `from()` for guaranteed-safe casts
+ptr_as_ptr               = "warn"    # prefer `cast::<T>()` over `as *const T`
+
+# ── Style & clarity ────────────────────────────────────────────
+manual_let_else          = "warn"    # prefer `let ... else { return }` pattern
 needless_pass_by_value   = "warn"    # take &T when T is only read
 manual_strip             = "warn"    # use str::strip_prefix instead of slicing
 new_without_default      = "warn"    # impl Default when you have fn new()
@@ -107,3 +120,9 @@ vec_init_then_push       = "warn"    # prefer vec![] macro
 identity_op              = "warn"    # operations that have no effect
 unnecessary_cast         = "warn"    # remove casts to same type
 fn_to_numeric_cast       = "warn"    # prefer `as usize` for function pointers
+implicit_clone           = "warn"    # prefer explicit .clone()
+redundant_closure_for_method_calls = "warn"  # prefer method ref over closure
+
+# ── Deny — hard errors in CI ───────────────────────────────────
+dbg_macro                = "deny"    # no debug prints in committed code
+print_stderr             = "warn"    # prefer log::warn! over eprintln! where possible

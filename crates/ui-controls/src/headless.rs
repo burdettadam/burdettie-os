@@ -4,13 +4,14 @@
 //! `window-backend-darwin` but never opens a real window. Tests drive
 //! interactions programmatically via `click_button()`, `type_in_textfield()`,
 //! etc., and inspect state via `label_text()`, `textfield_text()`, etc.
+//!
+//! Internally delegates to [`AppScene`] — the same backend-agnostic rendering
+//! kernel that the native `GuiApp` uses.
 
 use graphics_core::Point;
 
+use crate::scene::AppScene;
 use crate::{Button, Label, TextField};
-
-/// Button click handler type — matches the one in `window-backend-darwin`.
-type ButtonClickHandler = Box<dyn FnMut(usize, &mut Vec<Label>, &mut Vec<TextField>)>;
 
 /// A headless GUI application for testing.
 ///
@@ -31,10 +32,7 @@ type ButtonClickHandler = Box<dyn FnMut(usize, &mut Vec<Label>, &mut Vec<TextFie
 /// assert_eq!(app.label_text(0), "after");
 /// ```
 pub struct HeadlessApp {
-    labels: Vec<Label>,
-    buttons: Vec<Button>,
-    textfields: Vec<TextField>,
-    on_button_click: Option<ButtonClickHandler>,
+    scene: AppScene,
 }
 
 impl Default for HeadlessApp {
@@ -46,36 +44,43 @@ impl Default for HeadlessApp {
 impl HeadlessApp {
     pub fn new() -> Self {
         Self {
-            labels: Vec::new(),
-            buttons: Vec::new(),
-            textfields: Vec::new(),
-            on_button_click: None,
+            scene: AppScene::new(),
         }
+    }
+
+    /// Access the underlying scene (for advanced use / testing).
+    pub fn scene(&self) -> &AppScene {
+        &self.scene
+    }
+
+    /// Mutable access to the underlying scene.
+    pub fn scene_mut(&mut self) -> &mut AppScene {
+        &mut self.scene
     }
 
     // ── Builder API (same as GuiApp) ──────────────────
 
-    pub fn set_background(&mut self, _color: graphics_core::Color) {
-        // no-op in headless mode
+    pub fn set_background(&mut self, color: graphics_core::Color) {
+        self.scene.set_background(color);
     }
 
     pub fn add_label(&mut self, label: Label) {
-        self.labels.push(label);
+        self.scene.add_label(label);
     }
 
     pub fn add_button(&mut self, button: Button) {
-        self.buttons.push(button);
+        self.scene.add_button(button);
     }
 
     pub fn add_textfield(&mut self, tf: TextField) {
-        self.textfields.push(tf);
+        self.scene.add_textfield(tf);
     }
 
     pub fn on_button_click(
         &mut self,
         handler: impl FnMut(usize, &mut Vec<Label>, &mut Vec<TextField>) + 'static,
     ) {
-        self.on_button_click = Some(Box::new(handler));
+        self.scene.on_button_click(handler);
     }
 
     // ── Test driver API ───────────────────────────────
@@ -86,94 +91,83 @@ impl HeadlessApp {
     ///
     /// Panics if `idx` is out of bounds.
     pub fn click_button(&mut self, idx: usize) {
-        assert!(idx < self.buttons.len(), "button index {idx} out of bounds");
-        self.buttons[idx].perform_click();
-        if let Some(ref mut handler) = self.on_button_click {
-            handler(idx, &mut self.labels, &mut self.textfields);
+        assert!(
+            idx < self.scene.buttons.len(),
+            "button index {idx} out of bounds"
+        );
+        self.scene.buttons[idx].perform_click();
+        if let Some(ref mut handler) = self.scene.on_button_click {
+            handler(idx, &mut self.scene.labels, &mut self.scene.textfields);
         }
     }
 
     /// Simulate clicking at a logical coordinate. Finds the first button
     /// whose frame contains the point and clicks it.
     pub fn click_at(&mut self, x: f64, y: f64) {
-        let point = Point::new(x, y);
-        let idx = self.buttons.iter().enumerate().find_map(|(i, btn)| {
-            if btn.is_enabled() && btn.view().frame.contains(point) {
-                Some(i)
-            } else {
-                None
-            }
-        });
-        if let Some(idx) = idx {
-            self.click_button(idx);
-        }
+        self.scene.handle_click(Point::new(x, y));
     }
 
     /// Type text into textfield at `idx` — inserts each character.
     pub fn type_in_textfield(&mut self, idx: usize, text: &str) {
         assert!(
-            idx < self.textfields.len(),
+            idx < self.scene.textfields.len(),
             "textfield index {idx} out of bounds"
         );
         for ch in text.chars() {
-            self.textfields[idx].insert_char(ch);
+            self.scene.textfields[idx].insert_char(ch);
         }
     }
 
     /// Clear textfield at `idx`.
     pub fn clear_textfield(&mut self, idx: usize) {
         assert!(
-            idx < self.textfields.len(),
+            idx < self.scene.textfields.len(),
             "textfield index {idx} out of bounds"
         );
-        self.textfields[idx].set_text("");
+        self.scene.textfields[idx].set_text("");
+    }
+
+    /// Render the scene and return the surface (for snapshot / visual testing).
+    pub fn render(&mut self, width: u32, height: u32) -> graphics_core::Surface {
+        self.scene.render(width, height)
     }
 
     // ── Inspection API ────────────────────────────────
 
-    /// Get the text of label at `idx`.
     pub fn label_text(&self, idx: usize) -> &str {
-        self.labels[idx].text()
+        self.scene.label_text(idx)
     }
 
-    /// Get the text of textfield at `idx`.
     pub fn textfield_text(&self, idx: usize) -> &str {
-        self.textfields[idx].text()
+        self.scene.textfield_text(idx)
     }
 
-    /// Get the title of button at `idx`.
     pub fn button_title(&self, idx: usize) -> &str {
-        self.buttons[idx].title()
+        self.scene.button_title(idx)
     }
 
-    /// Number of labels.
     pub fn label_count(&self) -> usize {
-        self.labels.len()
+        self.scene.label_count()
     }
 
-    /// Number of buttons.
     pub fn button_count(&self) -> usize {
-        self.buttons.len()
+        self.scene.button_count()
     }
 
-    /// Number of text fields.
     pub fn textfield_count(&self) -> usize {
-        self.textfields.len()
+        self.scene.textfield_count()
     }
 
-    /// Access to labels slice.
     pub fn labels(&self) -> &[Label] {
-        &self.labels
+        self.scene.labels()
     }
 
-    /// Access to buttons slice.
     pub fn buttons(&self) -> &[Button] {
-        &self.buttons
+        self.scene.buttons()
     }
 
-    /// Access to text fields slice.
     pub fn textfields(&self) -> &[TextField] {
-        &self.textfields
+        self.scene.textfields()
     }
 }
 
@@ -297,5 +291,41 @@ mod tests {
 
         app.click_at(50.0, 40.0);
         assert_eq!(app.label_text(0), "");
+    }
+
+    #[test]
+    fn headless_render_produces_surface() {
+        let mut app = HeadlessApp::new();
+        app.set_background(graphics_core::Color::WHITE);
+        app.add_label(Label::new(Rect::new(10.0, 10.0, 200.0, 20.0), "Hello"));
+        app.add_button(Button::new(Rect::new(10.0, 40.0, 80.0, 25.0), "OK"));
+        let surface = app.render(300, 200);
+        assert_eq!(surface.width(), 300);
+        assert_eq!(surface.height(), 200);
+        // Should not be all-black (we cleared to white)
+        assert!(surface.pixels().iter().any(|&p| p != 0));
+    }
+
+    #[test]
+    fn headless_scene_access() {
+        let mut app = HeadlessApp::new();
+        app.add_label(Label::new(Rect::new(0.0, 0.0, 100.0, 20.0), "Test"));
+        // Access scene for advanced operations
+        assert_eq!(app.scene().label_count(), 1);
+        app.scene_mut().set_background(graphics_core::Color::BLACK);
+    }
+
+    #[test]
+    fn headless_textfield_via_scene() {
+        let mut app = HeadlessApp::new();
+        app.add_textfield(TextField::new(Rect::new(10.0, 10.0, 200.0, 24.0)));
+        // Focus the textfield via click on scene
+        app.click_at(50.0, 20.0);
+        // Type via scene
+        app.scene_mut().handle_character_input("hello");
+        assert_eq!(app.textfield_text(0), "hello");
+        // Backspace via scene
+        app.scene_mut().handle_backspace();
+        assert_eq!(app.textfield_text(0), "hell");
     }
 }

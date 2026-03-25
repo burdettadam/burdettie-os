@@ -11,7 +11,7 @@ unsafe impl Send for DarwinSymbolResolver {}
 unsafe impl Sync for DarwinSymbolResolver {}
 
 impl DarwinSymbolResolver {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             default_handle: -2isize as *mut libc::c_void, // RTLD_DEFAULT
         }

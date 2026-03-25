@@ -42,7 +42,7 @@ unsafe fn replace_backing_store(obj: u64, new_bytes: &[u8]) {
     if !old_ptr.is_null() {
         drop(CString::from_raw(old_ptr));
     }
-    let new_cs = CString::new(new_bytes).unwrap_or_else(|_| CString::new("").unwrap());
+    let new_cs = CString::new(new_bytes).unwrap_or_default();
     let new_ptr = new_cs.into_raw();
     *((obj as usize + 16) as *mut u64) = new_ptr as u64;
     *((obj as usize + 24) as *mut u64) = new_bytes.len() as u64;
@@ -54,12 +54,12 @@ pub extern "C" fn shim_nsmutablestring_string(cls: u64, _cmd: u64) -> u64 {
         return 0;
     }
 
-    let obj = unsafe { libc::calloc(1, 32) } as u64;
+    let obj = crate::pal_alloc().calloc(1, 32) as u64;
     if obj == 0 {
         return 0;
     }
 
-    let empty = CString::new("").unwrap();
+    let empty = CString::default();
     let ptr = empty.into_raw();
 
     unsafe {
@@ -80,7 +80,7 @@ pub extern "C" fn shim_nsmutablestring_init_with_string(obj: u64, _cmd: u64, sou
     }
 
     let bytes = read_string_bytes(source);
-    let cs = CString::new(bytes.clone()).unwrap_or_else(|_| CString::new("").unwrap());
+    let cs = CString::new(bytes.clone()).unwrap_or_default();
     let ptr = cs.into_raw();
 
     unsafe {

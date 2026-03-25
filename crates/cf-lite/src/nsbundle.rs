@@ -15,7 +15,7 @@ static MAIN_BUNDLE: OnceLock<u64> = OnceLock::new();
 
 fn get_or_create_main_bundle() -> u64 {
     *MAIN_BUNDLE.get_or_init(|| {
-        let obj = unsafe { libc::calloc(1, 16) } as u64;
+        let obj = crate::pal_alloc().calloc(1, 16) as u64;
         if obj == 0 {
             return 0;
         }

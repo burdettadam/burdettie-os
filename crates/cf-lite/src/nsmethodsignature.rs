@@ -155,7 +155,7 @@ pub extern "C" fn shim_signature_with_objc_types(_cls: u64, _cmd: u64, types_ptr
     let num_args = if parsed.len() > 1 { parsed.len() - 1 } else { 0 };
 
     // Allocate the object
-    let obj = unsafe { libc::calloc(1, INSTANCE_SIZE as usize) as u64 };
+    let obj = crate::pal_alloc().calloc(1, INSTANCE_SIZE as usize) as u64;
     if obj == 0 {
         return 0;
     }
@@ -168,7 +168,7 @@ pub extern "C" fn shim_signature_with_objc_types(_cls: u64, _cmd: u64, types_ptr
 
     // Copy the encoding string to a heap-allocated C string
     let c_encoding =
-        std::ffi::CString::new(encoding).unwrap_or_else(|_| std::ffi::CString::new("").unwrap());
+        std::ffi::CString::new(encoding).unwrap_or_default();
     let encoding_ptr = c_encoding.into_raw() as u64;
     unsafe {
         *((obj + 8) as *mut u64) = encoding_ptr;
@@ -245,7 +245,7 @@ pub extern "C" fn shim_get_argument_type_at_index(obj: u64, _cmd: u64, index: u6
     }
     // Return a pointer to a leaked C string of this type
     let c_type = std::ffi::CString::new(parsed[type_index].as_str())
-        .unwrap_or_else(|_| std::ffi::CString::new("").unwrap());
+        .unwrap_or_default();
     c_type.into_raw() as u64
 }
 
@@ -288,9 +288,7 @@ pub extern "C" fn shim_dealloc(obj: u64, _cmd: u64) {
             drop(std::ffi::CString::from_raw(enc_ptr as *mut std::ffi::c_char));
         }
     }
-    unsafe {
-        libc::free(obj as *mut libc::c_void);
-    }
+    crate::pal_alloc().free(obj as *mut u8);
 }
 
 // ── Helper for creating NSMethodSignature from Rust ────────────────
@@ -299,7 +297,7 @@ pub extern "C" fn shim_dealloc(obj: u64, _cmd: u64) {
 /// Used internally by methodSignatureForSelector: and the forwarding chain.
 pub fn create_method_signature(encoding: &str) -> u64 {
     let c_encoding =
-        std::ffi::CString::new(encoding).unwrap_or_else(|_| std::ffi::CString::new("").unwrap());
+        std::ffi::CString::new(encoding).unwrap_or_default();
     shim_signature_with_objc_types(
         nsobj::nsmethodsignature_class_addr(),
         0,

@@ -5,8 +5,8 @@ pub use types::*;
 
 use macho_parse::ParsedMachO;
 use parse::{
-    count_pointer_list, parse_catlist, parse_function_pointer_array, parse_image_info,
-    parse_init_offsets, parse_pointer_list, parse_selrefs,
+    parse_catlist, parse_function_pointer_array, parse_image_info,
+    parse_init_offsets, parse_pointer_list, parse_protolist, parse_selrefs,
 };
 use types::OBJC_SECTIONS;
 
@@ -33,7 +33,8 @@ pub fn parse_objc_metadata(parsed: &ParsedMachO, data: &[u8]) -> ObjcMetadata {
     let class_refs = parse_pointer_list(parsed, data, "__objc_classlist");
     let categories = parse_catlist(parsed, data);
     let category_count = categories.len();
-    let protocol_count = count_pointer_list(parsed, data, "__objc_protolist");
+    let protocols = parse_protolist(parsed, data);
+    let protocol_count = protocols.len();
     let (selectors, selref_addrs) = parse_selrefs(parsed, data);
     let image_info = parse_image_info(parsed, data);
 
@@ -41,6 +42,7 @@ pub fn parse_objc_metadata(parsed: &ParsedMachO, data: &[u8]) -> ObjcMetadata {
         presence,
         class_refs,
         categories,
+        protocols,
         category_count,
         protocol_count,
         selectors,

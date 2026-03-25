@@ -31,7 +31,9 @@ static PLATFORM_HASHER: OnceLock<Arc<dyn platform_core::hash::Hasher>> = OnceLoc
 
 /// Set the global platform hasher (called once from runtime initialization).
 pub fn set_platform_hasher(hasher: Arc<dyn platform_core::hash::Hasher>) {
-    let _ = PLATFORM_HASHER.set(hasher);
+    if PLATFORM_HASHER.set(hasher).is_err() {
+        log::debug!("macho-parse: set_platform_hasher called more than once (harmless if reusing runtime)");
+    }
 }
 
 /// Get the global platform hasher (if set).

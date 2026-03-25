@@ -34,7 +34,7 @@ const KIND_NEWLINE: u64 = 9;
 // ── Helpers ────────────────────────────────────────────────────────
 
 fn alloc_predefined(kind: u64) -> u64 {
-    let obj = unsafe { libc::calloc(1, 32) } as u64;
+    let obj = crate::pal_alloc().calloc(1, 32) as u64;
     if obj == 0 {
         return 0;
     }
@@ -147,7 +147,7 @@ pub extern "C" fn shim_nscharacterset_with_characters_in_string(
     _cmd: u64,
     string: u64,
 ) -> u64 {
-    let obj = unsafe { libc::calloc(1, 32) } as u64;
+    let obj = crate::pal_alloc().calloc(1, 32) as u64;
     if obj == 0 {
         return 0;
     }
@@ -167,7 +167,7 @@ pub extern "C" fn shim_nscharacterset_with_characters_in_string(
 
         let len = codepoints.len();
         if len > 0 {
-            let buf = unsafe { libc::malloc(len * 4) } as *mut u32;
+            let buf = crate::pal_alloc().malloc(len * 4) as *mut u32;
             if !buf.is_null() {
                 for (i, &cp) in codepoints.iter().enumerate() {
                     unsafe {

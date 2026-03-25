@@ -6,8 +6,10 @@
 
 mod app;
 mod event;
+pub mod menu;
 mod responder;
 
 pub use app::{AppDelegate, NSApplication};
 pub use event::Event;
+pub use menu::{KeyEquivalent, ModifierFlags, NSMenu, NSMenuItem};
 pub use responder::Responder;

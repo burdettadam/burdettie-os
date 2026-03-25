@@ -20,8 +20,8 @@ fn now_cf_absolute_time() -> f64 {
     unix_secs - CF_EPOCH_OFFSET
 }
 
-fn alloc_nsdate(ti: f64) -> u64 {
-    let obj = unsafe { libc::calloc(1, 16) } as u64;
+pub fn alloc_nsdate(ti: f64) -> u64 {
+    let obj = crate::pal_alloc().calloc(1, 16) as u64;
     if obj == 0 {
         return 0;
     }

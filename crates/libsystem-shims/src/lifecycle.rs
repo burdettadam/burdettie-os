@@ -38,7 +38,7 @@ impl LifecycleShims {
     /// Called by the runtime during controlled shutdown.
     pub fn run_atexit_handlers() {
         let handlers = {
-            let mut guard = ATEXIT_HANDLERS.lock().unwrap();
+            let mut guard = ATEXIT_HANDLERS.lock().unwrap_or_else(|e| e.into_inner());
             let h = guard.clone();
             guard.clear();
             h
@@ -51,7 +51,7 @@ impl LifecycleShims {
 
     /// Reset atexit handlers (useful between test runs).
     pub fn reset() {
-        let mut guard = ATEXIT_HANDLERS.lock().unwrap();
+        let mut guard = ATEXIT_HANDLERS.lock().unwrap_or_else(|e| e.into_inner());
         guard.clear();
     }
 }
@@ -59,7 +59,7 @@ impl LifecycleShims {
 /// `int atexit(void (*function)(void))`
 extern "C" fn shim_atexit(function: Option<extern "C" fn()>) -> i32 {
     if let Some(f) = function {
-        let mut guard = ATEXIT_HANDLERS.lock().unwrap();
+        let mut guard = ATEXIT_HANDLERS.lock().unwrap_or_else(|e| e.into_inner());
         guard.push(f);
         log::trace!("atexit: registered handler ({} total)", guard.len());
         0
@@ -130,13 +130,13 @@ mod tests {
         static ORDER: Mutex<Vec<i32>> = Mutex::new(Vec::new());
 
         extern "C" fn first() {
-            ORDER.lock().unwrap().push(1);
+            ORDER.lock().unwrap_or_else(|e| e.into_inner()).push(1);
         }
         extern "C" fn second() {
-            ORDER.lock().unwrap().push(2);
+            ORDER.lock().unwrap_or_else(|e| e.into_inner()).push(2);
         }
         extern "C" fn third() {
-            ORDER.lock().unwrap().push(3);
+            ORDER.lock().unwrap_or_else(|e| e.into_inner()).push(3);
         }
 
         shim_atexit(Some(first));
@@ -146,7 +146,7 @@ mod tests {
         LifecycleShims::run_atexit_handlers();
 
         // LIFO: third registered last → called first
-        assert_eq!(*ORDER.lock().unwrap(), vec![3, 2, 1]);
+        assert_eq!(*ORDER.lock().unwrap_or_else(|e| e.into_inner()), vec![3, 2, 1]);
     }
 
     #[test]

@@ -22,7 +22,9 @@ pub mod config;
 pub mod context;
 pub mod error;
 mod loader;
+mod objc_setup;
 pub mod resolver;
+mod security;
 pub mod tracer;
 
 pub use config::{RuntimeConfig, ShimSet};
@@ -34,10 +36,9 @@ pub use tracer::{EventKind, RuntimeEvent, RuntimeTracer, TRACER_SCHEMA_VERSION};
 use std::path::Path;
 
 use libsystem_shims::ShimConfig;
-use macho_exec::{call_constructors, call_entry, ImageRegistry, StubResolver};
+use macho_exec::{call_constructors, ImageRegistry, StubResolver};
 use macho_objc::{extract_initializers, parse_objc_metadata};
-use macho_parse::ParsedMachO;
-use trust_policy::{CodeSignatureInfo, SecurityReport};
+use trust_policy::SecurityReport;
 
 /// Result of a complete runtime execution.
 #[derive(Debug)]
@@ -108,7 +109,7 @@ impl Runtime {
         };
 
         // 3. Security evaluation
-        let security_report = Self::evaluate_security(&parsed, binary_path, config)?;
+        let security_report = security::evaluate_security(&parsed, binary_path, config)?;
         tracer.record(
             EventKind::Pipeline,
             format!(
@@ -138,6 +139,20 @@ impl Runtime {
         // 5. Build composite resolver: shims → host fallback
         let host_symbols: std::sync::Arc<dyn platform_core::symbols::HostSymbolResolver> =
             std::sync::Arc::new(platform_darwin_host::DarwinSymbolResolver::new());
+
+        // Install host symbol resolver for objc-runtime exception bridge
+        objc_runtime::set_host_symbols(host_symbols.clone());
+
+        // Install platform allocator for objc-runtime object memory
+        objc_runtime::set_allocator(
+            std::sync::Arc::new(platform_darwin_host::DarwinAllocator),
+        );
+
+        // Install platform threading for objc-runtime @synchronized
+        objc_runtime::set_threading(
+            std::sync::Arc::new(platform_darwin_host::PosixThreading),
+        );
+
         let stub_resolver = if config.host_fallback {
             Some(StubResolver::new(host_symbols))
         } else {
@@ -146,7 +161,10 @@ impl Runtime {
         let composite = CompositeResolver::new(&ctx.shim_table, stub_resolver.as_ref());
 
         // 6. Load dependencies + main binary into ImageRegistry
-        let mut registry = ImageRegistry::new(config.platform.memory());
+        let mut registry = ImageRegistry::new(
+            config.platform.memory(),
+            std::sync::Arc::new(platform_darwin_host::DarwinUnwindRegistry),
+        );
         let binary_dir = binary_path.parent().unwrap_or(Path::new("."));
 
         // BFS dependency loading (skip system libraries)
@@ -245,67 +263,7 @@ impl Runtime {
 
             // Phase D: register synthetic Foundation classes (NSObject, NSString, etc.)
             if config.shim_set.foundation {
-                // Initialize cf-lite's platform provider for Foundation shims
-                cf_lite::set_platform(config.platform.clone());
-
-                cf_lite::FoundationShims::register_nsobject_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsstring_proper_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsstring_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsarray_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsnumber_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsdictionary_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsmutablearray_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsmutabledictionary_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsmutablestring_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsdata_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsprocessinfo_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nserror_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsbundle_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsfilemanager_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsexception_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsenumerator_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsdate_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsuserdefaults_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsset_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsmutableset_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsurl_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsnull_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsdateformatter_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nscharacterset_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsnotificationcenter_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsvalue_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsuuid_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nslocale_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nstimezone_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nscalendar_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsnumberformatter_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsindexset_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsmutableindexset_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nssortdescriptor_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nstimer_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsthread_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nslock_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsrecursivelock_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nscondition_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsconditionlock_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsmethodsignature_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsinvocation_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsregularexpression_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nspredicate_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsattributedstring_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsmutableattributedstring_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nscache_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsmaptable_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nshashtable_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsoperation_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsblockoperation_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsoperationqueue_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nsjsonserialization_class(&mut objc_rt);
-                cf_lite::FoundationShims::register_nspropertylistserialization_class(&mut objc_rt);
-                tracer.record(
-                    EventKind::ClassRegistration,
-                    "54 synthetic Foundation classes registered",
-                );
+                objc_setup::register_foundation_classes(&mut objc_rt, config, &tracer);
             }
 
             // Phase E: repair superclass addrs from mapped memory (post-fixup).
@@ -331,13 +289,8 @@ impl Runtime {
             format!("mprotect applied to {} images", registry.images().len(),),
         );
 
-        // 8.1. Register unwind info for all mapped images so that
-        // @try/@catch/@finally and C++ exceptions work through mapped code.
-        // libunwind needs to know about our images' __unwind_info / __eh_frame
-        // sections to find landing pads during stack unwinding.
-        for loaded in registry.images() {
-            macho_exec::register_unwind_info(&loaded.parsed.segments, loaded.image.slide);
-        }
+        // 8.1. Unwind info is now registered automatically by ImageRegistry::load()
+        // via the UnwindRegistry trait (DarwinUnwindRegistry on macOS).
         tracer.record(
             EventKind::Pipeline,
             format!(
@@ -396,7 +349,19 @@ impl Runtime {
             .ok_or(RuntimeError::NoEntryPoint)?;
 
         tracer.record(EventKind::Pipeline, "calling entry point".to_string());
-        let entry_result = call_entry(&app.image, entry)?;
+
+        // Build entry args from RuntimeConfig
+        let entry_args = macho_exec::EntryArgs {
+            program_name: config.process_name.clone(),
+            args: Vec::new(),
+            env: config
+                .env_overrides
+                .iter()
+                .map(|(k, v)| format!("{k}={v}"))
+                .collect(),
+        };
+        let entry_result =
+            macho_exec::call_entry_with_args(&app.image, entry, Some(&entry_args))?;
         tracer.record(
             EventKind::Pipeline,
             format!("entry point returned exit_code={}", entry_result.exit_code,),
@@ -419,51 +384,4 @@ impl Runtime {
         })
     }
 
-    /// Evaluate security policy, returning the report or an error if denied.
-    fn evaluate_security(
-        parsed: &ParsedMachO,
-        binary_path: &Path,
-        config: &RuntimeConfig,
-    ) -> Result<Option<SecurityReport>, RuntimeError> {
-        let Some(policy) = &config.security_policy else {
-            return Ok(None);
-        };
-
-        // Reject encrypted binaries
-        for cmd in &parsed.commands {
-            if let macho_types::load_command::LoadCommandPayload::EncryptionInfo {
-                crypt_id, ..
-            } = &cmd.payload
-            {
-                if *crypt_id != 0 {
-                    return Err(RuntimeError::EncryptedBinary {
-                        crypt_id: *crypt_id,
-                    });
-                }
-            }
-        }
-
-        let cs_info = parsed
-            .code_signature
-            .as_ref()
-            .map(CodeSignatureInfo::from_parsed)
-            .unwrap_or_default();
-
-        let report = policy.evaluate_binary_parsed(binary_path, parsed.header.flags, &cs_info);
-
-        if !report.allowed {
-            return Err(RuntimeError::SecurityDenied {
-                reasons: report.denied_reasons.clone(),
-            });
-        }
-
-        log::info!(
-            "Security check passed for {} (hardened={}, strip_dyld_env={})",
-            binary_path.display(),
-            report.hardened_runtime,
-            report.strip_dyld_env,
-        );
-
-        Ok(Some(report))
-    }
 }

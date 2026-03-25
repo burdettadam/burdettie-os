@@ -13,7 +13,7 @@ const NSVALUE_SIZE: usize = 32;
 
 /// Allocate a 32-byte NSValue on the heap.
 fn alloc_nsvalue(lo: u64, hi: u64, type_ptr: *const u8) -> u64 {
-    let obj = unsafe { libc::calloc(1, NSVALUE_SIZE) } as *mut u64;
+    let obj = crate::pal_alloc().calloc(1, NSVALUE_SIZE) as *mut u64;
     if obj.is_null() {
         return 0;
     }

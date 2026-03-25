@@ -11,7 +11,7 @@ const NSENUM_INDEX_OFF: usize = 16;
 /// `+[NSEnumerator alloc]` — internal; shouldn't be called directly,
 /// but `objectEnumerator` / `keyEnumerator` create instances.
 pub fn alloc_enumerator(source: u64) -> u64 {
-    let obj = unsafe { libc::calloc(1, 24) } as u64;
+    let obj = crate::pal_alloc().calloc(1, 24) as u64;
     if obj == 0 {
         return 0;
     }

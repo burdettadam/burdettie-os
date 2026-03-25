@@ -57,7 +57,7 @@ impl TlsShims {
     /// Register TLS-related shims in the table.
     pub fn install(table: &mut ShimTable) {
         {
-            let mut guard = TLV_REGISTRY.lock().unwrap();
+            let mut guard = TLV_REGISTRY.lock().unwrap_or_else(|e| e.into_inner());
             if guard.is_none() {
                 *guard = Some(TlvRegistry::new());
             }
@@ -75,7 +75,7 @@ impl TlsShims {
 
     /// Reset all TLS state (useful between test runs).
     pub fn reset() {
-        let mut guard = TLV_REGISTRY.lock().unwrap();
+        let mut guard = TLV_REGISTRY.lock().unwrap_or_else(|e| e.into_inner());
         if let Some(registry) = guard.as_mut() {
             // Delete all pthread keys
             for &(pkey, _) in registry.keys.values() {
@@ -101,7 +101,7 @@ extern "C" fn shim_tlv_bootstrap(desc: *mut TlvDescriptor) -> *mut u8 {
     // SAFETY: desc is non-null, we assume valid layout from the Mach-O binary.
     let (key, size) = unsafe { ((*desc).key, (*desc).offset) };
 
-    let mut guard = TLV_REGISTRY.lock().unwrap();
+    let mut guard = TLV_REGISTRY.lock().unwrap_or_else(|e| e.into_inner());
     let registry = guard.as_mut().expect("TLV registry not initialised");
 
     // If key == 0, this descriptor hasn't been assigned a key yet.

@@ -25,7 +25,7 @@ unsafe fn get_set(obj: u64) -> &'static mut SetStorage {
 
 /// `+[NSHashTable hashTableWithOptions:]`
 pub extern "C" fn shim_hashtable_with_options(_cls: u64, _cmd: u64, options: u64) -> u64 {
-    let obj = unsafe { libc::calloc(1, INSTANCE_SIZE as usize) } as u64;
+    let obj = crate::pal_alloc().calloc(1, INSTANCE_SIZE as usize) as u64;
     if obj == 0 { return 0; }
     unsafe {
         *(obj as *mut u64) = nsobj::nshashtable_class_addr();

@@ -1,8 +1,23 @@
-# Roadmap
+# Darwin Loader Lab — Open Core Roadmap
 
-> **Development compass**: Build the smallest believable non-GUI macOS runtime
-> that can run ordinary Objective-C/Foundation command-line software, and let
-> that goal decide every next task.
+> **Strategic goal**: Transform the project from a completed prototype into
+> a full macOS-compatible runtime platform capable of running real software
+> and eventually supporting its own host environment.
+
+> **Next-generation roadmap**: See [NEXT_GENERATION_ROADMAP.md](NEXT_GENERATION_ROADMAP.md)
+> for Tracks C–F: running real apps, host independence, cross-platform Linux
+> support, and a native GUI stack.
+
+Every subsystem may evolve:
+
+* loader core
+* ObjC runtime
+* Foundation layer
+* GUI framework
+* platform abstraction
+* host independence
+
+Progress is driven by **running real binaries and expanding capabilities where required**.
 
 ---
 
@@ -640,8 +655,8 @@
 
 ```
 loader-core        = macho-types + macho-parse + macho-map + macho-resolve
-                     + macho-objc + macho-exec (FROZEN — no new features
-                     unless a target binary needs them)
+                     + macho-objc + macho-exec (evolves as real binaries
+                     demand new Mach-O / dyld features)
 
 objc-runtime       = classes / selectors / dispatch / super / categories
                      / blocks / retain-release / introspection
@@ -669,19 +684,23 @@ demo-apps          = hello-darwin, control-gallery, foundation-explorer
 
 ### Development Rules
 
-1. **No new parser/loader features** unless a target binary needs them
-2. **Every new feature** must unlock or stabilize a real fixture/app pattern
-3. **Target-driven**: a fixture binary that fails without the feature and passes with it
+1. **Any layer may evolve** when real software requires it — loader, runtime, Foundation, GUI
+2. **Every new feature** must unlock or stabilize a real fixture/app/binary pattern
+3. **Target-driven**: a real binary or fixture that fails without the feature and passes with it
 4. **Permissive mode stays the default** — trust-policy is not the main product surface
+5. **Host dependency shrinks over time** — replace host fallbacks with native implementations
 
 ---
 
 ## Milestone
 
-> **Run a realistic Objective-C/Foundation CLI app with dynamic strings,
-> collections, file I/O, process info, and blocks.**
+> **A complete macOS-compatible runtime platform capable of running real
+> software independently of Apple's OS.**
 
-All work is subordinate to this milestone.
+Progress is measured by:
+* real programs running
+* host dependency shrinking
+* platform capabilities expanding
 
 ---
 
@@ -844,18 +863,422 @@ Structured tracing for debugging and alignment via `RuntimeTracer`:
 
 ---
 
-## Out of Scope
+## Out of Scope (current phase)
 
-Explicitly not targeted for this milestone (but see [EXPANSION_ROADMAP.md](EXPANSION_ROADMAP.md) for future plans):
+Not targeted in the immediate term but part of the forward roadmap (Phases 39–52):
 
-| Area | Status |
+| Area | Forward Phase |
 |---|---|
-| GUI / AppKit / UIKit | ✅ Basic GUI completed in Phases 35–38 (run loop, app object, view tree, controls, 3 demo apps) |
+| Full kernel / Darwin recreation | Out of scope — this is a userspace runtime |
 | Full notarization / security parity | Policy layer is optional/comparison-only |
-| Full kernel / Darwin recreation | Out of scope for a userspace runtime |
-| KVO / KVC / NSInvocation | Future — see [EXPANSION_ROADMAP.md](EXPANSION_ROADMAP.md) |
-| PAC / ARM64e pointer auth | Future — see [EXPANSION_ROADMAP.md](EXPANSION_ROADMAP.md) |
-| Method swizzling | Future — see [EXPANSION_ROADMAP.md](EXPANSION_ROADMAP.md) |
+| Custom window server / graphics stack | Phase 52 — long-term host independence |
+
+Previously out-of-scope items now part of the open core roadmap:
+
+| Area | Phase |
+|---|---|
+| KVO / KVC / NSInvocation | Phase 42 — Foundation Growth |
+| PAC / ARM64e pointer auth | Phase 40 — Loader Expansion |
+| Method swizzling | Phase 41 — Runtime Expansion |
+| GUI / AppKit expansion | Phase 45 — GUI Framework Expansion |
+| Platform independence | Phase 43–44 — Platform Abstraction + Host Reduction |
+
+---
+
+## Forward Roadmap — Phases 39–52
+
+### Phase 39 — Real Software Corpus ✅
+
+**Completed.** Created `compat-runner` crate and 12-program corpus. All 12 pass (100%).
+
+Goal: move beyond fixture tests. Create a **real application test corpus**.
+
+| Category | Examples |
+|---|---|
+| CLI tools | ripgrep, jq, fd |
+| ObjC utilities | small Cocoa tools |
+| Foundation-heavy tools | plist processors |
+| GUI apps | tiny Cocoa samples |
+| system utilities | file tools, network tools |
+
+Add crate: `compat-runner`
+
+Features:
+- runs binaries under runtime
+- records missing symbols/classes/selectors
+- stores reports
+
+Output: `compatibility-report.json`
+
+Success criteria: **10 real binaries run successfully** ✅ 12/12 pass
+
+#### Deliverables
+- `crates/compat-runner/` — library + `darwin-compat` CLI binary
+- `corpus/` — 12 programs: word_counter, json_formatter, file_lister, string_processor, config_reader, date_calculator, path_resolver, collection_pipeline, error_reporter, runtime_info, todo_manager, text_analyzer
+- `corpus/build_corpus.sh` — builds all corpus programs
+- 8 integration tests including regression gate (≥10 must pass)
+- Host class resolution for `_OBJC_CLASS_$_NSConstantArray` and `_OBJC_CLASS_$_NSConstantDictionary` (for `@[]`/`@{}` literals)
+
+---
+
+### Phase 40 — Loader Expansion (when required) ✅
+
+**Completed.** Five loader improvements driven by real-binary analysis.
+
+Goal: evolve loader as real binaries demand.
+
+#### Mach-O features
+- new load commands
+- relocation formats
+- dyld shared cache behaviors
+- stub-and-resolver symbols
+- new export trie variants
+- ARM64e pointer authentication expansion
+
+#### Loader improvements
+- lazy binding correctness
+- TLS improvements
+- initializer edge cases
+- symbol interposition
+
+Success criteria: **real-world binaries load reliably** ✅
+
+#### Deliverables
+1. **Weak bind application** — `fixups.weak_binds` now applied in `apply_binds()` alongside regular and lazy binds (previously silently skipped → null GOT slots)
+2. **NSConstantIntegerNumber host class** — `_OBJC_CLASS_$_NSConstantIntegerNumber` resolved via host `dlsym` for `@(int)` literal support (joins NSConstantArray/NSConstantDictionary)
+3. **StubResolver safe-list expansion** — 40+ new symbols: `pthread_cond_*`, `pthread_rwlock_*`, `pthread_mutex_trylock`, ObjC runtime introspection (`class_*`, `sel_*`, `method_*`, `ivar_*`, `property_*`), GCD (`dispatch_async/sync/queue_create`), blocks (`_NSConcreteStackBlock/GlobalBlock`), atomics (`os_unfair_lock_*`), system (`sysctl*`, `arc4random*`, `atexit`, `_tlv_bootstrap`)
+4. **Entry point argv/envp propagation** — `call_entry_with_args()` passes `argc`, `argv[]`, `envp[]` from `RuntimeConfig` (previously hardcoded `argc=1, argv=["app"]`)
+5. **`__TEXT_EXEC` unwind scan** — `register_unwind_info()` now scans both `__TEXT` and `__TEXT_EXEC` segments for `__unwind_info` / `__eh_frame` sections
+
+---
+
+### Phase 41 — Runtime Expansion ✅
+
+Goal: extend ObjC runtime when needed.
+
+#### ObjC runtime gaps — DONE
+- ✅ `objc_alloc_init` — now dispatches `-init` after alloc
+- ✅ Associated objects (`objc_setAssociatedObject`, `objc_getAssociatedObject`, `objc_removeAssociatedObjects`) — per-object key-value store with RETAIN/COPY/ASSIGN policies
+- ✅ Weak references (`objc_initWeak`, `objc_destroyWeak`, `objc_loadWeakRetained`, `objc_storeWeak`, `objc_loadWeak`, `objc_copyWeak`, `objc_moveWeak`) — weak reference table
+- ✅ `object_setClass` — swaps ISA, returns old class
+- ✅ `class_getClassMethod` — class method lookup returning fake Method struct
+- ✅ IMP caching — `method_index`/`class_method_index` HashMaps on ClassInfo for O(1) selector→IMP lookup; dispatch, category merge, `class_addMethod`, and `class_replaceMethod` all maintain indices
+
+#### Shim count
+- ObjC shims: 66 → 78 (+12 new shims)
+- Total shims: 235 → 247 (macOS)
+
+#### Test results
+- 961 tests, 0 failures
+- 155 runtime tests (63 fixtures, 12 corpus) all pass
+- 0 clippy errors
+
+---
+
+### Phase 42 — Foundation Growth ✅
+
+Goal: extend Foundation as required by real programs.
+
+#### NSNumber — 10 new factory methods, 10 new accessors
+- ✅ Factory methods: `numberWithInteger:`, `numberWithLong:`, `numberWithLongLong:`, `numberWithFloat:`, `numberWithUnsignedInt:`, `numberWithUnsignedInteger:`, `numberWithShort:`, `numberWithChar:`, `numberWithUnsignedChar:`
+- ✅ Accessors: `longLongValue`, `longValue`, `floatValue`, `unsignedIntegerValue`, `unsignedIntValue`, `shortValue`, `charValue`, `unsignedCharValue`, `stringValue`
+- ✅ `isEqual:` — delegates to `isEqualToNumber:` for NSNumber objects
+
+#### NSString — 7 new methods
+- ✅ `containsString:` — substring search
+- ✅ `substringWithRange:` — extract substring by NSRange
+- ✅ `characterAtIndex:` — UTF-16 code unit access
+- ✅ `initWithString:` — copy constructor
+- ✅ `capitalizedString` — title-case transformation
+- ✅ `caseInsensitiveCompare:` — case-insensitive ordering
+- ✅ `isEqual:` — delegates to `isEqualToString:`
+
+#### NSArray — 4 new methods
+- ✅ `indexOfObject:` — linear scan returning index or NSNotFound
+- ✅ `isEqualToArray:` — element-wise equality
+- ✅ `arrayByAddingObject:` — returns new array with element appended
+- ✅ `subarrayWithRange:` — extract subarray by NSRange
+
+#### NSMutableArray — 3 new methods
+- ✅ `removeObject:` — remove by value (all occurrences)
+- ✅ `addObjectsFromArray:` — batch append from another array
+- ✅ `exchangeObjectAtIndex:withObjectAtIndex:` — swap elements
+
+#### NSUserDefaults — 7 new methods
+- ✅ Typed setters: `setInteger:forKey:`, `setBool:forKey:`, `setDouble:forKey:`, `setFloat:forKey:`
+- ✅ Typed getters: `floatForKey:`, `arrayForKey:`, `dictionaryForKey:`
+
+#### NSDateFormatter — 1 new method
+- ✅ `dateFromString:` — parse date string using format pattern (simplified TR35 parser)
+
+#### NSMutableDictionary — 1 new method
+- ✅ `addEntriesFromDictionary:` — batch-merge from another dictionary
+
+#### Test results
+- 961 tests, 0 failures
+- 155 runtime tests (63 fixtures, 12 corpus) all pass
+- 0 clippy errors
+
+---
+
+### Phase 43 — Platform Abstraction Layer ✅
+
+Goal: remove direct host dependencies by routing through existing PAL traits.
+
+Deliverables:
+- **Unwind deduplication**: removed 150+ lines of duplicate FFI/globals/callback from `macho-exec/src/unwind.rs`; now delegates to `UnwindRegistry` trait via `platform-darwin-host`
+  - `MappedImage` stores `Arc<dyn UnwindRegistry>`, Drop calls `registry.unregister()`
+  - `ImageRegistry` accepts and threads `Arc<dyn UnwindRegistry>`, registers unwind in `load()`
+  - `NoopUnwindRegistry` added to `platform-core` for tests
+- **HostSymbolResolver injection**: replaced 7 raw `libc::dlsym` calls in `objc-runtime/src/shims/lifecycle.rs` with `resolve_host_symbol()` helper that queries the global `HostSymbolResolver`
+  - `objc_runtime::set_host_symbols()` / `host_symbols()` global
+  - Fallback to raw dlsym if resolver not initialized (backward compat)
+- **PAL trait expansion**: added `ProcessInfo::is_main_thread()` and `Clock::sleep_secs()`
+  - Implemented in `DarwinProcessInfo` (via `pthread_main_np`) and `DarwinClock` (via `nanosleep`)
+  - `cf-lite/nsthread.rs` now routes through PAL instead of direct `libc::pthread_main_np()` and `libc::nanosleep()`
+- **Deferred**: macho-resolve filesystem threading (low-priority, only 2 `std::fs::read` sites, would require 40+ caller updates)
+
+Test results: 961 passed, 0 failures, 0 clippy errors
+
+---
+
+### Phase 43b — Allocator PAL ✅
+
+Goal: abstract heap allocation (calloc/malloc/realloc/free) behind the Platform Abstraction Layer.
+
+Deliverables:
+- **Allocator trait**: `platform_core::alloc::Allocator` with `calloc`, `malloc`, `realloc`, `free` methods returning `*mut u8`
+- **DarwinAllocator**: `platform-darwin-host/src/alloc.rs` — delegates to libc
+- **PlatformProvider**: added `fn alloc() -> &dyn Allocator` to the bundle trait
+- **cf-lite**: replaced ~120 `libc::calloc/malloc/realloc/free` calls with `crate::pal_alloc()`. Fallback `LibcAllocator` for unit tests
+- **objc-runtime**: replaced ~25 `libc::calloc/malloc/free` calls with `crate::pal_alloc()`. Fallback `LibcAllocator` for unit tests. `set_allocator()` called by `macho-runtime` during init
+- **Excluded**: `libsystem-shims` TLS/pthread allocation (stays as direct libc — POSIX primitives, not ObjC objects), `lifecycle.rs` pthread_mutex_t allocation
+
+Test results: 961 passed, 0 failures, 0 clippy errors
+
+---
+
+### Phase 44 — Host Dependency Reduction ✅
+
+Goal: audit all host dependencies, document them, and reduce where practical.
+
+#### Host Dependency Inventory
+
+| Component | Category | Calls | Status |
+|---|---|---|---|
+| `platform-darwin-host` | libc (mmap/mprotect/munmap) | 4 | ✅ Correct — PAL impl |
+| `platform-darwin-host` | libc (calloc/malloc/realloc/free) | 4 | ✅ Correct — PAL impl |
+| `platform-darwin-host` | libc (clock/time) | 6 | ✅ Correct — PAL impl |
+| `platform-darwin-host` | libc (dlsym/dlopen) | 3 | ✅ Correct — PAL impl |
+| `platform-darwin-host` | libc (pthread_mutex/cond) | 15 | ✅ Correct — PAL impl |
+| `platform-darwin-host` | libc (arc4random, pthread_main_np, mach_absolute_time) | 3 | ✅ Correct — macOS PAL impl |
+| `platform-darwin-host` | CommonCrypto (CC_SHA256) | 1 | ✅ Correct — PAL impl |
+| `platform-darwin-host` | libunwind (__unw_add/remove) | 2 | ✅ Correct — PAL impl |
+| `cf-lite` | dlsym/dlopen (Foundation symbols) | 0 | ✅ Replaced → `pal_symbols()` |
+| `cf-lite` | pthread_mutex/cond (NSLock family) | 0 | ✅ Replaced → `pal_threading()` |
+| `cf-lite` | libc (allocator fallback) | 4 | ⚠️ Test-only fallback |
+| `cf-lite` | std::env (LANG, TZ) | 2 | 📌 Acceptable — env var reads |
+| `cf-lite` | ARM64 asm trampolines | 2 files | 📌 Architecture-specific by design |
+| `cf-lite` | `#[cfg(target_os = "macos")]` | 5 blocks | 📌 Host-only features (EHTYPE, ISA aliases) |
+| `objc-runtime` | pthread_mutex (@synchronized) | 0 | ✅ Replaced → `pal_threading()` |
+| `objc-runtime` | libc::dlsym (host fallback) | 1 | 📌 Acceptable — already behind `host_symbols()` PAL |
+| `objc-runtime` | ARM64 asm trampoline | 1 file | 📌 Architecture-specific by design |
+| `objc-runtime` | std::process::abort | 12 | 📌 Standard library, not host-specific |
+| `libsystem-shims` | pthread/TLS/mach | 55+ | 📌 Correct — shim layer MUST use host primitives |
+| `macho-parse` | Mach-O format parsing | all | 📌 Correct — format-specific by design |
+| `macho-resolve` | std::fs, DYLD_* env vars | 3 | 📌 Correct — resolver needs filesystem |
+| `macho-exec` | dyld chained fixups | all | 📌 Correct — execution-specific by design |
+| `trust-policy` | DYLD_* / SIP policy | 5 | 📌 Correct — security policy by design |
+
+#### Deliverables
+
+- **Threading PAL trait**: `platform_core::threading::Threading` with mutex (init, init_recursive, lock, unlock, trylock, destroy) and condition variable (init, wait, signal, broadcast, destroy) operations
+- **PosixThreading**: `platform-darwin-host/src/threading.rs` — POSIX pthread implementation
+- **PlatformProvider**: added `fn threading() -> &dyn Threading` to the bundle trait (now 10 methods)
+- **cf-lite dlsym/dlopen → PAL**: replaced 7 `libc::dlsym` + 2 `libc::dlopen` calls in `foundation/mod.rs` and `nssortdescriptor.rs` with `crate::pal_symbols()` (HostSymbolResolver)
+- **cf-lite NSLock → PAL**: replaced 35 `libc::pthread_mutex_*/pthread_cond_*` calls in `nslock.rs` with `crate::pal_threading()`, removed 13 unnecessary `unsafe` blocks
+- **objc-runtime @synchronized → PAL**: replaced `libc::calloc` + 7 `libc::pthread_*` calls in `lifecycle.rs` sync_mutex_for/sync_enter/sync_exit with `crate::pal_threading()`
+- **Fallback impls**: `LibcSymbolResolver` + `PosixThreadingFallback` in both `cf-lite` and `objc-runtime` for unit tests
+
+Test results: 961 passed, 0 failures, 0 clippy errors
+
+---
+
+### Phase 45 — GUI Framework Expansion ✅
+
+Goal: evolve GUI layer into a usable framework.
+
+Delivered:
+- **Menu system** (`app-kit-lite/src/menu.rs`): `NSMenu`, `NSMenuItem` with titles, actions,
+  key equivalents (keyboard shortcuts), submenus, separators, modifier flags, recursive
+  key-equivalent dispatch
+- **Event modifiers**: `Event::KeyDown`/`KeyUp` now carry `ModifierFlags`; `NSApplication`
+  performs menu key equivalents before dispatching to responder chain
+- **ScrollView** (`ui-controls/src/scrollview.rs`): content offset, content size, scroll-by,
+  vertical/horizontal enable, visible rect, scroll indicators, offset clamping
+- **Layout system** (`ui-controls/src/layout.rs`): `StackView` with horizontal/vertical axis,
+  natural and fill-equally distribution, spacing, padding; `layout_vertical`/`layout_horizontal`
+  helper functions
+- **TableView** (`ui-controls/src/tableview.rs`): `TableDataSource` trait, `VecDataSource`
+  in-memory data source, `TableColumn`, row selection, scrolling, alternating row colors,
+  column headers, hit-test for click-to-select
+- **SplitView** (`ui-controls/src/splitview.rs`): horizontal/vertical orientation, adjustable
+  divider position, min-size constraints, pane frame computation, divider hit testing
+- **Menu bar rendering** in `window-backend-darwin`: `GuiApp.set_main_menu()`, menu title
+  rendering, modifier tracking via `ModifiersChanged`, key-equivalent interception before
+  text field dispatch
+- **Control Gallery updated**: File/Edit menu bar with Cmd+N/O/Q/X/C/V shortcuts,
+  layout adjusted for menu bar height
+
+Test results: **1007 passed, 0 failed** (46 new tests)
+
+---
+
+### Phase 46 — Window Backend Abstraction ✅
+
+Goal: GUI independent of host.
+
+Delivered:
+- **Extended `WindowBackend` trait** (`window-backend/src/lib.rs`): added `Modifiers` struct,
+  `CharacterInput`, `ModifiersChanged`, `ScrollWheel` event variants, `window_size()` and
+  `scale_factor()` methods with default implementations
+- **Enhanced `HeadlessBackend`**: supports all new events, configurable scale factor via
+  `with_scale()`, window size tracking
+- **`AppScene` kernel** (`ui-controls/src/scene.rs`): backend-agnostic rendering and interaction
+  core — holds labels, buttons, textfields, menus; provides `render()` → Surface, `handle_click()`,
+  `handle_key_down()`, `handle_character_input()`, `handle_backspace()`, modifier tracking
+- **Refactored `GuiApp`** (window-backend-darwin): delegates all rendering/interaction logic to
+  `AppScene` instead of owning it directly; winit `AppState` is now a thin presentation layer
+- **Refactored `HeadlessApp`** (ui-controls): wraps `AppScene`, exposes `scene()`/`scene_mut()`
+  for direct scene access, added `render()` for headless surface generation
+- **Unified code path**: same `AppScene` renders identically in both native (winit+softbuffer)
+  and headless (testing) modes — proving GUI framework is backend-agnostic
+- **NSApplication** handles all new WindowEvent variants (CharacterInput, ModifiersChanged,
+  ScrollWheel)
+
+Test results: **1027 passed, 0 failed** (20 new tests)
+
+---
+
+### Phase 47 — Runtime Diagnostics
+
+Goal: make debugging compatibility easier.
+
+Add runtime events:
+- SelectorMissing
+- ClassMissing
+- SymbolMissing
+- HostFallback
+- MethodDispatch
+
+Add CLI tool: `darwin-inspect --why-failed`
+
+Success criteria: **every compatibility failure is diagnosable**
+
+---
+
+### Phase 48 — Developer Tooling
+
+Goal: improve usability for developers.
+
+Tools:
+- darwin-run
+- darwin-trace
+- darwin-compat
+- darwin-inspect
+
+Capabilities:
+- class browser
+- selector lookup
+- dispatch trace
+- method resolution trace
+
+Success criteria: **developers can debug runtime behavior easily**
+
+---
+
+### Phase 49 — Demo Environment
+
+Goal: create a polished demonstration system.
+
+Add:
+- runtime-shell
+- runtime-control-panel
+
+Capabilities:
+- run apps
+- inspect runtime state
+- toggle security modes
+- view compatibility reports
+
+Success criteria: **interactive runtime environment**
+
+---
+
+### Phase 50 — Performance Work
+
+Goal: optimize runtime.
+
+Targets:
+- method dispatch
+- selector lookup caching
+- symbol resolution
+- ARC operations
+- startup time
+
+Add benchmarks.
+
+Success criteria: **performance competitive with host runtime**
+
+---
+
+### Phase 51 — Ecosystem Integration
+
+Goal: allow external projects to use runtime.
+
+Improve:
+- C API
+- Swift bindings
+- Rust library usage
+
+Add:
+- documentation
+- sample apps
+- tutorials
+
+Success criteria: **third-party projects use runtime**
+
+---
+
+### Phase 52 — Toward Host Independence
+
+Goal: enable runtime to operate without macOS host.
+
+Future work may include:
+- custom window server
+- graphics abstraction
+- filesystem layer
+- network stack
+- process management
+
+This prepares the runtime to become the userspace of a future OS.
+
+---
+
+## Guiding Principle
+
+Instead of freezing layers, the roadmap follows this rule:
+
+> **Any layer may evolve when real software requires it.**
+
+Progress is measured by:
+* real programs running
+* host dependency shrinking
+* platform capabilities expanding
+
+## North Star
+
+> **A complete macOS-compatible runtime platform capable of running real software independently of Apple's OS.**
 
 ---
 

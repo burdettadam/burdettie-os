@@ -13,6 +13,16 @@ const NSERROR_CODE_OFF: usize = 8;
 const NSERROR_DOMAIN_OFF: usize = 16;
 const NSERROR_USERINFO_OFF: usize = 24;
 
+/// Create an NSError object with a domain string, code, and no userInfo.
+///
+/// Used internally when shim functions need to populate an `error_out` pointer.
+pub(crate) fn make_nserror(domain: &str, code: i64) -> u64 {
+    let domain_cstr = std::ffi::CString::new(domain).unwrap_or_default();
+    let domain_nsstring =
+        crate::cfstring::shim_cf_string_create_with_cstring(0, domain_cstr.as_ptr(), 0);
+    shim_nserror_error_with_domain_code_userinfo(0, 0, domain_nsstring, code, 0)
+}
+
 /// `+[NSError errorWithDomain:code:userInfo:]`
 pub extern "C" fn shim_nserror_error_with_domain_code_userinfo(
     _cls: u64,
@@ -21,7 +31,7 @@ pub extern "C" fn shim_nserror_error_with_domain_code_userinfo(
     code: i64,
     user_info: u64,
 ) -> u64 {
-    let obj = unsafe { libc::calloc(1, 32) } as u64;
+    let obj = crate::pal_alloc().calloc(1, 32) as u64;
     if obj == 0 {
         return 0;
     }

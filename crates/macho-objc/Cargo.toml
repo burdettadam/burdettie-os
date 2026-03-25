@@ -12,7 +12,8 @@ macho-parse = { workspace = true }
 serde       = { workspace = true }
 
 [dev-dependencies]
-serde_json  = { workspace = true }
+serde_json      = { workspace = true }
+macho-fixtures  = { workspace = true }
 
 [lints]
 workspace = true

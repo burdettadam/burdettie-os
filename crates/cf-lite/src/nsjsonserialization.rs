@@ -157,9 +157,14 @@ pub extern "C" fn shim_json_object_with_data(
 
     match serde_json::from_slice::<serde_json::Value>(slice) {
         Ok(val) => json_value_to_foundation(&val),
-        Err(_) => {
+        Err(e) => {
             if error_out != 0 {
-                unsafe { *(error_out as *mut u64) = 0; }
+                let err = crate::nserror::make_nserror(
+                    "NSCocoaErrorDomain",
+                    3840, // NSPropertyListReadCorruptError
+                );
+                unsafe { *(error_out as *mut u64) = err; }
+                log::debug!("NSJSONSerialization: parse error: {}", e);
             }
             0
         }
@@ -188,9 +193,14 @@ pub extern "C" fn shim_data_with_json_object(
         Ok(bytes) => {
             crate::nsdata::make_nsdata(&bytes)
         }
-        Err(_) => {
+        Err(e) => {
             if error_out != 0 {
-                unsafe { *(error_out as *mut u64) = 0; }
+                let err = crate::nserror::make_nserror(
+                    "NSCocoaErrorDomain",
+                    3840, // NSPropertyListWriteStreamError
+                );
+                unsafe { *(error_out as *mut u64) = err; }
+                log::debug!("NSJSONSerialization: serialization error: {}", e);
             }
             0
         }

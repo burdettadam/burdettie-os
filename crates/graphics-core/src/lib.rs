@@ -4,470 +4,24 @@
 //! buffer (`Surface`), and a `Renderer` trait for drawing shapes and text.
 //! Backends implement `Renderer` for their specific rendering target.
 
-// ── Geometry types ─────────────────────────────────────────────────
+mod geometry;
+mod color;
+mod font;
+mod font_manager;
+mod text_layout;
+mod surface;
+mod renderer;
+mod software;
+pub mod unicode;
 
-/// A 2D point.
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
-pub struct Point {
-    pub x: f64,
-    pub y: f64,
-}
-
-impl Point {
-    pub const ZERO: Point = Point { x: 0.0, y: 0.0 };
-
-    pub const fn new(x: f64, y: f64) -> Self {
-        Self { x, y }
-    }
-}
-
-/// An axis-aligned rectangle.
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
-pub struct Rect {
-    pub x: f64,
-    pub y: f64,
-    pub width: f64,
-    pub height: f64,
-}
-
-impl Rect {
-    pub const ZERO: Rect = Rect {
-        x: 0.0,
-        y: 0.0,
-        width: 0.0,
-        height: 0.0,
-    };
-
-    pub const fn new(x: f64, y: f64, width: f64, height: f64) -> Self {
-        Self {
-            x,
-            y,
-            width,
-            height,
-        }
-    }
-
-    /// Origin point (top-left).
-    pub fn origin(&self) -> Point {
-        Point::new(self.x, self.y)
-    }
-
-    /// Whether the rect contains a point.
-    pub fn contains(&self, point: Point) -> bool {
-        point.x >= self.x
-            && point.x < self.x + self.width
-            && point.y >= self.y
-            && point.y < self.y + self.height
-    }
-
-    /// Intersect with another rect.
-    pub fn intersects(&self, other: &Rect) -> bool {
-        self.x < other.x + other.width
-            && self.x + self.width > other.x
-            && self.y < other.y + other.height
-            && self.y + self.height > other.y
-    }
-
-    /// Inset the rect by a uniform amount on all sides.
-    pub fn inset(&self, dx: f64, dy: f64) -> Rect {
-        Rect::new(
-            self.x + dx,
-            self.y + dy,
-            (self.width - 2.0 * dx).max(0.0),
-            (self.height - 2.0 * dy).max(0.0),
-        )
-    }
-}
-
-// ── Color ──────────────────────────────────────────────────────────
-
-/// An RGBA color with components in 0.0..=1.0.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Color {
-    pub r: f64,
-    pub g: f64,
-    pub b: f64,
-    pub a: f64,
-}
-
-impl Color {
-    pub const BLACK: Color = Color {
-        r: 0.0,
-        g: 0.0,
-        b: 0.0,
-        a: 1.0,
-    };
-    pub const WHITE: Color = Color {
-        r: 1.0,
-        g: 1.0,
-        b: 1.0,
-        a: 1.0,
-    };
-    pub const RED: Color = Color {
-        r: 1.0,
-        g: 0.0,
-        b: 0.0,
-        a: 1.0,
-    };
-    pub const GREEN: Color = Color {
-        r: 0.0,
-        g: 1.0,
-        b: 0.0,
-        a: 1.0,
-    };
-    pub const BLUE: Color = Color {
-        r: 0.0,
-        g: 0.0,
-        b: 1.0,
-        a: 1.0,
-    };
-    pub const TRANSPARENT: Color = Color {
-        r: 0.0,
-        g: 0.0,
-        b: 0.0,
-        a: 0.0,
-    };
-
-    pub const fn new(r: f64, g: f64, b: f64, a: f64) -> Self {
-        Self { r, g, b, a }
-    }
-
-    pub const fn rgb(r: f64, g: f64, b: f64) -> Self {
-        Self { r, g, b, a: 1.0 }
-    }
-
-    /// Convert to 32-bit ARGB pixel value.
-    pub fn to_argb32(&self) -> u32 {
-        let a = (self.a * 255.0) as u32;
-        let r = (self.r * 255.0) as u32;
-        let g = (self.g * 255.0) as u32;
-        let b = (self.b * 255.0) as u32;
-        (a << 24) | (r << 16) | (g << 8) | b
-    }
-}
-
-impl Default for Color {
-    fn default() -> Self {
-        Self::BLACK
-    }
-}
-
-// ── Font ───────────────────────────────────────────────────────────
-
-/// A font descriptor.
-#[derive(Debug, Clone)]
-pub struct Font {
-    pub name: String,
-    pub size: f64,
-}
-
-impl Font {
-    pub fn new(name: impl Into<String>, size: f64) -> Self {
-        Self {
-            name: name.into(),
-            size,
-        }
-    }
-
-    pub fn system(size: f64) -> Self {
-        Self::new("System", size)
-    }
-}
-
-impl Default for Font {
-    fn default() -> Self {
-        Self::system(14.0)
-    }
-}
-
-// ── Surface ────────────────────────────────────────────────────────
-
-/// A CPU-rendered pixel buffer (ARGB32, row-major).
-pub struct Surface {
-    pixels: Vec<u32>,
-    width: u32,
-    height: u32,
-}
-
-impl Surface {
-    pub fn new(width: u32, height: u32) -> Self {
-        Self {
-            pixels: vec![0; (width * height) as usize],
-            width,
-            height,
-        }
-    }
-
-    pub fn width(&self) -> u32 {
-        self.width
-    }
-
-    pub fn height(&self) -> u32 {
-        self.height
-    }
-
-    pub fn pixels(&self) -> &[u32] {
-        &self.pixels
-    }
-
-    pub fn pixels_mut(&mut self) -> &mut [u32] {
-        &mut self.pixels
-    }
-
-    /// Set a single pixel (bounds-checked).
-    pub fn set_pixel(&mut self, x: u32, y: u32, color: u32) {
-        if x < self.width && y < self.height {
-            self.pixels[(y * self.width + x) as usize] = color;
-        }
-    }
-
-    /// Clear to a solid color.
-    pub fn clear(&mut self, color: Color) {
-        let c = color.to_argb32();
-        self.pixels.fill(c);
-    }
-}
-
-// ── Renderer trait ─────────────────────────────────────────────────
-
-/// 2D drawing operations. Backends implement this for their target surface.
-pub trait Renderer {
-    fn clear(&mut self, color: Color);
-    fn fill_rect(&mut self, rect: Rect, color: Color);
-    fn stroke_rect(&mut self, rect: Rect, color: Color, width: f64);
-    fn draw_text(&mut self, text: &str, origin: Point, font: &Font, color: Color);
-    fn draw_line(&mut self, from: Point, to: Point, color: Color, width: f64);
-}
-
-// ── Software renderer ──────────────────────────────────────────────
-
-// 5×7 bitmap font for printable ASCII (32–126).
-// Each glyph is 7 rows; each row has 5 bits (bit 4 = leftmost pixel).
-#[rustfmt::skip]
-const FONT_5X7: [[u8; 7]; 95] = [
-    [0x00,0x00,0x00,0x00,0x00,0x00,0x00], // 32 ' '
-    [0x04,0x04,0x04,0x04,0x04,0x00,0x04], // 33 '!'
-    [0x0A,0x0A,0x0A,0x00,0x00,0x00,0x00], // 34 '"'
-    [0x0A,0x0A,0x1F,0x0A,0x1F,0x0A,0x0A], // 35 '#'
-    [0x04,0x0F,0x14,0x0E,0x05,0x1E,0x04], // 36 '$'
-    [0x18,0x19,0x02,0x04,0x08,0x13,0x03], // 37 '%'
-    [0x0C,0x12,0x14,0x08,0x15,0x12,0x0D], // 38 '&'
-    [0x06,0x04,0x08,0x00,0x00,0x00,0x00], // 39 "'"
-    [0x02,0x04,0x08,0x08,0x08,0x04,0x02], // 40 '('
-    [0x08,0x04,0x02,0x02,0x02,0x04,0x08], // 41 ')'
-    [0x00,0x04,0x15,0x0E,0x15,0x04,0x00], // 42 '*'
-    [0x00,0x04,0x04,0x1F,0x04,0x04,0x00], // 43 '+'
-    [0x00,0x00,0x00,0x00,0x06,0x04,0x08], // 44 ','
-    [0x00,0x00,0x00,0x1F,0x00,0x00,0x00], // 45 '-'
-    [0x00,0x00,0x00,0x00,0x00,0x06,0x06], // 46 '.'
-    [0x00,0x01,0x02,0x04,0x08,0x10,0x00], // 47 '/'
-    [0x0E,0x11,0x13,0x15,0x19,0x11,0x0E], // 48 '0'
-    [0x04,0x0C,0x04,0x04,0x04,0x04,0x0E], // 49 '1'
-    [0x0E,0x11,0x01,0x02,0x04,0x08,0x1F], // 50 '2'
-    [0x1F,0x02,0x04,0x02,0x01,0x11,0x0E], // 51 '3'
-    [0x02,0x06,0x0A,0x12,0x1F,0x02,0x02], // 52 '4'
-    [0x1F,0x10,0x1E,0x01,0x01,0x11,0x0E], // 53 '5'
-    [0x06,0x08,0x10,0x1E,0x11,0x11,0x0E], // 54 '6'
-    [0x1F,0x01,0x02,0x04,0x08,0x08,0x08], // 55 '7'
-    [0x0E,0x11,0x11,0x0E,0x11,0x11,0x0E], // 56 '8'
-    [0x0E,0x11,0x11,0x0F,0x01,0x02,0x0C], // 57 '9'
-    [0x00,0x06,0x06,0x00,0x06,0x06,0x00], // 58 ':'
-    [0x00,0x06,0x06,0x00,0x06,0x04,0x08], // 59 ';'
-    [0x02,0x04,0x08,0x10,0x08,0x04,0x02], // 60 '<'
-    [0x00,0x00,0x1F,0x00,0x1F,0x00,0x00], // 61 '='
-    [0x08,0x04,0x02,0x01,0x02,0x04,0x08], // 62 '>'
-    [0x0E,0x11,0x01,0x02,0x04,0x00,0x04], // 63 '?'
-    [0x0E,0x11,0x17,0x15,0x17,0x10,0x0E], // 64 '@'
-    [0x0E,0x11,0x11,0x1F,0x11,0x11,0x11], // 65 'A'
-    [0x1E,0x11,0x11,0x1E,0x11,0x11,0x1E], // 66 'B'
-    [0x0E,0x11,0x10,0x10,0x10,0x11,0x0E], // 67 'C'
-    [0x1C,0x12,0x11,0x11,0x11,0x12,0x1C], // 68 'D'
-    [0x1F,0x10,0x10,0x1E,0x10,0x10,0x1F], // 69 'E'
-    [0x1F,0x10,0x10,0x1E,0x10,0x10,0x10], // 70 'F'
-    [0x0E,0x11,0x10,0x17,0x11,0x11,0x0F], // 71 'G'
-    [0x11,0x11,0x11,0x1F,0x11,0x11,0x11], // 72 'H'
-    [0x0E,0x04,0x04,0x04,0x04,0x04,0x0E], // 73 'I'
-    [0x07,0x02,0x02,0x02,0x02,0x12,0x0C], // 74 'J'
-    [0x11,0x12,0x14,0x18,0x14,0x12,0x11], // 75 'K'
-    [0x10,0x10,0x10,0x10,0x10,0x10,0x1F], // 76 'L'
-    [0x11,0x1B,0x15,0x15,0x11,0x11,0x11], // 77 'M'
-    [0x11,0x11,0x19,0x15,0x13,0x11,0x11], // 78 'N'
-    [0x0E,0x11,0x11,0x11,0x11,0x11,0x0E], // 79 'O'
-    [0x1E,0x11,0x11,0x1E,0x10,0x10,0x10], // 80 'P'
-    [0x0E,0x11,0x11,0x11,0x15,0x12,0x0D], // 81 'Q'
-    [0x1E,0x11,0x11,0x1E,0x14,0x12,0x11], // 82 'R'
-    [0x0E,0x11,0x10,0x0E,0x01,0x11,0x0E], // 83 'S'
-    [0x1F,0x04,0x04,0x04,0x04,0x04,0x04], // 84 'T'
-    [0x11,0x11,0x11,0x11,0x11,0x11,0x0E], // 85 'U'
-    [0x11,0x11,0x11,0x11,0x11,0x0A,0x04], // 86 'V'
-    [0x11,0x11,0x11,0x15,0x15,0x15,0x0A], // 87 'W'
-    [0x11,0x11,0x0A,0x04,0x0A,0x11,0x11], // 88 'X'
-    [0x11,0x11,0x0A,0x04,0x04,0x04,0x04], // 89 'Y'
-    [0x1F,0x01,0x02,0x04,0x08,0x10,0x1F], // 90 'Z'
-    [0x0E,0x08,0x08,0x08,0x08,0x08,0x0E], // 91 '['
-    [0x00,0x10,0x08,0x04,0x02,0x01,0x00], // 92 '\'
-    [0x0E,0x02,0x02,0x02,0x02,0x02,0x0E], // 93 ']'
-    [0x04,0x0A,0x11,0x00,0x00,0x00,0x00], // 94 '^'
-    [0x00,0x00,0x00,0x00,0x00,0x00,0x1F], // 95 '_'
-    [0x08,0x04,0x02,0x00,0x00,0x00,0x00], // 96 '`'
-    [0x00,0x00,0x0E,0x01,0x0F,0x11,0x0F], // 97 'a'
-    [0x10,0x10,0x16,0x19,0x11,0x11,0x1E], // 98 'b'
-    [0x00,0x00,0x0E,0x10,0x10,0x11,0x0E], // 99 'c'
-    [0x01,0x01,0x0D,0x13,0x11,0x11,0x0F], // 100 'd'
-    [0x00,0x00,0x0E,0x11,0x1F,0x10,0x0E], // 101 'e'
-    [0x06,0x09,0x08,0x1C,0x08,0x08,0x08], // 102 'f'
-    [0x00,0x00,0x0F,0x11,0x0F,0x01,0x0E], // 103 'g'
-    [0x10,0x10,0x16,0x19,0x11,0x11,0x11], // 104 'h'
-    [0x04,0x00,0x0C,0x04,0x04,0x04,0x0E], // 105 'i'
-    [0x02,0x00,0x06,0x02,0x02,0x12,0x0C], // 106 'j'
-    [0x10,0x10,0x12,0x14,0x18,0x14,0x12], // 107 'k'
-    [0x0C,0x04,0x04,0x04,0x04,0x04,0x0E], // 108 'l'
-    [0x00,0x00,0x1A,0x15,0x15,0x11,0x11], // 109 'm'
-    [0x00,0x00,0x16,0x19,0x11,0x11,0x11], // 110 'n'
-    [0x00,0x00,0x0E,0x11,0x11,0x11,0x0E], // 111 'o'
-    [0x00,0x00,0x1E,0x11,0x1E,0x10,0x10], // 112 'p'
-    [0x00,0x00,0x0D,0x13,0x0F,0x01,0x01], // 113 'q'
-    [0x00,0x00,0x16,0x19,0x10,0x10,0x10], // 114 'r'
-    [0x00,0x00,0x0E,0x10,0x0E,0x01,0x1E], // 115 's'
-    [0x08,0x08,0x1C,0x08,0x08,0x09,0x06], // 116 't'
-    [0x00,0x00,0x11,0x11,0x11,0x13,0x0D], // 117 'u'
-    [0x00,0x00,0x11,0x11,0x11,0x0A,0x04], // 118 'v'
-    [0x00,0x00,0x11,0x11,0x15,0x15,0x0A], // 119 'w'
-    [0x00,0x00,0x11,0x0A,0x04,0x0A,0x11], // 120 'x'
-    [0x00,0x00,0x11,0x11,0x0F,0x01,0x0E], // 121 'y'
-    [0x00,0x00,0x1F,0x02,0x04,0x08,0x1F], // 122 'z'
-    [0x02,0x04,0x04,0x08,0x04,0x04,0x02], // 123 '{'
-    [0x04,0x04,0x04,0x04,0x04,0x04,0x04], // 124 '|'
-    [0x08,0x04,0x04,0x02,0x04,0x04,0x08], // 125 '}'
-    [0x00,0x00,0x0D,0x12,0x00,0x00,0x00], // 126 '~'
-];
-
-/// Look up a glyph for a character, returning a filled rectangle for unknowns.
-fn glyph_for(ch: char) -> &'static [u8; 7] {
-    let idx = ch as u32;
-    if (32..=126).contains(&idx) {
-        &FONT_5X7[(idx - 32) as usize]
-    } else {
-        // Unknown character → filled block
-        static BLOCK: [u8; 7] = [0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F];
-        &BLOCK
-    }
-}
-
-/// A basic software renderer that draws into a `Surface`.
-pub struct SoftwareRenderer<'a> {
-    surface: &'a mut Surface,
-}
-
-impl<'a> SoftwareRenderer<'a> {
-    pub fn new(surface: &'a mut Surface) -> Self {
-        Self { surface }
-    }
-
-    fn fill_pixel_rect(&mut self, x: i32, y: i32, w: i32, h: i32, color: u32) {
-        let sw = self.surface.width() as i32;
-        let sh = self.surface.height() as i32;
-
-        let x0 = x.max(0);
-        let y0 = y.max(0);
-        let x1 = (x + w).min(sw);
-        let y1 = (y + h).min(sh);
-
-        for py in y0..y1 {
-            for px in x0..x1 {
-                self.surface.set_pixel(px as u32, py as u32, color);
-            }
-        }
-    }
-}
-
-impl Renderer for SoftwareRenderer<'_> {
-    fn clear(&mut self, color: Color) {
-        self.surface.clear(color);
-    }
-
-    fn fill_rect(&mut self, rect: Rect, color: Color) {
-        let c = color.to_argb32();
-        self.fill_pixel_rect(
-            rect.x as i32,
-            rect.y as i32,
-            rect.width as i32,
-            rect.height as i32,
-            c,
-        );
-    }
-
-    fn stroke_rect(&mut self, rect: Rect, color: Color, width: f64) {
-        let c = color.to_argb32();
-        let w = width as i32;
-        let x = rect.x as i32;
-        let y = rect.y as i32;
-        let rw = rect.width as i32;
-        let rh = rect.height as i32;
-
-        // Top
-        self.fill_pixel_rect(x, y, rw, w, c);
-        // Bottom
-        self.fill_pixel_rect(x, y + rh - w, rw, w, c);
-        // Left
-        self.fill_pixel_rect(x, y, w, rh, c);
-        // Right
-        self.fill_pixel_rect(x + rw - w, y, w, rh, c);
-    }
-
-    fn draw_text(&mut self, text: &str, origin: Point, font: &Font, color: Color) {
-        let c = color.to_argb32();
-        let scale = (font.size / 7.0).max(1.0).round() as i32;
-        let char_w = 5 * scale;
-        let spacing = char_w + scale; // 1-pixel gap scaled
-
-        for (i, ch) in text.chars().enumerate() {
-            let glyph = glyph_for(ch);
-            let bx = origin.x as i32 + (i as i32) * spacing;
-            let by = origin.y as i32;
-            for (row, &bits) in glyph.iter().enumerate() {
-                for col in 0..5 {
-                    if bits & (1 << (4 - col)) != 0 {
-                        let px = bx + col * scale;
-                        let py = by + (row as i32) * scale;
-                        self.fill_pixel_rect(px, py, scale, scale, c);
-                    }
-                }
-            }
-        }
-    }
-
-    fn draw_line(&mut self, from: Point, to: Point, color: Color, _width: f64) {
-        // Bresenham's line algorithm
-        let c = color.to_argb32();
-        let mut x0 = from.x as i32;
-        let mut y0 = from.y as i32;
-        let x1 = to.x as i32;
-        let y1 = to.y as i32;
-
-        let dx = (x1 - x0).abs();
-        let dy = -(y1 - y0).abs();
-        let sx = if x0 < x1 { 1 } else { -1 };
-        let sy = if y0 < y1 { 1 } else { -1 };
-        let mut err = dx + dy;
-
-        loop {
-            self.surface.set_pixel(x0 as u32, y0 as u32, c);
-            if x0 == x1 && y0 == y1 {
-                break;
-            }
-            let e2 = 2 * err;
-            if e2 >= dy {
-                err += dy;
-                x0 += sx;
-            }
-            if e2 <= dx {
-                err += dx;
-                y0 += sy;
-            }
-        }
-    }
-}
+pub use geometry::*;
+pub use color::*;
+pub use font::*;
+pub use font_manager::*;
+pub use text_layout::*;
+pub use surface::*;
+pub use renderer::*;
+pub use software::*;
 
 // ── Tests ──────────────────────────────────────────────────────────
 
@@ -570,5 +124,302 @@ mod tests {
         let f = Font::default();
         assert_eq!(f.name, "System");
         assert_eq!(f.size, 14.0);
+    }
+
+    // ── FontManager tests ──────────────────────────────────
+
+    #[test]
+    fn font_manager_loads_default_fonts() {
+        let fm = FontManager::new();
+        assert_eq!(fm.system().name(), "System");
+        assert_eq!(fm.bold().name(), "System-Bold");
+        assert_eq!(fm.monospace().name(), "Monospace");
+    }
+
+    #[test]
+    fn font_manager_get_fallback() {
+        let fm = FontManager::new();
+        // Unknown name falls back to system font
+        let face = fm.get("NonExistent");
+        assert_eq!(face.name(), "System");
+    }
+
+    #[test]
+    fn font_face_metrics() {
+        let fm = FontManager::new();
+        let m = fm.system().metrics(14.0);
+        // Ascent should be positive, descent negative
+        assert!(m.ascent > 0.0);
+        assert!(m.descent < 0.0);
+        assert!(m.line_height() > 0.0);
+    }
+
+    #[test]
+    fn font_face_measure_text() {
+        let fm = FontManager::new();
+        let w = fm.system().measure_text("Hello", 14.0);
+        assert!(w > 0.0);
+        // Longer text should be wider
+        let w2 = fm.system().measure_text("Hello, World!", 14.0);
+        assert!(w2 > w);
+    }
+
+    #[test]
+    fn font_face_char_width() {
+        let fm = FontManager::new();
+        let w = fm.system().char_width('A', 14.0);
+        assert!(w > 0.0);
+    }
+
+    #[test]
+    fn font_face_line_height() {
+        let fm = FontManager::new();
+        let lh = fm.system().line_height(14.0);
+        assert!(lh > 0.0);
+        // Line height should scale with size
+        let lh_big = fm.system().line_height(28.0);
+        assert!(lh_big > lh);
+    }
+
+    // ── TextLayout tests ───────────────────────────────────
+
+    #[test]
+    fn text_layout_single_line() {
+        let fm = FontManager::new();
+        let layout = layout_single_line("Hello", fm.system(), 14.0);
+        assert_eq!(layout.line_count, 1);
+        assert_eq!(layout.glyphs.len(), 5);
+        assert!(layout.width > 0.0);
+        assert!(layout.height > 0.0);
+    }
+
+    #[test]
+    fn text_layout_empty_string() {
+        let fm = FontManager::new();
+        let layout = layout_single_line("", fm.system(), 14.0);
+        assert_eq!(layout.glyphs.len(), 0);
+        assert_eq!(layout.line_count, 1);
+    }
+
+    #[test]
+    fn text_layout_wrapped_no_wrap() {
+        let fm = FontManager::new();
+        let layout = layout_wrapped("Hello World", fm.system(), 14.0, 1000.0, WrapMode::NoWrap);
+        assert_eq!(layout.line_count, 1);
+    }
+
+    #[test]
+    fn text_layout_wrapped_word_wrap() {
+        let fm = FontManager::new();
+        // Use a narrow width to force wrapping
+        let layout = layout_wrapped("Hello World", fm.system(), 14.0, 50.0, WrapMode::Word);
+        assert!(layout.line_count >= 2, "Expected multi-line, got {}", layout.line_count);
+    }
+
+    #[test]
+    fn text_layout_wrapped_char_wrap() {
+        let fm = FontManager::new();
+        let layout = layout_wrapped("ABCDEFGHIJ", fm.system(), 14.0, 30.0, WrapMode::Character);
+        assert!(layout.line_count >= 2, "Expected multi-line, got {}", layout.line_count);
+    }
+
+    #[test]
+    fn text_layout_newline_handling() {
+        let fm = FontManager::new();
+        let layout = layout_wrapped("Line1\nLine2\nLine3", fm.system(), 14.0, 1000.0, WrapMode::NoWrap);
+        assert_eq!(layout.line_count, 3);
+    }
+
+    // ── TrueType rendering tests ───────────────────────────
+
+    #[test]
+    fn truetype_render_produces_pixels() {
+        let fm = FontManager::new();
+        let mut s = Surface::new(200, 50);
+        {
+            let mut r = SoftwareRenderer::with_fonts(&mut s, &fm);
+            r.clear(Color::WHITE);
+            r.draw_text("Hello", Point::new(10.0, 5.0), &Font::system(14.0), Color::BLACK);
+        }
+        // At least some pixels should differ from white after rendering text
+        let white = Color::WHITE.to_argb32();
+        let non_white = s.pixels().iter().filter(|&&p| p != white).count();
+        assert!(non_white > 0, "Expected non-white pixels from TrueType rendering");
+    }
+
+    #[test]
+    fn truetype_measure_text() {
+        let fm = FontManager::new();
+        let mut s = Surface::new(100, 50);
+        let r = SoftwareRenderer::with_fonts(&mut s, &fm);
+        let w = r.measure_text("Test", &Font::system(14.0));
+        assert!(w > 0.0);
+    }
+
+    // ── Unicode integration tests ──────────────────────────
+
+    #[test]
+    fn unicode_nfc_layout_combining_acute() {
+        // NFD "é" (e + combining acute) should produce the same layout as NFC "é"
+        let fm = FontManager::new();
+        let nfd = layout_single_line("e\u{0301}", fm.system(), 14.0);
+        let nfc = layout_single_line("é", fm.system(), 14.0);
+        // After NFC normalization, both should have 1 base glyph
+        // (NFD composes to the single precomposed é)
+        assert_eq!(nfc.glyphs.len(), 1);
+        assert_eq!(nfd.glyphs.len(), 1);
+        // Widths should be equal
+        assert!((nfd.width - nfc.width).abs() < 0.01,
+            "NFD width {} != NFC width {}", nfd.width, nfc.width);
+    }
+
+    #[test]
+    fn unicode_combining_mark_no_advance() {
+        let fm = FontManager::new();
+        // U+0308 (combining diaeresis) — use 'q' which has no precomposed form
+        // with diaeresis, so NFC won't collapse it
+        let layout = layout_single_line("q\u{0308}", fm.system(), 14.0);
+        // Should have 2 glyphs (base + combining mark)
+        assert_eq!(layout.glyphs.len(), 2);
+        // The combining mark should be at the same x as the base character
+        assert!((layout.glyphs[0].x - layout.glyphs[1].x).abs() < 0.01,
+            "Combining mark at x={} should overlap base at x={}", layout.glyphs[1].x, layout.glyphs[0].x);
+        // Total width should be roughly the same as just 'q' (combining mark doesn't advance)
+        let q_layout = layout_single_line("q", fm.system(), 14.0);
+        assert!((layout.width - q_layout.width).abs() < 0.01,
+            "q+diaeresis width {} should equal q width {}", layout.width, q_layout.width);
+    }
+
+    #[test]
+    fn unicode_zero_width_chars_skipped() {
+        let fm = FontManager::new();
+        // Insert ZWJ and ZWNJ between characters — should not affect width
+        let plain = layout_single_line("ab", fm.system(), 14.0);
+        let with_zwj = layout_single_line("a\u{200D}b", fm.system(), 14.0);
+        let with_zwnj = layout_single_line("a\u{200C}b", fm.system(), 14.0);
+        let with_zwsp = layout_single_line("a\u{200B}b", fm.system(), 14.0);
+        assert!((plain.width - with_zwj.width).abs() < 0.01);
+        assert!((plain.width - with_zwnj.width).abs() < 0.01);
+        assert!((plain.width - with_zwsp.width).abs() < 0.01);
+    }
+
+    #[test]
+    fn unicode_zero_width_chars_excluded_from_glyphs() {
+        let fm = FontManager::new();
+        let layout = layout_single_line("a\u{200D}b", fm.system(), 14.0);
+        // Should be 2 glyphs (a and b), ZWJ skipped
+        assert_eq!(layout.glyphs.len(), 2);
+    }
+
+    #[test]
+    fn unicode_emoji_missing_glyph() {
+        let fm = FontManager::new();
+        // Use a character outside DejaVu's coverage — a rare CJK ideograph
+        // that DejaVu Sans definitely doesn't include
+        let layout = layout_single_line("\u{2F800}", fm.system(), 14.0); // CJK Compatibility Ideograph
+        assert_eq!(layout.glyphs.len(), 1);
+        assert!(layout.glyphs[0].missing,
+            "CJK ideograph should be marked as missing glyph, glyph_id={:?}", layout.glyphs[0].glyph_id);
+    }
+
+    #[test]
+    fn unicode_emoji_renders_in_dejavu() {
+        // DejaVu Sans has monochrome emoji — verify they render successfully
+        let fm = FontManager::new();
+        assert!(fm.system().has_glyph('😀'), "DejaVu Sans should have 😀");
+        let layout = layout_single_line("😀", fm.system(), 14.0);
+        assert_eq!(layout.glyphs.len(), 1);
+        assert!(!layout.glyphs[0].missing);
+    }
+
+    #[test]
+    fn unicode_emoji_placeholder_renders() {
+        let fm = FontManager::new();
+        let mut s = Surface::new(200, 50);
+        {
+            let mut r = SoftwareRenderer::with_fonts(&mut s, &fm);
+            r.clear(Color::WHITE);
+            r.draw_text("😀", Point::new(10.0, 5.0), &Font::system(14.0), Color::BLACK);
+        }
+        // Placeholder box should produce some non-white pixels
+        let white = Color::WHITE.to_argb32();
+        let non_white = s.pixels().iter().filter(|&&p| p != white).count();
+        assert!(non_white > 0, "Expected placeholder box pixels for emoji");
+    }
+
+    #[test]
+    fn unicode_mixed_text_layout() {
+        let fm = FontManager::new();
+        // Mix of ASCII, accented, and CJK-range characters
+        let layout = layout_single_line("Héllo", fm.system(), 14.0);
+        assert_eq!(layout.glyphs.len(), 5);
+        assert!(layout.width > 0.0);
+    }
+
+    #[test]
+    fn unicode_bom_filtered() {
+        let fm = FontManager::new();
+        // BOM at start should be filtered
+        let with_bom = layout_single_line("\u{FEFF}Hello", fm.system(), 14.0);
+        let without = layout_single_line("Hello", fm.system(), 14.0);
+        assert_eq!(with_bom.glyphs.len(), without.glyphs.len());
+        assert!((with_bom.width - without.width).abs() < 0.01);
+    }
+
+    #[test]
+    fn unicode_soft_hyphen_filtered() {
+        let fm = FontManager::new();
+        let with_shy = layout_single_line("Hel\u{00AD}lo", fm.system(), 14.0);
+        let without = layout_single_line("Hello", fm.system(), 14.0);
+        assert_eq!(with_shy.glyphs.len(), without.glyphs.len());
+        assert!((with_shy.width - without.width).abs() < 0.01);
+    }
+
+    #[test]
+    fn unicode_measure_text_nfc() {
+        let fm = FontManager::new();
+        // NFD and NFC should measure the same
+        let w_nfd = fm.system().measure_text("e\u{0301}", 14.0);
+        let w_nfc = fm.system().measure_text("é", 14.0);
+        assert!((w_nfd - w_nfc).abs() < 0.01,
+            "NFD measure {} != NFC measure {}", w_nfd, w_nfc);
+    }
+
+    #[test]
+    fn unicode_wrapped_combining_not_split() {
+        let fm = FontManager::new();
+        // Word with combining mark should not be split at the combining mark
+        let layout = layout_wrapped("x\u{0308} test", fm.system(), 14.0, 1000.0, WrapMode::Word);
+        assert_eq!(layout.line_count, 1);
+        // x + combining diaeresis + space + test = 2 + 1 + 4 = 7 glyphs
+        // (combining mark present as separate glyph at same x)
+        assert!(layout.glyphs.len() >= 6);
+    }
+
+    #[test]
+    fn unicode_multiple_combining_marks() {
+        let fm = FontManager::new();
+        // q + combining acute + combining diaeresis (stacked diacritics)
+        // Neither composes with q in NFC, so both marks remain
+        let layout = layout_single_line("q\u{0301}\u{0308}", fm.system(), 14.0);
+        // Should have 3 glyphs: q (base) + acute (combining) + diaeresis (combining)
+        assert_eq!(layout.glyphs.len(), 3);
+        // Both combining marks should be at the same x as the base character
+        assert!((layout.glyphs[0].x - layout.glyphs[1].x).abs() < 0.01);
+        assert!((layout.glyphs[0].x - layout.glyphs[2].x).abs() < 0.01);
+    }
+
+    #[test]
+    fn unicode_render_accented_text() {
+        let fm = FontManager::new();
+        let mut s = Surface::new(300, 50);
+        {
+            let mut r = SoftwareRenderer::with_fonts(&mut s, &fm);
+            r.clear(Color::WHITE);
+            r.draw_text("Ü Ö Ä é à ñ", Point::new(5.0, 5.0), &Font::system(14.0), Color::BLACK);
+        }
+        let white = Color::WHITE.to_argb32();
+        let non_white = s.pixels().iter().filter(|&&p| p != white).count();
+        assert!(non_white > 50, "Expected many non-white pixels for accented text, got {}", non_white);
     }
 }

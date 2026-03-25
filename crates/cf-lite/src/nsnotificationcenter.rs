@@ -21,7 +21,7 @@ static DEFAULT_CENTER: OnceLock<u64> = OnceLock::new();
 
 fn default_center_ptr() -> u64 {
     *DEFAULT_CENTER.get_or_init(|| {
-        let obj = unsafe { libc::calloc(1, 16) } as u64;
+        let obj = crate::pal_alloc().calloc(1, 16) as u64;
         if obj != 0 {
             unsafe {
                 *(obj as *mut u64) = nsobj::nsnotificationcenter_class_addr();

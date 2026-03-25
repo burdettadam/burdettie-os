@@ -292,6 +292,7 @@ dependencies = [
  "log",
  "objc-runtime",
  "platform-core",
+ "platform-darwin-host",
  "regex",
  "serde_json",
 ]
@@ -365,6 +366,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "compat-runner"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "env_logger",
+ "log",
+ "macho-fixtures",
+ "macho-parse",
+ "macho-runtime",
+ "macho-types",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "concurrent-queue"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -377,6 +394,7 @@ dependencies = [
 name = "control-gallery"
 version = "0.1.0"
 dependencies = [
+ "app-kit-lite",
  "graphics-core",
  "ui-controls",
  "window-backend",
@@ -666,6 +684,11 @@ dependencies = [
 [[package]]
 name = "graphics-core"
 version = "0.1.0"
+dependencies = [
+ "ab_glyph",
+ "unicode-normalization",
+ "unicode-segmentation",
+]
 
 [[package]]
 name = "hashbrown"
@@ -913,6 +936,7 @@ dependencies = [
  "macho-types",
  "platform-core",
  "platform-darwin-host",
+ "runtime-diagnostics",
  "serde_json",
  "thiserror 2.0.18",
  "trust-policy",
@@ -940,6 +964,7 @@ dependencies = [
  "macho-types",
  "platform-core",
  "platform-darwin-host",
+ "runtime-diagnostics",
  "serde",
  "serde_json",
  "trust-policy",
@@ -949,6 +974,7 @@ dependencies = [
 name = "macho-map"
 version = "0.1.0"
 dependencies = [
+ "macho-fixtures",
  "macho-parse",
  "macho-types",
  "serde",
@@ -960,6 +986,7 @@ dependencies = [
 name = "macho-objc"
 version = "0.1.0"
 dependencies = [
+ "macho-fixtures",
  "macho-parse",
  "macho-types",
  "serde",
@@ -985,6 +1012,7 @@ name = "macho-resolve"
 version = "0.1.0"
 dependencies = [
  "log",
+ "macho-fixtures",
  "macho-parse",
  "macho-types",
  "serde",
@@ -996,6 +1024,7 @@ dependencies = [
 name = "macho-run-plan"
 version = "0.1.0"
 dependencies = [
+ "macho-fixtures",
  "macho-map",
  "macho-objc",
  "macho-parse",
@@ -1035,6 +1064,7 @@ name = "macho-types"
 version = "0.1.0"
 dependencies = [
  "bitflags 2.11.0",
+ "macho-fixtures",
  "serde",
  "serde_json",
 ]
@@ -1116,6 +1146,9 @@ dependencies = [
  "log",
  "macho-objc",
  "macho-parse",
+ "platform-core",
+ "platform-darwin-host",
+ "runtime-diagnostics",
 ]
 
 [[package]]
@@ -1622,6 +1655,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "runtime-diagnostics"
+version = "0.1.0"
+
+[[package]]
 name = "runtime-shell"
 version = "0.1.0"
 dependencies = [
@@ -1992,6 +2029,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "tinyvec"
+version = "1.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3e61e67053d25a4e82c844e8424039d9745781b3fc4f32b8d55ed50f5f667ef3"
+dependencies = [
+ "tinyvec_macros",
+]
+
+[[package]]
+name = "tinyvec_macros"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
+
+[[package]]
 name = "toml"
 version = "0.8.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2082,6 +2134,7 @@ checksum = "db97caf9d906fbde555dd62fa95ddba9eecfd14cb388e4f491a66d74cd5fb79a"
 name = "trust-policy"
 version = "0.1.0"
 dependencies = [
+ "macho-fixtures",
  "macho-parse",
  "macho-run-plan",
  "macho-types",
@@ -2102,6 +2155,7 @@ dependencies = [
  "app-kit-lite",
  "graphics-core",
  "ui-view",
+ "window-backend",
 ]
 
 [[package]]
@@ -2117,6 +2171,15 @@ name = "unicode-ident"
 version = "1.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6e4313cd5fcd3dad5cafa179702e2b244f760991f45397d14d4ebf38247da75"
+
+[[package]]
+name = "unicode-normalization"
+version = "0.1.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5fd4f6878c9cb28d874b009da9e8d183b5abc80117c40bbd187a1fde336be6e8"
+dependencies = [
+ "tinyvec",
+]
 
 [[package]]
 name = "unicode-segmentation"
@@ -2363,7 +2426,9 @@ dependencies = [
 name = "window-backend-darwin"
 version = "0.1.0"
 dependencies = [
+ "app-kit-lite",
  "graphics-core",
+ "log",
  "softbuffer",
  "ui-controls",
  "ui-view",

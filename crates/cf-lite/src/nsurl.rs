@@ -28,7 +28,7 @@ fn url_is_file(obj: u64) -> bool {
 }
 
 fn alloc_url(url_string: u64, is_file: bool) -> u64 {
-    let obj = unsafe { libc::calloc(1, 24) } as u64;
+    let obj = crate::pal_alloc().calloc(1, 24) as u64;
     if obj == 0 {
         return 0;
     }
@@ -50,7 +50,7 @@ pub extern "C" fn shim_nsurl_file_url_with_path(_cls: u64, _cmd: u64, path: u64)
     // Get the path string and prepend file://
     if let Some(path_str) = cfstring::extract_cfstring_cstr(path) {
         let url_str = format!("file://{}", path_str);
-        let c_str = std::ffi::CString::new(url_str).unwrap();
+        let c_str = std::ffi::CString::new(url_str).unwrap_or_default();
         let ns_url_string = cfstring::shim_cf_string_create_with_cstring(0, c_str.as_ptr(), 0);
         alloc_url(ns_url_string, true)
     } else {
@@ -101,7 +101,7 @@ pub extern "C" fn shim_nsurl_path(obj: u64, _cmd: u64) -> u64 {
         } else {
             s.to_string()
         };
-        let c_str = std::ffi::CString::new(path).unwrap();
+        let c_str = std::ffi::CString::new(path).unwrap_or_default();
         cfstring::shim_cf_string_create_with_cstring(0, c_str.as_ptr(), 0)
     } else {
         0
@@ -118,7 +118,7 @@ pub extern "C" fn shim_nsurl_last_path_component(obj: u64, _cmd: u64) -> u64 {
         let offset = if s.starts_with("file://") { 7 } else { 0 };
         let path = &s[offset..];
         let component = path.rsplit('/').next().unwrap_or(path);
-        let c_str = std::ffi::CString::new(component).unwrap();
+        let c_str = std::ffi::CString::new(component).unwrap_or_default();
         cfstring::shim_cf_string_create_with_cstring(0, c_str.as_ptr(), 0)
     } else {
         0
@@ -139,7 +139,7 @@ pub extern "C" fn shim_nsurl_path_extension(obj: u64, _cmd: u64) -> u64 {
             Some(dot) if dot > 0 => &last[dot + 1..],
             _ => "",
         };
-        let c_str = std::ffi::CString::new(ext).unwrap();
+        let c_str = std::ffi::CString::new(ext).unwrap_or_default();
         cfstring::shim_cf_string_create_with_cstring(0, c_str.as_ptr(), 0)
     } else {
         0
@@ -162,7 +162,7 @@ pub extern "C" fn shim_nsurl_url_by_appending_path_component(
     ) {
         let sep = if base.ends_with('/') { "" } else { "/" };
         let new_url = format!("{}{}{}", base, sep, comp);
-        let c_str = std::ffi::CString::new(new_url).unwrap();
+        let c_str = std::ffi::CString::new(new_url).unwrap_or_default();
         let ns_str = cfstring::shim_cf_string_create_with_cstring(0, c_str.as_ptr(), 0);
         alloc_url(ns_str, url_is_file(obj))
     } else {
@@ -187,7 +187,7 @@ pub extern "C" fn shim_nsurl_scheme(obj: u64, _cmd: u64) -> u64 {
     if let Some(s) = cfstring::extract_cfstring_cstr(str_ptr) {
         if let Some(idx) = s.find("://") {
             let scheme = &s[..idx];
-            let c_str = std::ffi::CString::new(scheme).unwrap();
+            let c_str = std::ffi::CString::new(scheme).unwrap_or_default();
             return cfstring::shim_cf_string_create_with_cstring(0, c_str.as_ptr(), 0);
         }
     }

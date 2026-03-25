@@ -253,8 +253,15 @@ pub extern "C" fn shim_plist_with_data(
     let slice = unsafe { std::slice::from_raw_parts(bytes_ptr, length) };
     let xml = match std::str::from_utf8(slice) {
         Ok(s) => s,
-        Err(_) => {
-            if error_out != 0 { unsafe { *(error_out as *mut u64) = 0; } }
+        Err(e) => {
+            if error_out != 0 {
+                let err = crate::nserror::make_nserror(
+                    "NSCocoaErrorDomain",
+                    3840, // NSPropertyListReadCorruptError
+                );
+                unsafe { *(error_out as *mut u64) = err; }
+                log::debug!("NSPropertyListSerialization: UTF-8 decode error: {}", e);
+            }
             return 0;
         }
     };
@@ -268,7 +275,11 @@ pub extern "C" fn shim_plist_with_data(
 
     let (result, _) = parse_xml_value(body.trim());
     if result == 0 && error_out != 0 {
-        unsafe { *(error_out as *mut u64) = 0; }
+        let err = crate::nserror::make_nserror(
+            "NSCocoaErrorDomain",
+            3840, // NSPropertyListReadCorruptError
+        );
+        unsafe { *(error_out as *mut u64) = err; }
     }
     result
 }

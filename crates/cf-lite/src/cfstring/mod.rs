@@ -45,10 +45,10 @@ pub extern "C" fn shim_cf_string_create_with_cstring(
     let bytes = rust_str.to_bytes();
     let len = bytes.len();
 
-    let owned = CString::new(bytes).unwrap_or_else(|_| CString::new("").unwrap());
+    let owned = CString::new(bytes).unwrap_or_default();
     let owned_ptr = owned.into_raw();
 
-    let obj = unsafe { libc::calloc(1, 32) as u64 };
+    let obj = crate::pal_alloc().calloc(1, 32) as u64;
     if obj == 0 {
         unsafe {
             drop(CString::from_raw(owned_ptr));
@@ -177,7 +177,7 @@ mod tests {
         let result = unsafe { CStr::from_ptr(ptr) };
         assert_eq!(result.to_str().unwrap(), "hello world");
 
-        unsafe { libc::free(obj as *mut libc::c_void) };
+        crate::pal_alloc().free(obj as *mut u8);
     }
 
     #[test]
@@ -196,7 +196,7 @@ mod tests {
         );
         assert_ne!(obj, 0);
         assert_eq!(shim_cf_string_get_length(obj), 0);
-        unsafe { libc::free(obj as *mut libc::c_void) };
+        crate::pal_alloc().free(obj as *mut u8);
     }
 
     #[test]
@@ -215,7 +215,7 @@ mod tests {
         let s = unsafe { CStr::from_ptr(ptr) };
         assert_eq!(s.to_str().unwrap(), "test");
 
-        unsafe { libc::free(obj as *mut libc::c_void) };
+        crate::pal_alloc().free(obj as *mut u8);
     }
 
     fn make_str(s: &str) -> u64 {

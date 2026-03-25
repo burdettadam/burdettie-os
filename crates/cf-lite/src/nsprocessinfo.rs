@@ -13,7 +13,7 @@ static PROCESS_INFO_INSTANCE: OnceLock<u64> = OnceLock::new();
 
 fn get_or_create_instance() -> u64 {
     *PROCESS_INFO_INSTANCE.get_or_init(|| {
-        let obj = unsafe { libc::calloc(1, 8) } as u64;
+        let obj = crate::pal_alloc().calloc(1, 8) as u64;
         if obj != 0 {
             unsafe {
                 *(obj as *mut u64) = crate::nsobj::nsprocessinfo_class_addr();
@@ -75,7 +75,7 @@ pub extern "C" fn shim_nsprocessinfo_arguments(obj: u64, _cmd: u64) -> u64 {
     let nsstr = crate::cfstring::alloc_nsstring_from_cstr(cstr.as_ptr());
 
     // Allocate a one-element NSArray
-    let obj = unsafe { libc::calloc(1, 24) } as u64;
+    let obj = crate::pal_alloc().calloc(1, 24) as u64;
     if obj == 0 {
         return 0;
     }
@@ -87,7 +87,7 @@ pub extern "C" fn shim_nsprocessinfo_arguments(obj: u64, _cmd: u64) -> u64 {
         *((obj as usize + 8) as *mut u64) = 1;
     } // count = 1
 
-    let buf = unsafe { libc::malloc(8) } as u64;
+    let buf = crate::pal_alloc().malloc(8) as u64;
     if buf != 0 {
         unsafe {
             *(buf as *mut u64) = nsstr;
@@ -109,7 +109,7 @@ pub extern "C" fn shim_nsprocessinfo_environment(obj: u64, _cmd: u64) -> u64 {
     }
 
     // Create an empty NSDictionary (count=0)
-    let dict = unsafe { libc::calloc(1, 40) } as u64;
+    let dict = crate::pal_alloc().calloc(1, 40) as u64;
     if dict == 0 {
         return 0;
     }

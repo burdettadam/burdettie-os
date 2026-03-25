@@ -18,7 +18,7 @@ const FLAG_VALID: u64 = 1;
 const FLAG_REPEATS: u64 = 2;
 
 fn alloc_nstimer(interval: f64, block: u64, repeats: bool) -> u64 {
-    let obj = unsafe { libc::calloc(1, NSTIMER_SIZE) } as *mut u64;
+    let obj = crate::pal_alloc().calloc(1, NSTIMER_SIZE) as *mut u64;
     if obj.is_null() {
         return 0;
     }

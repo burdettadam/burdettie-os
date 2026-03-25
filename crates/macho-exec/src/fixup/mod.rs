@@ -54,7 +54,12 @@ pub fn apply_binds(
 ) -> Result<usize, ExecError> {
     let mut count = 0;
 
-    for bind in fixups.binds.iter().chain(fixups.lazy_binds.iter()) {
+    for bind in fixups
+        .binds
+        .iter()
+        .chain(fixups.lazy_binds.iter())
+        .chain(fixups.weak_binds.iter())
+    {
         let seg =
             image
                 .segments

@@ -6,6 +6,23 @@
 
 use std::collections::HashMap;
 
+/// Batch-register shims into a [`ShimTable`].
+///
+/// Each entry is `(symbol_name, address_expr, description)`.
+///
+/// ```ignore
+/// register_shims!(table,
+///     ("_getprogname", shim_getprogname as u64, "getprogname shim"),
+///     ("_setprogname", shim_setprogname as u64, "setprogname shim"),
+/// );
+/// ```
+#[macro_export]
+macro_rules! register_shims {
+    ($table:expr, $( ($name:expr, $addr:expr, $desc:expr) ),* $(,)?) => {
+        $( $table.register($name, $addr, $desc); )*
+    };
+}
+
 /// A single shim entry in the table.
 #[derive(Debug, Clone)]
 pub struct ShimEntry {

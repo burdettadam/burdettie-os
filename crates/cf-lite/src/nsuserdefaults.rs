@@ -17,7 +17,7 @@ static STANDARD_DEFAULTS: OnceLock<u64> = OnceLock::new();
 
 fn get_or_create_singleton() -> u64 {
     *STANDARD_DEFAULTS.get_or_init(|| {
-        let obj = unsafe { libc::calloc(1, 16) } as u64;
+        let obj = crate::pal_alloc().calloc(1, 16) as u64;
         unsafe {
             *(obj as *mut u64) = crate::nsobj::nsuserdefaults_class_addr();
         }
@@ -133,4 +133,43 @@ pub extern "C" fn shim_nsuserdefaults_remove_object(obj: u64, _cmd: u64, key: u6
 /// `-[NSUserDefaults synchronize]` — no-op in our in-memory store.
 pub extern "C" fn shim_nsuserdefaults_synchronize(_obj: u64, _cmd: u64) -> u8 {
     1 // YES — always succeeds
+}
+
+/// `-[NSUserDefaults setInteger:forKey:]`
+pub extern "C" fn shim_nsuserdefaults_set_integer(obj: u64, _cmd: u64, value: i64, key: u64) {
+    let number = crate::nsnumber::make_nsnumber_int(value);
+    shim_nsuserdefaults_set_object(obj, 0, number, key);
+}
+
+/// `-[NSUserDefaults setBool:forKey:]`
+pub extern "C" fn shim_nsuserdefaults_set_bool(obj: u64, _cmd: u64, value: u8, key: u64) {
+    let number = crate::nsnumber::make_nsnumber_bool(value != 0);
+    shim_nsuserdefaults_set_object(obj, 0, number, key);
+}
+
+/// `-[NSUserDefaults setDouble:forKey:]`
+pub extern "C" fn shim_nsuserdefaults_set_double(obj: u64, _cmd: u64, value: f64, key: u64) {
+    let number = crate::nsnumber::make_nsnumber_double(value);
+    shim_nsuserdefaults_set_object(obj, 0, number, key);
+}
+
+/// `-[NSUserDefaults setFloat:forKey:]`
+pub extern "C" fn shim_nsuserdefaults_set_float(obj: u64, _cmd: u64, value: f32, key: u64) {
+    let number = crate::nsnumber::make_nsnumber_double(value as f64);
+    shim_nsuserdefaults_set_object(obj, 0, number, key);
+}
+
+/// `-[NSUserDefaults floatForKey:]`
+pub extern "C" fn shim_nsuserdefaults_float_for_key(obj: u64, _cmd: u64, key: u64) -> f32 {
+    shim_nsuserdefaults_double_for_key(obj, _cmd, key) as f32
+}
+
+/// `-[NSUserDefaults arrayForKey:]`
+pub extern "C" fn shim_nsuserdefaults_array_for_key(obj: u64, _cmd: u64, key: u64) -> u64 {
+    shim_nsuserdefaults_object_for_key(obj, _cmd, key)
+}
+
+/// `-[NSUserDefaults dictionaryForKey:]`
+pub extern "C" fn shim_nsuserdefaults_dictionary_for_key(obj: u64, _cmd: u64, key: u64) -> u64 {
+    shim_nsuserdefaults_object_for_key(obj, _cmd, key)
 }

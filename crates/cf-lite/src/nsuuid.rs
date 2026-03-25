@@ -23,7 +23,7 @@ fn generate_uuid_v4() -> (u64, u64) {
 }
 
 fn alloc_nsuuid(lo: u64, hi: u64) -> u64 {
-    let obj = unsafe { libc::calloc(1, NSUUID_SIZE) } as *mut u64;
+    let obj = crate::pal_alloc().calloc(1, NSUUID_SIZE) as *mut u64;
     if obj.is_null() {
         return 0;
     }

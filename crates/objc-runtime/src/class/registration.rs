@@ -1,8 +1,10 @@
 //! Class registration, category merging, and superclass repair.
 
+use std::collections::HashMap;
+
 use macho_objc::ObjcMetadata;
 
-use super::{ClassInfo, IvarEntry, MethodEntry, ObjcRuntime, PropertyEntry};
+use super::{ClassInfo, IvarEntry, MethodEntry, ObjcRuntime, PropertyEntry, ProtocolInfo};
 
 impl ObjcRuntime {
     /// Register classes from parsed ObjC metadata of a loaded image.
@@ -78,13 +80,14 @@ impl ObjcRuntime {
                 name, mapped_addr, methods.len(), ivars.len(), properties.len(), instance_size,
             );
 
-            let info = ClassInfo {
+            let mut info = ClassInfo {
                 name: name.clone(),
                 mapped_addr,
                 methods,
                 class_methods,
                 ivars,
                 properties,
+                protocol_names: class_ref.protocol_names.clone(),
                 instance_size,
                 is_root,
                 is_meta,
@@ -93,7 +96,10 @@ impl ObjcRuntime {
                 } else {
                     None
                 },
+                method_index: HashMap::new(),
+                class_method_index: HashMap::new(),
             };
+            info.rebuild_indices();
 
             self.classes_by_addr.insert(mapped_addr, name.clone());
             self.classes_by_name.insert(name.clone(), info);
@@ -122,6 +128,9 @@ impl ObjcRuntime {
                         cat.name.as_deref().unwrap_or("?"),
                         cat_class_addr,
                     );
+                    runtime_diagnostics::emit(
+                        runtime_diagnostics::DiagEvent::CategoryOrphan { class_addr: cat_class_addr },
+                    );
                     continue;
                 }
             };
@@ -134,15 +143,6 @@ impl ObjcRuntime {
                         type_encoding: m.type_encoding.clone(),
                     });
                 }
-                log::debug!(
-                    "ObjcRuntime: merged category '{}' into '{}' ({} instance methods)",
-                    cat.name.as_deref().unwrap_or("?"),
-                    target_name,
-                    cat.instance_methods.len(),
-                );
-            }
-
-            if let Some(class_info) = self.classes_by_name.get_mut(&target_name) {
                 for m in &cat.class_methods {
                     class_info.class_methods.push(MethodEntry {
                         selector: m.selector.clone(),
@@ -150,12 +150,14 @@ impl ObjcRuntime {
                         type_encoding: m.type_encoding.clone(),
                     });
                 }
-                if !cat.class_methods.is_empty() {
-                    log::debug!(
-                        "ObjcRuntime: merged category '{}' class methods into '{}' ({} class methods)",
-                        cat.name.as_deref().unwrap_or("?"), target_name, cat.class_methods.len(),
-                    );
-                }
+                class_info.rebuild_indices();
+                log::debug!(
+                    "ObjcRuntime: merged category '{}' into '{}' ({} instance, {} class methods)",
+                    cat.name.as_deref().unwrap_or("?"),
+                    target_name,
+                    cat.instance_methods.len(),
+                    cat.class_methods.len(),
+                );
             }
 
             for m in &cat.instance_methods {
@@ -164,6 +166,63 @@ impl ObjcRuntime {
             for m in &cat.class_methods {
                 self.intern_selector(&m.selector);
             }
+        }
+
+        // Register protocols
+        for proto in &metadata.protocols {
+            let instance_methods: Vec<MethodEntry> = proto
+                .instance_methods
+                .iter()
+                .map(|m| MethodEntry {
+                    selector: m.selector.clone(),
+                    imp: (m.imp_vmaddr as i64 + slide) as u64,
+                    type_encoding: m.type_encoding.clone(),
+                })
+                .collect();
+            let class_methods: Vec<MethodEntry> = proto
+                .class_methods
+                .iter()
+                .map(|m| MethodEntry {
+                    selector: m.selector.clone(),
+                    imp: (m.imp_vmaddr as i64 + slide) as u64,
+                    type_encoding: m.type_encoding.clone(),
+                })
+                .collect();
+            let optional_instance_methods: Vec<MethodEntry> = proto
+                .optional_instance_methods
+                .iter()
+                .map(|m| MethodEntry {
+                    selector: m.selector.clone(),
+                    imp: (m.imp_vmaddr as i64 + slide) as u64,
+                    type_encoding: m.type_encoding.clone(),
+                })
+                .collect();
+            let optional_class_methods: Vec<MethodEntry> = proto
+                .optional_class_methods
+                .iter()
+                .map(|m| MethodEntry {
+                    selector: m.selector.clone(),
+                    imp: (m.imp_vmaddr as i64 + slide) as u64,
+                    type_encoding: m.type_encoding.clone(),
+                })
+                .collect();
+            let properties: Vec<PropertyEntry> = proto
+                .properties
+                .iter()
+                .map(|p| PropertyEntry {
+                    name: p.name.clone(),
+                    attributes: p.attributes.clone(),
+                })
+                .collect();
+            self.register_protocol(ProtocolInfo {
+                name: proto.name.clone(),
+                instance_methods,
+                class_methods,
+                optional_instance_methods,
+                optional_class_methods,
+                properties,
+                adopted_protocols: proto.adopted_protocols.clone(),
+            });
         }
     }
 
@@ -199,6 +258,9 @@ impl ObjcRuntime {
                         cat.name.as_deref().unwrap_or("?"),
                         resolved_cls,
                     );
+                    runtime_diagnostics::emit(
+                        runtime_diagnostics::DiagEvent::CategoryOrphan { class_addr: resolved_cls },
+                    );
                     continue;
                 }
             };
@@ -211,15 +273,6 @@ impl ObjcRuntime {
                         type_encoding: m.type_encoding.clone(),
                     });
                 }
-                log::debug!(
-                    "ObjcRuntime: merged cross-image category '{}' into '{}' ({} instance methods)",
-                    cat.name.as_deref().unwrap_or("?"),
-                    target_name,
-                    cat.instance_methods.len(),
-                );
-            }
-
-            if let Some(class_info) = self.classes_by_name.get_mut(&target_name) {
                 for m in &cat.class_methods {
                     class_info.class_methods.push(MethodEntry {
                         selector: m.selector.clone(),
@@ -227,12 +280,14 @@ impl ObjcRuntime {
                         type_encoding: m.type_encoding.clone(),
                     });
                 }
-                if !cat.class_methods.is_empty() {
-                    log::debug!(
-                        "ObjcRuntime: merged cross-image category '{}' class methods into '{}' ({} class methods)",
-                        cat.name.as_deref().unwrap_or("?"), target_name, cat.class_methods.len(),
-                    );
-                }
+                class_info.rebuild_indices();
+                log::debug!(
+                    "ObjcRuntime: merged cross-image category '{}' into '{}' ({} instance, {} class methods)",
+                    cat.name.as_deref().unwrap_or("?"),
+                    target_name,
+                    cat.instance_methods.len(),
+                    cat.class_methods.len(),
+                );
             }
 
             for m in &cat.instance_methods {
@@ -245,7 +300,7 @@ impl ObjcRuntime {
     }
 
     /// Register a synthetic class created by the runtime (not from parsed metadata).
-    pub fn register_synthetic_class(&mut self, info: ClassInfo) {
+    pub fn register_synthetic_class(&mut self, mut info: ClassInfo) {
         let addr = info.mapped_addr;
         let name = info.name.clone();
         for m in &info.methods {
@@ -254,6 +309,7 @@ impl ObjcRuntime {
         for m in &info.class_methods {
             self.intern_selector(&m.selector);
         }
+        info.rebuild_indices();
         log::debug!(
             "ObjcRuntime: registered synthetic class '{}' at {:#x}, {} methods",
             name,

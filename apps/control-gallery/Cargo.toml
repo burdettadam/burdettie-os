@@ -10,6 +10,7 @@ name = "control-gallery"
 path = "src/main.rs"
 
 [dependencies]
+app-kit-lite          = { workspace = true }
 graphics-core         = { workspace = true }
 window-backend        = { workspace = true }
 window-backend-darwin = { workspace = true }

@@ -16,8 +16,10 @@ use crate::cfstring;
 // ── KVO option flags ───────────────────────────────────────────────
 
 /// KVO option: include the new value in the change dictionary.
+#[allow(dead_code)]
 pub const NSK_VO_OPTION_NEW: u64 = 0x01;
 /// KVO option: include the old value in the change dictionary.
+#[allow(dead_code)]
 pub const NSK_VO_OPTION_OLD: u64 = 0x02;
 /// KVO option: fire an initial notification on registration.
 pub const NSK_VO_OPTION_INITIAL: u64 = 0x04;
@@ -25,6 +27,7 @@ pub const NSK_VO_OPTION_INITIAL: u64 = 0x04;
 // ── KVO change kind ────────────────────────────────────────────────
 
 /// Change kind: a value was set.
+#[allow(dead_code)]
 pub const NSK_VO_CHANGE_SETTING: u64 = 1;
 
 // ── Observer entry ─────────────────────────────────────────────────
@@ -32,6 +35,7 @@ pub const NSK_VO_CHANGE_SETTING: u64 = 1;
 #[derive(Debug, Clone)]
 struct KvoEntry {
     observer: u64,
+    #[allow(dead_code)]
     options: u64,
     context: u64,
 }
@@ -227,6 +231,7 @@ fn dispatch_observation(observer: u64, key_path: u64, object: u64, change: u64, 
 // ── Query helpers (for tests / FFI) ────────────────────────────────
 
 /// Returns the number of observers registered for a given (object, keyPath).
+#[allow(dead_code)]
 pub fn observer_count(obj: u64, key_path: &str) -> usize {
     with_observers(|map| {
         map.get(&(obj, key_path.to_string()))
@@ -235,6 +240,7 @@ pub fn observer_count(obj: u64, key_path: &str) -> usize {
 }
 
 /// Clear all KVO registrations (for test isolation).
+#[allow(dead_code)]
 pub fn clear_all_observers() {
     with_observers(|map| map.clear());
 }

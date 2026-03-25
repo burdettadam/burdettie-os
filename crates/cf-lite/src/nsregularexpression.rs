@@ -37,7 +37,11 @@ pub extern "C" fn shim_regex_with_pattern(
         Some(s) => s.to_string(),
         None => {
             if error_out != 0 {
-                unsafe { *(error_out as *mut u64) = 0; }
+                let err = crate::nserror::make_nserror(
+                    "NSCocoaErrorDomain",
+                    2048, // NSFormattingError
+                );
+                unsafe { *(error_out as *mut u64) = err; }
             }
             return 0;
         }
@@ -60,7 +64,7 @@ pub extern "C" fn shim_regex_with_pattern(
 
     match regex::Regex::new(&regex_pat) {
         Ok(re) => {
-            let obj = unsafe { libc::calloc(1, INSTANCE_SIZE as usize) } as u64;
+            let obj = crate::pal_alloc().calloc(1, INSTANCE_SIZE as usize) as u64;
             unsafe {
                 *(obj as *mut u64) = nsobj::nsregularexpression_class_addr();
                 *((obj + 8) as *mut u64) = pattern;
@@ -69,9 +73,14 @@ pub extern "C" fn shim_regex_with_pattern(
             }
             obj
         }
-        Err(_) => {
+        Err(e) => {
             if error_out != 0 {
-                unsafe { *(error_out as *mut u64) = 0; }
+                let err = crate::nserror::make_nserror(
+                    "NSCocoaErrorDomain",
+                    2048, // NSFormattingError
+                );
+                unsafe { *(error_out as *mut u64) = err; }
+                log::debug!("NSRegularExpression: invalid pattern: {}", e);
             }
             0
         }
@@ -102,13 +111,11 @@ pub extern "C" fn shim_regex_number_of_matches(
     _range_len: u64,
 ) -> u64 {
     if obj == 0 || string == 0 { return 0; }
-    let re = match unsafe { get_regex(obj) } {
-        Some(r) => r,
-        None => return 0,
+    let Some(re) = (unsafe { get_regex(obj) }) else {
+        return 0;
     };
-    let c_str = match cfstring::extract_cfstring_cstr(string) {
-        Some(s) => s,
-        None => return 0,
+    let Some(c_str) = cfstring::extract_cfstring_cstr(string) else {
+        return 0;
     };
     re.find_iter(c_str).count() as u64
 }
@@ -126,13 +133,11 @@ pub extern "C" fn shim_regex_first_match(
     _range_len: u64,
 ) -> u64 {
     if obj == 0 || string == 0 { return 0; }
-    let re = match unsafe { get_regex(obj) } {
-        Some(r) => r,
-        None => return 0,
+    let Some(re) = (unsafe { get_regex(obj) }) else {
+        return 0;
     };
-    let c_str = match cfstring::extract_cfstring_cstr(string) {
-        Some(s) => s,
-        None => return 0,
+    let Some(c_str) = cfstring::extract_cfstring_cstr(string) else {
+        return 0;
     };
     match re.find(c_str) {
         Some(m) => {
@@ -157,17 +162,14 @@ pub extern "C" fn shim_regex_replace(
     template: u64,
 ) -> u64 {
     if obj == 0 || string == 0 || template == 0 { return 0; }
-    let re = match unsafe { get_regex(obj) } {
-        Some(r) => r,
-        None => return 0,
+    let Some(re) = (unsafe { get_regex(obj) }) else {
+        return 0;
     };
-    let input = match cfstring::extract_cfstring_cstr(string) {
-        Some(s) => s,
-        None => return 0,
+    let Some(input) = cfstring::extract_cfstring_cstr(string) else {
+        return 0;
     };
-    let tmpl = match cfstring::extract_cfstring_cstr(template) {
-        Some(s) => s,
-        None => return 0,
+    let Some(tmpl) = cfstring::extract_cfstring_cstr(template) else {
+        return 0;
     };
     let result = re.replace_all(input, tmpl);
     let c_result = std::ffi::CString::new(result.as_ref()).unwrap_or_default();

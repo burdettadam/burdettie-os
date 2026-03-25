@@ -7,6 +7,7 @@ pub(crate) const OBJC_SECTIONS: &[&str] = &[
     "__objc_classlist",
     "__objc_catlist",
     "__objc_protolist",
+    "__objc_protorefs",
     "__objc_selrefs",
     "__objc_classrefs",
     "__objc_methnames",
@@ -56,10 +57,23 @@ pub struct ObjcClassRef {
     pub class_methods: Vec<ObjcMethodInfo>,
     pub ivars: Vec<ObjcIvarInfo>,
     pub properties: Vec<ObjcPropertyInfo>,
+    pub protocol_names: Vec<String>,
     pub instance_size: u32,
     pub ro_flags: u32,
     pub superclass_addr: u64,
     pub metaclass_addr: u64,
+}
+
+/// A parsed ObjC protocol from __objc_protolist.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ObjcProtocolRef {
+    pub name: String,
+    pub instance_methods: Vec<ObjcMethodInfo>,
+    pub class_methods: Vec<ObjcMethodInfo>,
+    pub optional_instance_methods: Vec<ObjcMethodInfo>,
+    pub optional_class_methods: Vec<ObjcMethodInfo>,
+    pub properties: Vec<ObjcPropertyInfo>,
+    pub adopted_protocols: Vec<String>,
 }
 
 /// A reference to an ObjC category found in __objc_catlist.
@@ -78,6 +92,7 @@ pub struct ObjcMetadata {
     pub presence: ObjcPresence,
     pub class_refs: Vec<ObjcClassRef>,
     pub categories: Vec<ObjcCategoryRef>,
+    pub protocols: Vec<ObjcProtocolRef>,
     pub category_count: usize,
     pub protocol_count: usize,
     pub selectors: Vec<String>,

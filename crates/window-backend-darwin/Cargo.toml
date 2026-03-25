@@ -6,7 +6,9 @@ license.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+app-kit-lite   = { workspace = true }
 graphics-core  = { workspace = true }
+log            = { workspace = true }
 window-backend = { workspace = true }
 ui-controls    = { workspace = true }
 ui-view        = { workspace = true }

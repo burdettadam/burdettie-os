@@ -41,7 +41,7 @@ pub extern "C" fn shim_predicate_with_format(
 
     let predicate_fn: Box<dyn Fn(u64) -> bool + Send + Sync> = parse_format(&fmt_str);
 
-    let obj = unsafe { libc::calloc(1, INSTANCE_SIZE as usize) } as u64;
+    let obj = crate::pal_alloc().calloc(1, INSTANCE_SIZE as usize) as u64;
     unsafe {
         *(obj as *mut u64) = nsobj::nspredicate_class_addr();
         *((obj + 8) as *mut u64) = format;
@@ -55,7 +55,7 @@ pub extern "C" fn shim_predicate_with_value(_cls: u64, _cmd: u64, value: u8) -> 
     let val = value != 0;
     let predicate_fn: Box<dyn Fn(u64) -> bool + Send + Sync> = Box::new(move |_| val);
 
-    let obj = unsafe { libc::calloc(1, INSTANCE_SIZE as usize) } as u64;
+    let obj = crate::pal_alloc().calloc(1, INSTANCE_SIZE as usize) as u64;
     unsafe {
         *(obj as *mut u64) = nsobj::nspredicate_class_addr();
         *((obj + 16) as *mut u64) = Box::into_raw(Box::new(predicate_fn)) as u64;
@@ -70,7 +70,7 @@ pub extern "C" fn shim_predicate_evaluate(obj: u64, _cmd: u64, target: u64) -> u
     if obj == 0 { return 0; }
     let fn_ptr = unsafe { *((obj + 16) as *const u64) };
     if fn_ptr == 0 { return 0; }
-    let predicate: &Box<dyn Fn(u64) -> bool + Send + Sync> =
+    let predicate: &(dyn Fn(u64) -> bool + Send + Sync) =
         unsafe { &*(fn_ptr as *const Box<dyn Fn(u64) -> bool + Send + Sync>) };
     u8::from(predicate(target))
 }

@@ -31,7 +31,7 @@ pub const QUEUE_INSTANCE_SIZE: u32 = 32;
 
 /// `+[NSOperation alloc]`
 pub extern "C" fn shim_nsoperation_alloc(_cls: u64, _cmd: u64) -> u64 {
-    let obj = unsafe { libc::calloc(1, OP_INSTANCE_SIZE as usize) } as u64;
+    let obj = crate::pal_alloc().calloc(1, OP_INSTANCE_SIZE as usize) as u64;
     if obj != 0 {
         unsafe { *(obj as *mut u64) = nsobj::nsoperation_class_addr(); }
     }
@@ -77,7 +77,7 @@ pub extern "C" fn shim_nsoperation_start(obj: u64, _cmd: u64) {
 
 /// `+[NSBlockOperation blockOperationWithBlock:]`
 pub extern "C" fn shim_block_op_with_block(_cls: u64, _cmd: u64, block: u64) -> u64 {
-    let obj = unsafe { libc::calloc(1, BLOCK_OP_INSTANCE_SIZE as usize) } as u64;
+    let obj = crate::pal_alloc().calloc(1, BLOCK_OP_INSTANCE_SIZE as usize) as u64;
     if obj == 0 { return 0; }
     unsafe {
         *(obj as *mut u64) = nsobj::nsblockoperation_class_addr();
@@ -107,7 +107,7 @@ pub extern "C" fn shim_block_op_start(obj: u64, _cmd: u64) {
 
 /// `+[NSOperationQueue alloc]`
 pub extern "C" fn shim_queue_alloc(_cls: u64, _cmd: u64) -> u64 {
-    let obj = unsafe { libc::calloc(1, QUEUE_INSTANCE_SIZE as usize) } as u64;
+    let obj = crate::pal_alloc().calloc(1, QUEUE_INSTANCE_SIZE as usize) as u64;
     if obj != 0 {
         unsafe {
             *(obj as *mut u64) = nsobj::nsoperationqueue_class_addr();

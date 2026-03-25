@@ -277,21 +277,8 @@ mod export_trie_tests {
 
 #[cfg(test)]
 mod fixture_fixup_tests {
+    use macho_fixtures::read_fixture;
     use macho_parse::{extract_exports, extract_fixups, parse, FixupModel};
-    use std::path::PathBuf;
-
-    fn fixtures_dir() -> PathBuf {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .join("fixtures")
-    }
-
-    fn read_fixture(name: &str) -> Option<Vec<u8>> {
-        std::fs::read(fixtures_dir().join(name)).ok()
-    }
 
     // ── simple_cli uses chained fixups ──────────────────────────────
 

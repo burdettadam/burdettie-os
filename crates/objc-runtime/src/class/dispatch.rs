@@ -9,11 +9,7 @@ impl ObjcRuntime {
     /// Returns the IMP address if found.
     pub fn lookup_method(&self, class_name: &str, selector: &str) -> Option<u64> {
         let class = self.classes_by_name.get(class_name)?;
-        class
-            .methods
-            .iter()
-            .find(|m| m.selector == selector)
-            .map(|m| m.imp)
+        class.find_method(selector).map(|m| m.imp)
     }
 
     /// Look up a method by isa address and selector name.
@@ -35,12 +31,12 @@ impl ObjcRuntime {
                 break;
             }
             if let Some(class) = self.get_class_by_addr(addr) {
-                let methods = if is_meta {
-                    &class.class_methods
+                let entry = if is_meta {
+                    class.find_class_method(selector)
                 } else {
-                    &class.methods
+                    class.find_method(selector)
                 };
-                if let Some(entry) = methods.iter().find(|m| m.selector == selector) {
+                if let Some(entry) = entry {
                     return Some(entry);
                 }
                 current_addr = class.superclass_addr;

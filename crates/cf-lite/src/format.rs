@@ -162,8 +162,7 @@ pub(crate) fn expand_format(fmt: &str, args: &[u64]) -> String {
                     arg_idx += 1;
                 }
                 Some('g') | Some('G') => {
-                    let ch = *chars.peek().unwrap();
-                    chars.next();
+                    let ch = chars.next().expect("already peeked");
                     if arg_idx < args.len() {
                         let f: f64 = f64::from_bits(args[arg_idx]);
                         let s = if ch == 'G' {
@@ -181,8 +180,7 @@ pub(crate) fn expand_format(fmt: &str, args: &[u64]) -> String {
                     arg_idx += 1;
                 }
                 Some('e') | Some('E') => {
-                    let ch = *chars.peek().unwrap();
-                    chars.next();
+                    let ch = chars.next().expect("already peeked");
                     if arg_idx < args.len() {
                         let f: f64 = f64::from_bits(args[arg_idx]);
                         if ch == 'E' {
