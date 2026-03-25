@@ -245,8 +245,24 @@ pub(super) extern "C" fn shim_sched_yield() -> libc::c_int {
     unsafe { libc::sched_yield() }
 }
 
-// ── macOS-specific ──────────────────────────────────────────────────
+// ── macOS-specific (with portable fallbacks) ────────────────────────
 
+/// `int pthread_main_np(void)` — returns 1 if current thread is main.
+///
+/// On macOS: delegates to `libc::pthread_main_np()`.
+/// On Linux: compares `gettid() == getpid()`.
 pub(super) extern "C" fn shim_pthread_main_np() -> libc::c_int {
-    unsafe { libc::pthread_main_np() }
+    #[cfg(target_os = "macos")]
+    {
+        unsafe { libc::pthread_main_np() }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        // On Linux, the main thread has tid == pid.
+        unsafe {
+            let tid = libc::syscall(libc::SYS_gettid) as libc::pid_t;
+            let pid = libc::getpid();
+            if tid == pid { 1 } else { 0 }
+        }
+    }
 }

@@ -27,6 +27,8 @@ pub struct ShimSet {
     pub objc: bool,
     /// Install Foundation/CF-lite shims (NSLog, NSObject class, CFConstantString)
     pub foundation: bool,
+    /// Install random number shims (arc4random, arc4random_buf, arc4random_uniform)
+    pub random: bool,
 }
 
 impl Default for ShimSet {
@@ -41,6 +43,7 @@ impl Default for ShimSet {
             ptrauth: true,
             objc: true,
             foundation: true,
+            random: true,
         }
     }
 }

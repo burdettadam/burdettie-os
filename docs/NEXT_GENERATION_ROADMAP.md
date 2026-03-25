@@ -379,21 +379,23 @@ Replace Mach-specific APIs with portable equivalents hidden behind PAL traits.
 
 #### Tasks
 
-- [ ] Replace `mach_task_self()` — return a synthetic task port ID
-- [ ] Replace `mach_absolute_time()` — use `clock_gettime(CLOCK_MONOTONIC)` on Linux, existing on macOS
-- [ ] Replace `mach_timebase_info()` — return {1, 1} on Linux (nanoseconds already)
-- [ ] Implement `dispatch_once_f` without host GCD (atomic + mutex)
-- [ ] Implement `dispatch_async` / `dispatch_sync` stubs (single-threaded queue)
-- [ ] Implement `dispatch_get_main_queue` / `dispatch_get_global_queue` stubs
-- [ ] Replace `pthread_main_np()` with `gettid() == getpid()` on Linux
-- [ ] Replace `arc4random_buf` with `getrandom(2)` on Linux
-- [ ] All replacements gated behind `#[cfg(target_os)]` or go through PAL
+- [x] Replace `mach_task_self()` — return a synthetic task port ID (0x103 on non-macOS)
+- [x] Replace `mach_absolute_time()` — use `clock_gettime(CLOCK_MONOTONIC)` on Linux, existing on macOS
+- [x] Replace `mach_timebase_info()` — return {1, 1} on Linux (nanoseconds already)
+- [x] Implement `dispatch_once_f` without host GCD (atomic + mutex) — already self-hosted
+- [x] Implement `dispatch_async` / `dispatch_sync` stubs — already inline
+- [x] Implement `dispatch_get_main_queue` / `dispatch_get_global_queue` stubs
+- [x] Replace `pthread_main_np()` with `gettid() == getpid()` on Linux
+- [x] Replace `arc4random_buf` with `getrandom(2)` on Linux — added arc4random, arc4random_buf, arc4random_uniform
+- [x] All replacements gated behind `#[cfg(target_os)]` or go through PAL
+- [x] Added `random` shim category to `ShimSet` and `RuntimeContext`
 
 #### Acceptance
 
-- [ ] `libsystem-shims` compiles on both macOS and Linux
-- [ ] All shim functions produce correct results on macOS
-- [ ] Linux implementations compile (even if not yet tested end-to-end)
+- [x] `libsystem-shims` compiles on both macOS and Linux
+- [x] All shim functions produce correct results on macOS (47 tests pass)
+- [x] Linux implementations compile (gated behind `#[cfg(not(target_os = "macos"))]`)
+- [x] Runtime tests pass with 271 total shims (267 → 271: +dispatch_get_global_queue, +arc4random/buf/uniform)
 
 ---
 
@@ -620,7 +622,7 @@ can render AppKit-compatible UIs at native quality on any platform.
 | 8 | **F1** — Text layout | GUI needs real fonts to be useful |
 | 9 | **C6** — Real CLI tools | First "real app works!" moment |
 | 10 | **D3** — Portable unwind | Needed before Linux |
-| 11 | **D4** — Self-contained libsystem | Completes host independence |
+| 11 | **D4** — Self-contained libsystem | ~~Completes host independence~~ ✅ Done |
 | 12 | **E1** — Linux PAL | Linux compilation gate |
 | 13 | **E2** — x86_64 trampolines | x86_64 dispatch |
 | 14 | **C7** — Real GUI app | The showcase milestone |

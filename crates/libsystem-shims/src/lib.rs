@@ -29,6 +29,7 @@ pub(crate) mod mach;
 pub mod process;
 pub(crate) mod ptrauth;
 pub(crate) mod pthread;
+pub(crate) mod random;
 pub mod table;
 pub(crate) mod tls;
 
@@ -38,6 +39,7 @@ pub use mach::MachShims;
 pub use process::ProcessShims;
 pub use ptrauth::PtrauthShims;
 pub use pthread::PthreadShims;
+pub use random::RandomShims;
 pub use table::{ShimEntry, ShimTable};
 pub use tls::TlsShims;
 
@@ -51,6 +53,7 @@ pub fn install_default_shims(table: &mut ShimTable, config: &ShimConfig) {
     MachShims::install(table);
     PtrauthShims::install(table);
     LifecycleShims::install(table);
+    RandomShims::install(table);
 }
 
 /// Configuration for shim behavior.

@@ -31,6 +31,13 @@ const DISPATCH_ONCE_GATE: i64 = 1;
 /// inline dispatch_sync/dispatch_async shims.
 static DISPATCH_MAIN_Q: [u8; 8] = [0; 8];
 
+/// Fake dispatch_queue_t for global queues.
+///
+/// `dispatch_get_global_queue(identifier, flags)` returns a global concurrent
+/// queue. Since our dispatch is inline (single-threaded), we return a stable
+/// non-null address distinct from the main queue.
+static DISPATCH_GLOBAL_Q: [u8; 8] = [0; 8];
+
 impl DispatchShims {
     /// Register dispatch shims in the table.
     pub fn install(table: &mut ShimTable) {
@@ -59,8 +66,13 @@ impl DispatchShims {
             DISPATCH_MAIN_Q.as_ptr() as u64,
             "_dispatch_main_q data symbol",
         );
+        table.register(
+            "_dispatch_get_global_queue",
+            shim_dispatch_get_global_queue as u64,
+            "dispatch_get_global_queue (inline)",
+        );
 
-        log::debug!("DispatchShims: registered 5 dispatch shims");
+        log::debug!("DispatchShims: registered 6 dispatch shims");
     }
 }
 
@@ -183,6 +195,18 @@ extern "C" fn shim_dispatch_sync(_queue: *const u8, block: *const u8) {
     }
 }
 
+/// `dispatch_queue_t dispatch_get_global_queue(long identifier, unsigned long flags)`
+///
+/// Returns a pointer to the global concurrent queue. Since our dispatch is
+/// inline (single-threaded), the queue identity doesn't matter — we just
+/// return a stable non-null address.
+extern "C" fn shim_dispatch_get_global_queue(
+    _identifier: i64,
+    _flags: u64,
+) -> *const u8 {
+    DISPATCH_GLOBAL_Q.as_ptr()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -196,7 +220,8 @@ mod tests {
         assert!(table.resolve("_dispatch_async").is_some());
         assert!(table.resolve("_dispatch_sync").is_some());
         assert!(table.resolve("__dispatch_main_q").is_some());
-        assert_eq!(table.len(), 5);
+        assert!(table.resolve("_dispatch_get_global_queue").is_some());
+        assert_eq!(table.len(), 6);
     }
 
     #[test]

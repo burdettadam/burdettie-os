@@ -131,12 +131,14 @@ impl StubResolver {
             | "dispatch_once" | "dispatch_once_f"
             | "dispatch_sync" | "dispatch_async"
             | "dispatch_queue_create" | "dispatch_get_main_queue"
+            | "dispatch_get_global_queue"
             | "_dispatch_main_q"
             // Math
             | "floor" | "ceil" | "round" | "sqrt" | "pow"
             | "log" | "sin" | "cos" | "fabs"
-            // Random
-            | "arc4random" | "arc4random_uniform"
+            // Random — now shimmed via RandomShims, but keep safe-list
+            // entries for binaries that link directly.
+            | "arc4random" | "arc4random_buf" | "arc4random_uniform"
             // Mach
             | "mach_task_self" | "mach_absolute_time"
             // System info

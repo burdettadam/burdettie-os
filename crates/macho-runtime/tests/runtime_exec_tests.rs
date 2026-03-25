@@ -185,11 +185,11 @@ fn runtime_dylib_chain_images_counted() {
 fn runtime_shim_count_with_all_categories() {
     let Some(result) = common::run_fixture("return42/return42") else { return };
 
-    // Shim count with all categories (updated after D1: self-hosted NSConstant* + EHTYPE).
+    // Shim count with all categories (updated after D4: +dispatch_get_global_queue, +arc4random/buf/uniform).
     #[cfg(target_os = "macos")]
-    assert_eq!(result.shims_installed, 267, "expected 267 shims installed");
+    assert_eq!(result.shims_installed, 271, "expected 271 shims installed");
     #[cfg(not(target_os = "macos"))]
-    assert_eq!(result.shims_installed, 267, "expected 267 shims installed");
+    assert_eq!(result.shims_installed, 271, "expected 271 shims installed");
 }
 
 // ── Tracing tests ──────────────────────────────────────────────────

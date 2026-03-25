@@ -43,6 +43,9 @@ impl RuntimeContext {
         if shim_set.foundation {
             cf_lite::FoundationShims::install(&mut table);
         }
+        if shim_set.random {
+            libsystem_shims::RandomShims::install(&mut table);
+        }
 
         log::info!("RuntimeContext: installed {} shims", table.len());
 
