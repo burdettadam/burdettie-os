@@ -528,7 +528,7 @@ PAL + translation (if x86_64) running on Linux.
 **Goal**: Replace the software renderer with a real graphics pipeline that
 can render AppKit-compatible UIs at native quality on any platform.
 
-### Phase F1 — Text Layout Engine
+### Phase F1 — Text Layout Engine ✅
 
 #### Tasks
 
@@ -536,7 +536,7 @@ can render AppKit-compatible UIs at native quality on any platform.
 - [x] Implement `CTFont` equivalent: font loading, glyph lookup, metrics (ascent, descent, leading) — `FontFace`, `FontMetrics`, `FontManager`
 - [x] Implement `CTLine` equivalent: single-line text layout with glyph positions — `layout_single_line()`
 - [x] Implement `CTFrame` equivalent: multi-line text layout with line breaking — `layout_wrapped()` with `WrapMode::Word` / `Character`
-- [ ] Implement attributed string rendering (bold, italic, color, size per range)
+- [x] Implement attributed string rendering (bold, italic, color, size per range)
 - [x] Replace 5×7 bitmap font with system font rendering in `SoftwareRenderer` — TrueType rendering with alpha blending, bitmap fallback preserved
 - [x] Unicode support: NFC normalization, combining characters, zero-width char filtering, emoji (DejaVu monochrome), missing glyph placeholder boxes
 - [x] Font fallback chain (primary → system → last resort) — `FontManager::get()` falls back to system font

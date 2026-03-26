@@ -239,9 +239,59 @@ impl Renderer for SoftwareRenderer<'_> {
             }
         }
     }
-}
 
-// ── Text rendering implementations ─────────────────────────────────
+    fn draw_attributed_text(
+        &mut self,
+        layout: &super::text_layout::AttributedLayout<'_>,
+        origin: Point,
+        default_color: Color,
+    ) {
+        let sw = self.surface.width() as i32;
+        let sh = self.surface.height() as i32;
+
+        for g in &layout.glyphs {
+            let color = g.color.unwrap_or(default_color);
+            let cr = (color.r.clamp(0.0, 1.0) * 255.0) as u32;
+            let cg = (color.g.clamp(0.0, 1.0) * 255.0) as u32;
+            let cb = (color.b.clamp(0.0, 1.0) * 255.0) as u32;
+            let ca = (color.a.clamp(0.0, 1.0) * 255.0) as u32;
+
+            if g.missing {
+                let placeholder_w = (g.size * 0.6) as i32;
+                let placeholder_h = (g.y * 0.9) as i32;
+                let px = (origin.x + g.x) as i32;
+                let py = (origin.y + g.y - g.y * 0.85) as i32;
+                self.draw_placeholder_box(px, py, placeholder_w, placeholder_h, color);
+                continue;
+            }
+
+            let face = layout.fonts[g.font_index];
+            let ab_font = face.inner();
+            let glyph = g.glyph_id.with_scale_and_position(
+                g.size as f32,
+                ab_glyph::point(
+                    (origin.x + g.x) as f32,
+                    (origin.y + g.y) as f32,
+                ),
+            );
+
+            if let Some(outlined) = ab_font.outline_glyph(glyph) {
+                let bounds = outlined.px_bounds();
+                outlined.draw(|rx, ry, coverage| {
+                    self.blend_pixel(
+                        bounds.min.x as i32 + rx as i32,
+                        bounds.min.y as i32 + ry as i32,
+                        coverage, cr, cg, cb, ca, sw, sh,
+                    );
+                });
+            }
+        }
+    }
+
+    fn supports_attributed_text(&self) -> bool {
+        self.font_manager.is_some()
+    }
+}
 
 impl SoftwareRenderer<'_> {
     /// Legacy 5×7 bitmap font rendering (used when no FontManager is set).
@@ -280,7 +330,7 @@ impl SoftwareRenderer<'_> {
         fm: &FontManager,
     ) {
         let normalized = normalize_nfc(text);
-        let face = fm.get(&font.name);
+        let face = fm.resolve_font(font);
         let ab_font = face.inner();
         let size = font.size as f32;
         let scaled = ab_font.as_scaled(size);

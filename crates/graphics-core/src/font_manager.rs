@@ -13,6 +13,10 @@ const DEJAVU_SANS: &[u8] = include_bytes!("../fonts/DejaVuSans.ttf");
 const DEJAVU_SANS_BOLD: &[u8] = include_bytes!("../fonts/DejaVuSans-Bold.ttf");
 /// Embedded DejaVu Sans Mono.
 const DEJAVU_SANS_MONO: &[u8] = include_bytes!("../fonts/DejaVuSansMono.ttf");
+/// Embedded DejaVu Sans Oblique (italic).
+const DEJAVU_SANS_OBLIQUE: &[u8] = include_bytes!("../fonts/DejaVuSans-Oblique.ttf");
+/// Embedded DejaVu Sans Bold Oblique (bold italic).
+const DEJAVU_SANS_BOLD_OBLIQUE: &[u8] = include_bytes!("../fonts/DejaVuSans-BoldOblique.ttf");
 
 /// A loaded font face backed by `ab_glyph::FontVec`.
 pub struct FontFace {
@@ -135,6 +139,12 @@ impl FontManager {
         if let Some(face) = FontFace::from_bytes("Monospace", DEJAVU_SANS_MONO) {
             mgr.fonts.push(face);
         }
+        if let Some(face) = FontFace::from_bytes("System-Italic", DEJAVU_SANS_OBLIQUE) {
+            mgr.fonts.push(face);
+        }
+        if let Some(face) = FontFace::from_bytes("System-BoldItalic", DEJAVU_SANS_BOLD_OBLIQUE) {
+            mgr.fonts.push(face);
+        }
 
         mgr
     }
@@ -171,6 +181,29 @@ impl FontManager {
     /// The default monospace font.
     pub fn monospace(&self) -> &FontFace {
         self.get("Monospace")
+    }
+
+    /// The default italic font.
+    pub fn italic(&self) -> &FontFace {
+        self.get("System-Italic")
+    }
+
+    /// The default bold italic font.
+    pub fn bold_italic(&self) -> &FontFace {
+        self.get("System-BoldItalic")
+    }
+
+    /// Resolve a `Font` descriptor to a concrete `FontFace`, respecting bold/italic flags.
+    pub fn resolve_font(&self, font: &super::Font) -> &FontFace {
+        if font.bold && font.italic {
+            self.get("System-BoldItalic")
+        } else if font.bold {
+            self.get("System-Bold")
+        } else if font.italic {
+            self.get("System-Italic")
+        } else {
+            self.get(&font.name)
+        }
     }
 }
 
