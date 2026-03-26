@@ -63,6 +63,9 @@ pub(crate) mod nspredicate;
 pub(crate) mod nsprocessinfo;
 pub(crate) mod nspropertylistserialization;
 pub(crate) mod nsregularexpression;
+pub(crate) mod nsresponder;
+pub(crate) mod nsrunloop;
+pub(crate) mod nsscreen;
 pub(crate) mod nsset;
 pub(crate) mod nssortdescriptor;
 pub(crate) mod nsthread;
@@ -72,6 +75,15 @@ pub(crate) mod nsurl;
 pub(crate) mod nsuserdefaults;
 pub(crate) mod nsuuid;
 pub(crate) mod nsvalue;
+pub(crate) mod nsview;
+pub(crate) mod nswindow;
+pub(crate) mod nsworkspace;
+// AppKit stubs
+pub(crate) mod nsapplication;
+pub(crate) mod nscolor;
+pub(crate) mod nsevent;
+pub(crate) mod nsfont;
+pub(crate) mod nsimage;
 
 pub use foundation::FoundationShims;
 

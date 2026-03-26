@@ -34,7 +34,7 @@
 - **D4** — Self-Contained libsystem ✅ (portable mach/pthread/dispatch/arc4random shims)
 - **C3** — Struct Return & Extended ABI ✅ (x8 save/restore, stret/fp2ret aliases, CG types, NSValue)
 - **C4** — CoreFoundation Toll-Free Bridging ✅ (CFRetain/Release/Equal/Hash, CFArray/Dict/Data/URL/Bundle)
-
+- **C5** — AppKit Bootstrap ✅ (NSApplication, NSRunLoop, NSResponder, NSWindow, NSView, NSEvent, NSScreen, NSWorkspace, NSColor, NSFont, NSImage)
 ### What Works Today
 
 - Full Mach-O load → execute pipeline (parse, resolve, map, fixup, security, constructors, entry)
@@ -200,35 +200,35 @@ Foundation counterparts.
 
 ---
 
-### Phase C5 — AppKit Bootstrap (NSApplication Launch)
+### Phase C5 — AppKit Bootstrap (NSApplication Launch) ✅
 
 The minimum viable path to launching a real `.app` bundle. Get `[NSApplication
 sharedApplication]` → `[NSApp run]` to not crash.
 
 #### Tasks
 
-- [ ] Implement `NSApplication` class in cf-lite: `sharedApplication`, `run`, `terminate:`, `mainMenu`, `setMainMenu:`
-- [ ] Implement `NSRunLoop` class: `currentRunLoop`, `mainRunLoop`, `runUntilDate:`, `addTimer:forMode:`
-- [ ] Implement `NSRunLoop` mode constants: `NSDefaultRunLoopMode`, `NSRunLoopCommonModes`
-- [ ] Implement `NSWorkspace` stub: `sharedWorkspace`
-- [ ] Implement `NSScreen` stub: `mainScreen`, `frame`, `visibleFrame`
-- [ ] Implement `NSEvent` class: `type`, `locationInWindow`, `modifierFlags`, `characters`, `keyCode`
-- [ ] Implement `NSResponder` chain: `nextResponder`, `keyDown:`, `mouseDown:`, etc.
-- [ ] Implement `NSWindow` stub: `initWithContentRect:styleMask:backing:defer:`, `makeKeyAndOrderFront:`, `contentView`
-- [ ] Implement `NSView` stub: `initWithFrame:`, `addSubview:`, `setNeedsDisplay:`, `frame`, `bounds`
-- [ ] Implement `NSColor` stub: `whiteColor`, `blackColor`, `redColor`, etc.
-- [ ] Implement `NSFont` stub: `systemFontOfSize:`, `fontName`, `pointSize`
-- [ ] Implement `NSImage` stub: `imageNamed:` (return nil gracefully)
-- [ ] Implement `NSBundle` dynamic loading: `+[NSBundle loadNibNamed:owner:]` stub (no-op, log warning)
-- [ ] Create `appkit_bootstrap` fixture — minimal NSApplication launch + quit after 1 runloop iteration
-- [ ] Write unit tests
+- [x] Implement `NSApplication` class in cf-lite: `sharedApplication`, `run`, `terminate:`, `mainMenu`, `setMainMenu:`
+- [x] Implement `NSRunLoop` class: `currentRunLoop`, `mainRunLoop`, `runUntilDate:`, `addTimer:forMode:`
+- [x] Implement `NSRunLoop` mode constants: `NSDefaultRunLoopMode`, `NSRunLoopCommonModes`
+- [x] Implement `NSWorkspace` stub: `sharedWorkspace`
+- [x] Implement `NSScreen` stub: `mainScreen`, `frame`, `visibleFrame`
+- [x] Implement `NSEvent` class: `type`, `locationInWindow`, `modifierFlags`, `characters`, `keyCode`
+- [x] Implement `NSResponder` chain: `nextResponder`, `keyDown:`, `mouseDown:`, etc.
+- [x] Implement `NSWindow` stub: `initWithContentRect:styleMask:backing:defer:`, `makeKeyAndOrderFront:`, `contentView`
+- [x] Implement `NSView` stub: `initWithFrame:`, `addSubview:`, `setNeedsDisplay:`, `frame`, `bounds`
+- [x] Implement `NSColor` stub: `whiteColor`, `blackColor`, `redColor`, etc.
+- [x] Implement `NSFont` stub: `systemFontOfSize:`, `fontName`, `pointSize`
+- [x] Implement `NSImage` stub: `imageNamed:` (return nil gracefully)
+- [x] Implement `NSBundle` dynamic loading: `+[NSBundle loadNibNamed:owner:]` stub (no-op, log warning)
+- [x] Create `appkit_bootstrap` fixture — minimal NSApplication launch + quit after 1 runloop iteration
+- [x] Write unit tests
 
 #### Acceptance
 
-- [ ] `[NSApplication sharedApplication]` returns a valid object
-- [ ] `[NSApp run]` enters and exits the run loop without crashing
-- [ ] App delegate receives `applicationDidFinishLaunching:`
-- [ ] Bootstrap fixture exits cleanly with exit code 0
+- [x] `[NSApplication sharedApplication]` returns a valid object
+- [x] `[NSApp run]` enters and exits the run loop without crashing
+- [x] App delegate receives `applicationDidFinishLaunching:`
+- [x] Bootstrap fixture exits cleanly with exit code 0
 
 ---
 
@@ -634,7 +634,7 @@ can render AppKit-compatible UIs at native quality on any platform.
 | 4 | **D1** — Kill host fallback | ✅ Done |
 | 5 | **D2** — Pure Rust crypto | ✅ Done |
 | 6 | **C4** — CF bridging | ✅ Done |
-| 7 | **C5** — AppKit bootstrap | The big milestone: NSApp launches |
+| 7 | **C5** — AppKit bootstrap | ✅ Done |
 | 8 | **F1** — Text layout | GUI needs real fonts to be useful |
 | 9 | **C6** — Real CLI tools | First "real app works!" moment |
 | 10 | **D3** — Portable unwind | ✅ Done |

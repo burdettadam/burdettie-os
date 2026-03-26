@@ -49,11 +49,11 @@ fn context_installs_all_shims() {
     let shim_set = ShimSet::default();
     let ctx = RuntimeContext::new(&config, &shim_set);
 
-    // Shim count (updated after C4: +29 CF toll-free bridging shims)
+    // Shim count (updated after C5: +25 AppKit shims)
     #[cfg(target_os = "macos")]
-    assert_eq!(ctx.shim_table.len(), 308);
+    assert_eq!(ctx.shim_table.len(), 333);
     #[cfg(not(target_os = "macos"))]
-    assert_eq!(ctx.shim_table.len(), 308);
+    assert_eq!(ctx.shim_table.len(), 333);
 }
 
 #[test]

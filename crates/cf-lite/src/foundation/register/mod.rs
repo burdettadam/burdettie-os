@@ -15,6 +15,7 @@ mod threading;
 mod invocation;
 mod text;
 mod advanced_collections;
+mod appkit;
 
 pub use string::*;
 pub use object::*;
@@ -28,6 +29,7 @@ pub use threading::*;
 pub use invocation::*;
 pub use text::*;
 pub use advanced_collections::*;
+pub use appkit::*;
 
 use objc_runtime::MethodEntry;
 

@@ -50,6 +50,19 @@ pub(super) fn install_class_symbols(table: &mut ShimTable) {
     register_class!(table, "NSJSONSerialization", nsobj::nsjsonserialization_class_addr(), nsobj::nsjsonserialization_metaclass_addr());
     register_class!(table, "NSPropertyListSerialization", nsobj::nspropertylistserialization_class_addr(), nsobj::nspropertylistserialization_metaclass_addr());
 
+    // ── AppKit class data symbols (Phase C5) ────────────────────────
+    register_class!(table, "NSResponder", nsobj::nsresponder_class_addr(), nsobj::nsresponder_metaclass_addr());
+    register_class!(table, "NSApplication", nsobj::nsapplication_class_addr(), nsobj::nsapplication_metaclass_addr());
+    register_class!(table, "NSRunLoop", nsobj::nsrunloop_class_addr(), nsobj::nsrunloop_metaclass_addr());
+    register_class!(table, "NSWindow", nsobj::nswindow_class_addr(), nsobj::nswindow_metaclass_addr());
+    register_class!(table, "NSView", nsobj::nsview_class_addr(), nsobj::nsview_metaclass_addr());
+    register_class!(table, "NSEvent", nsobj::nsevent_class_addr(), nsobj::nsevent_metaclass_addr());
+    register_class!(table, "NSWorkspace", nsobj::nsworkspace_class_addr(), nsobj::nsworkspace_metaclass_addr());
+    register_class!(table, "NSScreen", nsobj::nsscreen_class_addr(), nsobj::nsscreen_metaclass_addr());
+    register_class!(table, "NSColor", nsobj::nscolor_class_addr(), nsobj::nscolor_metaclass_addr());
+    register_class!(table, "NSFont", nsobj::nsfont_class_addr(), nsobj::nsfont_metaclass_addr());
+    register_class!(table, "NSImage", nsobj::nsimage_class_addr(), nsobj::nsimage_metaclass_addr());
+
     // ── Synthetic _OBJC_EHTYPE_$_NSException ──────────────────────────
     // On macOS, @catch(NSException *) uses the personality function
     // __objc_personality_v0, which requires an objc_ehtype_t struct whose

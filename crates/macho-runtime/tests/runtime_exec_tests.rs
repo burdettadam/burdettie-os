@@ -185,11 +185,11 @@ fn runtime_dylib_chain_images_counted() {
 fn runtime_shim_count_with_all_categories() {
     let Some(result) = common::run_fixture("return42/return42") else { return };
 
-    // Shim count with all categories (updated after C4: +29 CF toll-free bridging shims).
+    // Shim count with all categories (updated after C5: +25 AppKit shims).
     #[cfg(target_os = "macos")]
-    assert_eq!(result.shims_installed, 308, "expected 308 shims installed");
+    assert_eq!(result.shims_installed, 333, "expected 333 shims installed");
     #[cfg(not(target_os = "macos"))]
-    assert_eq!(result.shims_installed, 308, "expected 308 shims installed");
+    assert_eq!(result.shims_installed, 333, "expected 333 shims installed");
 }
 
 // ── Tracing tests ──────────────────────────────────────────────────
@@ -266,7 +266,7 @@ fn runtime_struct_return_shims_resolved() {
     assert_eq!(result.exit_code, 0);
     // The fixture uses objc_msgSend (and implicitly objc_msgSend_stret for CGRect).
     // If it exits 0, both regular and struct-returning dispatch worked.
-    assert!(result.shims_installed >= 308, "should have all shims");
+    assert!(result.shims_installed >= 333, "should have all shims");
 }
 
 // ── CF toll-free bridging tests (Phase C4) ────────────────────────
@@ -281,5 +281,5 @@ fn runtime_cf_bridging_exit_zero() {
 fn runtime_cf_bridging_shims_resolved() {
     let Some(result) = common::run_fixture("cf_bridging/app") else { return };
     assert_eq!(result.exit_code, 0);
-    assert!(result.shims_installed >= 308, "should have all CF shims");
+    assert!(result.shims_installed >= 333, "should have all CF shims");
 }

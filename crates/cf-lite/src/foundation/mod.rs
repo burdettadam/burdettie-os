@@ -233,6 +233,52 @@ impl FoundationShims {
         register::register_nspropertylistserialization_class(rt);
     }
 
+    // ── AppKit classes (Phase C5) ─────────────────────────────────
+
+    pub fn register_nsresponder_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsresponder_class(rt);
+    }
+
+    pub fn register_nsapplication_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsapplication_class(rt);
+    }
+
+    pub fn register_nsrunloop_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsrunloop_class(rt);
+    }
+
+    pub fn register_nswindow_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nswindow_class(rt);
+    }
+
+    pub fn register_nsview_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsview_class(rt);
+    }
+
+    pub fn register_nsevent_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsevent_class(rt);
+    }
+
+    pub fn register_nsworkspace_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsworkspace_class(rt);
+    }
+
+    pub fn register_nsscreen_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsscreen_class(rt);
+    }
+
+    pub fn register_nscolor_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nscolor_class(rt);
+    }
+
+    pub fn register_nsfont_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsfont_class(rt);
+    }
+
+    pub fn register_nsimage_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsimage_class(rt);
+    }
+
     /// Register tagged pointer class table entries.
     ///
     /// On arm64, tagged pointers encode a 3-bit class index in bits 60-62.
@@ -375,11 +421,11 @@ mod tests {
             .is_some());
         assert!(table.resolve("_OBJC_CLASS_$_NSInvocation").is_some());
         assert!(table.resolve("_OBJC_METACLASS_$_NSInvocation").is_some());
-        // 104 base shims + 1 EHTYPE + 3 NSConstant{Array,Dictionary,IntegerNumber} on macOS + 29 CF toll-free bridging + 4 CF data symbols
+        // 141 base + 22 AppKit class symbols + 3 AppKit data symbols = 166 on macOS
         #[cfg(target_os = "macos")]
-        assert_eq!(table.len(), 141);
+        assert_eq!(table.len(), 166);
         #[cfg(not(target_os = "macos"))]
-        assert_eq!(table.len(), 137);
+        assert_eq!(table.len(), 162);
     }
 
     #[test]

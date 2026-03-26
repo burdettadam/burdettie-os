@@ -4,6 +4,7 @@ use libsystem_shims::register_shims;
 use libsystem_shims::table::ShimTable;
 
 use crate::{cf_core, cfstring, nslog, nsobj, nsvalue};
+use crate::{nsapplication, nsrunloop};
 use super::cfconstant_string::cfconstant_string_class_addr;
 
 /// Register core CF/Foundation shims and the first group of class data symbols.
@@ -193,5 +194,12 @@ pub(super) fn install_core_shims(table: &mut ShimTable) {
     register_shims!(table,
         ("_kCFBooleanTrue", cf_core::kcf_boolean_true_addr(), "kCFBooleanTrue data symbol"),
         ("_kCFBooleanFalse", cf_core::kcf_boolean_false_addr(), "kCFBooleanFalse data symbol"),
+    );
+
+    // NSApp global variable + NSRunLoop mode constants (Phase C5)
+    register_shims!(table,
+        ("_NSApp", nsapplication::nsapp_global_addr(), "NSApp global variable (data symbol)"),
+        ("_NSDefaultRunLoopMode", nsrunloop::nsdefault_run_loop_mode_addr(), "NSDefaultRunLoopMode constant string"),
+        ("_NSRunLoopCommonModes", nsrunloop::nsrun_loop_common_modes_addr(), "NSRunLoopCommonModes constant string"),
     );
 }

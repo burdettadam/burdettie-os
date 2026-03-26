@@ -369,3 +369,82 @@ define_class_pair!(child NSPROPERTYLISTSERIALIZATION_CLASS_DATA, NSPROPERTYLISTS
     meta_addr: nspropertylistserialization_metaclass_addr,
     parent_class: nsobject_class_addr,
     parent_meta: nsobject_metaclass_addr);
+
+// ── AppKit class pairs (Phase C5) ──────────────────────────────────
+
+define_class_pair!(child NSRESPONDER_CLASS_DATA, NSRESPONDER_METACLASS_DATA, NSRESPONDER_INIT,
+    ensure: ensure_nsresponder_init,
+    class_addr: nsresponder_class_addr,
+    meta_addr: nsresponder_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSAPPLICATION_CLASS_DATA, NSAPPLICATION_METACLASS_DATA, NSAPPLICATION_INIT,
+    ensure: ensure_nsapplication_init,
+    class_addr: nsapplication_class_addr,
+    meta_addr: nsapplication_metaclass_addr,
+    parent_class: nsresponder_class_addr,
+    parent_meta: nsresponder_metaclass_addr);
+
+define_class_pair!(child NSRUNLOOP_CLASS_DATA, NSRUNLOOP_METACLASS_DATA, NSRUNLOOP_INIT,
+    ensure: ensure_nsrunloop_init,
+    class_addr: nsrunloop_class_addr,
+    meta_addr: nsrunloop_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSWINDOW_CLASS_DATA, NSWINDOW_METACLASS_DATA, NSWINDOW_INIT,
+    ensure: ensure_nswindow_init,
+    class_addr: nswindow_class_addr,
+    meta_addr: nswindow_metaclass_addr,
+    parent_class: nsresponder_class_addr,
+    parent_meta: nsresponder_metaclass_addr);
+
+define_class_pair!(child NSVIEW_CLASS_DATA, NSVIEW_METACLASS_DATA, NSVIEW_INIT,
+    ensure: ensure_nsview_init,
+    class_addr: nsview_class_addr,
+    meta_addr: nsview_metaclass_addr,
+    parent_class: nsresponder_class_addr,
+    parent_meta: nsresponder_metaclass_addr);
+
+define_class_pair!(child NSEVENT_CLASS_DATA, NSEVENT_METACLASS_DATA, NSEVENT_INIT,
+    ensure: ensure_nsevent_init,
+    class_addr: nsevent_class_addr,
+    meta_addr: nsevent_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSWORKSPACE_CLASS_DATA, NSWORKSPACE_METACLASS_DATA, NSWORKSPACE_INIT,
+    ensure: ensure_nsworkspace_init,
+    class_addr: nsworkspace_class_addr,
+    meta_addr: nsworkspace_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSSCREEN_CLASS_DATA, NSSCREEN_METACLASS_DATA, NSSCREEN_INIT,
+    ensure: ensure_nsscreen_init,
+    class_addr: nsscreen_class_addr,
+    meta_addr: nsscreen_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSCOLOR_CLASS_DATA, NSCOLOR_METACLASS_DATA, NSCOLOR_INIT,
+    ensure: ensure_nscolor_init,
+    class_addr: nscolor_class_addr,
+    meta_addr: nscolor_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSFONT_CLASS_DATA, NSFONT_METACLASS_DATA, NSFONT_INIT,
+    ensure: ensure_nsfont_init,
+    class_addr: nsfont_class_addr,
+    meta_addr: nsfont_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSIMAGE_CLASS_DATA, NSIMAGE_METACLASS_DATA, NSIMAGE_INIT,
+    ensure: ensure_nsimage_init,
+    class_addr: nsimage_class_addr,
+    meta_addr: nsimage_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);

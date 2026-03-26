@@ -67,9 +67,22 @@ pub(crate) fn register_foundation_classes(
     cf_lite::FoundationShims::register_nsoperationqueue_class(objc_rt);
     cf_lite::FoundationShims::register_nsjsonserialization_class(objc_rt);
     cf_lite::FoundationShims::register_nspropertylistserialization_class(objc_rt);
+
+    // AppKit classes (Phase C5)
+    cf_lite::FoundationShims::register_nsresponder_class(objc_rt);
+    cf_lite::FoundationShims::register_nsapplication_class(objc_rt);
+    cf_lite::FoundationShims::register_nsrunloop_class(objc_rt);
+    cf_lite::FoundationShims::register_nswindow_class(objc_rt);
+    cf_lite::FoundationShims::register_nsview_class(objc_rt);
+    cf_lite::FoundationShims::register_nsevent_class(objc_rt);
+    cf_lite::FoundationShims::register_nsworkspace_class(objc_rt);
+    cf_lite::FoundationShims::register_nsscreen_class(objc_rt);
+    cf_lite::FoundationShims::register_nscolor_class(objc_rt);
+    cf_lite::FoundationShims::register_nsfont_class(objc_rt);
+    cf_lite::FoundationShims::register_nsimage_class(objc_rt);
     tracer.record(
         EventKind::ClassRegistration,
-        "54 synthetic Foundation classes registered",
+        "65 synthetic Foundation/AppKit classes registered",
     );
 
     // Register host ISA aliases so constant objects
