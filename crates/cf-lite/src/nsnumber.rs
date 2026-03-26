@@ -1,10 +1,16 @@
 //! NSNumber shim: boxed numeric values (int, double, bool).
 //!
-//! Object layout (heap-allocated):
+//! Object layout (heap-allocated, our dynamic objects):
 //!
 //!   offset  0: isa       (u64 — pointer to NSNumber class)
 //!   offset  8: type_tag  (u64 — 0=int64, 1=double, 2=bool)
 //!   offset 16: value     (u64 — raw bits: i64 as u64, f64 as u64, bool as 0/1)
+//!
+//! NSConstantIntegerNumber layout (compiler-embedded):
+//!
+//!   offset  0: isa       (u64 — pointer to NSConstantIntegerNumber class)
+//!   offset  8: type_desc (u64 — pointer to type descriptor in __TEXT)
+//!   offset 16: value     (u64 — the integer value)
 //!
 //! Total: 24 bytes per number object.
 
@@ -16,6 +22,39 @@ const TAG_BOOL: u64 = 2;
 
 const TYPE_TAG_OFF: usize = 8;
 const VALUE_OFF: usize = 16;
+
+/// Check if this is an NSConstantIntegerNumber (compiler-embedded literal).
+fn is_constant_integer(obj: u64) -> bool {
+    let isa = unsafe { std::ptr::read_unaligned(obj as *const u64) };
+    isa == crate::nsobj::nsconstantintegernumber_class_addr()
+}
+
+/// Read the tag and raw value from an NSNumber or NSConstantIntegerNumber.
+/// For constant numbers, always returns (TAG_INT, value).
+fn read_number(obj: u64) -> (u64, u64) {
+    let tag = unsafe { std::ptr::read_unaligned((obj as usize + TYPE_TAG_OFF) as *const u64) };
+    let raw = unsafe { std::ptr::read_unaligned((obj as usize + VALUE_OFF) as *const u64) };
+    if is_constant_integer(obj) || tag > TAG_BOOL {
+        // Constant integer: offset 8 is a type descriptor pointer, not our tag.
+        // Treat the value at offset 16 as a direct integer.
+        (TAG_INT, raw)
+    } else {
+        (tag, raw)
+    }
+}
+
+/// Public accessor for cross-module use (e.g., NSJSONSerialization).
+pub fn read_number_pub(obj: u64) -> (u64, u64) {
+    read_number(obj)
+}
+
+/// Extract an integer value from a tagged pointer NSNumber (tag index 2).
+/// On arm64, tagged NSNumber layout: bit 63 set, bits 60-62 = 2,
+/// value encoded in the lower bits.
+pub fn tagged_int_value(ptr: u64) -> i64 {
+    // Tagged pointer: bits 0..59 contain the payload
+    ((ptr << 4) as i64) >> 4
+}
 
 /// Allocate and initialize an NSNumber with the given tag and raw value bits.
 pub fn alloc_nsnumber(tag: u64, raw_value: u64) -> u64 {
@@ -120,12 +159,10 @@ pub extern "C" fn shim_nsnumber_int_value(obj: u64, _cmd: u64) -> i32 {
     if obj == 0 {
         return 0;
     }
-    let tag = unsafe { *((obj as usize + TYPE_TAG_OFF) as *const u64) };
-    let raw = unsafe { *((obj as usize + VALUE_OFF) as *const u64) };
+    let (tag, raw) = read_number(obj);
     match tag {
-        TAG_INT => raw as i64 as i32,
+        TAG_INT | TAG_BOOL => raw as i64 as i32,
         TAG_DOUBLE => f64::from_bits(raw) as i32,
-        TAG_BOOL => raw as i32,
         _ => 0,
     }
 }
@@ -135,12 +172,10 @@ pub extern "C" fn shim_nsnumber_double_value(obj: u64, _cmd: u64) -> f64 {
     if obj == 0 {
         return 0.0;
     }
-    let tag = unsafe { *((obj as usize + TYPE_TAG_OFF) as *const u64) };
-    let raw = unsafe { *((obj as usize + VALUE_OFF) as *const u64) };
+    let (tag, raw) = read_number(obj);
     match tag {
-        TAG_INT => raw as i64 as f64,
+        TAG_INT | TAG_BOOL => raw as i64 as f64,
         TAG_DOUBLE => f64::from_bits(raw),
-        TAG_BOOL => raw as f64,
         _ => 0.0,
     }
 }
@@ -150,30 +185,10 @@ pub extern "C" fn shim_nsnumber_bool_value(obj: u64, _cmd: u64) -> u8 {
     if obj == 0 {
         return 0;
     }
-    let tag = unsafe { *((obj as usize + TYPE_TAG_OFF) as *const u64) };
-    let raw = unsafe { *((obj as usize + VALUE_OFF) as *const u64) };
+    let (tag, raw) = read_number(obj);
     match tag {
-        TAG_INT => {
-            if raw as i64 != 0 {
-                1
-            } else {
-                0
-            }
-        }
-        TAG_DOUBLE => {
-            if f64::from_bits(raw) != 0.0 {
-                1
-            } else {
-                0
-            }
-        }
-        TAG_BOOL => {
-            if raw != 0 {
-                1
-            } else {
-                0
-            }
-        }
+        TAG_INT | TAG_BOOL => if raw as i64 != 0 { 1 } else { 0 },
+        TAG_DOUBLE => if f64::from_bits(raw) != 0.0 { 1 } else { 0 },
         _ => 0,
     }
 }
@@ -183,12 +198,10 @@ pub extern "C" fn shim_nsnumber_integer_value(obj: u64, _cmd: u64) -> i64 {
     if obj == 0 {
         return 0;
     }
-    let tag = unsafe { *((obj as usize + TYPE_TAG_OFF) as *const u64) };
-    let raw = unsafe { *((obj as usize + VALUE_OFF) as *const u64) };
+    let (tag, raw) = read_number(obj);
     match tag {
-        TAG_INT => raw as i64,
+        TAG_INT | TAG_BOOL => raw as i64,
         TAG_DOUBLE => f64::from_bits(raw) as i64,
-        TAG_BOOL => raw as i64,
         _ => 0,
     }
 }
@@ -213,12 +226,10 @@ pub extern "C" fn shim_nsnumber_unsigned_integer_value(obj: u64, _cmd: u64) -> u
     if obj == 0 {
         return 0;
     }
-    let tag = unsafe { *((obj as usize + TYPE_TAG_OFF) as *const u64) };
-    let raw = unsafe { *((obj as usize + VALUE_OFF) as *const u64) };
+    let (tag, raw) = read_number(obj);
     match tag {
-        TAG_INT => raw,
+        TAG_INT | TAG_BOOL => raw,
         TAG_DOUBLE => f64::from_bits(raw) as u64,
-        TAG_BOOL => raw,
         _ => 0,
     }
 }

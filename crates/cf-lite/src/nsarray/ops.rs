@@ -192,3 +192,33 @@ pub extern "C" fn shim_nsarray_subarray_with_range(
     }
     make_nsarray(&items)
 }
+
+/// `-[NSArray filteredArrayUsingPredicate:]`
+///
+/// Calls the predicate's stored closure (offset 16 in our NSPredicate layout)
+/// on each element and collects those that pass.
+pub extern "C" fn shim_nsarray_filtered_using_predicate(
+    obj: u64, _cmd: u64, predicate: u64,
+) -> u64 {
+    if obj == 0 || predicate == 0 { return make_nsarray(&[]); }
+
+    let count = shim_nsarray_count(obj, 0) as usize;
+    let elems = unsafe { *((obj as usize + NSARRAY_ELEMS_OFF) as *const u64) };
+    if count == 0 || elems == 0 { return make_nsarray(&[]); }
+
+    // Our NSPredicate stores a closure at offset 16
+    let fn_ptr = unsafe { *((predicate + 16) as *const u64) };
+    if fn_ptr == 0 { return make_nsarray(&[]); }
+
+    let predicate_fn: &(dyn Fn(u64) -> bool + Send + Sync) =
+        unsafe { &*(fn_ptr as *const Box<dyn Fn(u64) -> bool + Send + Sync>) };
+
+    let mut results = Vec::new();
+    for i in 0..count {
+        let elem = unsafe { *((elems as usize + i * 8) as *const u64) };
+        if predicate_fn(elem) {
+            results.push(elem);
+        }
+    }
+    make_nsarray(&results)
+}

@@ -21,6 +21,11 @@ pub fn register_nsarray_class(rt: &mut objc_runtime::ObjcRuntime) {
                 "@@:Q",
             ),
             me(
+                "objectAtIndexedSubscript:",
+                nsarray::shim_nsarray_object_at_index as u64,
+                "@@:Q",
+            ),
+            me(
                 "firstObject",
                 nsarray::shim_nsarray_first_object as u64,
                 "@@:",
@@ -75,6 +80,11 @@ pub fn register_nsarray_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nsarray::ops::shim_nsarray_subarray_with_range as u64,
                 "@@:{_NSRange=QQ}",
             ),
+            me(
+                "filteredArrayUsingPredicate:",
+                nsarray::ops::shim_nsarray_filtered_using_predicate as u64,
+                "@@:@",
+            ),
         ],
         class_methods: vec![me(
             "arrayWithObjects:count:",
@@ -107,6 +117,11 @@ pub fn register_nsmutablearray_class(rt: &mut objc_runtime::ObjcRuntime) {
             me("count", nsarray::shim_nsarray_count as u64, "Q@:"),
             me(
                 "objectAtIndex:",
+                nsarray::shim_nsarray_object_at_index as u64,
+                "@@:Q",
+            ),
+            me(
+                "objectAtIndexedSubscript:",
                 nsarray::shim_nsarray_object_at_index as u64,
                 "@@:Q",
             ),

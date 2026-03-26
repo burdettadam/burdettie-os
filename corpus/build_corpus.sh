@@ -28,6 +28,11 @@ PROGRAMS=(
     runtime_info
     todo_manager
     text_analyzer
+    json_query
+    plist_converter
+    regex_search
+    event_bus
+    predicate_filter
 )
 
 BUILT=0

@@ -58,12 +58,19 @@ fn json_value_to_foundation(val: &serde_json::Value) -> u64 {
 
 // ── Foundation → JSON ──────────────────────────────────────────────
 
+/// Check whether an address looks like a valid heap/stack pointer.
+fn is_valid_ptr(addr: u64) -> bool {
+    addr > 0x1000 && addr & (1u64 << 63) == 0
+}
+
 fn foundation_to_json_value(obj: u64) -> serde_json::Value {
-    if obj == 0 {
+    if !is_valid_ptr(obj) {
         return serde_json::Value::Null;
     }
 
-    let isa = unsafe { *(obj as *const u64) };
+    // Safety: all reads use read_unaligned since object memory may come from
+    // the loaded binary's mapped pages and is not guaranteed 8-byte aligned.
+    let isa = unsafe { std::ptr::read_unaligned(obj as *const u64) };
 
     // NSNull
     if isa == nsobj::nsnull_class_addr() {
@@ -80,20 +87,17 @@ fn foundation_to_json_value(obj: u64) -> serde_json::Value {
         }
     }
 
-    // NSNumber
-    if isa == nsobj::nsnumber_class_addr() {
-        let type_tag = unsafe { *((obj + 8) as *const u64) };
-        return match type_tag {
+    // NSNumber / NSConstantIntegerNumber
+    if isa == nsobj::nsnumber_class_addr() || isa == nsobj::nsconstantintegernumber_class_addr() {
+        let (tag, raw) = nsnumber::read_number_pub(obj);
+        return match tag {
             2 => { // TAG_BOOL
-                let val = unsafe { *((obj + 16) as *const u64) };
-                serde_json::Value::Bool(val != 0)
+                serde_json::Value::Bool(raw != 0)
             }
             0 => { // TAG_INT
-                let val = unsafe { *((obj + 16) as *const i64) };
-                serde_json::Value::Number(serde_json::Number::from(val))
+                serde_json::Value::Number(serde_json::Number::from(raw as i64))
             }
             1 => { // TAG_DOUBLE
-                let raw = unsafe { *((obj + 16) as *const u64) };
                 let val = f64::from_bits(raw);
                 serde_json::Number::from_f64(val)
                     .map(serde_json::Value::Number)
@@ -105,25 +109,35 @@ fn foundation_to_json_value(obj: u64) -> serde_json::Value {
 
     // NSArray
     if isa == nsobj::nsarray_class_addr() || isa == nsobj::nsmutablearray_class_addr() {
-        let count = unsafe { *((obj + 8) as *const u64) } as usize;
-        let items_ptr = unsafe { *((obj + 16) as *const u64) };
-        let mut arr = Vec::with_capacity(count);
+        let count = unsafe { std::ptr::read_unaligned((obj + 8) as *const u64) } as usize;
+        let items_ptr = unsafe { std::ptr::read_unaligned((obj + 16) as *const u64) };
+        if !is_valid_ptr(items_ptr) || count > 100_000 {
+            return serde_json::Value::Array(Vec::new());
+        }
+        let mut arr = Vec::with_capacity(count.min(10_000));
         for i in 0..count {
-            let item = unsafe { *((items_ptr as *const u64).add(i)) };
+            let item = unsafe { std::ptr::read_unaligned((items_ptr as *const u64).add(i)) };
             arr.push(foundation_to_json_value(item));
         }
         return serde_json::Value::Array(arr);
     }
 
-    // NSDictionary
-    if isa == nsobj::nsdictionary_class_addr() || isa == nsobj::nsmutabledictionary_class_addr() {
-        let count = unsafe { *((obj + 8) as *const u64) } as usize;
-        let keys_ptr = unsafe { *((obj + 16) as *const u64) };
-        let vals_ptr = unsafe { *((obj + 24) as *const u64) };
-        let mut map = serde_json::Map::with_capacity(count);
+    // NSDictionary / NSConstantDictionary
+    if isa == nsobj::nsdictionary_class_addr()
+        || isa == nsobj::nsmutabledictionary_class_addr()
+        || isa == nsobj::nsconstantdictionary_class_addr()
+    {
+        // Use layout-aware helpers that handle both dynamic and constant dicts
+        let count = nsdictionary::helpers_pub::dict_count_pub(obj) as usize;
+        let keys_ptr = nsdictionary::helpers_pub::dict_keys_pub(obj);
+        let vals_ptr = nsdictionary::helpers_pub::dict_vals_pub(obj);
+        if !is_valid_ptr(keys_ptr) || !is_valid_ptr(vals_ptr) || count > 100_000 {
+            return serde_json::Value::Object(serde_json::Map::new());
+        }
+        let mut map = serde_json::Map::with_capacity(count.min(10_000));
         for i in 0..count {
-            let key = unsafe { *((keys_ptr as *const u64).add(i)) };
-            let val = unsafe { *((vals_ptr as *const u64).add(i)) };
+            let key = unsafe { std::ptr::read_unaligned((keys_ptr as *const u64).add(i)) };
+            let val = unsafe { std::ptr::read_unaligned((vals_ptr as *const u64).add(i)) };
             let key_str = cfstring::extract_cfstring_cstr(key)
                 .unwrap_or("<non-string key>")
                 .to_string();

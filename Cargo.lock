@@ -1102,6 +1102,7 @@ dependencies = [
  "objc-runtime",
  "platform-core",
  "platform-darwin-host",
+ "runtime-diagnostics",
  "serde",
  "serde_json",
  "thiserror 2.0.18",

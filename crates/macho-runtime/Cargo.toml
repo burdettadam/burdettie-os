@@ -27,6 +27,8 @@ thiserror      = { workspace = true }
 [dev-dependencies]
 macho-fixtures = { workspace = true }
 objc-runtime   = { workspace = true }
+runtime-diagnostics = { workspace = true }
+cf-lite        = { workspace = true }
 env_logger     = { workspace = true }
 
 [lints]

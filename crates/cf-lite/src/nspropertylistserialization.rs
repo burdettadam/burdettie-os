@@ -19,6 +19,19 @@ use crate::nsdictionary;
 use crate::nsnumber;
 use crate::nsobj;
 
+/// Check if ISA matches a dictionary class (dynamic or constant).
+fn is_dict_isa(isa: u64) -> bool {
+    isa == nsobj::nsdictionary_class_addr()
+        || isa == nsobj::nsmutabledictionary_class_addr()
+        || isa == nsobj::nsconstantdictionary_class_addr()
+}
+
+/// Check if ISA matches a number class (dynamic or constant).
+fn is_number_isa(isa: u64) -> bool {
+    isa == nsobj::nsnumber_class_addr()
+        || isa == nsobj::nsconstantintegernumber_class_addr()
+}
+
 /// `NSPropertyListXMLFormat_v1_0 = 100`
 const _PLIST_XML_FORMAT: u64 = 100;
 
@@ -42,17 +55,16 @@ fn foundation_to_xml(obj: u64, indent: usize) -> String {
         return format!("{pad}<string>{escaped}</string>");
     }
 
-    // NSNumber
-    if isa == nsobj::nsnumber_class_addr() {
-        let tag = unsafe { *((obj + 8) as *const u64) };
-        let raw = unsafe { *((obj + 16) as *const u64) };
+    // NSNumber (including NSConstantIntegerNumber)
+    if is_number_isa(isa) {
+        let (tag, raw) = nsnumber::read_number_pub(obj);
         return match tag {
             2 => { // bool
                 if raw != 0 { format!("{pad}<true/>") } else { format!("{pad}<false/>") }
             }
             0 => format!("{pad}<integer>{}</integer>", raw as i64), // int
             1 => format!("{pad}<real>{}</real>", f64::from_bits(raw)), // double
-            _ => format!("{pad}<integer>0</integer>"),
+            _ => format!("{pad}<integer>{}</integer>", raw as i64),
         };
     }
 
@@ -69,11 +81,11 @@ fn foundation_to_xml(obj: u64, indent: usize) -> String {
         return lines.join("\n");
     }
 
-    // NSDictionary
-    if isa == nsobj::nsdictionary_class_addr() || isa == nsobj::nsmutabledictionary_class_addr() {
-        let count = unsafe { *((obj + 8) as *const u64) } as usize;
-        let keys_ptr = unsafe { *((obj + 16) as *const u64) };
-        let vals_ptr = unsafe { *((obj + 24) as *const u64) };
+    // NSDictionary (including NSConstantDictionary)
+    if is_dict_isa(isa) {
+        let count = nsdictionary::helpers_pub::dict_count_pub(obj) as usize;
+        let keys_ptr = nsdictionary::helpers_pub::dict_keys_pub(obj);
+        let vals_ptr = nsdictionary::helpers_pub::dict_vals_pub(obj);
         let mut lines = vec![format!("{pad}<dict>")];
         let inner_pad = "  ".repeat(indent + 1);
         for i in 0..count {
@@ -241,10 +253,15 @@ pub extern "C" fn shim_plist_with_data(
     _cmd: u64,
     data: u64,
     _options: u64,
-    _format: u64,
+    format_out: u64,
     error_out: u64,
 ) -> u64 {
     if data == 0 { return 0; }
+
+    // Write format=XML (100) if caller provided a format pointer
+    if format_out != 0 {
+        unsafe { *(format_out as *mut u64) = 100; }
+    }
 
     let length = unsafe { *((data + 8) as *const u64) } as usize;
     let bytes_ptr = unsafe { *((data + 16) as *const u64) } as *const u8;
@@ -290,10 +307,9 @@ pub extern "C" fn shim_plist_is_valid(_cls: u64, _cmd: u64, plist: u64, _format:
     let isa = unsafe { *(plist as *const u64) };
     if isa == nsobj::nsarray_class_addr()
         || isa == nsobj::nsmutablearray_class_addr()
-        || isa == nsobj::nsdictionary_class_addr()
-        || isa == nsobj::nsmutabledictionary_class_addr()
+        || is_dict_isa(isa)
         || isa == nsobj::nsstring_class_addr()
-        || isa == nsobj::nsnumber_class_addr()
+        || is_number_isa(isa)
         || isa == nsobj::nsdata_class_addr()
     {
         1

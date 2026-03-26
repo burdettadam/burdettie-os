@@ -75,6 +75,11 @@ pub fn register_nsstring_proper_class(rt: &mut objc_runtime::ObjcRuntime) {
                 "@@:*",
             ),
             me(
+                "initWithData:encoding:",
+                cfstring::shim_nsstring_init_with_data_encoding as u64,
+                "@@:@Q",
+            ),
+            me(
                 "isEqualToString:",
                 cfstring::shim_nsstring_is_equal_to_string as u64,
                 "B@:@",

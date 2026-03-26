@@ -165,6 +165,13 @@ define_class_pair!(child NSNOTIFICATIONCENTER_CLASS_DATA, NSNOTIFICATIONCENTER_M
     parent_class: nsobject_class_addr,
     parent_meta: nsobject_metaclass_addr);
 
+define_class_pair!(child NSNOTIFICATION_CLASS_DATA, NSNOTIFICATION_METACLASS_DATA, NSNOTIFICATION_INIT,
+    ensure: ensure_nsnotification_init,
+    class_addr: nsnotification_class_addr,
+    meta_addr: nsnotification_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
 define_class_pair!(child NSVALUE_CLASS_DATA, NSVALUE_METACLASS_DATA, NSVALUE_INIT,
     ensure: ensure_nsvalue_init,
     class_addr: nsvalue_class_addr,
@@ -446,5 +453,30 @@ define_class_pair!(child NSIMAGE_CLASS_DATA, NSIMAGE_METACLASS_DATA, NSIMAGE_INI
     ensure: ensure_nsimage_init,
     class_addr: nsimage_class_addr,
     meta_addr: nsimage_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+// ── NSConstant* classes (compiler-embedded ObjC literals) ──────
+
+define_class_pair!(child NSCONSTANTDICTIONARY_CLASS_DATA, NSCONSTANTDICTIONARY_METACLASS_DATA, NSCONSTANTDICTIONARY_INIT,
+    ensure: ensure_nsconstantdictionary_init,
+    class_addr: nsconstantdictionary_class_addr,
+    meta_addr: nsconstantdictionary_metaclass_addr,
+    parent_class: nsdictionary_class_addr,
+    parent_meta: nsdictionary_metaclass_addr);
+
+define_class_pair!(child NSCONSTANTINTEGERNUMBER_CLASS_DATA, NSCONSTANTINTEGERNUMBER_METACLASS_DATA, NSCONSTANTINTEGERNUMBER_INIT,
+    ensure: ensure_nsconstantintegernumber_init,
+    class_addr: nsconstantintegernumber_class_addr,
+    meta_addr: nsconstantintegernumber_metaclass_addr,
+    parent_class: nsnumber_class_addr,
+    parent_meta: nsnumber_metaclass_addr);
+
+// ── NSTextCheckingResult (regex match results) ─────────────────
+
+define_class_pair!(child NSTEXTCHECKINGRESULT_CLASS_DATA, NSTEXTCHECKINGRESULT_METACLASS_DATA, NSTEXTCHECKINGRESULT_INIT,
+    ensure: ensure_nstextcheckingresult_init,
+    class_addr: nstextcheckingresult_class_addr,
+    meta_addr: nstextcheckingresult_metaclass_addr,
     parent_class: nsobject_class_addr,
     parent_meta: nsobject_metaclass_addr);

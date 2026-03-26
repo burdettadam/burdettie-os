@@ -97,8 +97,12 @@ pub fn register_nsnotificationcenter_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nsnotificationcenter::shim_nsnotificationcenter_post_notification_name_object as u64, "v@:@@"),
             me("postNotificationName:object:userInfo:",
                 nsnotificationcenter::shim_nsnotificationcenter_post_notification_name_object_userinfo as u64, "v@:@@@"),
+            me("postNotification:",
+                nsnotificationcenter::shim_nsnotificationcenter_post_notification as u64, "v@:@"),
             me("addObserver:selector:name:object:",
                 nsnotificationcenter::shim_nsnotificationcenter_add_observer as u64,               "v@:@:@@"),
+            me("addObserverForName:object:queue:usingBlock:",
+                nsnotificationcenter::shim_nsnotificationcenter_add_observer_for_name as u64,      "@@:@@@@?"),
             me("removeObserver:",
                 nsnotificationcenter::shim_nsnotificationcenter_remove_observer as u64,            "v@:@"),
             me("removeObserver:name:object:",
@@ -121,6 +125,39 @@ pub fn register_nsnotificationcenter_class(rt: &mut objc_runtime::ObjcRuntime) {
     rt.register_metaclass_addr(metaclass_addr, "NSNotificationCenter");
 }
 
+/// Register `NSNotification` with name/object/userInfo accessors.
+pub fn register_nsnotification_class(rt: &mut objc_runtime::ObjcRuntime) {
+    let class_addr = nsobj::nsnotification_class_addr();
+    let metaclass_addr = nsobj::nsnotification_metaclass_addr();
+
+    let info = ClassInfo {
+        name: "NSNotification".to_string(),
+        mapped_addr: class_addr,
+        methods: vec![
+            me("name", nsnotificationcenter::shim_nsnotification_name as u64, "@@:"),
+            me("object", nsnotificationcenter::shim_nsnotification_object as u64, "@@:"),
+            me("userInfo", nsnotificationcenter::shim_nsnotification_userinfo as u64, "@@:"),
+        ],
+        class_methods: vec![
+            me("notificationWithName:object:userInfo:",
+                nsnotificationcenter::shim_nsnotification_with_name_object_userinfo as u64, "@@:@@@"),
+            me("notificationWithName:object:",
+                nsnotificationcenter::shim_nsnotification_with_name_object as u64, "@@:@@"),
+        ],
+        ivars: vec![],
+        properties: vec![],
+        protocol_names: Vec::new(),
+        instance_size: 32,
+        is_root: false,
+        is_meta: false,
+        superclass_addr: Some(nsobj::nsobject_class_addr()),
+        method_index: HashMap::new(),
+        class_method_index: HashMap::new(),
+    };
+    rt.register_synthetic_class(info);
+    rt.register_metaclass_addr(metaclass_addr, "NSNotification");
+}
+
 /// Register `NSRegularExpression`.
 pub fn register_nsregularexpression_class(rt: &mut objc_runtime::ObjcRuntime) {
     let class_addr = nsobj::nsregularexpression_class_addr();
@@ -134,6 +171,8 @@ pub fn register_nsregularexpression_class(rt: &mut objc_runtime::ObjcRuntime) {
             me("options", nsregularexpression::shim_regex_options as u64, "Q@:"),
             me("numberOfMatchesInString:options:range:", nsregularexpression::shim_regex_number_of_matches as u64, "Q@:@Q{_NSRange=QQ}"),
             me("firstMatchInString:options:range:", nsregularexpression::shim_regex_first_match as u64, "@@:@Q{_NSRange=QQ}"),
+            me("matchesInString:options:range:", nsregularexpression::shim_regex_matches_in_string as u64, "@@:@Q{_NSRange=QQ}"),
+            me("enumerateMatchesInString:options:range:usingBlock:", nsregularexpression::shim_regex_enumerate_matches as u64, "v@:@Q{_NSRange=QQ}@?"),
             me("stringByReplacingMatchesInString:options:range:withTemplate:", nsregularexpression::shim_regex_replace as u64, "@@:@Q{_NSRange=QQ}@"),
             me("description", nsregularexpression::shim_regex_description as u64, "@@:"),
         ],
@@ -152,6 +191,34 @@ pub fn register_nsregularexpression_class(rt: &mut objc_runtime::ObjcRuntime) {
     };
     rt.register_synthetic_class(info);
     rt.register_metaclass_addr(metaclass_addr, "NSRegularExpression");
+}
+
+/// Register `NSTextCheckingResult`.
+pub fn register_nstextcheckingresult_class(rt: &mut objc_runtime::ObjcRuntime) {
+    let class_addr = nsobj::nstextcheckingresult_class_addr();
+    let metaclass_addr = nsobj::nstextcheckingresult_metaclass_addr();
+
+    let info = ClassInfo {
+        name: "NSTextCheckingResult".to_string(),
+        mapped_addr: class_addr,
+        methods: vec![
+            me("range", nsregularexpression::shim_textcheckingresult_range as u64, "{_NSRange=QQ}@:"),
+            me("rangeAtIndex:", nsregularexpression::shim_textcheckingresult_range_at_index as u64, "{_NSRange=QQ}@:Q"),
+            me("numberOfRanges", nsregularexpression::shim_textcheckingresult_number_of_ranges as u64, "Q@:"),
+        ],
+        class_methods: vec![],
+        ivars: vec![],
+        properties: vec![],
+        protocol_names: Vec::new(),
+        instance_size: 32,
+        is_root: false,
+        is_meta: false,
+        superclass_addr: Some(nsobj::nsobject_class_addr()),
+        method_index: HashMap::new(),
+        class_method_index: HashMap::new(),
+    };
+    rt.register_synthetic_class(info);
+    rt.register_metaclass_addr(metaclass_addr, "NSTextCheckingResult");
 }
 
 /// Register `NSPredicate`.

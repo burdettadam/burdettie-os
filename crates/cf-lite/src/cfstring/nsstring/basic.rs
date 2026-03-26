@@ -22,6 +22,27 @@ pub extern "C" fn shim_nsstring_description(obj: u64, _sel: u64) -> u64 {
     obj
 }
 
+/// `-[NSString initWithData:encoding:]`
+pub extern "C" fn shim_nsstring_init_with_data_encoding(
+    _obj: u64,
+    _sel: u64,
+    data: u64,
+    _encoding: u64,
+) -> u64 {
+    if data == 0 {
+        return 0;
+    }
+    let length = unsafe { *((data as *const u8).add(8) as *const u64) } as usize;
+    let bytes_ptr = unsafe { *((data as *const u8).add(16) as *const u64) } as *const u8;
+    if bytes_ptr.is_null() || length == 0 {
+        return shim_cf_string_create_with_cstring(0, b"\0".as_ptr() as *const c_char, 0);
+    }
+    let slice = unsafe { std::slice::from_raw_parts(bytes_ptr, length) };
+    let s = String::from_utf8_lossy(slice);
+    let c_str = CString::new(s.as_ref()).unwrap_or_default();
+    shim_cf_string_create_with_cstring(0, c_str.as_ptr(), 0)
+}
+
 /// `-[NSString initWithUTF8String:]`
 pub extern "C" fn shim_nsstring_init_with_utf8string(
     obj: u64,

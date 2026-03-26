@@ -3,9 +3,23 @@
 use crate::cfstring;
 use crate::nsobj;
 
+// ── Dynamic NSDictionary layout (our objects) ──────────────────
 pub(super) const COUNT_OFF: usize = 8;
 pub(super) const KEYS_OFF: usize = 16;
 pub(super) const VALS_OFF: usize = 24;
+
+// ── NSConstantDictionary layout (compiler-embedded) ────────────
+// offset 0: ISA, offset 8: flags, offset 16: count,
+// offset 24: keys_ptr, offset 32: vals_ptr
+const CONST_COUNT_OFF: usize = 16;
+const CONST_KEYS_OFF: usize = 24;
+const CONST_VALS_OFF: usize = 32;
+
+/// Check if this dict object has the NSConstantDictionary layout.
+fn is_constant_dict(obj: u64) -> bool {
+    let isa = unsafe { *(obj as *const u64) };
+    isa == nsobj::nsconstantdictionary_class_addr()
+}
 
 /// Create an NSDictionary from parallel key/value slices.
 pub fn make_nsdictionary(keys: &[u64], vals: &[u64]) -> u64 {
@@ -35,19 +49,22 @@ pub fn make_nsdictionary(keys: &[u64], vals: &[u64]) -> u64 {
     obj
 }
 
-/// Read count from an NSDictionary object.
+/// Read count from an NSDictionary or NSConstantDictionary object.
 pub(super) fn dict_count(obj: u64) -> u64 {
-    unsafe { *((obj as usize + COUNT_OFF) as *const u64) }
+    let off = if is_constant_dict(obj) { CONST_COUNT_OFF } else { COUNT_OFF };
+    unsafe { std::ptr::read_unaligned((obj as usize + off) as *const u64) }
 }
 
-/// Read keys pointer from an NSDictionary object.
+/// Read keys pointer from an NSDictionary or NSConstantDictionary object.
 pub(super) fn dict_keys(obj: u64) -> u64 {
-    unsafe { *((obj as usize + KEYS_OFF) as *const u64) }
+    let off = if is_constant_dict(obj) { CONST_KEYS_OFF } else { KEYS_OFF };
+    unsafe { std::ptr::read_unaligned((obj as usize + off) as *const u64) }
 }
 
-/// Read values pointer from an NSDictionary object.
+/// Read values pointer from an NSDictionary or NSConstantDictionary object.
 pub(super) fn dict_vals(obj: u64) -> u64 {
-    unsafe { *((obj as usize + VALS_OFF) as *const u64) }
+    let off = if is_constant_dict(obj) { CONST_VALS_OFF } else { VALS_OFF };
+    unsafe { std::ptr::read_unaligned((obj as usize + off) as *const u64) }
 }
 
 /// Find the index of `key` in the dictionary, or None.

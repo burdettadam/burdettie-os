@@ -11,6 +11,13 @@ use crate::cfstring;
 use crate::nsarray;
 use crate::nsobj;
 
+/// NSRange ABI-compatible struct for ARM64 return values.
+#[repr(C)]
+pub struct NSRange {
+    pub location: u64,
+    pub length: u64,
+}
+
 pub const INSTANCE_SIZE: u32 = 40;
 
 /// Read the `regex::Regex` pointer stored at offset 24.
@@ -122,8 +129,7 @@ pub extern "C" fn shim_regex_number_of_matches(
 
 /// `-[NSRegularExpression firstMatchInString:options:range:]`
 ///
-/// Returns an NSArray [matchStart, matchLen] or 0 (nil) if no match.
-/// (Simplified: real NSTextCheckingResult not implemented.)
+/// Returns an NSTextCheckingResult or 0 (nil) if no match.
 pub extern "C" fn shim_regex_first_match(
     obj: u64,
     _cmd: u64,
@@ -139,16 +145,115 @@ pub extern "C" fn shim_regex_first_match(
     let Some(c_str) = cfstring::extract_cfstring_cstr(string) else {
         return 0;
     };
-    match re.find(c_str) {
-        Some(m) => {
-            // Return an NSArray of [location, length] as NSNumbers
-            let loc = crate::nsnumber::make_nsnumber_int(m.start() as i64);
-            let len = crate::nsnumber::make_nsnumber_int(m.len() as i64);
-            let items = [loc, len];
-            nsarray::make_nsarray(&items)
-        }
+    match re.captures(c_str) {
+        Some(caps) => make_text_checking_result(&caps),
         None => 0,
     }
+}
+
+/// `-[NSRegularExpression matchesInString:options:range:]`
+pub extern "C" fn shim_regex_matches_in_string(
+    obj: u64,
+    _cmd: u64,
+    string: u64,
+    _options: u64,
+    _range_loc: u64,
+    _range_len: u64,
+) -> u64 {
+    if obj == 0 || string == 0 { return 0; }
+    let Some(re) = (unsafe { get_regex(obj) }) else {
+        return 0;
+    };
+    let Some(c_str) = cfstring::extract_cfstring_cstr(string) else {
+        return 0;
+    };
+    let results: Vec<u64> = re.captures_iter(c_str)
+        .map(|caps| make_text_checking_result(&caps))
+        .collect();
+    nsarray::make_nsarray(&results)
+}
+
+/// `-[NSRegularExpression enumerateMatchesInString:options:range:usingBlock:]`
+pub extern "C" fn shim_regex_enumerate_matches(
+    obj: u64,
+    _cmd: u64,
+    string: u64,
+    _options: u64,
+    _range_loc: u64,
+    _range_len: u64,
+    block: u64,
+) -> u64 {
+    if obj == 0 || string == 0 || block == 0 { return 0; }
+    let Some(re) = (unsafe { get_regex(obj) }) else {
+        return 0;
+    };
+    let Some(c_str) = cfstring::extract_cfstring_cstr(string) else {
+        return 0;
+    };
+
+    // Block layout: isa(0), flags(8), invoke(16)
+    let invoke = unsafe { std::ptr::read_unaligned((block + 16) as *const u64) };
+    let invoke_fn: extern "C" fn(u64, u64, u64, *mut u8) =
+        unsafe { std::mem::transmute(invoke) };
+
+    let mut stop: u8 = 0;
+    for caps in re.captures_iter(c_str) {
+        let result = make_text_checking_result(&caps);
+        invoke_fn(block, result, 0, &mut stop);
+        if stop != 0 { break; }
+    }
+    0
+}
+
+// ── NSTextCheckingResult ───────────────────────────────────────────
+//
+// Layout (24 + 16 * range_count bytes):
+//   offset  0: isa          (u64)
+//   offset  8: range_count  (u64)
+//   offset 16: ranges       (inline array of (u64 location, u64 length))
+
+fn make_text_checking_result(caps: &regex::Captures) -> u64 {
+    let n = caps.len(); // group 0 = full match + capture groups
+    let size = 16 + 16 * n;
+    let obj = crate::pal_alloc().calloc(1, size) as u64;
+    unsafe {
+        *(obj as *mut u64) = nsobj::nstextcheckingresult_class_addr();
+        *((obj + 8) as *mut u64) = n as u64;
+        for i in 0..n {
+            let (loc, len) = match caps.get(i) {
+                Some(m) => (m.start() as u64, m.len() as u64),
+                None => (u64::MAX, 0), // NSNotFound = NSUIntegerMax
+            };
+            *((obj + 16 + (i * 16) as u64) as *mut u64) = loc;
+            *((obj + 16 + (i * 16) as u64 + 8) as *mut u64) = len;
+        }
+    }
+    obj
+}
+
+/// `-[NSTextCheckingResult range]` — returns NSRange in (x0, x1).
+pub extern "C" fn shim_textcheckingresult_range(obj: u64, _cmd: u64) -> NSRange {
+    if obj == 0 { return NSRange { location: u64::MAX, length: 0 }; }
+    let loc = unsafe { *((obj + 16) as *const u64) };
+    let len = unsafe { *((obj + 24) as *const u64) };
+    NSRange { location: loc, length: len }
+}
+
+/// `-[NSTextCheckingResult rangeAtIndex:]` — returns NSRange for capture group i.
+pub extern "C" fn shim_textcheckingresult_range_at_index(obj: u64, _cmd: u64, index: u64) -> NSRange {
+    if obj == 0 { return NSRange { location: u64::MAX, length: 0 }; }
+    let count = unsafe { *((obj + 8) as *const u64) };
+    if index >= count { return NSRange { location: u64::MAX, length: 0 }; }
+    let offset = 16 + index * 16;
+    let loc = unsafe { *((obj + offset) as *const u64) };
+    let len = unsafe { *((obj + offset + 8) as *const u64) };
+    NSRange { location: loc, length: len }
+}
+
+/// `-[NSTextCheckingResult numberOfRanges]`
+pub extern "C" fn shim_textcheckingresult_number_of_ranges(obj: u64, _cmd: u64) -> u64 {
+    if obj == 0 { return 0; }
+    unsafe { *((obj + 8) as *const u64) }
 }
 
 /// `-[NSRegularExpression stringByReplacingMatchesInString:options:range:withTemplate:]`

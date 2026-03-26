@@ -122,7 +122,9 @@ pub fn extract_cfstring_cstr(obj: u64) -> Option<&'static str> {
     if ptr.is_null() {
         return None;
     }
-    let c_str_ptr = unsafe { *((ptr.add(16)) as *const u64) };
+    // Use read_unaligned: __CFConstantString objects from loaded binaries
+    // may reside at addresses that are not 8-byte aligned.
+    let c_str_ptr = unsafe { std::ptr::read_unaligned((ptr.add(16)) as *const u64) };
     if c_str_ptr == 0 {
         return None;
     }
@@ -143,8 +145,8 @@ pub(crate) fn cfstring_parts(obj: u64) -> Option<(&'static [u8], usize)> {
         return None;
     }
     unsafe {
-        let ptr = *((obj as usize + 16) as *const u64);
-        let len = *((obj as usize + 24) as *const u64) as usize;
+        let ptr = std::ptr::read_unaligned((obj as usize + 16) as *const u64);
+        let len = std::ptr::read_unaligned((obj as usize + 24) as *const u64) as usize;
         if ptr == 0 {
             return None;
         }

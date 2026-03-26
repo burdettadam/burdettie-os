@@ -18,7 +18,9 @@ pub(crate) fn register_foundation_classes(
     cf_lite::FoundationShims::register_nsstring_class(objc_rt);
     cf_lite::FoundationShims::register_nsarray_class(objc_rt);
     cf_lite::FoundationShims::register_nsnumber_class(objc_rt);
+    cf_lite::FoundationShims::register_nsconstantintegernumber_class(objc_rt);
     cf_lite::FoundationShims::register_nsdictionary_class(objc_rt);
+    cf_lite::FoundationShims::register_nsconstantdictionary_class(objc_rt);
     cf_lite::FoundationShims::register_nsmutablearray_class(objc_rt);
     cf_lite::FoundationShims::register_nsmutabledictionary_class(objc_rt);
     cf_lite::FoundationShims::register_nsmutablestring_class(objc_rt);
@@ -38,6 +40,7 @@ pub(crate) fn register_foundation_classes(
     cf_lite::FoundationShims::register_nsdateformatter_class(objc_rt);
     cf_lite::FoundationShims::register_nscharacterset_class(objc_rt);
     cf_lite::FoundationShims::register_nsnotificationcenter_class(objc_rt);
+    cf_lite::FoundationShims::register_nsnotification_class(objc_rt);
     cf_lite::FoundationShims::register_nsvalue_class(objc_rt);
     cf_lite::FoundationShims::register_nsuuid_class(objc_rt);
     cf_lite::FoundationShims::register_nslocale_class(objc_rt);
@@ -56,6 +59,7 @@ pub(crate) fn register_foundation_classes(
     cf_lite::FoundationShims::register_nsmethodsignature_class(objc_rt);
     cf_lite::FoundationShims::register_nsinvocation_class(objc_rt);
     cf_lite::FoundationShims::register_nsregularexpression_class(objc_rt);
+    cf_lite::FoundationShims::register_nstextcheckingresult_class(objc_rt);
     cf_lite::FoundationShims::register_nspredicate_class(objc_rt);
     cf_lite::FoundationShims::register_nsattributedstring_class(objc_rt);
     cf_lite::FoundationShims::register_nsmutableattributedstring_class(objc_rt);

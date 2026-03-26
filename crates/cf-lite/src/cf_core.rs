@@ -391,17 +391,34 @@ pub extern "C" fn shim_cf_bundle_copy_bundle_url(bundle: u64) -> u64 {
 
 // ── kCFBooleanTrue/False data symbols ──────────────────────────────
 
-static K_CF_BOOLEAN_TRUE: u64 = 1;
-static K_CF_BOOLEAN_FALSE: u64 = 0;
+use std::sync::Once;
 
-/// Address of kCFBooleanTrue data symbol.
-pub fn kcf_boolean_true_addr() -> u64 {
-    &K_CF_BOOLEAN_TRUE as *const u64 as u64
+/// Boolean singletons — real NSNumber objects with ISA + tag(2=bool) + value.
+/// Layout: [isa: u64, tag: u64, value: u64] = 24 bytes.
+static mut K_CF_BOOLEAN_TRUE_OBJ: [u64; 3] = [0, 2, 1];
+static mut K_CF_BOOLEAN_FALSE_OBJ: [u64; 3] = [0, 2, 0];
+static BOOL_INIT: Once = Once::new();
+
+fn ensure_bool_singletons() {
+    BOOL_INIT.call_once(|| {
+        let isa = nsobj::nsnumber_class_addr();
+        unsafe {
+            K_CF_BOOLEAN_TRUE_OBJ[0] = isa;
+            K_CF_BOOLEAN_FALSE_OBJ[0] = isa;
+        }
+    });
 }
 
-/// Address of kCFBooleanFalse data symbol.
+/// Address of kCFBooleanTrue — a real NSNumber(bool=1) object.
+pub fn kcf_boolean_true_addr() -> u64 {
+    ensure_bool_singletons();
+    unsafe { K_CF_BOOLEAN_TRUE_OBJ.as_ptr() as u64 }
+}
+
+/// Address of kCFBooleanFalse — a real NSNumber(bool=0) object.
 pub fn kcf_boolean_false_addr() -> u64 {
-    &K_CF_BOOLEAN_FALSE as *const u64 as u64
+    ensure_bool_singletons();
+    unsafe { K_CF_BOOLEAN_FALSE_OBJ.as_ptr() as u64 }
 }
 
 #[cfg(test)]

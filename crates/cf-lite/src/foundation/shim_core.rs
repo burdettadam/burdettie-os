@@ -194,6 +194,8 @@ pub(super) fn install_core_shims(table: &mut ShimTable) {
     register_shims!(table,
         ("_kCFBooleanTrue", cf_core::kcf_boolean_true_addr(), "kCFBooleanTrue data symbol"),
         ("_kCFBooleanFalse", cf_core::kcf_boolean_false_addr(), "kCFBooleanFalse data symbol"),
+        ("___kCFBooleanTrue", cf_core::kcf_boolean_true_addr(), "__kCFBooleanTrue for @YES literals"),
+        ("___kCFBooleanFalse", cf_core::kcf_boolean_false_addr(), "__kCFBooleanFalse for @NO literals"),
     );
 
     // NSApp global variable + NSRunLoop mode constants (Phase C5)

@@ -162,6 +162,33 @@ pub extern "C" fn shim_set_value_for_undefined_key_method(
 
 // ── Internal helpers ──────────────────────────────────────────────
 
+/// `valueForKeyPath:` override for NSDictionary / NSConstantDictionary.
+///
+/// Splits the key-path on `.` and calls `objectForKey:` at each step,
+/// creating an NSString key from each path component.
+pub extern "C" fn shim_dict_value_for_key_path(
+    obj: u64,
+    _sel: u64,
+    key_path_nsstring: u64,
+) -> u64 {
+    if obj == 0 || key_path_nsstring == 0 {
+        return 0;
+    }
+    let Some(key_path) = cfstring::extract_cfstring_cstr(key_path_nsstring) else {
+        return 0;
+    };
+    let mut current = obj;
+    for component in key_path.split('.') {
+        if current == 0 {
+            return 0;
+        }
+        let c_key = std::ffi::CString::new(component).unwrap_or_default();
+        let ns_key = cfstring::shim_cf_string_create_with_cstring(0, c_key.as_ptr(), 0);
+        current = crate::nsdictionary::shim_nsdictionary_object_for_key(current, 0, ns_key);
+    }
+    current
+}
+
 /// Core `valueForKey:` logic without NSString extraction.
 fn value_for_key_direct(obj: u64, key: &str) -> u64 {
     if obj == 0 || key.is_empty() {

@@ -37,8 +37,16 @@ impl FoundationShims {
         register::register_nsnumber_class(rt);
     }
 
+    pub fn register_nsconstantintegernumber_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsconstantintegernumber_class(rt);
+    }
+
     pub fn register_nsdictionary_class(rt: &mut objc_runtime::ObjcRuntime) {
         register::register_nsdictionary_class(rt);
+    }
+
+    pub fn register_nsconstantdictionary_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsconstantdictionary_class(rt);
     }
 
     pub fn register_nsmutablearray_class(rt: &mut objc_runtime::ObjcRuntime) {
@@ -117,6 +125,10 @@ impl FoundationShims {
         register::register_nsnotificationcenter_class(rt);
     }
 
+    pub fn register_nsnotification_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsnotification_class(rt);
+    }
+
     pub fn register_nsvalue_class(rt: &mut objc_runtime::ObjcRuntime) {
         register::register_nsvalue_class(rt);
     }
@@ -187,6 +199,10 @@ impl FoundationShims {
 
     pub fn register_nsregularexpression_class(rt: &mut objc_runtime::ObjcRuntime) {
         register::register_nsregularexpression_class(rt);
+    }
+
+    pub fn register_nstextcheckingresult_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nstextcheckingresult_class(rt);
     }
 
     pub fn register_nspredicate_class(rt: &mut objc_runtime::ObjcRuntime) {
@@ -305,8 +321,8 @@ impl FoundationShims {
 
         for (sym_name, target_class) in [
             ("OBJC_CLASS_$_NSConstantArray", "NSArray"),
-            ("OBJC_CLASS_$_NSConstantDictionary", "NSDictionary"),
-            ("OBJC_CLASS_$_NSConstantIntegerNumber", "NSNumber"),
+            ("OBJC_CLASS_$_NSConstantDictionary", "NSConstantDictionary"),
+            ("OBJC_CLASS_$_NSConstantIntegerNumber", "NSConstantIntegerNumber"),
             ("OBJC_CLASS_$_NSException", "NSException"),
         ] {
             if let Some(addr) = symbols.resolve(sym_name) {
@@ -423,7 +439,7 @@ mod tests {
         assert!(table.resolve("_OBJC_METACLASS_$_NSInvocation").is_some());
         // 141 base + 22 AppKit class symbols + 3 AppKit data symbols = 166 on macOS
         #[cfg(target_os = "macos")]
-        assert_eq!(table.len(), 166);
+        assert_eq!(table.len(), 172);
         #[cfg(not(target_os = "macos"))]
         assert_eq!(table.len(), 162);
     }

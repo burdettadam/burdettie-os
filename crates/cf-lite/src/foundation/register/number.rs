@@ -168,6 +168,47 @@ pub fn register_nsnumber_class(rt: &mut objc_runtime::ObjcRuntime) {
     rt.register_metaclass_addr(metaclass_addr, "NSNumber");
 }
 
+/// Register `NSConstantIntegerNumber` — compiler-embedded number literals (@(N)).
+/// Reuses all NSNumber method implementations; the `read_number()` helper
+/// in nsnumber.rs detects the constant layout automatically.
+pub fn register_nsconstantintegernumber_class(rt: &mut objc_runtime::ObjcRuntime) {
+    let class_addr = nsobj::nsconstantintegernumber_class_addr();
+    let metaclass_addr = nsobj::nsconstantintegernumber_metaclass_addr();
+
+    let info = ClassInfo {
+        name: "NSConstantIntegerNumber".to_string(),
+        mapped_addr: class_addr,
+        methods: vec![
+            me("intValue", nsnumber::shim_nsnumber_int_value as u64, "i@:"),
+            me("doubleValue", nsnumber::shim_nsnumber_double_value as u64, "d@:"),
+            me("boolValue", nsnumber::shim_nsnumber_bool_value as u64, "B@:"),
+            me("integerValue", nsnumber::shim_nsnumber_integer_value as u64, "q@:"),
+            me("longLongValue", nsnumber::shim_nsnumber_long_long_value as u64, "q@:"),
+            me("longValue", nsnumber::shim_nsnumber_long_value as u64, "q@:"),
+            me("floatValue", nsnumber::shim_nsnumber_float_value as u64, "f@:"),
+            me("unsignedIntegerValue", nsnumber::shim_nsnumber_unsigned_integer_value as u64, "Q@:"),
+            me("unsignedIntValue", nsnumber::shim_nsnumber_unsigned_int_value as u64, "I@:"),
+            me("stringValue", nsnumber::shim_nsnumber_string_value as u64, "@@:"),
+            me("isEqualToNumber:", nsnumber::shim_nsnumber_is_equal_to_number as u64, "B@:@"),
+            me("isEqual:", nsnumber::shim_nsnumber_is_equal as u64, "B@:@"),
+            me("compare:", nsnumber::shim_nsnumber_compare as u64, "q@:@"),
+            me("description", nsnumber::shim_nsnumber_description as u64, "@@:"),
+        ],
+        class_methods: vec![],
+        ivars: vec![],
+        properties: vec![],
+        protocol_names: Vec::new(),
+        instance_size: 24,
+        is_root: false,
+        is_meta: false,
+        superclass_addr: Some(nsobj::nsnumber_class_addr()),
+        method_index: HashMap::new(),
+        class_method_index: HashMap::new(),
+    };
+    rt.register_synthetic_class(info);
+    rt.register_metaclass_addr(metaclass_addr, "NSConstantIntegerNumber");
+}
+
 /// Register `NSValue` with value wrapping methods.
 pub fn register_nsvalue_class(rt: &mut objc_runtime::ObjcRuntime) {
     let class_addr = nsobj::nsvalue_class_addr();

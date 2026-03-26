@@ -25,6 +25,7 @@ pub(super) fn install_class_symbols(table: &mut ShimTable) {
     register_class!(table, "NSDateFormatter", nsobj::nsdateformatter_class_addr(), nsobj::nsdateformatter_metaclass_addr());
     register_class!(table, "NSCharacterSet", nsobj::nscharacterset_class_addr(), nsobj::nscharacterset_metaclass_addr());
     register_class!(table, "NSNotificationCenter", nsobj::nsnotificationcenter_class_addr(), nsobj::nsnotificationcenter_metaclass_addr());
+    register_class!(table, "NSNotification", nsobj::nsnotification_class_addr(), nsobj::nsnotification_metaclass_addr());
     register_class!(table, "NSValue", nsobj::nsvalue_class_addr(), nsobj::nsvalue_metaclass_addr());
     register_class!(table, "NSUUID", nsobj::nsuuid_class_addr(), nsobj::nsuuid_metaclass_addr());
     register_class!(table, "NSLocale", nsobj::nslocale_class_addr(), nsobj::nslocale_metaclass_addr());
@@ -38,6 +39,7 @@ pub(super) fn install_class_symbols(table: &mut ShimTable) {
     register_class!(table, "NSMethodSignature", nsobj::nsmethodsignature_class_addr(), nsobj::nsmethodsignature_metaclass_addr());
     register_class!(table, "NSInvocation", nsobj::nsinvocation_class_addr(), nsobj::nsinvocation_metaclass_addr());
     register_class!(table, "NSRegularExpression", nsobj::nsregularexpression_class_addr(), nsobj::nsregularexpression_metaclass_addr());
+    register_class!(table, "NSTextCheckingResult", nsobj::nstextcheckingresult_class_addr(), nsobj::nstextcheckingresult_metaclass_addr());
     register_class!(table, "NSPredicate", nsobj::nspredicate_class_addr(), nsobj::nspredicate_metaclass_addr());
     register_class!(table, "NSAttributedString", nsobj::nsattributedstring_class_addr(), nsobj::nsattributedstring_metaclass_addr());
     register_class!(table, "NSMutableAttributedString", nsobj::nsmutableattributedstring_class_addr(), nsobj::nsmutableattributedstring_metaclass_addr());
@@ -128,20 +130,23 @@ pub(super) fn install_class_symbols(table: &mut ShimTable) {
 
     // ── NSConstant* class symbols (self-hosted) ────────────────────
     // The compiler embeds constant objects (@[], @{}, @(int)) whose ISA
-    // points to these symbols.  We map them to our own classes.
+    // points to these symbols.  We give NSConstantDictionary and
+    // NSConstantIntegerNumber their own class addresses because their
+    // memory layout differs from our dynamic NSDictionary/NSNumber.
+    // NSConstantArray happens to share the same layout as our NSArray.
     table.register(
         "_OBJC_CLASS_$_NSConstantArray",
         nsobj::nsarray_class_addr(),
-        "NSConstantArray class (self-hosted, for @[] literals)",
+        "NSConstantArray class (same layout as NSArray)",
     );
     table.register(
         "_OBJC_CLASS_$_NSConstantDictionary",
-        nsobj::nsdictionary_class_addr(),
-        "NSConstantDictionary class (self-hosted, for @{} literals)",
+        nsobj::nsconstantdictionary_class_addr(),
+        "NSConstantDictionary class (40-byte constant layout)",
     );
     table.register(
         "_OBJC_CLASS_$_NSConstantIntegerNumber",
-        nsobj::nsnumber_class_addr(),
-        "NSConstantIntegerNumber class (self-hosted, for @(int) literals)",
+        nsobj::nsconstantintegernumber_class_addr(),
+        "NSConstantIntegerNumber class (offset 16 = value)",
     );
 }

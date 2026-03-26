@@ -163,6 +163,38 @@ pub extern "C" fn shim_objc_opt_class(obj: u64) -> u64 {
     unsafe { *(obj as *const u64) }
 }
 
+/// `BOOL objc_opt_isKindOfClass(id obj, Class cls)` — fast path for `[obj isKindOfClass:]`
+pub extern "C" fn shim_objc_opt_is_kind_of_class(obj: u64, cls: u64) -> u8 {
+    if obj == 0 || cls == 0 {
+        return 0;
+    }
+    let isa = unsafe { *(obj as *const u64) };
+
+    let guard = match OBJC_RUNTIME.lock() {
+        Ok(g) => g,
+        Err(e) => e.into_inner(),
+    };
+    let Some(rt) = guard.as_ref() else { return 0 };
+
+    let mut current = Some(isa);
+    let mut depth = 0;
+    while let Some(addr) = current {
+        if depth > 64 {
+            break;
+        }
+        if addr == cls {
+            return 1;
+        }
+        if let Some(class_info) = rt.get_class_by_addr(addr) {
+            current = class_info.superclass_addr;
+        } else {
+            break;
+        }
+        depth += 1;
+    }
+    0
+}
+
 /// `BOOL objc_opt_respondsToSelector(id obj, SEL sel)`
 pub extern "C" fn shim_objc_opt_responds_to_selector(obj: u64, sel: u64) -> u8 {
     if obj == 0 || sel == 0 {

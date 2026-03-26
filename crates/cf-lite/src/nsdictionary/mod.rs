@@ -23,6 +23,13 @@ use crate::nsobj;
 pub use helpers::make_nsdictionary;
 use helpers::{dict_count, dict_keys, dict_vals, find_key_index, COUNT_OFF, KEYS_OFF, VALS_OFF};
 
+/// Public accessors for dict layout helpers (used by NSJSONSerialization etc.).
+pub mod helpers_pub {
+    pub fn dict_count_pub(obj: u64) -> u64 { super::helpers::dict_count(obj) }
+    pub fn dict_keys_pub(obj: u64) -> u64 { super::helpers::dict_keys(obj) }
+    pub fn dict_vals_pub(obj: u64) -> u64 { super::helpers::dict_vals(obj) }
+}
+
 // ── Class methods ──────────────────────────────────────────────────
 
 /// `+[NSDictionary dictionaryWithObjects:forKeys:count:]`
