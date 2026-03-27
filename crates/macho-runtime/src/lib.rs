@@ -540,49 +540,14 @@ impl Runtime {
             loaded.image.protect()?;
         }
 
-        // 10. Fire +load methods from app binary only (not system dylibs,
-        //     whose +load IMPs depend on the full host ObjC runtime).
-        if config.shim_set.objc {
-            let app_ranges: Vec<(u64, u64)> = registry.images()[app_idx]
-                .image
-                .segments
-                .iter()
-                .map(|s| (s.base as u64, s.base as u64 + s.size as u64))
-                .collect();
-            let guard = objc_runtime::OBJC_RUNTIME
-                .lock()
-                .unwrap_or_else(|e| e.into_inner());
-            if let Some(rt) = guard.as_ref() {
-                let loads = rt.collect_load_methods();
-                drop(guard);
-                for (class_name, imp) in &loads {
-                    let in_app = app_ranges.iter().any(|&(lo, hi)| *imp >= lo && *imp < hi);
-                    if !in_app {
-                        log::debug!(
-                            "Interpreter: skipping +[{} load] at {:#x} (outside app)",
-                            class_name,
-                            imp
-                        );
-                        continue;
-                    }
-                    log::info!(
-                        "Interpreter: calling +[{} load] at {:#x}",
-                        class_name,
-                        imp
-                    );
-                    let f: extern "C" fn() = unsafe { std::mem::transmute(*imp) };
-                    f();
-                }
-            }
-        }
-
-        // 11. Interpreter execution
+        // 10. Build interpreter infrastructure (needed for +load and main).
         let app = &registry.images()[app_idx];
         let entry = app
             .parsed
             .entry
             .as_ref()
-            .ok_or(RuntimeError::NoEntryPoint)?;
+            .ok_or(RuntimeError::NoEntryPoint)?
+            .clone();
 
         // Build guest memory ranges for the interpreter bridge.
         let guest_ranges: Vec<(u64, u64)> = registry
@@ -610,6 +575,65 @@ impl Runtime {
             })
             .collect();
 
+        // 10b. Fire +load methods from app binary via the interpreter.
+        if config.shim_set.objc {
+            let app_ranges: Vec<(u64, u64)> = registry.images()[app_idx]
+                .image
+                .segments
+                .iter()
+                .map(|s| (s.base as u64, s.base as u64 + s.size as u64))
+                .collect();
+            let guard = objc_runtime::OBJC_RUNTIME
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+            if let Some(rt) = guard.as_ref() {
+                let loads = rt.collect_load_methods();
+                drop(guard);
+
+                // Collect +load IMPs in app range.
+                let app_loads: Vec<_> = loads
+                    .iter()
+                    .filter(|(_, imp)| app_ranges.iter().any(|&(lo, hi)| *imp >= lo && *imp < hi))
+                    .collect();
+
+                if !app_loads.is_empty() {
+                    // Build segment list for the +load interpreter.
+                    let mut load_segments: Vec<(u64, *mut u8, usize, bool)> = registry
+                        .images()[app_idx]
+                        .image
+                        .segments
+                        .iter()
+                        .map(|s| {
+                            let writable = s.name != "__TEXT";
+                            (s.base as u64, s.base, s.size, writable)
+                        })
+                        .collect();
+                    load_segments.extend_from_slice(&all_segments);
+
+                    for (class_name, imp) in &app_loads {
+                        log::info!(
+                            "Interpreter: calling +[{} load] at {:#x} via interpreter",
+                            class_name,
+                            imp
+                        );
+                        let ffi = interp_bridge::build_interpreter_bridge(&guest_ranges);
+                        // SAFETY: segments are valid for the duration of this block.
+                        let mut mem = unsafe {
+                            arm64_translate::Memory::from_segments(&load_segments)
+                        };
+                        mem.host_passthrough = true;
+                        let mut cpu = arm64_translate::CpuState::new();
+                        cpu.pc = *imp;
+                        cpu.sp = mem.initial_sp();
+                        cpu.x[30] = 0; // RET → 0 triggers ReturnedToHost exit
+                        let mut interp = arm64_translate::Interpreter::new(cpu, mem, ffi);
+                        let _ = interp.run();
+                    }
+                }
+            }
+        }
+
+        // 11. Interpreter execution of main()
         let ffi_bridge = interp_bridge::build_interpreter_bridge(&guest_ranges);
 
         let entry_args = macho_exec::EntryArgs {
@@ -623,8 +647,8 @@ impl Runtime {
         };
 
         let entry_result = macho_exec::call_entry_interpreted(
-            &app.image,
-            entry,
+            &registry.images()[app_idx].image,
+            &entry,
             Some(&entry_args),
             ffi_bridge,
             &all_segments,

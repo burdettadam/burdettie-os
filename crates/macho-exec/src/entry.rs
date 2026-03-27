@@ -256,17 +256,17 @@ pub fn call_entry_interpreted(
                     return Err(ExecError::NoEntryPoint);
                 }
                 arm64_translate::ExitReason::Unimplemented { pc, raw } => {
-                    log::error!("Interpreter: unimplemented instruction {raw:#010x} at {pc:#x}");
+                    eprintln!("Interpreter: unimplemented instruction {raw:#010x} at {pc:#x}");
                     return Err(ExecError::NoEntryPoint);
                 }
                 arm64_translate::ExitReason::MemoryFault { pc, addr, is_write } => {
-                    log::error!(
+                    eprintln!(
                         "Interpreter: memory fault at PC {pc:#x}, addr {addr:#x} (write={is_write})"
                     );
                     return Err(ExecError::NoEntryPoint);
                 }
                 arm64_translate::ExitReason::BadBranch { pc, target } => {
-                    log::error!("Interpreter: bad branch at {pc:#x} → {target:#x}");
+                    eprintln!("Interpreter: bad branch at {pc:#x} → {target:#x}");
                     return Err(ExecError::NoEntryPoint);
                 }
             };

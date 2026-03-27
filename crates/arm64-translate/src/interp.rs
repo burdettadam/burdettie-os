@@ -1368,6 +1368,18 @@ impl Interpreter {
                 }
                 self.cpu.pc = pc + 4;
             }
+            Instruction::Fabd { sf, rd, rn, rm } => {
+                if sf {
+                    let a = f64::from_bits(self.cpu.read_d(rn));
+                    let b = f64::from_bits(self.cpu.read_d(rm));
+                    self.cpu.write_d(rd, (a - b).abs().to_bits());
+                } else {
+                    let a = f32::from_bits(self.cpu.read_s(rn));
+                    let b = f32::from_bits(self.cpu.read_s(rm));
+                    self.cpu.write_s(rd, (a - b).abs().to_bits());
+                }
+                self.cpu.pc = pc + 4;
+            }
             Instruction::Fneg { sf, rd, rn } => {
                 if sf {
                     let a = f64::from_bits(self.cpu.read_d(rn));
@@ -1439,16 +1451,25 @@ impl Interpreter {
     /// Handle an FFI call: extract args from registers, call the host function,
     /// and process the result (return, exit, or tail-call).
     fn do_ffi_call(&mut self, target: u64, _call_pc: u64) -> StepResult {
-        let args: [u64; 8] = [
-            self.cpu.x[0], self.cpu.x[1], self.cpu.x[2], self.cpu.x[3],
-            self.cpu.x[4], self.cpu.x[5], self.cpu.x[6], self.cpu.x[7],
-        ];
-        let guest_x8 = self.cpu.x[8];
+        let args = crate::ffi::FfiCallArgs {
+            x: [
+                self.cpu.x[0], self.cpu.x[1], self.cpu.x[2], self.cpu.x[3],
+                self.cpu.x[4], self.cpu.x[5], self.cpu.x[6], self.cpu.x[7],
+            ],
+            d: [
+                self.cpu.read_d(0), self.cpu.read_d(1), self.cpu.read_d(2), self.cpu.read_d(3),
+                self.cpu.read_d(4), self.cpu.read_d(5), self.cpu.read_d(6), self.cpu.read_d(7),
+            ],
+            x8: self.cpu.x[8],
+            host_x8: if self.cpu.x[8] != 0 {
+                self.mem.guest_to_host(self.cpu.x[8], 64)
+            } else { 0 },
+        };
         // Translate guest SP to a host pointer for variadic stack arg copy.
         // Returns 0 (skip copy) if the address can't be mapped.
         let guest_sp = self.mem.guest_to_host(self.cpu.sp, 128);
         let name = self.ffi.name_of(target);
-        let result = self.ffi.call_or_stub(target, &args, guest_x8, guest_sp);
+        let result = self.ffi.call_or_stub(target, &args, guest_sp);
         match result {
             crate::ffi::FfiResult::Return(val) => {
                 log::trace!("FFI {target:#x} ({}) returned {val:#x}", name.unwrap_or("?"));

@@ -22,11 +22,23 @@ pub enum FfiResult {
     TailCall(u64),
 }
 
+/// Arguments passed to a host function from interpreted ARM64 code.
+pub struct FfiCallArgs {
+    /// Integer registers x0-x7.
+    pub x: [u64; 8],
+    /// FP registers d0-d7 (as raw u64 bit patterns).
+    pub d: [u64; 8],
+    /// The guest's x8 register (indirect struct return pointer).
+    pub x8: u64,
+    /// Pre-translated host pointer for x8 (0 if x8==0 or untranslatable).
+    pub host_x8: u64,
+}
+
 /// A host function that can be called from interpreted ARM64 code.
 ///
-/// Receives the current register file (x0–x7 contain arguments per AAPCS64)
-/// and returns an [`FfiResult`].
-pub type HostFn = Box<dyn Fn(&[u64; 8]) -> FfiResult + Send>;
+/// Receives the current register file (x0–x7 and d0-d7 contain arguments per
+/// AAPCS64) and returns an [`FfiResult`].
+pub type HostFn = Box<dyn Fn(&FfiCallArgs) -> FfiResult + Send>;
 
 /// FFI bridge: maps guest code addresses to host function implementations.
 pub struct FfiBridge {
@@ -65,11 +77,11 @@ impl FfiBridge {
     /// Call a host function with the given argument registers.
     /// Returns `Some(FfiResult)` if the address is registered,
     /// `None` if the address is not an FFI target.
-    pub fn call(&self, addr: u64, args: &[u64; 8]) -> Option<FfiResult> {
+    pub fn call(&self, addr: u64, args: &FfiCallArgs) -> Option<FfiResult> {
         let handler = self.handlers.get(&addr)?;
         let name = self.names.get(&addr).map(|s| s.as_str()).unwrap_or("???");
         log::trace!("FFI call: {} ({:#x}) args=[{:#x}, {:#x}, {:#x}, ...]",
-            name, addr, args[0], args[1], args[2]);
+            name, addr, args.x[0], args.x[1], args.x[2]);
         Some(handler(args))
     }
 
@@ -86,7 +98,8 @@ impl FfiBridge {
     ///
     /// `guest_x8`: the guest's x8 register (indirect struct return pointer).
     /// `guest_sp`: the guest's stack pointer (for variadic args on the stack).
-    pub fn call_or_stub(&self, addr: u64, args: &[u64; 8], guest_x8: u64, guest_sp: u64) -> FfiResult {
+    /// `fp_args`: the guest's d0-d7 FP register values.
+    pub fn call_or_stub(&self, addr: u64, args: &FfiCallArgs, guest_sp: u64) -> FfiResult {
         if let Some(result) = self.call(addr, args) {
             return result;
         }
@@ -95,7 +108,7 @@ impl FfiBridge {
             // SAFETY: addr came from fixup resolution (CompositeResolver/StubResolver)
             // and is a valid host function pointer.
             unsafe {
-                let (x0, x1, d0, d1) = call_host_capturing(addr, args, guest_x8, guest_sp);
+                let (x0, x1, d0, d1) = call_host_capturing(addr, &args.x, args.host_x8, guest_sp, &args.d);
                 return FfiResult::ReturnFull { x0, x1, d0, d1 };
             }
         }
@@ -117,8 +130,18 @@ impl FfiBridge {
 /// bytes from this address onto the host stack before the call. Required for
 /// variadic C functions (printf, etc.) on ARM64 macOS, which read variadic
 /// arguments from the stack rather than registers.
+///
+/// `fp_args`: the guest's d0-d7 FP register values. These are loaded into
+/// the host d0-d7 before the call. Required for ObjC methods and C functions
+/// that receive floating-point arguments (e.g., `[NSNumber numberWithDouble:]`).
 #[cfg(target_arch = "aarch64")]
-pub unsafe fn call_host_capturing(addr: u64, args: &[u64; 8], guest_x8: u64, guest_sp: u64) -> (u64, u64, u64, u64) {
+pub unsafe fn call_host_capturing(
+    addr: u64,
+    args: &[u64; 8],
+    guest_x8: u64,
+    guest_sp: u64,
+    fp_args: &[u64; 8],
+) -> (u64, u64, u64, u64) {
     let x0_ret: u64;
     let x1_ret: u64;
     let d0_ret: u64;
@@ -149,12 +172,23 @@ pub unsafe fn call_host_capturing(addr: u64, args: &[u64; 8], guest_x8: u64, gue
             "ldp x11, x12, [x13, #112]",
             "stp x11, x12, [sp, #112]",
             "2:",
+            // Load FP arguments d0-d7 from the fp_args array.
+            // x14 holds the base pointer to fp_args[].
+            "ldr d0, [x14]",
+            "ldr d1, [x14, #8]",
+            "ldr d2, [x14, #16]",
+            "ldr d3, [x14, #24]",
+            "ldr d4, [x14, #32]",
+            "ldr d5, [x14, #40]",
+            "ldr d6, [x14, #48]",
+            "ldr d7, [x14, #56]",
             "blr x16",
             // Restore host stack (always, regardless of guest_sp).
             "add sp, sp, #128",
             "fmov x9, d0",
             "fmov x10, d1",
             in("x13") guest_sp,
+            in("x14") fp_args.as_ptr(),
             in("x16") addr,
             in("x8") guest_x8,
             in("x0") args[0],
@@ -171,6 +205,7 @@ pub unsafe fn call_host_capturing(addr: u64, args: &[u64; 8], guest_x8: u64, gue
             lateout("x10") d1_ret,
             lateout("x11") _,
             lateout("x12") _,
+            lateout("x14") _,
             clobber_abi("C"),
         );
     }
@@ -179,7 +214,13 @@ pub unsafe fn call_host_capturing(addr: u64, args: &[u64; 8], guest_x8: u64, gue
 
 /// Fallback for non-aarch64 hosts: only captures x0 (integer return).
 #[cfg(not(target_arch = "aarch64"))]
-pub unsafe fn call_host_capturing(addr: u64, args: &[u64; 8], _guest_x8: u64, _guest_sp: u64) -> (u64, u64, u64, u64) {
+pub unsafe fn call_host_capturing(
+    addr: u64,
+    args: &[u64; 8],
+    _guest_x8: u64,
+    _guest_sp: u64,
+    _fp_args: &[u64; 8],
+) -> (u64, u64, u64, u64) {
     let f: extern "C" fn(u64, u64, u64, u64, u64, u64, u64, u64) -> u64 =
         std::mem::transmute(addr);
     let result = f(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7]);
@@ -211,8 +252,8 @@ pub fn register_libc_handlers(
                 }));
             }
             "_exit" | "exit" => {
-                bridge.register(addr, &name, Box::new(|args| {
-                    FfiResult::Exit(args[0])
+                bridge.register(addr, &name, Box::new(|args: &FfiCallArgs| {
+                    FfiResult::Exit(args.x[0])
                 }));
             }
             "_printf" | "printf" | "_fprintf" | "fprintf" => {

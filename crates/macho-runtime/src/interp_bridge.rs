@@ -11,7 +11,7 @@
 //!
 //! This lets the interpreter run ObjC and Foundation fixtures end-to-end.
 
-use arm64_translate::{FfiBridge, FfiResult, call_host_capturing};
+use arm64_translate::{FfiBridge, FfiCallArgs, FfiResult, call_host_capturing};
 use objc_runtime::shims::dispatch::{
     objc_msg_send_addr, objc_msg_send_stret_addr, objc_msg_send_fp2ret_addr,
     objc_msg_send_super_addr, objc_msg_send_super_stret_addr,
@@ -52,7 +52,7 @@ pub fn build_interpreter_bridge(guest_ranges: &[(u64, u64)]) -> FfiBridge {
         };
         if addr != 0 {
             let name = sym.to_string();
-            bridge.register(addr, &name, Box::new(|args| FfiResult::Exit(args[0])));
+            bridge.register(addr, &name, Box::new(|args| FfiResult::Exit(args.x[0])));
         }
     }
 
@@ -63,8 +63,8 @@ pub fn build_interpreter_bridge(guest_ranges: &[(u64, u64)]) -> FfiBridge {
 fn register_msg_send(bridge: &mut FfiBridge, addr: u64, name: &str, guest_ranges: &[(u64, u64)]) {
     let ranges: Vec<(u64, u64)> = guest_ranges.to_vec();
     let handler_name = name.to_string();
-    bridge.register(addr, name, Box::new(move |args: &[u64; 8]| {
-        let (obj, sel) = (args[0], args[1]);
+    bridge.register(addr, name, Box::new(move |args: &FfiCallArgs| {
+        let (obj, sel) = (args.x[0], args.x[1]);
 
         // Nil message → return 0 (matches Apple ABI).
         if obj == 0 {
@@ -87,9 +87,9 @@ fn register_msg_send(bridge: &mut FfiBridge, addr: u64, name: &str, guest_ranges
             return FfiResult::TailCall(imp);
         }
 
-        // Host IMP — call directly with full ABI capture.
+        // Host IMP — call directly with full ABI capture (integer + FP args).
         unsafe {
-            let (x0, x1, d0, d1) = call_host_capturing(imp, args, 0, 0);
+            let (x0, x1, d0, d1) = call_host_capturing(imp, &args.x, args.host_x8, 0, &args.d);
             FfiResult::ReturnFull { x0, x1, d0, d1 }
         }
     }));
@@ -99,9 +99,9 @@ fn register_msg_send(bridge: &mut FfiBridge, addr: u64, name: &str, guest_ranges
 /// x0 = &objc_super, x1 = SEL. The objc_super struct is { id receiver; Class super_class; }.
 fn register_msg_send_super(bridge: &mut FfiBridge, addr: u64, name: &str, guest_ranges: &[(u64, u64)]) {
     let ranges: Vec<(u64, u64)> = guest_ranges.to_vec();
-    bridge.register(addr, name, Box::new(move |args: &[u64; 8]| {
-        let super_ptr = args[0];
-        let sel = args[1];
+    bridge.register(addr, name, Box::new(move |args: &FfiCallArgs| {
+        let super_ptr = args.x[0];
+        let sel = args.x[1];
 
         if super_ptr == 0 {
             return FfiResult::Return(0);
@@ -118,17 +118,12 @@ fn register_msg_send_super(bridge: &mut FfiBridge, addr: u64, name: &str, guest_
         }
 
         if is_in_guest(imp, &ranges) {
-            // For super sends, the real receiver goes in x0 (not the super struct).
-            // We can't modify registers from here, so we call the IMP directly
-            // for host IMPs, or TailCall for guest IMPs.
-            // TODO: For guest IMPs, we'd need to patch x0 to receiver.
-            // For now, just call host IMP:
             return FfiResult::TailCall(imp);
         }
 
         unsafe {
-            let super_args = [receiver, sel, args[2], args[3], args[4], args[5], args[6], args[7]];
-            let (x0, x1, d0, d1) = call_host_capturing(imp, &super_args, 0, 0);
+            let super_args = [receiver, sel, args.x[2], args.x[3], args.x[4], args.x[5], args.x[6], args.x[7]];
+            let (x0, x1, d0, d1) = call_host_capturing(imp, &super_args, args.host_x8, 0, &args.d);
             FfiResult::ReturnFull { x0, x1, d0, d1 }
         }
     }));
@@ -137,9 +132,9 @@ fn register_msg_send_super(bridge: &mut FfiBridge, addr: u64, name: &str, guest_
 /// Register an `objc_msgSendSuper2` handler (super_class is the class itself, not the superclass).
 fn register_msg_send_super2(bridge: &mut FfiBridge, addr: u64, name: &str, guest_ranges: &[(u64, u64)]) {
     let ranges: Vec<(u64, u64)> = guest_ranges.to_vec();
-    bridge.register(addr, name, Box::new(move |args: &[u64; 8]| {
-        let super_ptr = args[0];
-        let sel = args[1];
+    bridge.register(addr, name, Box::new(move |args: &FfiCallArgs| {
+        let super_ptr = args.x[0];
+        let sel = args.x[1];
 
         if super_ptr == 0 {
             return FfiResult::Return(0);
@@ -160,8 +155,8 @@ fn register_msg_send_super2(bridge: &mut FfiBridge, addr: u64, name: &str, guest
         }
 
         unsafe {
-            let super_args = [receiver, sel, args[2], args[3], args[4], args[5], args[6], args[7]];
-            let (x0, x1, d0, d1) = call_host_capturing(imp, &super_args, 0, 0);
+            let super_args = [receiver, sel, args.x[2], args.x[3], args.x[4], args.x[5], args.x[6], args.x[7]];
+            let (x0, x1, d0, d1) = call_host_capturing(imp, &super_args, args.host_x8, 0, &args.d);
             FfiResult::ReturnFull { x0, x1, d0, d1 }
         }
     }));

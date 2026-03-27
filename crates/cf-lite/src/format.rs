@@ -11,6 +11,23 @@ use crate::foundation::cfconstant_string_class_addr;
 /// Otherwise, look up and call the object's `-description` method through
 /// the ObjC runtime — `description` returns a CFString we can read.
 pub(crate) fn format_objc_object(obj: u64) -> String {
+    // Null pointer guard.
+    if obj == 0 {
+        return "(null)".to_string();
+    }
+
+    // Tagged pointer: bit 63 set on arm64 means it's an inline-encoded
+    // value (NSNumber, NSDate, etc.), not a real heap pointer.  We can't
+    // dereference it, so forward to host -description via objc_msgSend.
+    if (obj >> 63) != 0 {
+        return format_tagged_via_host(obj);
+    }
+
+    // Alignment check: a valid ObjC object pointer must be 8-byte aligned.
+    if obj & 0x7 != 0 {
+        return format!("<invalid obj {:#x}>", obj);
+    }
+
     let isa = unsafe { *(obj as *const u64) };
 
     // Fast path: if it's already a CFString, read directly
@@ -38,6 +55,52 @@ pub(crate) fn format_objc_object(obj: u64) -> String {
     }
 
     format!("<ObjC object {:#x}>", obj)
+}
+
+/// Format a tagged pointer (bit 63 set) by calling the host objc_msgSend
+/// with the `description` selector, then reading the returned NSString.
+fn format_tagged_via_host(obj: u64) -> String {
+    // Use dlsym to look up objc_msgSend and sel_registerName at runtime,
+    // avoiding a direct link dependency on libobjc.
+    extern "C" {
+        fn dlsym(handle: *mut std::ffi::c_void, symbol: *const c_char) -> *mut std::ffi::c_void;
+    }
+    unsafe {
+        let msg_send: extern "C" fn(u64, u64) -> u64 = {
+            let ptr = dlsym(
+                std::ptr::null_mut(),
+                b"objc_msgSend\0".as_ptr() as *const c_char,
+            );
+            if ptr.is_null() {
+                return format!("<tagged {:#x}>", obj);
+            }
+            std::mem::transmute(ptr)
+        };
+        let sel_reg: extern "C" fn(*const c_char) -> u64 = {
+            let ptr = dlsym(
+                std::ptr::null_mut(),
+                b"sel_registerName\0".as_ptr() as *const c_char,
+            );
+            if ptr.is_null() {
+                return format!("<tagged {:#x}>", obj);
+            }
+            std::mem::transmute(ptr)
+        };
+
+        let desc_sel = sel_reg(b"description\0".as_ptr() as *const c_char);
+        let desc_obj = msg_send(obj, desc_sel);
+        if desc_obj != 0 {
+            let utf8_sel = sel_reg(b"UTF8String\0".as_ptr() as *const c_char);
+            let cstr_ptr = msg_send(desc_obj, utf8_sel);
+            if cstr_ptr != 0 {
+                let cstr = CStr::from_ptr(cstr_ptr as *const c_char);
+                if let Ok(s) = cstr.to_str() {
+                    return s.to_string();
+                }
+            }
+        }
+    }
+    format!("<tagged {:#x}>", obj)
 }
 
 /// Simple format string expansion.

@@ -20,6 +20,6 @@ pub mod mem;
 
 pub use cpu::CpuState;
 pub use decode::Instruction;
-pub use ffi::{FfiBridge, FfiResult, call_host_capturing};
+pub use ffi::{FfiBridge, FfiCallArgs, FfiResult, call_host_capturing};
 pub use interp::{ExitReason, Interpreter};
 pub use mem::Memory;

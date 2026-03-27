@@ -267,6 +267,8 @@ pub enum Instruction {
     Fmul { sf: bool, rd: u8, rn: u8, rm: u8 },
     /// FDIV Dd, Dn, Dm
     Fdiv { sf: bool, rd: u8, rn: u8, rm: u8 },
+    /// FABD Dd, Dn, Dm (Advanced SIMD scalar absolute difference)
+    Fabd { sf: bool, rd: u8, rn: u8, rm: u8 },
     /// FNEG Dd, Dn
     Fneg { sf: bool, rd: u8, rn: u8 },
     /// FABS Dd, Dn
@@ -749,8 +751,10 @@ fn decode_load_store_reg(raw: u32) -> Instruction {
     }
 
     // Unscaled / pre-index / post-index: size 11 1 0 00 opc 0 imm9 idx Rn Rt
-    if (raw >> 24) & 0x3F == 0b111000 || (raw >> 24) & 0x3F == 0b101000
-        || (raw >> 24) & 0x3F == 0b011000 || (raw >> 24) & 0x3F == 0b001000
+    // Guard: bit[21]==0 excludes register-indexed encodings (handled below)
+    if ((raw >> 21) & 1) == 0
+        && ((raw >> 24) & 0x3F == 0b111000 || (raw >> 24) & 0x3F == 0b101000
+            || (raw >> 24) & 0x3F == 0b011000 || (raw >> 24) & 0x3F == 0b001000)
     {
         let imm9 = ((raw >> 12) & 0x1FF) as i16;
         let imm = sign_extend9(imm9);
@@ -1125,6 +1129,18 @@ fn decode_fp_dp(raw: u32) -> Instruction {
         return Instruction::FMovImm { sf, rd, imm };
     }
 
+    // Advanced SIMD scalar FABD: 0 1 1 11110 sz 1 Rm 110101 Rn Rd
+    if (raw >> 24) & 0xFF == 0x7E
+        && (raw >> 21) & 0x3 == 0b11
+        && (raw >> 10) & 0x3F == 0b110101
+    {
+        let sf = (raw >> 22) & 1 == 1;
+        let rm = ((raw >> 16) & 0x1F) as u8;
+        let rn = ((raw >> 5) & 0x1F) as u8;
+        let rd = (raw & 0x1F) as u8;
+        return Instruction::Fabd { sf, rd, rn, rm };
+    }
+
     Instruction::Unknown { raw }
 }
 
@@ -1141,13 +1157,13 @@ fn decode_fp_imm8(imm8: u8, is_double: bool) -> u64 {
     if is_double {
         let top_bit = (exp3 >> 2) & 1;
         let exp_hi = if top_bit != 0 { 0b0_u64 } else { 0b1 };
-        let exp_rep = if top_bit != 0 { 0x00_u64 } else { 0xFF };
+        let exp_rep = if top_bit != 0 { 0xFF_u64 } else { 0x00 };
         let full_exp = (exp_hi << 10) | (exp_rep << 2) | (exp3 & 0x3);
         (sign << 63) | (full_exp << 52) | (frac4 << 48)
     } else {
         let top_bit = (exp3 >> 2) & 1;
         let exp_hi = if top_bit != 0 { 0b0_u64 } else { 0b1 };
-        let exp_rep = if top_bit != 0 { 0x00_u64 } else { 0x1F };
+        let exp_rep = if top_bit != 0 { 0x1F_u64 } else { 0x00 };
         let full_exp = (exp_hi << 7) | (exp_rep << 2) | (exp3 & 0x3);
         ((sign << 31) | (full_exp << 23) | (frac4 << 19)) & 0xFFFF_FFFF
     }
