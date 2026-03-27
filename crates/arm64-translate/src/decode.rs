@@ -95,15 +95,43 @@ pub enum Instruction {
     /// STUR Xt, [Xn, #simm9]  (unscaled)
     Stur { sf: bool, rt: u8, rn: u8, imm: i16 },
 
-    /// LDR Xt, [Xn, #simm]!  (pre-index)
+    /// LDR Xt, [Xn, #simm]!  (pre-index, 32/64-bit)
     LdrPre { sf: bool, rt: u8, rn: u8, imm: i16 },
-    /// STR Xt, [Xn, #simm]!  (pre-index)
+    /// STR Xt, [Xn, #simm]!  (pre-index, 32/64-bit)
     StrPre { sf: bool, rt: u8, rn: u8, imm: i16 },
+    /// LDRB Wt, [Xn, #simm]!  (pre-index byte)
+    LdrbPre { rt: u8, rn: u8, imm: i16 },
+    /// STRB Wt, [Xn, #simm]!  (pre-index byte)
+    StrbPre { rt: u8, rn: u8, imm: i16 },
+    /// LDRH Wt, [Xn, #simm]!  (pre-index halfword)
+    LdrhPre { rt: u8, rn: u8, imm: i16 },
+    /// STRH Wt, [Xn, #simm]!  (pre-index halfword)
+    StrhPre { rt: u8, rn: u8, imm: i16 },
+    /// LDRSB Xt/Wt, [Xn, #simm]!  (pre-index signed byte)
+    LdrsbPre { sf: bool, rt: u8, rn: u8, imm: i16 },
+    /// LDRSH Xt/Wt, [Xn, #simm]!  (pre-index signed halfword)
+    LdrshPre { sf: bool, rt: u8, rn: u8, imm: i16 },
+    /// LDRSW Xt, [Xn, #simm]!  (pre-index signed word)
+    LdrswPre { rt: u8, rn: u8, imm: i16 },
 
-    /// LDR Xt, [Xn], #simm  (post-index)
+    /// LDR Xt, [Xn], #simm  (post-index, 32/64-bit)
     LdrPost { sf: bool, rt: u8, rn: u8, imm: i16 },
-    /// STR Xt, [Xn], #simm  (post-index)
+    /// STR Xt, [Xn], #simm  (post-index, 32/64-bit)
     StrPost { sf: bool, rt: u8, rn: u8, imm: i16 },
+    /// LDRB Wt, [Xn], #simm  (post-index byte)
+    LdrbPost { rt: u8, rn: u8, imm: i16 },
+    /// STRB Wt, [Xn], #simm  (post-index byte)
+    StrbPost { rt: u8, rn: u8, imm: i16 },
+    /// LDRH Wt, [Xn], #simm  (post-index halfword)
+    LdrhPost { rt: u8, rn: u8, imm: i16 },
+    /// STRH Wt, [Xn], #simm  (post-index halfword)
+    StrhPost { rt: u8, rn: u8, imm: i16 },
+    /// LDRSB Xt/Wt, [Xn], #simm  (post-index signed byte)
+    LdrsbPost { sf: bool, rt: u8, rn: u8, imm: i16 },
+    /// LDRSH Xt/Wt, [Xn], #simm  (post-index signed halfword)
+    LdrshPost { sf: bool, rt: u8, rn: u8, imm: i16 },
+    /// LDRSW Xt, [Xn], #simm  (post-index signed word)
+    LdrswPost { rt: u8, rn: u8, imm: i16 },
 
     /// LDP Xt1, Xt2, [Xn, #imm]
     Ldp { sf: bool, rt: u8, rt2: u8, rn: u8, imm: i16 },
@@ -794,14 +822,42 @@ fn decode_load_store_reg(raw: u32) -> Instruction {
                 }
             }
             0b01 => {
-                // Post-index
-                if is_load { Instruction::LdrPost { sf, rt, rn, imm } }
-                else { Instruction::StrPost { sf, rt, rn, imm } }
+                // Post-index: dispatch by size and opc like unscaled
+                match (size, opc) {
+                    (0b00, 0b00) => Instruction::StrbPost { rt, rn, imm },
+                    (0b00, 0b01) => Instruction::LdrbPost { rt, rn, imm },
+                    (0b00, 0b10) => Instruction::LdrsbPost { sf: true, rt, rn, imm },
+                    (0b00, 0b11) => Instruction::LdrsbPost { sf: false, rt, rn, imm },
+                    (0b01, 0b00) => Instruction::StrhPost { rt, rn, imm },
+                    (0b01, 0b01) => Instruction::LdrhPost { rt, rn, imm },
+                    (0b01, 0b10) => Instruction::LdrshPost { sf: true, rt, rn, imm },
+                    (0b01, 0b11) => Instruction::LdrshPost { sf: false, rt, rn, imm },
+                    (0b10, 0b00) => Instruction::StrPost { sf: false, rt, rn, imm },
+                    (0b10, 0b01) => Instruction::LdrPost { sf: false, rt, rn, imm },
+                    (0b10, 0b10) => Instruction::LdrswPost { rt, rn, imm },
+                    (0b11, 0b00) => Instruction::StrPost { sf: true, rt, rn, imm },
+                    (0b11, 0b01) => Instruction::LdrPost { sf: true, rt, rn, imm },
+                    _ => Instruction::Unknown { raw },
+                }
             }
             0b11 => {
-                // Pre-index
-                if is_load { Instruction::LdrPre { sf, rt, rn, imm } }
-                else { Instruction::StrPre { sf, rt, rn, imm } }
+                // Pre-index: dispatch by size and opc like unscaled
+                match (size, opc) {
+                    (0b00, 0b00) => Instruction::StrbPre { rt, rn, imm },
+                    (0b00, 0b01) => Instruction::LdrbPre { rt, rn, imm },
+                    (0b00, 0b10) => Instruction::LdrsbPre { sf: true, rt, rn, imm },
+                    (0b00, 0b11) => Instruction::LdrsbPre { sf: false, rt, rn, imm },
+                    (0b01, 0b00) => Instruction::StrhPre { rt, rn, imm },
+                    (0b01, 0b01) => Instruction::LdrhPre { rt, rn, imm },
+                    (0b01, 0b10) => Instruction::LdrshPre { sf: true, rt, rn, imm },
+                    (0b01, 0b11) => Instruction::LdrshPre { sf: false, rt, rn, imm },
+                    (0b10, 0b00) => Instruction::StrPre { sf: false, rt, rn, imm },
+                    (0b10, 0b01) => Instruction::LdrPre { sf: false, rt, rn, imm },
+                    (0b10, 0b10) => Instruction::LdrswPre { rt, rn, imm },
+                    (0b11, 0b00) => Instruction::StrPre { sf: true, rt, rn, imm },
+                    (0b11, 0b01) => Instruction::LdrPre { sf: true, rt, rn, imm },
+                    _ => Instruction::Unknown { raw },
+                }
             }
             _ => Instruction::Unknown { raw },
         };

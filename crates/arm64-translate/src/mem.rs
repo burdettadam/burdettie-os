@@ -108,8 +108,10 @@ impl Memory {
     }
 
     /// Initial stack pointer value (top of stack, 16-byte aligned).
+    /// Leaves headroom above SP for the 128-byte host stack copy used by
+    /// variadic FFI calls (call_host_capturing).
     pub fn initial_sp(&self) -> u64 {
-        self.stack_guest_base - 16
+        self.stack_guest_base - 256
     }
 
     /// Translate a guest address to a host pointer (read-only).

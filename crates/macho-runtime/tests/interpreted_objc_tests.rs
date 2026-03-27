@@ -150,14 +150,13 @@ fn interp_nsstring_ops() {
 }
 
 #[test]
-#[ignore = "SIGABRT in host function"]
+#[ignore = "NSString %@ format substitution not yet supported"]
 fn interp_nsstring_format() {
     let Some(r) = run_interpreted("nsstring_format") else { return };
     assert_eq!(r.exit_code, 0, "nsstring_format should exit 0");
 }
 
 #[test]
-#[ignore = "SIGSEGV — likely incomplete FP/SIMD instruction support"]
 fn interp_nsstring_manip() {
     let Some(r) = run_interpreted("nsstring_manip") else { return };
     assert_eq!(r.exit_code, 0, "nsstring_manip should exit 0");

@@ -649,6 +649,116 @@ impl Interpreter {
                 self.cpu.pc = pc + 4;
             }
 
+            // ── Byte/Halfword/Signed pre-index ─────────────────────
+            Instruction::LdrbPre { rt, rn, imm } => {
+                let base = (self.cpu.read_reg(rn) as i64).wrapping_add(imm as i64) as u64;
+                self.cpu.write_reg(rn, base);
+                let val = match self.mem.read_u8(base) { Some(v) => v as u64, None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: false }) };
+                self.cpu.write_reg_zr(rt, val);
+                self.cpu.pc = pc + 4;
+            }
+            Instruction::StrbPre { rt, rn, imm } => {
+                let base = (self.cpu.read_reg(rn) as i64).wrapping_add(imm as i64) as u64;
+                self.cpu.write_reg(rn, base);
+                if !self.mem.write_u8(base, self.cpu.read_reg_zr(rt) as u8) {
+                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: true });
+                }
+                self.cpu.pc = pc + 4;
+            }
+            Instruction::LdrhPre { rt, rn, imm } => {
+                let base = (self.cpu.read_reg(rn) as i64).wrapping_add(imm as i64) as u64;
+                self.cpu.write_reg(rn, base);
+                let val = match self.mem.read_u16(base) { Some(v) => v as u64, None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: false }) };
+                self.cpu.write_reg_zr(rt, val);
+                self.cpu.pc = pc + 4;
+            }
+            Instruction::StrhPre { rt, rn, imm } => {
+                let base = (self.cpu.read_reg(rn) as i64).wrapping_add(imm as i64) as u64;
+                self.cpu.write_reg(rn, base);
+                if !self.mem.write_u16(base, self.cpu.read_reg_zr(rt) as u16) {
+                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: true });
+                }
+                self.cpu.pc = pc + 4;
+            }
+            Instruction::LdrsbPre { sf, rt, rn, imm } => {
+                let base = (self.cpu.read_reg(rn) as i64).wrapping_add(imm as i64) as u64;
+                self.cpu.write_reg(rn, base);
+                let byte = match self.mem.read_u8(base) { Some(v) => v, None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: false }) };
+                let val = if sf { (byte as i8) as i64 as u64 } else { (byte as i8) as i32 as u32 as u64 };
+                self.cpu.write_reg_zr(rt, val);
+                self.cpu.pc = pc + 4;
+            }
+            Instruction::LdrshPre { sf, rt, rn, imm } => {
+                let base = (self.cpu.read_reg(rn) as i64).wrapping_add(imm as i64) as u64;
+                self.cpu.write_reg(rn, base);
+                let hw = match self.mem.read_u16(base) { Some(v) => v, None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: false }) };
+                let val = if sf { (hw as i16) as i64 as u64 } else { (hw as i16) as i32 as u32 as u64 };
+                self.cpu.write_reg_zr(rt, val);
+                self.cpu.pc = pc + 4;
+            }
+            Instruction::LdrswPre { rt, rn, imm } => {
+                let base = (self.cpu.read_reg(rn) as i64).wrapping_add(imm as i64) as u64;
+                self.cpu.write_reg(rn, base);
+                let word = match self.mem.read_u32(base) { Some(v) => v, None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: false }) };
+                self.cpu.write_reg_zr(rt, (word as i32) as i64 as u64);
+                self.cpu.pc = pc + 4;
+            }
+
+            // ── Byte/Halfword/Signed post-index ────────────────────
+            Instruction::LdrbPost { rt, rn, imm } => {
+                let base = self.cpu.read_reg(rn);
+                let val = match self.mem.read_u8(base) { Some(v) => v as u64, None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: false }) };
+                self.cpu.write_reg_zr(rt, val);
+                self.cpu.write_reg(rn, (base as i64).wrapping_add(imm as i64) as u64);
+                self.cpu.pc = pc + 4;
+            }
+            Instruction::StrbPost { rt, rn, imm } => {
+                let base = self.cpu.read_reg(rn);
+                if !self.mem.write_u8(base, self.cpu.read_reg_zr(rt) as u8) {
+                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: true });
+                }
+                self.cpu.write_reg(rn, (base as i64).wrapping_add(imm as i64) as u64);
+                self.cpu.pc = pc + 4;
+            }
+            Instruction::LdrhPost { rt, rn, imm } => {
+                let base = self.cpu.read_reg(rn);
+                let val = match self.mem.read_u16(base) { Some(v) => v as u64, None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: false }) };
+                self.cpu.write_reg_zr(rt, val);
+                self.cpu.write_reg(rn, (base as i64).wrapping_add(imm as i64) as u64);
+                self.cpu.pc = pc + 4;
+            }
+            Instruction::StrhPost { rt, rn, imm } => {
+                let base = self.cpu.read_reg(rn);
+                if !self.mem.write_u16(base, self.cpu.read_reg_zr(rt) as u16) {
+                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: true });
+                }
+                self.cpu.write_reg(rn, (base as i64).wrapping_add(imm as i64) as u64);
+                self.cpu.pc = pc + 4;
+            }
+            Instruction::LdrsbPost { sf, rt, rn, imm } => {
+                let base = self.cpu.read_reg(rn);
+                let byte = match self.mem.read_u8(base) { Some(v) => v, None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: false }) };
+                let val = if sf { (byte as i8) as i64 as u64 } else { (byte as i8) as i32 as u32 as u64 };
+                self.cpu.write_reg_zr(rt, val);
+                self.cpu.write_reg(rn, (base as i64).wrapping_add(imm as i64) as u64);
+                self.cpu.pc = pc + 4;
+            }
+            Instruction::LdrshPost { sf, rt, rn, imm } => {
+                let base = self.cpu.read_reg(rn);
+                let hw = match self.mem.read_u16(base) { Some(v) => v, None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: false }) };
+                let val = if sf { (hw as i16) as i64 as u64 } else { (hw as i16) as i32 as u32 as u64 };
+                self.cpu.write_reg_zr(rt, val);
+                self.cpu.write_reg(rn, (base as i64).wrapping_add(imm as i64) as u64);
+                self.cpu.pc = pc + 4;
+            }
+            Instruction::LdrswPost { rt, rn, imm } => {
+                let base = self.cpu.read_reg(rn);
+                let word = match self.mem.read_u32(base) { Some(v) => v, None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: false }) };
+                self.cpu.write_reg_zr(rt, (word as i32) as i64 as u64);
+                self.cpu.write_reg(rn, (base as i64).wrapping_add(imm as i64) as u64);
+                self.cpu.pc = pc + 4;
+            }
+
             // ── Load/Store pair ────────────────────────────────────
             Instruction::Ldp { sf, rt, rt2, rn, imm } => {
                 let base = (self.cpu.read_reg(rn) as i64).wrapping_add(imm as i64) as u64;
