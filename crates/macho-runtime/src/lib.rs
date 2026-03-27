@@ -540,7 +540,43 @@ impl Runtime {
             loaded.image.protect()?;
         }
 
-        // 10. Interpreter execution (skip constructors / +load for now)
+        // 10. Fire +load methods from app binary only (not system dylibs,
+        //     whose +load IMPs depend on the full host ObjC runtime).
+        if config.shim_set.objc {
+            let app_ranges: Vec<(u64, u64)> = registry.images()[app_idx]
+                .image
+                .segments
+                .iter()
+                .map(|s| (s.base as u64, s.base as u64 + s.size as u64))
+                .collect();
+            let guard = objc_runtime::OBJC_RUNTIME
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+            if let Some(rt) = guard.as_ref() {
+                let loads = rt.collect_load_methods();
+                drop(guard);
+                for (class_name, imp) in &loads {
+                    let in_app = app_ranges.iter().any(|&(lo, hi)| *imp >= lo && *imp < hi);
+                    if !in_app {
+                        log::debug!(
+                            "Interpreter: skipping +[{} load] at {:#x} (outside app)",
+                            class_name,
+                            imp
+                        );
+                        continue;
+                    }
+                    log::info!(
+                        "Interpreter: calling +[{} load] at {:#x}",
+                        class_name,
+                        imp
+                    );
+                    let f: extern "C" fn() = unsafe { std::mem::transmute(*imp) };
+                    f();
+                }
+            }
+        }
+
+        // 11. Interpreter execution
         let app = &registry.images()[app_idx];
         let entry = app
             .parsed

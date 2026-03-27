@@ -83,7 +83,10 @@ impl FfiBridge {
     /// If `auto_call_host` is true, unregistered non-zero targets are called
     /// as host function pointers (safe when targets come from fixup resolution).
     /// Otherwise, returns `FfiResult::Return(0)` as a silent stub.
-    pub fn call_or_stub(&self, addr: u64, args: &[u64; 8]) -> FfiResult {
+    ///
+    /// `guest_x8`: the guest's x8 register (indirect struct return pointer).
+    /// `guest_sp`: the guest's stack pointer (for variadic args on the stack).
+    pub fn call_or_stub(&self, addr: u64, args: &[u64; 8], guest_x8: u64, guest_sp: u64) -> FfiResult {
         if let Some(result) = self.call(addr, args) {
             return result;
         }
@@ -91,11 +94,10 @@ impl FfiBridge {
             log::debug!("FFI auto-call: host fn at {addr:#x}");
             // SAFETY: addr came from fixup resolution (CompositeResolver/StubResolver)
             // and is a valid host function pointer.
-            let f: extern "C" fn(u64, u64, u64, u64, u64, u64, u64, u64) -> u64 =
-                unsafe { std::mem::transmute(addr) };
-            let result = f(args[0], args[1], args[2], args[3],
-                           args[4], args[5], args[6], args[7]);
-            return FfiResult::Return(result);
+            unsafe {
+                let (x0, x1, d0, d1) = call_host_capturing(addr, args, guest_x8, guest_sp);
+                return FfiResult::ReturnFull { x0, x1, d0, d1 };
+            }
         }
         log::warn!("FFI stub: unknown target {addr:#x}, returning 0");
         FfiResult::Return(0)
@@ -106,24 +108,55 @@ impl FfiBridge {
 ///
 /// On ARM64, integer results use x0/x1 and FP results use d0/d1.
 /// Small structs may be spread across x0+x1 or d0+d1.
+///
+/// `guest_x8`: the guest's x8 register value. On ARM64, x8 is the indirect
+/// result location register — functions returning large structs (>16 bytes)
+/// write through the pointer in x8.
+///
+/// `guest_sp`: if non-zero, a host pointer to guest stack data. Copies 128
+/// bytes from this address onto the host stack before the call. Required for
+/// variadic C functions (printf, etc.) on ARM64 macOS, which read variadic
+/// arguments from the stack rather than registers.
 #[cfg(target_arch = "aarch64")]
-#[allow(dead_code)]
-unsafe fn call_host_capturing(addr: u64, args: &[u64; 8]) -> (u64, u64, u64, u64) {
+pub unsafe fn call_host_capturing(addr: u64, args: &[u64; 8], guest_x8: u64, guest_sp: u64) -> (u64, u64, u64, u64) {
     let x0_ret: u64;
     let x1_ret: u64;
     let d0_ret: u64;
     let d1_ret: u64;
-    // Scratch buffer for x8 (indirect struct return pointer).
-    // Functions returning large structs (>16 bytes) write through x8.
-    let mut indirect_buf = [0u8; 64];
-    let x8_buf = indirect_buf.as_mut_ptr() as u64;
     unsafe {
         core::arch::asm!(
+            // Allocate 128 bytes on host stack for variadic arguments.
+            // On ARM64 macOS, variadic args are always passed on the stack.
+            "sub sp, sp, #128",
+            // If guest_sp is nonzero, copy guest stack data to the host stack.
+            // This makes variadic functions (printf, snprintf, etc.) work
+            // because they read va_args from the stack, not registers.
+            "cbz x13, 2f",
+            "ldp x11, x12, [x13]",
+            "stp x11, x12, [sp]",
+            "ldp x11, x12, [x13, #16]",
+            "stp x11, x12, [sp, #16]",
+            "ldp x11, x12, [x13, #32]",
+            "stp x11, x12, [sp, #32]",
+            "ldp x11, x12, [x13, #48]",
+            "stp x11, x12, [sp, #48]",
+            "ldp x11, x12, [x13, #64]",
+            "stp x11, x12, [sp, #64]",
+            "ldp x11, x12, [x13, #80]",
+            "stp x11, x12, [sp, #80]",
+            "ldp x11, x12, [x13, #96]",
+            "stp x11, x12, [sp, #96]",
+            "ldp x11, x12, [x13, #112]",
+            "stp x11, x12, [sp, #112]",
+            "2:",
             "blr x16",
+            // Restore host stack (always, regardless of guest_sp).
+            "add sp, sp, #128",
             "fmov x9, d0",
             "fmov x10, d1",
+            in("x13") guest_sp,
             in("x16") addr,
-            in("x8") x8_buf,
+            in("x8") guest_x8,
             in("x0") args[0],
             in("x1") args[1],
             in("x2") args[2],
@@ -136,18 +169,17 @@ unsafe fn call_host_capturing(addr: u64, args: &[u64; 8]) -> (u64, u64, u64, u64
             lateout("x1") x1_ret,
             lateout("x9") d0_ret,
             lateout("x10") d1_ret,
+            lateout("x11") _,
+            lateout("x12") _,
             clobber_abi("C"),
         );
     }
-    // Keep indirect_buf alive past the asm block
-    std::hint::black_box(&indirect_buf);
     (x0_ret, x1_ret, d0_ret, d1_ret)
 }
 
 /// Fallback for non-aarch64 hosts: only captures x0 (integer return).
 #[cfg(not(target_arch = "aarch64"))]
-#[allow(dead_code)]
-unsafe fn call_host_capturing(addr: u64, args: &[u64; 8]) -> (u64, u64, u64, u64) {
+pub unsafe fn call_host_capturing(addr: u64, args: &[u64; 8], _guest_x8: u64, _guest_sp: u64) -> (u64, u64, u64, u64) {
     let f: extern "C" fn(u64, u64, u64, u64, u64, u64, u64, u64) -> u64 =
         std::mem::transmute(addr);
     let result = f(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7]);

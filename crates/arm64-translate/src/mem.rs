@@ -112,6 +112,14 @@ impl Memory {
         self.stack_guest_base - 16
     }
 
+    /// Translate a guest address to a host pointer (read-only).
+    /// Returns 0 if the address cannot be mapped.
+    pub fn guest_to_host(&self, addr: u64, size: usize) -> u64 {
+        // Use strict region lookup — never fall through to host_passthrough,
+        // because guest stack addresses are NOT valid host pointers.
+        self.translate_strict(addr, size).map(|p| p as u64).unwrap_or(0)
+    }
+
     /// Translate a guest address to a host pointer using only mapped regions
     /// (ignoring host_passthrough). Used for instruction fetch.
     fn translate_strict(&self, addr: u64, size: usize) -> Option<*const u8> {

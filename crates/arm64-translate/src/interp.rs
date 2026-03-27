@@ -762,7 +762,7 @@ impl Interpreter {
 
             // ── Byte/Halfword/SignedWord loads/stores ──────────────
             Instruction::Ldrb { rt, rn, imm } => {
-                let addr = self.cpu.read_reg(rn).wrapping_add(imm as u64);
+                let addr = (self.cpu.read_reg(rn) as i64).wrapping_add(imm as i64) as u64;
                 match self.mem.read_u8(addr) {
                     Some(v) => self.cpu.write_reg_zr(rt, v as u64),
                     None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false }),
@@ -770,7 +770,7 @@ impl Interpreter {
                 self.cpu.pc = pc + 4;
             }
             Instruction::Strb { rt, rn, imm } => {
-                let addr = self.cpu.read_reg(rn).wrapping_add(imm as u64);
+                let addr = (self.cpu.read_reg(rn) as i64).wrapping_add(imm as i64) as u64;
                 let val = self.cpu.read_reg_zr(rt) as u8;
                 if !self.mem.write_u8(addr, val) {
                     return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
@@ -778,7 +778,7 @@ impl Interpreter {
                 self.cpu.pc = pc + 4;
             }
             Instruction::Ldrh { rt, rn, imm } => {
-                let addr = self.cpu.read_reg(rn).wrapping_add(imm as u64);
+                let addr = (self.cpu.read_reg(rn) as i64).wrapping_add(imm as i64) as u64;
                 match self.mem.read_u16(addr) {
                     Some(v) => self.cpu.write_reg_zr(rt, v as u64),
                     None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false }),
@@ -786,7 +786,7 @@ impl Interpreter {
                 self.cpu.pc = pc + 4;
             }
             Instruction::Strh { rt, rn, imm } => {
-                let addr = self.cpu.read_reg(rn).wrapping_add(imm as u64);
+                let addr = (self.cpu.read_reg(rn) as i64).wrapping_add(imm as i64) as u64;
                 let val = self.cpu.read_reg_zr(rt) as u16;
                 if !self.mem.write_u16(addr, val) {
                     return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
@@ -794,7 +794,7 @@ impl Interpreter {
                 self.cpu.pc = pc + 4;
             }
             Instruction::Ldrsw { rt, rn, imm } => {
-                let addr = self.cpu.read_reg(rn).wrapping_add(imm as u64);
+                let addr = (self.cpu.read_reg(rn) as i64).wrapping_add(imm as i64) as u64;
                 match self.mem.read_u32(addr) {
                     Some(v) => self.cpu.write_reg_zr(rt, v as i32 as i64 as u64), // sign-extend
                     None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false }),
@@ -802,7 +802,7 @@ impl Interpreter {
                 self.cpu.pc = pc + 4;
             }
             Instruction::Ldrsb { rt, rn, imm, sf } => {
-                let addr = self.cpu.read_reg(rn).wrapping_add(imm as u64);
+                let addr = (self.cpu.read_reg(rn) as i64).wrapping_add(imm as i64) as u64;
                 match self.mem.read_u8(addr) {
                     Some(v) => {
                         let val = if sf { v as i8 as i64 as u64 } else { v as i8 as i32 as u32 as u64 };
@@ -813,7 +813,7 @@ impl Interpreter {
                 self.cpu.pc = pc + 4;
             }
             Instruction::Ldrsh { rt, rn, imm, sf } => {
-                let addr = self.cpu.read_reg(rn).wrapping_add(imm as u64);
+                let addr = (self.cpu.read_reg(rn) as i64).wrapping_add(imm as i64) as u64;
                 match self.mem.read_u16(addr) {
                     Some(v) => {
                         let val = if sf { v as i16 as i64 as u64 } else { v as i16 as i32 as u32 as u64 };
@@ -1443,8 +1443,12 @@ impl Interpreter {
             self.cpu.x[0], self.cpu.x[1], self.cpu.x[2], self.cpu.x[3],
             self.cpu.x[4], self.cpu.x[5], self.cpu.x[6], self.cpu.x[7],
         ];
+        let guest_x8 = self.cpu.x[8];
+        // Translate guest SP to a host pointer for variadic stack arg copy.
+        // Returns 0 (skip copy) if the address can't be mapped.
+        let guest_sp = self.mem.guest_to_host(self.cpu.sp, 128);
         let name = self.ffi.name_of(target);
-        let result = self.ffi.call_or_stub(target, &args);
+        let result = self.ffi.call_or_stub(target, &args, guest_x8, guest_sp);
         match result {
             crate::ffi::FfiResult::Return(val) => {
                 log::trace!("FFI {target:#x} ({}) returned {val:#x}", name.unwrap_or("?"));

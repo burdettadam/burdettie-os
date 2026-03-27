@@ -121,21 +121,21 @@ pub enum Instruction {
     StpPost { sf: bool, rt: u8, rt2: u8, rn: u8, imm: i16 },
 
     /// LDRB Wt, [Xn, #imm]  (byte load, zero-extend)
-    Ldrb { rt: u8, rn: u8, imm: u32 },
+    Ldrb { rt: u8, rn: u8, imm: i32 },
     /// STRB Wt, [Xn, #imm]  (byte store)
-    Strb { rt: u8, rn: u8, imm: u32 },
+    Strb { rt: u8, rn: u8, imm: i32 },
     /// LDRH Wt, [Xn, #imm]  (halfword load, zero-extend)
-    Ldrh { rt: u8, rn: u8, imm: u32 },
+    Ldrh { rt: u8, rn: u8, imm: i32 },
     /// STRH Wt, [Xn, #imm]  (halfword store)
-    Strh { rt: u8, rn: u8, imm: u32 },
+    Strh { rt: u8, rn: u8, imm: i32 },
 
     /// LDRSW Xt, [Xn, #imm]  (signed word load, sign-extend to 64)
-    Ldrsw { rt: u8, rn: u8, imm: u32 },
+    Ldrsw { rt: u8, rn: u8, imm: i32 },
 
     /// LDRSB Xt/Wt, [Xn, #imm]  (signed byte load)
-    Ldrsb { rt: u8, rn: u8, imm: u32, sf: bool },
+    Ldrsb { rt: u8, rn: u8, imm: i32, sf: bool },
     /// LDRSH Xt/Wt, [Xn, #imm]  (signed halfword load)
-    Ldrsh { rt: u8, rn: u8, imm: u32, sf: bool },
+    Ldrsh { rt: u8, rn: u8, imm: i32, sf: bool },
 
     /// LDR/STR Xt, [Xn, Xm{, extend/shift}]  (register-indexed)
     LdrReg { sf: bool, rt: u8, rn: u8, rm: u8, extend: u8, s: bool },
@@ -734,16 +734,16 @@ fn decode_load_store_reg(raw: u32) -> Instruction {
             (0b11, 0b00) => Instruction::StrImm { sf: true, rt, rn, imm: offset },
             (0b10, 0b01) => Instruction::LdrImm { sf: false, rt, rn, imm: offset },
             (0b10, 0b00) => Instruction::StrImm { sf: false, rt, rn, imm: offset },
-            (0b10, 0b10) => Instruction::Ldrsw { rt, rn, imm: offset },
-            (0b00, 0b01) => Instruction::Ldrb { rt, rn, imm: offset },
-            (0b00, 0b00) => Instruction::Strb { rt, rn, imm: offset },
-            (0b01, 0b01) => Instruction::Ldrh { rt, rn, imm: offset },
-            (0b01, 0b00) => Instruction::Strh { rt, rn, imm: offset },
+            (0b10, 0b10) => Instruction::Ldrsw { rt, rn, imm: offset as i32 },
+            (0b00, 0b01) => Instruction::Ldrb { rt, rn, imm: offset as i32 },
+            (0b00, 0b00) => Instruction::Strb { rt, rn, imm: offset as i32 },
+            (0b01, 0b01) => Instruction::Ldrh { rt, rn, imm: offset as i32 },
+            (0b01, 0b00) => Instruction::Strh { rt, rn, imm: offset as i32 },
             // Signed byte/halfword loads
-            (0b00, 0b10) => Instruction::Ldrsb { rt, rn, imm: offset, sf: true },   // LDRSB Xt
-            (0b00, 0b11) => Instruction::Ldrsb { rt, rn, imm: offset, sf: false },  // LDRSB Wt
-            (0b01, 0b10) => Instruction::Ldrsh { rt, rn, imm: offset, sf: true },   // LDRSH Xt
-            (0b01, 0b11) => Instruction::Ldrsh { rt, rn, imm: offset, sf: false },  // LDRSH Wt
+            (0b00, 0b10) => Instruction::Ldrsb { rt, rn, imm: offset as i32, sf: true },   // LDRSB Xt
+            (0b00, 0b11) => Instruction::Ldrsb { rt, rn, imm: offset as i32, sf: false },  // LDRSB Wt
+            (0b01, 0b10) => Instruction::Ldrsh { rt, rn, imm: offset as i32, sf: true },   // LDRSH Xt
+            (0b01, 0b11) => Instruction::Ldrsh { rt, rn, imm: offset as i32, sf: false },  // LDRSH Wt
             _ => Instruction::Unknown { raw },
         };
     }
@@ -758,19 +758,35 @@ fn decode_load_store_reg(raw: u32) -> Instruction {
         let sf = size == 0b11;
 
         let is_load = opc == 0b01;
+        let is_signed_load = opc >= 0b10; // LDRSW, LDRSB, LDRSH
         let is_sw = size == 0b10 && opc == 0b10; // LDRSW
 
         return match idx {
             0b00 => {
                 // Unscaled
                 if is_sw {
-                    Instruction::Ldur { sf: true, rt, rn, imm }
-                } else if is_load || opc == 0b01 {
-                    if size == 0b00 { Instruction::Ldrb { rt, rn, imm: imm as u32 } }
-                    else { Instruction::Ldur { sf, rt, rn, imm } }
+                    Instruction::Ldrsw { rt, rn, imm: imm as i32 }
+                } else if is_signed_load {
+                    // LDURSB / LDURSH (unscaled signed byte/halfword)
+                    match (size, opc) {
+                        (0b00, 0b10) => Instruction::Ldrsb { rt, rn, imm: imm as i32, sf: true },
+                        (0b00, 0b11) => Instruction::Ldrsb { rt, rn, imm: imm as i32, sf: false },
+                        (0b01, 0b10) => Instruction::Ldrsh { rt, rn, imm: imm as i32, sf: true },
+                        (0b01, 0b11) => Instruction::Ldrsh { rt, rn, imm: imm as i32, sf: false },
+                        _ => Instruction::Unknown { raw },
+                    }
+                } else if is_load {
+                    match size {
+                        0b00 => Instruction::Ldrb { rt, rn, imm: imm as i32 },
+                        0b01 => Instruction::Ldrh { rt, rn, imm: imm as i32 },
+                        _ => Instruction::Ldur { sf, rt, rn, imm },
+                    }
                 } else {
-                    if size == 0b00 { Instruction::Strb { rt, rn, imm: imm as u32 } }
-                    else { Instruction::Stur { sf, rt, rn, imm } }
+                    match size {
+                        0b00 => Instruction::Strb { rt, rn, imm: imm as i32 },
+                        0b01 => Instruction::Strh { rt, rn, imm: imm as i32 },
+                        _ => Instruction::Stur { sf, rt, rn, imm },
+                    }
                 }
             }
             0b01 => {

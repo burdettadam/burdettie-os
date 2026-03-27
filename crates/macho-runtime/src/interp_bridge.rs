@@ -11,7 +11,7 @@
 //!
 //! This lets the interpreter run ObjC and Foundation fixtures end-to-end.
 
-use arm64_translate::{FfiBridge, FfiResult};
+use arm64_translate::{FfiBridge, FfiResult, call_host_capturing};
 use objc_runtime::shims::dispatch::{
     objc_msg_send_addr, objc_msg_send_stret_addr, objc_msg_send_fp2ret_addr,
     objc_msg_send_super_addr, objc_msg_send_super_stret_addr,
@@ -87,13 +87,10 @@ fn register_msg_send(bridge: &mut FfiBridge, addr: u64, name: &str, guest_ranges
             return FfiResult::TailCall(imp);
         }
 
-        // Host IMP (a shim function) — call it directly.
-        // SAFETY: IMP comes from the ObjC runtime's method tables, which
-        // were populated from our shim registrations.
+        // Host IMP — call directly with full ABI capture.
         unsafe {
-            let f: extern "C" fn(u64, u64, u64, u64, u64, u64, u64, u64) -> u64 =
-                std::mem::transmute(imp);
-            FfiResult::Return(f(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7]))
+            let (x0, x1, d0, d1) = call_host_capturing(imp, args, 0, 0);
+            FfiResult::ReturnFull { x0, x1, d0, d1 }
         }
     }));
 }
@@ -130,9 +127,9 @@ fn register_msg_send_super(bridge: &mut FfiBridge, addr: u64, name: &str, guest_
         }
 
         unsafe {
-            let f: extern "C" fn(u64, u64, u64, u64, u64, u64, u64, u64) -> u64 =
-                std::mem::transmute(imp);
-            FfiResult::Return(f(receiver, sel, args[2], args[3], args[4], args[5], args[6], args[7]))
+            let super_args = [receiver, sel, args[2], args[3], args[4], args[5], args[6], args[7]];
+            let (x0, x1, d0, d1) = call_host_capturing(imp, &super_args, 0, 0);
+            FfiResult::ReturnFull { x0, x1, d0, d1 }
         }
     }));
 }
@@ -163,9 +160,9 @@ fn register_msg_send_super2(bridge: &mut FfiBridge, addr: u64, name: &str, guest
         }
 
         unsafe {
-            let f: extern "C" fn(u64, u64, u64, u64, u64, u64, u64, u64) -> u64 =
-                std::mem::transmute(imp);
-            FfiResult::Return(f(receiver, sel, args[2], args[3], args[4], args[5], args[6], args[7]))
+            let super_args = [receiver, sel, args[2], args[3], args[4], args[5], args[6], args[7]];
+            let (x0, x1, d0, d1) = call_host_capturing(imp, &super_args, 0, 0);
+            FfiResult::ReturnFull { x0, x1, d0, d1 }
         }
     }));
 }
