@@ -140,3 +140,142 @@ pub fn call_entry_with_args(
         }
     }
 }
+
+/// Call the binary's entry point via the ARM64 interpreter (Phase E3).
+///
+/// This executes the binary by interpreting ARM64 instructions instead of
+/// running them natively. This enables executing ARM64 Mach-O binaries on
+/// any host architecture.
+///
+/// # Safety
+///
+/// The mapped image segments must remain valid for the lifetime of the
+/// interpreter call. Only use with known fixture binaries.
+pub fn call_entry_interpreted(
+    image: &MappedImage,
+    entry: &EntryPoint,
+    args: Option<&EntryArgs>,
+    ffi_bridge: arm64_translate::FfiBridge,
+    extra_segments: &[(u64, *mut u8, usize, bool)],
+) -> Result<EntryResult, ExecError> {
+    match entry {
+        EntryPoint::Main { entry_offset, .. } => {
+            let text_base = image.text_base()?;
+            let entry_addr = text_base as u64 + *entry_offset as u64;
+
+            log::info!(
+                "Interpreter: entry at {entry_addr:#x} (text_base={:#x} + offset={entry_offset:#x})",
+                text_base as u64
+            );
+
+            // Build segments list for the interpreter memory model.
+            let mut segments: Vec<(u64, *mut u8, usize, bool)> = image
+                .segments
+                .iter()
+                .map(|s| {
+                    let writable = s.name != "__TEXT";
+                    (s.base as u64, s.base, s.size, writable)
+                })
+                .collect();
+            // Include segments from all loaded images (dylibs, etc.) so the
+            // interpreter can fetch instructions from stub code in dependent
+            // libraries.
+            segments.extend_from_slice(extra_segments);
+
+            // Build argv/envp (host pointers passed as u64 values)
+            let default_name = std::ffi::CString::new("app").unwrap();
+            let (c_program, c_args, c_env): (
+                std::ffi::CString,
+                Vec<std::ffi::CString>,
+                Vec<std::ffi::CString>,
+            ) = if let Some(a) = args {
+                let prog = std::ffi::CString::new(a.program_name.as_str())
+                    .unwrap_or_else(|_| default_name.clone());
+                let extra: Vec<_> = a
+                    .args
+                    .iter()
+                    .filter_map(|s| std::ffi::CString::new(s.as_str()).ok())
+                    .collect();
+                let env: Vec<_> = a
+                    .env
+                    .iter()
+                    .filter_map(|s| std::ffi::CString::new(s.as_str()).ok())
+                    .collect();
+                (prog, extra, env)
+            } else {
+                (default_name, Vec::new(), Vec::new())
+            };
+
+            let mut argv_ptrs: Vec<*const u8> = Vec::with_capacity(2 + c_args.len());
+            argv_ptrs.push(c_program.as_ptr().cast::<u8>());
+            for a in &c_args {
+                argv_ptrs.push(a.as_ptr().cast::<u8>());
+            }
+            argv_ptrs.push(std::ptr::null());
+
+            let mut envp_ptrs: Vec<*const u8> = Vec::with_capacity(1 + c_env.len());
+            for e in &c_env {
+                envp_ptrs.push(e.as_ptr().cast::<u8>());
+            }
+            envp_ptrs.push(std::ptr::null());
+
+            let argc = (argv_ptrs.len() - 1) as i32;
+
+            // Create the interpreter memory model.
+            // SAFETY: the MappedImage segments are valid for the duration of this call.
+            let mut mem = unsafe {
+                arm64_translate::Memory::from_segments(&segments)
+            };
+            // Enable host passthrough: fixture code may dereference host
+            // pointers (ObjC class objects, shim allocations, etc.) that
+            // live outside the mapped image segments.
+            mem.host_passthrough = true;
+
+            // Set up and run the interpreter.
+            let mut interp = arm64_translate::interp::setup_for_main(
+                mem,
+                ffi_bridge,
+                entry_addr,
+                argc,
+                argv_ptrs.as_ptr() as u64,
+                envp_ptrs.as_ptr() as u64,
+            );
+
+            let exit_reason = interp.run();
+            log::info!("Interpreter exit: {exit_reason:?}");
+
+            let exit_code = match exit_reason {
+                arm64_translate::ExitReason::Returned { code } => code as i32,
+                arm64_translate::ExitReason::Exit { code } => code as i32,
+                arm64_translate::ExitReason::ReturnedToHost { lr } => {
+                    log::debug!("Interpreter: RET to host LR {lr:#x}, using x0 as exit code");
+                    interp.cpu.x[0] as i32
+                }
+                arm64_translate::ExitReason::InstructionLimit { count } => {
+                    log::warn!("Interpreter: instruction limit reached ({count})");
+                    return Err(ExecError::NoEntryPoint);
+                }
+                arm64_translate::ExitReason::Unimplemented { pc, raw } => {
+                    log::error!("Interpreter: unimplemented instruction {raw:#010x} at {pc:#x}");
+                    return Err(ExecError::NoEntryPoint);
+                }
+                arm64_translate::ExitReason::MemoryFault { pc, addr, is_write } => {
+                    log::error!(
+                        "Interpreter: memory fault at PC {pc:#x}, addr {addr:#x} (write={is_write})"
+                    );
+                    return Err(ExecError::NoEntryPoint);
+                }
+                arm64_translate::ExitReason::BadBranch { pc, target } => {
+                    log::error!("Interpreter: bad branch at {pc:#x} → {target:#x}");
+                    return Err(ExecError::NoEntryPoint);
+                }
+            };
+
+            Ok(EntryResult {
+                exit_code,
+                entry_address: entry_addr,
+            })
+        }
+        EntryPoint::UnixThread { .. } => Err(ExecError::NoEntryPoint),
+    }
+}
