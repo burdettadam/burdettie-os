@@ -1,0 +1,38 @@
+# docker/Dockerfile.linux-e2e — Full runtime on Linux ARM64.
+#
+# Builds the ENTIRE workspace on Linux including objc-runtime, cf-lite,
+# libsystem-shims, platform-linux, arm64-translate, and macho-runtime.
+# The ARM64 interpreter is the execution engine (no macOS assembly
+# trampolines needed). Mach-O fixtures compiled on macOS are included
+# and executed via `load_and_run_interpreted`.
+#
+# Usage (from repo root):
+#   docker build --platform linux/arm64 -f docker/Dockerfile.linux-e2e -t darwin-runtime-linux .
+#   docker run --rm darwin-runtime-linux
+#
+# To run interactively:
+#   docker run --rm -it darwin-runtime-linux bash
+#   cargo test -p macho-runtime --test interpreted_objc_tests -- --test-threads=1
+
+FROM rust:bookworm
+
+RUN rustup component add clippy
+
+WORKDIR /workspace
+COPY . .
+
+# Build the full workspace (all crates including runtime stack).
+# On ARM64 Linux this uses platform-linux for the PAL layer.
+RUN cargo build --workspace --exclude hello-darwin \
+    --exclude control-gallery --exclude foundation-explorer \
+    --exclude window-backend-darwin \
+    2>&1 | tail -5
+
+# Build test binaries for the interpreted test suite.
+RUN cargo test --no-run -p macho-runtime --test interpreted_objc_tests 2>&1 | tail -5
+
+# Default: run the interpreted fixture tests (single-threaded for ObjC
+# runtime global state safety).
+CMD ["cargo", "test", "-p", "macho-runtime", \
+     "--test", "interpreted_objc_tests", \
+     "--", "--test-threads=1"]

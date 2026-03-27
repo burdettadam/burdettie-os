@@ -66,6 +66,26 @@ pub extern "C" fn shim_objc_set_property_nonatomic(
     }
 }
 
+/// `void objc_setProperty_nonatomic_copy(id self, SEL _cmd, id newValue, ptrdiff_t offset)`
+///
+/// In a full runtime this would call `[newValue copy]`. We store directly
+/// since our guest runtime doesn't yet support sending `copy` through the
+/// host ObjC runtime (the host can't resolve synthetic ISA pointers).
+pub extern "C" fn shim_objc_set_property_nonatomic_copy(
+    obj: u64,
+    _sel: u64,
+    new_value: u64,
+    offset: isize,
+) {
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        let slot = (obj as *mut u8).offset(offset) as *mut u64;
+        *slot = new_value;
+    }
+}
+
 /// `void objc_storeStrong(id *location, id obj)`
 pub extern "C" fn shim_objc_store_strong(location: *mut u64, obj: u64) {
     if location.is_null() {

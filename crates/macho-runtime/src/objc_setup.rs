@@ -84,6 +84,14 @@ pub(crate) fn register_foundation_classes(
     cf_lite::FoundationShims::register_nscolor_class(objc_rt);
     cf_lite::FoundationShims::register_nsfont_class(objc_rt);
     cf_lite::FoundationShims::register_nsimage_class(objc_rt);
+
+    // AppKit classes (Phase C7)
+    cf_lite::FoundationShims::register_nsappearance_class(objc_rt);
+    cf_lite::FoundationShims::register_nsusernotificationcenter_class(objc_rt);
+    cf_lite::FoundationShims::register_nsmenu_class(objc_rt);
+    cf_lite::FoundationShims::register_nsmenuitem_class(objc_rt);
+    cf_lite::FoundationShims::register_nsnib_class(objc_rt);
+
     tracer.record(
         EventKind::ClassRegistration,
         "65 synthetic Foundation/AppKit classes registered",

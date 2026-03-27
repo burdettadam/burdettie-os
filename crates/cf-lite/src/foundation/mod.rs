@@ -295,6 +295,28 @@ impl FoundationShims {
         register::register_nsimage_class(rt);
     }
 
+    // ── Phase C7 AppKit class registrations ─────────────────────
+
+    pub fn register_nsappearance_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsappearance_class(rt);
+    }
+
+    pub fn register_nsusernotificationcenter_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsusernotificationcenter_class(rt);
+    }
+
+    pub fn register_nsmenu_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsmenu_class(rt);
+    }
+
+    pub fn register_nsmenuitem_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsmenuitem_class(rt);
+    }
+
+    pub fn register_nsnib_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsnib_class(rt);
+    }
+
     /// Register tagged pointer class table entries.
     ///
     /// On arm64, tagged pointers encode a 3-bit class index in bits 60-62.

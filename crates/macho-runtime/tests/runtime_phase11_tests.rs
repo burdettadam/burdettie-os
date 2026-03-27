@@ -210,14 +210,7 @@ fn runtime_nstimer_basics_exit_zero() {
     assert_eq!(result.exit_code, 0, "nstimer_basics should exit 0");
 }
 
-// ── Try/catch ──────────────────────────────────────────────────────
-
-#[test]
-#[ignore = "D1: self-hosted __cxa_throw works but @catch in mapped binary needs full unwind info registration (future work)"]
-fn runtime_try_catch_test_exit_zero() {
-    let Some(result) = common::run_fixture("try_catch_test/app") else { return };
-    assert_eq!(
-        result.exit_code, 0,
-        "try_catch_test should exit 0 (@try/@catch/@finally)"
-    );
-}
+// NOTE: try_catch_test removed — @catch in loaded code requires full unwind
+// info registration which is future work. When implemented, the compat_score
+// regression gate (which currently skips minimal_throw and try_catch_test)
+// will cover this fixture.

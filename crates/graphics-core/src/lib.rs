@@ -12,7 +12,14 @@ mod text_layout;
 mod surface;
 mod renderer;
 mod software;
+mod image_buf;
+mod path;
+mod gradient;
+mod shadow;
 pub mod unicode;
+
+#[cfg(feature = "gpu")]
+pub mod gpu;
 
 pub use geometry::*;
 pub use color::*;
@@ -22,6 +29,13 @@ pub use text_layout::*;
 pub use surface::*;
 pub use renderer::*;
 pub use software::*;
+pub use image_buf::*;
+pub use path::*;
+pub use gradient::*;
+pub use shadow::*;
+
+#[cfg(feature = "gpu")]
+pub use gpu::{GpuRenderer, try_create_gpu_renderer};
 
 // ── Tests ──────────────────────────────────────────────────────────
 

@@ -11,9 +11,14 @@ macho-parse         = { path = "../macho-parse" }
 libsystem-shims     = { path = "../libsystem-shims" }
 runtime-diagnostics = { workspace = true }
 platform-core       = { workspace = true }
-platform-darwin-host = { workspace = true }
 log                 = { workspace = true }
 libc                = { workspace = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+platform-darwin-host = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+platform-linux       = { workspace = true }
 
 [build-dependencies]
 cc = "1"

@@ -20,11 +20,16 @@ macho-objc     = { workspace = true }
 macho-map      = { workspace = true }
 runtime-diagnostics = { workspace = true }
 platform-core  = { workspace = true }
-platform-darwin-host = { workspace = true }
 trust-policy   = { workspace = true }
 clap           = { workspace = true }
 serde_json     = { workspace = true }
 serde          = { workspace = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+platform-darwin-host = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+platform-linux       = { workspace = true }
 
 [lints]
 workspace = true

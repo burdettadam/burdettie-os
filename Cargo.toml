@@ -32,6 +32,7 @@ members = [
     "crates/window-backend-darwin",
     "crates/compat-runner",
     "crates/darwin-runtime-ffi",
+    "crates/arm64-translate",
     "apps/hello-darwin",
     "apps/control-gallery",
     "apps/foundation-explorer",
@@ -76,6 +77,7 @@ ui-controls    = { path = "crates/ui-controls" }
 window-backend-darwin = { path = "crates/window-backend-darwin" }
 compat-runner         = { path = "crates/compat-runner" }
 darwin-runtime-ffi    = { path = "crates/darwin-runtime-ffi" }
+arm64-translate       = { path = "crates/arm64-translate" }
 hello-darwin          = { path = "apps/hello-darwin" }
 control-gallery       = { path = "apps/control-gallery" }
 foundation-explorer   = { path = "apps/foundation-explorer" }

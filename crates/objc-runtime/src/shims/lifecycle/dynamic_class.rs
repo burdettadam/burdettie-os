@@ -148,6 +148,7 @@ pub extern "C" fn shim_objc_allocate_class_pair(
             },
         );
 
+
     log::debug!(
         "objc_allocateClassPair: allocated '{}' at {:#x} (meta {:#x})",
         name_str,

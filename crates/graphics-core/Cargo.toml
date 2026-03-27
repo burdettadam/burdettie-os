@@ -10,6 +10,16 @@ rust-version.workspace = true
 ab_glyph = "0.2"
 unicode-normalization = "0.1"
 unicode-segmentation = "1.11"
+image = { version = "0.25", optional = true, default-features = false, features = ["png", "jpeg"] }
+wgpu = { version = "24", optional = true }
+bytemuck = { version = "1", features = ["derive"], optional = true }
+log = { version = "0.4", optional = true }
+pollster = { version = "0.4", optional = true }
+
+[features]
+default = []
+imaging = ["dep:image"]
+gpu = ["dep:wgpu", "dep:bytemuck", "dep:log", "dep:pollster"]
 
 [lints]
 workspace = true

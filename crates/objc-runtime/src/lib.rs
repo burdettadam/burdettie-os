@@ -21,7 +21,7 @@
 pub(crate) mod blocks;
 mod class;
 pub mod refcount;
-mod shims;
+pub mod shims;
 
 pub use class::{ClassInfo, MethodEntry, ObjcRuntime, ProtocolInfo, OBJC_RUNTIME};
 pub use shims::ObjcShims;
@@ -76,15 +76,33 @@ pub fn set_threading(threading: Arc<dyn platform_core::threading::Threading>) {
 /// Access the platform heap allocator from shim functions.
 /// Falls back to libc if not initialized (for tests).
 pub(crate) fn pal_alloc() -> &'static dyn platform_core::alloc::Allocator {
-    use platform_darwin_host::DarwinAllocator;
-    static FALLBACK: DarwinAllocator = DarwinAllocator;
-    PAL_ALLOC.get().map(|a| a.as_ref()).unwrap_or(&FALLBACK)
+    #[cfg(target_os = "macos")]
+    {
+        use platform_darwin_host::DarwinAllocator;
+        static FALLBACK: DarwinAllocator = DarwinAllocator;
+        PAL_ALLOC.get().map(|a| a.as_ref()).unwrap_or(&FALLBACK)
+    }
+    #[cfg(target_os = "linux")]
+    {
+        use platform_linux::LinuxAllocator;
+        static FALLBACK: LinuxAllocator = LinuxAllocator;
+        PAL_ALLOC.get().map(|a| a.as_ref()).unwrap_or(&FALLBACK)
+    }
 }
 
 /// Access the platform threading primitives from shim functions.
 /// Falls back to POSIX pthreads if not initialized (for tests).
 pub(crate) fn pal_threading() -> &'static dyn platform_core::threading::Threading {
-    use platform_darwin_host::PosixThreading;
-    static FALLBACK: PosixThreading = PosixThreading;
-    PAL_THREADING.get().map(|t| t.as_ref()).unwrap_or(&FALLBACK)
+    #[cfg(target_os = "macos")]
+    {
+        use platform_darwin_host::PosixThreading;
+        static FALLBACK: PosixThreading = PosixThreading;
+        PAL_THREADING.get().map(|t| t.as_ref()).unwrap_or(&FALLBACK)
+    }
+    #[cfg(target_os = "linux")]
+    {
+        use platform_linux::LinuxThreading;
+        static FALLBACK: LinuxThreading = LinuxThreading;
+        PAL_THREADING.get().map(|t| t.as_ref()).unwrap_or(&FALLBACK)
+    }
 }

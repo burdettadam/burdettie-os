@@ -63,6 +63,31 @@ impl Color {
         let b = (self.b.clamp(0.0, 1.0) * 255.0) as u32;
         (a << 24) | (r << 16) | (g << 8) | b
     }
+
+    /// Create from a 32-bit ARGB pixel value.
+    pub fn from_argb32(argb: u32) -> Self {
+        let a = ((argb >> 24) & 0xFF) as f64 / 255.0;
+        let r = ((argb >> 16) & 0xFF) as f64 / 255.0;
+        let g = ((argb >> 8) & 0xFF) as f64 / 255.0;
+        let b = (argb & 0xFF) as f64 / 255.0;
+        Self { r, g, b, a }
+    }
+
+    /// Return a copy with the given alpha value.
+    pub const fn with_alpha(self, a: f64) -> Self {
+        Self { r: self.r, g: self.g, b: self.b, a }
+    }
+
+    /// Linearly interpolate between two colors.
+    pub fn lerp(self, other: Color, t: f64) -> Self {
+        let t = t.clamp(0.0, 1.0);
+        Self {
+            r: self.r + (other.r - self.r) * t,
+            g: self.g + (other.g - self.g) * t,
+            b: self.b + (other.b - self.b) * t,
+            a: self.a + (other.a - self.a) * t,
+        }
+    }
 }
 
 impl Default for Color {

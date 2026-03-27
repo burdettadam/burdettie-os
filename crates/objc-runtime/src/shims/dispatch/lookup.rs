@@ -59,7 +59,9 @@ pub extern "C" fn objc_msg_lookup_imp(obj: u64, sel: u64) -> u64 {
 
     #[cfg(target_arch = "aarch64")]
     let isa = raw_isa & 0x007ffffffffffff8;
-    #[cfg(not(target_arch = "aarch64"))]
+    #[cfg(target_arch = "x86_64")]
+    let isa = raw_isa & 0x00007ffffffffff8;
+    #[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
     let isa = raw_isa;
 
     let sel_str = unsafe { CStr::from_ptr(sel as *const c_char) }

@@ -13,6 +13,28 @@ impl Point {
     pub const fn new(x: f64, y: f64) -> Self {
         Self { x, y }
     }
+
+    /// Distance to another point.
+    pub fn distance_to(self, other: Point) -> f64 {
+        let dx = self.x - other.x;
+        let dy = self.y - other.y;
+        (dx * dx + dy * dy).sqrt()
+    }
+}
+
+/// A 2D size.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct Size {
+    pub width: f64,
+    pub height: f64,
+}
+
+impl Size {
+    pub const ZERO: Size = Size { width: 0.0, height: 0.0 };
+
+    pub const fn new(width: f64, height: f64) -> Self {
+        Self { width, height }
+    }
 }
 
 /// An axis-aligned rectangle.
@@ -70,5 +92,25 @@ impl Rect {
             (self.width - 2.0 * dx).max(0.0),
             (self.height - 2.0 * dy).max(0.0),
         )
+    }
+
+    /// Size of this rect.
+    pub fn size(&self) -> Size {
+        Size::new(self.width, self.height)
+    }
+
+    /// Right edge (x + width).
+    pub fn max_x(&self) -> f64 {
+        self.x + self.width
+    }
+
+    /// Bottom edge (y + height).
+    pub fn max_y(&self) -> f64 {
+        self.y + self.height
+    }
+
+    /// Center point.
+    pub fn center(&self) -> Point {
+        Point::new(self.x + self.width * 0.5, self.y + self.height * 0.5)
     }
 }

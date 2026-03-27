@@ -1,6 +1,6 @@
 [package]
 name         = "platform-linux"
-description  = "Linux host implementation of platform-core traits (stub)"
+description  = "Linux host implementation of platform-core traits"
 version.workspace      = true
 edition.workspace      = true
 license.workspace      = true
@@ -10,6 +10,8 @@ rust-version.workspace = true
 platform-core = { path = "../platform-core" }
 macho-exec    = { path = "../macho-exec" }
 log           = { workspace = true }
+libc          = { workspace = true }
+sha2          = { workspace = true }
 
 [lints]
 workspace = true

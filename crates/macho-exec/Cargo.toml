@@ -15,6 +15,7 @@ macho-objc     = { workspace = true }
 trust-policy   = { workspace = true }
 runtime-diagnostics = { workspace = true }
 platform-core  = { workspace = true }
+arm64-translate = { workspace = true }
 thiserror      = { workspace = true }
 log            = { workspace = true }
 libc           = { workspace = true }
@@ -22,8 +23,13 @@ libc           = { workspace = true }
 [dev-dependencies]
 macho-fixtures     = { workspace = true }
 macho-run-plan     = { workspace = true }
-platform-darwin-host = { workspace = true }
 serde_json         = { workspace = true }
+
+[target.'cfg(target_os = "macos")'.dev-dependencies]
+platform-darwin-host = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+platform-linux       = { workspace = true }
 
 [lints]
 workspace = true

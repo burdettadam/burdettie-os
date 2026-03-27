@@ -14,11 +14,16 @@ path = "src/main.rs"
 macho-runtime  = { workspace = true }
 runtime-demo   = { workspace = true }
 platform-core  = { workspace = true }
-platform-darwin-host = { workspace = true }
 trust-policy   = { workspace = true }
 serde_json     = { workspace = true }
 log            = { workspace = true }
 env_logger     = { workspace = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+platform-darwin-host = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+platform-linux       = { workspace = true }
 
 [lints]
 workspace = true

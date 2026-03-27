@@ -23,14 +23,20 @@ Progress is driven by **running real binaries and expanding capabilities where r
 
 ## Status
 
-- **900+ tests, 0 failures, 0 clippy warnings**
-- **62 fixture binaries** executing end-to-end
-- **30 workspace members** (27 crates + 3 GUI apps)
-- **40 Foundation classes** registered
-- **59 shim functions** (libsystem-shims) + ObjC/Foundation method shims
-- **Compatibility: 62/62 (100%)**
+- **1090+ tests, 0 failures, 0 clippy warnings**
+- **85+ fixture binaries** executing end-to-end
+- **31 workspace crates** + 3 GUI apps (34 workspace members)
+- **52 Foundation classes** registered
+- **340+ total shims** (libsystem-shims + ObjC method shims)
+- **Compatibility: 63/63 (100%)** — all compat-scored fixtures pass
+- **17/17 corpus programs** passing
 - **3 GUI apps** (hello-darwin, control-gallery, foundation-explorer)
-- **App layer phases 30–38 complete** — see [APP_LAYER_ROADMAP.md](APP_LAYER_ROADMAP.md)
+- **GPU renderer** (`GpuRenderer` via wgpu, glyph atlas, optional `gpu` feature)
+- **Drawing primitives** (BezierPath, Gradient, Shadow, ImageBuffer, scanline fill, image blit)
+- **x86_64 trampolines** — all 7 `objc_msgSend` entry points + variadic bridges
+- **Linux PAL** — all 10 traits implemented, cross-compile verified
+- **App layer phases C1–C7, D1–D4, E1–E2, F1–F3 complete**
+- See [NEXT_GENERATION_ROADMAP.md](NEXT_GENERATION_ROADMAP.md) for Track C–F details
 
 ---
 

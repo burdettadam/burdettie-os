@@ -65,6 +65,13 @@ pub(super) fn install_class_symbols(table: &mut ShimTable) {
     register_class!(table, "NSFont", nsobj::nsfont_class_addr(), nsobj::nsfont_metaclass_addr());
     register_class!(table, "NSImage", nsobj::nsimage_class_addr(), nsobj::nsimage_metaclass_addr());
 
+    // ── AppKit Phase C7 class data symbols ──────────────────────────
+    register_class!(table, "NSAppearance", nsobj::nsappearance_class_addr(), nsobj::nsappearance_metaclass_addr());
+    register_class!(table, "NSUserNotificationCenter", nsobj::nsusernotificationcenter_class_addr(), nsobj::nsusernotificationcenter_metaclass_addr());
+    register_class!(table, "NSMenu", nsobj::nsmenu_class_addr(), nsobj::nsmenu_metaclass_addr());
+    register_class!(table, "NSMenuItem", nsobj::nsmenuitem_class_addr(), nsobj::nsmenuitem_metaclass_addr());
+    register_class!(table, "NSNib", nsobj::nsnib_class_addr(), nsobj::nsnib_metaclass_addr());
+
     // ── Synthetic _OBJC_EHTYPE_$_NSException ──────────────────────────
     // On macOS, @catch(NSException *) uses the personality function
     // __objc_personality_v0, which requires an objc_ehtype_t struct whose

@@ -5,11 +5,16 @@
 
 use std::fs;
 use std::path::PathBuf;
+use std::sync::Mutex;
 
 use graphics_core::Rect;
+use macho_runtime::{Runtime, RuntimeConfig};
 use ui_controls::{Button, HeadlessApp, Label};
 
 use hello_darwin::{discover_fixtures, run_scorecard_from};
+
+/// Serializes in-process load_and_run calls (global ObjC state is process-wide).
+static RUNTIME_LOCK: Mutex<()> = Mutex::new(());
 
 /// Create a temporary fixture tree with fake binaries.
 fn make_temp_fixtures() -> tempfile::TempDir {
@@ -127,27 +132,76 @@ fn scorecard_from_nonexistent_dir() {
     assert_eq!(result, "Fixtures directory not found.");
 }
 
-#[test]
-fn scorecard_from_real_fixtures() {
-    // Use the actual fixtures directory if available
+/// Resolve the workspace fixtures directory (apps/hello-darwin -> workspace root).
+fn real_fixtures_dir() -> Option<PathBuf> {
     let mut p = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    // apps/hello-darwin -> workspace root
-    p.pop();
-    p.pop();
+    p.pop(); // apps/
+    p.pop(); // workspace root
     let fixtures = p.join("fixtures");
-    if !fixtures.is_dir() {
-        // Skip if fixtures aren't built
-        return;
+    fixtures.is_dir().then_some(fixtures)
+}
+
+/// Expected exit code per fixture.
+fn expected_exit(name: &str) -> i32 {
+    match name {
+        "return42" => 42,
+        "appkit_bootstrap" => 1,
+        _ => 0,
+    }
+}
+
+/// Decomposed per-fixture test — runs each fixture individually and reports
+/// which specific fixtures pass or fail, instead of a single opaque scorecard.
+#[test]
+fn scorecard_per_fixture_results() {
+    let Some(fixtures_root) = real_fixtures_dir() else { return };
+    let entries = discover_fixtures(&fixtures_root);
+
+    assert!(
+        entries.len() >= 61,
+        "Expected at least 61 discoverable fixtures, found {}",
+        entries.len()
+    );
+
+    let mut passed = Vec::new();
+    let mut failed = Vec::new();
+
+    for (name, binary) in &entries {
+        let expected = expected_exit(name);
+        let config = RuntimeConfig::permissive(binary);
+
+        let _lock = RUNTIME_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        match Runtime::load_and_run(binary, &config) {
+            Ok(result) if result.exit_code == expected => {
+                passed.push(name.clone());
+            }
+            Ok(result) => {
+                failed.push(format!(
+                    "{name}: exit {} (expected {expected})",
+                    result.exit_code
+                ));
+            }
+            Err(e) => {
+                failed.push(format!("{name}: runtime error — {e}"));
+            }
+        }
     }
 
-    let result = run_scorecard_from(&fixtures);
+    // Print summary so --nocapture shows what happened
+    let total = passed.len() + failed.len();
+    println!("\nScorecard: {}/{total} fixtures passed", passed.len());
+    if !failed.is_empty() {
+        println!("Failures:");
+        for f in &failed {
+            println!("  {f}");
+        }
+    }
+
     assert!(
-        result.starts_with("Scorecard:"),
-        "should start with Scorecard: but got: {result}"
-    );
-    assert!(
-        result.contains("fixtures passed"),
-        "should contain 'fixtures passed' but got: {result}"
+        failed.is_empty(),
+        "Scorecard regression — {} fixture(s) failed:\n  {}",
+        failed.len(),
+        failed.join("\n  ")
     );
 }
 

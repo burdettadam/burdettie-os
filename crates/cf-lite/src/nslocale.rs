@@ -8,6 +8,7 @@
 //! Provides `+[NSLocale currentLocale]` as a singleton using the system
 //! locale from the `LANG` environment variable, falling back to `en_US`.
 
+use std::ffi::c_char;
 use std::sync::OnceLock;
 
 use crate::cfstring;
@@ -65,7 +66,7 @@ pub extern "C" fn shim_nslocale_locale_identifier(obj: u64, _cmd: u64) -> u64 {
     if obj == 0 {
         return 0;
     }
-    let id_ptr = unsafe { *((obj as *const u64).add(1)) } as *const i8;
+    let id_ptr = unsafe { *((obj as *const u64).add(1)) } as *const c_char;
     if id_ptr.is_null() {
         return 0;
     }
@@ -77,7 +78,7 @@ pub extern "C" fn shim_nslocale_language_code(obj: u64, _cmd: u64) -> u64 {
     if obj == 0 {
         return 0;
     }
-    let id_ptr = unsafe { *((obj as *const u64).add(1)) } as *const i8;
+    let id_ptr = unsafe { *((obj as *const u64).add(1)) } as *const c_char;
     if id_ptr.is_null() {
         return 0;
     }
@@ -93,7 +94,7 @@ pub extern "C" fn shim_nslocale_country_code(obj: u64, _cmd: u64) -> u64 {
     if obj == 0 {
         return 0;
     }
-    let id_ptr = unsafe { *((obj as *const u64).add(1)) } as *const i8;
+    let id_ptr = unsafe { *((obj as *const u64).add(1)) } as *const c_char;
     if id_ptr.is_null() {
         return 0;
     }
@@ -148,7 +149,7 @@ pub extern "C" fn shim_nslocale_description(obj: u64, _cmd: u64) -> u64 {
     if obj == 0 {
         return 0;
     }
-    let id_ptr = unsafe { *((obj as *const u64).add(1)) } as *const i8;
+    let id_ptr = unsafe { *((obj as *const u64).add(1)) } as *const c_char;
     let id_str = if !id_ptr.is_null() {
         let cstr = unsafe { std::ffi::CStr::from_ptr(id_ptr) };
         cstr.to_str().unwrap_or("?")

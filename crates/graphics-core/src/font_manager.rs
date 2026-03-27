@@ -193,6 +193,11 @@ impl FontManager {
         self.get("System-BoldItalic")
     }
 
+    /// Access a font face by index. Returns None if out of range.
+    pub fn face_by_index(&self, index: usize) -> Option<&FontFace> {
+        self.fonts.get(index)
+    }
+
     /// Resolve a `Font` descriptor to a concrete `FontFace`, respecting bold/italic flags.
     pub fn resolve_font(&self, font: &super::Font) -> &FontFace {
         if font.bold && font.italic {

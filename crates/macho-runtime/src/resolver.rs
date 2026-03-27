@@ -52,8 +52,12 @@ mod tests {
     use super::*;
 
     fn test_stub_resolver() -> StubResolver {
+        #[cfg(target_os = "macos")]
         let host: std::sync::Arc<dyn platform_core::symbols::HostSymbolResolver> =
             std::sync::Arc::new(platform_darwin_host::DarwinSymbolResolver::new());
+        #[cfg(target_os = "linux")]
+        let host: std::sync::Arc<dyn platform_core::symbols::HostSymbolResolver> =
+            std::sync::Arc::new(platform_linux::LinuxSymbolResolver::new());
         StubResolver::new(host)
     }
 

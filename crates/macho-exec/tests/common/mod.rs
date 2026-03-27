@@ -8,7 +8,10 @@ use platform_core::unwind::UnwindRegistry;
 pub use macho_fixtures::{fixtures_dir, read_fixture};
 
 pub fn default_mapper() -> Arc<dyn MemoryMapper> {
-    Arc::new(platform_darwin_host::DarwinMemoryMapper)
+    #[cfg(target_os = "macos")]
+    { Arc::new(platform_darwin_host::DarwinMemoryMapper) }
+    #[cfg(target_os = "linux")]
+    { Arc::new(platform_linux::LinuxMemoryMapper) }
 }
 
 pub fn default_unwind() -> Arc<dyn UnwindRegistry> {
@@ -16,7 +19,11 @@ pub fn default_unwind() -> Arc<dyn UnwindRegistry> {
 }
 
 pub fn default_stub_resolver() -> StubResolver {
+    #[cfg(target_os = "macos")]
     let host: Arc<dyn platform_core::symbols::HostSymbolResolver> =
         Arc::new(platform_darwin_host::DarwinSymbolResolver::new());
+    #[cfg(target_os = "linux")]
+    let host: Arc<dyn platform_core::symbols::HostSymbolResolver> =
+        Arc::new(platform_linux::LinuxSymbolResolver::new());
     StubResolver::new(host)
 }

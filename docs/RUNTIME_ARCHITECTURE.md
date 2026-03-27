@@ -18,7 +18,8 @@
 
 ## Where we are
 
-After 33+ phases the **loader core** and **runtime layer** are fully operational:
+After 50+ phases the **loader core** and **runtime layer** are fully operational,
+with cross-platform trampolines, a GPU rendering pipeline, and Linux PAL complete:
 
 | Area | Status |
 |---|---|
@@ -27,12 +28,15 @@ After 33+ phases the **loader core** and **runtime layer** are fully operational
 | Fixup application | Complete — classic rebase/bind, chained fixups (all 5 pointer formats), re-export chain following, weak null-fill |
 | In-process execution | Complete — contiguous mmap, protection finalization, `StubResolver` with 86+ allowed symbols via `dlsym`, constructor invocation |
 | Security modeling | Complete — 8-gate evaluation, trust reports, entitlement keys, encrypted binary rejection |
-| Runtime shims | 158 shims across 8 categories (process, TLS, dispatch, pthread, mach, lifecycle, ObjC, Foundation) |
-| ObjC runtime | ARM64 assembly `objc_msgSend` / `objc_msgSendSuper` / `objc_msgSendSuper2` trampolines, class registration with superclass chain traversal, metaclass dispatch, selector interning + `__objc_selrefs` uniquing, `__objc_stubs` support, category merge (instance + class methods), +load, retain/release/autorelease, blocks runtime (`_Block_copy`/`_Block_release`), two-phase cross-image registration, post-fixup superclass repair, ObjC introspection (5 helpers), host msgSend fallback with selector translation, tagged pointer forwarding |
-| Foundation-lite | 35 Foundation classes: NSObject, NSString/__NSCFConstantString (30 methods), NSArray (9), NSMutableArray (16), NSDictionary (8), NSMutableDictionary (12), NSNumber (6+3), NSMutableString (13), NSData (4+2), NSProcessInfo (7+1), NSError (6+1), NSBundle (4+1), NSFileManager (4+1), NSException (6+1), NSEnumerator (2), NSDate (8+3), NSUserDefaults (8+1), NSSet (10+3), NSMutableSet (16+2), NSURL (8+2), NSNull (1+1), NSDateFormatter (8), NSCharacterSet (1+10), NSNotificationCenter (5+1), NSValue (4+3), NSUUID (4+1), NSLocale (6+1), NSTimeZone (4+5), NSCalendar (6+2), NSNumberFormatter (8), NSIndexSet (6+3), NSMutableIndexSet (5+1), NSSortDescriptor (5+1), NSTimer (5+3); NSLog with ARM64 variadic trampoline + capture |
-| T-matrix coverage | T0–T45 all passing — 35 known fixtures, 136 runtime tests + 348 lib/unit tests, 0 warnings |
-| Exception handling | Compact unwind registration via `__unw_add_find_dynamic_unwind_sections`, cf-lite→host NSException translation, `@try`/`@catch`/`@finally` through mapped code |
-| Code quality | Workspace-wide clippy lint config, silenced error audit, 0 warnings |
+| Runtime shims | 340+ shims across 9 categories (process, TLS, dispatch, pthread, mach, lifecycle, ObjC, Foundation, CF) |
+| ObjC runtime | ARM64 + x86_64 assembly trampolines (7 entry points each), self-hosted exception handling (C++ ABI), tagged pointer dispatch (NSNumber/NSString/NSDate), tagged pointer ISA table, self-hosted NSConstant* classes, doesNotRecognizeSelector:, class registration, metaclass dispatch, selector interning, category merge, +load, retain/release/autorelease, blocks, KVO/KVC/swizzling/NSInvocation, protocols (C1), dynamic class creation (C2), struct return ABI (C3) |
+| Foundation-lite | 52 Foundation classes including AppKit stubs: NSObject, NSString, NSArray, NSMutableArray, NSDictionary, NSMutableDictionary, NSNumber, NSData, NSProcessInfo, NSError, NSBundle (.app bundle loading), NSFileManager, NSException, NSDate, NSUserDefaults, NSSet, NSURL, NSNull, NSDateFormatter, NSCharacterSet, NSNotificationCenter, NSValue (CG types), NSUUID, NSLocale, NSTimeZone, NSCalendar, NSNumberFormatter, NSIndexSet, NSSortDescriptor, NSTimer, NSLog; AppKit: NSApplication, NSWindow, NSView, NSEvent, NSScreen, NSWorkspace, NSColor, NSFont, NSImage, NSRunLoop, NSResponder, NSAppearance, NSUserNotificationCenter, NSMenu, NSMenuItem, NSNib |
+| Fixture coverage | 85+ fixture directories, 63 compat-scored, 17/17 corpus binaries — 1090+ tests, 0 failures |
+| Exception handling | Self-hosted via C++ ABI (`__cxa_throw`/`__cxa_begin_catch`/`__cxa_end_catch`), compact unwind registration, `@try`/`@catch`/`@finally` through mapped code |
+| Platform abstraction | 10 PAL traits — macOS (`DarwinHostPlatform`) and Linux (`LinuxHostPlatform`) impls complete |
+| GUI stack | software-rendered (SoftwareRenderer: scanline fill, image blit, gradients) + GPU-accelerated (GpuRenderer via wgpu, glyph atlas) + TrueType text layout (ab_glyph, FontManager) + drawing primitives (BezierPath, Gradient, Shadow, ImageBuffer) |
+| Cross-platform | x86_64 assembly trampolines verified; `cargo check --target x86_64-apple-darwin` and `aarch64-unknown-linux-gnu` both pass |
+| Code quality | Workspace-wide clippy lint config, 0 warnings |
 
 ---
 

@@ -49,11 +49,11 @@ fn context_installs_all_shims() {
     let shim_set = ShimSet::default();
     let ctx = RuntimeContext::new(&config, &shim_set);
 
-    // Shim count (updated after C5: +25 AppKit shims)
+    // Shim count (updated after adding objc_setProperty_nonatomic_copy shim)
     #[cfg(target_os = "macos")]
-    assert_eq!(ctx.shim_table.len(), 333);
+    assert_eq!(ctx.shim_table.len(), 341);
     #[cfg(not(target_os = "macos"))]
-    assert_eq!(ctx.shim_table.len(), 333);
+    assert_eq!(ctx.shim_table.len(), 341);
 }
 
 #[test]
@@ -92,8 +92,12 @@ fn composite_resolver_shim_priority() {
     table.register("_printf", 0xCAFE, "test override");
 
     let stub = {
+        #[cfg(target_os = "macos")]
         let host: std::sync::Arc<dyn platform_core::symbols::HostSymbolResolver> =
             std::sync::Arc::new(platform_darwin_host::DarwinSymbolResolver::new());
+        #[cfg(target_os = "linux")]
+        let host: std::sync::Arc<dyn platform_core::symbols::HostSymbolResolver> =
+            std::sync::Arc::new(platform_linux::LinuxSymbolResolver::new());
         StubResolver::new(host)
     };
     let resolver = CompositeResolver::new(&table, Some(&stub));
@@ -110,8 +114,12 @@ fn composite_resolver_host_fallback() {
 
     let table = ShimTable::new();
     let stub = {
+        #[cfg(target_os = "macos")]
         let host: std::sync::Arc<dyn platform_core::symbols::HostSymbolResolver> =
             std::sync::Arc::new(platform_darwin_host::DarwinSymbolResolver::new());
+        #[cfg(target_os = "linux")]
+        let host: std::sync::Arc<dyn platform_core::symbols::HostSymbolResolver> =
+            std::sync::Arc::new(platform_linux::LinuxSymbolResolver::new());
         StubResolver::new(host)
     };
     let resolver = CompositeResolver::new(&table, Some(&stub));

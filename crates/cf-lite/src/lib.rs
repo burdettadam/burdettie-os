@@ -80,10 +80,14 @@ pub(crate) mod nswindow;
 pub(crate) mod nsworkspace;
 // AppKit stubs
 pub(crate) mod nsapplication;
+pub(crate) mod nsappearance;
 pub(crate) mod nscolor;
 pub(crate) mod nsevent;
 pub(crate) mod nsfont;
 pub(crate) mod nsimage;
+pub(crate) mod nsmenu_shim;
+pub(crate) mod nsnib;
+pub(crate) mod nsusernotificationcenter;
 
 pub use foundation::FoundationShims;
 
@@ -115,32 +119,50 @@ pub(crate) fn platform() -> &'static dyn PlatformProvider {
 /// Convenience accessor for the platform heap allocator.
 /// Falls back to libc if the platform isn't initialized (unit tests).
 pub(crate) fn pal_alloc() -> &'static dyn platform_core::alloc::Allocator {
-    use platform_darwin_host::DarwinAllocator;
-    static FALLBACK: DarwinAllocator = DarwinAllocator;
-    PLATFORM
-        .get()
-        .map(|p| p.alloc())
-        .unwrap_or(&FALLBACK)
+    #[cfg(target_os = "macos")]
+    {
+        use platform_darwin_host::DarwinAllocator;
+        static FALLBACK: DarwinAllocator = DarwinAllocator;
+        PLATFORM.get().map(|p| p.alloc()).unwrap_or(&FALLBACK)
+    }
+    #[cfg(target_os = "linux")]
+    {
+        use platform_linux::LinuxAllocator;
+        static FALLBACK: LinuxAllocator = LinuxAllocator;
+        PLATFORM.get().map(|p| p.alloc()).unwrap_or(&FALLBACK)
+    }
 }
 
 /// Convenience accessor for the platform symbol resolver.
 /// Falls back to libc dlsym if the platform isn't initialized (unit tests).
 pub(crate) fn pal_symbols() -> &'static dyn platform_core::symbols::HostSymbolResolver {
-    use platform_darwin_host::DarwinSymbolResolver;
-    static FALLBACK: DarwinSymbolResolver = DarwinSymbolResolver::new();
-    PLATFORM
-        .get()
-        .map(|p| p.symbols())
-        .unwrap_or(&FALLBACK)
+    #[cfg(target_os = "macos")]
+    {
+        use platform_darwin_host::DarwinSymbolResolver;
+        static FALLBACK: DarwinSymbolResolver = DarwinSymbolResolver::new();
+        PLATFORM.get().map(|p| p.symbols()).unwrap_or(&FALLBACK)
+    }
+    #[cfg(target_os = "linux")]
+    {
+        use platform_linux::LinuxSymbolResolver;
+        static FALLBACK: LinuxSymbolResolver = LinuxSymbolResolver::new();
+        PLATFORM.get().map(|p| p.symbols()).unwrap_or(&FALLBACK)
+    }
 }
 
 /// Convenience accessor for the platform threading primitives.
 /// Falls back to POSIX pthreads if the platform isn't initialized (unit tests).
 pub(crate) fn pal_threading() -> &'static dyn platform_core::threading::Threading {
-    use platform_darwin_host::PosixThreading;
-    static FALLBACK: PosixThreading = PosixThreading;
-    PLATFORM
-        .get()
-        .map(|p| p.threading())
-        .unwrap_or(&FALLBACK)
+    #[cfg(target_os = "macos")]
+    {
+        use platform_darwin_host::PosixThreading;
+        static FALLBACK: PosixThreading = PosixThreading;
+        PLATFORM.get().map(|p| p.threading()).unwrap_or(&FALLBACK)
+    }
+    #[cfg(target_os = "linux")]
+    {
+        use platform_linux::LinuxThreading;
+        static FALLBACK: LinuxThreading = LinuxThreading;
+        PLATFORM.get().map(|p| p.threading()).unwrap_or(&FALLBACK)
+    }
 }

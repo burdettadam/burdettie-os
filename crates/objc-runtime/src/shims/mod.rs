@@ -9,7 +9,7 @@
 //! (x0-x7, d0-d7) across the class-table lookup, then tail-calls the
 //! IMP.
 
-mod dispatch;
+pub mod dispatch;
 mod install;
 mod install_advanced;
 mod lifecycle;

@@ -135,7 +135,8 @@ impl StubResolver {
             | "_dispatch_main_q"
             // Math
             | "floor" | "ceil" | "round" | "sqrt" | "pow"
-            | "log" | "sin" | "cos" | "fabs"
+            | "log" | "log2" | "log10" | "exp" | "exp2"
+            | "sin" | "cos" | "tan" | "fabs" | "fmod"
             // Random — now shimmed via RandomShims, but keep safe-list
             // entries for binaries that link directly.
             | "arc4random" | "arc4random_buf" | "arc4random_uniform"
@@ -165,8 +166,12 @@ mod tests {
     use super::*;
 
     fn test_resolver() -> StubResolver {
+        #[cfg(target_os = "macos")]
         let host: Arc<dyn HostSymbolResolver> =
             Arc::new(platform_darwin_host::DarwinSymbolResolver::new());
+        #[cfg(target_os = "linux")]
+        let host: Arc<dyn HostSymbolResolver> =
+            Arc::new(platform_linux::LinuxSymbolResolver::new());
         StubResolver::new(host)
     }
 

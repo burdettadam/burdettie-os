@@ -13,6 +13,8 @@
 //! For our runtime, we support string-key-based sorting using the ObjC
 //! runtime's msg_lookup to dispatch the key getter and `compare:`.
 
+use std::ffi::c_char;
+
 use crate::cfstring;
 use crate::nsobj;
 
@@ -57,7 +59,7 @@ fn alloc_nssortdescriptor(key: &str, ascending: bool) -> u64 {
 
 /// Read the key as a &str from the stored C string pointer.
 fn read_key(obj: u64) -> &'static str {
-    let key_ptr = unsafe { *((obj as *const u64).add(1)) } as *const i8;
+    let key_ptr = unsafe { *((obj as *const u64).add(1)) } as *const c_char;
     if key_ptr.is_null() {
         return "";
     }
@@ -90,7 +92,7 @@ pub extern "C" fn shim_nssortdescriptor_key(obj: u64, _cmd: u64) -> u64 {
     if obj == 0 {
         return 0;
     }
-    let key_ptr = unsafe { *((obj as *const u64).add(1)) } as *const i8;
+    let key_ptr = unsafe { *((obj as *const u64).add(1)) } as *const c_char;
     if key_ptr.is_null() {
         return 0;
     }

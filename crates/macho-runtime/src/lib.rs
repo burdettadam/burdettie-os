@@ -21,6 +21,7 @@
 pub mod config;
 pub mod context;
 pub mod error;
+pub mod interp_bridge;
 mod loader;
 mod objc_setup;
 pub mod resolver;
@@ -77,7 +78,10 @@ impl Runtime {
             .unwrap_or_else(RuntimeTracer::disabled);
 
         // Initialize platform hasher for code signature verification
+        #[cfg(target_os = "macos")]
         macho_parse::set_platform_hasher(std::sync::Arc::new(platform_darwin_host::DarwinHasher));
+        #[cfg(target_os = "linux")]
+        macho_parse::set_platform_hasher(std::sync::Arc::new(platform_linux::LinuxHasher));
 
         // 1. Read binary data
         let data = config
@@ -137,20 +141,34 @@ impl Runtime {
         );
 
         // 5. Build composite resolver: shims → host fallback
+        #[cfg(target_os = "macos")]
         let host_symbols: std::sync::Arc<dyn platform_core::symbols::HostSymbolResolver> =
             std::sync::Arc::new(platform_darwin_host::DarwinSymbolResolver::new());
+        #[cfg(target_os = "linux")]
+        let host_symbols: std::sync::Arc<dyn platform_core::symbols::HostSymbolResolver> =
+            std::sync::Arc::new(platform_linux::LinuxSymbolResolver::new());
 
         // Install host symbol resolver for objc-runtime exception bridge
         objc_runtime::set_host_symbols(host_symbols.clone());
 
         // Install platform allocator for objc-runtime object memory
+        #[cfg(target_os = "macos")]
         objc_runtime::set_allocator(
             std::sync::Arc::new(platform_darwin_host::DarwinAllocator),
         );
+        #[cfg(target_os = "linux")]
+        objc_runtime::set_allocator(
+            std::sync::Arc::new(platform_linux::LinuxAllocator),
+        );
 
         // Install platform threading for objc-runtime @synchronized
+        #[cfg(target_os = "macos")]
         objc_runtime::set_threading(
             std::sync::Arc::new(platform_darwin_host::PosixThreading),
+        );
+        #[cfg(target_os = "linux")]
+        objc_runtime::set_threading(
+            std::sync::Arc::new(platform_linux::LinuxThreading),
         );
 
         let stub_resolver = if config.host_fallback {
@@ -161,9 +179,15 @@ impl Runtime {
         let composite = CompositeResolver::new(&ctx.shim_table, stub_resolver.as_ref());
 
         // 6. Load dependencies + main binary into ImageRegistry
+        #[cfg(target_os = "macos")]
+        let unwind_registry: std::sync::Arc<dyn platform_core::unwind::UnwindRegistry> =
+            std::sync::Arc::new(platform_darwin_host::DarwinUnwindRegistry);
+        #[cfg(target_os = "linux")]
+        let unwind_registry: std::sync::Arc<dyn platform_core::unwind::UnwindRegistry> =
+            std::sync::Arc::new(platform_linux::LinuxUnwindRegistry::new());
         let mut registry = ImageRegistry::new(
             config.platform.memory(),
-            std::sync::Arc::new(platform_darwin_host::DarwinUnwindRegistry),
+            unwind_registry,
         );
         let binary_dir = binary_path.parent().unwrap_or(Path::new("."));
 
@@ -384,4 +408,264 @@ impl Runtime {
         })
     }
 
+    /// Load a Mach-O binary and run it via the ARM64 interpreter.
+    ///
+    /// Same pipeline as [`load_and_run`] through phase 7.5 (parse, map, shim,
+    /// fixup, ObjC registration), then executes through the interpreter instead
+    /// of native execution. This enables running ObjC/Foundation fixtures on
+    /// any architecture.
+    pub fn load_and_run_interpreted(
+        binary_path: &Path,
+        config: &RuntimeConfig,
+    ) -> Result<RuntimeResult, RuntimeError> {
+        // Initialize platform hasher for code signature verification
+        #[cfg(target_os = "macos")]
+        macho_parse::set_platform_hasher(std::sync::Arc::new(platform_darwin_host::DarwinHasher));
+        #[cfg(target_os = "linux")]
+        macho_parse::set_platform_hasher(std::sync::Arc::new(platform_linux::LinuxHasher));
+
+        // 1. Read binary
+        let data = config
+            .platform
+            .fs()
+            .read(binary_path)
+            .map_err(|e| RuntimeError::Io {
+                path: binary_path.to_path_buf(),
+                source: e,
+            })?;
+
+        // 2. Parse
+        let parsed = macho_parse::parse_auto(&data, macho_types::CpuType::Arm64)?;
+        let main_data = if macho_parse::is_fat(&data) {
+            macho_parse::fat_slice_for_cpu(&data, macho_types::CpuType::Arm64)?.to_vec()
+        } else {
+            data
+        };
+
+        // 4. Build shim table
+        let shim_config = ShimConfig {
+            process_name: config.process_name.clone(),
+            executable_path: config.process_path.to_string_lossy().to_string(),
+            argc: 1,
+            argv: vec![config.process_name.clone()],
+            env: config.env_overrides.clone(),
+        };
+        let ctx = RuntimeContext::new(&shim_config, &config.shim_set);
+
+        // 5. Build composite resolver
+        #[cfg(target_os = "macos")]
+        let host_symbols: std::sync::Arc<dyn platform_core::symbols::HostSymbolResolver> =
+            std::sync::Arc::new(platform_darwin_host::DarwinSymbolResolver::new());
+        #[cfg(target_os = "linux")]
+        let host_symbols: std::sync::Arc<dyn platform_core::symbols::HostSymbolResolver> =
+            std::sync::Arc::new(platform_linux::LinuxSymbolResolver::new());
+
+        objc_runtime::set_host_symbols(host_symbols.clone());
+        #[cfg(target_os = "macos")]
+        objc_runtime::set_allocator(
+            std::sync::Arc::new(platform_darwin_host::DarwinAllocator),
+        );
+        #[cfg(target_os = "linux")]
+        objc_runtime::set_allocator(
+            std::sync::Arc::new(platform_linux::LinuxAllocator),
+        );
+        #[cfg(target_os = "macos")]
+        objc_runtime::set_threading(
+            std::sync::Arc::new(platform_darwin_host::PosixThreading),
+        );
+        #[cfg(target_os = "linux")]
+        objc_runtime::set_threading(
+            std::sync::Arc::new(platform_linux::LinuxThreading),
+        );
+
+        let stub_resolver = if config.host_fallback {
+            Some(StubResolver::new(host_symbols))
+        } else {
+            None
+        };
+        let composite = CompositeResolver::new(&ctx.shim_table, stub_resolver.as_ref());
+
+        // 6. Load + map
+        #[cfg(target_os = "macos")]
+        let unwind_registry: std::sync::Arc<dyn platform_core::unwind::UnwindRegistry> =
+            std::sync::Arc::new(platform_darwin_host::DarwinUnwindRegistry);
+        #[cfg(target_os = "linux")]
+        let unwind_registry: std::sync::Arc<dyn platform_core::unwind::UnwindRegistry> =
+            std::sync::Arc::new(platform_linux::LinuxUnwindRegistry::new());
+        let mut registry = ImageRegistry::new(config.platform.memory(), unwind_registry);
+        let binary_dir = binary_path.parent().unwrap_or(Path::new("."));
+        loader::load_dependencies(&parsed, &mut registry, binary_dir, config.platform.fs())?;
+        let app_idx = registry.load("__main__", main_data)?;
+
+        // 7. Apply fixups
+        registry.apply_all_fixups(&composite)?;
+
+        // 7.5. ObjC registration
+        if config.shim_set.objc {
+            let mut objc_rt = objc_runtime::ObjcRuntime::new();
+            let mut image_metadata: Vec<(macho_objc::ObjcMetadata, i64)> = Vec::new();
+
+            for loaded in registry.images() {
+                let metadata = parse_objc_metadata(&loaded.parsed, &loaded.data);
+                if metadata.presence.has_objc {
+                    objc_rt.register_image(&metadata, loaded.image.slide);
+                    image_metadata.push((metadata, loaded.image.slide));
+                }
+            }
+
+            for (metadata, slide) in &image_metadata {
+                if !metadata.categories.is_empty() {
+                    objc_rt.merge_categories_post_fixup(metadata, *slide);
+                }
+            }
+            for (metadata, slide) in &image_metadata {
+                if !metadata.selref_addrs.is_empty() {
+                    objc_rt.fixup_selrefs(metadata, *slide);
+                }
+            }
+            if config.shim_set.foundation {
+                let tracer = RuntimeTracer::disabled();
+                objc_setup::register_foundation_classes(&mut objc_rt, config, &tracer);
+            }
+            unsafe {
+                objc_rt.repair_superclass_addrs();
+            }
+            *objc_runtime::OBJC_RUNTIME
+                .lock()
+                .unwrap_or_else(|e| e.into_inner()) = Some(objc_rt);
+        }
+
+        // 8. Protect segments
+        for loaded in registry.images() {
+            loaded.image.protect()?;
+        }
+
+        // 10. Interpreter execution (skip constructors / +load for now)
+        let app = &registry.images()[app_idx];
+        let entry = app
+            .parsed
+            .entry
+            .as_ref()
+            .ok_or(RuntimeError::NoEntryPoint)?;
+
+        // Build guest memory ranges for the interpreter bridge.
+        let guest_ranges: Vec<(u64, u64)> = registry
+            .images()
+            .iter()
+            .flat_map(|loaded| {
+                loaded.image.segments.iter().map(|s| {
+                    (s.base as u64, s.base as u64 + s.size as u64)
+                })
+            })
+            .collect();
+
+        // Build segment list from ALL loaded images for the interpreter
+        // memory model (so it can fetch instructions from dylib stubs).
+        let all_segments: Vec<(u64, *mut u8, usize, bool)> = registry
+            .images()
+            .iter()
+            .enumerate()
+            .filter(|&(i, _)| i != app_idx)
+            .flat_map(|(_, loaded)| {
+                loaded.image.segments.iter().map(|s| {
+                    let writable = s.name != "__TEXT";
+                    (s.base as u64, s.base, s.size, writable)
+                })
+            })
+            .collect();
+
+        let ffi_bridge = interp_bridge::build_interpreter_bridge(&guest_ranges);
+
+        let entry_args = macho_exec::EntryArgs {
+            program_name: config.process_name.clone(),
+            args: Vec::new(),
+            env: config
+                .env_overrides
+                .iter()
+                .map(|(k, v)| format!("{k}={v}"))
+                .collect(),
+        };
+
+        let entry_result = macho_exec::call_entry_interpreted(
+            &app.image,
+            entry,
+            Some(&entry_args),
+            ffi_bridge,
+            &all_segments,
+        )?;
+
+        Ok(RuntimeResult {
+            exit_code: entry_result.exit_code,
+            security_report: None,
+            images_loaded: registry.images().len(),
+            shims_installed: ctx.shim_table.len(),
+            initializers_run: 0,
+            tracer: None,
+        })
+    }
+
+    /// Resolve an `.app` bundle path to the executable inside.
+    ///
+    /// Given a path like `Foo.app`, reads `Contents/Info.plist` for
+    /// `CFBundleExecutable` and returns `Foo.app/Contents/MacOS/<exe>`.
+    /// Returns `None` if the path is not an `.app` bundle.
+    pub fn resolve_app_bundle(bundle_path: &Path) -> Option<std::path::PathBuf> {
+        let name = bundle_path.file_name()?.to_str()?;
+        if !name.ends_with(".app") {
+            return None;
+        }
+
+        let contents = bundle_path.join("Contents");
+        let macos = contents.join("MacOS");
+
+        // Try Info.plist for CFBundleExecutable
+        let plist_path = contents.join("Info.plist");
+        if let Ok(data) = std::fs::read_to_string(&plist_path) {
+            if let Some(exe_name) = parse_cf_bundle_executable(&data) {
+                let exe = macos.join(&exe_name);
+                if exe.exists() {
+                    return Some(exe);
+                }
+            }
+        }
+
+        // Fallback: bundle name without .app suffix
+        let stem = name.strip_suffix(".app")?;
+        let exe = macos.join(stem);
+        if exe.exists() {
+            return Some(exe);
+        }
+
+        // Last resort: any executable in Contents/MacOS
+        if let Ok(entries) = std::fs::read_dir(&macos) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file() {
+                    return Some(path);
+                }
+            }
+        }
+
+        None
+    }
+
+}
+
+/// Minimal plist parser: extract CFBundleExecutable from Info.plist XML.
+fn parse_cf_bundle_executable(plist_xml: &str) -> Option<String> {
+    // Look for <key>CFBundleExecutable</key> followed by <string>...</string>
+    let key_tag = "<key>CFBundleExecutable</key>";
+    let key_pos = plist_xml.find(key_tag)?;
+    let after_key = &plist_xml[key_pos + key_tag.len()..];
+
+    let string_start = after_key.find("<string>")?;
+    let value_start = string_start + "<string>".len();
+    let value_end = after_key[value_start..].find("</string>")?;
+
+    let value = after_key[value_start..value_start + value_end].trim();
+    if value.is_empty() {
+        None
+    } else {
+        Some(value.to_string())
+    }
 }

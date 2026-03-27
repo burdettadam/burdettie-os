@@ -15,5 +15,9 @@ ui-view        = { workspace = true }
 winit      = "0.30"
 softbuffer = "0.4"
 
+[features]
+default = []
+gpu = ["graphics-core/gpu"]
+
 [lints]
 workspace = true

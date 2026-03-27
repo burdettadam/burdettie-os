@@ -18,17 +18,30 @@ extern "C" {
     fn shim_nslog_asm();
 }
 
-/// Returns the address of the NSLog ARM64 variadic trampoline.
+// ── x86_64 assembly trampoline linkage ─────────────────────────────
+
+#[cfg(all(target_arch = "x86_64", target_os = "macos"))]
+extern "C" {
+    fn shim_nslog_x86_64_asm();
+}
+
+/// Returns the address of the NSLog variadic trampoline.
 ///
 /// On aarch64-apple, this is the assembly trampoline that reads
 /// variadic args from the caller's stack before calling `shim_nslog_inner`.
+/// On x86_64-apple, variadic args are already in registers, so
+/// the trampoline is a simple tail-call.
 /// On other platforms, returns the Rust function directly.
 pub fn nslog_trampoline_addr() -> u64 {
     #[cfg(all(target_arch = "aarch64", target_os = "macos"))]
     {
         shim_nslog_asm as u64
     }
-    #[cfg(not(all(target_arch = "aarch64", target_os = "macos")))]
+    #[cfg(all(target_arch = "x86_64", target_os = "macos"))]
+    {
+        shim_nslog_x86_64_asm as u64
+    }
+    #[cfg(not(all(any(target_arch = "aarch64", target_arch = "x86_64"), target_os = "macos")))]
     {
         shim_nslog_inner as u64
     }

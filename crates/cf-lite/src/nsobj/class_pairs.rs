@@ -480,3 +480,40 @@ define_class_pair!(child NSTEXTCHECKINGRESULT_CLASS_DATA, NSTEXTCHECKINGRESULT_M
     meta_addr: nstextcheckingresult_metaclass_addr,
     parent_class: nsobject_class_addr,
     parent_meta: nsobject_metaclass_addr);
+
+// ── AppKit Phase C7 classes ────────────────────────────────────
+
+define_class_pair!(child NSAPPEARANCE_CLASS_DATA, NSAPPEARANCE_METACLASS_DATA, NSAPPEARANCE_INIT,
+    ensure: ensure_nsappearance_init,
+    class_addr: nsappearance_class_addr,
+    meta_addr: nsappearance_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSUSERNOTIFICATIONCENTER_CLASS_DATA, NSUSERNOTIFICATIONCENTER_METACLASS_DATA, NSUSERNOTIFICATIONCENTER_INIT,
+    ensure: ensure_nsusernotificationcenter_init,
+    class_addr: nsusernotificationcenter_class_addr,
+    meta_addr: nsusernotificationcenter_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSMENU_CLASS_DATA, NSMENU_METACLASS_DATA, NSMENU_INIT,
+    ensure: ensure_nsmenu_init,
+    class_addr: nsmenu_class_addr,
+    meta_addr: nsmenu_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSMENUITEM_CLASS_DATA, NSMENUITEM_METACLASS_DATA, NSMENUITEM_INIT,
+    ensure: ensure_nsmenuitem_init,
+    class_addr: nsmenuitem_class_addr,
+    meta_addr: nsmenuitem_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSNIB_CLASS_DATA, NSNIB_METACLASS_DATA, NSNIB_INIT,
+    ensure: ensure_nsnib_init,
+    class_addr: nsnib_class_addr,
+    meta_addr: nsnib_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);

@@ -75,7 +75,15 @@ pub(super) extern "C" fn shim_pthread_attr_getdetachstate(
     attr: *const libc::pthread_attr_t,
     detachstate: *mut libc::c_int,
 ) -> libc::c_int {
-    unsafe { libc::pthread_attr_getdetachstate(attr, detachstate) }
+    // libc crate doesn't expose pthread_attr_getdetachstate on all targets,
+    // so we link it directly via POSIX.
+    extern "C" {
+        fn pthread_attr_getdetachstate(
+            attr: *const libc::pthread_attr_t,
+            detachstate: *mut libc::c_int,
+        ) -> libc::c_int;
+    }
+    unsafe { pthread_attr_getdetachstate(attr, detachstate) }
 }
 
 pub(super) extern "C" fn shim_pthread_attr_setstacksize(
@@ -234,7 +242,13 @@ pub(super) extern "C" fn shim_pthread_once(
     init_routine: Option<extern "C" fn()>,
 ) -> libc::c_int {
     match init_routine {
-        Some(f) => unsafe { libc::pthread_once(once_control, Some(f)) },
+        Some(f) => {
+            // macOS libc wants Option<extern "C" fn()>, Linux wants bare fn ptr.
+            #[cfg(target_os = "macos")]
+            { unsafe { libc::pthread_once(once_control, Some(f)) } }
+            #[cfg(not(target_os = "macos"))]
+            { unsafe { libc::pthread_once(once_control, f) } }
+        }
         None => libc::EINVAL,
     }
 }

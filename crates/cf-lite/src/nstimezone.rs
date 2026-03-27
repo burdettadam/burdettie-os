@@ -7,6 +7,7 @@
 //!
 //! Singletons: systemTimeZone, localTimeZone (alias for system).
 
+use std::ffi::c_char;
 use std::sync::OnceLock;
 
 use crate::cfstring;
@@ -150,7 +151,7 @@ pub extern "C" fn shim_nstimezone_name(obj: u64, _cmd: u64) -> u64 {
     if obj == 0 {
         return 0;
     }
-    let name_ptr = unsafe { *((obj as *const u64).add(1)) } as *const i8;
+    let name_ptr = unsafe { *((obj as *const u64).add(1)) } as *const c_char;
     if name_ptr.is_null() {
         return 0;
     }
@@ -175,7 +176,7 @@ pub extern "C" fn shim_nstimezone_description(obj: u64, _cmd: u64) -> u64 {
     if obj == 0 {
         return 0;
     }
-    let name_ptr = unsafe { *((obj as *const u64).add(1)) } as *const i8;
+    let name_ptr = unsafe { *((obj as *const u64).add(1)) } as *const c_char;
     let name_str = if !name_ptr.is_null() {
         let c = unsafe { std::ffi::CStr::from_ptr(name_ptr) };
         c.to_str().unwrap_or("?")

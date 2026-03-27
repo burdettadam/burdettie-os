@@ -67,6 +67,7 @@ fn objc_shims_registered() {
     assert!(table.resolve("_objc_exception_rethrow").is_some());
     assert!(table.resolve("_objc_terminate").is_some());
     assert!(table.resolve("_objc_setProperty_nonatomic").is_some());
+    assert!(table.resolve("_objc_setProperty_nonatomic_copy").is_some());
     assert!(table.resolve("_method_setImplementation").is_some());
     assert!(table.resolve("_method_exchangeImplementations").is_some());
     assert!(table.resolve("_class_replaceMethod").is_some());
@@ -100,5 +101,5 @@ fn objc_shims_registered() {
     assert!(table.resolve("_objc_msgSend_fp2ret").is_some());
     assert!(table.resolve("_objc_msgSendSuper_stret").is_some());
     assert!(table.resolve("_objc_msgSendSuper2_stret").is_some());
-    assert_eq!(table.len(), 103);
+    assert_eq!(table.len(), 104);
 }

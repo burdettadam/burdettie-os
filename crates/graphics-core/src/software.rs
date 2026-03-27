@@ -2,7 +2,11 @@ use super::color::Color;
 use super::font::Font;
 use super::font_manager::FontManager;
 use super::geometry::{Point, Rect};
+use super::gradient::Gradient;
+use super::image_buf::ImageBuffer;
+use super::path::BezierPath;
 use super::renderer::Renderer;
+use super::shadow::Shadow;
 use super::surface::Surface;
 use super::unicode::{is_combining_mark, is_zero_width, normalize_nfc};
 
@@ -290,6 +294,216 @@ impl Renderer for SoftwareRenderer<'_> {
 
     fn supports_attributed_text(&self) -> bool {
         self.font_manager.is_some()
+    }
+
+    // ── F3: Image & Drawing Primitives ─────────────────────────────
+
+    fn draw_image(&mut self, image: &ImageBuffer, dest: Rect) {
+        let sw = self.surface.width() as i32;
+        let sh = self.surface.height() as i32;
+        let iw = image.width();
+        let ih = image.height();
+        if iw == 0 || ih == 0 {
+            return;
+        }
+
+        let dx0 = (dest.x as i32).max(0);
+        let dy0 = (dest.y as i32).max(0);
+        let dx1 = ((dest.x + dest.width) as i32).min(sw);
+        let dy1 = ((dest.y + dest.height) as i32).min(sh);
+
+        let pixels = self.surface.pixels_mut();
+        for py in dy0..dy1 {
+            for px in dx0..dx1 {
+                // Nearest-neighbor sampling
+                let sx = ((px as f64 - dest.x) / dest.width * iw as f64) as u32;
+                let sy = ((py as f64 - dest.y) / dest.height * ih as f64) as u32;
+                let sx = sx.min(iw - 1);
+                let sy = sy.min(ih - 1);
+                let src = image.argb32_at(sx, sy);
+                let sa = (src >> 24) & 0xFF;
+                if sa == 0 {
+                    continue;
+                }
+                let idx = (py * sw + px) as usize;
+                if sa >= 255 {
+                    pixels[idx] = src;
+                } else {
+                    let inv = 255 - sa;
+                    let sr = (src >> 16) & 0xFF;
+                    let sg = (src >> 8) & 0xFF;
+                    let sb = src & 0xFF;
+                    let dst = pixels[idx];
+                    let dr = (dst >> 16) & 0xFF;
+                    let dg = (dst >> 8) & 0xFF;
+                    let db = dst & 0xFF;
+                    let da = (dst >> 24) & 0xFF;
+                    let or = (sr * sa + dr * inv) / 255;
+                    let og = (sg * sa + dg * inv) / 255;
+                    let ob = (sb * sa + db * inv) / 255;
+                    let oa = sa + (da * inv) / 255;
+                    pixels[idx] = (oa << 24) | (or << 16) | (og << 8) | ob;
+                }
+            }
+        }
+    }
+
+    fn fill_rounded_rect(&mut self, rect: Rect, radius: f64, color: Color) {
+        let path = BezierPath::rounded_rect(rect.x, rect.y, rect.width, rect.height, radius);
+        self.fill_path(&path, color);
+    }
+
+    fn stroke_rounded_rect(&mut self, rect: Rect, radius: f64, color: Color, width: f64) {
+        let path = BezierPath::rounded_rect(rect.x, rect.y, rect.width, rect.height, radius);
+        self.stroke_path(&path, color, width);
+    }
+
+    fn fill_ellipse(&mut self, rect: Rect, color: Color) {
+        let path = BezierPath::ellipse(rect.x, rect.y, rect.width, rect.height);
+        self.fill_path(&path, color);
+    }
+
+    fn stroke_ellipse(&mut self, rect: Rect, color: Color, width: f64) {
+        let path = BezierPath::ellipse(rect.x, rect.y, rect.width, rect.height);
+        self.stroke_path(&path, color, width);
+    }
+
+    fn fill_path(&mut self, path: &BezierPath, color: Color) {
+        let subpaths = path.flatten(0.5);
+        if subpaths.is_empty() {
+            return;
+        }
+        let c = color.to_argb32();
+        let sw = self.surface.width() as i32;
+        let sh = self.surface.height() as i32;
+
+        // Compute bounding box
+        let mut min_y = f64::MAX;
+        let mut max_y = f64::MIN;
+        for sp in &subpaths {
+            for p in sp {
+                if p.y < min_y { min_y = p.y; }
+                if p.y > max_y { max_y = p.y; }
+            }
+        }
+        let y0 = (min_y as i32).max(0);
+        let y1 = ((max_y as i32) + 1).min(sh);
+
+        // Scanline fill with even-odd rule
+        let mut crossings: Vec<f64> = Vec::new();
+        let pixels = self.surface.pixels_mut();
+        for y in y0..y1 {
+            crossings.clear();
+            let scan_y = y as f64 + 0.5;
+            for sp in &subpaths {
+                if sp.len() < 2 { continue; }
+                for i in 0..sp.len() - 1 {
+                    let p0 = sp[i];
+                    let p1 = sp[i + 1];
+                    let (y_lo, y_hi) = if p0.y <= p1.y { (p0.y, p1.y) } else { (p1.y, p0.y) };
+                    if scan_y < y_lo || scan_y >= y_hi {
+                        continue;
+                    }
+                    let dy = p1.y - p0.y;
+                    if dy.abs() < 1e-12 { continue; }
+                    let t = (scan_y - p0.y) / dy;
+                    let x_cross = p0.x + t * (p1.x - p0.x);
+                    crossings.push(x_cross);
+                }
+            }
+            crossings.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            // Fill between pairs (even-odd rule)
+            let mut i = 0;
+            while i + 1 < crossings.len() {
+                let x0 = (crossings[i] as i32).max(0);
+                let x1 = ((crossings[i + 1] as i32) + 1).min(sw);
+                for x in x0..x1 {
+                    let idx = (y * sw + x) as usize;
+                    let ca = (c >> 24) & 0xFF;
+                    if ca >= 255 {
+                        pixels[idx] = c;
+                    } else if ca > 0 {
+                        let inv = 255 - ca;
+                        let sr = (c >> 16) & 0xFF;
+                        let sg = (c >> 8) & 0xFF;
+                        let sb = c & 0xFF;
+                        let dst = pixels[idx];
+                        let dr = (dst >> 16) & 0xFF;
+                        let dg = (dst >> 8) & 0xFF;
+                        let db = dst & 0xFF;
+                        let da = (dst >> 24) & 0xFF;
+                        let or = (sr * ca + dr * inv) / 255;
+                        let og = (sg * ca + dg * inv) / 255;
+                        let ob = (sb * ca + db * inv) / 255;
+                        let oa = ca + (da * inv) / 255;
+                        pixels[idx] = (oa << 24) | (or << 16) | (og << 8) | ob;
+                    }
+                }
+                i += 2;
+            }
+        }
+    }
+
+    fn stroke_path(&mut self, path: &BezierPath, color: Color, width: f64) {
+        let subpaths = path.flatten(0.5);
+        for sp in &subpaths {
+            if sp.len() < 2 { continue; }
+            for i in 0..sp.len() - 1 {
+                self.draw_line(sp[i], sp[i + 1], color, width);
+            }
+        }
+    }
+
+    fn fill_gradient(&mut self, rect: Rect, gradient: &Gradient) {
+        let sw = self.surface.width() as i32;
+        let sh = self.surface.height() as i32;
+
+        let x0 = (rect.x as i32).max(0);
+        let y0 = (rect.y as i32).max(0);
+        let x1 = ((rect.x + rect.width) as i32).min(sw);
+        let y1 = ((rect.y + rect.height) as i32).min(sh);
+
+        let pixels = self.surface.pixels_mut();
+        for py in y0..y1 {
+            for px in x0..x1 {
+                let color = gradient.color_at(px as f64 + 0.5, py as f64 + 0.5);
+                let c = color.to_argb32();
+                let ca = (c >> 24) & 0xFF;
+                if ca == 0 { continue; }
+                let idx = (py * sw + px) as usize;
+                if ca >= 255 {
+                    pixels[idx] = c;
+                } else {
+                    let inv = 255 - ca;
+                    let sr = (c >> 16) & 0xFF;
+                    let sg = (c >> 8) & 0xFF;
+                    let sb = c & 0xFF;
+                    let dst = pixels[idx];
+                    let dr = (dst >> 16) & 0xFF;
+                    let dg = (dst >> 8) & 0xFF;
+                    let db = dst & 0xFF;
+                    let da = (dst >> 24) & 0xFF;
+                    let or = (sr * ca + dr * inv) / 255;
+                    let og = (sg * ca + dg * inv) / 255;
+                    let ob = (sb * ca + db * inv) / 255;
+                    let oa = ca + (da * inv) / 255;
+                    pixels[idx] = (oa << 24) | (or << 16) | (og << 8) | ob;
+                }
+            }
+        }
+    }
+
+    fn with_shadow<F: FnOnce(&mut Self)>(&mut self, shadow: &Shadow, draw_fn: F) {
+        // Simple shadow: draw the content at the shadow offset with shadow color,
+        // then draw the actual content on top.
+        // Note: a full Gaussian blur would be expensive; we approximate with a
+        // small box expansion for the shadow.
+        let _blur = shadow.blur_radius;
+        let _offset_x = shadow.offset_x;
+        let _offset_y = shadow.offset_y;
+        // For now, just execute the draw function (shadow rendering would
+        // require a temporary surface and compositing, which we'll add later).
+        draw_fn(self);
     }
 }
 

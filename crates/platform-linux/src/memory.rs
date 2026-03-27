@@ -1,0 +1,73 @@
+//! Linux memory mapping via mmap/mprotect/munmap.
+
+use platform_core::memory::MemoryMapper;
+use platform_core::{PalError, Protection};
+
+pub struct LinuxMemoryMapper;
+
+impl MemoryMapper for LinuxMemoryMapper {
+    fn page_size(&self) -> usize {
+        unsafe { libc::sysconf(libc::_SC_PAGESIZE) as usize }
+    }
+
+    fn map_anonymous(&self, size: usize) -> Result<*mut u8, PalError> {
+        let ptr = unsafe {
+            libc::mmap(
+                std::ptr::null_mut(),
+                size,
+                libc::PROT_READ | libc::PROT_WRITE,
+                libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
+                -1,
+                0,
+            )
+        };
+        if ptr == libc::MAP_FAILED {
+            Err(PalError::Memory(format!(
+                "mmap failed for {} bytes: {}",
+                size,
+                std::io::Error::last_os_error()
+            )))
+        } else {
+            Ok(ptr as *mut u8)
+        }
+    }
+
+    fn protect(&self, addr: *mut u8, size: usize, prot: Protection) -> Result<(), PalError> {
+        let flags = prot_to_mmap(prot);
+        let ret = unsafe { libc::mprotect(addr as *mut libc::c_void, size, flags) };
+        if ret != 0 {
+            Err(PalError::Memory(format!(
+                "mprotect failed: {}",
+                std::io::Error::last_os_error()
+            )))
+        } else {
+            Ok(())
+        }
+    }
+
+    fn unmap(&self, addr: *mut u8, size: usize) -> Result<(), PalError> {
+        let ret = unsafe { libc::munmap(addr as *mut libc::c_void, size) };
+        if ret != 0 {
+            Err(PalError::Memory(format!(
+                "munmap failed: {}",
+                std::io::Error::last_os_error()
+            )))
+        } else {
+            Ok(())
+        }
+    }
+}
+
+fn prot_to_mmap(p: Protection) -> libc::c_int {
+    let mut flags = libc::PROT_NONE;
+    if p.read {
+        flags |= libc::PROT_READ;
+    }
+    if p.write {
+        flags |= libc::PROT_WRITE;
+    }
+    if p.execute {
+        flags |= libc::PROT_EXEC;
+    }
+    flags
+}

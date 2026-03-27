@@ -29,11 +29,16 @@ fn get_or_create_main_bundle() -> u64 {
             .map(|s| s.to_string())
             .unwrap_or_else(|| "/usr/local/bin/unknown".to_string());
 
-        // Bundle path = directory containing the executable
-        let bundle_path = std::path::Path::new(&exe_path)
-            .parent()
-            .map(|p| p.to_string_lossy().to_string())
-            .unwrap_or_else(|| "/".to_string());
+        // Detect .app bundle layout: Foo.app/Contents/MacOS/Foo
+        // Walk up from the executable to find the .app root.
+        let bundle_path = detect_app_bundle_root(&exe_path)
+            .unwrap_or_else(|| {
+                // Flat CLI: bundle path = directory containing the executable
+                std::path::Path::new(&exe_path)
+                    .parent()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_else(|| "/".to_string())
+            });
 
         let cstr = std::ffi::CString::new(bundle_path).unwrap_or_default();
         let nsstr = crate::cfstring::alloc_nsstring_from_cstr(cstr.as_ptr());
@@ -43,6 +48,30 @@ fn get_or_create_main_bundle() -> u64 {
 
         obj
     })
+}
+
+/// Walk up from an executable path to detect a .app bundle root.
+///
+/// Standard layout: `Foo.app/Contents/MacOS/Foo` — we check if the path
+/// walks up through `Contents/MacOS` inside a `*.app` directory.
+fn detect_app_bundle_root(exe_path: &str) -> Option<String> {
+    let path = std::path::Path::new(exe_path);
+    // exe is at: .../Foo.app/Contents/MacOS/Foo
+    let macos_dir = path.parent()?;                     // .../Foo.app/Contents/MacOS
+    if macos_dir.file_name()?.to_str()? != "MacOS" {
+        return None;
+    }
+    let contents_dir = macos_dir.parent()?;             // .../Foo.app/Contents
+    if contents_dir.file_name()?.to_str()? != "Contents" {
+        return None;
+    }
+    let app_dir = contents_dir.parent()?;               // .../Foo.app
+    let name = app_dir.file_name()?.to_str()?;
+    if name.ends_with(".app") {
+        Some(app_dir.to_string_lossy().to_string())
+    } else {
+        None
+    }
 }
 
 /// `+[NSBundle mainBundle]` — returns the main bundle singleton.

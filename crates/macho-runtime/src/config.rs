@@ -6,6 +6,18 @@ use std::sync::Arc;
 use platform_core::PlatformProvider;
 use trust_policy::TrustPolicy;
 
+/// Return the default platform provider for the current OS.
+#[cfg(target_os = "macos")]
+fn default_platform() -> impl PlatformProvider {
+    platform_darwin_host::DarwinHostPlatform::new()
+}
+
+/// Return the default platform provider for the current OS.
+#[cfg(target_os = "linux")]
+fn default_platform() -> impl PlatformProvider {
+    platform_linux::LinuxHostPlatform::new()
+}
+
 /// Controls which shim categories are installed.
 #[derive(Debug, Clone)]
 pub struct ShimSet {
@@ -69,7 +81,7 @@ pub struct RuntimeConfig {
     pub tracer: Option<crate::tracer::RuntimeTracer>,
     /// Platform abstraction provider.
     /// Supplies host services (memory mapping, symbol resolution, clocks, etc.).
-    /// Defaults to `DarwinHostPlatform` when created via `permissive()` or `secure()`.
+    /// Defaults to the host platform when created via `permissive()` or `secure()`.
     pub platform: Arc<dyn PlatformProvider>,
 }
 
@@ -89,7 +101,7 @@ impl RuntimeConfig {
             process_name: name,
             process_path: binary_path.to_path_buf(),
             tracer: None,
-            platform: Arc::new(platform_darwin_host::DarwinHostPlatform::new()),
+            platform: Arc::new(default_platform()),
         }
     }
 

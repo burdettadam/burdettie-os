@@ -1,0 +1,14 @@
+[package]
+name         = "arm64-translate"
+description  = "ARM64 (AArch64) interpreter for binary translation — E3 moonshot"
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+rust-version.workspace = true
+
+[dependencies]
+log = { workspace = true }
+libc = { workspace = true }
+
+[lints]
+workspace = true

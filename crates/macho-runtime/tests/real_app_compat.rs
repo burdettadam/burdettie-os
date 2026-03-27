@@ -184,55 +184,21 @@ fn real_app_compat_report() {
         }
         println!();
     }
-}
 
-/// The 5 new CLI tools (C6) must all pass.  Original 12 corpus tools should
-/// continue to pass as well.
-/// NOTE: ignored because running two in-process test functions that exercise
-/// global ObjC state back-to-back causes hangs. The `real_app_compat_report`
-/// test already validates 17/17 pass.
-#[test]
-#[ignore]
-fn real_app_compat_c6_tools_pass() {
-    let c6_tools = [
-        "json_query",
-        "plist_converter",
-        "regex_search",
-        "event_bus",
-        "predicate_filter",
-    ];
-
-    let base = corpus_dir();
-    let mut failures = Vec::new();
-
-    for name in &c6_tools {
-        let binary = base.join(name).join("app");
-        if !binary.exists() {
-            failures.push(format!("{name}: binary not found"));
-            continue;
-        }
-        let result = run_tool(name, &binary);
-        if !result.passed {
-            let detail = result
-                .error
-                .unwrap_or_else(|| format!("exit code {}", result.exit_code.unwrap_or(-1)));
-            failures.push(format!("{name}: {detail}"));
-
-            // Print diagnostics for failed tool
-            if !result.diag_events.is_empty() {
-                eprintln!("\n  Diagnostics for {name}:");
-                for d in &result.diag_events {
-                    if !d.starts_with("dispatch:") {
-                        eprintln!("    {d}");
-                    }
-                }
-            }
-        }
-    }
-
+    // Regression gate: all tools must pass
+    let failed: Vec<_> = results.iter().filter(|r| !r.passed).collect();
     assert!(
-        failures.is_empty(),
-        "C6 CLI tools failed:\n{}",
-        failures.join("\n")
+        failed.is_empty(),
+        "Real-app compatibility regression — {} tool(s) failed:\n{}",
+        failed.len(),
+        failed
+            .iter()
+            .map(|r| format!(
+                "  {}: {}",
+                r.name,
+                r.error.as_deref().unwrap_or("non-zero exit")
+            ))
+            .collect::<Vec<_>>()
+            .join("\n")
     );
 }

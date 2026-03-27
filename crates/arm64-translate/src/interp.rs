@@ -533,12 +533,12 @@ impl Interpreter {
                         None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false }),
                     }
                 };
-                self.cpu.write_reg(rt, val);
+                self.cpu.write_reg_zr(rt, val);
                 self.cpu.pc = pc + 4;
             }
             Instruction::StrImm { sf, rt, rn, imm } => {
                 let addr = self.cpu.read_reg(rn).wrapping_add(imm as u64);
-                let val = self.cpu.read_reg(rt);
+                let val = self.cpu.read_reg_zr(rt);
                 let ok = if sf {
                     self.mem.write_u64(addr, val)
                 } else {
@@ -564,12 +564,12 @@ impl Interpreter {
                         None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false }),
                     }
                 };
-                self.cpu.write_reg(rt, val);
+                self.cpu.write_reg_zr(rt, val);
                 self.cpu.pc = pc + 4;
             }
             Instruction::Stur { sf, rt, rn, imm } => {
                 let addr = (self.cpu.read_reg(rn) as i64).wrapping_add(imm as i64) as u64;
-                let val = self.cpu.read_reg(rt);
+                let val = self.cpu.read_reg_zr(rt);
                 let ok = if sf {
                     self.mem.write_u64(addr, val)
                 } else {
@@ -596,13 +596,13 @@ impl Interpreter {
                         None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: false }),
                     }
                 };
-                self.cpu.write_reg(rt, val);
+                self.cpu.write_reg_zr(rt, val);
                 self.cpu.pc = pc + 4;
             }
             Instruction::StrPre { sf, rt, rn, imm } => {
                 let base = (self.cpu.read_reg(rn) as i64).wrapping_add(imm as i64) as u64;
                 self.cpu.write_reg(rn, base);
-                let val = self.cpu.read_reg(rt);
+                let val = self.cpu.read_reg_zr(rt);
                 let ok = if sf {
                     self.mem.write_u64(base, val)
                 } else {
@@ -628,14 +628,14 @@ impl Interpreter {
                         None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: false }),
                     }
                 };
-                self.cpu.write_reg(rt, val);
+                self.cpu.write_reg_zr(rt, val);
                 let new_base = (base as i64).wrapping_add(imm as i64) as u64;
                 self.cpu.write_reg(rn, new_base);
                 self.cpu.pc = pc + 4;
             }
             Instruction::StrPost { sf, rt, rn, imm } => {
                 let base = self.cpu.read_reg(rn);
-                let val = self.cpu.read_reg(rt);
+                let val = self.cpu.read_reg_zr(rt);
                 let ok = if sf {
                     self.mem.write_u64(base, val)
                 } else {
@@ -668,15 +668,15 @@ impl Interpreter {
                         _ => return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: false }),
                     }
                 };
-                self.cpu.write_reg(rt, v1);
-                self.cpu.write_reg(rt2, v2);
+                self.cpu.write_reg_zr(rt, v1);
+                self.cpu.write_reg_zr(rt2, v2);
                 self.cpu.pc = pc + 4;
             }
             Instruction::Stp { sf, rt, rt2, rn, imm } => {
                 let base = (self.cpu.read_reg(rn) as i64).wrapping_add(imm as i64) as u64;
                 let size = if sf { 8u64 } else { 4 };
-                let v1 = self.cpu.read_reg(rt);
-                let v2 = self.cpu.read_reg(rt2);
+                let v1 = self.cpu.read_reg_zr(rt);
+                let v2 = self.cpu.read_reg_zr(rt2);
                 let ok = if sf {
                     self.mem.write_u64(base, v1) && self.mem.write_u64(base + size, v2)
                 } else {
@@ -702,16 +702,16 @@ impl Interpreter {
                         _ => return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: false }),
                     }
                 };
-                self.cpu.write_reg(rt, v1);
-                self.cpu.write_reg(rt2, v2);
+                self.cpu.write_reg_zr(rt, v1);
+                self.cpu.write_reg_zr(rt2, v2);
                 self.cpu.pc = pc + 4;
             }
             Instruction::StpPre { sf, rt, rt2, rn, imm } => {
                 let base = (self.cpu.read_reg(rn) as i64).wrapping_add(imm as i64) as u64;
                 self.cpu.write_reg(rn, base);
                 let size = if sf { 8u64 } else { 4 };
-                let v1 = self.cpu.read_reg(rt);
-                let v2 = self.cpu.read_reg(rt2);
+                let v1 = self.cpu.read_reg_zr(rt);
+                let v2 = self.cpu.read_reg_zr(rt2);
                 let ok = if sf {
                     self.mem.write_u64(base, v1) && self.mem.write_u64(base + size, v2)
                 } else {
@@ -736,8 +736,8 @@ impl Interpreter {
                         _ => return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: false }),
                     }
                 };
-                self.cpu.write_reg(rt, v1);
-                self.cpu.write_reg(rt2, v2);
+                self.cpu.write_reg_zr(rt, v1);
+                self.cpu.write_reg_zr(rt2, v2);
                 let new_base = (base as i64).wrapping_add(imm as i64) as u64;
                 self.cpu.write_reg(rn, new_base);
                 self.cpu.pc = pc + 4;
@@ -745,8 +745,8 @@ impl Interpreter {
             Instruction::StpPost { sf, rt, rt2, rn, imm } => {
                 let base = self.cpu.read_reg(rn);
                 let size = if sf { 8u64 } else { 4 };
-                let v1 = self.cpu.read_reg(rt);
-                let v2 = self.cpu.read_reg(rt2);
+                let v1 = self.cpu.read_reg_zr(rt);
+                let v2 = self.cpu.read_reg_zr(rt2);
                 let ok = if sf {
                     self.mem.write_u64(base, v1) && self.mem.write_u64(base + size, v2)
                 } else {
@@ -764,14 +764,14 @@ impl Interpreter {
             Instruction::Ldrb { rt, rn, imm } => {
                 let addr = self.cpu.read_reg(rn).wrapping_add(imm as u64);
                 match self.mem.read_u8(addr) {
-                    Some(v) => self.cpu.write_reg(rt, v as u64),
+                    Some(v) => self.cpu.write_reg_zr(rt, v as u64),
                     None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false }),
                 }
                 self.cpu.pc = pc + 4;
             }
             Instruction::Strb { rt, rn, imm } => {
                 let addr = self.cpu.read_reg(rn).wrapping_add(imm as u64);
-                let val = self.cpu.read_reg(rt) as u8;
+                let val = self.cpu.read_reg_zr(rt) as u8;
                 if !self.mem.write_u8(addr, val) {
                     return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
                 }
@@ -780,14 +780,14 @@ impl Interpreter {
             Instruction::Ldrh { rt, rn, imm } => {
                 let addr = self.cpu.read_reg(rn).wrapping_add(imm as u64);
                 match self.mem.read_u16(addr) {
-                    Some(v) => self.cpu.write_reg(rt, v as u64),
+                    Some(v) => self.cpu.write_reg_zr(rt, v as u64),
                     None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false }),
                 }
                 self.cpu.pc = pc + 4;
             }
             Instruction::Strh { rt, rn, imm } => {
                 let addr = self.cpu.read_reg(rn).wrapping_add(imm as u64);
-                let val = self.cpu.read_reg(rt) as u16;
+                let val = self.cpu.read_reg_zr(rt) as u16;
                 if !self.mem.write_u16(addr, val) {
                     return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
                 }
@@ -796,7 +796,7 @@ impl Interpreter {
             Instruction::Ldrsw { rt, rn, imm } => {
                 let addr = self.cpu.read_reg(rn).wrapping_add(imm as u64);
                 match self.mem.read_u32(addr) {
-                    Some(v) => self.cpu.write_reg(rt, v as i32 as i64 as u64), // sign-extend
+                    Some(v) => self.cpu.write_reg_zr(rt, v as i32 as i64 as u64), // sign-extend
                     None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false }),
                 }
                 self.cpu.pc = pc + 4;
@@ -806,7 +806,7 @@ impl Interpreter {
                 match self.mem.read_u8(addr) {
                     Some(v) => {
                         let val = if sf { v as i8 as i64 as u64 } else { v as i8 as i32 as u32 as u64 };
-                        self.cpu.write_reg(rt, val);
+                        self.cpu.write_reg_zr(rt, val);
                     }
                     None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false }),
                 }
@@ -817,7 +817,7 @@ impl Interpreter {
                 match self.mem.read_u16(addr) {
                     Some(v) => {
                         let val = if sf { v as i16 as i64 as u64 } else { v as i16 as i32 as u32 as u64 };
-                        self.cpu.write_reg(rt, val);
+                        self.cpu.write_reg_zr(rt, val);
                     }
                     None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false }),
                 }
@@ -838,15 +838,15 @@ impl Interpreter {
                         None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false }),
                     }
                 };
-                self.cpu.write_reg(rt, val);
+                self.cpu.write_reg_zr(rt, val);
                 self.cpu.pc = pc + 4;
             }
             Instruction::StrReg { sf, rt, rn, rm, extend, s } => {
                 let addr = self.reg_index_addr(rn, rm, extend, s, if sf { 3 } else { 2 });
                 let ok = if sf {
-                    self.mem.write_u64(addr, self.cpu.read_reg(rt))
+                    self.mem.write_u64(addr, self.cpu.read_reg_zr(rt))
                 } else {
-                    self.mem.write_u32(addr, self.cpu.read_reg(rt) as u32)
+                    self.mem.write_u32(addr, self.cpu.read_reg_zr(rt) as u32)
                 };
                 if !ok {
                     return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
@@ -856,14 +856,14 @@ impl Interpreter {
             Instruction::LdrbReg { rt, rn, rm, extend, s } => {
                 let addr = self.reg_index_addr(rn, rm, extend, s, 0);
                 match self.mem.read_u8(addr) {
-                    Some(v) => self.cpu.write_reg(rt, v as u64),
+                    Some(v) => self.cpu.write_reg_zr(rt, v as u64),
                     None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false }),
                 }
                 self.cpu.pc = pc + 4;
             }
             Instruction::StrbReg { rt, rn, rm, extend, s } => {
                 let addr = self.reg_index_addr(rn, rm, extend, s, 0);
-                if !self.mem.write_u8(addr, self.cpu.read_reg(rt) as u8) {
+                if !self.mem.write_u8(addr, self.cpu.read_reg_zr(rt) as u8) {
                     return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
                 }
                 self.cpu.pc = pc + 4;
@@ -871,14 +871,14 @@ impl Interpreter {
             Instruction::LdrhReg { rt, rn, rm, extend, s } => {
                 let addr = self.reg_index_addr(rn, rm, extend, s, 1);
                 match self.mem.read_u16(addr) {
-                    Some(v) => self.cpu.write_reg(rt, v as u64),
+                    Some(v) => self.cpu.write_reg_zr(rt, v as u64),
                     None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false }),
                 }
                 self.cpu.pc = pc + 4;
             }
             Instruction::StrhReg { rt, rn, rm, extend, s } => {
                 let addr = self.reg_index_addr(rn, rm, extend, s, 1);
-                if !self.mem.write_u16(addr, self.cpu.read_reg(rt) as u16) {
+                if !self.mem.write_u16(addr, self.cpu.read_reg_zr(rt) as u16) {
                     return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
                 }
                 self.cpu.pc = pc + 4;
@@ -888,7 +888,7 @@ impl Interpreter {
                 match self.mem.read_u8(addr) {
                     Some(v) => {
                         let val = if sf { v as i8 as i64 as u64 } else { v as i8 as i32 as u32 as u64 };
-                        self.cpu.write_reg(rt, val);
+                        self.cpu.write_reg_zr(rt, val);
                     }
                     None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false }),
                 }
@@ -899,7 +899,7 @@ impl Interpreter {
                 match self.mem.read_u16(addr) {
                     Some(v) => {
                         let val = if sf { v as i16 as i64 as u64 } else { v as i16 as i32 as u32 as u64 };
-                        self.cpu.write_reg(rt, val);
+                        self.cpu.write_reg_zr(rt, val);
                     }
                     None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false }),
                 }
@@ -908,7 +908,7 @@ impl Interpreter {
             Instruction::LdrswReg { rt, rn, rm, extend, s } => {
                 let addr = self.reg_index_addr(rn, rm, extend, s, 2);
                 match self.mem.read_u32(addr) {
-                    Some(v) => self.cpu.write_reg(rt, v as i32 as i64 as u64),
+                    Some(v) => self.cpu.write_reg_zr(rt, v as i32 as i64 as u64),
                     None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false }),
                 }
                 self.cpu.pc = pc + 4;
@@ -928,7 +928,7 @@ impl Interpreter {
                         None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false }),
                     }
                 };
-                self.cpu.write_reg(rt, val);
+                self.cpu.write_reg_zr(rt, val);
                 self.cpu.pc = pc + 4;
             }
 
@@ -965,6 +965,7 @@ impl Interpreter {
             Instruction::Ret { rn } => {
                 let target = self.cpu.read_reg(rn);
                 if target == SENTINEL_LR {
+                    log::trace!("RET to sentinel: x0={:#x} sp={:#x}", self.cpu.x[0], self.cpu.sp);
                     return StepResult::Exit(ExitReason::Returned {
                         code: self.cpu.x[0] as i64,
                     });
@@ -1442,10 +1443,20 @@ impl Interpreter {
             self.cpu.x[0], self.cpu.x[1], self.cpu.x[2], self.cpu.x[3],
             self.cpu.x[4], self.cpu.x[5], self.cpu.x[6], self.cpu.x[7],
         ];
+        let name = self.ffi.name_of(target);
         let result = self.ffi.call_or_stub(target, &args);
         match result {
             crate::ffi::FfiResult::Return(val) => {
+                log::trace!("FFI {target:#x} ({}) returned {val:#x}", name.unwrap_or("?"));
                 self.cpu.x[0] = val;
+                self.cpu.pc = self.cpu.x[30];
+                StepResult::Continue
+            }
+            crate::ffi::FfiResult::ReturnFull { x0, x1, d0, d1 } => {
+                self.cpu.x[0] = x0;
+                self.cpu.x[1] = x1;
+                self.cpu.write_d(0, d0);
+                self.cpu.write_d(1, d1);
                 self.cpu.pc = self.cpu.x[30];
                 StepResult::Continue
             }

@@ -13,16 +13,22 @@ macho-map      = { workspace = true }
 macho-resolve  = { workspace = true }
 macho-objc     = { workspace = true }
 macho-exec     = { workspace = true }
+arm64-translate = { workspace = true }
 trust-policy   = { workspace = true }
 libsystem-shims = { workspace = true }
 objc-runtime   = { workspace = true }
 cf-lite        = { workspace = true }
 platform-core  = { workspace = true }
-platform-darwin-host = { workspace = true }
 log            = { workspace = true }
 serde          = { workspace = true }
 serde_json     = { workspace = true }
 thiserror      = { workspace = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+platform-darwin-host = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+platform-linux       = { workspace = true }
 
 [dev-dependencies]
 macho-fixtures = { workspace = true }

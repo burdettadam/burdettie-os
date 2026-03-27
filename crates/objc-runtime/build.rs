@@ -13,6 +13,15 @@ fn main() {
         println!("cargo:rerun-if-changed=src/trampoline.s");
     }
 
+    if target_arch == "x86_64" && target_os == "macos" {
+        cc::Build::new()
+            .file("src/trampoline_x86_64.s")
+            .compile("objc_trampoline_x86_64");
+
+        println!("cargo:rustc-link-lib=static=objc_trampoline_x86_64");
+        println!("cargo:rerun-if-changed=src/trampoline_x86_64.s");
+    }
+
     // Link libc++abi for __cxa_throw / __cxa_begin_catch / etc.
     if target_os == "macos" {
         println!("cargo:rustc-link-lib=c++abi");

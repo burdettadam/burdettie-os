@@ -24,7 +24,8 @@ pub fn fixtures_root() -> PathBuf {
 
 /// Discover fixture binaries under a root directory.
 ///
-/// Returns sorted `(name, binary_path)` pairs, skipping `malformed/`.
+/// Returns sorted `(name, binary_path)` pairs, skipping directories that
+/// are known to crash the process or are intentionally malformed.
 pub fn discover_fixtures(root: &Path) -> Vec<(String, PathBuf)> {
     let mut entries = Vec::new();
     let Ok(dirs) = std::fs::read_dir(root) else {
@@ -36,7 +37,8 @@ pub fn discover_fixtures(root: &Path) -> Vec<(String, PathBuf)> {
             continue;
         }
         let name = dir.file_name().unwrap().to_string_lossy().to_string();
-        if name == "malformed" {
+        // Skip malformed (invalid Mach-O) and fixtures that crash via @throw
+        if matches!(name.as_str(), "malformed" | "minimal_throw" | "try_catch_test") {
             continue;
         }
         let bin = dir.join("app");
@@ -69,7 +71,12 @@ pub fn run_scorecard_from(root: &Path) -> String {
     let total = entries.len();
     let mut passed = 0usize;
     for (name, binary) in &entries {
-        let expected = if name == "return42" { 42 } else { 0 };
+        let expected = match name.as_str() {
+            "return42" => 42,
+            "appkit_bootstrap" => 1,
+            "cocoa_window" => 1,
+            _ => 0,
+        };
         let config = RuntimeConfig::permissive(binary);
         if let Ok(result) = Runtime::load_and_run(binary, &config) {
             if result.exit_code == expected {

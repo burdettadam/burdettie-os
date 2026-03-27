@@ -167,13 +167,22 @@ extern "C" {
     fn shim_nsstring_format_asm();
 }
 
+#[cfg(all(target_arch = "x86_64", target_os = "macos"))]
+extern "C" {
+    fn shim_nsstring_format_x86_64_asm();
+}
+
 /// Returns the address of the stringWithFormat: trampoline.
 pub fn string_with_format_trampoline_addr() -> u64 {
     #[cfg(all(target_arch = "aarch64", target_os = "macos"))]
     {
         shim_nsstring_format_asm as u64
     }
-    #[cfg(not(all(target_arch = "aarch64", target_os = "macos")))]
+    #[cfg(all(target_arch = "x86_64", target_os = "macos"))]
+    {
+        shim_nsstring_format_x86_64_asm as u64
+    }
+    #[cfg(not(all(any(target_arch = "aarch64", target_arch = "x86_64"), target_os = "macos")))]
     {
         shim_nsstring_string_with_format_inner as u64
     }
