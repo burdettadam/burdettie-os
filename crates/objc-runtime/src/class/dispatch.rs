@@ -1,5 +1,7 @@
 //! Method dispatch, selref fixup, and +load collection.
 
+use std::collections::HashSet;
+
 use macho_objc::ObjcMetadata;
 
 use super::ObjcRuntime;
@@ -48,17 +50,68 @@ impl ObjcRuntime {
         None
     }
 
-    /// Collect all +load method IMPs.
+    /// Collect all +load method IMPs in correct Apple-compatible order:
+    /// 1. Class +load methods sorted by hierarchy (superclasses before subclasses)
+    /// 2. Category +load methods in registration order
     pub fn collect_load_methods(&self) -> Vec<(String, u64)> {
-        let mut loads = Vec::new();
+        // Build set of IMPs that came from categories.
+        let cat_imp_set: HashSet<u64> = self
+            .category_load_imps
+            .iter()
+            .map(|(_, imp)| *imp)
+            .collect();
+
+        // Collect class-defined +load (excluding category-contributed IMPs).
+        let mut class_loads: Vec<(String, u64)> = Vec::new();
         for (name, info) in &self.classes_by_name {
             for m in &info.class_methods {
-                if m.selector == "load" {
-                    loads.push((name.clone(), m.imp));
+                if m.selector == "load" && !cat_imp_set.contains(&m.imp) {
+                    class_loads.push((name.clone(), m.imp));
                 }
             }
         }
-        loads
+
+        // Topological sort: superclasses before subclasses.
+        let load_names: HashSet<&str> = class_loads.iter().map(|(n, _)| n.as_str()).collect();
+        let mut sorted: Vec<(String, u64)> = Vec::with_capacity(class_loads.len());
+        let mut visited: HashSet<String> = HashSet::new();
+        // Build a quick name→imp map for reconstruction after DFS.
+        let imp_map: std::collections::HashMap<&str, u64> =
+            class_loads.iter().map(|(n, imp)| (n.as_str(), *imp)).collect();
+        for (name, _) in &class_loads {
+            self.visit_load_topo(name, &load_names, &imp_map, &mut visited, &mut sorted);
+        }
+
+        // Append category +loads in registration order.
+        sorted.extend(self.category_load_imps.iter().cloned());
+        sorted
+    }
+
+    /// DFS helper: visit a class's superclass first if it also has +load.
+    fn visit_load_topo(
+        &self,
+        name: &str,
+        load_names: &HashSet<&str>,
+        imp_map: &std::collections::HashMap<&str, u64>,
+        visited: &mut HashSet<String>,
+        sorted: &mut Vec<(String, u64)>,
+    ) {
+        if visited.contains(name) {
+            return;
+        }
+        visited.insert(name.to_string());
+        if let Some(class) = self.classes_by_name.get(name) {
+            if let Some(super_addr) = class.superclass_addr {
+                if let Some(super_name) = self.classes_by_addr.get(&super_addr) {
+                    if load_names.contains(super_name.as_str()) {
+                        self.visit_load_topo(super_name, load_names, imp_map, visited, sorted);
+                    }
+                }
+            }
+        }
+        if let Some(&imp) = imp_map.get(name) {
+            sorted.push((name.to_string(), imp));
+        }
     }
 
     /// Fix up `__objc_selrefs` in mapped memory to point to interned selectors.

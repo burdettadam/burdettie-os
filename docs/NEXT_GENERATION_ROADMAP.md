@@ -698,7 +698,7 @@ is memory corruption from incorrect address computation in load/store handlers.
 - [x] Fix unscaled decode: LDURSB/LDURSH were falling to store path (opc matching bug)
 - [x] Fix unscaled halfword: route through Ldrh/Strh (not Ldur/Stur)
 - [x] Enforce 16-byte SP alignment before every FFI call (`do_ffi_call`)
-- [ ] Audit all pre/post-index byte/halfword handlers for sign-extension correctness
+- [x] Audit all pre/post-index byte/halfword handlers for sign-extension correctness
 
 ##### Tests Targeted
 
@@ -715,8 +715,8 @@ are never invoked.
 
 - [x] In interpreter init path, call `collect_load_methods()` and fire each IMP
 - [x] Filter +load to app-binary-only IMPs (system dylib +load not safe to call)
-- [ ] Add category +load collection to `collect_load_methods()`
-- [ ] Fire +load in correct order: superclasses before subclasses, classes before categories
+- [x] Add category +load collection to `collect_load_methods()`
+- [x] Fire +load in correct order: superclasses before subclasses, classes before categories
 
 ##### Tests Fixed
 
@@ -842,7 +842,7 @@ can render AppKit-compatible UIs at native quality on any platform.
 - [x] Intrinsic content size for labels, buttons, text fields
 - [x] Content hugging and compression resistance priorities
 - [x] `NSStackView` backed by constraints
-- [ ] Safe area / margin guides
+- [x] Safe area / margin guides
 - [x] Layout debugging: constraint conflict detection and logging
 
 #### Acceptance

@@ -440,3 +440,157 @@ fn remove_nonexistent_class_returns_false() {
     let mut rt = ObjcRuntime::new();
     assert!(!rt.remove_class_by_addr(0xFFFF));
 }
+
+// ── +load ordering tests ───────────────────────────────────────────
+
+/// Helper: build metadata for a class with a +load class method and a
+/// superclass address, allowing us to construct a hierarchy.
+fn make_loadable_class(
+    name: &str,
+    class_addr: u64,
+    load_imp: u64,
+    superclass_addr: u64,
+    metaclass_addr: u64,
+) -> ObjcMetadata {
+    ObjcMetadata {
+        presence: macho_objc::ObjcPresence {
+            has_objc: true,
+            sections_found: vec!["__objc_classlist".to_string()],
+        },
+        class_refs: vec![ObjcClassRef {
+            pointer_addr: 0x1000,
+            class_data_addr: class_addr,
+            name: Some(name.to_string()),
+            methods: vec![],
+            class_methods: vec![ObjcMethodInfo {
+                selector: "load".to_string(),
+                type_encoding: "v@:".to_string(),
+                imp_vmaddr: load_imp,
+            }],
+            ivars: vec![],
+            properties: vec![],
+            protocol_names: vec![],
+            instance_size: 16,
+            ro_flags: if superclass_addr == 0 { 0x02 } else { 0x00 },
+            superclass_addr,
+            metaclass_addr,
+        }],
+        categories: vec![],
+        protocols: vec![],
+        category_count: 0,
+        protocol_count: 0,
+        selectors: vec![],
+        selref_addrs: vec![],
+        image_info: None,
+    }
+}
+
+#[test]
+fn load_methods_superclass_before_subclass() {
+    let mut rt = ObjcRuntime::new();
+    // Register Child first, then Parent — collect_load_methods must still
+    // return Parent before Child.
+    let child = make_loadable_class("Child", 0x4000, 0xB000, 0x2000, 0x4100);
+    let parent = make_loadable_class("Parent", 0x2000, 0xA000, 0, 0x2100);
+    rt.register_image(&child, 0);
+    rt.register_image(&parent, 0);
+
+    let loads = rt.collect_load_methods();
+    let names: Vec<&str> = loads.iter().map(|(n, _)| n.as_str()).collect();
+    assert_eq!(names, vec!["Parent", "Child"]);
+}
+
+#[test]
+fn load_methods_class_before_category() {
+    let mut rt = ObjcRuntime::new();
+    // Class Widget has its own +load, then a category also adds +load.
+    let class_meta = make_loadable_class("Widget", 0x2000, 0xA000, 0, 0x2100);
+    rt.register_image(&class_meta, 0);
+
+    let cat_meta = ObjcMetadata {
+        presence: macho_objc::ObjcPresence {
+            has_objc: true,
+            sections_found: vec!["__objc_catlist".to_string()],
+        },
+        class_refs: vec![],
+        categories: vec![macho_objc::ObjcCategoryRef {
+            name: Some("Startup".to_string()),
+            class_vmaddr: 0x2000,
+            cat_struct_vmaddr: 0x3000,
+            instance_methods: vec![],
+            class_methods: vec![ObjcMethodInfo {
+                selector: "load".to_string(),
+                type_encoding: "v@:".to_string(),
+                imp_vmaddr: 0xC000,
+            }],
+        }],
+        protocols: vec![],
+        category_count: 1,
+        protocol_count: 0,
+        selectors: vec![],
+        selref_addrs: vec![],
+        image_info: None,
+    };
+    rt.register_image(&cat_meta, 0);
+
+    let loads = rt.collect_load_methods();
+    assert_eq!(loads.len(), 2);
+    // Class +load first, then category +load.
+    assert_eq!(loads[0], ("Widget".to_string(), 0xA000));
+    assert_eq!(loads[1], ("Widget".to_string(), 0xC000));
+}
+
+#[test]
+fn load_methods_hierarchy_then_categories() {
+    let mut rt = ObjcRuntime::new();
+    // Grandparent → Parent → Child hierarchy, each with +load.
+    // Plus a category +load on Parent.
+    let gp = make_loadable_class("GrandParent", 0x2000, 0xA000, 0, 0x2100);
+    let parent = make_loadable_class("Parent", 0x4000, 0xB000, 0x2000, 0x4100);
+    let child = make_loadable_class("Child", 0x6000, 0xC000, 0x4000, 0x6100);
+    // Register in reverse order to ensure topo-sort, not insertion order.
+    rt.register_image(&child, 0);
+    rt.register_image(&parent, 0);
+    rt.register_image(&gp, 0);
+
+    // Category +load on Parent.
+    let cat_meta = ObjcMetadata {
+        presence: macho_objc::ObjcPresence {
+            has_objc: true,
+            sections_found: vec!["__objc_catlist".to_string()],
+        },
+        class_refs: vec![],
+        categories: vec![macho_objc::ObjcCategoryRef {
+            name: Some("Extra".to_string()),
+            class_vmaddr: 0x4000,
+            cat_struct_vmaddr: 0x5000,
+            instance_methods: vec![],
+            class_methods: vec![ObjcMethodInfo {
+                selector: "load".to_string(),
+                type_encoding: "v@:".to_string(),
+                imp_vmaddr: 0xD000,
+            }],
+        }],
+        protocols: vec![],
+        category_count: 1,
+        protocol_count: 0,
+        selectors: vec![],
+        selref_addrs: vec![],
+        image_info: None,
+    };
+    rt.register_image(&cat_meta, 0);
+
+    let loads = rt.collect_load_methods();
+    let names_and_imps: Vec<(&str, u64)> = loads.iter().map(|(n, i)| (n.as_str(), *i)).collect();
+
+    // Class +loads in hierarchy order, then category +load last.
+    assert_eq!(
+        names_and_imps,
+        vec![
+            ("GrandParent", 0xA000),
+            ("Parent", 0xB000),
+            ("Child", 0xC000),
+            ("Parent", 0xD000), // category +load
+        ]
+    );
+}

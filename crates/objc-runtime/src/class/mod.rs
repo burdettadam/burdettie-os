@@ -102,6 +102,9 @@ pub struct ObjcRuntime {
     protocols_by_name: HashMap<String, ProtocolInfo>,
     selectors: HashMap<String, usize>,
     selector_storage: Vec<std::ffi::CString>,
+    /// Category +load IMPs recorded during category merging.
+    /// Each entry is (target_class_name, imp) in registration order.
+    category_load_imps: Vec<(String, u64)>,
     /// Tagged pointer class table: tag index (0-6) → class address.
     /// On arm64, tagged pointers have bit 63 set and encode the tag class
     /// in bits 60-62 (basic tags). Tag 0 is reserved.
@@ -124,6 +127,7 @@ impl ObjcRuntime {
             protocols_by_name: HashMap::new(),
             selectors: HashMap::new(),
             selector_storage: Vec::new(),
+            category_load_imps: Vec::new(),
             tagged_classes: [0u64; 7],
         }
     }

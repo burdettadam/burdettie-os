@@ -135,6 +135,14 @@ impl ObjcRuntime {
                 }
             };
 
+            // Record category +load IMPs before merging.
+            for m in &cat.class_methods {
+                if m.selector == "load" {
+                    let imp = (m.imp_vmaddr as i64 + slide) as u64;
+                    self.category_load_imps.push((target_name.clone(), imp));
+                }
+            }
+
             if let Some(class_info) = self.classes_by_name.get_mut(&target_name) {
                 for m in &cat.instance_methods {
                     class_info.methods.push(MethodEntry {
@@ -264,6 +272,14 @@ impl ObjcRuntime {
                     continue;
                 }
             };
+
+            // Record category +load IMPs before merging.
+            for m in &cat.class_methods {
+                if m.selector == "load" {
+                    let imp = (m.imp_vmaddr as i64 + slide) as u64;
+                    self.category_load_imps.push((target_name.clone(), imp));
+                }
+            }
 
             if let Some(class_info) = self.classes_by_name.get_mut(&target_name) {
                 for m in &cat.instance_methods {

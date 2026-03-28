@@ -19,6 +19,15 @@ pub struct ViewId(pub u64);
 /// The superview (container) sentinel.
 pub const SUPERVIEW: ViewId = ViewId(0);
 
+/// The layout margins guide — represents the container inset by its margins.
+pub const LAYOUT_MARGINS_GUIDE: ViewId = ViewId(u64::MAX);
+
+/// The safe area guide — represents the container inset by safe area insets.
+pub const SAFE_AREA_GUIDE: ViewId = ViewId(u64::MAX - 1);
+
+/// Sentinel IDs that must never be modified by the solver.
+const GUIDE_SENTINELS: [ViewId; 3] = [SUPERVIEW, LAYOUT_MARGINS_GUIDE, SAFE_AREA_GUIDE];
+
 // ── Attribute & Relation ───────────────────────────────────────────
 
 /// A layout attribute (edge, dimension, or center).
@@ -54,6 +63,29 @@ impl LayoutPriority {
     pub const DEFAULT_LOW: Self = Self(250.0);
     pub const FITTING_SIZE_COMPRESSION: Self = Self(750.0);
     pub const FITTING_SIZE_HUGGING: Self = Self(250.0);
+}
+
+// ── Edge Insets ────────────────────────────────────────────────────
+
+/// Insets from each edge (top, left, bottom, right).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct EdgeInsets {
+    pub top: f64,
+    pub left: f64,
+    pub bottom: f64,
+    pub right: f64,
+}
+
+impl EdgeInsets {
+    pub const ZERO: Self = Self { top: 0.0, left: 0.0, bottom: 0.0, right: 0.0 };
+
+    pub fn new(top: f64, left: f64, bottom: f64, right: f64) -> Self {
+        Self { top, left, bottom, right }
+    }
+
+    pub fn uniform(value: f64) -> Self {
+        Self { top: value, left: value, bottom: value, right: value }
+    }
 }
 
 // ── Constraint ─────────────────────────────────────────────────────
@@ -142,6 +174,10 @@ pub struct LayoutEngine {
     constraints: Vec<LayoutConstraint>,
     /// Container (superview) frame.
     container: Rect,
+    /// Layout margins — insets from the container edges.
+    margins: EdgeInsets,
+    /// Safe area insets — insets from the container edges for safe area.
+    safe_area_insets: EdgeInsets,
 }
 
 impl LayoutEngine {
@@ -149,7 +185,19 @@ impl LayoutEngine {
         Self {
             constraints: Vec::new(),
             container,
+            margins: EdgeInsets::ZERO,
+            safe_area_insets: EdgeInsets::ZERO,
         }
+    }
+
+    /// Set layout margins.
+    pub fn set_margins(&mut self, margins: EdgeInsets) {
+        self.margins = margins;
+    }
+
+    /// Set safe area insets.
+    pub fn set_safe_area_insets(&mut self, insets: EdgeInsets) {
+        self.safe_area_insets = insets;
     }
 
     /// Update the container size (e.g. on window resize).
@@ -198,14 +246,14 @@ impl LayoutEngine {
             .filter(|(_, c)| c.active)
             .collect();
 
-        // Collect all view IDs (excluding SUPERVIEW).
+        // Exclude guide sentinels from view list — they are pre-seeded.
         let mut view_ids: Vec<ViewId> = Vec::new();
         for (_, c) in &active {
-            if c.first_item != SUPERVIEW && !view_ids.contains(&c.first_item) {
+            if !GUIDE_SENTINELS.contains(&c.first_item) && !view_ids.contains(&c.first_item) {
                 view_ids.push(c.first_item);
             }
             if let Some(id) = c.second_item {
-                if id != SUPERVIEW && !view_ids.contains(&id) {
+                if !GUIDE_SENTINELS.contains(&id) && !view_ids.contains(&id) {
                     view_ids.push(id);
                 }
             }
@@ -226,6 +274,20 @@ impl LayoutEngine {
             VarKey(SUPERVIEW, LayoutAttribute::Height),
             self.container.height,
         );
+
+        // Initialize layout margins guide (container inset by margins).
+        let mg = &self.margins;
+        values.insert(VarKey(LAYOUT_MARGINS_GUIDE, LayoutAttribute::Left), self.container.x + mg.left);
+        values.insert(VarKey(LAYOUT_MARGINS_GUIDE, LayoutAttribute::Top), self.container.y + mg.top);
+        values.insert(VarKey(LAYOUT_MARGINS_GUIDE, LayoutAttribute::Width), (self.container.width - mg.left - mg.right).max(0.0));
+        values.insert(VarKey(LAYOUT_MARGINS_GUIDE, LayoutAttribute::Height), (self.container.height - mg.top - mg.bottom).max(0.0));
+
+        // Initialize safe area guide (container inset by safe area insets).
+        let sa = &self.safe_area_insets;
+        values.insert(VarKey(SAFE_AREA_GUIDE, LayoutAttribute::Left), self.container.x + sa.left);
+        values.insert(VarKey(SAFE_AREA_GUIDE, LayoutAttribute::Top), self.container.y + sa.top);
+        values.insert(VarKey(SAFE_AREA_GUIDE, LayoutAttribute::Width), (self.container.width - sa.left - sa.right).max(0.0));
+        values.insert(VarKey(SAFE_AREA_GUIDE, LayoutAttribute::Height), (self.container.height - sa.top - sa.bottom).max(0.0));
 
         // Initialize view variables with defaults (centered, zero size).
         for &vid in &view_ids {
@@ -403,8 +465,8 @@ fn apply_correction(
     attr: LayoutAttribute,
     delta: f64,
 ) {
-    if view == SUPERVIEW {
-        return; // Never modify the superview.
+    if view == SUPERVIEW || view == LAYOUT_MARGINS_GUIDE || view == SAFE_AREA_GUIDE {
+        return; // Never modify guide sentinels.
     }
     match attr {
         LayoutAttribute::Left | LayoutAttribute::Top | LayoutAttribute::Width | LayoutAttribute::Height => {
@@ -592,6 +654,16 @@ pub fn equal(
     LayoutConstraint::new(view, attr, LayoutRelation::Equal, anchor, anchor_attr, 1.0, offset)
 }
 
+/// Pin all four edges of `view` to the layout margins guide.
+pub fn pin_to_margins(view: ViewId) -> Vec<LayoutConstraint> {
+    pin_edges(view, LAYOUT_MARGINS_GUIDE, 0.0)
+}
+
+/// Pin all four edges of `view` to the safe area guide.
+pub fn pin_to_safe_area(view: ViewId) -> Vec<LayoutConstraint> {
+    pin_edges(view, SAFE_AREA_GUIDE, 0.0)
+}
+
 // ── Tests ──────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -767,5 +839,65 @@ mod tests {
 
         let result = engine.solve();
         assert!(result.is_err(), "should detect conflict");
+    }
+
+    // ── Safe area / margin guide tests ─────────────────────────────
+
+    #[test]
+    fn pin_to_margins_respects_insets() {
+        let mut engine = LayoutEngine::new(Rect::new(0.0, 0.0, 400.0, 300.0));
+        engine.set_margins(EdgeInsets::new(20.0, 16.0, 20.0, 16.0));
+        let v = ViewId(1);
+
+        engine.add_constraints(pin_to_margins(v));
+
+        let frames = engine.solve().unwrap();
+        let f = frames[&v];
+        assert!(approx(f.x, 16.0), "left={}", f.x);
+        assert!(approx(f.y, 20.0), "top={}", f.y);
+        assert!(approx(f.width, 368.0), "width={}", f.width);   // 400 - 16 - 16
+        assert!(approx(f.height, 260.0), "height={}", f.height); // 300 - 20 - 20
+    }
+
+    #[test]
+    fn pin_to_safe_area_respects_insets() {
+        let mut engine = LayoutEngine::new(Rect::new(0.0, 0.0, 390.0, 844.0));
+        // iPhone-style: 47pt top notch, 34pt bottom home indicator
+        engine.set_safe_area_insets(EdgeInsets::new(47.0, 0.0, 34.0, 0.0));
+        let v = ViewId(1);
+
+        engine.add_constraints(pin_to_safe_area(v));
+
+        let frames = engine.solve().unwrap();
+        let f = frames[&v];
+        assert!(approx(f.x, 0.0), "left={}", f.x);
+        assert!(approx(f.y, 47.0), "top={}", f.y);
+        assert!(approx(f.width, 390.0), "width={}", f.width);
+        assert!(approx(f.height, 763.0), "height={}", f.height); // 844 - 47 - 34
+    }
+
+    #[test]
+    fn safe_area_with_centered_child() {
+        let mut engine = LayoutEngine::new(Rect::new(0.0, 0.0, 400.0, 800.0));
+        engine.set_safe_area_insets(EdgeInsets::new(44.0, 0.0, 34.0, 0.0));
+        let v = ViewId(1);
+
+        engine.add_constraints(set_size(v, 100.0, 50.0));
+        engine.add_constraints(center_in(v, SAFE_AREA_GUIDE));
+
+        let frames = engine.solve().unwrap();
+        let f = frames[&v];
+        assert!(approx(f.width, 100.0));
+        assert!(approx(f.height, 50.0));
+        // Safe area center Y = 44 + (800-44-34)/2 = 44 + 361 = 405
+        let expected_cy = 44.0 + (800.0 - 44.0 - 34.0) / 2.0;
+        let actual_cy = f.y + f.height / 2.0;
+        assert!(approx(actual_cy, expected_cy), "cy={} expected={}", actual_cy, expected_cy);
+    }
+
+    #[test]
+    fn margins_uniform() {
+        let insets = EdgeInsets::uniform(10.0);
+        assert_eq!(insets, EdgeInsets::new(10.0, 10.0, 10.0, 10.0));
     }
 }
