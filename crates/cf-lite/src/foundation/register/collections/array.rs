@@ -227,6 +227,11 @@ pub fn register_nsmutablearray_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nsmutablearray::shim_nsmutablearray_array_with_capacity as u64,
                 "@@:Q",
             ),
+            me(
+                "arrayWithArray:",
+                nsmutablearray::shim_nsmutablearray_array_with_array as u64,
+                "@@:@",
+            ),
         ],
         ivars: vec![],
         properties: vec![],

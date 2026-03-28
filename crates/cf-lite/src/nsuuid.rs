@@ -73,6 +73,21 @@ pub extern "C" fn shim_nsuuid_uuid(_cls: u64, _cmd: u64) -> u64 {
     alloc_nsuuid(lo, hi)
 }
 
+/// `-[NSUUID init]` — initialise an already-alloc'd NSUUID with a random value.
+pub extern "C" fn shim_nsuuid_init(obj: u64, _cmd: u64) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
+    let (lo, hi) = generate_uuid_v4();
+    unsafe {
+        let ptr = obj as *mut u64;
+        *ptr = nsobj::nsuuid_class_addr();
+        *ptr.add(1) = lo;
+        *ptr.add(2) = hi;
+    }
+    obj
+}
+
 /// `-[NSUUID initWithUUIDString:]` — init from a UUID string.
 pub extern "C" fn shim_nsuuid_init_with_uuid_string(obj: u64, _cmd: u64, string: u64) -> u64 {
     if obj == 0 || string == 0 {

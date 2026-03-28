@@ -29,6 +29,25 @@ pub extern "C" fn shim_nsmutablearray_array(cls: u64, _cmd: u64) -> u64 {
     shim_nsmutablearray_array_with_capacity(cls, _cmd, INITIAL_CAPACITY)
 }
 
+/// `+[NSMutableArray arrayWithArray:]` — creates a new mutable array
+/// containing all elements from the source array.
+pub extern "C" fn shim_nsmutablearray_array_with_array(cls: u64, _cmd: u64, source: u64) -> u64 {
+    if source == 0 {
+        return shim_nsmutablearray_array(cls, _cmd);
+    }
+    let count = crate::nsarray::shim_nsarray_count(source, 0);
+    let cap = if count == 0 { INITIAL_CAPACITY } else { count };
+    let new_arr = shim_nsmutablearray_array_with_capacity(cls, _cmd, cap);
+    if new_arr == 0 {
+        return 0;
+    }
+    for i in 0..count {
+        let elem = crate::nsarray::shim_nsarray_object_at_index(source, 0, i);
+        shim_nsmutablearray_add_object(new_arr, 0, elem);
+    }
+    new_arr
+}
+
 /// `+[NSMutableArray arrayWithCapacity:]` — creates an empty mutable array
 /// with pre-allocated capacity.
 pub extern "C" fn shim_nsmutablearray_array_with_capacity(

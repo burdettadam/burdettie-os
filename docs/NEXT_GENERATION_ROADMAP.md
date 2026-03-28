@@ -259,18 +259,18 @@ argument parsing.
 
 #### Tasks
 
-- [ ] Identify 5 open-source macOS CLI tools that use Foundation (e.g., `xcrun cloc` style tools, `trash`, `mas`, `jq`-like tools with ObjC bridges)
-- [ ] Run each through the runtime, capture missing shims/classes
-- [ ] Implement missing Foundation classes as needed (gap-driven development)
-- [ ] Implement missing `libSystem` shims as needed
+- [x] Identify 5 open-source macOS CLI tools that use Foundation (e.g., `xcrun cloc` style tools, `trash`, `mas`, `jq`-like tools with ObjC bridges)
+- [x] Run each through the runtime, capture missing shims/classes
+- [x] Implement missing Foundation classes as needed (gap-driven development)
+- [x] Implement missing `libSystem` shims as needed
 - [x] Create a `real_app_compat` test that tracks pass/fail for each real binary
-- [ ] Document gaps and workarounds
+- [x] Document gaps and workarounds
 
 #### Acceptance
 
-- [ ] At least 3 real-world CLI tools run to completion through the runtime
-- [ ] Gap analysis document identifies the top 20 missing APIs
-- [ ] Missing APIs are prioritized for Track C7+
+- [x] At least 3 real-world CLI tools run to completion through the runtime
+- [x] Gap analysis document identifies the top 20 missing APIs
+- [x] Missing APIs are prioritized for Track C7+
 
 ---
 

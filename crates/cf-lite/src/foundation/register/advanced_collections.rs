@@ -17,6 +17,7 @@ pub fn register_nsuuid_class(rt: &mut objc_runtime::ObjcRuntime) {
         name: "NSUUID".to_string(),
         mapped_addr: class_addr,
         methods: vec![
+            me("init", nsuuid::shim_nsuuid_init as u64, "@@:"),
             me(
                 "initWithUUIDString:",
                 nsuuid::shim_nsuuid_init_with_uuid_string as u64,

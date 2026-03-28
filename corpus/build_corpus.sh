@@ -33,6 +33,11 @@ PROGRAMS=(
     regex_search
     event_bus
     predicate_filter
+    sort_util
+    cache_bench
+    uuid_registry
+    attr_string
+    kv_store
 )
 
 BUILT=0

@@ -157,7 +157,7 @@ pub extern "C" fn shim_mutable_attrstr_init_with_string(obj: u64, _cmd: u64, str
 
 /// `-[NSMutableAttributedString addAttribute:value:range:]`
 ///
-/// Simplified: replaces all attribute runs with a single run for the given range.
+/// Appends a new attribute run (does not merge overlapping ranges).
 pub extern "C" fn shim_mutable_attrstr_add_attribute(
     obj: u64,
     _cmd: u64,
@@ -172,26 +172,74 @@ pub extern "C" fn shim_mutable_attrstr_add_attribute(
     let vals = [value];
     let dict = crate::nsdictionary::make_nsdictionary(&keys, &vals);
 
-    let run_buf = crate::pal_alloc().calloc(1, ATTR_RUN_SIZE) as u64;
+    let old_count = unsafe { *((obj + 16) as *const u64) } as usize;
+    let old_ptr = unsafe { *((obj + 24) as *const u64) };
+    let new_count = old_count + 1;
+    let new_buf = crate::pal_alloc().calloc(new_count, ATTR_RUN_SIZE) as u64;
+    if new_buf == 0 { return; }
+
+    // Copy existing runs
+    if old_count > 0 && old_ptr != 0 {
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                old_ptr as *const u8,
+                new_buf as *mut u8,
+                old_count * ATTR_RUN_SIZE,
+            );
+        }
+    }
+
+    // Append new run
+    let new_run = new_buf + (old_count * ATTR_RUN_SIZE) as u64;
     unsafe {
-        *(run_buf as *mut u64) = range_loc;
-        *((run_buf + 8) as *mut u64) = range_len;
-        *((run_buf + 16) as *mut u64) = dict;
-        *((obj + 16) as *mut u64) = 1;
-        *((obj + 24) as *mut u64) = run_buf;
+        *(new_run as *mut u64) = range_loc;
+        *((new_run + 8) as *mut u64) = range_len;
+        *((new_run + 16) as *mut u64) = dict;
+        *((obj + 16) as *mut u64) = new_count as u64;
+        *((obj + 24) as *mut u64) = new_buf;
     }
 }
 
 /// `-[NSMutableAttributedString replaceCharactersInRange:withString:]`
 ///
-/// Simplified: replaces the underlying string entirely (ignores range).
+/// Replaces characters in the given range with the replacement string,
+/// producing a new backing NSString.
 pub extern "C" fn shim_mutable_attrstr_replace_chars(
     obj: u64,
     _cmd: u64,
-    _range_loc: u64,
-    _range_len: u64,
-    string: u64,
+    range_loc: u64,
+    range_len: u64,
+    replacement: u64,
 ) {
     if obj == 0 { return; }
-    unsafe { *((obj + 8) as *mut u64) = string; }
+    let old_str = unsafe { *((obj + 8) as *const u64) };
+    let old_cstr = cfstring::extract_cfstring_cstr(old_str).unwrap_or("");
+    let rep_cstr = if replacement != 0 {
+        cfstring::extract_cfstring_cstr(replacement).unwrap_or("")
+    } else {
+        ""
+    };
+
+    let loc = range_loc as usize;
+    let len = range_len as usize;
+    let mut result = String::with_capacity(old_cstr.len());
+    // Build prefix + replacement + suffix
+    for (i, ch) in old_cstr.char_indices() {
+        if i < loc {
+            result.push(ch);
+        } else if i >= loc + len {
+            result.push(ch);
+        }
+        // characters in [loc, loc+len) are skipped
+    }
+    // Insert replacement at the right position
+    if loc <= result.len() {
+        result.insert_str(loc, rep_cstr);
+    } else {
+        result.push_str(rep_cstr);
+    }
+
+    let c_str = std::ffi::CString::new(result).unwrap_or_default();
+    let new_nsstr = cfstring::shim_cf_string_create_with_cstring(0, c_str.as_ptr(), 0);
+    unsafe { *((obj + 8) as *mut u64) = new_nsstr; }
 }
