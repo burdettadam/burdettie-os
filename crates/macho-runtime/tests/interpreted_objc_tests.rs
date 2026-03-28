@@ -224,7 +224,6 @@ fn interp_nslog_format_specifiers() {
 }
 
 #[test]
-#[ignore = "guest→host pointer translation causes valueWithPointer:/pointerValue roundtrip mismatch"]
 fn interp_nsvalue_basics() {
     let Some(r) = run_interpreted("nsvalue_basics") else { return };
     assert_eq!(r.exit_code, 0, "nsvalue_basics should exit 0");

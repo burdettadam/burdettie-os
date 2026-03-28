@@ -40,6 +40,8 @@ struct Region {
 /// Memory model: maps guest (ARM64 virtual) addresses to host memory.
 ///
 /// Backed by the MappedImage segments plus an interpreter-owned stack.
+/// The stack is `mmap`'d at a real virtual address so that guest and host
+/// pointers are identical — no address translation is needed at FFI boundaries.
 /// When `host_passthrough` is enabled, reads/writes to addresses outside
 /// mapped regions are forwarded directly to host memory. This is correct
 /// for in-process interpretation where guest pointers may reference
@@ -47,10 +49,12 @@ struct Region {
 pub struct Memory {
     /// Regions sorted by guest_start for binary search.
     regions: BTreeMap<u64, Region>,
-    /// Interpreter-owned stack allocation.
-    stack: Vec<u8>,
-    /// Guest address of the stack base (bottom, highest address).
-    stack_guest_base: u64,
+    /// mmap'd stack allocation (host pointer == guest address).
+    stack_ptr: *mut u8,
+    /// Size of the mmap'd stack.
+    stack_size: usize,
+    /// Top of the stack (highest address).
+    stack_top: u64,
     /// When true, unmapped addresses are treated as direct host pointers.
     pub host_passthrough: bool,
 }
@@ -59,11 +63,18 @@ pub struct Memory {
 // segments that outlive it (the caller ensures this).
 unsafe impl Send for Memory {}
 
+impl Drop for Memory {
+    fn drop(&mut self) {
+        if !self.stack_ptr.is_null() {
+            unsafe {
+                libc::munmap(self.stack_ptr as *mut libc::c_void, self.stack_size);
+            }
+        }
+    }
+}
+
 /// Default interpreter stack size: 1 MB.
 const DEFAULT_STACK_SIZE: usize = 1024 * 1024;
-
-/// Guest address for the interpreter stack (well above typical Mach-O load addresses).
-const STACK_GUEST_BASE: u64 = 0x7000_0000_0000;
 
 impl Memory {
     /// Create a new memory model from mapped segments.
@@ -86,9 +97,22 @@ impl Memory {
             );
         }
 
-        let mut stack = vec![0u8; DEFAULT_STACK_SIZE];
-        let stack_guest_start = STACK_GUEST_BASE - DEFAULT_STACK_SIZE as u64;
-        let stack_ptr = stack.as_mut_ptr();
+        // mmap the interpreter stack at a real virtual address.
+        // guest_start == base as u64, so guest pointers ARE host pointers.
+        let stack_ptr = libc::mmap(
+            std::ptr::null_mut(),
+            DEFAULT_STACK_SIZE,
+            libc::PROT_READ | libc::PROT_WRITE,
+            libc::MAP_PRIVATE | libc::MAP_ANON,
+            -1,
+            0,
+        ) as *mut u8;
+        assert!(
+            stack_ptr != libc::MAP_FAILED as *mut u8,
+            "mmap failed for interpreter stack"
+        );
+        let stack_guest_start = stack_ptr as u64;
+        let stack_top = stack_guest_start + DEFAULT_STACK_SIZE as u64;
         regions.insert(
             stack_guest_start,
             Region {
@@ -101,8 +125,9 @@ impl Memory {
 
         Self {
             regions,
-            stack,
-            stack_guest_base: STACK_GUEST_BASE,
+            stack_ptr,
+            stack_size: DEFAULT_STACK_SIZE,
+            stack_top,
             host_passthrough: false,
         }
     }
@@ -111,28 +136,7 @@ impl Memory {
     /// Leaves headroom above SP for the 128-byte host stack copy used by
     /// variadic FFI calls (call_host_capturing).
     pub fn initial_sp(&self) -> u64 {
-        self.stack_guest_base - 256
-    }
-
-    /// Translate a guest address to a host pointer (read-only).
-    /// Returns 0 if the address cannot be mapped.
-    pub fn guest_to_host(&self, addr: u64, size: usize) -> u64 {
-        // Use strict region lookup — never fall through to host_passthrough,
-        // because guest stack addresses are NOT valid host pointers.
-        self.translate_strict(addr, size).map(|p| p as u64).unwrap_or(0)
-    }
-
-    /// Translate a u64 value for FFI argument passing.
-    ///
-    /// If `val` falls in a mapped guest region (stack or segment), returns
-    /// the corresponding host pointer. Otherwise returns `val` unchanged
-    /// (it may be a host pointer, an integer, or zero).
-    pub fn translate_ffi_arg(&self, val: u64) -> u64 {
-        if val == 0 {
-            return 0;
-        }
-        let host = self.guest_to_host(val, 1);
-        if host != 0 { host } else { val }
+        self.stack_top - 256
     }
 
     /// Translate a guest address to a host pointer using only mapped regions

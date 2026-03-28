@@ -1561,44 +1561,21 @@ impl Interpreter {
     /// Handle an FFI call: extract args from registers, call the host function,
     /// and process the result (return, exit, or tail-call).
     fn do_ffi_call(&mut self, target: u64, _call_pc: u64) -> StepResult {
-        // Translate guest SP to a host pointer for variadic stack arg copy.
-        // Variadic arguments on ARM64 macOS are passed on the stack, so we
-        // need to translate any guest-region pointers in the stack data too.
-        let mut stack_buf = [0u64; 16];
-        let guest_sp_raw = self.mem.guest_to_host(self.cpu.sp, 128);
-        let translated_sp = if guest_sp_raw != 0 {
-            for i in 0..16 {
-                let raw = unsafe { *((guest_sp_raw as *const u64).add(i)) };
-                stack_buf[i] = self.mem.translate_ffi_arg(raw);
-            }
-            stack_buf.as_ptr() as u64
-        } else {
-            0
-        };
-        // Translate any guest-region pointers (stack, segment) in the
-        // argument registers to host addresses so host functions can
-        // dereference them safely (e.g. objc_msgSendSuper taking an
-        // objc_super* on the guest stack).
+        // The interpreter stack is mmap'd at a real virtual address, so
+        // guest pointers (stack, segment) ARE valid host pointers.
+        // No address translation is needed at the FFI boundary.
         let args = crate::ffi::FfiCallArgs {
             x: [
-                self.mem.translate_ffi_arg(self.cpu.x[0]),
-                self.mem.translate_ffi_arg(self.cpu.x[1]),
-                self.mem.translate_ffi_arg(self.cpu.x[2]),
-                self.mem.translate_ffi_arg(self.cpu.x[3]),
-                self.mem.translate_ffi_arg(self.cpu.x[4]),
-                self.mem.translate_ffi_arg(self.cpu.x[5]),
-                self.mem.translate_ffi_arg(self.cpu.x[6]),
-                self.mem.translate_ffi_arg(self.cpu.x[7]),
+                self.cpu.x[0], self.cpu.x[1], self.cpu.x[2], self.cpu.x[3],
+                self.cpu.x[4], self.cpu.x[5], self.cpu.x[6], self.cpu.x[7],
             ],
             d: [
                 self.cpu.read_d(0), self.cpu.read_d(1), self.cpu.read_d(2), self.cpu.read_d(3),
                 self.cpu.read_d(4), self.cpu.read_d(5), self.cpu.read_d(6), self.cpu.read_d(7),
             ],
             x8: self.cpu.x[8],
-            host_x8: if self.cpu.x[8] != 0 {
-                self.mem.guest_to_host(self.cpu.x[8], 64)
-            } else { 0 },
-            guest_sp: translated_sp,
+            host_x8: self.cpu.x[8],
+            guest_sp: self.cpu.sp,
         };
         let name = self.ffi.name_of(target);
         let result = self.ffi.call_or_stub(target, &args);

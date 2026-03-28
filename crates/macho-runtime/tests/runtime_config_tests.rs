@@ -51,9 +51,9 @@ fn context_installs_all_shims() {
 
     // Shim count (updated after adding objc_setProperty_nonatomic_copy shim)
     #[cfg(target_os = "macos")]
-    assert_eq!(ctx.shim_table.len(), 341);
+    assert_eq!(ctx.shim_table.len(), 351);
     #[cfg(not(target_os = "macos"))]
-    assert_eq!(ctx.shim_table.len(), 341);
+    assert_eq!(ctx.shim_table.len(), 351);
 }
 
 #[test]
