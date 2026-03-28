@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use macho_exec::ImageRegistry;
 use macho_parse::{parse, ParsedMachO};
 use platform_core::fs::FilesystemProvider;
+use runtime_diagnostics::DiagEvent;
 
 use crate::error::RuntimeError;
 
@@ -32,8 +33,18 @@ pub(crate) fn load_dependencies(
             continue; // already loaded
         }
 
+        runtime_diagnostics::emit(DiagEvent::ResourceRequest {
+            kind: "dylib".into(),
+            name: install_name.clone(),
+        });
+
         let Some(path) = resolve_dylib_path(&install_name, &rpaths, binary_dir, fs) else {
             log::debug!("Dependency not found locally: {install_name}");
+            runtime_diagnostics::emit(DiagEvent::ResourceFailed {
+                kind: "dylib".into(),
+                name: install_name.clone(),
+                reason: "not found on disk".into(),
+            });
             continue;
         };
 
@@ -41,6 +52,11 @@ pub(crate) fn load_dependencies(
             Ok(d) => d,
             Err(e) => {
                 log::warn!("Failed to read {}: {e}", path.display());
+                runtime_diagnostics::emit(DiagEvent::ResourceFailed {
+                    kind: "dylib".into(),
+                    name: install_name.clone(),
+                    reason: format!("read error: {e}"),
+                });
                 continue;
             }
         };
@@ -50,6 +66,11 @@ pub(crate) fn load_dependencies(
             Ok(p) => p,
             Err(e) => {
                 log::warn!("Failed to parse {install_name}: {e}");
+                runtime_diagnostics::emit(DiagEvent::ResourceFailed {
+                    kind: "dylib".into(),
+                    name: install_name.clone(),
+                    reason: format!("parse error: {e}"),
+                });
                 continue;
             }
         };
@@ -66,8 +87,22 @@ pub(crate) fn load_dependencies(
         }
 
         match registry.load(&install_name, dylib_data) {
-            Ok(_) => log::info!("Loaded dependency: {install_name} ({})", path.display()),
-            Err(e) => log::warn!("Failed to load {install_name}: {e}"),
+            Ok(_) => {
+                log::info!("Loaded dependency: {install_name} ({})", path.display());
+                runtime_diagnostics::emit(DiagEvent::ResourceResolved {
+                    kind: "dylib".into(),
+                    name: install_name,
+                    addr: 0, // no single address for an image
+                });
+            }
+            Err(e) => {
+                log::warn!("Failed to load {install_name}: {e}");
+                runtime_diagnostics::emit(DiagEvent::ResourceFailed {
+                    kind: "dylib".into(),
+                    name: install_name,
+                    reason: format!("load error: {e}"),
+                });
+            }
         }
     }
 

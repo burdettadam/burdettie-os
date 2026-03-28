@@ -93,6 +93,28 @@ pub enum DiagEvent {
         isa: u64,
         imp: u64,
     },
+
+    // ── Resource-request graph ─────────────────────────────────────
+
+    /// A resource (dylib, image, symbol) was requested.
+    ResourceRequest {
+        kind: String,
+        name: String,
+    },
+
+    /// A resource request was successfully resolved.
+    ResourceResolved {
+        kind: String,
+        name: String,
+        addr: u64,
+    },
+
+    /// A resource request failed.
+    ResourceFailed {
+        kind: String,
+        name: String,
+        reason: String,
+    },
 }
 
 impl std::fmt::Display for DiagEvent {
@@ -136,6 +158,15 @@ impl std::fmt::Display for DiagEvent {
             }
             DiagEvent::MethodDispatch { selector, isa, imp } => {
                 write!(f, "dispatch: [{selector}] isa={isa:#x} → imp={imp:#x}")
+            }
+            DiagEvent::ResourceRequest { kind, name } => {
+                write!(f, "resource request: {kind} '{name}'")
+            }
+            DiagEvent::ResourceResolved { kind, name, addr } => {
+                write!(f, "resource resolved: {kind} '{name}' at {addr:#x}")
+            }
+            DiagEvent::ResourceFailed { kind, name, reason } => {
+                write!(f, "resource failed: {kind} '{name}': {reason}")
             }
         }
     }

@@ -19,6 +19,7 @@ libsystem-shims = { workspace = true }
 objc-runtime   = { workspace = true }
 cf-lite        = { workspace = true }
 platform-core  = { workspace = true }
+runtime-diagnostics = { workspace = true }
 log            = { workspace = true }
 serde          = { workspace = true }
 serde_json     = { workspace = true }
@@ -33,7 +34,6 @@ platform-linux       = { workspace = true }
 [dev-dependencies]
 macho-fixtures = { workspace = true }
 objc-runtime   = { workspace = true }
-runtime-diagnostics = { workspace = true }
 cf-lite        = { workspace = true }
 env_logger     = { workspace = true }
 

@@ -1,61 +1,92 @@
 //! Thread-safe global diagnostic event collector.
+//!
+//! Backed by a fixed-capacity [`DiagRing`] that silently evicts the
+//! oldest entries when full, preventing unbounded memory growth from
+//! verbose dispatch tracing.
 
-use std::sync::Mutex;
+use std::sync::{LazyLock, Mutex};
 
 use crate::DiagEvent;
+use crate::ring::{DiagRing, StampedEvent, CategoryCounters, DiagCategory};
 
-static EVENTS: Mutex<Vec<DiagEvent>> = Mutex::new(Vec::new());
+static RING: LazyLock<Mutex<DiagRing>> = LazyLock::new(|| Mutex::new(DiagRing::new()));
 
-/// Record a diagnostic event.
-pub fn emit(event: DiagEvent) {
-    let mut events = match EVENTS.lock() {
-        Ok(g) => g,
-        Err(e) => e.into_inner(),
-    };
-    events.push(event);
+fn lock_ring() -> std::sync::MutexGuard<'static, DiagRing> {
+    RING.lock().unwrap_or_else(|e| e.into_inner())
 }
 
-/// Drain all collected events, returning them and clearing the collector.
+/// Record a diagnostic event. Returns the event's sequence number.
+pub fn emit(event: DiagEvent) -> u64 {
+    lock_ring().push(event)
+}
+
+/// Drain all events in the ring buffer, returning them in chronological
+/// order and clearing the buffer. Aggregate counters are preserved.
 pub fn drain() -> Vec<DiagEvent> {
-    let mut events = match EVENTS.lock() {
-        Ok(g) => g,
-        Err(e) => e.into_inner(),
-    };
-    std::mem::take(&mut *events)
+    lock_ring().drain().into_iter().map(|se| se.event).collect()
 }
 
-/// Return a snapshot of all collected events without clearing.
+/// Drain stamped events (with sequence numbers).
+pub fn drain_stamped() -> Vec<StampedEvent> {
+    lock_ring().drain()
+}
+
+/// Return a snapshot of all events currently in the ring buffer.
 pub fn snapshot() -> Vec<DiagEvent> {
-    let events = match EVENTS.lock() {
-        Ok(g) => g,
-        Err(e) => e.into_inner(),
-    };
-    events.clone()
+    lock_ring().iter().map(|se| se.event.clone()).collect()
 }
 
-/// Check whether any events have been recorded.
+/// Return a stamped snapshot (with sequence numbers).
+pub fn snapshot_stamped() -> Vec<StampedEvent> {
+    lock_ring().snapshot()
+}
+
+/// Check whether any events are currently in the ring buffer.
 pub fn has_events() -> bool {
-    let events = match EVENTS.lock() {
-        Ok(g) => g,
-        Err(e) => e.into_inner(),
-    };
-    !events.is_empty()
+    !lock_ring().is_empty()
 }
 
-/// Clear all collected events.
+/// Clear all events in the ring buffer. Counters are preserved.
 pub fn clear() {
-    let mut events = match EVENTS.lock() {
-        Ok(g) => g,
-        Err(e) => e.into_inner(),
-    };
-    events.clear();
+    lock_ring().clear();
 }
 
-/// Return the number of collected events.
+/// Number of events currently in the ring buffer (not total emitted).
 pub fn event_count() -> usize {
-    let events = match EVENTS.lock() {
-        Ok(g) => g,
-        Err(e) => e.into_inner(),
-    };
-    events.len()
+    lock_ring().len()
+}
+
+/// Total number of events ever emitted (including evicted ones).
+pub fn total_emitted() -> u64 {
+    lock_ring().total_emitted()
+}
+
+/// Number of events that were evicted due to ring buffer overflow.
+pub fn evicted_count() -> u64 {
+    lock_ring().evicted()
+}
+
+/// Aggregate counters across all categories (never evicted).
+pub fn counters() -> CategoryCounters {
+    lock_ring().counters.clone()
+}
+
+/// Return events matching a specific diagnostic category.
+pub fn by_category(cat: DiagCategory) -> Vec<StampedEvent> {
+    lock_ring().by_category(cat)
+}
+
+/// Return the most recent N events.
+pub fn tail(n: usize) -> Vec<StampedEvent> {
+    lock_ring().tail(n)
+}
+
+/// Resize the ring buffer (events are preserved up to the new capacity).
+pub fn resize(new_capacity: usize) {
+    let mut ring = lock_ring();
+    let events = ring.drain();
+    *ring = DiagRing::with_capacity(new_capacity);
+    for se in events {
+        ring.push(se.event);
+    }
 }
