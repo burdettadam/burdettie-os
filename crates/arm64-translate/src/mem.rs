@@ -29,7 +29,8 @@ fn is_page_mapped(addr: u64) -> bool {
 struct Region {
     /// Host pointer to the start of this region.
     base: *mut u8,
-    /// Guest (virtual) start address.
+    /// Guest (virtual) start address — identity-mapped, kept for Debug output.
+    #[allow(dead_code)]
     guest_start: u64,
     /// Size in bytes.
     size: usize,

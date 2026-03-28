@@ -4,6 +4,10 @@
 //! and helper functions for common layout patterns.
 
 use graphics_core::{Rect, Renderer};
+use ui_view::layout::{
+    self as constraint, LayoutAttribute, LayoutEngine, ViewId,
+    SUPERVIEW,
+};
 use ui_view::View;
 
 /// Axis along which a stack view arranges its children.
@@ -197,6 +201,146 @@ impl StackView {
     pub fn draw(&mut self, renderer: &mut dyn Renderer) {
         self.view.draw(renderer);
     }
+
+    /// Recompute layout using the constraint engine.
+    ///
+    /// Generates constraints that model the stacking behaviour (axis, spacing,
+    /// distribution, padding) and solves them with [`LayoutEngine`]. Each child
+    /// view must have a `layout_id` set; if any child is missing an ID, this
+    /// method falls back to the simple `layout()` path.
+    pub fn layout_with_constraints(&mut self) {
+        let count = self.view.subviews().len();
+        if count == 0 {
+            self.child_frames.clear();
+            return;
+        }
+
+        // Collect child layout_ids — fall back to simple layout if any are missing.
+        let ids: Vec<ViewId> = self
+            .view
+            .subviews()
+            .iter()
+            .filter_map(|sv| sv.layout_id)
+            .collect();
+        if ids.len() != count {
+            self.layout();
+            return;
+        }
+
+        let mut engine = LayoutEngine::new(self.view.frame);
+
+        // All children pin to superview cross-axis and are chained along primary axis.
+        for (i, &vid) in ids.iter().enumerate() {
+            match self.axis {
+                Axis::Vertical => {
+                    // Pin left/right to superview with padding.
+                    engine.add_constraint(constraint::equal(
+                        vid, LayoutAttribute::Left,
+                        SUPERVIEW, LayoutAttribute::Left,
+                        self.padding,
+                    ));
+                    engine.add_constraint(constraint::equal(
+                        vid, LayoutAttribute::Right,
+                        SUPERVIEW, LayoutAttribute::Right,
+                        -self.padding,
+                    ));
+                    // Chain vertically.
+                    if i == 0 {
+                        engine.add_constraint(constraint::equal(
+                            vid, LayoutAttribute::Top,
+                            SUPERVIEW, LayoutAttribute::Top,
+                            self.padding,
+                        ));
+                    } else {
+                        engine.add_constraint(constraint::equal(
+                            vid, LayoutAttribute::Top,
+                            ids[i - 1], LayoutAttribute::Bottom,
+                            self.spacing,
+                        ));
+                    }
+                    if self.distribution == Distribution::FillEqually && i > 0 {
+                        engine.add_constraint(constraint::equal(
+                            vid, LayoutAttribute::Height,
+                            ids[0], LayoutAttribute::Height,
+                            0.0,
+                        ));
+                    }
+                }
+                Axis::Horizontal => {
+                    // Pin top/bottom to superview with padding.
+                    engine.add_constraint(constraint::equal(
+                        vid, LayoutAttribute::Top,
+                        SUPERVIEW, LayoutAttribute::Top,
+                        self.padding,
+                    ));
+                    engine.add_constraint(constraint::equal(
+                        vid, LayoutAttribute::Bottom,
+                        SUPERVIEW, LayoutAttribute::Bottom,
+                        -self.padding,
+                    ));
+                    // Chain horizontally.
+                    if i == 0 {
+                        engine.add_constraint(constraint::equal(
+                            vid, LayoutAttribute::Left,
+                            SUPERVIEW, LayoutAttribute::Left,
+                            self.padding,
+                        ));
+                    } else {
+                        engine.add_constraint(constraint::equal(
+                            vid, LayoutAttribute::Left,
+                            ids[i - 1], LayoutAttribute::Right,
+                            self.spacing,
+                        ));
+                    }
+                    if self.distribution == Distribution::FillEqually && i > 0 {
+                        engine.add_constraint(constraint::equal(
+                            vid, LayoutAttribute::Width,
+                            ids[0], LayoutAttribute::Width,
+                            0.0,
+                        ));
+                    }
+                }
+            }
+        }
+
+        // Last child pins to superview trailing edge (for FillEqually).
+        if self.distribution == Distribution::FillEqually {
+            let last = *ids.last().unwrap();
+            match self.axis {
+                Axis::Vertical => {
+                    engine.add_constraint(constraint::equal(
+                        last, LayoutAttribute::Bottom,
+                        SUPERVIEW, LayoutAttribute::Bottom,
+                        -self.padding,
+                    ));
+                }
+                Axis::Horizontal => {
+                    engine.add_constraint(constraint::equal(
+                        last, LayoutAttribute::Right,
+                        SUPERVIEW, LayoutAttribute::Right,
+                        -self.padding,
+                    ));
+                }
+            }
+        }
+
+        // Solve and apply.
+        if let Ok(frames) = engine.solve() {
+            self.child_frames.clear();
+            let subviews = self.view.subviews_mut();
+            for (i, &vid) in ids.iter().enumerate() {
+                if let Some(&rect) = frames.get(&vid) {
+                    if i < subviews.len() {
+                        subviews[i].set_frame(rect);
+                    }
+                    self.child_frames.push(rect);
+                }
+            }
+        } else {
+            // Conflict — fall back to simple layout.
+            self.layout();
+        }
+    }
 }
 
 // ── Utility functions ──────────────────────────────────────────────
@@ -342,5 +486,44 @@ mod tests {
         let mut surface = graphics_core::Surface::new(200, 200);
         let mut renderer = graphics_core::SoftwareRenderer::new(&mut surface);
         stack.draw(&mut renderer);
+    }
+
+    #[test]
+    fn stack_constraint_fill_equally() {
+        let mut stack = StackView::new(Rect::new(0.0, 0.0, 300.0, 100.0), Axis::Horizontal);
+        stack.set_spacing(10.0);
+        stack.set_distribution(Distribution::FillEqually);
+
+        let mut a = View::new(Rect::new(0.0, 0.0, 50.0, 30.0));
+        a.layout_id = Some(ViewId(1));
+        let mut b = View::new(Rect::new(0.0, 0.0, 50.0, 30.0));
+        b.layout_id = Some(ViewId(2));
+        stack.add_arranged_subview(a);
+        stack.add_arranged_subview(b);
+
+        stack.layout_with_constraints();
+
+        let subs = stack.view().subviews();
+        // 300 - 10 spacing = 290, 290 / 2 = 145 each
+        assert!((subs[0].frame.width - 145.0).abs() < 2.0, "a.w={}", subs[0].frame.width);
+        assert!((subs[1].frame.width - 145.0).abs() < 2.0, "b.w={}", subs[1].frame.width);
+        assert!((subs[0].frame.x).abs() < 2.0, "a.x={}", subs[0].frame.x);
+        assert!((subs[1].frame.x - 155.0).abs() < 2.0, "b.x={}", subs[1].frame.x);
+    }
+
+    #[test]
+    fn stack_constraint_fallback_without_ids() {
+        // Without layout_ids, layout_with_constraints falls back to layout()
+        let mut stack = StackView::new(Rect::new(0.0, 0.0, 200.0, 300.0), Axis::Vertical);
+        stack.set_distribution(Distribution::FillEqually);
+        stack.add_arranged_subview(View::new(Rect::new(0.0, 0.0, 100.0, 50.0)));
+        stack.add_arranged_subview(View::new(Rect::new(0.0, 0.0, 100.0, 50.0)));
+
+        stack.layout_with_constraints();
+
+        // Fallback to simple layout still works
+        let subs = stack.view().subviews();
+        assert_eq!(subs.len(), 2);
+        assert!(subs[0].frame.height > 0.0);
     }
 }

@@ -1564,6 +1564,10 @@ impl Interpreter {
         // The interpreter stack is mmap'd at a real virtual address, so
         // guest pointers (stack, segment) ARE valid host pointers.
         // No address translation is needed at the FFI boundary.
+        //
+        // Enforce 16-byte SP alignment (ARM64 ABI requirement).  Misaligned
+        // SP can cause SIGSEGV in host NEON/SIMD code.
+        let aligned_sp = self.cpu.sp & !0xF;
         let args = crate::ffi::FfiCallArgs {
             x: [
                 self.cpu.x[0], self.cpu.x[1], self.cpu.x[2], self.cpu.x[3],
@@ -1575,7 +1579,7 @@ impl Interpreter {
             ],
             x8: self.cpu.x[8],
             host_x8: self.cpu.x[8],
-            guest_sp: self.cpu.sp,
+            guest_sp: aligned_sp,
         };
         let name = self.ffi.name_of(target);
         let result = self.ffi.call_or_stub(target, &args);

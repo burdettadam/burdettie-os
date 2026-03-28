@@ -72,8 +72,8 @@
 ### What Doesn't Work Yet
 
 - No real macOS `.app` bundles can fully run (AppKit depth, nib loading, CoreGraphics)
-- ARM64 interpreter: 9 fixtures pass (return42, simple_cli, constructor_test, process_info, objc_minimal, objc_classes, objc_foundation, nsnotification_basics, nsurl_basics); 21 fail (mostly FP/SIMD gaps); 10 ignored (SIGSEGV)
-- Docker image for Linux ARM64 exist (`docker/Dockerfile.linux-e2e`) but CI not yet wired
+- ARM64 interpreter: 40/40 fixtures pass (all ObjC/Foundation fixtures), 0 ignored
+- Docker image for Linux ARM64 exists (`docker/Dockerfile.linux-e2e`) but CI not yet wired
 - GPU renderer renders to CPU `Surface` (readback path); native swapchain integration pending
 
 ---
@@ -697,7 +697,7 @@ is memory corruption from incorrect address computation in load/store handlers.
 - [x] Fix interpreter handlers for signed loads: signed address arithmetic
 - [x] Fix unscaled decode: LDURSB/LDURSH were falling to store path (opc matching bug)
 - [x] Fix unscaled halfword: route through Ldrh/Strh (not Ldur/Stur)
-- [ ] Enforce 16-byte SP alignment before every FFI call (`do_ffi_call`)
+- [x] Enforce 16-byte SP alignment before every FFI call (`do_ffi_call`)
 - [ ] Audit all pre/post-index byte/halfword handlers for sign-extension correctness
 
 ##### Tests Targeted
@@ -722,13 +722,13 @@ are never invoked.
 
 - `objc_category` — `+load` method now invoked during image initialization
 
-#### Sub-phase E4d — Typestate Loader (Future)
+#### Sub-phase E4d — Typestate Loader ✅
 
 Replace `struct Image { is_verified: bool }` with typestate pattern:
 `UnverifiedImage` → `VerifiedImage`. Compile-time guarantee: can't call `map()`
 on an `UnverifiedImage`. The compiler becomes the linter.
 
-#### Sub-phase E4e — Diagnostic Ring Buffer (Future)
+#### Sub-phase E4e — Diagnostic Ring Buffer ✅
 
 Build a lock-free ring buffer in `runtime-diagnostics` where every component
 logs resource requests (e.g., "Task A wants Lock B", "Loader C wants Memory D").
@@ -745,7 +745,7 @@ capability, the CPU/kernel physically cannot address the target.
 
 - [x] `simple_cli` fixture prints correct output on macOS ARM64 interpreter
 - [x] At least 25 interpreted fixtures pass (14→22 via E4a+E4b+E4c)
-- [ ] Zero SIGSEGV crashes in non-ignored tests
+- [x] Zero SIGSEGV crashes in non-ignored tests
 - [ ] Linux CI job is green
 
 ---
@@ -841,7 +841,7 @@ can render AppKit-compatible UIs at native quality on any platform.
 - [x] `NSLayoutConstraint` equivalent: item1.attr = multiplier * item2.attr + constant
 - [x] Intrinsic content size for labels, buttons, text fields
 - [x] Content hugging and compression resistance priorities
-- [ ] `NSStackView` backed by constraints
+- [x] `NSStackView` backed by constraints
 - [ ] Safe area / margin guides
 - [x] Layout debugging: constraint conflict detection and logging
 
