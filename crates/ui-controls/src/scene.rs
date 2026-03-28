@@ -9,6 +9,7 @@ use app_kit_lite::menu::{ModifierFlags, NSMenu};
 use graphics_core::{
     Color, Font, FontManager, Point, Rect, Renderer as _, SoftwareRenderer, Surface,
 };
+use ui_view::layout::{LayoutConstraint, LayoutEngine};
 use window_backend::KeyCode;
 
 use crate::{Button, Label, TextField};
@@ -30,6 +31,7 @@ pub struct AppScene {
     pub(crate) focused_textfield: Option<usize>,
     pub(crate) modifier_flags: ModifierFlags,
     pub(crate) font_manager: FontManager,
+    pub(crate) constraints: Vec<LayoutConstraint>,
 }
 
 impl AppScene {
@@ -44,6 +46,7 @@ impl AppScene {
             focused_textfield: None,
             modifier_flags: ModifierFlags::default(),
             font_manager: FontManager::new(),
+            constraints: Vec::new(),
         }
     }
 
@@ -74,6 +77,53 @@ impl AppScene {
 
     pub fn set_main_menu(&mut self, menu: NSMenu) {
         self.main_menu = Some(menu);
+    }
+
+    /// Add a layout constraint.
+    pub fn add_constraint(&mut self, constraint: LayoutConstraint) {
+        self.constraints.push(constraint);
+    }
+
+    /// Add multiple layout constraints.
+    pub fn add_constraints(&mut self, constraints: impl IntoIterator<Item = LayoutConstraint>) {
+        self.constraints.extend(constraints);
+    }
+
+    /// Solve layout constraints and update frames of all controls that have
+    /// a `layout_id` set. Returns the number of constraint conflicts (0 = success).
+    pub fn solve_layout(&mut self, width: f64, height: f64) -> usize {
+        if self.constraints.is_empty() {
+            return 0;
+        }
+        let mut engine = LayoutEngine::new(Rect::new(0.0, 0.0, width, height));
+        engine.add_constraints(self.constraints.iter().cloned());
+        match engine.solve() {
+            Ok(frames) => {
+                for label in &mut self.labels {
+                    if let Some(vid) = label.view().layout_id {
+                        if let Some(rect) = frames.get(&vid) {
+                            label.view_mut().set_frame(*rect);
+                        }
+                    }
+                }
+                for button in &mut self.buttons {
+                    if let Some(vid) = button.view().layout_id {
+                        if let Some(rect) = frames.get(&vid) {
+                            button.view_mut().set_frame(*rect);
+                        }
+                    }
+                }
+                for tf in &mut self.textfields {
+                    if let Some(vid) = tf.view().layout_id {
+                        if let Some(rect) = frames.get(&vid) {
+                            tf.view_mut().set_frame(*rect);
+                        }
+                    }
+                }
+                0
+            }
+            Err(conflicts) => conflicts.len(),
+        }
     }
 
     // ── Rendering ──────────────────────────────────────

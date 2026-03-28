@@ -263,7 +263,7 @@ argument parsing.
 - [ ] Run each through the runtime, capture missing shims/classes
 - [ ] Implement missing Foundation classes as needed (gap-driven development)
 - [ ] Implement missing `libSystem` shims as needed
-- [ ] Create a `real_app_compat` test that tracks pass/fail for each real binary
+- [x] Create a `real_app_compat` test that tracks pass/fail for each real binary
 - [ ] Document gaps and workarounds
 
 #### Acceptance
@@ -637,7 +637,7 @@ PAL + ARM64 interpreter running on Linux.
 - [x] Handle library resolution: fixture dylibs must be found without macOS search paths
 - [x] Run Foundation fixture suite on Linux ARM64
 - [x] Docker image for Linux ARM64 testing (`docker/Dockerfile.linux-e2e`)
-- [ ] CI: Linux ARM64 test matrix
+- [x] CI: Linux ARM64 test matrix
 - [x] Cross-compilation verified: `cargo check --target aarch64-unknown-linux-gnu`
 - [x] Host memory passthrough with `mincore()` safety (6 interpreter bug fixes)
 
@@ -849,7 +849,7 @@ can render AppKit-compatible UIs at native quality on any platform.
 
 - [x] Constraints solve correctly for complex layouts
 - [x] Window resizing re-layouts correctly
-- [ ] No constraint conflicts in demo apps
+- [x] No constraint conflicts in demo apps
 
 ---
 

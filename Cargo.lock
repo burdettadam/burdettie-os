@@ -983,6 +983,7 @@ dependencies = [
  "macho-runtime",
  "tempfile",
  "ui-controls",
+ "ui-view",
  "window-backend",
  "window-backend-darwin",
 ]

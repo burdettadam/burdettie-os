@@ -10,6 +10,9 @@ use std::sync::Mutex;
 use graphics_core::Rect;
 use macho_runtime::{Runtime, RuntimeConfig};
 use ui_controls::{Button, HeadlessApp, Label};
+use ui_view::layout::{
+    equal, set_size, LayoutAttribute, ViewId, SUPERVIEW,
+};
 
 use hello_darwin::{discover_fixtures, run_scorecard_from};
 
@@ -209,24 +212,53 @@ fn scorecard_per_fixture_results() {
 
 /// Build the hello-darwin app UI headlessly — same setup as main.rs.
 fn build_hello_app(scorecard_fn: impl FnMut() -> String + 'static) -> HeadlessApp {
+    let title_id = ViewId(1);
+    let result_id = ViewId(2);
+    let run_id = ViewId(3);
+    let quit_id = ViewId(4);
+
     let mut app = HeadlessApp::new();
+
     // Title label (index 0)
-    app.add_label(Label::new(
-        Rect::new(30.0, 25.0, 460.0, 24.0),
-        "Running on burdetty-os runtime v0.1",
-    ));
+    let mut title = Label::new(Rect::default(), "Running on burdetty-os runtime v0.1");
+    title.view_mut().layout_id = Some(title_id);
+    app.add_label(title);
+
     // Result label (index 1)
-    app.add_label(Label::new(
-        Rect::new(30.0, 190.0, 460.0, 24.0),
-        "Press a button to begin.",
-    ));
+    let mut result_label = Label::new(Rect::default(), "Press a button to begin.");
+    result_label.view_mut().layout_id = Some(result_id);
+    app.add_label(result_label);
+
     // Run Scorecard button (index 0)
-    app.add_button(Button::new(
-        Rect::new(30.0, 80.0, 200.0, 40.0),
-        "Run Scorecard",
-    ));
+    let mut run_btn = Button::new(Rect::default(), "Run Scorecard");
+    run_btn.view_mut().layout_id = Some(run_id);
+    app.add_button(run_btn);
+
     // Quit button (index 1)
-    app.add_button(Button::new(Rect::new(260.0, 80.0, 120.0, 40.0), "Quit"));
+    let mut quit_btn = Button::new(Rect::default(), "Quit");
+    quit_btn.view_mut().layout_id = Some(quit_id);
+    app.add_button(quit_btn);
+
+    // Constraints (same as main.rs)
+    let scene = app.scene_mut();
+    scene.add_constraint(equal(title_id, LayoutAttribute::Left, SUPERVIEW, LayoutAttribute::Left, 30.0));
+    scene.add_constraint(equal(title_id, LayoutAttribute::Top, SUPERVIEW, LayoutAttribute::Top, 25.0));
+    scene.add_constraints(set_size(title_id, 460.0, 24.0));
+
+    scene.add_constraint(equal(run_id, LayoutAttribute::Left, SUPERVIEW, LayoutAttribute::Left, 30.0));
+    scene.add_constraint(equal(run_id, LayoutAttribute::Top, title_id, LayoutAttribute::Bottom, 31.0));
+    scene.add_constraints(set_size(run_id, 200.0, 40.0));
+
+    scene.add_constraint(equal(quit_id, LayoutAttribute::Left, run_id, LayoutAttribute::Right, 30.0));
+    scene.add_constraint(equal(quit_id, LayoutAttribute::Top, run_id, LayoutAttribute::Top, 0.0));
+    scene.add_constraints(set_size(quit_id, 120.0, 40.0));
+
+    scene.add_constraint(equal(result_id, LayoutAttribute::Left, SUPERVIEW, LayoutAttribute::Left, 30.0));
+    scene.add_constraint(equal(result_id, LayoutAttribute::Top, run_id, LayoutAttribute::Bottom, 70.0));
+    scene.add_constraints(set_size(result_id, 460.0, 24.0));
+
+    let conflicts = scene.solve_layout(520.0, 300.0);
+    assert_eq!(conflicts, 0, "Layout has constraint conflicts");
 
     let mut scorecard_fn = scorecard_fn;
     app.on_button_click(move |idx, labels, _tfs| {
@@ -276,7 +308,7 @@ fn hello_app_scorecard_shows_error_message() {
 fn hello_app_scorecard_button_click_at_coordinates() {
     let mut app = build_hello_app(|| "Scorecard: 10/10 fixtures passed".to_string());
 
-    // Click inside the "Run Scorecard" button (30,80 200x40)
+    // Click inside the "Run Scorecard" button (solved: x=30 y=80 200×40)
     app.click_at(100.0, 100.0);
     assert_eq!(app.label_text(1), "Scorecard: 10/10 fixtures passed");
 }
@@ -288,4 +320,47 @@ fn hello_app_click_outside_buttons_does_nothing() {
     // Click in empty space
     app.click_at(450.0, 250.0);
     assert_eq!(app.label_text(1), "Press a button to begin.");
+}
+
+#[test]
+fn hello_app_zero_constraint_conflicts() {
+    // Verify the hello-darwin layout solves without conflicts
+    // at various window sizes (the F4 acceptance criterion).
+    for (w, h) in [(520.0, 300.0), (800.0, 600.0), (320.0, 200.0)] {
+        let title_id = ViewId(1);
+        let result_id = ViewId(2);
+        let run_id = ViewId(3);
+        let quit_id = ViewId(4);
+
+        let mut app = HeadlessApp::new();
+        let mut title = Label::new(Rect::default(), "Title");
+        title.view_mut().layout_id = Some(title_id);
+        app.add_label(title);
+        let mut result = Label::new(Rect::default(), "Result");
+        result.view_mut().layout_id = Some(result_id);
+        app.add_label(result);
+        let mut run_btn = Button::new(Rect::default(), "Run");
+        run_btn.view_mut().layout_id = Some(run_id);
+        app.add_button(run_btn);
+        let mut quit_btn = Button::new(Rect::default(), "Quit");
+        quit_btn.view_mut().layout_id = Some(quit_id);
+        app.add_button(quit_btn);
+
+        let scene = app.scene_mut();
+        scene.add_constraint(equal(title_id, LayoutAttribute::Left, SUPERVIEW, LayoutAttribute::Left, 30.0));
+        scene.add_constraint(equal(title_id, LayoutAttribute::Top, SUPERVIEW, LayoutAttribute::Top, 25.0));
+        scene.add_constraints(set_size(title_id, 460.0, 24.0));
+        scene.add_constraint(equal(run_id, LayoutAttribute::Left, SUPERVIEW, LayoutAttribute::Left, 30.0));
+        scene.add_constraint(equal(run_id, LayoutAttribute::Top, title_id, LayoutAttribute::Bottom, 31.0));
+        scene.add_constraints(set_size(run_id, 200.0, 40.0));
+        scene.add_constraint(equal(quit_id, LayoutAttribute::Left, run_id, LayoutAttribute::Right, 30.0));
+        scene.add_constraint(equal(quit_id, LayoutAttribute::Top, run_id, LayoutAttribute::Top, 0.0));
+        scene.add_constraints(set_size(quit_id, 120.0, 40.0));
+        scene.add_constraint(equal(result_id, LayoutAttribute::Left, SUPERVIEW, LayoutAttribute::Left, 30.0));
+        scene.add_constraint(equal(result_id, LayoutAttribute::Top, run_id, LayoutAttribute::Bottom, 70.0));
+        scene.add_constraints(set_size(result_id, 460.0, 24.0));
+
+        let conflicts = scene.solve_layout(w, h);
+        assert_eq!(conflicts, 0, "Conflicts at {w}×{h}");
+    }
 }

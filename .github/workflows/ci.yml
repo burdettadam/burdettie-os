@@ -151,3 +151,29 @@ jobs:
       - name: Build Swift client example
         working-directory: examples/swift-client
         run: swift build
+
+  linux-arm64-e2e:
+    name: Linux ARM64 E2E (Interpreter)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU (for ARM64 emulation)
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Linux ARM64 E2E image
+        run: |
+          docker buildx build \
+            --platform linux/arm64 \
+            -f docker/Dockerfile.linux-e2e \
+            -t darwin-runtime-linux \
+            --load .
+
+      - name: Run interpreted fixture tests
+        run: |
+          docker run --rm darwin-runtime-linux
