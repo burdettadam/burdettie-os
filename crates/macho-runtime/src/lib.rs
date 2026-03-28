@@ -27,6 +27,7 @@ mod objc_setup;
 pub mod resolver;
 mod security;
 pub mod tracer;
+pub mod typestate;
 
 pub use config::{RuntimeConfig, ShimSet};
 pub use context::RuntimeContext;
