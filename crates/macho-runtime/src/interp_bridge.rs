@@ -89,7 +89,7 @@ fn register_msg_send(bridge: &mut FfiBridge, addr: u64, name: &str, guest_ranges
 
         // Host IMP — call directly with full ABI capture (integer + FP args).
         unsafe {
-            let (x0, x1, d0, d1) = call_host_capturing(imp, &args.x, args.host_x8, 0, &args.d);
+            let (x0, x1, d0, d1) = call_host_capturing(imp, &args.x, args.host_x8, args.guest_sp, &args.d);
             FfiResult::ReturnFull { x0, x1, d0, d1 }
         }
     }));
@@ -118,12 +118,12 @@ fn register_msg_send_super(bridge: &mut FfiBridge, addr: u64, name: &str, guest_
         }
 
         if is_in_guest(imp, &ranges) {
-            return FfiResult::TailCall(imp);
+            return FfiResult::TailCallWithX0(imp, receiver);
         }
 
         unsafe {
             let super_args = [receiver, sel, args.x[2], args.x[3], args.x[4], args.x[5], args.x[6], args.x[7]];
-            let (x0, x1, d0, d1) = call_host_capturing(imp, &super_args, args.host_x8, 0, &args.d);
+            let (x0, x1, d0, d1) = call_host_capturing(imp, &super_args, args.host_x8, args.guest_sp, &args.d);
             FfiResult::ReturnFull { x0, x1, d0, d1 }
         }
     }));
@@ -151,12 +151,12 @@ fn register_msg_send_super2(bridge: &mut FfiBridge, addr: u64, name: &str, guest
         }
 
         if is_in_guest(imp, &ranges) {
-            return FfiResult::TailCall(imp);
+            return FfiResult::TailCallWithX0(imp, receiver);
         }
 
         unsafe {
             let super_args = [receiver, sel, args.x[2], args.x[3], args.x[4], args.x[5], args.x[6], args.x[7]];
-            let (x0, x1, d0, d1) = call_host_capturing(imp, &super_args, args.host_x8, 0, &args.d);
+            let (x0, x1, d0, d1) = call_host_capturing(imp, &super_args, args.host_x8, args.guest_sp, &args.d);
             FfiResult::ReturnFull { x0, x1, d0, d1 }
         }
     }));

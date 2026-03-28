@@ -102,7 +102,6 @@ fn interp_objc_inherit() {
 }
 
 #[test]
-#[ignore = "SIGSEGV — likely incomplete FP/SIMD instruction support"]
 fn interp_objc_super() {
     let Some(r) = run_interpreted("objc_super") else { return };
     assert_eq!(r.exit_code, 0, "objc_super should exit 0");
@@ -115,14 +114,12 @@ fn interp_objc_foundation() {
 }
 
 #[test]
-#[ignore = "SIGSEGV after bitmask fix — needs deeper investigation"]
 fn interp_protocol_basics() {
     let Some(r) = run_interpreted("protocol_basics") else { return };
     assert_eq!(r.exit_code, 0, "protocol_basics should exit 0");
 }
 
 #[test]
-#[ignore = "SIGSEGV after bitmask fix — needs deeper investigation"]
 fn interp_dynamic_class() {
     let Some(r) = run_interpreted("dynamic_class") else { return };
     assert_eq!(r.exit_code, 0, "dynamic_class should exit 0");
@@ -135,7 +132,6 @@ fn interp_struct_return() {
 }
 
 #[test]
-#[ignore = "SIGSEGV in host function — needs cf-lite investigation"]
 fn interp_cf_bridging() {
     let Some(r) = run_interpreted("cf_bridging") else { return };
     assert_eq!(r.exit_code, 0, "cf_bridging should exit 0");
@@ -150,7 +146,6 @@ fn interp_nsstring_ops() {
 }
 
 #[test]
-#[ignore = "NSString %@ format substitution not yet supported"]
 fn interp_nsstring_format() {
     let Some(r) = run_interpreted("nsstring_format") else { return };
     assert_eq!(r.exit_code, 0, "nsstring_format should exit 0");
@@ -169,7 +164,6 @@ fn interp_nsnumber_basics() {
 }
 
 #[test]
-#[ignore = "SIGSEGV — likely incomplete FP/SIMD instruction support"]
 fn interp_nsnull_basics() {
     let Some(r) = run_interpreted("nsnull_basics") else { return };
     assert_eq!(r.exit_code, 0, "nsnull_basics should exit 0");
@@ -182,14 +176,12 @@ fn interp_nserror_basics() {
 }
 
 #[test]
-#[ignore = "SIGSEGV — likely incomplete FP/SIMD instruction support"]
 fn interp_nsdata_basics() {
     let Some(r) = run_interpreted("nsdata_basics") else { return };
     assert_eq!(r.exit_code, 0, "nsdata_basics should exit 0");
 }
 
 #[test]
-#[ignore = "SIGSEGV — likely incomplete FP/SIMD instruction support"]
 fn interp_nsarray_basics() {
     let Some(r) = run_interpreted("nsarray_basics") else { return };
     assert_eq!(r.exit_code, 0, "nsarray_basics should exit 0");
@@ -202,7 +194,6 @@ fn interp_nsmutablearray_basics() {
 }
 
 #[test]
-#[ignore = "SIGSEGV in host function — FP args not yet passed to host"]
 fn interp_nsdictionary_basics() {
     let Some(r) = run_interpreted("nsdictionary_basics") else { return };
     assert_eq!(r.exit_code, 0, "nsdictionary_basics should exit 0");
@@ -221,7 +212,6 @@ fn interp_nsdate_basics() {
 }
 
 #[test]
-#[ignore = "SIGSEGV in host function — FP args not yet passed to host"]
 fn interp_nsset_basics() {
     let Some(r) = run_interpreted("nsset_basics") else { return };
     assert_eq!(r.exit_code, 0, "nsset_basics should exit 0");
@@ -234,7 +224,7 @@ fn interp_nslog_format_specifiers() {
 }
 
 #[test]
-#[ignore = "SIGSEGV — likely incomplete FP/SIMD instruction support"]
+#[ignore = "guest→host pointer translation causes valueWithPointer:/pointerValue roundtrip mismatch"]
 fn interp_nsvalue_basics() {
     let Some(r) = run_interpreted("nsvalue_basics") else { return };
     assert_eq!(r.exit_code, 0, "nsvalue_basics should exit 0");
@@ -271,7 +261,6 @@ fn interp_nscache_basics() {
 }
 
 #[test]
-#[ignore = "SIGSEGV — likely incomplete FP/SIMD instruction support"]
 fn interp_nsjson_basics() {
     let Some(r) = run_interpreted("nsjson_basics") else { return };
     assert_eq!(r.exit_code, 0, "nsjson_basics should exit 0");
@@ -296,7 +285,6 @@ fn interp_nscalendar_basics() {
 }
 
 #[test]
-#[ignore = "SIGSEGV — likely incomplete FP/SIMD instruction support"]
 fn interp_collection_enum() {
     let Some(r) = run_interpreted("collection_enum") else { return };
     assert_eq!(r.exit_code, 0, "collection_enum should exit 0");

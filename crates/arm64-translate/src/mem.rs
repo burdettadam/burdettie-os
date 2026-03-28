@@ -122,6 +122,19 @@ impl Memory {
         self.translate_strict(addr, size).map(|p| p as u64).unwrap_or(0)
     }
 
+    /// Translate a u64 value for FFI argument passing.
+    ///
+    /// If `val` falls in a mapped guest region (stack or segment), returns
+    /// the corresponding host pointer. Otherwise returns `val` unchanged
+    /// (it may be a host pointer, an integer, or zero).
+    pub fn translate_ffi_arg(&self, val: u64) -> u64 {
+        if val == 0 {
+            return 0;
+        }
+        let host = self.guest_to_host(val, 1);
+        if host != 0 { host } else { val }
+    }
+
     /// Translate a guest address to a host pointer using only mapped regions
     /// (ignoring host_passthrough). Used for instruction fetch.
     fn translate_strict(&self, addr: u64, size: usize) -> Option<*const u8> {

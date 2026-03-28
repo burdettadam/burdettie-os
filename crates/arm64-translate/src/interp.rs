@@ -300,7 +300,7 @@ impl Interpreter {
 
             // ── Multiply-add / Multiply-sub ────────────────────────
             Instruction::Madd { sf, rd, rn, rm, ra } => {
-                let a = self.cpu.read_reg(ra);
+                let a = self.cpu.read_reg_zr(ra);
                 let n = self.cpu.read_reg(rn);
                 let m = self.cpu.read_reg(rm);
                 let result = if sf {
@@ -312,7 +312,7 @@ impl Interpreter {
                 self.cpu.pc = pc + 4;
             }
             Instruction::Msub { sf, rd, rn, rm, ra } => {
-                let a = self.cpu.read_reg(ra);
+                let a = self.cpu.read_reg_zr(ra);
                 let n = self.cpu.read_reg(rn);
                 let m = self.cpu.read_reg(rm);
                 let result = if sf {
@@ -1561,10 +1561,34 @@ impl Interpreter {
     /// Handle an FFI call: extract args from registers, call the host function,
     /// and process the result (return, exit, or tail-call).
     fn do_ffi_call(&mut self, target: u64, _call_pc: u64) -> StepResult {
+        // Translate guest SP to a host pointer for variadic stack arg copy.
+        // Variadic arguments on ARM64 macOS are passed on the stack, so we
+        // need to translate any guest-region pointers in the stack data too.
+        let mut stack_buf = [0u64; 16];
+        let guest_sp_raw = self.mem.guest_to_host(self.cpu.sp, 128);
+        let translated_sp = if guest_sp_raw != 0 {
+            for i in 0..16 {
+                let raw = unsafe { *((guest_sp_raw as *const u64).add(i)) };
+                stack_buf[i] = self.mem.translate_ffi_arg(raw);
+            }
+            stack_buf.as_ptr() as u64
+        } else {
+            0
+        };
+        // Translate any guest-region pointers (stack, segment) in the
+        // argument registers to host addresses so host functions can
+        // dereference them safely (e.g. objc_msgSendSuper taking an
+        // objc_super* on the guest stack).
         let args = crate::ffi::FfiCallArgs {
             x: [
-                self.cpu.x[0], self.cpu.x[1], self.cpu.x[2], self.cpu.x[3],
-                self.cpu.x[4], self.cpu.x[5], self.cpu.x[6], self.cpu.x[7],
+                self.mem.translate_ffi_arg(self.cpu.x[0]),
+                self.mem.translate_ffi_arg(self.cpu.x[1]),
+                self.mem.translate_ffi_arg(self.cpu.x[2]),
+                self.mem.translate_ffi_arg(self.cpu.x[3]),
+                self.mem.translate_ffi_arg(self.cpu.x[4]),
+                self.mem.translate_ffi_arg(self.cpu.x[5]),
+                self.mem.translate_ffi_arg(self.cpu.x[6]),
+                self.mem.translate_ffi_arg(self.cpu.x[7]),
             ],
             d: [
                 self.cpu.read_d(0), self.cpu.read_d(1), self.cpu.read_d(2), self.cpu.read_d(3),
@@ -1574,12 +1598,10 @@ impl Interpreter {
             host_x8: if self.cpu.x[8] != 0 {
                 self.mem.guest_to_host(self.cpu.x[8], 64)
             } else { 0 },
+            guest_sp: translated_sp,
         };
-        // Translate guest SP to a host pointer for variadic stack arg copy.
-        // Returns 0 (skip copy) if the address can't be mapped.
-        let guest_sp = self.mem.guest_to_host(self.cpu.sp, 128);
         let name = self.ffi.name_of(target);
-        let result = self.ffi.call_or_stub(target, &args, guest_sp);
+        let result = self.ffi.call_or_stub(target, &args);
         match result {
             crate::ffi::FfiResult::Return(val) => {
                 log::trace!("FFI {target:#x} ({}) returned {val:#x}", name.unwrap_or("?"));
@@ -1599,6 +1621,11 @@ impl Interpreter {
                 StepResult::Exit(ExitReason::Exit { code: code as i64 })
             }
             crate::ffi::FfiResult::TailCall(addr) => {
+                self.cpu.pc = addr;
+                StepResult::Continue
+            }
+            crate::ffi::FfiResult::TailCallWithX0(addr, x0) => {
+                self.cpu.x[0] = x0;
                 self.cpu.pc = addr;
                 StepResult::Continue
             }

@@ -20,6 +20,10 @@ pub enum FfiResult {
     /// Tail-call: redirect PC to this address without modifying registers.
     /// Used by `objc_msgSend` to jump to the resolved IMP in guest code.
     TailCall(u64),
+    /// Tail-call with x0 override: redirect PC and set x0 to the given value.
+    /// Used by `objc_msgSendSuper` to replace the `&objc_super` pointer in x0
+    /// with the receiver before jumping to the resolved IMP in guest code.
+    TailCallWithX0(u64, u64),
 }
 
 /// Arguments passed to a host function from interpreted ARM64 code.
@@ -32,6 +36,8 @@ pub struct FfiCallArgs {
     pub x8: u64,
     /// Pre-translated host pointer for x8 (0 if x8==0 or untranslatable).
     pub host_x8: u64,
+    /// Pre-translated host pointer to variadic stack arguments (0 if none).
+    pub guest_sp: u64,
 }
 
 /// A host function that can be called from interpreted ARM64 code.
@@ -99,7 +105,7 @@ impl FfiBridge {
     /// `guest_x8`: the guest's x8 register (indirect struct return pointer).
     /// `guest_sp`: the guest's stack pointer (for variadic args on the stack).
     /// `fp_args`: the guest's d0-d7 FP register values.
-    pub fn call_or_stub(&self, addr: u64, args: &FfiCallArgs, guest_sp: u64) -> FfiResult {
+    pub fn call_or_stub(&self, addr: u64, args: &FfiCallArgs) -> FfiResult {
         if let Some(result) = self.call(addr, args) {
             return result;
         }
@@ -108,7 +114,7 @@ impl FfiBridge {
             // SAFETY: addr came from fixup resolution (CompositeResolver/StubResolver)
             // and is a valid host function pointer.
             unsafe {
-                let (x0, x1, d0, d1) = call_host_capturing(addr, &args.x, args.host_x8, guest_sp, &args.d);
+                let (x0, x1, d0, d1) = call_host_capturing(addr, &args.x, args.host_x8, args.guest_sp, &args.d);
                 return FfiResult::ReturnFull { x0, x1, d0, d1 };
             }
         }
