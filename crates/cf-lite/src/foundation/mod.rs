@@ -317,6 +317,86 @@ impl FoundationShims {
         register::register_nsnib_class(rt);
     }
 
+    // ── Gap-analysis classes (Phase C8) ──────────────────────────
+
+    pub fn register_nsmutabledata_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsmutabledata_class(rt);
+    }
+
+    pub fn register_nsfilehandle_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsfilehandle_class(rt);
+    }
+
+    pub fn register_nsscanner_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsscanner_class(rt);
+    }
+
+    pub fn register_nsorderedset_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsorderedset_class(rt);
+    }
+
+    pub fn register_nsmutableorderedset_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsmutableorderedset_class(rt);
+    }
+
+    pub fn register_nscountedset_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nscountedset_class(rt);
+    }
+
+    pub fn register_nsmutablecharacterset_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsmutablecharacterset_class(rt);
+    }
+
+    // ── Gap-analysis Phase C9 ────────────────────────────────────
+
+    pub fn register_nsurlcomponents_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsurlcomponents_class(rt);
+    }
+
+    pub fn register_nsurlqueryitem_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsurlqueryitem_class(rt);
+    }
+
+    pub fn register_nsbytecountformatter_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsbytecountformatter_class(rt);
+    }
+
+    pub fn register_nsiso8601dateformatter_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsiso8601dateformatter_class(rt);
+    }
+
+    pub fn register_nsprogress_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsprogress_class(rt);
+    }
+
+    pub fn register_nshost_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nshost_class(rt);
+    }
+
+    pub fn register_nspipe_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nspipe_class(rt);
+    }
+
+    pub fn register_nsurlrequest_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsurlrequest_class(rt);
+    }
+
+    pub fn register_nsmutableurlrequest_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsmutableurlrequest_class(rt);
+    }
+
+    pub fn register_nsurlresponse_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsurlresponse_class(rt);
+    }
+
+    pub fn register_nshttpurlresponse_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nshttpurlresponse_class(rt);
+    }
+
+    pub fn register_nstask_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nstask_class(rt);
+    }
+
     /// Register tagged pointer class table entries.
     ///
     /// On arm64, tagged pointers encode a 3-bit class index in bits 60-62.

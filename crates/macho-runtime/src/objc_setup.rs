@@ -92,9 +92,32 @@ pub(crate) fn register_foundation_classes(
     cf_lite::FoundationShims::register_nsmenuitem_class(objc_rt);
     cf_lite::FoundationShims::register_nsnib_class(objc_rt);
 
+    // Gap-analysis classes (Phase C8)
+    cf_lite::FoundationShims::register_nsmutabledata_class(objc_rt);
+    cf_lite::FoundationShims::register_nsfilehandle_class(objc_rt);
+    cf_lite::FoundationShims::register_nsscanner_class(objc_rt);
+    cf_lite::FoundationShims::register_nsorderedset_class(objc_rt);
+    cf_lite::FoundationShims::register_nsmutableorderedset_class(objc_rt);
+    cf_lite::FoundationShims::register_nscountedset_class(objc_rt);
+    cf_lite::FoundationShims::register_nsmutablecharacterset_class(objc_rt);
+
+    // Gap-analysis Phase C9
+    cf_lite::FoundationShims::register_nsurlcomponents_class(objc_rt);
+    cf_lite::FoundationShims::register_nsurlqueryitem_class(objc_rt);
+    cf_lite::FoundationShims::register_nsbytecountformatter_class(objc_rt);
+    cf_lite::FoundationShims::register_nsiso8601dateformatter_class(objc_rt);
+    cf_lite::FoundationShims::register_nsprogress_class(objc_rt);
+    cf_lite::FoundationShims::register_nshost_class(objc_rt);
+    cf_lite::FoundationShims::register_nspipe_class(objc_rt);
+    cf_lite::FoundationShims::register_nsurlrequest_class(objc_rt);
+    cf_lite::FoundationShims::register_nsmutableurlrequest_class(objc_rt);
+    cf_lite::FoundationShims::register_nsurlresponse_class(objc_rt);
+    cf_lite::FoundationShims::register_nshttpurlresponse_class(objc_rt);
+    cf_lite::FoundationShims::register_nstask_class(objc_rt);
+
     tracer.record(
         EventKind::ClassRegistration,
-        "65 synthetic Foundation/AppKit classes registered",
+        "84 synthetic Foundation/AppKit classes registered",
     );
 
     // Register host ISA aliases so constant objects

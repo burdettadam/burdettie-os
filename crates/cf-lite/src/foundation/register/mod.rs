@@ -16,6 +16,7 @@ mod invocation;
 mod text;
 mod advanced_collections;
 mod appkit;
+mod gap_analysis;
 
 pub use string::*;
 pub use object::*;
@@ -30,6 +31,7 @@ pub use invocation::*;
 pub use text::*;
 pub use advanced_collections::*;
 pub use appkit::*;
+pub use gap_analysis::*;
 
 use objc_runtime::MethodEntry;
 

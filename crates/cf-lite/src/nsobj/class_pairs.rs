@@ -517,3 +517,140 @@ define_class_pair!(child NSNIB_CLASS_DATA, NSNIB_METACLASS_DATA, NSNIB_INIT,
     meta_addr: nsnib_metaclass_addr,
     parent_class: nsobject_class_addr,
     parent_meta: nsobject_metaclass_addr);
+
+// ── Gap-analysis classes (Phase C8) ─────────────────────────────
+
+define_class_pair!(child NSMUTABLEDATA_CLASS_DATA, NSMUTABLEDATA_METACLASS_DATA, NSMUTABLEDATA_INIT,
+    ensure: ensure_nsmutabledata_init,
+    class_addr: nsmutabledata_class_addr,
+    meta_addr: nsmutabledata_metaclass_addr,
+    parent_class: nsdata_class_addr,
+    parent_meta: nsdata_metaclass_addr);
+
+define_class_pair!(child NSFILEHANDLE_CLASS_DATA, NSFILEHANDLE_METACLASS_DATA, NSFILEHANDLE_INIT,
+    ensure: ensure_nsfilehandle_init,
+    class_addr: nsfilehandle_class_addr,
+    meta_addr: nsfilehandle_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSSCANNER_CLASS_DATA, NSSCANNER_METACLASS_DATA, NSSCANNER_INIT,
+    ensure: ensure_nsscanner_init,
+    class_addr: nsscanner_class_addr,
+    meta_addr: nsscanner_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSORDEREDSET_CLASS_DATA, NSORDEREDSET_METACLASS_DATA, NSORDEREDSET_INIT,
+    ensure: ensure_nsorderedset_init,
+    class_addr: nsorderedset_class_addr,
+    meta_addr: nsorderedset_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSMUTABLEORDEREDSET_CLASS_DATA, NSMUTABLEORDEREDSET_METACLASS_DATA, NSMUTABLEORDEREDSET_INIT,
+    ensure: ensure_nsmutableorderedset_init,
+    class_addr: nsmutableorderedset_class_addr,
+    meta_addr: nsmutableorderedset_metaclass_addr,
+    parent_class: nsorderedset_class_addr,
+    parent_meta: nsorderedset_metaclass_addr);
+
+define_class_pair!(child NSCOUNTEDSET_CLASS_DATA, NSCOUNTEDSET_METACLASS_DATA, NSCOUNTEDSET_INIT,
+    ensure: ensure_nscountedset_init,
+    class_addr: nscountedset_class_addr,
+    meta_addr: nscountedset_metaclass_addr,
+    parent_class: nsmutableset_class_addr,
+    parent_meta: nsmutableset_metaclass_addr);
+
+define_class_pair!(child NSMUTABLECHARACTERSET_CLASS_DATA, NSMUTABLECHARACTERSET_METACLASS_DATA, NSMUTABLECHARACTERSET_INIT,
+    ensure: ensure_nsmutablecharacterset_init,
+    class_addr: nsmutablecharacterset_class_addr,
+    meta_addr: nsmutablecharacterset_metaclass_addr,
+    parent_class: nscharacterset_class_addr,
+    parent_meta: nscharacterset_metaclass_addr);
+
+// ── Gap-analysis Phase C9 ───────────────────────────────────────
+
+define_class_pair!(child NSURLCOMPONENTS_CLASS_DATA, NSURLCOMPONENTS_METACLASS_DATA, NSURLCOMPONENTS_INIT,
+    ensure: ensure_nsurlcomponents_init,
+    class_addr: nsurlcomponents_class_addr,
+    meta_addr: nsurlcomponents_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSURLQUERYITEM_CLASS_DATA, NSURLQUERYITEM_METACLASS_DATA, NSURLQUERYITEM_INIT,
+    ensure: ensure_nsurlqueryitem_init,
+    class_addr: nsurlqueryitem_class_addr,
+    meta_addr: nsurlqueryitem_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSBYTECOUNTFORMATTER_CLASS_DATA, NSBYTECOUNTFORMATTER_METACLASS_DATA, NSBYTECOUNTFORMATTER_INIT,
+    ensure: ensure_nsbytecountformatter_init,
+    class_addr: nsbytecountformatter_class_addr,
+    meta_addr: nsbytecountformatter_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSISO8601DATEFORMATTER_CLASS_DATA, NSISO8601DATEFORMATTER_METACLASS_DATA, NSISO8601DATEFORMATTER_INIT,
+    ensure: ensure_nsiso8601dateformatter_init,
+    class_addr: nsiso8601dateformatter_class_addr,
+    meta_addr: nsiso8601dateformatter_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSPROGRESS_CLASS_DATA, NSPROGRESS_METACLASS_DATA, NSPROGRESS_INIT,
+    ensure: ensure_nsprogress_init,
+    class_addr: nsprogress_class_addr,
+    meta_addr: nsprogress_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSHOST_CLASS_DATA, NSHOST_METACLASS_DATA, NSHOST_INIT,
+    ensure: ensure_nshost_init,
+    class_addr: nshost_class_addr,
+    meta_addr: nshost_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSPIPE_CLASS_DATA, NSPIPE_METACLASS_DATA, NSPIPE_INIT,
+    ensure: ensure_nspipe_init,
+    class_addr: nspipe_class_addr,
+    meta_addr: nspipe_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSURLREQUEST_CLASS_DATA, NSURLREQUEST_METACLASS_DATA, NSURLREQUEST_INIT,
+    ensure: ensure_nsurlrequest_init,
+    class_addr: nsurlrequest_class_addr,
+    meta_addr: nsurlrequest_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSMUTABLEURLREQUEST_CLASS_DATA, NSMUTABLEURLREQUEST_METACLASS_DATA, NSMUTABLEURLREQUEST_INIT,
+    ensure: ensure_nsmutableurlrequest_init,
+    class_addr: nsmutableurlrequest_class_addr,
+    meta_addr: nsmutableurlrequest_metaclass_addr,
+    parent_class: nsurlrequest_class_addr,
+    parent_meta: nsurlrequest_metaclass_addr);
+
+define_class_pair!(child NSURLRESPONSE_CLASS_DATA, NSURLRESPONSE_METACLASS_DATA, NSURLRESPONSE_INIT,
+    ensure: ensure_nsurlresponse_init,
+    class_addr: nsurlresponse_class_addr,
+    meta_addr: nsurlresponse_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSHTTPURLRESPONSE_CLASS_DATA, NSHTTPURLRESPONSE_METACLASS_DATA, NSHTTPURLRESPONSE_INIT,
+    ensure: ensure_nshttpurlresponse_init,
+    class_addr: nshttpurlresponse_class_addr,
+    meta_addr: nshttpurlresponse_metaclass_addr,
+    parent_class: nsurlresponse_class_addr,
+    parent_meta: nsurlresponse_metaclass_addr);
+
+define_class_pair!(child NSTASK_CLASS_DATA, NSTASK_METACLASS_DATA, NSTASK_INIT,
+    ensure: ensure_nstask_init,
+    class_addr: nstask_class_addr,
+    meta_addr: nstask_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);

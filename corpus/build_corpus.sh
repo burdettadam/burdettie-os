@@ -38,6 +38,9 @@ PROGRAMS=(
     uuid_registry
     attr_string
     kv_store
+    data_buffer
+    scanner_parse
+    ordered_collections
 )
 
 BUILT=0
