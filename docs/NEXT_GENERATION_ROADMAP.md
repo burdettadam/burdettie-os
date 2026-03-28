@@ -44,6 +44,7 @@
 - **F1** — Text Layout Engine ✅ (ab_glyph, FontManager, attributed layout, per-glyph color)
 - **F2** — GPU-Accelerated Rendering ✅ (wgpu GpuRenderer, 1024×1024 glyph atlas, quad batching, WGSL shader)
 - **F3** — Image & Drawing Primitives ✅ (BezierPath, Gradient, Shadow, ImageBuffer, scanline fill, draw_image, NSImage backing store)
+- **F4** — Layout Engine (Auto Layout Lite) ✅ (constraint solver, LayoutConstraint, intrinsic sizes, hugging/compression, conflict detection)
 ### What Works Today
 
 - Full Mach-O load → execute pipeline (parse, resolve, map, fixup, security, constructors, entry)
@@ -832,22 +833,22 @@ can render AppKit-compatible UIs at native quality on any platform.
 
 ---
 
-### Phase F4 — Layout Engine (Auto Layout Lite)
+### Phase F4 — Layout Engine (Auto Layout Lite) ✅
 
 #### Tasks
 
-- [ ] Implement constraint-based layout solver (Cassowary algorithm via `cassowary` crate or custom)
-- [ ] `NSLayoutConstraint` equivalent: item1.attr = multiplier * item2.attr + constant
-- [ ] Intrinsic content size for labels, buttons, text fields
-- [ ] Content hugging and compression resistance priorities
+- [x] Implement constraint-based layout solver (Cassowary algorithm via custom iterative relaxation solver)
+- [x] `NSLayoutConstraint` equivalent: item1.attr = multiplier * item2.attr + constant
+- [x] Intrinsic content size for labels, buttons, text fields
+- [x] Content hugging and compression resistance priorities
 - [ ] `NSStackView` backed by constraints
 - [ ] Safe area / margin guides
-- [ ] Layout debugging: constraint conflict detection and logging
+- [x] Layout debugging: constraint conflict detection and logging
 
 #### Acceptance
 
-- [ ] Constraints solve correctly for complex layouts
-- [ ] Window resizing re-layouts correctly
+- [x] Constraints solve correctly for complex layouts
+- [x] Window resizing re-layouts correctly
 - [ ] No constraint conflicts in demo apps
 
 ---
@@ -894,7 +895,7 @@ can render AppKit-compatible UIs at native quality on any platform.
 | 21 | **E4b** — Arch integrity: sign-ext + SP align | ✅ Done (5 SIGSEGV fixed) |
 | 22 | **E4c** — Category +load | ✅ Done (app-only filter) |
 | 23 | **E4** — Linux E2E | Full cross-platform |
-| 24 | **F4** — Auto Layout | Complete UI framework |
+| 24 | **F4** — Auto Layout | ✅ Done |
 | 25 | **E4d** — Typestate loader | Compile-time safety |
 | 26 | **E4e** — Diagnostic ring buffer | Debug tooling |
 | 27 | **E4f** — Capability-based IPC | Future arch |

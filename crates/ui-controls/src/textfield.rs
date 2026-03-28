@@ -1,6 +1,7 @@
 //! TextField control — single-line editable text input.
 
 use graphics_core::{Color, Font, Point, Rect, Renderer};
+use ui_view::layout::IntrinsicSize;
 use ui_view::View;
 
 /// A single-line text field for user input.
@@ -112,6 +113,13 @@ impl TextField {
     /// Mutable access to the underlying view.
     pub fn view_mut(&mut self) -> &mut View {
         &mut self.view
+    }
+
+    /// Compute the intrinsic content size.
+    /// Text fields have a fixed intrinsic height but no intrinsic width.
+    pub fn intrinsic_content_size(&self) -> IntrinsicSize {
+        let height = self.font.size + 8.0; // font + padding
+        IntrinsicSize::height_only(height)
     }
 
     /// Draw the text field.

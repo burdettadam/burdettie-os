@@ -1,6 +1,7 @@
 //! Label control — displays static text.
 
 use graphics_core::{Color, Font, Point, Rect, Renderer};
+use ui_view::layout::IntrinsicSize;
 use ui_view::View;
 
 /// A text label control.
@@ -55,6 +56,15 @@ impl Label {
     /// Mutable access to the underlying view.
     pub fn view_mut(&mut self) -> &mut View {
         &mut self.view
+    }
+
+    /// Compute the intrinsic content size based on text length and font.
+    pub fn intrinsic_content_size(&self) -> IntrinsicSize {
+        // Approximate: ~0.6 * font_size per character width, font_size + 4 height
+        let char_width = self.font.size * 0.6;
+        let width = self.text.len() as f64 * char_width + 8.0; // +8 for padding
+        let height = self.font.size + 4.0;
+        IntrinsicSize::new(width, height)
     }
 
     /// Draw the label.

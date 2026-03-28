@@ -1,6 +1,7 @@
 //! Button control — triggers an action on click.
 
 use graphics_core::{Color, Font, Point, Rect, Renderer};
+use ui_view::layout::IntrinsicSize;
 use ui_view::View;
 
 /// A clickable button control.
@@ -69,6 +70,14 @@ impl Button {
     /// Mutable access to the underlying view.
     pub fn view_mut(&mut self) -> &mut View {
         &mut self.view
+    }
+
+    /// Compute the intrinsic content size based on title length and font.
+    pub fn intrinsic_content_size(&self) -> IntrinsicSize {
+        let char_width = self.font.size * 0.6;
+        let width = self.title.len() as f64 * char_width + 24.0; // +24 for button padding + border
+        let height = self.font.size + 12.0; // +12 for top/bottom padding
+        IntrinsicSize::new(width, height)
     }
 
     /// Simulate a click (triggers the action if enabled).

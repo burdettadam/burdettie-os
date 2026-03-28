@@ -35,7 +35,7 @@ Progress is driven by **running real binaries and expanding capabilities where r
 - **Drawing primitives** (BezierPath, Gradient, Shadow, ImageBuffer, scanline fill, image blit)
 - **x86_64 trampolines** — all 7 `objc_msgSend` entry points + variadic bridges
 - **Linux PAL** — all 10 traits implemented, cross-compile verified
-- **App layer phases C1–C7, D1–D4, E1–E2, F1–F3 complete**
+- **App layer phases C1–C7, D1–D4, E1–E2, F1–F4 complete**
 - See [NEXT_GENERATION_ROADMAP.md](NEXT_GENERATION_ROADMAP.md) for Track C–F details
 
 ---

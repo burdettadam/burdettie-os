@@ -6,9 +6,15 @@
 //!
 //! Hit testing walks the view tree in reverse (front-to-back) order to
 //! find the deepest view containing a point.
+//!
+//! The [`layout`] module provides a constraint-based layout engine (Auto Layout
+//! Lite) using the Cassowary algorithm for solving linear constraints.
+
+pub mod layout;
 
 use app_kit_lite::{Event, Responder};
 use graphics_core::{Color, Point, Rect, Renderer};
+use layout::{LayoutEngine, ViewId};
 
 /// A view in the view tree.
 pub struct View {
@@ -22,6 +28,8 @@ pub struct View {
     pub hidden: bool,
     /// Application-defined tag for identification.
     pub tag: usize,
+    /// Optional layout identifier for constraint-based layout.
+    pub layout_id: Option<ViewId>,
     /// Child views (drawn back-to-front: index 0 is backmost).
     subviews: Vec<View>,
     /// Whether the view needs a redraw.
@@ -37,6 +45,7 @@ impl View {
             background_color: Color::TRANSPARENT,
             hidden: false,
             tag: 0,
+            layout_id: None,
             subviews: Vec::new(),
             needs_display: true,
         }
@@ -181,6 +190,27 @@ impl View {
     /// Layout subviews. Override point for custom layout logic.
     pub fn layout_subviews(&mut self) {
         // Base implementation does nothing
+    }
+
+    /// Apply constraint-based layout to this view and all subviews that
+    /// have a `layout_id`. The engine must already contain constraints
+    /// referencing these IDs.
+    pub fn apply_layout(&mut self, engine: &LayoutEngine) {
+        if let Ok(frames) = engine.solve() {
+            self.apply_layout_frames(&frames);
+        }
+    }
+
+    /// Recursively apply solved layout frames to this view and subviews.
+    fn apply_layout_frames(&mut self, frames: &std::collections::HashMap<ViewId, Rect>) {
+        if let Some(id) = self.layout_id {
+            if let Some(&rect) = frames.get(&id) {
+                self.set_frame(rect);
+            }
+        }
+        for subview in &mut self.subviews {
+            subview.apply_layout_frames(frames);
+        }
     }
 
     /// Find a subview by tag (recursive).
