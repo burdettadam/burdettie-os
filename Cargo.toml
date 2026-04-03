@@ -119,6 +119,7 @@ ureq      = { version = "3", features = ["rustls"] }
 plist     = "1"
 quick-xml = "0.37"
 rusqlite  = { version = "0.35", features = ["bundled"] }
+cassowary = "0.3.0"
 
 # ── Workspace-wide lints ────────────────────────────────────────────
 # Inherited by every crate via `[lints] workspace = true`.

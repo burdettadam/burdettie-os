@@ -158,6 +158,7 @@ pub(crate) mod nssegmentedcontrol;
 pub(crate) mod nsslider;
 pub(crate) mod nssplitview;
 pub(crate) mod nslayoutconstraint;
+pub(crate) mod layout_solver;
 pub(crate) mod nsstackview;
 pub(crate) mod nstabview;
 pub(crate) mod nstabviewitem;
@@ -195,6 +196,7 @@ pub fn reset_runtime_state_for_reuse() {
     nskeyvalueobserving::clear_all_observers();
     nsnotificationcenter::clear_all_observers();
     nsrunloop::reset_runtime_state_for_reuse();
+    layout_solver::reset_global_state();
 }
 
 /// Install the platform provider for Foundation shims.

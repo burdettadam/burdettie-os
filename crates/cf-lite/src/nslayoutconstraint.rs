@@ -206,22 +206,30 @@ pub extern "C" fn shim_nsview_translates_autoresize(obj: u64, _cmd: u64) -> u8 {
     u8::from(flags & (1 << 2) == 0)
 }
 
-/// `-[NSView addConstraint:]` — stub (records nothing).
-pub extern "C" fn shim_nsview_add_constraint(_obj: u64, _cmd: u64, _constraint: u64) {}
+/// `-[NSView addConstraint:]` — delegates to Cassowary layout solver.
+pub extern "C" fn shim_nsview_add_constraint(obj: u64, _cmd: u64, constraint: u64) {
+    crate::layout_solver::add_constraint(obj, constraint);
+}
 
-/// `-[NSView addConstraints:]` — stub (records nothing).
-pub extern "C" fn shim_nsview_add_constraints(_obj: u64, _cmd: u64, _constraints: u64) {}
+/// `-[NSView addConstraints:]` — delegates to Cassowary layout solver.
+pub extern "C" fn shim_nsview_add_constraints(obj: u64, _cmd: u64, constraints: u64) {
+    crate::layout_solver::add_constraints(obj, constraints);
+}
 
-/// `-[NSView removeConstraint:]` — stub.
-pub extern "C" fn shim_nsview_remove_constraint(_obj: u64, _cmd: u64, _constraint: u64) {}
+/// `-[NSView removeConstraint:]` — delegates to Cassowary layout solver.
+pub extern "C" fn shim_nsview_remove_constraint(obj: u64, _cmd: u64, constraint: u64) {
+    crate::layout_solver::remove_constraint(obj, constraint);
+}
 
-/// `-[NSView removeConstraints:]` — stub.
-pub extern "C" fn shim_nsview_remove_constraints(_obj: u64, _cmd: u64, _constraints: u64) {}
+/// `-[NSView removeConstraints:]` — delegates to Cassowary layout solver.
+pub extern "C" fn shim_nsview_remove_constraints(obj: u64, _cmd: u64, constraints: u64) {
+    crate::layout_solver::remove_constraints(obj, constraints);
+}
 
-/// `-[NSView constraints]` — returns empty NSArray.
+/// `-[NSView constraints]` — returns NSArray of constraints added to this view.
 pub extern "C" fn shim_nsview_constraints(obj: u64, _cmd: u64) -> u64 {
     if obj == 0 { return 0; }
-    crate::nsarray::make_nsarray(&[])
+    crate::layout_solver::get_constraints(obj)
 }
 
 #[cfg(test)]

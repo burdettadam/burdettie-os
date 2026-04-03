@@ -333,7 +333,7 @@ How burdettieOS's architecture maps to Apple's real system and where it diverges
 | **NSObject** is a real class hierarchy with ivar layout | ✅ Ivar-layout-aware allocation from `__objc_ivar` section data | – | Resolved (P2) |
 | **Blocks ABI** (stack → heap promotion with copy/dispose helpers) | ✅ Full Blocks ABI: copy/dispose helpers invoked on stack→heap promotion, `_Block_object_assign`/`_Block_object_dispose` handle IS_OBJECT/IS_BLOCK/IS_BYREF | `__block` byref struct forwarding pointer update | Low |
 | **RunLoop source/observer model** (CFRunLoopSource, CFRunLoopObserver, input sources) | ✅ CFRunLoopSource (v0 + v1) and CFRunLoopObserver implemented | – | Resolved (P1) |
-| **Auto Layout** (constraint solver in AppKit) | NSLayoutConstraint class with create/activate/deactivate + NSView constraint methods | Full Cassowary solver integration | P3 |
+| **Auto Layout** (constraint solver in AppKit) | ✅ Cassowary-based solver: `addConstraint:`/`removeConstraint:` build live constraint system, `layoutIfNeeded` runs simplex solver and writes solved frames back to NSView objects | – | Resolved (P3) |
 | **Keychain Services** (persistent encrypted storage) | ✅ In-memory HashMap keychain with SecItemAdd/CopyMatching/Update/Delete | Persistent on-disk storage | Resolved (P3) |
 | **Thread-safe ARC** (atomic reference counting) | ✅ Sharded atomic ARC (`DashMap` / `AtomicUsize`) | – | Resolved (P2) |
 | **dyld interposing** (DYLD_INSERT_LIBRARIES) | ✅ DYLD_INSERT_LIBRARIES loading + `__DATA,__interpose` section parsing + InterposeResolver + hardened runtime security gate | – | Resolved (P3) |
@@ -376,3 +376,7 @@ How burdettieOS's architecture maps to Apple's real system and where it diverges
 13. **Blocks ABI copy/dispose helpers** — ✅ Upgraded `_Block_copy` to invoke copy helper from descriptor when `BLOCK_HAS_COPY_DISPOSE` set. `_Block_release` invokes dispose helper before freeing. `_Block_object_assign`/`_Block_object_dispose` now functional (IS_OBJECT stores pointer, IS_BLOCK copies/releases nested blocks, IS_BYREF stores pointer).
 
 14. **DYLD_INSERT_LIBRARIES** — ✅ Full dyld interposing pipeline: `RuntimeConfig.insert_libraries` + env var parsing, hardened runtime security gate (`strip_dyld_env`), insert library loading before normal BFS deps, `__DATA,__interpose` section parsing (`InterposeTable`), `InterposeResolver` for symbol-name-level overrides. Both native and interpreter pipelines supported.
+
+#### Phase 5: Auto Layout Solver (P3) — ✅ Complete
+
+15. **Cassowary constraint solver** — ✅ Integrated `cassowary` 0.3.0 crate (simplex-based Cassowary algorithm). New `layout_solver` module bridges NSLayoutConstraint ObjC objects to typed solver variables. Each NSView gets four solver variables (x, y, width, height). `addConstraint:`/`removeConstraint:` maintain live constraint state, `layoutIfNeeded` feeds active constraints to the solver and writes solved frames back. Supports all 10 NSLayoutAttributes, priority-to-strength mapping, and subtree collection for multi-view layouts. Added `setNeedsLayout:`, `needsLayout`, `layoutIfNeeded`, `layoutSubtreeIfNeeded`, `updateConstraints`, `setNeedsUpdateConstraints` methods to NSView.

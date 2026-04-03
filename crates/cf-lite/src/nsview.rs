@@ -329,6 +329,36 @@ pub extern "C" fn shim_nsview_is_flipped(_obj: u64, _cmd: u64) -> u8 {
     0
 }
 
+// ── Auto Layout pass methods ────────────────────────────────────
+
+/// `-[NSView setNeedsLayout:]`
+pub extern "C" fn shim_nsview_set_needs_layout(obj: u64, _cmd: u64, flag: u8) {
+    crate::layout_solver::set_needs_layout(obj, flag != 0);
+}
+
+/// `-[NSView needsLayout]`
+pub extern "C" fn shim_nsview_needs_layout(obj: u64, _cmd: u64) -> u8 {
+    u8::from(crate::layout_solver::needs_layout(obj))
+}
+
+/// `-[NSView layoutIfNeeded]`
+pub extern "C" fn shim_nsview_layout_if_needed(obj: u64, _cmd: u64) {
+    crate::layout_solver::layout_if_needed(obj);
+}
+
+/// `-[NSView layoutSubtreeIfNeeded]` — same as layoutIfNeeded for this impl.
+pub extern "C" fn shim_nsview_layout_subtree_if_needed(obj: u64, _cmd: u64) {
+    crate::layout_solver::layout_if_needed(obj);
+}
+
+/// `-[NSView updateConstraints]` — no-op base implementation.
+pub extern "C" fn shim_nsview_update_constraints(_obj: u64, _cmd: u64) {}
+
+/// `-[NSView setNeedsUpdateConstraints]`
+pub extern "C" fn shim_nsview_set_needs_update_constraints(obj: u64, _cmd: u64) {
+    crate::layout_solver::set_needs_layout(obj, true);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
