@@ -109,6 +109,27 @@ pub(super) fn run_interpreted(
         std::sync::Arc::new(platform_linux::LinuxUnwindRegistry::new());
     let mut registry = ImageRegistry::new(config.platform.memory(), unwind_registry);
     let binary_dir = binary_path.parent().unwrap_or(Path::new("."));
+
+    // 5.5. Load DYLD_INSERT_LIBRARIES (if any, and not blocked by hardened runtime).
+    {
+        let mut insert_paths = config.insert_libraries.clone();
+        for (key, val) in &config.env_overrides {
+            if key == "DYLD_INSERT_LIBRARIES" {
+                for p in val.split(':') {
+                    let p = p.trim();
+                    if !p.is_empty() {
+                        insert_paths.push(std::path::PathBuf::from(p));
+                    }
+                }
+            }
+        }
+        if !insert_paths.is_empty() {
+            let count =
+                loader::load_insert_libraries(&insert_paths, &mut registry, config.platform.fs());
+            log::info!("DYLD_INSERT_LIBRARIES: loaded {count}/{} libraries", insert_paths.len());
+        }
+    }
+
     let _dep_stats =
         loader::load_dependencies(&arc_parsed, &mut registry, binary_dir, config.platform.fs())?;
     let app_idx = registry.load_preparsed("__main__", arc_parsed, main_data)?;

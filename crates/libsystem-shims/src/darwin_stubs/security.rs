@@ -631,10 +631,17 @@ mod tests {
 
     #[test]
     fn keychain_add_and_query() {
-        clear_keychain();
-        let svc = make_fake_cfstring("com.test.myapp");
-        let acct = make_fake_cfstring("user@example.com");
+        let svc = make_fake_cfstring("com.test.add_query.u99");
+        let acct = make_fake_cfstring("user99@example.com");
         let data = make_fake_nsdata(b"s3cr3t");
+
+        // Ensure clean state for this specific key.
+        let del_q = make_fake_dict(&[
+            (KSEC_CLASS, KSEC_CLASS_GENERIC_PW),
+            (KSEC_ATTR_SERVICE, svc),
+            (KSEC_ATTR_ACCOUNT, acct),
+        ]);
+        let _ = shim_sec_item_delete(del_q);
 
         let add_dict = make_fake_dict(&[
             (KSEC_CLASS, KSEC_CLASS_GENERIC_PW),
@@ -664,15 +671,22 @@ mod tests {
         assert_eq!(length, 6);
         let slice = unsafe { std::slice::from_raw_parts(bytes_ptr as *const u8, length) };
         assert_eq!(slice, b"s3cr3t");
-        clear_keychain();
     }
 
     #[test]
     fn keychain_duplicate_add_fails() {
-        clear_keychain();
-        let svc = make_fake_cfstring("dup.test");
-        let acct = make_fake_cfstring("alice");
+        // Use unique service name to avoid collision with other tests.
+        let svc = make_fake_cfstring("dup.test.unique42");
+        let acct = make_fake_cfstring("alice42");
         let data = make_fake_nsdata(b"pw1");
+
+        // Ensure clean: delete any leftover from a prior run.
+        let del_q = make_fake_dict(&[
+            (KSEC_CLASS, KSEC_CLASS_GENERIC_PW),
+            (KSEC_ATTR_SERVICE, svc),
+            (KSEC_ATTR_ACCOUNT, acct),
+        ]);
+        let _ = shim_sec_item_delete(del_q);
 
         let dict = make_fake_dict(&[
             (KSEC_CLASS, KSEC_CLASS_GENERIC_PW),
@@ -683,16 +697,22 @@ mod tests {
 
         assert_eq!(shim_sec_item_add(dict, std::ptr::null_mut()), ERR_SEC_SUCCESS);
         assert_eq!(shim_sec_item_add(dict, std::ptr::null_mut()), ERR_SEC_DUPLICATE_ITEM);
-        clear_keychain();
     }
 
     #[test]
     fn keychain_update() {
-        clear_keychain();
-        let svc = make_fake_cfstring("upd.test");
-        let acct = make_fake_cfstring("bob");
+        let svc = make_fake_cfstring("upd.test.unique88");
+        let acct = make_fake_cfstring("bob88");
         let data1 = make_fake_nsdata(b"old");
         let data2 = make_fake_nsdata(b"new_password");
+
+        // Clean first.
+        let del_q = make_fake_dict(&[
+            (KSEC_CLASS, KSEC_CLASS_GENERIC_PW),
+            (KSEC_ATTR_SERVICE, svc),
+            (KSEC_ATTR_ACCOUNT, acct),
+        ]);
+        let _ = shim_sec_item_delete(del_q);
 
         let add_dict = make_fake_dict(&[
             (KSEC_CLASS, KSEC_CLASS_GENERIC_PW),
@@ -721,14 +741,13 @@ mod tests {
         assert_eq!(shim_sec_item_copy_matching(q2, &mut result), ERR_SEC_SUCCESS);
         let length = raw_read_u64(result, 16) as usize;
         assert_eq!(length, 12); // "new_password".len()
-        clear_keychain();
     }
 
     #[test]
     fn keychain_delete() {
-        clear_keychain();
-        let svc = make_fake_cfstring("del.test");
-        let acct = make_fake_cfstring("carol");
+        // Use unique service name.
+        let svc = make_fake_cfstring("del.test.unique77");
+        let acct = make_fake_cfstring("carol77");
         let data = make_fake_nsdata(b"delete_me");
 
         let add_dict = make_fake_dict(&[
@@ -737,24 +756,24 @@ mod tests {
             (KSEC_ATTR_ACCOUNT, acct),
             (KSEC_VALUE_DATA, data),
         ]);
-        assert_eq!(shim_sec_item_add(add_dict, std::ptr::null_mut()), ERR_SEC_SUCCESS);
-
+        // Clean first in case of prior run.
         let del_query = make_fake_dict(&[
             (KSEC_CLASS, KSEC_CLASS_GENERIC_PW),
             (KSEC_ATTR_SERVICE, svc),
             (KSEC_ATTR_ACCOUNT, acct),
         ]);
+        let _ = shim_sec_item_delete(del_query);
+
+        assert_eq!(shim_sec_item_add(add_dict, std::ptr::null_mut()), ERR_SEC_SUCCESS);
         assert_eq!(shim_sec_item_delete(del_query), ERR_SEC_SUCCESS);
         // Delete again → not found
         assert_eq!(shim_sec_item_delete(del_query), ERR_SEC_ITEM_NOT_FOUND);
-        clear_keychain();
     }
 
     #[test]
     fn keychain_query_nonexistent() {
-        clear_keychain();
-        let svc = make_fake_cfstring("no.such.service");
-        let acct = make_fake_cfstring("nobody");
+        let svc = make_fake_cfstring("no.such.svc.unique55");
+        let acct = make_fake_cfstring("nobody55");
         let query = make_fake_dict(&[
             (KSEC_CLASS, KSEC_CLASS_GENERIC_PW),
             (KSEC_ATTR_SERVICE, svc),

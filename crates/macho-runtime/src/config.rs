@@ -77,6 +77,9 @@ pub struct RuntimeConfig {
     pub shim_set: ShimSet,
     /// Environment variables available to the running binary.
     pub env_overrides: Vec<(String, String)>,
+    /// Libraries to insert before the main binary (DYLD_INSERT_LIBRARIES).
+    /// Colon-separated paths from the environment or set programmatically.
+    pub insert_libraries: Vec<PathBuf>,
     /// Process name returned by getprogname.
     pub process_name: String,
     /// Process path returned by _NSGetExecutablePath.
@@ -102,6 +105,7 @@ impl RuntimeConfig {
             security_policy: None,
             shim_set: ShimSet::default(),
             env_overrides: Vec::new(),
+            insert_libraries: Vec::new(),
             process_name: name,
             process_path: binary_path.to_path_buf(),
             tracer: None,

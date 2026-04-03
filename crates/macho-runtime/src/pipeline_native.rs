@@ -150,6 +150,39 @@ pub(super) fn run_native(
     let data_symbols = DataSymbolStore::new();
     let composite = CompositeResolver::new(&ctx.shim_table, &data_symbols, Some(&stub_resolver));
 
+    // 5.5. Parse DYLD_INSERT_LIBRARIES and check security gate.
+    let insert_lib_paths: Vec<std::path::PathBuf> = {
+        let mut paths = config.insert_libraries.clone();
+        // Also check env_overrides for DYLD_INSERT_LIBRARIES (colon-separated).
+        for (key, val) in &config.env_overrides {
+            if key == "DYLD_INSERT_LIBRARIES" {
+                for p in val.split(':') {
+                    let p = p.trim();
+                    if !p.is_empty() {
+                        paths.push(std::path::PathBuf::from(p));
+                    }
+                }
+            }
+        }
+        // Security gate: if hardened runtime blocks dylib insertion, skip.
+        if !paths.is_empty() {
+            if let Some(ref report) = security_report {
+                if report.strip_dyld_env {
+                    log::warn!(
+                        "DYLD_INSERT_LIBRARIES blocked by hardened runtime ({} libraries ignored)",
+                        paths.len(),
+                    );
+                    tracer.record(
+                        EventKind::Pipeline,
+                        format!("DYLD_INSERT_LIBRARIES: blocked by hardened runtime ({} libraries)", paths.len()),
+                    );
+                    paths.clear();
+                }
+            }
+        }
+        paths
+    };
+
     // 6. Load dependencies + main binary into ImageRegistry
     #[cfg(target_os = "macos")]
     let unwind_registry: std::sync::Arc<dyn platform_core::unwind::UnwindRegistry> =
@@ -162,6 +195,16 @@ pub(super) fn run_native(
         unwind_registry,
     );
     let binary_dir = binary_path.parent().unwrap_or(Path::new("."));
+
+    // 5.6. Load insert libraries first (before normal deps).
+    if !insert_lib_paths.is_empty() {
+        let insert_count =
+            loader::load_insert_libraries(&insert_lib_paths, &mut registry, config.platform.fs());
+        tracer.record(
+            EventKind::Pipeline,
+            format!("DYLD_INSERT_LIBRARIES: loaded {insert_count}/{} libraries", insert_lib_paths.len()),
+        );
+    }
 
     // BFS dependency loading (skip system libraries)
     let dep_stats =

@@ -292,3 +292,52 @@ pub(crate) fn resolve_dylib_path(
     }
     None
 }
+
+/// Load insert libraries (from `DYLD_INSERT_LIBRARIES`) into the registry
+/// before normal dependency loading.  Each library is parsed and loaded;
+/// its sub-dependencies are NOT loaded (they'll be resolved normally later
+/// through the dependency BFS).
+///
+/// Returns the number of libraries successfully loaded.
+pub(crate) fn load_insert_libraries(
+    paths: &[std::path::PathBuf],
+    registry: &mut ImageRegistry,
+    fs: &dyn FilesystemProvider,
+) -> usize {
+    let mut loaded = 0;
+    for path in paths {
+        let install_name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("insert_lib")
+            .to_string();
+        if registry.get(&install_name).is_some() {
+            log::debug!("insert library already loaded: {install_name}");
+            continue;
+        }
+        let data = match fs.read(path) {
+            Ok(d) => d,
+            Err(e) => {
+                log::warn!("DYLD_INSERT_LIBRARIES: cannot read {}: {e}", path.display());
+                continue;
+            }
+        };
+        let parsed = match parse(&data) {
+            Ok(p) => p,
+            Err(e) => {
+                log::warn!("DYLD_INSERT_LIBRARIES: cannot parse {}: {e}", path.display());
+                continue;
+            }
+        };
+        match registry.load_preparsed(&install_name, Arc::new(parsed), Arc::from(data)) {
+            Ok(_) => {
+                log::info!("DYLD_INSERT_LIBRARIES: loaded {}", path.display());
+                loaded += 1;
+            }
+            Err(e) => {
+                log::warn!("DYLD_INSERT_LIBRARIES: cannot load {}: {e}", path.display());
+            }
+        }
+    }
+    loaded
+}

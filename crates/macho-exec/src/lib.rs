@@ -17,6 +17,7 @@
 mod entry;
 mod fixup;
 mod initializer;
+pub mod interpose;
 mod mapped;
 pub mod compact_to_ehframe;
 pub mod patch;
