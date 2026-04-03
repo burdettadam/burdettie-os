@@ -1,7 +1,7 @@
 # Darwin Loader Lab — Compatibility & Coverage Metrics
 
-> All counts are as of 2026-03-28. See [FEATURES.md](FEATURES.md) for the full
-> feature index and [ROADMAP.md](ROADMAP.md) for what comes next.
+> All counts are as of 2026-04-03. See [FEATURES.md](FEATURES.md) for the full
+> feature index and [roadmap.md](roadmap.md) for what comes next.
 
 ---
 
@@ -9,20 +9,20 @@
 
 | Metric | Value | Notes |
 |---|---|---|
-| Fixture binaries | 85+ directories | ARM64 Mach-O binaries compiled from source |
+| Workspace members | 44 | 41 crates + 3 GUI apps |
+| Fixture binaries | 85 directories | ARM64 Mach-O binaries compiled from source |
 | Compat-scored fixtures | 63/63 passing | 0 failing |
-| Corpus CLI tools | 30/30 passing | 30 real-world CLI patterns; 100% pass rate |
-| Total tests | 1,090+ passing | 0 failing, 0 regressions since Phase 30 freeze |
-| Foundation classes — substantive | 52 | Full logic + selectors; NSObject through NSTask |
-| Foundation classes — total shimmed | 71 | Includes AppKit stubs and constant/synthetic variants |
-| Foundation selectors (Selector Count) | 523+ | All `objc_msgSend`-dispatchable Foundation methods |
-| Shim registrations (Registration Count) | 340+ | Unique `ShimTable::register()` calls at runtime start |
-| ObjC runtime shims | 103 | msgSend family + runtime introspection functions |
-| libSystem shims | 65 | pthread, dispatch, mach, process, I/O, allocation |
-| Rust LOC | ~70,000 + 620 asm | 620 lines of hand-written ARM64 + x86_64 assembly |
+| Corpus CLI tools | 39 dirs, 30/30 passing | 30 compat-scored CLI patterns; 100% pass rate |
+| Total tests | 5,599 passing | 0 failing, 11 ignored (arm64 arch-specific) |
+| Registered ObjC classes | 193 | 148 NS* Foundation + 40 AppKit + misc framework stubs |
+| Registered selectors | 1,380 | 867 Foundation + 513 AppKit |
+| cf-lite shim functions | 2,001 | Across 124 source modules, 2,538 tests |
+| ObjC runtime shims | 131 | msgSend family + runtime introspection — 208 tests |
+| libSystem shim functions | 443 | 37 darwin_stubs modules — 309 tests |
+| Rust LOC | ~186,000 + 620 asm | 620 lines of hand-written ARM64 + x86_64 assembly |
 | Interpreted fixtures passing | 22/22 | On macOS ARM64 host; E4a+E4b+E4c complete |
 | PAL trait implementations | 2 complete | macOS (`DarwinHostPlatform`), Linux (`LinuxHostPlatform`) |
-| GUI controls | 7 | Label, Button, TextField, ScrollView, StackView, TableView, SplitView |
+| GUI controls | 13 | AppKit controls with full property read/write — 244 tests |
 | GUI apps | 3 | hello-darwin, control-gallery, foundation-explorer |
 
 ---

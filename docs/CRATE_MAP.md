@@ -1,9 +1,9 @@
 # Darwin Loader Lab — Crate Map
 
-> Current state as of 2026-03-28. See [FEATURES.md](FEATURES.md) for the full
-> feature index and [ROADMAP.md](ROADMAP.md) for what comes next.
+> Current state as of 2026-04-03. See [FEATURES.md](FEATURES.md) for the full
+> feature index and [roadmap.md](roadmap.md) for what comes next.
 
-35 workspace members (32 crates + 3 GUI apps), organized by layer.
+44 workspace members (41 crates + 3 GUI apps), organized by layer.
 
 ---
 

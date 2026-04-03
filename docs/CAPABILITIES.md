@@ -2,7 +2,7 @@
 
 > Current state as of 2026-03-28. See [FEATURES.md](FEATURES.md) for the full
 > feature index, [CRATE_MAP.md](CRATE_MAP.md) for workspace structure, and
-> [ROADMAP.md](ROADMAP.md) for what comes next.
+> [roadmap.md](roadmap.md) for what comes next.
 
 ---
 
@@ -70,12 +70,13 @@ real CLI applications exercise.
 
 ### Counting Methodology
 
-Two numbers appear in project documents:
+Two numbers have historically appeared in project documents:
 
-- **52 substantive implementations**: Classes with full logic (NSArray, NSDate, NSFileManager, etc.). This is what `RUNTIME_ARCHITECTURE.md` tracks.
-- **71 fully shimmed classes**: The 52 above plus AppKit stubs (NSApplication, NSWindow, NSView, etc.) and synthetic/constant variants (`__NSCFConstantString`, `NSConstantIntegerNumber`, `NSConstantDictionary`, `NSConstantArray`). This is what the archived `GAP_ANALYSIS.md` tracks.
+- **193 registered ObjC classes**: All classes registered with the ObjC runtime at startup — 148 NS* Foundation classes, 40 AppKit classes, plus framework stubs (AVFoundation, CoreLocation, CoreBluetooth, CoreData, etc.).
+- **1,380 registered selectors**: All `objc_msgSend`-dispatchable methods (867 Foundation + 513 AppKit).
+- **2,001 shim functions**: Total `pub extern "C" fn shim_*` across cf-lite's 124 source modules.
 
-The list below uses the 71-class count, organized by domain.
+The list below covers the major class domains.
 
 ### Core Object Model
 `NSObject`, `NSNull`, `NSValue`, `NSNumber`, `NSConstantIntegerNumber`
@@ -149,21 +150,22 @@ The list below uses the 71-class count, organized by domain.
 
 ### Shim Count
 
-> **Note on shim counts**: Two figures appear in project documents and refer to
-> different things:
+> **Note on shim counts**: Multiple metrics measure different things:
 >
-> - **340+ total installed shims** — unique shim function-pointer registrations
->   across all 9 categories (ObjC: 103; Foundation: 172; libSystem: 65; misc).
->   This is the Registration Count.
+> - **1,380 registered selectors** — all `objc_msgSend`-dispatchable methods
+>   across 193 classes (867 Foundation + 513 AppKit).
 >
-> - **523+ total shims** — all Foundation method selectors individually counted
->   across 71 classes (Foundation: 355+; ObjC runtime: 103; libSystem: 65).
->   This is the Selector Count.
+> - **2,001 cf-lite shim functions** — total `pub extern "C" fn shim_*` across
+>   124 source modules in cf-lite.
 >
-> Both are correct; they measure different things. The Registration Count (340+)
-> reflects the number of `ShimTable::register()` calls at runtime startup. The
-> Selector Count (523+) reflects the total number of `objc_msgSend`-dispatchable
-> methods across all shimmed classes.
+> - **443 libsystem shim functions** — exported C functions in libsystem-shims
+>   (37 darwin_stubs modules + top-level + cross_platform).
+>
+> - **131 ObjC runtime shims** — exported functions in objc-runtime.
+>
+> The selector count reflects what guest code can dispatch via `objc_msgSend`.
+> The shim function count includes internal helpers and C-level functions not
+> dispatched through ObjC messaging.
 
 ---
 
@@ -173,7 +175,7 @@ Controlled implementations of macOS system library functions (`libSystem`,
 `libpthread`, `libdispatch`, `libmach`). Each shim is an `extern "C"` Rust
 function registered in the `ShimTable` and intercepted before any host call.
 
-**65 libSystem shims across these categories:**
+**443 libSystem shim functions across 37 darwin_stubs modules:**
 
 | Category | Key functions | Strategy |
 |---|---|---|

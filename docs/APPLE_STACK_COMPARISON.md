@@ -14,8 +14,8 @@ How burdettieOS maps to Apple's real system stack, layer by layer.
  │   NSApplication, NSWindow,        │    │    app, alert, event, menu,       │
  │   NSView, NSEvent, NSMenu,        │    │    responder, window_delegate     │
  │   NSResponder, Auto Layout        │    │  ui-view  (frame/bounds/subviews) │
- │                                   │    │  ui-controls  (7 built-in)        │
- │                                   │    │  cf-lite AppKit stubs (42 classes)│
+ │                                   │    │  ui-controls  (13 built-in)       │
+ │                                   │    │  cf-lite AppKit stubs (40 classes)│
  ├───────────────────────────────────┤    ├───────────────────────────────────┤
  │  Core Graphics / Metal / Quartz   │    │  graphics-core                    │
  │   CGContext, CGPath, CTFont,      │    │    software renderer (scanline)   │
@@ -26,7 +26,7 @@ How burdettieOS maps to Apple's real system stack, layer by layer.
  │                                   │    │  window-backend-darwin  (macOS)   │
  │                                   │    │  window-backend-linux   (winit)   │
  ├───────────────────────────────────┤    ├───────────────────────────────────┤
- │         Foundation                │    │  cf-lite  (122 synthetic classes)  │
+ │         Foundation                │    │  cf-lite  (193 synthetic classes)   │
  │   NSString, NSArray, NSDictionary,│    │    nsarray, nsdictionary, nsdata  │
  │   NSData, NSURL, NSDate,          │    │    nsurl, nsdate, nsbundle        │
  │   NSBundle, NSFileManager,        │    │    nsfilemanager, nsprocessinfo   │
@@ -56,11 +56,11 @@ How burdettieOS maps to Apple's real system stack, layer by layer.
  │                                   │    │    132 runtime shims              │
  │                                   │    │    backend.rs (libobjc2 ready)    │
  ├───────────────────────────────────┤    ├───────────────────────────────────┤
- │      libSystem.B.dylib            │    │  libsystem-shims  (985 shims)    │
+ │      libSystem.B.dylib            │    │  libsystem-shims  (443 shim fns) │
  │   ┌─────────────────────────────┐ │    │    process, pthread, dispatch     │
  │   │ libpthread                  │ │    │    mach, lifecycle, tls, socket   │
  │   │ libsystem_kernel (mach)     │ │    │    ptrauth, darwin_compat         │
- │   │ libsystem_malloc            │ │    │    darwin_stubs/ (28 modules)     │
+ │   │ libsystem_malloc            │ │    │    darwin_stubs/ (37 modules)     │
  │   │ libsystem_c (libc)          │ │    │      os_log, security, xpc,      │
  │   │ libdyld                     │ │    │      cfnetwork, common_crypto,    │
  │   │ libsystem_info              │ │    │      malloc_zone, sysinfo,        │
@@ -115,7 +115,7 @@ How burdettieOS maps to Apple's real system stack, layer by layer.
  │                                   │    │  macho-runtime (orchestration)    │
  │   Rosetta 2  (x86→ARM64)         │    │  arm64-translate  (CPU emulator) │
  │                                   │    │    164 insn variants, JIT + cache │
- │                                   │    │    11.4K LOC, 427 tests           │
+ │                                   │    │    12.3K LOC, 435 tests           │
  └───────────────────────────────────┘    └───────────────────────────────────┘
 ```
 
@@ -246,22 +246,23 @@ How burdettieOS maps to Apple's real system stack, layer by layer.
 
 | Layer | Apple Symbol Count (est.) | Covered | Coverage |
 |-------|--------------------------|---------|----------|
-| libSystem | ~800 | 985 shim fns, 36 darwin_stubs modules (309 tests) | ~92% |
-| ObjC Runtime | ~120 | 132 shims (msgSend, ARC, KVO/KVC, swizzle, exceptions, introspection) | ~98% |
+| libSystem | ~800 | 443 shim fns, 37 darwin_stubs modules (309 tests) | ~92% |
+| ObjC Runtime | ~120 | 131 shims (msgSend, ARC, KVO/KVC, swizzle, exceptions, introspection) — 208 tests | ~98% |
 | CoreFoundation | ~300 | ~173 functions + CG shims (~100) | ~91% |
-| Foundation | ~2000 methods | 122 synthetic classes, ~1958 shim fns (2528 tests) | ~78% |
-| AppKit | ~5000 methods | 91 stub classes (responder chain, window/view depth, pasteboard, controls, Auto Layout) | ~8% |
+| Foundation | ~2000 methods | 148 NS* classes, 867 registered selectors, 2,001 shim fns (2,538 tests) | ~43% selectors / ~100% shim fns |
+| AppKit | ~5000 methods | 40 classes, 513 registered selectors (responder chain, window/view, pasteboard, controls, Auto Layout solver) | ~10% |
 | ICU (i18n) | ~200 | 50 shim fns (real via icu4x: collation, locale, seg., datetime, decimal, calendar) | ~48% |
 | CFNetwork | ~60 | ~45 stubs | ~75% |
 | Security | ~150 | ~90 stubs + real SecItem CRUD + X.509 chain validation | ~65% |
 | XPC | ~70 | ~70 real shims (object store + transport + activity + pipe + Unix sockets) | ~100% |
 | IOKit | ~200 | 27 stubs (most return kIOReturnSuccess/plausible values) | ~14% |
-| ARM64 translator | n/a | 435 tests, 164 insn variants, JIT + block cache — MRS/MSR, LSE, LDAR/STLR, LDXR/STXR, FP/SIMD | ✅ |
+| ARM64 translator | n/a | 435 tests (11 ignored), 164 insn variants, JIT + block cache — MRS/MSR, LSE, LDAR/STLR, LDXR/STXR, FP/SIMD | ✅ |
 | dyld (Mach-O loading) | N/A (internal) | Full pipeline + shared cache parser + 5 chained fixup formats + DYLD_INSERT_LIBRARIES | ✅ |
 | Trust/Security gates | N/A (internal) | 8 gates + real AMFI via csops(2), 169 tests | ✅ |
-| Graphics/Rendering | N/A | Software + GPU (wgpu) renderer, cross-platform window backends | ✅ |
-| Fixtures (compat gate) | 39 corpus programs | 23 compat-runner test cases | ✅ |
-| **Total** | | **41 crates, 5590+ tests passing, 12 ignored** | |
+| Graphics/Rendering | N/A | Software + GPU (wgpu) renderer, cross-platform window backends — 181 tests | ✅ |
+| GUI controls | N/A | 13 AppKit controls (244 tests), responder chain (69 tests), view hierarchy (43 tests) | ✅ |
+| Fixtures (compat gate) | 39 corpus programs | 85 fixture dirs, 23 compat-runner test cases | ✅ |
+| **Total** | | **44 workspace members (41 crates + 3 apps), 186K LOC, 5,599 tests passing, 11 ignored** | |
 
 ## Remaining Gaps
 
@@ -380,3 +381,95 @@ How burdettieOS's architecture maps to Apple's real system and where it diverges
 #### Phase 5: Auto Layout Solver (P3) — ✅ Complete
 
 15. **Cassowary constraint solver** — ✅ Integrated `cassowary` 0.3.0 crate (simplex-based Cassowary algorithm). New `layout_solver` module bridges NSLayoutConstraint ObjC objects to typed solver variables. Each NSView gets four solver variables (x, y, width, height). `addConstraint:`/`removeConstraint:` maintain live constraint state, `layoutIfNeeded` feeds active constraints to the solver and writes solved frames back. Supports all 10 NSLayoutAttributes, priority-to-strength mapping, and subtree collection for multi-view layouts. Added `setNeedsLayout:`, `needsLayout`, `layoutIfNeeded`, `layoutSubtreeIfNeeded`, `updateConstraints`, `setNeedsUpdateConstraints` methods to NSView.
+
+---
+
+## Feature Parity Opportunities
+
+> **As of 2026-04-03.** Analysis of where architectural alignment can be
+> deepened to better match Apple's real system behaviour. Ordered by
+> expected impact on binary compatibility.
+
+### Tier 1 — High-Value Alignment (unlocks classes of real-world programs)
+
+| Opportunity | Apple Behaviour | Current State | Estimated Effort |
+|------------|----------------|---------------|-----------------|
+| **Layout Anchors API** | `NSLayoutAnchor`, `NSLayoutXAxisAnchor`, `NSLayoutYAxisAnchor`, `NSLayoutDimension` — modern constraint-building API that wraps NSLayoutConstraint | NSLayoutConstraint factory method + Cassowary solver exist; no anchor classes | Medium — 4 new ObjC classes, each ~8 methods, all delegating to existing `constraintWithItem:` |
+| **Visual Format Language** | `+[NSLayoutConstraint constraintsWithVisualFormat:options:metrics:views:]` — string-based constraint builder | Not implemented | Medium — parser for VFL grammar, emits existing NSLayoutConstraint objects |
+| **Intrinsic content size** | `intrinsicContentSize`, content-hugging, compression-resistance priorities — drives Auto Layout from content | `translatesAutoresizingMaskIntoConstraints` exists; no intrinsic size | Medium — add `intrinsicContentSize` method + auto-generated width/height constraints at MEDIUM strength |
+| **NSStackView actual stacking** | NSStackView distributes subviews with spacing using Auto Layout | Class registered with property storage; distribution is a no-op | Low — add `layoutSubviews` override that generates constraints from `distribution`/`spacing`/`alignment` |
+| **RunLoop-triggered layout** | AppKit triggers `layoutIfNeeded` from the run loop before display | Layout pass requires manual `layoutIfNeeded` call | Low — add `CFRunLoopObserver` in the `kCFRunLoopBeforeWaiting` activity to auto-flush layout |
+| **NSWindow contentLayoutGuide** | Window-level layout guide views can anchor to | Not implemented | Low — add `contentLayoutGuide` property returning a guide object with the content rect's anchors |
+
+### Tier 2 — Medium-Value Alignment (improves framework depth)
+
+| Opportunity | Apple Behaviour | Current State | Estimated Effort |
+|------------|----------------|---------------|-----------------|
+| **Safe area / layout margins** | `safeAreaLayoutGuide`, `layoutMarginsGuide` — inset rects for content placement | Not implemented | Medium — new guide objects + inset computation |
+| **Size classes / trait collections** | `NSTraitCollection`, `horizontalSizeClass`, `verticalSizeClass` — adaptive layout | Not implemented | Medium — new ObjC class + propagation through view hierarchy |
+| **NSAnimationContext / implicit animations** | `NSAnimationContext.runAnimationGroup`, `animator()` proxy, `CAAnimation` | Not implemented | High — requires animation timer integration with run loop |
+| **NSTableView / NSOutlineView data source** | `numberOfRows(in:)`, `tableView(_:objectValueFor:row:)` delegate protocol | NSTableView exists as property-storage stub | Medium — wire data source callbacks to actual row count / cell content |
+| **NSUndoManager** | Undo/redo stack with target-action invocations | Not implemented | Medium — new class with invocation recording |
+
+### Tier 3 — Completeness (polish and edge cases)
+
+| Opportunity | Apple Behaviour | Current State | Estimated Effort |
+|------------|----------------|---------------|-----------------|
+| **Persistent keychain** | Keychain stored on disk with encryption | In-memory HashMap (resets on exit) | Medium — SQLite backing + encrypted blob storage |
+| **`__block` byref forwarding** | `_Block_copy` updates byref forwarding pointers for heap blocks | Copy/dispose helpers invoked; forwarding pointer not updated | Low — single pointer write in `_Block_copy` |
+| **Full mach_msg reply path** | Complex Mach messages with OOL memory, ports, and reply ports | Bootstrap port lookup only | High — requires port rights tracking + message serialization |
+| **arm64e pointer authentication** | PAC-enabled instructions (BRAA, BLRAA, AUTIA, PACIA) | Strips PAC bits but doesn't verify authenticators | Medium — need PAC key generation + auth verification in interpreter |
+| **NSStream real I/O** | Bidirectional byte streams with run loop scheduling | Stub class registered | Medium — bridge to POSIX read/write with `CFRunLoopSource` integration |
+
+### Architectural Alignment Insights
+
+1. **The Cassowary solver unlocks a chain**: With a working constraint solver,
+   NSStackView, NSScrollView, and NSSplitView can all implement real layout
+   by generating constraints in their `layoutSubviews` overrides. This is exactly
+   how Apple does it — the solver is the single source of truth for geometry.
+
+2. **RunLoop integration is the glue**: Apple's layout, display, and animation
+   passes all fire from run loop observers. Wiring `layoutIfNeeded` to an
+   observer at `kCFRunLoopBeforeWaiting` would match Apple's display cycle and
+   make layout automatic instead of requiring explicit calls.
+
+3. **Layout anchors are the modern API**: Nearly all modern Apple code uses
+   `view.leadingAnchor.constraint(equalTo: other.trailingAnchor, constant: 8)`
+   rather than the verbose `constraintWithItem:` factory. Adding the 4 anchor
+   classes would make the solver accessible to the majority of real-world
+   constraint-building code.
+
+4. **AppKit depth vs breadth**: At 513 selectors across 40 classes (~10%),
+   AppKit is the largest remaining coverage gap. But full AppKit parity is an
+   anti-goal — the strategy should be deepening the classes we have (NSView,
+   NSWindow, NSStackView, NSTableView) rather than adding more stub classes.
+
+---
+
+## Documentation Consolidation Notes
+
+> **As of 2026-04-03 audit.** Cross-referenced all 23 docs/ files.
+
+### Stale Documents Requiring Update
+
+| Document | Issue | Action |
+|----------|-------|--------|
+| `METRICS.md` | Says "1,090+ tests", "71 shimmed classes", "523+ selectors", "340+ registrations" — all significantly stale | Update to 5,599 tests, 193 classes, 1,380 selectors, 44 workspace members |
+| `FEATURES.md` | Says "35 workspace members", "1,090+ tests" — same stale metrics | Update to 44 members, 5,599 tests, 193 classes |
+| `architecture.md` | Says "18 crates" — should be 44 workspace members | Update crate count in architecture table |
+| `BUILD.md` | Says "18 crates" in project structure | Update to 44 members |
+| `RUNTIME_ARCHITECTURE.md` | Says "17/17 corpus binaries" — should be 39 corpus tools, 30/30 passing | Update corpus counts |
+
+### Duplicate / Redundant Documents
+
+| Files | Overlap | Recommendation |
+|-------|---------|----------------|
+| `roadmap.md` + `ROADMAP.md` | Nearly identical; `roadmap.md` is newer (2026-03-28), `ROADMAP.md` is older (2025-07-17) | Delete `ROADMAP.md`, keep `roadmap.md` as canonical |
+| `macho-notes.md` + `LOADER_TECHNICAL_REFERENCE.md` | `macho-notes.md` (51 lines) is a strict subset of `LOADER_TECHNICAL_REFERENCE.md` (deep reference) | Delete `macho-notes.md` — all content is in the technical reference |
+| `DEMO.md` §VM + `VM_DEMO.md` | VM launch instructions duplicated in both | Consolidate into `DEMO.md` only; delete `VM_DEMO.md` or reduce to a pointer |
+| `FEATURES.md` metrics + `METRICS.md` summary | Nearly identical quick-reference table | Keep `METRICS.md` as the source of truth; have `FEATURES.md` link to it instead of duplicating |
+
+### Crate Map Appears in 4 Places
+
+`CRATE_MAP.md`, `architecture.md`, `RUNTIME_ARCHITECTURE.md`, `STABLE_API.md` all contain crate listings.
+**Recommendation**: `CRATE_MAP.md` should be the single source of truth; other docs should link to it.

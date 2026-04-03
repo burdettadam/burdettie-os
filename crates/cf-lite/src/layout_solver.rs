@@ -471,6 +471,9 @@ mod tests {
     use crate::nslayoutconstraint::*;
     use crate::nsview::VIEW_SIZE;
 
+    /// Serialise layout-solver tests — they share a process-global `LAYOUT_STATE`.
+    static TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     fn make_view(x: f64, y: f64, w: f64, h: f64) -> u64 {
         let v = alloc_obj(VIEW_SIZE, crate::nsobj::nsview_class_addr());
         unsafe {
@@ -543,6 +546,7 @@ mod tests {
 
     #[test]
     fn solver_width_height_constraint() {
+        let _guard = TEST_LOCK.lock().unwrap();
         reset();
         let parent = make_view(0.0, 0.0, 400.0, 300.0);
         let child = make_view(0.0, 0.0, 0.0, 0.0);
@@ -565,6 +569,7 @@ mod tests {
 
     #[test]
     fn solver_pin_to_parent_edges() {
+        let _guard = TEST_LOCK.lock().unwrap();
         reset();
         let parent = make_view(0.0, 0.0, 400.0, 300.0);
         let child = make_view(0.0, 0.0, 0.0, 0.0);
@@ -598,6 +603,7 @@ mod tests {
 
     #[test]
     fn solver_center_in_parent() {
+        let _guard = TEST_LOCK.lock().unwrap();
         reset();
         let parent = make_view(0.0, 0.0, 400.0, 300.0);
         let child = make_view(0.0, 0.0, 0.0, 0.0);
@@ -632,6 +638,7 @@ mod tests {
 
     #[test]
     fn solver_with_insets() {
+        let _guard = TEST_LOCK.lock().unwrap();
         reset();
         let parent = make_view(0.0, 0.0, 400.0, 300.0);
         let child = make_view(0.0, 0.0, 0.0, 0.0);
@@ -665,6 +672,7 @@ mod tests {
 
     #[test]
     fn solver_inactive_constraints_ignored() {
+        let _guard = TEST_LOCK.lock().unwrap();
         reset();
         let parent = make_view(0.0, 0.0, 400.0, 300.0);
         let child = make_view(50.0, 50.0, 10.0, 10.0);
@@ -687,6 +695,7 @@ mod tests {
 
     #[test]
     fn solver_remove_constraint() {
+        let _guard = TEST_LOCK.lock().unwrap();
         reset();
         let parent = make_view(0.0, 0.0, 400.0, 300.0);
         let child = make_view(0.0, 0.0, 0.0, 0.0);
@@ -714,6 +723,7 @@ mod tests {
 
     #[test]
     fn get_constraints_returns_added() {
+        let _guard = TEST_LOCK.lock().unwrap();
         reset();
         let parent = make_view(0.0, 0.0, 400.0, 300.0);
         let child = make_view(0.0, 0.0, 0.0, 0.0);
@@ -733,6 +743,7 @@ mod tests {
 
     #[test]
     fn needs_layout_flag() {
+        let _guard = TEST_LOCK.lock().unwrap();
         reset();
         let view = make_view(0.0, 0.0, 100.0, 100.0);
 
@@ -765,6 +776,7 @@ mod tests {
 
     #[test]
     fn solver_two_children_side_by_side() {
+        let _guard = TEST_LOCK.lock().unwrap();
         reset();
         let parent = make_view(0.0, 0.0, 400.0, 300.0);
         let left = make_view(0.0, 0.0, 0.0, 0.0);

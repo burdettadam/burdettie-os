@@ -1,7 +1,7 @@
 # Darwin Loader Lab — Security, Platform Support & Known Limitations
 
 > See [FEATURES.md](FEATURES.md) for the full feature index and
-> [ROADMAP.md](ROADMAP.md) for what comes next.
+> [roadmap.md](roadmap.md) for what comes next.
 
 ---
 

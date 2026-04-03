@@ -26,15 +26,18 @@ cd burdettie-os
 
 ## Project Structure
 
-The workspace contains 18 crates organized into layers:
+The workspace contains 44 members (41 crates + 3 GUI apps) organized into layers.
+See [CRATE_MAP.md](CRATE_MAP.md) for the full breakdown.
 
-| Layer | Crates | Platform |
+| Layer | Key Crates | Platform |
 |-------|--------|----------|
-| **Types & Parsing** | `macho-types`, `macho-parse` | Cross-platform |
-| **Analysis** | `macho-map`, `macho-objc`, `macho-resolve`, `macho-run-plan`, `macho-diff` | Cross-platform |
-| **Platform Abstraction** | `platform-core`, `platform-darwin-host` | Core: cross-platform; Darwin: macOS only |
-| **Runtime** | `macho-exec`, `macho-runtime`, `objc-runtime`, `cf-lite`, `libsystem-shims` | macOS only |
-| **Tooling** | `macho-inspect`, `trust-policy`, `macho-fixtures`, `test-harness` | Mixed |
+| **Types & Parsing** | `macho-types`, `macho-parse`, `macho-shared-cache` | Cross-platform |
+| **Analysis** | `macho-map`, `macho-objc`, `macho-resolve`, `macho-run-plan`, `macho-exec` | Cross-platform |
+| **Platform Abstraction** | `platform-core`, `platform-darwin-host`, `platform-linux` | Core: cross-platform; platform impls: OS-specific |
+| **Runtime** | `macho-runtime`, `objc-runtime`, `cf-lite`, `libsystem-shims`, `icu-shims` | macOS primary; Linux via PAL |
+| **Translation** | `arm64-translate` | Cross-platform |
+| **GUI** | `app-kit-lite`, `ui-view`, `ui-controls`, `graphics-core`, `window-backend-*` | Cross-platform |
+| **Tooling** | `macho-inspect`, `trust-policy`, `swift-stub-gen`, `compat-runner`, `test-harness` | Mixed |
 
 ## Build Commands
 
