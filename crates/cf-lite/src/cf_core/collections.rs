@@ -535,17 +535,17 @@ pub extern "C" fn shim_cf_run_loop_run_in_mode(
     _return_after_source: u8,
 ) -> i32 {
     let rl = shim_cf_run_loop_get_current();
-    // Create a date `seconds` from now. NSDate epoch = CFAbsoluteTime 2001-01-01.
-    // For simplicity, fire timers and return kCFRunLoopRunTimedOut (2).
+    // Fire observers + sources + timers via the full cycle path.
     let ms = (seconds * 1000.0) as u64;
     if ms > 0 {
-        // Create a date `seconds` from now and run until it
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs_f64();
         let date = crate::nsdate::alloc_nsdate(now + seconds);
         crate::nsrunloop::shim_nsrunloop_run_until_date(rl, 0, date);
+    } else {
+        crate::nsrunloop::shim_nsrunloop_run_until_date(rl, 0, 0);
     }
     2 // kCFRunLoopRunTimedOut
 }
@@ -563,9 +563,86 @@ pub extern "C" fn shim_cf_run_loop_add_timer(rl: u64, timer: u64, mode: u64) {
 }
 
 /// `void CFRunLoopAddSource(CFRunLoopRef rl, CFRunLoopSourceRef source, CFStringRef mode)`
-pub extern "C" fn shim_cf_run_loop_add_source(_rl: u64, _source: u64, _mode: u64) {
-    // Stub — run loop sources are not currently modeled.
-    log::debug!("CFRunLoopAddSource: stub (source={:#x})", _source);
+pub extern "C" fn shim_cf_run_loop_add_source(_rl: u64, source: u64, _mode: u64) {
+    if source == 0 { return; }
+    crate::nsrunloop::add_source(source);
+}
+
+/// `void CFRunLoopRemoveSource(CFRunLoopRef rl, CFRunLoopSourceRef source, CFStringRef mode)`
+pub extern "C" fn shim_cf_run_loop_remove_source(_rl: u64, source: u64, _mode: u64) {
+    if source == 0 { return; }
+    crate::nsrunloop::remove_source(source);
+}
+
+/// `CFRunLoopSourceRef CFRunLoopSourceCreate(CFAllocatorRef alloc, CFIndex order, CFRunLoopSourceContext *ctx)`
+///
+/// Allocates a version-0 run loop source. The `ctx` points to a
+/// `CFRunLoopSourceContext` struct:
+/// ```c
+/// struct CFRunLoopSourceContext {
+///     CFIndex version;             // 0
+///     void *info;
+///     CFAllocatorRetainCallBack retain;
+///     CFAllocatorReleaseCallBack release;
+///     CFAllocatorCopyDescriptionCallBack copyDescription;
+///     CFRunLoopEqualCallBack equal;
+///     CFRunLoopHashCallBack hash;
+///     void (*schedule)(void *info, CFRunLoopRef rl, CFStringRef mode);
+///     void (*cancel)(void *info, CFRunLoopRef rl, CFStringRef mode);
+///     void (*perform)(void *info);
+/// };
+/// ```
+pub extern "C" fn shim_cf_run_loop_source_create(_alloc: u64, _order: i64, ctx: u64) -> u64 {
+    crate::nsrunloop::create_source(ctx)
+}
+
+/// `void CFRunLoopSourceSignal(CFRunLoopSourceRef source)`
+pub extern "C" fn shim_cf_run_loop_source_signal(source: u64) {
+    if source == 0 { return; }
+    crate::nsrunloop::signal_source(source);
+}
+
+/// `void CFRunLoopSourceInvalidate(CFRunLoopSourceRef source)`
+pub extern "C" fn shim_cf_run_loop_source_invalidate(source: u64) {
+    if source == 0 { return; }
+    crate::nsrunloop::invalidate_source(source);
+}
+
+/// `Boolean CFRunLoopSourceIsValid(CFRunLoopSourceRef source)`
+pub extern "C" fn shim_cf_run_loop_source_is_valid(source: u64) -> u8 {
+    if source == 0 { return 0; }
+    crate::nsrunloop::source_is_valid(source)
+}
+
+/// `CFRunLoopObserverRef CFRunLoopObserverCreate(CFAllocatorRef alloc, CFOptionFlags activities,
+///     Boolean repeats, CFIndex order, CFRunLoopObserverCallBack callback, CFRunLoopObserverContext *ctx)`
+pub extern "C" fn shim_cf_run_loop_observer_create(
+    _alloc: u64,
+    activities: u64,
+    repeats: u8,
+    _order: i64,
+    callback: u64,
+    ctx: u64,
+) -> u64 {
+    crate::nsrunloop::create_observer(activities, repeats != 0, callback, ctx)
+}
+
+/// `void CFRunLoopAddObserver(CFRunLoopRef rl, CFRunLoopObserverRef observer, CFStringRef mode)`
+pub extern "C" fn shim_cf_run_loop_add_observer(_rl: u64, observer: u64, _mode: u64) {
+    if observer == 0 { return; }
+    crate::nsrunloop::add_observer(observer);
+}
+
+/// `void CFRunLoopRemoveObserver(CFRunLoopRef rl, CFRunLoopObserverRef observer, CFStringRef mode)`
+pub extern "C" fn shim_cf_run_loop_remove_observer(_rl: u64, observer: u64, _mode: u64) {
+    if observer == 0 { return; }
+    crate::nsrunloop::remove_observer(observer);
+}
+
+/// `void CFRunLoopObserverInvalidate(CFRunLoopObserverRef observer)`
+pub extern "C" fn shim_cf_run_loop_observer_invalidate(observer: u64) {
+    if observer == 0 { return; }
+    crate::nsrunloop::invalidate_observer(observer);
 }
 
 /// CFRunLoop mode constants — addresses of pre-allocated NSString objects.

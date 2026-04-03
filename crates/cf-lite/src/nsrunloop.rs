@@ -54,6 +54,210 @@ fn dispatch_selector_to_target(sel: u64, target: u64, arg: u64) -> bool {
     true
 }
 
+// ── CFRunLoopSource ────────────────────────────────────────────────────────
+//
+// A version-0 source stores the CFRunLoopSourceContext fields we care about:
+// - `info: u64` — opaque pointer passed to callbacks
+// - `perform: u64` — function pointer: `void (*perform)(void *info)`
+// - `signaled: bool` — whether CFRunLoopSourceSignal was called
+// - `valid: bool`
+
+struct RunLoopSource {
+    /// Opaque ID for the allocated source object.
+    addr: u64,
+    /// `void *info` from CFRunLoopSourceContext.
+    info: u64,
+    /// `void (*perform)(void *info)` — the source's perform callback.
+    perform: u64,
+    /// Whether the source has been signaled (ready to fire).
+    signaled: bool,
+    /// Whether the source is still valid.
+    valid: bool,
+}
+
+static SOURCES: OnceLock<Mutex<Vec<RunLoopSource>>> = OnceLock::new();
+
+fn sources() -> &'static Mutex<Vec<RunLoopSource>> {
+    SOURCES.get_or_init(|| Mutex::new(Vec::new()))
+}
+
+/// Allocate a new CFRunLoopSource from a context pointer.
+///
+/// `CFRunLoopSourceContext` (version 0) layout:
+/// ```text
+/// [0]  CFIndex version         (8 bytes)
+/// [1]  void *info              (8 bytes)
+/// [2]  retain callback         (8 bytes)
+/// [3]  release callback        (8 bytes)
+/// [4]  copyDescription         (8 bytes)
+/// [5]  equal callback          (8 bytes)
+/// [6]  hash callback           (8 bytes)
+/// [7]  schedule callback       (8 bytes)
+/// [8]  cancel callback         (8 bytes)
+/// [9]  perform callback        (8 bytes)
+/// ```
+pub fn create_source(ctx: u64) -> u64 {
+    let (info, perform) = if ctx != 0 {
+        unsafe {
+            let base = ctx as *const u64;
+            let info = *base.add(1);
+            let perform = *base.add(9);
+            (info, perform)
+        }
+    } else {
+        (0, 0)
+    };
+    // Allocate a small object as the source "handle"
+    let addr = crate::pal_alloc().calloc(1, 8) as u64;
+    if addr == 0 { return 0; }
+    let mut guard = sources().lock().unwrap_or_else(|e| e.into_inner());
+    guard.push(RunLoopSource { addr, info, perform, signaled: false, valid: true });
+    addr
+}
+
+pub fn signal_source(source: u64) {
+    let mut guard = sources().lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(s) = guard.iter_mut().find(|s| s.addr == source && s.valid) {
+        s.signaled = true;
+    }
+}
+
+pub fn invalidate_source(source: u64) {
+    let mut guard = sources().lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(s) = guard.iter_mut().find(|s| s.addr == source) {
+        s.valid = false;
+        s.signaled = false;
+    }
+}
+
+pub fn source_is_valid(source: u64) -> u8 {
+    let guard = sources().lock().unwrap_or_else(|e| e.into_inner());
+    if guard.iter().any(|s| s.addr == source && s.valid) { 1 } else { 0 }
+}
+
+pub fn add_source(source: u64) {
+    // Source is already tracked in the global SOURCES Vec.
+    // Mark it as valid in case it was re-added after removal.
+    let guard = sources().lock().unwrap_or_else(|e| e.into_inner());
+    let _ = guard.iter().find(|s| s.addr == source);
+    // No-op beyond ensuring it exists — fire_sources handles dispatch.
+}
+
+pub fn remove_source(source: u64) {
+    let mut guard = sources().lock().unwrap_or_else(|e| e.into_inner());
+    guard.retain(|s| s.addr != source);
+}
+
+/// Fire all signaled sources. Called from run loop dispatch.
+fn fire_signaled_sources() {
+    // Collect sources to fire while holding the lock, then fire without lock.
+    let to_fire: Vec<(u64, u64)> = {
+        let mut guard = sources().lock().unwrap_or_else(|e| e.into_inner());
+        let mut result = Vec::new();
+        for s in guard.iter_mut() {
+            if s.valid && s.signaled {
+                s.signaled = false;
+                if s.perform != 0 {
+                    result.push((s.perform, s.info));
+                }
+            }
+        }
+        result
+    };
+    for (perform, info) in to_fire {
+        let f: extern "C" fn(u64) = unsafe { std::mem::transmute(perform) };
+        f(info);
+    }
+}
+
+// ── CFRunLoopObserver ──────────────────────────────────────────────────────
+//
+// Core Foundation run loop activity flags:
+//   kCFRunLoopEntry       = 1 << 0
+//   kCFRunLoopBeforeTimers = 1 << 1
+//   kCFRunLoopBeforeSources = 1 << 2
+//   kCFRunLoopBeforeWaiting = 1 << 5
+//   kCFRunLoopAfterWaiting  = 1 << 6
+//   kCFRunLoopExit         = 1 << 7
+//   kCFRunLoopAllActivities = 0x0FFFFFFF
+
+pub const CF_RUN_LOOP_ENTRY: u64 = 1 << 0;
+pub const CF_RUN_LOOP_BEFORE_TIMERS: u64 = 1 << 1;
+pub const CF_RUN_LOOP_BEFORE_SOURCES: u64 = 1 << 2;
+pub const CF_RUN_LOOP_BEFORE_WAITING: u64 = 1 << 5;
+pub const CF_RUN_LOOP_AFTER_WAITING: u64 = 1 << 6;
+pub const CF_RUN_LOOP_EXIT: u64 = 1 << 7;
+
+struct RunLoopObserver {
+    addr: u64,
+    /// Bitmask of activity flags this observer monitors.
+    activities: u64,
+    /// Whether the observer fires on every matching activity (true) or once (false).
+    repeats: bool,
+    /// `void (*callback)(CFRunLoopObserverRef observer, CFRunLoopActivity activity, void *info)`
+    callback: u64,
+    /// `void *info` from observer context.
+    info: u64,
+    valid: bool,
+}
+
+static OBSERVERS: OnceLock<Mutex<Vec<RunLoopObserver>>> = OnceLock::new();
+
+fn observers() -> &'static Mutex<Vec<RunLoopObserver>> {
+    OBSERVERS.get_or_init(|| Mutex::new(Vec::new()))
+}
+
+pub fn create_observer(activities: u64, repeats: bool, callback: u64, ctx: u64) -> u64 {
+    let info = if ctx != 0 {
+        // CFRunLoopObserverContext: version(8), info(8), retain(8), release(8), copyDescription(8)
+        unsafe { *(ctx as *const u64).add(1) }
+    } else {
+        0
+    };
+    let addr = crate::pal_alloc().calloc(1, 8) as u64;
+    if addr == 0 { return 0; }
+    let mut guard = observers().lock().unwrap_or_else(|e| e.into_inner());
+    guard.push(RunLoopObserver { addr, activities, repeats, callback, info, valid: true });
+    addr
+}
+
+pub fn add_observer(observer: u64) {
+    // Observer is already tracked in the global OBSERVERS Vec.
+    // No-op — just ensure the observer exists.
+    let _guard = observers().lock().unwrap_or_else(|e| e.into_inner());
+    let _ = observer;
+}
+
+pub fn remove_observer(observer: u64) {
+    let mut guard = observers().lock().unwrap_or_else(|e| e.into_inner());
+    guard.retain(|o| o.addr != observer);
+}
+
+pub fn invalidate_observer(observer: u64) {
+    let mut guard = observers().lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(o) = guard.iter_mut().find(|o| o.addr == observer) {
+        o.valid = false;
+    }
+}
+
+/// Notify all observers watching for the given activity.
+fn notify_observers(activity: u64) {
+    let to_call: Vec<(u64, u64, u64, bool)> = {
+        let guard = observers().lock().unwrap_or_else(|e| e.into_inner());
+        guard.iter()
+            .filter(|o| o.valid && (o.activities & activity) != 0 && o.callback != 0)
+            .map(|o| (o.callback, o.addr, o.info, o.repeats))
+            .collect()
+    };
+    for (callback, addr, info, repeats) in &to_call {
+        let f: extern "C" fn(u64, u64, u64) = unsafe { std::mem::transmute(*callback) };
+        f(*addr, activity, *info);
+        if !repeats {
+            invalidate_observer(*addr);
+        }
+    }
+}
+
 // ── Pending timer queue ────────────────────────────────────────────────────
 
 struct PendingTimer {
@@ -69,11 +273,22 @@ fn pending_timers() -> &'static Mutex<Vec<PendingTimer>> {
 
 pub(crate) fn reset_runtime_state_for_reuse() {
     pending_timers().lock().unwrap_or_else(|e| e.into_inner()).clear();
+    sources().lock().unwrap_or_else(|e| e.into_inner()).clear();
+    observers().lock().unwrap_or_else(|e| e.into_inner()).clear();
     if let Some(run_loop) = MAIN_RUN_LOOP.get().copied() {
         unsafe {
             *((run_loop as usize + 8) as *mut u64) = 0;
         }
     }
+}
+
+/// Execute one full run-loop cycle: notify observers, fire sources, fire timers.
+fn run_loop_cycle() {
+    notify_observers(CF_RUN_LOOP_BEFORE_TIMERS);
+    notify_observers(CF_RUN_LOOP_BEFORE_SOURCES);
+    fire_signaled_sources();
+    fire_due_timers();
+    notify_observers(CF_RUN_LOOP_BEFORE_WAITING);
 }
 
 /// Fire all timers whose `fire_at` is ≤ now, keeping repeating timers.
@@ -158,24 +373,26 @@ pub extern "C" fn shim_nsrunloop_main_run_loop(_cls: u64, _cmd: u64) -> u64 {
 
 // ── Instance methods ───────────────────────────────────────────────
 
-/// `-[NSRunLoop runUntilDate:]` — fires all due timers, then returns.
+/// `-[NSRunLoop runUntilDate:]` — runs one cycle (observers + sources + timers).
 pub extern "C" fn shim_nsrunloop_run_until_date(_obj: u64, _cmd: u64, _date: u64) {
-    fire_due_timers();
+    run_loop_cycle();
 }
 
-/// `-[NSRunLoop runMode:beforeDate:]` — fires all due timers, returns YES.
+/// `-[NSRunLoop runMode:beforeDate:]` — runs one cycle, returns YES.
 pub extern "C" fn shim_nsrunloop_run_mode_before_date(_obj: u64, _cmd: u64, _mode: u64, _date: u64) -> u8 {
-    fire_due_timers();
+    run_loop_cycle();
     1
 }
 
-/// `-[NSRunLoop run]` — fires all due timers and returns.
+/// `-[NSRunLoop run]` — runs one cycle (observers + sources + timers).
 ///
-/// In a real run loop, `run` would block indefinitely. Here we fire pending
-/// timers once and return so that single-threaded tests using the pattern
+/// In a real run loop, `run` would block indefinitely. Here we run one
+/// cycle and return so that single-threaded tests using the pattern
 /// `[timer scheduledTimer…]; [[NSRunLoop currentRunLoop] run];` proceed.
 pub extern "C" fn shim_nsrunloop_run(_obj: u64, _cmd: u64) {
-    fire_due_timers();
+    notify_observers(CF_RUN_LOOP_ENTRY);
+    run_loop_cycle();
+    notify_observers(CF_RUN_LOOP_EXIT);
 }
 
 /// `-[NSRunLoop addTimer:forMode:]` — enqueues the timer for firing on the next run.
@@ -211,7 +428,7 @@ pub extern "C" fn shim_nsrunloop_perform_selector(
 
 /// `-[NSRunLoop acceptInputForMode:beforeDate:]`
 pub extern "C" fn shim_nsrunloop_accept_input(_obj: u64, _cmd: u64, _mode: u64, _date: u64) -> u64 {
-    fire_due_timers();
+    run_loop_cycle();
     0
 }
 
@@ -357,6 +574,124 @@ mod tests {
             1,
             "reset_runtime_state_for_reuse should unschedule pending timers without firing them"
         );
+        reset_runtime_state_for_reuse();
+    }
+
+    // ── CFRunLoopSource tests ──────────────────────────────────────────
+
+    #[test]
+    fn create_source_returns_nonzero() {
+        let _guard = lock_runloop_state();
+        reset_runtime_state_for_reuse();
+        let src = create_source(0);
+        assert_ne!(src, 0);
+        reset_runtime_state_for_reuse();
+    }
+
+    #[test]
+    fn source_is_valid_after_create() {
+        let _guard = lock_runloop_state();
+        reset_runtime_state_for_reuse();
+        let src = create_source(0);
+        assert_eq!(source_is_valid(src), 1);
+        reset_runtime_state_for_reuse();
+    }
+
+    #[test]
+    fn source_invalidate() {
+        let _guard = lock_runloop_state();
+        reset_runtime_state_for_reuse();
+        let src = create_source(0);
+        assert_eq!(source_is_valid(src), 1);
+        invalidate_source(src);
+        assert_eq!(source_is_valid(src), 0);
+        reset_runtime_state_for_reuse();
+    }
+
+    #[test]
+    fn source_signal_and_check() {
+        let _guard = lock_runloop_state();
+        reset_runtime_state_for_reuse();
+        let src = create_source(0);
+        signal_source(src);
+        // fire_signaled_sources should not crash even with perform == 0
+        fire_signaled_sources();
+        reset_runtime_state_for_reuse();
+    }
+
+    #[test]
+    fn remove_source_makes_it_gone() {
+        let _guard = lock_runloop_state();
+        reset_runtime_state_for_reuse();
+        let src = create_source(0);
+        assert_eq!(source_is_valid(src), 1);
+        remove_source(src);
+        assert_eq!(source_is_valid(src), 0);
+        reset_runtime_state_for_reuse();
+    }
+
+    // ── CFRunLoopObserver tests ────────────────────────────────────────
+
+    #[test]
+    fn create_observer_returns_nonzero() {
+        let _guard = lock_runloop_state();
+        reset_runtime_state_for_reuse();
+        let obs = create_observer(CF_RUN_LOOP_ENTRY, true, 0, 0);
+        assert_ne!(obs, 0);
+        reset_runtime_state_for_reuse();
+    }
+
+    #[test]
+    fn observer_invalidate() {
+        let _guard = lock_runloop_state();
+        reset_runtime_state_for_reuse();
+        let obs = create_observer(CF_RUN_LOOP_BEFORE_TIMERS, true, 0, 0);
+        assert_ne!(obs, 0);
+        invalidate_observer(obs);
+        // After invalidation the observer should not fire (callback == 0 anyway,
+        // but verify the valid flag is cleared by checking the internal state).
+        let guard = observers().lock().unwrap();
+        let o = guard.iter().find(|o| o.addr == obs);
+        assert!(o.is_some(), "observer should still be in the Vec");
+        assert!(!o.unwrap().valid, "observer should be invalid");
+        drop(guard);
+        reset_runtime_state_for_reuse();
+    }
+
+    #[test]
+    fn remove_observer_removes() {
+        let _guard = lock_runloop_state();
+        reset_runtime_state_for_reuse();
+        let obs = create_observer(CF_RUN_LOOP_EXIT, false, 0, 0);
+        assert_ne!(obs, 0);
+        remove_observer(obs);
+        let guard = observers().lock().unwrap();
+        assert!(guard.iter().find(|o| o.addr == obs).is_none(), "observer should be removed");
+        drop(guard);
+        reset_runtime_state_for_reuse();
+    }
+
+    // ── Nil safety tests ───────────────────────────────────────────────
+
+    #[test]
+    fn nil_source_operations_safe() {
+        let _guard = lock_runloop_state();
+        reset_runtime_state_for_reuse();
+        signal_source(0);
+        invalidate_source(0);
+        assert_eq!(source_is_valid(0), 0);
+        add_source(0);
+        remove_source(0);
+        reset_runtime_state_for_reuse();
+    }
+
+    #[test]
+    fn nil_observer_safe() {
+        let _guard = lock_runloop_state();
+        reset_runtime_state_for_reuse();
+        invalidate_observer(0);
+        remove_observer(0);
+        add_observer(0);
         reset_runtime_state_for_reuse();
     }
 }

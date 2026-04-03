@@ -283,14 +283,69 @@ pub extern "C" fn shim_nsthread_thread_dictionary(_obj: u64, _cmd: u64) -> u64 {
 
 // ── Internal ───────────────────────────────────────────────────────
 
-/// Spawn a real OS thread. The thread sets the object's state to FINISHED on exit.
-fn spawn_thread(obj: u64, _target: u64, _sel: u64, _arg: u64) {
-    // We need to mark the object as finished when thread exits.
-    // The obj pointer is heap-allocated and stable, safe to send to the thread.
+/// Spawn a real OS thread that invokes `[target selector:arg]` via the
+/// ObjC runtime, then marks the NSThread object as finished.
+fn spawn_thread(obj: u64, target: u64, sel: u64, arg: u64) {
     let obj_ptr = obj as usize;
+    let target_val = target as usize;
+    let sel_val = sel as usize;
+    let arg_val = arg as usize;
     thread::spawn(move || {
-        // In a full runtime we would call objc_msgSend(target, sel, arg) here.
-        // For now, the thread runs to completion immediately.
+        // Invoke the target selector via ObjC message dispatch.
+        if target_val != 0 && sel_val != 0 {
+            use objc_runtime::OBJC_RUNTIME;
+
+            let target = target_val as u64;
+            let sel = sel_val as u64;
+            let arg = arg_val as u64;
+
+            // Read the selector name from the SEL pointer (C string).
+            // Safety: verify the pointer is in a mapped memory page before
+            // dereferencing. Use mincore() to check page residency.
+            let sel_name = if sel > 0x10000 {
+                let page_size = 0x4000u64;
+                let page_start = sel & !(page_size - 1);
+                let mut vec: u8 = 0;
+                let mapped = unsafe {
+                    libc::mincore(
+                        page_start as *mut libc::c_void,
+                        page_size as usize,
+                        &mut vec as *mut u8 as *mut libc::c_char,
+                    )
+                } == 0;
+                if mapped {
+                    unsafe {
+                        std::ffi::CStr::from_ptr(sel as *const std::ffi::c_char)
+                            .to_str()
+                            .ok()
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            if let Some(sel_name) = sel_name {
+                if !sel_name.is_empty() {
+                    let isa = unsafe { *(target as *const u64) };
+                    let guard = match OBJC_RUNTIME.read() {
+                        Ok(g) => g,
+                        Err(e) => e.into_inner(),
+                    };
+                    if let Some(rt) = guard.as_ref() {
+                        if let Some(imp) = rt.msg_lookup(isa, sel_name) {
+                            let sel_ptr = rt.selector_ptr(sel_name)
+                                .unwrap_or(sel as usize) as u64;
+                            drop(guard);
+                            let func: extern "C" fn(u64, u64, u64) =
+                                unsafe { std::mem::transmute(imp) };
+                            func(target, sel_ptr, arg);
+                        }
+                    }
+                }
+            }
+        }
         // Mark finished.
         unsafe {
             *((obj_ptr + EXEC_OFF) as *mut u64) = STATE_FINISHED;

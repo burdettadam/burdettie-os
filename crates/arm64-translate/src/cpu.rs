@@ -4,7 +4,11 @@
 ///
 /// Models the AArch64 general-purpose register file (x0–x30), stack pointer,
 /// program counter, NZCV condition flags, and SIMD/FP registers (v0–v31).
+///
+/// `repr(C)` guarantees field ordering so JIT-emitted code can access fields
+/// at compile-time-known offsets.
 #[derive(Debug, Clone)]
+#[repr(C)]
 pub struct CpuState {
     /// General-purpose registers x0–x30.
     /// x29 = frame pointer (FP), x30 = link register (LR).
@@ -24,10 +28,15 @@ pub struct CpuState {
     pub fpcr: u64,
     /// Floating-point status register (FPSR).
     pub fpsr: u64,
+    /// Exclusive monitor for LDXR/STXR emulation.
+    /// Set by Load-Exclusive; checked and cleared by Store-Exclusive.
+    /// `Some((addr, size))` if an exclusive monitor is active.
+    pub exclusive_monitor: Option<(u64, u8)>,
 }
 
 /// NZCV condition flags.
 #[derive(Debug, Clone, Copy, Default)]
+#[repr(C)]
 pub struct Nzcv {
     /// Negative flag — set when result is negative (bit 31/63 set).
     pub n: bool,
@@ -103,6 +112,28 @@ impl Condition {
             Condition::Al | Condition::Nv => true,
         }
     }
+
+    /// Encode this condition as a 4-bit value for native ARM64 instructions.
+    pub fn to_bits(self) -> u32 {
+        match self {
+            Condition::Eq => 0x0,
+            Condition::Ne => 0x1,
+            Condition::Cs => 0x2,
+            Condition::Cc => 0x3,
+            Condition::Mi => 0x4,
+            Condition::Pl => 0x5,
+            Condition::Vs => 0x6,
+            Condition::Vc => 0x7,
+            Condition::Hi => 0x8,
+            Condition::Ls => 0x9,
+            Condition::Ge => 0xA,
+            Condition::Lt => 0xB,
+            Condition::Gt => 0xC,
+            Condition::Le => 0xD,
+            Condition::Al => 0xE,
+            Condition::Nv => 0xF,
+        }
+    }
 }
 
 impl CpuState {
@@ -117,6 +148,7 @@ impl CpuState {
             tpidr_el0: 0,
             fpcr: 0,
             fpsr: 0,
+            exclusive_monitor: None,
         }
     }
 

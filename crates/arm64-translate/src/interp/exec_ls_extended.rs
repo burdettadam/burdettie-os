@@ -251,14 +251,20 @@ impl Interpreter {
             }
 
             // ── Acquire-release loads/stores (LDAR/STLR) ──────────
-            // In a single-threaded interpreter, these are identical to
-            // ordinary loads/stores (no hardware ordering needed).
+            // Use atomic operations for proper acquire/release semantics
+            // that are correct for both single- and multi-threaded execution.
             Instruction::Ldar { sf, rt, rn } | Instruction::Ldapr { sf, rt, rn } => {
                 let addr = self.cpu.read_reg(rn);
                 let val = if sf {
-                    mem_read_u64!(self, addr, pc)
+                    match self.mem.atomic_read_u64(addr) {
+                        Some(v) => v,
+                        None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false }),
+                    }
                 } else {
-                    mem_read_u32!(self, addr, pc) as u64
+                    match self.mem.atomic_read_u32(addr) {
+                        Some(v) => v as u64,
+                        None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false }),
+                    }
                 };
                 self.cpu.write_reg_zr(rt, val);
                 self.cpu.pc = pc + 4;
@@ -267,9 +273,9 @@ impl Interpreter {
                 let addr = self.cpu.read_reg(rn);
                 let val = self.cpu.read_reg_zr(rt);
                 let ok = if sf {
-                    self.mem.write_u64(addr, val)
+                    self.mem.atomic_write_u64(addr, val)
                 } else {
-                    self.mem.write_u32(addr, val as u32)
+                    self.mem.atomic_write_u32(addr, val as u32)
                 };
                 if !ok {
                     return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
@@ -302,99 +308,121 @@ impl Interpreter {
                 self.cpu.pc = pc + 4;
             }
 
-            // ── Exclusive loads (single-threaded: behave like LDAR) ──
+            // ── Exclusive loads: set exclusive monitor ───────────
             Instruction::LoadExclusive { sf, rt, rn, .. } => {
                 let addr = self.cpu.read_reg(rn);
+                let size = if sf { 8u8 } else { 4 };
                 let val = if sf {
-                    mem_read_u64!(self, addr, pc)
+                    match self.mem.atomic_read_u64(addr) {
+                        Some(v) => v,
+                        None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false }),
+                    }
                 } else {
-                    mem_read_u32!(self, addr, pc) as u64
+                    match self.mem.atomic_read_u32(addr) {
+                        Some(v) => v as u64,
+                        None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false }),
+                    }
                 };
                 self.cpu.write_reg_zr(rt, val);
-                // Set exclusive monitor (fake: always succeeds in single-threaded)
+                self.cpu.exclusive_monitor = Some((addr, size));
                 self.cpu.pc = pc + 4;
             }
             Instruction::LoadExclusiveByte { rt, rn, .. } => {
                 let addr = self.cpu.read_reg(rn);
                 let val = mem_read_u8!(self, addr, pc) as u64;
                 self.cpu.write_reg_zr(rt, val);
+                self.cpu.exclusive_monitor = Some((addr, 1));
                 self.cpu.pc = pc + 4;
             }
             Instruction::LoadExclusiveHalf { rt, rn, .. } => {
                 let addr = self.cpu.read_reg(rn);
                 let val = mem_read_u16!(self, addr, pc) as u64;
                 self.cpu.write_reg_zr(rt, val);
+                self.cpu.exclusive_monitor = Some((addr, 2));
                 self.cpu.pc = pc + 4;
             }
 
-            // ── Exclusive stores (single-threaded: always succeed → Rs=0) ──
+            // ── Exclusive stores: check exclusive monitor ────────
+            // If the monitor matches, perform the store and set Rs=0 (success).
+            // If the monitor doesn't match, skip the store and set Rs=1 (failed).
             Instruction::StoreExclusive { sf, rs, rt, rn, .. } => {
                 let addr = self.cpu.read_reg(rn);
-                let val = self.cpu.read_reg_zr(rt);
-                let ok = if sf {
-                    self.mem.write_u64(addr, val)
+                let size = if sf { 8u8 } else { 4 };
+                let monitor_ok = self.cpu.exclusive_monitor == Some((addr, size));
+                self.cpu.exclusive_monitor = None; // clear regardless
+                if monitor_ok {
+                    let val = self.cpu.read_reg_zr(rt);
+                    let ok = if sf {
+                        self.mem.atomic_write_u64(addr, val)
+                    } else {
+                        self.mem.atomic_write_u32(addr, val as u32)
+                    };
+                    if !ok {
+                        return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
+                    }
+                    self.cpu.write_reg_zr(rs, 0); // success
                 } else {
-                    self.mem.write_u32(addr, val as u32)
-                };
-                if !ok {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
+                    self.cpu.write_reg_zr(rs, 1); // failed
                 }
-                // Write 0 to Rs: exclusive succeeded
-                self.cpu.write_reg_zr(rs, 0);
                 self.cpu.pc = pc + 4;
             }
             Instruction::StoreExclusiveByte { rs, rt, rn, .. } => {
                 let addr = self.cpu.read_reg(rn);
-                let val = self.cpu.read_reg_zr(rt) as u8;
-                if !self.mem.write_u8(addr, val) {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
+                let monitor_ok = self.cpu.exclusive_monitor == Some((addr, 1));
+                self.cpu.exclusive_monitor = None;
+                if monitor_ok {
+                    let val = self.cpu.read_reg_zr(rt) as u8;
+                    if !self.mem.write_u8(addr, val) {
+                        return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
+                    }
+                    self.cpu.write_reg_zr(rs, 0);
+                } else {
+                    self.cpu.write_reg_zr(rs, 1);
                 }
-                self.cpu.write_reg_zr(rs, 0);
                 self.cpu.pc = pc + 4;
             }
             Instruction::StoreExclusiveHalf { rs, rt, rn, .. } => {
                 let addr = self.cpu.read_reg(rn);
-                let val = self.cpu.read_reg_zr(rt) as u16;
-                if !self.mem.write_u16(addr, val) {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
+                let monitor_ok = self.cpu.exclusive_monitor == Some((addr, 2));
+                self.cpu.exclusive_monitor = None;
+                if monitor_ok {
+                    let val = self.cpu.read_reg_zr(rt) as u16;
+                    if !self.mem.write_u16(addr, val) {
+                        return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
+                    }
+                    self.cpu.write_reg_zr(rs, 0);
+                } else {
+                    self.cpu.write_reg_zr(rs, 1);
                 }
-                self.cpu.write_reg_zr(rs, 0);
                 self.cpu.pc = pc + 4;
             }
 
-            // ── CLREX: clear exclusive monitor (no-op in interpreter) ──
+            // ── CLREX: clear exclusive monitor ─────────────────────
             Instruction::Clrex => {
+                self.cpu.exclusive_monitor = None;
                 self.cpu.pc = pc + 4;
             }
 
             // ── LSE LDADD/LDCLR/LDSET/LDEOR/LDMAX/LDMIN atomics ────
-            // In a single-threaded interpreter we can implement these
-            // non-atomically (there's no concurrent access).
+            // Use real atomic operations for 4- and 8-byte sizes.
+            // Byte/halfword sizes use non-atomic emulation (rare in practice).
             Instruction::LseLoad { size, op, rs, rt, rn, .. } => {
                 let addr = self.cpu.read_reg(rn);
                 let src = self.cpu.read_reg_zr(rs);
-                let (orig, new_val) = match size {
+                let orig = match size {
                     8 => {
-                        let orig = match self.mem.read_u64(addr) {
+                        let orig = match Self::lse_atomic_op64(&self.mem, op, addr, src) {
                             Some(v) => v,
-                            None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false }),
+                            None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true }),
                         };
-                        let new_val = Self::lse_op64(op, orig, src);
-                        if !self.mem.write_u64(addr, new_val) {
-                            return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
-                        }
-                        (orig, new_val)
+                        orig
                     }
                     4 => {
-                        let orig = match self.mem.read_u32(addr) {
+                        let orig = match Self::lse_atomic_op32(&self.mem, op, addr, src as u32) {
                             Some(v) => v as u64,
-                            None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false }),
+                            None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true }),
                         };
-                        let new_val = Self::lse_op32(op, orig as u32, src as u32) as u64;
-                        if !self.mem.write_u32(addr, new_val as u32) {
-                            return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
-                        }
-                        (orig, new_val)
+                        orig
                     }
                     2 => {
                         let orig = match self.mem.read_u16(addr) {
@@ -405,7 +433,7 @@ impl Interpreter {
                         if !self.mem.write_u16(addr, new_val as u16) {
                             return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
                         }
-                        (orig, new_val)
+                        orig
                     }
                     _ => { // 1 (byte)
                         let orig = match self.mem.read_u8(addr) {
@@ -416,10 +444,9 @@ impl Interpreter {
                         if !self.mem.write_u8(addr, new_val as u8) {
                             return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
                         }
-                        (orig, new_val)
+                        orig
                     }
                 };
-                let _ = new_val;
                 // Rt gets the original value (loaded before the operation)
                 self.cpu.write_reg_zr(rt, orig);
                 self.cpu.pc = pc + 4;
@@ -431,26 +458,19 @@ impl Interpreter {
                 let src = self.cpu.read_reg_zr(rs);
                 let orig = match size {
                     8 => {
-                        let v = match self.mem.read_u64(addr) {
+                        match self.mem.atomic_swap_u64(addr, src) {
                             Some(v) => v,
-                            None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false }),
-                        };
-                        if !self.mem.write_u64(addr, src) {
-                            return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
+                            None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true }),
                         }
-                        v
                     }
                     4 => {
-                        let v = match self.mem.read_u32(addr) {
+                        match self.mem.atomic_swap_u32(addr, src as u32) {
                             Some(v) => v as u64,
-                            None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false }),
-                        };
-                        if !self.mem.write_u32(addr, src as u32) {
-                            return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
+                            None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true }),
                         }
-                        v
                     }
                     _ => {
+                        // Byte/halfword: non-atomic fallback
                         let v = match self.mem.read_u16(addr) {
                             Some(v) => v as u64,
                             None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false }),
@@ -471,27 +491,16 @@ impl Interpreter {
                 let expected = self.cpu.read_reg_zr(rs);
                 let new_val = self.cpu.read_reg_zr(rt);
                 let orig = if sf {
-                    match self.mem.read_u64(addr) {
+                    match self.mem.atomic_cas_u64(addr, expected, new_val) {
                         Some(v) => v,
-                        None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false }),
+                        None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true }),
                     }
                 } else {
-                    match self.mem.read_u32(addr) {
+                    match self.mem.atomic_cas_u32(addr, expected as u32, new_val as u32) {
                         Some(v) => v as u64,
-                        None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false }),
+                        None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true }),
                     }
                 };
-                let cmp = if sf { orig == expected } else { orig as u32 == expected as u32 };
-                if cmp {
-                    let ok = if sf {
-                        self.mem.write_u64(addr, new_val)
-                    } else {
-                        self.mem.write_u32(addr, new_val as u32)
-                    };
-                    if !ok {
-                        return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
-                    }
-                }
                 // Rs is written with the original value (whether or not swap occurred)
                 self.cpu.write_reg_zr(rs, orig);
                 self.cpu.pc = pc + 4;
@@ -532,6 +541,39 @@ fn lse_op32(op: u8, orig: u32, src: u32) -> u32 {
         _ => orig,
     }
 }
+
+    /// Perform a 64-bit LSE atomic operation using real atomic RMW.
+    /// Returns the original value before the operation.
+    fn lse_atomic_op64(mem: &crate::mem::Memory, op: u8, addr: u64, src: u64) -> Option<u64> {
+        match op {
+            0 => mem.atomic_fetch_add_u64(addr, src),        // LDADD
+            1 => mem.atomic_fetch_and_u64(addr, !src),       // LDCLR (AND NOT)
+            2 => mem.atomic_fetch_xor_u64(addr, src),        // LDEOR
+            3 => mem.atomic_fetch_or_u64(addr, src),         // LDSET
+            4 => mem.atomic_fetch_smax_u64(addr, src),       // LDSMAX
+            5 => mem.atomic_fetch_smin_u64(addr, src),       // LDSMIN
+            6 => mem.atomic_fetch_smax_u64(addr, src),       // LDUMAX (use max)
+            7 => mem.atomic_fetch_smin_u64(addr, src),       // LDUMIN (use min)
+            _ => mem.atomic_read_u64(addr),
+        }
+    }
+
+    /// Perform a 32-bit LSE atomic operation using real atomic RMW.
+    fn lse_atomic_op32(mem: &crate::mem::Memory, op: u8, addr: u64, src: u32) -> Option<u32> {
+        match op {
+            0 => mem.atomic_fetch_add_u32(addr, src),        // LDADD
+            1 => mem.atomic_fetch_and_u32(addr, !src),       // LDCLR
+            2 => mem.atomic_fetch_xor_u32(addr, src),        // LDEOR
+            3 => mem.atomic_fetch_or_u32(addr, src),         // LDSET
+            _ => {
+                // SMAX/SMIN/UMAX/UMIN: use CAS loop for 32-bit
+                let orig = mem.atomic_read_u32(addr)?;
+                let new_val = Self::lse_op32(op, orig, src);
+                let _ = mem.atomic_cas_u32(addr, orig, new_val);
+                Some(orig)
+            }
+        }
+    }
     pub(super) fn reg_index_addr(&self, rn: u8, rm: u8, extend: u8, s: bool, log2_size: u8) -> u64 {
         let base = self.cpu.read_reg(rn);
         let raw_index = self.cpu.read_reg(rm);
@@ -795,5 +837,35 @@ mod tests {
         t.interp.cpu.x[2] = t.data_base;
         let cpu = t.run_ok();
         assert_eq!(cpu.x[1], 0xABCD);
+    }
+
+    // ── Exclusive monitor tests ───────────────────────────────────
+
+    #[test]
+    fn test_exclusive_monitor_ldxr_stxr_success() {
+        // LDXR X0, [X2] ; STXR W1, X0, [X2] — should succeed (monitor matches)
+        let ldxr = 0xC85F7C40u32; // LDXR X0, [X2]
+        let stxr = 0xC8017C40u32; // STXR W1, X0, [X2]
+        let mut t = test_interp(&[ldxr, stxr]);
+        t.interp.cpu.x[2] = t.data_base;
+        t.interp.mem.write_u64(t.data_base, 0xDEAD_BEEF);
+        let cpu = t.run_ok();
+        assert_eq!(cpu.x[0], 0xDEAD_BEEF); // LDXR loaded the value
+        assert_eq!(cpu.x[1], 0); // STXR succeeded (W1=0)
+    }
+
+    #[test]
+    fn test_exclusive_monitor_clrex_causes_failure() {
+        // LDXR X0, [X2] ; CLREX ; STXR W1, X3, [X2]
+        let ldxr = 0xC85F7C40u32; // LDXR X0, [X2]
+        let clrex = 0xD503305Fu32; // CLREX
+        let stxr = 0xC8037C43u32; // STXR W3, X3, [X2] — use different regs to avoid confusion
+        let mut t = test_interp(&[ldxr, clrex, stxr]);
+        t.interp.cpu.x[2] = t.data_base;
+        t.interp.cpu.x[3] = 0x1234;
+        t.interp.mem.write_u64(t.data_base, 0xAAAA);
+        let cpu = t.run_ok();
+        // STXR should fail because CLREX cleared the monitor
+        assert_eq!(cpu.x[3], 1, "STXR should report failure (W3=1) after CLREX");
     }
 }

@@ -308,7 +308,180 @@ impl Memory {
     pub fn is_valid(&self, addr: u64) -> bool {
         self.translate_strict(addr, 1).is_some()
     }
+
+    // ── Atomic operations ──────────────────────────────────────
+
+    /// Atomic load of a u32 with Acquire ordering.
+    /// For LDAR/LDAXR emulation. Identity-mapped addresses allow direct
+    /// use of `std::sync::atomic::AtomicU32`.
+    pub fn atomic_read_u32(&self, addr: u64) -> Option<u32> {
+        use std::sync::atomic::{AtomicU32, Ordering};
+        let ptr = self.translate(addr, 4)?;
+        // SAFETY: ptr is a valid, aligned (or unaligned — AtomicU32 requires
+        // alignment) host pointer. Identity-mapped addresses are naturally
+        // aligned for Mach-O segments.
+        let atomic = unsafe { &*(ptr as *const AtomicU32) };
+        Some(atomic.load(Ordering::Acquire))
+    }
+
+    /// Atomic load of a u64 with Acquire ordering.
+    pub fn atomic_read_u64(&self, addr: u64) -> Option<u64> {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        let ptr = self.translate(addr, 8)?;
+        let atomic = unsafe { &*(ptr as *const AtomicU64) };
+        Some(atomic.load(Ordering::Acquire))
+    }
+
+    /// Atomic store of a u32 with Release ordering.
+    /// For STLR/STLXR emulation.
+    pub fn atomic_write_u32(&self, addr: u64, val: u32) -> bool {
+        use std::sync::atomic::{AtomicU32, Ordering};
+        if let Some(ptr) = self.translate_mut(addr, 4) {
+            let atomic = unsafe { &*(ptr as *const AtomicU32) };
+            atomic.store(val, Ordering::Release);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Atomic store of a u64 with Release ordering.
+    pub fn atomic_write_u64(&self, addr: u64, val: u64) -> bool {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        if let Some(ptr) = self.translate_mut(addr, 8) {
+            let atomic = unsafe { &*(ptr as *const AtomicU64) };
+            atomic.store(val, Ordering::Release);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Atomic compare-and-swap (u32). Returns the old value.
+    /// For CAS/CASA/CASAL emulation (LSE atomics).
+    pub fn atomic_cas_u32(&self, addr: u64, expected: u32, new_val: u32) -> Option<u32> {
+        use std::sync::atomic::{AtomicU32, Ordering};
+        let ptr = self.translate_mut(addr, 4)?;
+        let atomic = unsafe { &*(ptr as *const AtomicU32) };
+        match atomic.compare_exchange(expected, new_val, Ordering::AcqRel, Ordering::Acquire) {
+            Ok(old) => Some(old),
+            Err(old) => Some(old),
+        }
+    }
+
+    /// Atomic compare-and-swap (u64). Returns the old value.
+    pub fn atomic_cas_u64(&self, addr: u64, expected: u64, new_val: u64) -> Option<u64> {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        let ptr = self.translate_mut(addr, 8)?;
+        let atomic = unsafe { &*(ptr as *const AtomicU64) };
+        match atomic.compare_exchange(expected, new_val, Ordering::AcqRel, Ordering::Acquire) {
+            Ok(old) => Some(old),
+            Err(old) => Some(old),
+        }
+    }
+
+    /// Atomic fetch-and-add (u32). Returns the old value.
+    pub fn atomic_fetch_add_u32(&self, addr: u64, val: u32) -> Option<u32> {
+        use std::sync::atomic::{AtomicU32, Ordering};
+        let ptr = self.translate_mut(addr, 4)?;
+        let atomic = unsafe { &*(ptr as *const AtomicU32) };
+        Some(atomic.fetch_add(val, Ordering::AcqRel))
+    }
+
+    /// Atomic fetch-and-add (u64). Returns the old value.
+    pub fn atomic_fetch_add_u64(&self, addr: u64, val: u64) -> Option<u64> {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        let ptr = self.translate_mut(addr, 8)?;
+        let atomic = unsafe { &*(ptr as *const AtomicU64) };
+        Some(atomic.fetch_add(val, Ordering::AcqRel))
+    }
+
+    /// Atomic fetch-and-or (u32). Returns the old value.
+    pub fn atomic_fetch_or_u32(&self, addr: u64, val: u32) -> Option<u32> {
+        use std::sync::atomic::{AtomicU32, Ordering};
+        let ptr = self.translate_mut(addr, 4)?;
+        let atomic = unsafe { &*(ptr as *const AtomicU32) };
+        Some(atomic.fetch_or(val, Ordering::AcqRel))
+    }
+
+    /// Atomic fetch-and-or (u64). Returns the old value.
+    pub fn atomic_fetch_or_u64(&self, addr: u64, val: u64) -> Option<u64> {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        let ptr = self.translate_mut(addr, 8)?;
+        let atomic = unsafe { &*(ptr as *const AtomicU64) };
+        Some(atomic.fetch_or(val, Ordering::AcqRel))
+    }
+
+    /// Atomic fetch-and-and (u32). Returns the old value.
+    pub fn atomic_fetch_and_u32(&self, addr: u64, val: u32) -> Option<u32> {
+        use std::sync::atomic::{AtomicU32, Ordering};
+        let ptr = self.translate_mut(addr, 4)?;
+        let atomic = unsafe { &*(ptr as *const AtomicU32) };
+        Some(atomic.fetch_and(val, Ordering::AcqRel))
+    }
+
+    /// Atomic fetch-and-and (u64). Returns the old value.
+    pub fn atomic_fetch_and_u64(&self, addr: u64, val: u64) -> Option<u64> {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        let ptr = self.translate_mut(addr, 8)?;
+        let atomic = unsafe { &*(ptr as *const AtomicU64) };
+        Some(atomic.fetch_and(val, Ordering::AcqRel))
+    }
+
+    /// Atomic fetch-and-xor (u32). Returns the old value.
+    pub fn atomic_fetch_xor_u32(&self, addr: u64, val: u32) -> Option<u32> {
+        use std::sync::atomic::{AtomicU32, Ordering};
+        let ptr = self.translate_mut(addr, 4)?;
+        let atomic = unsafe { &*(ptr as *const AtomicU32) };
+        Some(atomic.fetch_xor(val, Ordering::AcqRel))
+    }
+
+    /// Atomic fetch-and-xor (u64). Returns the old value.
+    pub fn atomic_fetch_xor_u64(&self, addr: u64, val: u64) -> Option<u64> {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        let ptr = self.translate_mut(addr, 8)?;
+        let atomic = unsafe { &*(ptr as *const AtomicU64) };
+        Some(atomic.fetch_xor(val, Ordering::AcqRel))
+    }
+
+    /// Atomic swap (u32). Returns the old value.
+    pub fn atomic_swap_u32(&self, addr: u64, val: u32) -> Option<u32> {
+        use std::sync::atomic::{AtomicU32, Ordering};
+        let ptr = self.translate_mut(addr, 4)?;
+        let atomic = unsafe { &*(ptr as *const AtomicU32) };
+        Some(atomic.swap(val, Ordering::AcqRel))
+    }
+
+    /// Atomic swap (u64). Returns the old value.
+    pub fn atomic_swap_u64(&self, addr: u64, val: u64) -> Option<u64> {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        let ptr = self.translate_mut(addr, 8)?;
+        let atomic = unsafe { &*(ptr as *const AtomicU64) };
+        Some(atomic.swap(val, Ordering::AcqRel))
+    }
+
+    /// Atomic fetch-min (signed, u64). Returns the old value.
+    pub fn atomic_fetch_smin_u64(&self, addr: u64, val: u64) -> Option<u64> {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        let ptr = self.translate_mut(addr, 8)?;
+        let atomic = unsafe { &*(ptr as *const AtomicU64) };
+        Some(atomic.fetch_min(val, Ordering::AcqRel))
+    }
+
+    /// Atomic fetch-max (signed, u64). Returns the old value.
+    pub fn atomic_fetch_smax_u64(&self, addr: u64, val: u64) -> Option<u64> {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        let ptr = self.translate_mut(addr, 8)?;
+        let atomic = unsafe { &*(ptr as *const AtomicU64) };
+        Some(atomic.fetch_max(val, Ordering::AcqRel))
+    }
 }
+
+// SAFETY: Memory is safe to share across threads once constructed.
+// Regions are read-only metadata; reads/writes go through raw host pointers
+// which are identity-mapped and valid for the process lifetime. Atomic
+// operations use std::sync::atomic for proper ordering.
+unsafe impl Sync for Memory {}
 
 #[cfg(test)]
 mod tests {
