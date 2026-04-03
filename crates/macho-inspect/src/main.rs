@@ -38,9 +38,13 @@ struct Cli {
     #[arg(long)]
     plan: bool,
 
-    /// Map, fixup, and execute the binary in-process (macOS only).
+    /// Map, fixup, and execute the binary in-process.
     #[arg(long)]
     exec: bool,
+
+    /// Arguments to pass to the guest binary when using --exec.
+    #[arg(long = "exec-args", num_args = 1.., allow_hyphen_values = true)]
+    exec_args: Vec<String>,
 
     /// Show code signature details.
     #[arg(long)]
@@ -102,6 +106,7 @@ fn parse_cpu_type(s: &str) -> Result<CpuType, String> {
 }
 
 fn main() {
+    env_logger::init();
     let cli = Cli::parse();
 
     let data = match fs::read(&cli.path) {
@@ -161,11 +166,11 @@ fn main() {
     let abs_path = fs::canonicalize(&cli.path).unwrap_or_else(|_| cli.path.clone());
 
     if cli.exec {
-        #[cfg(target_os = "macos")]
-        exec::print_exec(&parsed, &data, &abs_path);
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        exec::print_exec(&parsed, &effective_data, &abs_path, &cli.exec_args);
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
         {
-            eprintln!("error: --exec is only supported on macOS");
+            eprintln!("error: --exec is only supported on macOS and Linux");
             std::process::exit(1);
         }
     } else if cli.why_failed {

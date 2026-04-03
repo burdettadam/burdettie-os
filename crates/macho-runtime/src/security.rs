@@ -36,7 +36,19 @@ pub(crate) fn evaluate_security(
         .map(CodeSignatureInfo::from_parsed)
         .unwrap_or_default();
 
-    let report = policy.evaluate_binary_parsed(binary_path, parsed.header.flags, &cs_info);
+    // Extract entitlement keys from code signature if present
+    let entitlement_keys = parsed
+        .code_signature
+        .as_ref()
+        .map(|cs| cs.entitlement_keys())
+        .unwrap_or_default();
+
+    let report = policy.evaluate_binary_parsed_with_keys(
+        binary_path,
+        parsed.header.flags,
+        &cs_info,
+        &entitlement_keys,
+    );
 
     if !report.allowed {
         return Err(RuntimeError::SecurityDenied {

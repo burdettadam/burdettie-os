@@ -6,7 +6,7 @@ use std::ptr;
 #[no_mangle]
 pub extern "C" fn darwin_objc_class_count() -> usize {
     let guard = objc_runtime::OBJC_RUNTIME
-        .lock()
+        .read()
         .unwrap_or_else(|e| e.into_inner());
     guard.as_ref().map_or(0, |rt| rt.class_count())
 }
@@ -15,7 +15,7 @@ pub extern "C" fn darwin_objc_class_count() -> usize {
 #[no_mangle]
 pub extern "C" fn darwin_objc_selector_count() -> usize {
     let guard = objc_runtime::OBJC_RUNTIME
-        .lock()
+        .read()
         .unwrap_or_else(|e| e.into_inner());
     guard.as_ref().map_or(0, |rt| rt.selector_count())
 }
@@ -73,7 +73,7 @@ pub unsafe extern "C" fn darwin_objc_get_class(name: *const c_char) -> DarwinCla
     };
 
     let guard = objc_runtime::OBJC_RUNTIME
-        .lock()
+        .read()
         .unwrap_or_else(|e| e.into_inner());
 
     let Some(rt) = guard.as_ref() else {
@@ -112,7 +112,7 @@ pub struct DarwinClassList {
 #[no_mangle]
 pub extern "C" fn darwin_objc_list_classes() -> DarwinClassList {
     let guard = objc_runtime::OBJC_RUNTIME
-        .lock()
+        .read()
         .unwrap_or_else(|e| e.into_inner());
 
     let Some(rt) = guard.as_ref() else {
@@ -122,7 +122,7 @@ pub extern "C" fn darwin_objc_list_classes() -> DarwinClassList {
         };
     };
 
-    let mut names: Vec<String> = rt.classes_by_name_iter().map(|(n, _)| n.clone()).collect();
+    let mut names: Vec<String> = rt.classes_by_name_iter().map(|(n, _)| n.to_string()).collect();
     names.sort();
 
     let mut c_names: Vec<*mut c_char> = Vec::with_capacity(names.len());
@@ -162,7 +162,7 @@ pub unsafe extern "C" fn darwin_objc_list_methods(
     };
 
     let guard = objc_runtime::OBJC_RUNTIME
-        .lock()
+        .read()
         .unwrap_or_else(|e| e.into_inner());
 
     let methods = match guard.as_ref().and_then(|rt| rt.get_class(name_str)) {
@@ -176,10 +176,10 @@ pub unsafe extern "C" fn darwin_objc_list_methods(
     let mut infos: Vec<DarwinMethodInfo> = methods
         .iter()
         .map(|m| DarwinMethodInfo {
-            selector: CString::new(m.selector.as_str())
+            selector: CString::new(m.selector.as_ref())
                 .map(|s| s.into_raw())
                 .unwrap_or(ptr::null_mut()),
-            type_encoding: CString::new(m.type_encoding.as_str())
+            type_encoding: CString::new(m.type_encoding.as_ref())
                 .map(|s| s.into_raw())
                 .unwrap_or(ptr::null_mut()),
         })
@@ -198,7 +198,7 @@ pub unsafe extern "C" fn darwin_objc_list_methods(
 #[no_mangle]
 pub extern "C" fn darwin_foundation_class_count() -> usize {
     let guard = objc_runtime::OBJC_RUNTIME
-        .lock()
+        .read()
         .unwrap_or_else(|e| e.into_inner());
 
     guard.as_ref().map_or(0, |rt| {
@@ -206,4 +206,70 @@ pub extern "C" fn darwin_foundation_class_count() -> usize {
             .filter(|(name, _)| name.starts_with("NS") || name.starts_with("__NSCF"))
             .count()
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn class_count_without_runtime() {
+        let count = darwin_objc_class_count();
+        // Without a loaded binary the runtime may or may not be initialised;
+        // the function must not panic and must return a non-negative value.
+        assert!(count < 100_000);
+    }
+
+    #[test]
+    fn selector_count_without_runtime() {
+        let count = darwin_objc_selector_count();
+        assert!(count < 100_000);
+    }
+
+    #[test]
+    fn foundation_class_count_without_runtime() {
+        let count = darwin_foundation_class_count();
+        assert!(count < 100_000);
+    }
+
+    #[test]
+    fn get_class_null_name() {
+        let info = unsafe { darwin_objc_get_class(std::ptr::null()) };
+        assert!(info.name.is_null());
+    }
+
+    #[test]
+    fn list_classes_empty_runtime() {
+        let list = darwin_objc_list_classes();
+        // Either null with count 0, or a valid (possibly empty) list.
+        if list.names.is_null() {
+            assert_eq!(list.count, 0);
+        } else {
+            // Free the returned list to avoid leaks.
+            unsafe { crate::memory::darwin_class_list_free(list) };
+        }
+    }
+
+    #[test]
+    fn list_methods_null_class_name_returns_null() {
+        let mut count: usize = 42;
+        let ptr = unsafe { darwin_objc_list_methods(std::ptr::null(), &mut count) };
+        assert!(ptr.is_null());
+    }
+
+    #[test]
+    fn list_methods_null_out_count_returns_null() {
+        let name = std::ffi::CString::new("NSObject").unwrap();
+        let ptr = unsafe { darwin_objc_list_methods(name.as_ptr(), std::ptr::null_mut()) };
+        assert!(ptr.is_null());
+    }
+
+    #[test]
+    fn get_class_unknown_name() {
+        let name = std::ffi::CString::new("__NonExistentClass42__").unwrap();
+        let info = unsafe { darwin_objc_get_class(name.as_ptr()) };
+        assert!(info.name.is_null());
+        assert_eq!(info.method_count, 0);
+        assert_eq!(info.class_method_count, 0);
+    }
 }

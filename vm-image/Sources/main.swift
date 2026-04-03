@@ -22,14 +22,14 @@ struct VMConfig {
 
         return VMConfig(
             restoreImagePath: ProcessInfo.processInfo.environment["VM_IPSW"]
-                ?? "\(home)/.burdetty-os/RestoreImage.ipsw",
+                ?? "\(home)/.burdettie-os/RestoreImage.ipsw",
             sharedDirectory: ProcessInfo.processInfo.environment["VM_SHARED_DIR"]
                 ?? "\(projectRoot)/dist",
             cpuCount: Int(ProcessInfo.processInfo.environment["VM_CPUS"] ?? "2") ?? 2,
             memorySize: UInt64(ProcessInfo.processInfo.environment["VM_MEMORY_GB"] ?? "4")
                 .map { $0 * 1024 * 1024 * 1024 } ?? 4 * 1024 * 1024 * 1024,
             bundlePath: ProcessInfo.processInfo.environment["VM_BUNDLE"]
-                ?? "\(home)/.burdetty-os/vm-bundle"
+                ?? "\(home)/.burdettie-os/vm-bundle"
         )
     }
 }
@@ -348,7 +348,7 @@ struct DarwinVM {
         let builder = VMBuilder(config: config)
 
         print("╔══════════════════════════════════════════════════════╗")
-        print("║  burdetty-os — VM launcher                    ║")
+        print("║  burdettie-os — VM launcher                    ║")
         print("╚══════════════════════════════════════════════════════╝")
         print("")
         print("  Command:    \(command)")
@@ -435,11 +435,11 @@ struct DarwinVM {
           help      Show this help
 
         Environment:
-          VM_IPSW          Path to macOS restore IPSW (default: ~/.burdetty-os/RestoreImage.ipsw)
+          VM_IPSW          Path to macOS restore IPSW (default: ~/.burdettie-os/RestoreImage.ipsw)
           VM_SHARED_DIR    Directory to share with guest (default: ./dist)
           VM_CPUS          Number of CPUs (default: 2)
           VM_MEMORY_GB     Memory in GB (default: 4)
-          VM_BUNDLE        VM bundle path (default: ~/.burdetty-os/vm-bundle)
+          VM_BUNDLE        VM bundle path (default: ~/.burdettie-os/vm-bundle)
           DARWIN_LOADER_ROOT  Project root (default: current directory)
         """)
     }

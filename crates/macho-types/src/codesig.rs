@@ -179,6 +179,14 @@ pub struct CodeSignature {
     pub entitlements_plist: Option<String>,
     /// Whether a CMS (PKCS#7) signature blob is present.
     pub has_cms_signature: bool,
+    /// Raw CMS (PKCS#7) signature blob data (DER-encoded SignedData).
+    /// This is the content of the CSMAGIC_BLOBWRAPPER blob, minus the 8-byte header.
+    #[serde(skip)]
+    pub cms_data: Option<Vec<u8>>,
+    /// Raw CodeDirectory blob data (for CMS signature verification).
+    /// The CMS signature signs over this exact byte sequence.
+    #[serde(skip)]
+    pub cd_data: Option<Vec<u8>>,
 }
 
 impl CodeSignature {

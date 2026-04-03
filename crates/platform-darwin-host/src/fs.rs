@@ -37,3 +37,45 @@ impl FilesystemProvider for DarwinFilesystem {
         std::env::current_dir()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn exists_root() {
+        let fs = DarwinFilesystem;
+        assert!(fs.exists(Path::new("/")));
+    }
+
+    #[test]
+    fn exists_nonexistent() {
+        let fs = DarwinFilesystem;
+        assert!(!fs.exists(Path::new("/nonexistent_path_xyz")));
+    }
+
+    #[test]
+    fn is_dir_root() {
+        let fs = DarwinFilesystem;
+        assert!(fs.is_dir(Path::new("/")));
+    }
+
+    #[test]
+    fn is_dir_false_for_file() {
+        let fs = DarwinFilesystem;
+        assert!(!fs.is_dir(Path::new("Cargo.toml")));
+    }
+
+    #[test]
+    fn current_dir_ok() {
+        let fs = DarwinFilesystem;
+        assert!(fs.current_dir().is_ok());
+    }
+
+    #[test]
+    fn read_dir_root_nonempty() {
+        let fs = DarwinFilesystem;
+        let entries = fs.read_dir(Path::new("/")).unwrap();
+        assert!(!entries.is_empty());
+    }
+}

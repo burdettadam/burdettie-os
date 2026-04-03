@@ -66,7 +66,7 @@ impl ObjcRuntime {
         for (name, info) in &self.classes_by_name {
             for m in &info.class_methods {
                 if m.selector == "load" && !cat_imp_set.contains(&m.imp) {
-                    class_loads.push((name.clone(), m.imp));
+                    class_loads.push((name.to_string(), m.imp));
                 }
             }
         }
@@ -103,7 +103,7 @@ impl ObjcRuntime {
         if let Some(class) = self.classes_by_name.get(name) {
             if let Some(super_addr) = class.superclass_addr {
                 if let Some(super_name) = self.classes_by_addr.get(&super_addr) {
-                    if load_names.contains(super_name.as_str()) {
+                    if load_names.contains(super_name.as_ref()) {
                         self.visit_load_topo(super_name, load_names, imp_map, visited, sorted);
                     }
                 }

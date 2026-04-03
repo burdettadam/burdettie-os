@@ -10,15 +10,31 @@
 //! Phase 8 adds [`CodeSignatureInfo`] for enriched security evaluation using
 //! parsed code signature data (SuperBlob, CodeDirectory, CS flags).
 
+pub mod anchor;
 mod apple;
+mod builder;
+pub mod cert;
+pub mod config;
+pub mod effects;
+pub mod entitlements;
+pub mod enforcement;
 mod gates;
+pub mod hardened;
 mod mock;
+pub mod quarantine;
+pub mod real_amfi;
+pub mod sandbox;
 mod verdict;
+pub mod verify_gate;
+
+pub use enforcement::EnforcementMode;
+pub use real_amfi::{AmfiEvaluation, CdHashResult, RealAmfi, RealQuarantine, RealSip};
 
 pub use apple::{
     AppleAmfi, AppleCodeSignature, AppleEntitlements, AppleHardenedRuntime, AppleLibraryValidator,
     AppleQuarantine, AppleSandbox, AppleSip,
 };
+pub use builder::{PolicyPreset, TrustPolicyBuilder};
 pub use gates::{
     AmfiPolicy, CodeSignatureValidator, EntitlementEvaluator, HardenedRuntimePolicy,
     LibraryValidator, QuarantinePolicy, SandboxPolicy, SecurityGate, SipPolicy,
@@ -28,6 +44,7 @@ pub use mock::{
     MockQuarantine, MockSandbox, MockSip,
 };
 pub use verdict::{GateDecision, SecurityVerdict};
+pub use effects::{EntitlementEffects, EnrichedSecurityReport};
 
 use macho_types::codesig::CsFlags;
 use serde::{Deserialize, Serialize};
@@ -144,6 +161,42 @@ impl TrustPolicy {
             entitlements: Box::new(AppleEntitlements),
             amfi: Box::new(AppleAmfi),
             sip: Box::new(AppleSip),
+            hardened_runtime: Box::new(AppleHardenedRuntime),
+            library_validator: Box::new(AppleLibraryValidator),
+            sandbox: Box::new(AppleSandbox),
+        }
+    }
+
+    /// Production policy — real CDHash + CMS verification, macOS-compatible defaults.
+    ///
+    /// - AMFI: `RealAmfi::production()` (ad-hoc allowed, unsigned allowed with warning)
+    /// - Quarantine: real `com.apple.quarantine` xattr check
+    /// - SIP: real path-based SIP enforcement
+    /// - Other gates: Apple-default path-heuristic implementations
+    pub fn production() -> Self {
+        Self {
+            quarantine: Box::new(real_amfi::RealQuarantine::production()),
+            code_signature: Box::new(AppleCodeSignature),
+            entitlements: Box::new(AppleEntitlements),
+            amfi: Box::new(real_amfi::RealAmfi::production()),
+            sip: Box::new(real_amfi::RealSip::enforcing()),
+            hardened_runtime: Box::new(AppleHardenedRuntime),
+            library_validator: Box::new(AppleLibraryValidator),
+            sandbox: Box::new(AppleSandbox),
+        }
+    }
+
+    /// Audit policy — real verification but never blocks execution.
+    ///
+    /// All checks run; failures produce warnings instead of denials.
+    /// Use this to observe what `production()` would block without impact.
+    pub fn audit() -> Self {
+        Self {
+            quarantine: Box::new(real_amfi::RealQuarantine::log_only()),
+            code_signature: Box::new(AppleCodeSignature),
+            entitlements: Box::new(AppleEntitlements),
+            amfi: Box::new(real_amfi::RealAmfi::log_only()),
+            sip: Box::new(real_amfi::RealSip::log_only()),
             hardened_runtime: Box::new(AppleHardenedRuntime),
             library_validator: Box::new(AppleLibraryValidator),
             sandbox: Box::new(AppleSandbox),
@@ -324,4 +377,164 @@ pub struct SecurityReport {
     pub hardened_runtime: bool,
     /// Parsed code signature info (populated by `evaluate_binary_parsed`).
     pub cs_info: Option<CodeSignatureInfo>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn permissive_construction() {
+        let policy = TrustPolicy::permissive();
+        assert!(!policy.quarantine.is_enforcing());
+        assert!(!policy.code_signature.is_enforcing());
+        assert!(!policy.sip.is_enforcing());
+        assert!(!policy.sandbox.is_enforcing());
+    }
+
+    #[test]
+    fn apple_default_construction() {
+        let policy = TrustPolicy::apple_default();
+        assert!(policy.quarantine.is_enforcing());
+        assert!(policy.code_signature.is_enforcing());
+        assert!(policy.sip.is_enforcing());
+        assert!(policy.sandbox.is_enforcing());
+    }
+
+    #[test]
+    fn code_sig_info_default() {
+        let info = CodeSignatureInfo::default();
+        assert!(!info.present);
+        assert!(!info.adhoc);
+        assert!(!info.runtime);
+        assert!(info.identity.is_empty());
+        assert!(info.cd_hash.is_empty());
+    }
+
+    #[test]
+    fn code_sig_info_fields() {
+        let info = CodeSignatureInfo {
+            present: true,
+            adhoc: true,
+            runtime: false,
+            restrict: false,
+            library_validation: false,
+            get_task_allow: true,
+            identity: "com.example.app".into(),
+            team_id: "ABCDE12345".into(),
+            cd_hash: "deadbeef".into(),
+            has_cms_signature: false,
+            has_entitlements: true,
+        };
+        assert!(info.present);
+        assert!(info.adhoc);
+        assert!(info.get_task_allow);
+        assert_eq!(info.identity, "com.example.app");
+        assert_eq!(info.team_id, "ABCDE12345");
+        assert!(info.has_entitlements);
+        assert!(!info.has_cms_signature);
+    }
+
+    #[test]
+    fn permissive_allows_unsigned() {
+        let policy = TrustPolicy::permissive();
+        let report = policy.evaluate_binary(
+            Path::new("/tmp/unsigned"),
+            macho_types::header::MachFlags::empty(),
+            false,
+        );
+        assert!(report.allowed);
+        assert!(report.denied_reasons.is_empty());
+    }
+
+    #[test]
+    fn apple_default_allows_signed_nonsip() {
+        let policy = TrustPolicy::apple_default();
+        let report = policy.evaluate_binary(
+            Path::new("/tmp/my_app"),
+            macho_types::header::MachFlags::empty(),
+            true,
+        );
+        assert!(report.allowed);
+    }
+
+    #[test]
+    fn apple_default_denies_unsigned_sip() {
+        let policy = TrustPolicy::apple_default();
+        let report = policy.evaluate_binary(
+            Path::new("/usr/bin/ls"),
+            macho_types::header::MachFlags::empty(),
+            false,
+        );
+        assert!(!report.allowed);
+        assert!(!report.denied_reasons.is_empty());
+    }
+
+    #[test]
+    fn apple_sip_strips_dyld_env_for_protected_path() {
+        let policy = TrustPolicy::apple_default();
+        let report = policy.evaluate_binary(
+            Path::new("/usr/bin/ls"),
+            macho_types::header::MachFlags::empty(),
+            true,
+        );
+        assert!(report.strip_dyld_env);
+    }
+
+    #[test]
+    fn permissive_does_not_strip_dyld_env() {
+        let policy = TrustPolicy::permissive();
+        let report = policy.evaluate_binary(
+            Path::new("/usr/bin/ls"),
+            macho_types::header::MachFlags::empty(),
+            true,
+        );
+        assert!(!report.strip_dyld_env);
+    }
+
+    #[test]
+    fn apple_default_validate_dylib_sip_loader_rejects_nonsip() {
+        let policy = TrustPolicy::apple_default();
+        let verdict = policy.validate_dylib(
+            Path::new("/usr/bin/ls"),
+            Path::new("/tmp/evil.dylib"),
+        );
+        assert!(verdict.is_deny());
+    }
+
+    #[test]
+    fn permissive_validate_dylib_allows_any() {
+        let policy = TrustPolicy::permissive();
+        let verdict = policy.validate_dylib(
+            Path::new("/usr/bin/ls"),
+            Path::new("/tmp/anything.dylib"),
+        );
+        assert!(verdict.is_allow());
+    }
+
+    #[test]
+    fn apple_entitlements_allow_dyld_env_key() {
+        let ent = AppleEntitlements;
+        let keys = vec![(
+            "com.apple.security.cs.allow-dyld-environment-variables".to_string(),
+            true,
+        )];
+        let verdict = ent.evaluate_with_keys(Path::new("/tmp/app"), &keys);
+        assert!(verdict.is_allow());
+        assert!(matches!(verdict, SecurityVerdict::AllowWithWarning { .. }));
+    }
+
+    #[test]
+    fn hardened_runtime_sip_path_blocks_insertion() {
+        let hr = AppleHardenedRuntime;
+        assert!(hr.is_hardened(
+            Path::new("/usr/bin/ls"),
+            macho_types::header::MachFlags::empty(),
+        ));
+        assert!(!hr.allows_dylib_insertion(
+            Path::new("/usr/bin/ls"),
+            macho_types::header::MachFlags::empty(),
+        ));
+    }
 }

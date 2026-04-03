@@ -41,3 +41,59 @@ pub struct CalendarComponents {
     pub isdst: i32,  // daylight saving flag
     pub gmtoff: i64, // seconds east of UTC
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn calendar_components_default_zero() {
+        let c = CalendarComponents::default();
+        assert_eq!(c.sec, 0);
+        assert_eq!(c.min, 0);
+        assert_eq!(c.hour, 0);
+        assert_eq!(c.mday, 0);
+        assert_eq!(c.mon, 0);
+        assert_eq!(c.year, 0);
+        assert_eq!(c.wday, 0);
+        assert_eq!(c.yday, 0);
+        assert_eq!(c.isdst, 0);
+        assert_eq!(c.gmtoff, 0);
+    }
+
+    #[test]
+    fn calendar_components_fields_writable() {
+        let mut c = CalendarComponents::default();
+        c.sec = 30;
+        c.min = 45;
+        c.hour = 14;
+        c.mday = 29;
+        c.mon = 2;
+        c.year = 126;
+        c.wday = 0;
+        c.yday = 87;
+        c.isdst = 1;
+        c.gmtoff = -18000;
+        assert_eq!(c.sec, 30);
+        assert_eq!(c.gmtoff, -18000);
+    }
+
+    #[test]
+    fn calendar_components_clone() {
+        let mut c = CalendarComponents::default();
+        c.hour = 12;
+        c.year = 126;
+        let c2 = c.clone();
+        assert_eq!(c2.hour, 12);
+        assert_eq!(c2.year, 126);
+    }
+
+    #[test]
+    fn calendar_components_debug() {
+        let c = CalendarComponents::default();
+        let dbg = format!("{c:?}");
+        assert!(dbg.contains("CalendarComponents"));
+        assert!(dbg.contains("sec"));
+        assert!(dbg.contains("gmtoff"));
+    }
+}

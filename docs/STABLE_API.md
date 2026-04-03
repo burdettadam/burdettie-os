@@ -1,6 +1,6 @@
 # Stable API Reference — v0.1.0
 
-> **Freeze point**: Phase 30 of the burdetty-os roadmap.
+> **Freeze point**: Phase 30 of the burdettie-os roadmap.
 > This document records the public API surface of all 16 crates at the
 > point the runtime core was declared stable.  From this point forward,
 > only bug fixes are permitted in core crates; new features go in new

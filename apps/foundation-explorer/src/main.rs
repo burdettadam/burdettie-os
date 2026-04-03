@@ -47,6 +47,7 @@ fn build_class_data() -> Vec<ClassSummary> {
     cf_lite::FoundationShims::register_nstimezone_class(&mut rt);
     cf_lite::FoundationShims::register_nscalendar_class(&mut rt);
     cf_lite::FoundationShims::register_nsnumberformatter_class(&mut rt);
+    cf_lite::FoundationShims::register_nsdecimalnumber_class(&mut rt);
     cf_lite::FoundationShims::register_nsindexset_class(&mut rt);
     cf_lite::FoundationShims::register_nsmutableindexset_class(&mut rt);
     cf_lite::FoundationShims::register_nssortdescriptor_class(&mut rt);
@@ -61,14 +62,14 @@ fn build_class_data() -> Vec<ClassSummary> {
         .classes_by_name_iter()
         .map(|(name, info)| {
             let instance_methods: Vec<String> =
-                info.methods.iter().map(|m| m.selector.clone()).collect();
+                info.methods.iter().map(|m| m.selector.to_string()).collect();
             let class_methods: Vec<String> = info
                 .class_methods
                 .iter()
-                .map(|m| m.selector.clone())
+                .map(|m| m.selector.to_string())
                 .collect();
             ClassSummary {
-                name: name.clone(),
+                name: name.to_string(),
                 instance_method_count: instance_methods.len(),
                 class_method_count: class_methods.len(),
                 instance_methods,

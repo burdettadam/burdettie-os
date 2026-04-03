@@ -86,6 +86,15 @@ pub enum IsolatedResult {
     Crashed(String),
 }
 
+/// Full output from an isolated subprocess fixture run.
+#[derive(Debug)]
+#[allow(dead_code)]
+pub struct IsolatedRun {
+    pub result: IsolatedResult,
+    pub stdout: String,
+    pub stderr: String,
+}
+
 #[allow(dead_code)]
 impl IsolatedResult {
     pub fn exit_code(&self) -> Option<i32> {
@@ -140,6 +149,12 @@ pub fn subprocess_entry_point() {
 /// [`subprocess_entry_point()`] in the *calling* test file.
 #[allow(dead_code)]
 pub fn run_in_subprocess(binary: &Path) -> IsolatedResult {
+    run_in_subprocess_with_output(binary).result
+}
+
+/// Run a fixture binary in an isolated subprocess and capture stdout/stderr.
+#[allow(dead_code)]
+pub fn run_in_subprocess_with_output(binary: &Path) -> IsolatedRun {
     let exe = std::env::current_exe().expect("cannot find test binary");
 
     let output = Command::new(&exe)
@@ -152,9 +167,10 @@ pub fn run_in_subprocess(binary: &Path) -> IsolatedResult {
         .output()
         .expect("failed to spawn fixture subprocess");
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+    let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
 
-    if let Some(line) = stdout.lines().find(|l| l.starts_with("__RUNTIME_OK:")) {
+    let result = if let Some(line) = stdout.lines().find(|l| l.starts_with("__RUNTIME_OK:")) {
         let code: i32 = line["__RUNTIME_OK:".len()..].trim().parse().unwrap_or(-1);
         IsolatedResult::Completed { exit_code: code }
     } else if let Some(line) = stdout.lines().find(|l| l.starts_with("__RUNTIME_ERR:")) {
@@ -165,12 +181,22 @@ pub fn run_in_subprocess(binary: &Path) -> IsolatedResult {
         {
             use std::os::unix::process::ExitStatusExt;
             if let Some(sig) = output.status.signal() {
-                return IsolatedResult::Crashed(format!("signal {sig}"));
+                return IsolatedRun {
+                    result: IsolatedResult::Crashed(format!("signal {sig}")),
+                    stdout,
+                    stderr,
+                };
             }
         }
-        let stderr = String::from_utf8_lossy(&output.stderr);
+
         IsolatedResult::Crashed(
             stderr.lines().last().unwrap_or("unknown").to_string(),
         )
+    };
+
+    IsolatedRun {
+        result,
+        stdout,
+        stderr,
     }
 }

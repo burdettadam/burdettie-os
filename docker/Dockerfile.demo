@@ -11,29 +11,29 @@
 #   ./packaging/bundle-runtime.sh --release
 #
 #   # 2. Build demo image from the bundle:
-#   docker build -f docker/Dockerfile.demo -t burdetty-os-demo dist/
+#   docker build -f docker/Dockerfile.demo -t burdettie-os-demo dist/
 #
 #   # 3. Explore the image contents:
-#   docker run --rm burdetty-os-demo ls /opt/burdetty-os/fixtures/
+#   docker run --rm burdettie-os-demo ls /opt/burdettie-os/fixtures/
 
 FROM debian:bookworm-slim
 
-LABEL maintainer="burdetty-os"
-LABEL description="burdetty-os runtime + fixtures bundle"
+LABEL maintainer="burdettie-os"
+LABEL description="burdettie-os runtime + fixtures bundle"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     file \
     && rm -rf /var/lib/apt/lists/*
 
-COPY . /opt/burdetty-os/
+COPY . /opt/burdettie-os/
 
 # Make binaries accessible
-ENV PATH="/opt/burdetty-os/bin:${PATH}"
+ENV PATH="/opt/burdettie-os/bin:${PATH}"
 
-WORKDIR /opt/burdetty-os
+WORKDIR /opt/burdettie-os
 
 # Set runtime root for fixture discovery
-ENV BURDETTY_OS_ROOT="/opt/burdetty-os"
+ENV BURDETTIE_OS_ROOT="/opt/burdettie-os"
 
 # Default: launch the interactive runtime shell (falls back to info if no TTY)
-CMD ["sh", "-c", "if [ -t 0 ]; then runtime-shell; else echo 'burdetty-os demo image' && echo '' && echo 'Binaries:' && ls bin/ && echo '' && echo 'Fixtures:' && ls fixtures/ && echo '' && echo 'Run interactively: docker run -it burdetty-os-demo'; fi"]
+CMD ["sh", "-c", "if [ -t 0 ]; then runtime-shell; else echo 'burdettie-os demo image' && echo '' && echo 'Binaries:' && ls bin/ && echo '' && echo 'Fixtures:' && ls fixtures/ && echo '' && echo 'Run interactively: docker run -it burdettie-os-demo'; fi"]

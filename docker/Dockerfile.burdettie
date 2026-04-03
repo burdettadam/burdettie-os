@@ -1,0 +1,73 @@
+# docker/Dockerfile.burdettie — Burdettie OS: A Linux distro that runs Mach-O binaries natively.
+#
+# This builds the full darwin-loader runtime stack for Linux ARM64,
+# installs macho-inspect as the system Mach-O executor, and stages
+# extracted Xcode/macOS CLI tools for compatibility testing.
+#
+# Prerequisites (run on macOS first):
+#   ./scripts/extract_xcode_tools.sh
+#
+# Build (from repo root):
+#   docker build --platform linux/arm64 -f docker/Dockerfile.burdettie -t burdettie-os .
+#
+# Run all tool tests:
+#   docker run --rm burdettie-os
+#
+# Interactive shell:
+#   docker run --rm -it burdettie-os bash
+
+FROM rust:bookworm AS builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libstdc++-12-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN rustup component add clippy
+
+WORKDIR /build
+COPY . .
+
+# Build the full runtime stack for Linux ARM64.
+# Override target-dir from .cargo/config.toml (which points to /tmp for macOS SSD perf).
+ENV CARGO_TARGET_DIR=/build/target
+RUN cargo build --release --workspace \
+    --exclude hello-darwin \
+    --exclude control-gallery \
+    --exclude foundation-explorer \
+    --exclude window-backend-darwin \
+    --exclude platform-darwin-host \
+    2>&1 | tee /tmp/build.log | tail -10
+
+# Show errors if build failed
+RUN if [ ! -f target/release/macho-inspect ]; then \
+      echo "BUILD FAILED:"; \
+      grep -B5 -A5 'error\[E' /tmp/build.log | head -100 || true; \
+      exit 1; \
+    fi
+
+# ── Runtime image ──────────────────────────────────────────────────
+
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libstdc++6 \
+    file \
+    && rm -rf /var/lib/apt/lists/*
+
+# System identity
+RUN echo "burdettie-os 1.0" > /etc/burdettie-release
+
+# Install macho-inspect as the system Mach-O executor
+COPY --from=builder /build/target/release/macho-inspect /usr/local/bin/macho-inspect
+
+# Stage Mach-O tool binaries extracted from macOS host
+COPY docker/xcode-tools/ /opt/xcode-tools/
+
+# Install test runner
+COPY scripts/test_xcode_tools_docker.sh /usr/local/bin/test-xcode-tools
+RUN chmod +x /usr/local/bin/test-xcode-tools
+
+WORKDIR /opt/xcode-tools
+
+# Default: run the full Xcode tool compatibility test suite
+CMD ["test-xcode-tools"]

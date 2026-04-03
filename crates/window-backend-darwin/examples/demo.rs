@@ -9,7 +9,7 @@ use window_backend_darwin::GuiApp;
 
 fn main() {
     let config = WindowConfig {
-        title: "burdetty-os Demo".into(),
+        title: "burdettie-os Demo".into(),
         width: 480.0,
         height: 320.0,
         resizable: true,
@@ -21,7 +21,7 @@ fn main() {
     // Title label
     let mut title = Label::new(
         Rect::new(40.0, 30.0, 400.0, 30.0),
-        "Hello, burdetty-os!",
+        "Hello, burdettie-os!",
     );
     title.set_text_color(Color::new(0.1, 0.1, 0.4, 1.0));
     app.add_label(title);

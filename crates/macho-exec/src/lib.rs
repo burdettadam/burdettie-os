@@ -19,16 +19,20 @@ mod fixup;
 mod initializer;
 mod mapped;
 pub mod compact_to_ehframe;
+pub mod patch;
 pub mod ptrauth;
 mod registry;
 mod security;
+mod tlv;
 mod unwind;
 
 pub use entry::{call_entry, call_entry_with_args, call_entry_interpreted, EntryArgs, EntryResult};
 pub use fixup::{apply_binds, apply_chained_fixups, apply_rebases, StubResolver, SymbolResolver};
+pub use fixup::data_symbols::DataSymbolStore;
 pub use initializer::call_constructors;
 pub use mapped::{MappedImage, MappedSegment};
-pub use registry::{ImageRegistry, LoadedImage, RegistryResolver};
+pub use tlv::patch_tlv_thunks;
+pub use registry::{ImageRegistry, LoadedImage, RegistryResolver, normalize_install_name};
 #[doc(hidden)]
 pub use security::checked_entry;
 pub use unwind::register_unwind_info;
@@ -78,4 +82,91 @@ pub enum ExecError {
 
     #[error("binary is encrypted (cryptid={crypt_id}), cannot execute")]
     EncryptedBinary { crypt_id: u32 },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn exec_error_display_mmap() {
+        let err = ExecError::MmapFailed {
+            segment: "__TEXT".into(),
+            source: std::io::Error::new(std::io::ErrorKind::PermissionDenied, "denied"),
+        };
+        let msg = err.to_string();
+        assert!(msg.contains("__TEXT"), "message: {msg}");
+        assert!(msg.contains("denied"), "message: {msg}");
+    }
+
+    #[test]
+    fn exec_error_display_mprotect() {
+        let err = ExecError::MprotectFailed {
+            segment: "__DATA".into(),
+            source: std::io::Error::new(std::io::ErrorKind::Other, "bad perm"),
+        };
+        assert!(err.to_string().contains("__DATA"));
+    }
+
+    #[test]
+    fn exec_error_display_segment_oob() {
+        let err = ExecError::SegmentOutOfBounds {
+            segment: "__TEXT".into(),
+            fileoff: 0x1000,
+            filesize: 0x2000,
+            binary_len: 0x1500,
+        };
+        let msg = err.to_string();
+        assert!(msg.contains("__TEXT"));
+        assert!(msg.contains("0x1000"));
+    }
+
+    #[test]
+    fn exec_error_display_fixup_segment_range() {
+        let err = ExecError::FixupSegmentOutOfRange {
+            index: 5,
+            count: 3,
+        };
+        let msg = err.to_string();
+        assert!(msg.contains("5"));
+        assert!(msg.contains("3"));
+    }
+
+    #[test]
+    fn exec_error_display_fixup_offset_oob() {
+        let err = ExecError::FixupOffsetOutOfBounds {
+            segment: "__DATA".into(),
+            offset: 0x9000,
+            size: 0x4000,
+        };
+        let msg = err.to_string();
+        assert!(msg.contains("__DATA"));
+        assert!(msg.contains("0x9000"));
+    }
+
+    #[test]
+    fn exec_error_display_security_denied() {
+        let err = ExecError::SecurityDenied {
+            reason: "quarantine flag set".into(),
+        };
+        assert!(err.to_string().contains("quarantine flag set"));
+    }
+
+    #[test]
+    fn exec_error_display_encrypted() {
+        let err = ExecError::EncryptedBinary { crypt_id: 42 };
+        assert!(err.to_string().contains("42"));
+    }
+
+    #[test]
+    fn exec_error_display_no_text() {
+        let err = ExecError::NoTextSegment;
+        assert!(err.to_string().contains("__TEXT"));
+    }
+
+    #[test]
+    fn exec_error_display_no_entry() {
+        let err = ExecError::NoEntryPoint;
+        assert!(err.to_string().contains("entry point"));
+    }
 }

@@ -54,7 +54,7 @@ impl DispatchShims {
         table.register(
             "_dispatch_async",
             shim_dispatch_async as u64,
-            "dispatch_async (inline)",
+            "dispatch_async (threaded)",
         );
         table.register(
             "_dispatch_sync",
@@ -164,20 +164,28 @@ extern "C" fn shim_dispatch_once_f(
 
 /// `void dispatch_async(dispatch_queue_t queue, dispatch_block_t block)`
 ///
-/// Executes the block inline. For programs that dispatch work for
-/// initialization or simple sequencing, this is semantically correct.
+/// Spawns a thread to execute the block asynchronously.
+/// SAFETY: The block must remain valid for the duration of execution.
+/// In practice, Mach-O blocks dispatched via dispatch_async are heap-allocated
+/// (copied by the compiler) and thus safe to use from another thread.
 extern "C" fn shim_dispatch_async(_queue: *const u8, block: *const u8) {
     if block.is_null() {
         log::warn!("dispatch_async called with null block");
         return;
     }
 
-    // Execute block inline (same invoke convention as dispatch_once).
-    // SAFETY: block is non-null, we trust Mach-O binary block layout.
-    unsafe {
-        let invoke_ptr = *(block.add(16) as *const extern "C" fn(*const u8));
-        invoke_ptr(block);
-    }
+    // Read the invoke pointer before spawning (block layout: isa(8) + flags(4) + reserved(4) + invoke(8))
+    let invoke_ptr = unsafe { *(block.add(16) as *const usize) };
+    let block_addr = block as usize;
+
+    std::thread::spawn(move || {
+        // SAFETY: block is heap-allocated (Block_copy'd by compiler for async dispatch),
+        // invoke pointer was read before spawn. We trust the Mach-O binary's block layout.
+        unsafe {
+            let invoke: extern "C" fn(*const u8) = std::mem::transmute(invoke_ptr);
+            invoke(block_addr as *const u8);
+        }
+    });
 }
 
 /// `void dispatch_sync(dispatch_queue_t queue, dispatch_block_t block)`
@@ -294,5 +302,84 @@ mod tests {
         let mut predicate: DispatchOnceT = 0;
         shim_dispatch_once_f(&mut predicate, std::ptr::null_mut(), None);
         assert_eq!(predicate, DISPATCH_ONCE_DONE);
+    }
+
+    #[test]
+    fn dispatch_get_global_queue_returns_non_null() {
+        let ptr = shim_dispatch_get_global_queue(0, 0);
+        assert!(!ptr.is_null());
+    }
+
+    #[test]
+    fn dispatch_get_global_queue_stable_across_calls() {
+        let p1 = shim_dispatch_get_global_queue(0, 0);
+        let p2 = shim_dispatch_get_global_queue(0, 0);
+        assert_eq!(p1, p2);
+    }
+
+    #[test]
+    fn dispatch_global_queue_differs_from_main_queue() {
+        let global = shim_dispatch_get_global_queue(0, 0);
+        let main = DISPATCH_MAIN_Q.as_ptr();
+        assert_ne!(global, main);
+    }
+
+    /// Helper: build a fake block struct on the heap with a given invoke function.
+    ///
+    /// Block layout: [isa: u64(8)] [flags: u32(4)] [reserved: u32(4)] [invoke: fn ptr(8)]
+    fn make_fake_block(invoke: extern "C" fn(*const u8)) -> *const u8 {
+        let block = vec![0u8; 24].into_boxed_slice();
+        let ptr = Box::into_raw(block) as *mut u8;
+        unsafe {
+            // Write invoke pointer at offset 16
+            *(ptr.add(16) as *mut usize) = invoke as usize;
+        }
+        ptr
+    }
+
+    #[test]
+    fn dispatch_async_executes_block() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::sync::Arc;
+
+        static FLAG: AtomicBool = AtomicBool::new(false);
+        FLAG.store(false, Ordering::SeqCst);
+
+        extern "C" fn set_flag(_block: *const u8) {
+            FLAG.store(true, Ordering::SeqCst);
+        }
+
+        let block = make_fake_block(set_flag);
+        shim_dispatch_async(std::ptr::null(), block);
+
+        // Wait for the spawned thread to finish (up to 1 second)
+        for _ in 0..100 {
+            if FLAG.load(Ordering::SeqCst) {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+
+        assert!(FLAG.load(Ordering::SeqCst), "dispatch_async block should have run");
+
+        // Leak the block — it's a test and reclaiming is tricky with threads
+    }
+
+    #[test]
+    fn dispatch_sync_executes_inline() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        static FLAG: AtomicBool = AtomicBool::new(false);
+        FLAG.store(false, Ordering::SeqCst);
+
+        extern "C" fn set_flag(_block: *const u8) {
+            FLAG.store(true, Ordering::SeqCst);
+        }
+
+        let block = make_fake_block(set_flag);
+        shim_dispatch_sync(std::ptr::null(), block);
+
+        // Should have run synchronously — flag is set immediately
+        assert!(FLAG.load(Ordering::SeqCst), "dispatch_sync block should have run inline");
     }
 }

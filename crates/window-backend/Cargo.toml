@@ -1,6 +1,6 @@
 [package]
 name        = "window-backend"
-description = "Windowing abstraction trait for burdetty-os GUI framework"
+description = "Windowing abstraction trait for burdettie-os GUI framework"
 version.workspace      = true
 edition.workspace      = true
 license.workspace      = true

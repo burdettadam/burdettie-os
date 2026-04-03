@@ -254,3 +254,126 @@ pub extern "C" fn shim_objc_move_weak(dst: u64, src: u64) {
     }
     map.remove(&src);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── @synchronized ──────────────────────────────────────────────
+
+    #[test]
+    fn sync_enter_null() {
+        assert_eq!(shim_objc_sync_enter(0), 0);
+    }
+
+    #[test]
+    fn sync_exit_null() {
+        assert_eq!(shim_objc_sync_exit(0), 0);
+    }
+
+    #[test]
+    fn sync_enter_exit_cycle() {
+        let obj = 0x1234u64;
+        assert_eq!(shim_objc_sync_enter(obj), 0);
+        assert_eq!(shim_objc_sync_exit(obj), 0);
+    }
+
+    #[test]
+    fn sync_enter_twice_same_object() {
+        let obj = 0xAAAAu64;
+        assert_eq!(shim_objc_sync_enter(obj), 0);
+        assert_eq!(shim_objc_sync_enter(obj), 0);
+        assert_eq!(shim_objc_sync_exit(obj), 0);
+        assert_eq!(shim_objc_sync_exit(obj), 0);
+    }
+
+    // ── Associated objects ─────────────────────────────────────────
+
+    #[test]
+    fn associated_set_get() {
+        let obj = 0x2000u64;
+        let key = 0x3000u64;
+        let val = 0x4000u64;
+        shim_objc_set_associated_object(obj, key, val, OBJC_ASSOCIATION_ASSIGN);
+        assert_eq!(shim_objc_get_associated_object(obj, key), val);
+    }
+
+    #[test]
+    fn associated_get_unset() {
+        let obj = 0x5000u64;
+        let key = 0x6000u64;
+        assert_eq!(shim_objc_get_associated_object(obj, key), 0);
+    }
+
+    #[test]
+    fn associated_remove() {
+        let obj = 0x7000u64;
+        let key = 0x8000u64;
+        shim_objc_set_associated_object(obj, key, 0x9000, OBJC_ASSOCIATION_ASSIGN);
+        shim_objc_remove_associated_objects(obj);
+        assert_eq!(shim_objc_get_associated_object(obj, key), 0);
+    }
+
+    #[test]
+    fn associated_null_obj() {
+        shim_objc_set_associated_object(0, 0x100, 0x200, OBJC_ASSOCIATION_ASSIGN);
+        assert_eq!(shim_objc_get_associated_object(0, 0x100), 0);
+    }
+
+    // ── Weak references ────────────────────────────────────────────
+
+    #[test]
+    fn init_weak_null_location() {
+        assert_eq!(shim_objc_init_weak(0, 0x5678), 0);
+    }
+
+    #[test]
+    fn init_weak_valid() {
+        let mut location: u64 = 0;
+        let addr = &mut location as *mut u64 as u64;
+        let ret = shim_objc_init_weak(addr, 0x5678);
+        assert_eq!(ret, 0x5678);
+        assert_eq!(shim_objc_load_weak(addr), 0x5678);
+    }
+
+    #[test]
+    fn destroy_weak_null() {
+        shim_objc_destroy_weak(0);
+    }
+
+    #[test]
+    fn store_weak_updates() {
+        let mut location: u64 = 0;
+        let addr = &mut location as *mut u64 as u64;
+        shim_objc_init_weak(addr, 0xAAAA);
+        let ret = shim_objc_store_weak(addr, 0xBBBB);
+        assert_eq!(ret, 0xBBBB);
+        assert_eq!(shim_objc_load_weak(addr), 0xBBBB);
+    }
+
+    #[test]
+    fn copy_weak_copies_value() {
+        let mut src: u64 = 0;
+        let mut dst: u64 = 0;
+        let src_addr = &mut src as *mut u64 as u64;
+        let dst_addr = &mut dst as *mut u64 as u64;
+        shim_objc_init_weak(src_addr, 0xCCCC);
+        shim_objc_copy_weak(dst_addr, src_addr);
+        assert_eq!(shim_objc_load_weak(dst_addr), 0xCCCC);
+        // Source still intact after copy
+        assert_eq!(shim_objc_load_weak(src_addr), 0xCCCC);
+    }
+
+    #[test]
+    fn move_weak_transfers() {
+        let mut src: u64 = 0;
+        let mut dst: u64 = 0;
+        let src_addr = &mut src as *mut u64 as u64;
+        let dst_addr = &mut dst as *mut u64 as u64;
+        shim_objc_init_weak(src_addr, 0xDDDD);
+        shim_objc_move_weak(dst_addr, src_addr);
+        assert_eq!(shim_objc_load_weak(dst_addr), 0xDDDD);
+        // Source cleared after move
+        assert_eq!(shim_objc_load_weak(src_addr), 0);
+    }
+}

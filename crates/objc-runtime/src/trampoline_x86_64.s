@@ -1,4 +1,4 @@
-// x86_64 objc_msgSend trampoline for burdetty-os.
+// x86_64 objc_msgSend trampoline for burdettie-os.
 //
 // Preserves the entire argument register file (rdi-r9, xmm0-7) across
 // the class-table lookup, then tail-calls the resolved IMP. This is

@@ -1,22 +1,32 @@
-//! In-process Mach-O execution (macOS only).
+//! In-process Mach-O execution.
 
-#[cfg(target_os = "macos")]
-use macho_exec::{call_constructors, call_entry, ImageRegistry, StubResolver};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+use macho_exec::{call_constructors, call_entry_with_args, DataSymbolStore, EntryArgs, ImageRegistry, StubResolver, SymbolResolver, normalize_install_name};
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 use macho_parse::{parse, ParsedMachO};
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+use macho_objc::parse_objc_metadata;
 
-#[cfg(target_os = "macos")]
-pub fn print_exec(parsed: &ParsedMachO, data: &[u8], binary_path: &std::path::Path) {
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+pub fn print_exec(parsed: &ParsedMachO, data: &[u8], binary_path: &std::path::Path, guest_args: &[String]) {
     println!("=== In-Process Execution ===");
 
+    #[cfg(target_os = "macos")]
     let mapper = std::sync::Arc::new(platform_darwin_host::DarwinMemoryMapper);
+    #[cfg(target_os = "linux")]
+    let mapper = std::sync::Arc::new(platform_linux::LinuxMemoryMapper);
+
+    #[cfg(target_os = "macos")]
     let unwind = std::sync::Arc::new(platform_darwin_host::DarwinUnwindRegistry);
+    #[cfg(target_os = "linux")]
+    let unwind = std::sync::Arc::new(platform_linux::LinuxUnwindRegistry::new());
+
     let mut registry = ImageRegistry::new(mapper, unwind);
     let binary_dir = binary_path.parent().unwrap_or(std::path::Path::new("."));
 
     // Recursively load dylib dependencies (breadth-first).
     // Start with the main binary's direct deps, then process each loaded dylib's deps.
-    let mut queue: std::collections::VecDeque<(String, Vec<String>)> =
+    let mut queue: std::collections::VecDeque<(String, Vec<String>, std::path::PathBuf)> =
         std::collections::VecDeque::new();
 
     // Seed with main binary's deps and rpaths
@@ -25,15 +35,16 @@ pub fn print_exec(parsed: &ParsedMachO, data: &[u8], binary_path: &std::path::Pa
         if dlib.name.starts_with("/usr/lib/") || dlib.name.starts_with("/System/") {
             continue;
         }
-        queue.push_back((dlib.name.clone(), app_rpaths.clone()));
+        queue.push_back((dlib.name.clone(), app_rpaths.clone(), binary_dir.to_path_buf()));
     }
 
     // Load deps breadth-first
-    while let Some((install_name, rpaths)) = queue.pop_front() {
+    while let Some((raw_name, rpaths, loader_dir)) = queue.pop_front() {
+        let install_name = normalize_install_name(&raw_name);
         if registry.get(&install_name).is_some() {
             continue; // already loaded
         }
-        let resolved = resolve_dylib_path(&install_name, &rpaths, binary_dir);
+        let resolved = resolve_dylib_path(&install_name, &rpaths, binary_dir, &loader_dir);
         let Some(path) = resolved else {
             println!("  [skip] {install_name}: not found locally");
             continue;
@@ -45,31 +56,56 @@ pub fn print_exec(parsed: &ParsedMachO, data: &[u8], binary_path: &std::path::Pa
                 continue;
             }
         };
-        // Parse to get sub-dependencies before loading
-        let sub_parsed = match parse(&dylib_data) {
-            Ok(p) => p,
-            Err(e) => {
-                println!("  [warn] parse {install_name} failed: {e}");
-                continue;
+        // Parse to get sub-dependencies before loading (handle fat binaries)
+        let (sub_parsed, dylib_data) = if macho_parse::is_fat(&dylib_data) {
+            let preferred = macho_types::header::CpuType::Arm64;
+            match macho_parse::parse_auto(&dylib_data, preferred) {
+                Ok(p) => {
+                    let slice = macho_parse::fat_slice_for_cpu(&dylib_data, preferred)
+                        .map(|s| s.to_vec())
+                        .unwrap_or(dylib_data);
+                    (p, slice)
+                }
+                Err(e) => {
+                    println!("  [warn] parse fat {install_name} failed: {e}");
+                    continue;
+                }
+            }
+        } else {
+            match parse(&dylib_data) {
+                Ok(p) => (p, dylib_data),
+                Err(e) => {
+                    println!("  [warn] parse {install_name} failed: {e}");
+                    continue;
+                }
             }
         };
         let sub_rpaths = sub_parsed.rpaths.clone();
+        let sub_loader_dir = path.parent().unwrap_or(binary_dir).to_path_buf();
         for sub_dlib in &sub_parsed.dylibs {
             if sub_dlib.name.starts_with("/usr/lib/") || sub_dlib.name.starts_with("/System/") {
                 continue;
             }
             if registry.get(&sub_dlib.name).is_none() {
-                queue.push_back((sub_dlib.name.clone(), sub_rpaths.clone()));
+                queue.push_back((sub_dlib.name.clone(), sub_rpaths.clone(), sub_loader_dir.clone()));
             }
         }
-        match registry.load(&install_name, dylib_data) {
+        match registry.load_preparsed(
+            &install_name,
+            std::sync::Arc::new(sub_parsed),
+            std::sync::Arc::from(dylib_data),
+        ) {
             Ok(_) => println!("  Loaded {install_name} ({})", path.display()),
             Err(e) => println!("  [warn] load {install_name} failed: {e}"),
         }
     }
 
     // Load the main binary
-    let app_idx = match registry.load("__main__", data.to_vec()) {
+    let app_idx = match registry.load_preparsed(
+        "__main__",
+        std::sync::Arc::new(parsed.clone()),
+        std::sync::Arc::from(data.to_vec()),
+    ) {
         Ok(idx) => idx,
         Err(e) => {
             eprintln!("  map failed: {e}");
@@ -81,25 +117,140 @@ pub fn print_exec(parsed: &ParsedMachO, data: &[u8], binary_path: &std::path::Pa
         registry.images().len()
     );
 
-    // Apply all fixups with cross-image resolution
+    // Build shim table so Foundation/CF/ObjC/XCStringsParser symbols resolve
+    let process_name = binary_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("app")
+        .to_string();
+    let program_path = binary_path.to_string_lossy().to_string();
+    let shim_config = libsystem_shims::ShimConfig {
+        process_name: process_name.clone(),
+        executable_path: program_path.clone(),
+        argc: 1 + guest_args.len() as i32,
+        argv: std::iter::once(program_path.clone())
+            .chain(guest_args.iter().cloned())
+            .collect(),
+        env: Vec::new(),
+    };
+    let shim_set = macho_runtime::ShimSet::default();
+    let ctx = macho_runtime::RuntimeContext::new(&shim_config, &shim_set);
+    println!("  Shims installed: {}", ctx.shim_table.len());
+
+    // Apply all fixups with composite resolver (shim table → stub resolver)
+    #[cfg(target_os = "macos")]
     let host_syms: std::sync::Arc<dyn platform_core::symbols::HostSymbolResolver> =
         std::sync::Arc::new(platform_darwin_host::DarwinSymbolResolver::new());
+    #[cfg(target_os = "linux")]
+    let host_syms: std::sync::Arc<dyn platform_core::symbols::HostSymbolResolver> =
+        std::sync::Arc::new(platform_linux::LinuxSymbolResolver::new());
+
+    objc_runtime::set_host_symbols(host_syms.clone());
+
+    #[cfg(target_os = "macos")]
+    objc_runtime::set_allocator(std::sync::Arc::new(platform_darwin_host::DarwinAllocator));
+    #[cfg(target_os = "linux")]
+    objc_runtime::set_allocator(std::sync::Arc::new(platform_linux::LinuxAllocator));
+
+    #[cfg(target_os = "macos")]
+    objc_runtime::set_threading(std::sync::Arc::new(platform_darwin_host::PosixThreading));
+    #[cfg(target_os = "linux")]
+    objc_runtime::set_threading(std::sync::Arc::new(platform_linux::LinuxThreading));
+
     let stub = StubResolver::new(host_syms);
-    if let Err(e) = registry.apply_all_fixups(&stub) {
+    let data_symbols = DataSymbolStore::new();
+    let composite = macho_runtime::CompositeResolver::new(&ctx.shim_table, &data_symbols, Some(&stub));
+    if let Err(e) = registry.apply_all_fixups(&composite) {
         eprintln!("  fixup failed: {e}");
         return;
     }
     println!("  Fixups applied across all images");
 
-    // Protect all images
+    // Register ObjC metadata from all loaded images
+    {
+        let mut objc_rt = objc_runtime::ObjcRuntime::new();
+        let mut image_metadata: Vec<(macho_objc::ObjcMetadata, i64)> = Vec::new();
+
+        for loaded in registry.images() {
+            let metadata = parse_objc_metadata(&loaded.parsed, &loaded.data);
+            if metadata.presence.has_objc {
+                objc_rt.register_image(&metadata, loaded.image.slide);
+                image_metadata.push((metadata, loaded.image.slide));
+            }
+        }
+
+        // Selref fixups
+        for (metadata, slide) in &image_metadata {
+            if !metadata.selref_addrs.is_empty() {
+                objc_rt.fixup_selrefs(metadata, *slide);
+            }
+        }
+
+        macho_runtime::objc_setup::register_guest_compat_classes_from_registry(
+            &mut objc_rt,
+            &registry,
+        );
+
+        // Synthetic Foundation classes
+        let config = macho_runtime::RuntimeConfig::permissive(binary_path);
+        let tracer = macho_runtime::RuntimeTracer::new();
+        macho_runtime::objc_setup::register_foundation_classes(
+            &mut objc_rt, &config, &tracer,
+        );
+
+        // Cross-image categories (after Foundation classes so categories
+        // targeting Foundation classes can find their targets)
+        for (metadata, slide) in &image_metadata {
+            if !metadata.categories.is_empty() {
+                objc_rt.merge_categories_post_fixup(metadata, *slide);
+            }
+        }
+
+        // Superclass repair
+        unsafe { objc_rt.repair_superclass_addrs(); }
+
+        *objc_runtime::OBJC_RUNTIME
+            .write()
+            .unwrap_or_else(|e| e.into_inner()) = Some(objc_rt);
+
+        println!(
+            "  ObjC runtime: {} classes registered",
+            image_metadata.iter().map(|(m, _)| m.class_refs.len()).sum::<usize>(),
+        );
+    }
+
+    // Patch TLV thunks before protect() makes __DATA read-only
+    let mut total_tlv = 0;
     for loaded in registry.images() {
-        if let Err(e) = loaded.image.protect() {
-            eprintln!("  mprotect failed: {e}");
+        total_tlv += macho_exec::patch_tlv_thunks(&loaded.image, &loaded.parsed, &loaded.data);
+    }
+    if total_tlv > 0 {
+        println!("  Patched {total_tlv} TLV descriptors");
+    }
+
+    // Diagnostic: check critical symbol resolutions
+    for sym in &["_objc_msgSend", "_OBJC_CLASS_$_NSObject"] {
+        let addr = composite.resolve(sym);
+        println!("  [diag] {sym} → {addr:#x?}");
+    }
+    // Show slide
+    let app_loaded = &registry.images()[app_idx];
+    println!("  [diag] slide = {:#x}", app_loaded.image.slide);
+
+
+    // Call constructors for each image (in load order = bottom-up)
+    // Phase 1: patch known crash sites while __TEXT is still writable.
+    for loaded in registry.images() {
+        macho_exec::patch::patch_known_crashes(&loaded.image, &loaded.parsed);
+    }
+    // Phase 2: make __TEXT executable so constructors can run.
+    // __DATA_CONST stays writable — C++ static initializers may write there.
+    for loaded in registry.images() {
+        if let Err(e) = loaded.image.protect_executable() {
+            eprintln!("  mprotect (text) failed: {e}");
             return;
         }
     }
-
-    // Call constructors for each image (in load order = bottom-up)
     let mut total_ctors = 0;
     for loaded in registry.images() {
         let inits = macho_objc::extract_initializers(&loaded.parsed, &loaded.data);
@@ -117,6 +268,14 @@ pub fn print_exec(parsed: &ParsedMachO, data: &[u8], binary_path: &std::path::Pa
         println!("  Called {total_ctors} constructors");
     }
 
+    // Phase 2: finalize all protections (__DATA_CONST → R)
+    for loaded in registry.images() {
+        if let Err(e) = loaded.image.protect() {
+            eprintln!("  mprotect failed: {e}");
+            return;
+        }
+    }
+
     // Call entry
     let app = &registry.images()[app_idx];
     let Some(entry) = &app.parsed.entry else {
@@ -124,9 +283,19 @@ pub fn print_exec(parsed: &ParsedMachO, data: &[u8], binary_path: &std::path::Pa
         return;
     };
 
+    let entry_args = EntryArgs {
+        program_name: program_path,
+        args: guest_args.to_vec(),
+        env: Vec::new(),
+    };
+
+    if !guest_args.is_empty() {
+        println!("  Guest args: {:?}", guest_args);
+    }
     println!("  Calling entry...");
+
     println!("  ── output ──");
-    match call_entry(&app.image, entry) {
+    match call_entry_with_args(&app.image, entry, Some(&entry_args)) {
         Ok(result) => {
             println!("  ── end ──");
             println!("  Exit code: {}", result.exit_code);
@@ -138,20 +307,23 @@ pub fn print_exec(parsed: &ParsedMachO, data: &[u8], binary_path: &std::path::Pa
 }
 
 /// Resolve a dylib install name to a local path using rpaths.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 fn resolve_dylib_path(
     name: &str,
     rpaths: &[String],
     binary_dir: &std::path::Path,
+    loader_dir: &std::path::Path,
 ) -> Option<std::path::PathBuf> {
     if let Some(rest) = name.strip_prefix("@rpath/") {
         for rpath in rpaths {
-            let resolved_rpath = if rpath == "@executable_path" || rpath == "@loader_path" {
+            let resolved_rpath = if rpath == "@executable_path" {
                 binary_dir.to_path_buf()
+            } else if rpath == "@loader_path" {
+                loader_dir.to_path_buf()
             } else if let Some(r) = rpath.strip_prefix("@executable_path/") {
                 binary_dir.join(r)
             } else if let Some(r) = rpath.strip_prefix("@loader_path/") {
-                binary_dir.join(r)
+                loader_dir.join(r)
             } else {
                 std::path::PathBuf::from(rpath)
             };
@@ -171,7 +343,7 @@ fn resolve_dylib_path(
             return Some(candidate);
         }
     } else if let Some(rest) = name.strip_prefix("@loader_path/") {
-        let candidate = binary_dir.join(rest);
+        let candidate = loader_dir.join(rest);
         if candidate.exists() {
             return Some(candidate);
         }

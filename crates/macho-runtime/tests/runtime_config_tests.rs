@@ -13,7 +13,6 @@ use common::{RuntimeConfig, ShimSet};
 fn permissive_config_defaults() {
     let path = PathBuf::from("/tmp/test-binary");
     let config = RuntimeConfig::permissive(&path);
-    assert!(config.host_fallback);
     assert!(config.security_policy.is_none());
     assert_eq!(config.process_name, "test-binary");
 }
@@ -23,7 +22,6 @@ fn secure_config_has_policy() {
     let path = PathBuf::from("/tmp/test-binary");
     let config = RuntimeConfig::secure(&path);
     assert!(config.security_policy.is_some());
-    assert!(config.host_fallback);
 }
 
 #[test]
@@ -49,11 +47,13 @@ fn context_installs_all_shims() {
     let shim_set = ShimSet::default();
     let ctx = RuntimeContext::new(&config, &shim_set);
 
-    // Shim count (updated after adding objc_setProperty_nonatomic_copy shim)
-    #[cfg(target_os = "macos")]
-    assert_eq!(ctx.shim_table.len(), 351);
-    #[cfg(not(target_os = "macos"))]
-    assert_eq!(ctx.shim_table.len(), 351);
+    // Keep this as a floor rather than an exact value: the runtime keeps
+    // growing shim coverage, and exact-count assertions become noisy churn.
+    assert!(
+        ctx.shim_table.len() >= 450,
+        "expected full runtime shim install to retain broad coverage"
+    );
+    assert_eq!(ctx.shim_table.len(), ctx.shim_table.symbol_names().len());
 }
 
 #[test]
@@ -73,11 +73,74 @@ fn context_respects_shim_set() {
         objc: false,
         foundation: false,
         random: false,
+        darwin_stubs: false,
     };
     let ctx = RuntimeContext::new(&config, &shim_set);
 
     // Only TLS shims: 2
     assert_eq!(ctx.shim_table.len(), 2);
+}
+
+#[test]
+fn context_installs_representative_symbols_for_each_shim_family() {
+    use libsystem_shims::ShimConfig;
+    use macho_runtime::RuntimeContext;
+
+    let config = ShimConfig::default();
+    let ctx = RuntimeContext::new(&config, &ShimSet::default());
+
+    for symbol in [
+        "__NSGetExecutablePath",
+        "__tlv_bootstrap",
+        "_dispatch_once",
+        "_pthread_self",
+        "_mach_absolute_time",
+        "___cxa_atexit",
+        "_ptrauth_strip",
+        "_objc_msgSend",
+        "_NSLog",
+        "_arc4random",
+    ] {
+        assert!(
+            ctx.shim_table.resolve(symbol).is_some(),
+            "expected representative shim symbol {symbol} to be installed"
+        );
+    }
+}
+
+#[test]
+fn context_can_disable_foundation_without_affecting_objc_or_tls() {
+    use libsystem_shims::ShimConfig;
+    use macho_runtime::RuntimeContext;
+
+    let config = ShimConfig::default();
+    let shim_set = ShimSet {
+        process: false,
+        tls: true,
+        dispatch: false,
+        pthread: false,
+        mach: false,
+        lifecycle: false,
+        ptrauth: false,
+        objc: true,
+        foundation: false,
+        random: false,
+        darwin_stubs: false,
+    };
+    let ctx = RuntimeContext::new(&config, &shim_set);
+
+    assert!(ctx.shim_table.resolve("__tlv_bootstrap").is_some());
+    assert!(ctx.shim_table.resolve("_objc_msgSend").is_some());
+    assert!(
+        ctx.shim_table.resolve("_NSLog").is_none(),
+        "Foundation shims should be absent when foundation=false"
+    );
+    assert!(
+        ctx.shim_table
+            .resolve("___CFConstantStringClassReference")
+            .is_none(),
+        "CF/Foundation symbols should be absent when foundation=false"
+    );
 }
 
 // ── Resolver composition tests ────────────────────────────────────────
@@ -100,14 +163,15 @@ fn composite_resolver_shim_priority() {
             std::sync::Arc::new(platform_linux::LinuxSymbolResolver::new());
         StubResolver::new(host)
     };
-    let resolver = CompositeResolver::new(&table, Some(&stub));
+    let data = macho_exec::DataSymbolStore::new();
+    let resolver = CompositeResolver::new(&table, &data, Some(&stub));
 
     // Should get our shim address, not the host's
     assert_eq!(resolver.resolve("_printf"), Some(0xCAFE));
 }
 
 #[test]
-fn composite_resolver_host_fallback() {
+fn composite_resolver_always_uses_stub() {
     use libsystem_shims::ShimTable;
     use macho_exec::{StubResolver, SymbolResolver};
     use macho_runtime::CompositeResolver;
@@ -122,8 +186,9 @@ fn composite_resolver_host_fallback() {
             std::sync::Arc::new(platform_linux::LinuxSymbolResolver::new());
         StubResolver::new(host)
     };
-    let resolver = CompositeResolver::new(&table, Some(&stub));
+    let data = macho_exec::DataSymbolStore::new();
+    let resolver = CompositeResolver::new(&table, &data, Some(&stub));
 
-    // strlen should resolve via host
+    // strlen should resolve via the always-active safe-symbol StubResolver
     assert!(resolver.resolve("_strlen").is_some());
 }

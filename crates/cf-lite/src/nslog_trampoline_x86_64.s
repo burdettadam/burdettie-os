@@ -1,4 +1,4 @@
-// x86_64 NSLog variadic trampoline for burdetty-os.
+// x86_64 NSLog variadic trampoline for burdettie-os.
 //
 // On x86_64 System V ABI, variadic args are passed in registers —
 // the same registers as non-variadic calls:

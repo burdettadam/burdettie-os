@@ -11,3 +11,33 @@ impl Rng for DarwinRng {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fill_bytes_not_all_zero() {
+        let rng = DarwinRng;
+        let mut buf = [0u8; 64];
+        rng.fill_bytes(&mut buf);
+        assert!(buf.iter().any(|&b| b != 0));
+    }
+
+    #[test]
+    fn fill_bytes_zero_length() {
+        let rng = DarwinRng;
+        let mut buf = [];
+        rng.fill_bytes(&mut buf); // should not crash
+    }
+
+    #[test]
+    fn fill_bytes_different_each_call() {
+        let rng = DarwinRng;
+        let mut a = [0u8; 32];
+        let mut b = [0u8; 32];
+        rng.fill_bytes(&mut a);
+        rng.fill_bytes(&mut b);
+        assert_ne!(a, b);
+    }
+}

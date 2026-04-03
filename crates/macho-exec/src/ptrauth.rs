@@ -80,28 +80,20 @@ pub struct AuthMetadata {
 impl AuthMetadata {
     /// Extract auth metadata from an ARM64e auth bind/rebase raw value.
     ///
-    /// For auth entries (bit 63 set), the layout is:
+    /// ARM64e auth entries (bit 63 set) share this layout in the upper bits:
+    /// - Bits 32-47: diversity (16 bits)
+    /// - Bit 48: addrDiv (address diversity)
     /// - Bits 49-50: key (2 bits)
-    /// - Bit 51: addrDiv (address diversity)
-    /// - Bits 52-63: diversity (16 bits, but only 12 available in some formats)
+    /// - Bits 51-61: next (11 bits — not extracted here)
+    /// - Bit 62: bind flag
+    /// - Bit 63: auth flag
     ///
-    /// For format 1/12 auth bind:
-    /// - Bits 0-15: ordinal
-    /// - Bits 16-31: diversity (16 bits)
-    /// - Bits 32-42: next
-    /// - Bits 43-44: key
-    /// - Bit 45: addrDiv
-    ///
-    /// For format 1/12 auth rebase:
-    /// - Bits 0-31: target
-    /// - Bits 32-42: next
-    /// - Bits 43-44: key
-    /// - Bit 45: addrDiv
-    /// - Bits 46-61: diversity
+    /// For auth rebase, bits 0-31 are the target.
+    /// For auth bind, bits 0-15 are the ordinal, bits 16-31 are zero.
     pub fn from_auth_entry(raw: u64) -> Self {
-        let key = PacKey::from_bits((raw >> 43) & 0x3);
-        let addr_diversity = (raw >> 45) & 1 == 1;
-        let diversity = ((raw >> 46) & 0xFFFF) as u16;
+        let diversity = ((raw >> 32) & 0xFFFF) as u16;
+        let addr_diversity = (raw >> 48) & 1 == 1;
+        let key = PacKey::from_bits((raw >> 49) & 0x3);
         AuthMetadata {
             key,
             addr_diversity,
@@ -109,16 +101,9 @@ impl AuthMetadata {
         }
     }
 
-    /// Extract auth metadata from a bind entry where diversity is at bits 16-31.
+    /// Extract auth metadata from a bind entry (same layout as rebase for format 12).
     pub fn from_auth_bind(raw: u64) -> Self {
-        let key = PacKey::from_bits((raw >> 43) & 0x3);
-        let addr_diversity = (raw >> 45) & 1 == 1;
-        let diversity = ((raw >> 16) & 0xFFFF) as u16;
-        AuthMetadata {
-            key,
-            addr_diversity,
-            diversity,
-        }
+        Self::from_auth_entry(raw)
     }
 }
 
@@ -129,6 +114,93 @@ impl AuthMetadata {
 #[inline]
 pub fn has_pac_bits(ptr: u64) -> bool {
     ptr & 0xFFFF_0000_0000_0000 != 0
+}
+
+/// Blend a pointer address and a 16-bit integer into a PAC discriminator.
+///
+/// Matches Apple's `ptrauth_blend_discriminator`:
+///   `(uint64_t(diversity) << 48) | (addr & 0xFFFF)`
+#[inline]
+pub fn blend_discriminator(addr: u64, diversity: u16) -> u64 {
+    ((diversity as u64) << 48) | (addr & 0xFFFF)
+}
+
+/// Sign a pointer with the specified PAC key and discriminator.
+///
+/// On ARM64 with PAC support (Apple Silicon), uses hardware PACIA/PACIB/PACDA/PACDB
+/// instructions. On other architectures, returns the pointer unchanged.
+///
+/// # Arguments
+/// * `value` — the raw pointer/address to sign
+/// * `key` — which PAC key to use
+/// * `slot_addr` — address of the GOT slot (for address diversity)
+/// * `diversity` — 16-bit diversity value from the fixup entry
+/// * `addr_div` — whether address diversity is enabled
+///
+/// # Safety
+/// The caller must ensure `value` is a valid pointer for the target context.
+pub unsafe fn pac_sign_pointer(
+    value: u64,
+    key: PacKey,
+    slot_addr: u64,
+    diversity: u16,
+    addr_div: bool,
+) -> u64 {
+    if value == 0 {
+        return 0;
+    }
+    let modifier = if addr_div {
+        blend_discriminator(slot_addr, diversity)
+    } else {
+        diversity as u64
+    };
+    pac_sign_raw(value, key, modifier)
+}
+
+/// Sign a pointer with a PAC key and pre-computed modifier.
+///
+/// # Safety
+/// Caller ensures `value` is a valid address.
+#[cfg(all(target_arch = "aarch64", target_os = "macos"))]
+unsafe fn pac_sign_raw(value: u64, key: PacKey, modifier: u64) -> u64 {
+    let result: u64;
+    match key {
+        PacKey::IA => {
+            core::arch::asm!(
+                "pacia {ptr}, {mod}",
+                ptr = inout(reg) value => result,
+                mod = in(reg) modifier,
+            );
+        }
+        PacKey::IB => {
+            core::arch::asm!(
+                "pacib {ptr}, {mod}",
+                ptr = inout(reg) value => result,
+                mod = in(reg) modifier,
+            );
+        }
+        PacKey::DA => {
+            core::arch::asm!(
+                "pacda {ptr}, {mod}",
+                ptr = inout(reg) value => result,
+                mod = in(reg) modifier,
+            );
+        }
+        PacKey::DB => {
+            core::arch::asm!(
+                "pacdb {ptr}, {mod}",
+                ptr = inout(reg) value => result,
+                mod = in(reg) modifier,
+            );
+        }
+    }
+    result
+}
+
+#[cfg(not(all(target_arch = "aarch64", target_os = "macos")))]
+unsafe fn pac_sign_raw(value: u64, _key: PacKey, _modifier: u64) -> u64 {
+    // No hardware PAC support; return unsigned pointer.
+    value
 }
 
 #[cfg(test)]
@@ -172,9 +244,12 @@ mod tests {
 
     #[test]
     fn auth_metadata_from_rebase() {
-        // Simulate: key=IA (0), addrDiv=1, diversity=0x1234
-        // Bits 43-44 = 0b00, bit 45 = 1, bits 46-61 = 0x1234
-        let raw: u64 = (1u64 << 45) | (0x1234u64 << 46) | (1u64 << 63);
+        // Simulate auth rebase: key=IA (0), addrDiv=1, diversity=0x1234
+        // Bits 32-47 = diversity = 0x1234
+        // Bit 48 = addrDiv = 1
+        // Bits 49-50 = key = 0b00 (IA)
+        // Bit 63 = auth = 1
+        let raw: u64 = (0x1234u64 << 32) | (1u64 << 48) | (1u64 << 63);
         let meta = AuthMetadata::from_auth_entry(raw);
         assert_eq!(meta.key, PacKey::IA);
         assert!(meta.addr_diversity);
@@ -183,11 +258,16 @@ mod tests {
 
     #[test]
     fn auth_metadata_from_bind() {
-        // Simulate auth bind: key=IA (0), addrDiv=1, diversity at bits 16-31 = 0x0000
-        let raw: u64 = (1u64 << 45) | (1u64 << 63) | (1u64 << 62);
+        // Simulate auth bind: key=DA (2), addrDiv=0, diversity=0xABCD
+        // Bits 32-47 = diversity = 0xABCD
+        // Bit 48 = addrDiv = 0
+        // Bits 49-50 = key = 0b10 (DA)
+        // Bit 62 = bind = 1
+        // Bit 63 = auth = 1
+        let raw: u64 = (0xABCDu64 << 32) | (2u64 << 49) | (1u64 << 62) | (1u64 << 63);
         let meta = AuthMetadata::from_auth_bind(raw);
-        assert_eq!(meta.key, PacKey::IA);
-        assert!(meta.addr_diversity);
-        assert_eq!(meta.diversity, 0);
+        assert_eq!(meta.key, PacKey::DA);
+        assert!(!meta.addr_diversity);
+        assert_eq!(meta.diversity, 0xABCD);
     }
 }

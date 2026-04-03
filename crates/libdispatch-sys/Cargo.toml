@@ -1,0 +1,17 @@
+[package]
+name        = "libdispatch-sys"
+description = "Raw FFI bindings to Apple's libdispatch (GCD)"
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+rust-version.workspace = true
+links = "dispatch"
+
+[dependencies]
+libc.workspace = true
+
+[build-dependencies]
+pkg-config = "0.3"
+
+[lints]
+workspace = true

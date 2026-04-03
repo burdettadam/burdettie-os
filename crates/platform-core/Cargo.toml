@@ -1,6 +1,6 @@
 [package]
 name         = "platform-core"
-description  = "Platform abstraction traits for burdetty-os"
+description  = "Platform abstraction traits for burdettie-os"
 version.workspace      = true
 edition.workspace      = true
 license.workspace      = true

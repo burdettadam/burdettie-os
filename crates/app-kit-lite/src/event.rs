@@ -27,4 +27,11 @@ pub enum Event {
     MouseMoved {
         location: Point,
     },
+    ScrollWheel {
+        delta_x: f64,
+        delta_y: f64,
+    },
+    CharacterInput {
+        text: String,
+    },
 }

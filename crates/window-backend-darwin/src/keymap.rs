@@ -50,6 +50,52 @@ pub fn map_winit_key(key: winit::keyboard::KeyCode) -> KeyCode {
         WK::ArrowRight => KeyCode::Right,
         WK::ArrowUp => KeyCode::Up,
         WK::ArrowDown => KeyCode::Down,
+        // Function keys
+        WK::F1 => KeyCode::F1,
+        WK::F2 => KeyCode::F2,
+        WK::F3 => KeyCode::F3,
+        WK::F4 => KeyCode::F4,
+        WK::F5 => KeyCode::F5,
+        WK::F6 => KeyCode::F6,
+        WK::F7 => KeyCode::F7,
+        WK::F8 => KeyCode::F8,
+        WK::F9 => KeyCode::F9,
+        WK::F10 => KeyCode::F10,
+        WK::F11 => KeyCode::F11,
+        WK::F12 => KeyCode::F12,
+        // Navigation
+        WK::Home => KeyCode::Home,
+        WK::End => KeyCode::End,
+        WK::PageUp => KeyCode::PageUp,
+        WK::PageDown => KeyCode::PageDown,
+        WK::Insert => KeyCode::Insert,
+        // Punctuation / symbols
+        WK::Minus => KeyCode::Minus,
+        WK::Equal => KeyCode::Equal,
+        WK::BracketLeft => KeyCode::LeftBracket,
+        WK::BracketRight => KeyCode::RightBracket,
+        WK::Backslash => KeyCode::Backslash,
+        WK::Semicolon => KeyCode::Semicolon,
+        WK::Quote => KeyCode::Quote,
+        WK::Comma => KeyCode::Comma,
+        WK::Period => KeyCode::Period,
+        WK::Slash => KeyCode::Slash,
+        WK::Backquote => KeyCode::Grave,
+        // Modifier keys
+        WK::ShiftLeft => KeyCode::LeftShift,
+        WK::ShiftRight => KeyCode::RightShift,
+        WK::ControlLeft => KeyCode::LeftControl,
+        WK::ControlRight => KeyCode::RightControl,
+        WK::AltLeft => KeyCode::LeftAlt,
+        WK::AltRight => KeyCode::RightAlt,
+        WK::SuperLeft => KeyCode::LeftSuper,
+        WK::SuperRight => KeyCode::RightSuper,
+        // Lock / media keys
+        WK::CapsLock => KeyCode::CapsLock,
+        WK::NumLock => KeyCode::NumLock,
+        WK::ScrollLock => KeyCode::ScrollLock,
+        WK::PrintScreen => KeyCode::PrintScreen,
+        WK::Pause => KeyCode::Pause,
         other => KeyCode::Unknown(other as u32),
     }
 }
@@ -112,5 +158,69 @@ mod tests {
             map_winit_mouse(winit::event::MouseButton::Middle),
             MouseButton::Middle
         );
+    }
+
+    #[test]
+    fn map_key_function_keys() {
+        use winit::keyboard::KeyCode as WK;
+        assert_eq!(map_winit_key(WK::F1), KeyCode::F1);
+        assert_eq!(map_winit_key(WK::F2), KeyCode::F2);
+        assert_eq!(map_winit_key(WK::F3), KeyCode::F3);
+        assert_eq!(map_winit_key(WK::F4), KeyCode::F4);
+        assert_eq!(map_winit_key(WK::F5), KeyCode::F5);
+        assert_eq!(map_winit_key(WK::F6), KeyCode::F6);
+        assert_eq!(map_winit_key(WK::F7), KeyCode::F7);
+        assert_eq!(map_winit_key(WK::F8), KeyCode::F8);
+        assert_eq!(map_winit_key(WK::F9), KeyCode::F9);
+        assert_eq!(map_winit_key(WK::F10), KeyCode::F10);
+        assert_eq!(map_winit_key(WK::F11), KeyCode::F11);
+        assert_eq!(map_winit_key(WK::F12), KeyCode::F12);
+    }
+
+    #[test]
+    fn map_key_navigation() {
+        use winit::keyboard::KeyCode as WK;
+        assert_eq!(map_winit_key(WK::Home), KeyCode::Home);
+        assert_eq!(map_winit_key(WK::End), KeyCode::End);
+        assert_eq!(map_winit_key(WK::PageUp), KeyCode::PageUp);
+        assert_eq!(map_winit_key(WK::PageDown), KeyCode::PageDown);
+        assert_eq!(map_winit_key(WK::Insert), KeyCode::Insert);
+    }
+
+    #[test]
+    fn map_key_punctuation() {
+        use winit::keyboard::KeyCode as WK;
+        assert_eq!(map_winit_key(WK::Minus), KeyCode::Minus);
+        assert_eq!(map_winit_key(WK::Equal), KeyCode::Equal);
+        assert_eq!(map_winit_key(WK::BracketLeft), KeyCode::LeftBracket);
+        assert_eq!(map_winit_key(WK::BracketRight), KeyCode::RightBracket);
+        assert_eq!(map_winit_key(WK::Backslash), KeyCode::Backslash);
+        assert_eq!(map_winit_key(WK::Semicolon), KeyCode::Semicolon);
+        assert_eq!(map_winit_key(WK::Quote), KeyCode::Quote);
+        assert_eq!(map_winit_key(WK::Comma), KeyCode::Comma);
+        assert_eq!(map_winit_key(WK::Period), KeyCode::Period);
+        assert_eq!(map_winit_key(WK::Slash), KeyCode::Slash);
+        assert_eq!(map_winit_key(WK::Backquote), KeyCode::Grave);
+    }
+
+    #[test]
+    fn map_key_modifiers() {
+        use winit::keyboard::KeyCode as WK;
+        assert_eq!(map_winit_key(WK::ShiftLeft), KeyCode::LeftShift);
+        assert_eq!(map_winit_key(WK::ShiftRight), KeyCode::RightShift);
+        assert_eq!(map_winit_key(WK::ControlLeft), KeyCode::LeftControl);
+        assert_eq!(map_winit_key(WK::ControlRight), KeyCode::RightControl);
+        assert_eq!(map_winit_key(WK::AltLeft), KeyCode::LeftAlt);
+        assert_eq!(map_winit_key(WK::AltRight), KeyCode::RightAlt);
+        assert_eq!(map_winit_key(WK::SuperLeft), KeyCode::LeftSuper);
+        assert_eq!(map_winit_key(WK::SuperRight), KeyCode::RightSuper);
+    }
+
+    #[test]
+    fn map_key_lock_keys() {
+        use winit::keyboard::KeyCode as WK;
+        assert_eq!(map_winit_key(WK::CapsLock), KeyCode::CapsLock);
+        assert_eq!(map_winit_key(WK::NumLock), KeyCode::NumLock);
+        assert_eq!(map_winit_key(WK::ScrollLock), KeyCode::ScrollLock);
     }
 }

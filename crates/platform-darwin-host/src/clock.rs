@@ -120,3 +120,69 @@ impl Clock for DarwinClock {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn wall_time_after_2020() {
+        let c = DarwinClock;
+        let (sec, _usec) = c.wall_time_usec();
+        // 2020-01-01 00:00:00 UTC = 1577836800
+        assert!(sec > 1_577_836_800);
+    }
+
+    #[test]
+    fn monotonic_nonzero() {
+        let c = DarwinClock;
+        assert!(c.monotonic_ns() > 0);
+    }
+
+    #[test]
+    fn monotonic_is_monotonic() {
+        let c = DarwinClock;
+        let a = c.monotonic_ns();
+        let b = c.monotonic_ns();
+        assert!(b >= a);
+    }
+
+    #[test]
+    fn timezone_name_nonempty() {
+        let c = DarwinClock;
+        let name = c.timezone_name();
+        assert!(!name.is_empty());
+    }
+
+    #[test]
+    fn localtime_epoch_zero() {
+        let c = DarwinClock;
+        let comps = c.localtime(0);
+        // tm_year is years since 1900; epoch 0 is 1970 UTC but may
+        // show as Dec 31, 1969 (year=69) in western timezones.
+        assert!(comps.year == 69 || comps.year == 70);
+    }
+
+    #[test]
+    fn mktime_roundtrip() {
+        let c = DarwinClock;
+        let ts: i64 = 1_700_000_000; // ~Nov 2023
+        let mut comps = c.localtime(ts);
+        let recovered = c.mktime(&mut comps);
+        assert!((recovered - ts).abs() < 2);
+    }
+
+    #[test]
+    fn utc_offset_in_range() {
+        let c = DarwinClock;
+        let off = c.utc_offset_sec();
+        // ±14 hours = ±50400 seconds
+        assert!(off >= -50400 && off <= 50400, "offset {off} out of range");
+    }
+
+    #[test]
+    fn sleep_short_duration() {
+        let c = DarwinClock;
+        c.sleep_secs(0.001); // 1ms — should not crash
+    }
+}

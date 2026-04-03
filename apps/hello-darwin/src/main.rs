@@ -30,7 +30,7 @@ fn main() {
     let quit_id = ViewId(4);
 
     // Title label
-    let mut title = Label::new(Rect::default(), "Running on burdetty-os runtime v0.1");
+    let mut title = Label::new(Rect::default(), "Running on burdettie-os runtime v0.1");
     title.set_text_color(Color::new(0.1, 0.1, 0.3, 1.0));
     title.view_mut().layout_id = Some(title_id);
     app.add_label(title);

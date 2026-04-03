@@ -199,7 +199,7 @@ fn parse_relocations_empty_for_chained_binary() {
 #[test]
 fn parse_relocations_from_obj_file() {
     // Compile a .o file that will have relocation entries
-    let temp_dir = std::env::temp_dir().join("darwin_loader_lab_test");
+    let temp_dir = std::env::temp_dir().join("burdettieOS_test");
     let _ = std::fs::create_dir_all(&temp_dir);
     let c_path = temp_dir.join("reloc_test.c");
     let o_path = temp_dir.join("reloc_test.o");
@@ -235,7 +235,7 @@ fn parse_relocations_from_obj_file() {
 
 #[test]
 fn relocation_entries_have_valid_types() {
-    let temp_dir = std::env::temp_dir().join("darwin_loader_lab_reloc2");
+    let temp_dir = std::env::temp_dir().join("burdettieOS_reloc2");
     let _ = std::fs::create_dir_all(&temp_dir);
     let c_path = temp_dir.join("rt.c");
     let o_path = temp_dir.join("rt.o");
@@ -270,7 +270,7 @@ fn relocation_entries_have_valid_types() {
 
 #[test]
 fn section_relocations_struct_has_segment_info() {
-    let temp_dir = std::env::temp_dir().join("darwin_loader_lab_reloc3");
+    let temp_dir = std::env::temp_dir().join("burdettieOS_reloc3");
     let _ = std::fs::create_dir_all(&temp_dir);
     let c_path = temp_dir.join("seg.c");
     let o_path = temp_dir.join("seg.o");

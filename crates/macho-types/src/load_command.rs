@@ -214,3 +214,168 @@ pub fn decode_source_version(v: u64) -> String {
     let e = v & 0x3FF;
     format!("{a}.{b}.{c}.{d}.{e}")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── decode_version ──────────────────────────────────────────────
+
+    #[test]
+    fn decode_version_10_6_0() {
+        assert_eq!(decode_version(0x000A_0600), "10.6.0");
+    }
+
+    #[test]
+    fn decode_version_14_0_0() {
+        assert_eq!(decode_version(0x000E_0000), "14.0.0");
+    }
+
+    #[test]
+    fn decode_version_12_3_1() {
+        // major=12, minor=3, patch=1 → (12<<16)|(3<<8)|1
+        let packed = (12u32 << 16) | (3 << 8) | 1;
+        assert_eq!(decode_version(packed), "12.3.1");
+    }
+
+    #[test]
+    fn decode_version_zero() {
+        assert_eq!(decode_version(0x0000_0000), "0.0.0");
+    }
+
+    #[test]
+    fn decode_version_max() {
+        assert_eq!(decode_version(0xFFFF_FFFF), "65535.255.255");
+    }
+
+    #[test]
+    fn decode_version_11_2_0() {
+        assert_eq!(decode_version(0x000B_0200), "11.2.0");
+    }
+
+    // ── platform_name ───────────────────────────────────────────────
+
+    #[test]
+    fn platform_macos() {
+        assert_eq!(platform_name(1), "macOS");
+    }
+
+    #[test]
+    fn platform_ios() {
+        assert_eq!(platform_name(2), "iOS");
+    }
+
+    #[test]
+    fn platform_tvos() {
+        assert_eq!(platform_name(3), "tvOS");
+    }
+
+    #[test]
+    fn platform_watchos() {
+        assert_eq!(platform_name(4), "watchOS");
+    }
+
+    #[test]
+    fn platform_unknown() {
+        assert_eq!(platform_name(999), "unknown");
+    }
+
+    #[test]
+    fn platform_mac_catalyst() {
+        assert_eq!(platform_name(6), "macCatalyst");
+    }
+
+    #[test]
+    fn platform_bridge_os() {
+        assert_eq!(platform_name(5), "bridgeOS");
+    }
+
+    #[test]
+    fn platform_vision_os() {
+        assert_eq!(platform_name(11), "visionOS");
+    }
+
+    #[test]
+    fn platform_ios_simulator() {
+        assert_eq!(platform_name(7), "iOSSimulator");
+    }
+
+    #[test]
+    fn platform_driver_kit() {
+        assert_eq!(platform_name(10), "driverKit");
+    }
+
+    // ── decode_source_version ───────────────────────────────────────
+
+    #[test]
+    fn source_version_zero() {
+        assert_eq!(decode_source_version(0), "0.0.0.0.0");
+    }
+
+    #[test]
+    fn source_version_simple() {
+        // a=1, b=2, c=3, d=4, e=5
+        let packed = (1u64 << 40) | (2u64 << 30) | (3u64 << 20) | (4u64 << 10) | 5;
+        assert_eq!(decode_source_version(packed), "1.2.3.4.5");
+    }
+
+    #[test]
+    fn source_version_large_a() {
+        // a occupies 24 bits, so test a large a value
+        let packed = (1000u64 << 40) | (0u64 << 30) | (0u64 << 20) | (0u64 << 10) | 0;
+        assert_eq!(decode_source_version(packed), "1000.0.0.0.0");
+    }
+
+    #[test]
+    fn source_version_max_components() {
+        // b,c,d,e are 10-bit → max 1023
+        let packed = (0u64 << 40) | (1023u64 << 30) | (1023u64 << 20) | (1023u64 << 10) | 1023;
+        assert_eq!(decode_source_version(packed), "0.1023.1023.1023.1023");
+    }
+
+    // ── LoadCommandType From<u32> ───────────────────────────────────
+
+    #[test]
+    fn load_command_type_segment() {
+        assert_eq!(LoadCommandType::from(0x1), LoadCommandType::Segment);
+    }
+
+    #[test]
+    fn load_command_type_segment64() {
+        assert_eq!(LoadCommandType::from(0x19), LoadCommandType::Segment64);
+    }
+
+    #[test]
+    fn load_command_type_load_dylib() {
+        assert_eq!(LoadCommandType::from(0xC), LoadCommandType::LoadDylib);
+    }
+
+    #[test]
+    fn load_command_type_build_version() {
+        assert_eq!(LoadCommandType::from(0x32), LoadCommandType::BuildVersion);
+    }
+
+    #[test]
+    fn load_command_type_main() {
+        assert_eq!(
+            LoadCommandType::from(0x8000_0028),
+            LoadCommandType::Main
+        );
+    }
+
+    #[test]
+    fn load_command_type_chained_fixups() {
+        assert_eq!(
+            LoadCommandType::from(0x8000_0034),
+            LoadCommandType::DyldChainedFixups
+        );
+    }
+
+    #[test]
+    fn load_command_type_unknown() {
+        assert_eq!(
+            LoadCommandType::from(0x9999),
+            LoadCommandType::Unknown(0x9999)
+        );
+    }
+}

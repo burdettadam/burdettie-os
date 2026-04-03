@@ -83,3 +83,170 @@ pub extern "C" fn shim_nsusernotificationcenter_schedule(
     _notification: u64,
 ) {
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shim_test_helpers::*;
+
+    // -- +[NSUserNotificationCenter defaultUserNotificationCenter] --
+
+    #[test]
+    fn test_default_returns_nonzero() {
+        let ptr = shim_nsusernotificationcenter_default(0, 0);
+        assert_ne!(ptr, 0, "default center must be non-nil");
+    }
+
+    #[test]
+    fn test_default_is_singleton() {
+        let a = shim_nsusernotificationcenter_default(0, 0);
+        let b = shim_nsusernotificationcenter_default(0, 0);
+        assert_eq!(a, b, "default center must return the same pointer");
+    }
+
+    #[test]
+    fn test_default_has_correct_isa() {
+        let ptr = shim_nsusernotificationcenter_default(0, 0);
+        let isa = read_field(ptr, 0);
+        assert_eq!(isa, nsobj::nsusernotificationcenter_class_addr());
+    }
+
+    // -- -[NSUserNotificationCenter setDelegate:] --
+
+    #[test]
+    fn test_set_delegate_noop() {
+        let obj = alloc_obj_fake(16);
+        shim_nsusernotificationcenter_set_delegate(obj, 0, 0xCAFE);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn test_set_delegate_nil_obj() {
+        // nil receiver — must not crash
+        shim_nsusernotificationcenter_set_delegate(0, 0, 0xCAFE);
+    }
+
+    // -- -[NSUserNotificationCenter delegate] --
+
+    #[test]
+    fn test_delegate_returns_zero() {
+        let obj = alloc_obj_fake(16);
+        assert_eq!(shim_nsusernotificationcenter_delegate(obj, 0), 0);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn test_delegate_nil_obj() {
+        assert_eq!(shim_nsusernotificationcenter_delegate(0, 0), 0);
+    }
+
+    // -- -[NSUserNotificationCenter deliverNotification:] --
+
+    #[test]
+    fn test_deliver_noop() {
+        let obj = alloc_obj_fake(16);
+        shim_nsusernotificationcenter_deliver(obj, 0, 0xBEEF);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn test_deliver_nil_obj() {
+        shim_nsusernotificationcenter_deliver(0, 0, 0xBEEF);
+    }
+
+    // -- -[NSUserNotificationCenter removeDeliveredNotification:] --
+
+    #[test]
+    fn test_remove_noop() {
+        let obj = alloc_obj_fake(16);
+        shim_nsusernotificationcenter_remove(obj, 0, 0xBEEF);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn test_remove_nil_obj() {
+        shim_nsusernotificationcenter_remove(0, 0, 0xBEEF);
+    }
+
+    // -- -[NSUserNotificationCenter removeAllDeliveredNotifications] --
+
+    #[test]
+    fn test_remove_all_noop() {
+        let obj = alloc_obj_fake(16);
+        shim_nsusernotificationcenter_remove_all(obj, 0);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn test_remove_all_nil_obj() {
+        shim_nsusernotificationcenter_remove_all(0, 0);
+    }
+
+    // -- -[NSUserNotificationCenter deliveredNotifications] --
+
+    #[test]
+    fn test_delivered_notifications_returns_zero() {
+        let obj = alloc_obj_fake(16);
+        assert_eq!(
+            shim_nsusernotificationcenter_delivered_notifications(obj, 0),
+            0
+        );
+        free_obj(obj);
+    }
+
+    #[test]
+    fn test_delivered_notifications_nil_obj() {
+        assert_eq!(
+            shim_nsusernotificationcenter_delivered_notifications(0, 0),
+            0
+        );
+    }
+
+    // -- -[NSUserNotificationCenter scheduledNotifications] --
+
+    #[test]
+    fn test_scheduled_notifications_returns_zero() {
+        let obj = alloc_obj_fake(16);
+        assert_eq!(
+            shim_nsusernotificationcenter_scheduled_notifications(obj, 0),
+            0
+        );
+        free_obj(obj);
+    }
+
+    #[test]
+    fn test_scheduled_notifications_nil_obj() {
+        assert_eq!(
+            shim_nsusernotificationcenter_scheduled_notifications(0, 0),
+            0
+        );
+    }
+
+    // -- -[NSUserNotificationCenter setScheduledNotifications:] --
+
+    #[test]
+    fn test_set_scheduled_noop() {
+        let obj = alloc_obj_fake(16);
+        shim_nsusernotificationcenter_set_scheduled(obj, 0, 0xCAFE);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn test_set_scheduled_nil_obj() {
+        shim_nsusernotificationcenter_set_scheduled(0, 0, 0xCAFE);
+    }
+
+    // -- -[NSUserNotificationCenter scheduleNotification:] --
+
+    #[test]
+    fn test_schedule_noop() {
+        let obj = alloc_obj_fake(16);
+        shim_nsusernotificationcenter_schedule(obj, 0, 0xBEEF);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn test_schedule_nil_obj() {
+        shim_nsusernotificationcenter_schedule(0, 0, 0xBEEF);
+    }
+}

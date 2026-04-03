@@ -129,3 +129,50 @@ pub extern "C" fn shim_nsconditionlock_dealloc(obj: u64, _cmd: u64) {
     crate::pal_threading().mutex_destroy(mutex_ptr(obj));
     crate::pal_alloc().free(obj as *mut u8);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shim_test_helpers::*;
+
+    #[test]
+    fn alloc_sets_isa() {
+        let obj = shim_nsconditionlock_alloc(0, 0);
+        assert_ne!(obj, 0);
+        let isa = read_field(obj, 0);
+        assert_eq!(isa, nsobj::nsconditionlock_class_addr());
+        free_obj(obj); // no init, so skip dealloc
+    }
+
+    #[test]
+    fn nil_safety() {
+        assert_eq!(shim_nsconditionlock_condition(0, 0), 0);
+        shim_nsconditionlock_lock(0, 0);
+        shim_nsconditionlock_unlock(0, 0);
+        assert_eq!(shim_nsconditionlock_try_lock(0, 0), 0);
+        assert_eq!(shim_nsconditionlock_name(0, 0), 0);
+        shim_nsconditionlock_set_name(0, 0, 0);
+        shim_nsconditionlock_dealloc(0, 0);
+        // no panic = pass
+    }
+
+    #[test]
+    fn set_and_get_name() {
+        let obj = shim_nsconditionlock_alloc(0, 0);
+        assert_ne!(obj, 0);
+        let name = make_string("condLock");
+        shim_nsconditionlock_set_name(obj, 0, name);
+        assert_eq!(shim_nsconditionlock_name(obj, 0), name);
+        free_obj(obj);
+        free_obj(name);
+    }
+
+    #[test]
+    fn condition_accessor_after_alloc() {
+        // Without init, condition slot is 0 (calloc)
+        let obj = shim_nsconditionlock_alloc(0, 0);
+        assert_ne!(obj, 0);
+        assert_eq!(shim_nsconditionlock_condition(obj, 0), 0);
+        free_obj(obj);
+    }
+}

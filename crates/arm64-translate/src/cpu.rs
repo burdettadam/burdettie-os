@@ -18,6 +18,12 @@ pub struct CpuState {
     /// SIMD/FP registers v0–v31 (128-bit each).
     /// Access patterns: Q0=v0[127:0], D0=v0[63:0], S0=v0[31:0], H0=v0[15:0], B0=v0[7:0].
     pub v: [u128; 32],
+    /// Thread-local storage pointer (TPIDR_EL0). Used by pthreads TLS.
+    pub tpidr_el0: u64,
+    /// Floating-point control register (FPCR).
+    pub fpcr: u64,
+    /// Floating-point status register (FPSR).
+    pub fpsr: u64,
 }
 
 /// NZCV condition flags.
@@ -108,6 +114,9 @@ impl CpuState {
             pc: 0,
             nzcv: Nzcv::default(),
             v: [0u128; 32],
+            tpidr_el0: 0,
+            fpcr: 0,
+            fpsr: 0,
         }
     }
 
@@ -219,10 +228,270 @@ impl CpuState {
     pub fn write_h(&mut self, reg: u8, val: u16) {
         self.v[reg as usize] = val as u128;
     }
+
+    /// Write a SIMD vector register. If `q` is true, writes all 128 bits.
+    /// If `q` is false, writes the lower 64 bits and zeroes the upper 64.
+    pub fn write_v(&mut self, reg: u8, val: u128, q: bool) {
+        if q {
+            self.v[reg as usize] = val;
+        } else {
+            self.v[reg as usize] = val & 0xFFFF_FFFF_FFFF_FFFF;
+        }
+    }
 }
 
 impl Default for CpuState {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_helpers::*;
+
+    // ── CpuState basics ────────────────────────────────────────────
+
+    #[test]
+    fn test_new_all_zeroed() {
+        let cpu = CpuState::new();
+        for i in 0..31 {
+            assert_eq!(cpu.x[i], 0, "x[{i}] not zero");
+        }
+        assert_eq!(cpu.sp, 0);
+        assert_eq!(cpu.pc, 0);
+        assert!(!cpu.nzcv.n);
+        assert!(!cpu.nzcv.z);
+        assert!(!cpu.nzcv.c);
+        assert!(!cpu.nzcv.v);
+        for i in 0..32 {
+            assert_eq!(cpu.v[i], 0, "v[{i}] not zero");
+        }
+    }
+
+    #[test]
+    fn test_read_reg_31_returns_sp() {
+        let mut cpu = CpuState::new();
+        cpu.sp = 0x1000;
+        assert_eq!(cpu.read_reg(31), 0x1000);
+    }
+
+    #[test]
+    fn test_read_reg_0_returns_x0() {
+        let mut cpu = CpuState::new();
+        cpu.x[0] = 42;
+        assert_eq!(cpu.read_reg(0), 42);
+    }
+
+    #[test]
+    fn test_read_reg_zr_31_returns_zero() {
+        let mut cpu = CpuState::new();
+        cpu.sp = 0xFFFF;
+        assert_eq!(cpu.read_reg_zr(31), 0);
+    }
+
+    #[test]
+    fn test_write_reg_31_sets_sp() {
+        let mut cpu = CpuState::new();
+        cpu.write_reg(31, 0xABCD);
+        assert_eq!(cpu.sp, 0xABCD);
+    }
+
+    #[test]
+    fn test_write_reg_zr_31_is_noop() {
+        let mut cpu = CpuState::new();
+        cpu.sp = 0x1000;
+        cpu.write_reg_zr(31, 0xDEAD);
+        assert_eq!(cpu.sp, 0x1000); // unchanged
+    }
+
+    #[test]
+    fn test_write_read_reg_roundtrip() {
+        let mut cpu = CpuState::new();
+        cpu.write_reg(0, 0x123456789ABCDEF0);
+        assert_eq!(cpu.read_reg(0), 0x123456789ABCDEF0);
+    }
+
+    #[test]
+    fn test_read_w_lower_32() {
+        let mut cpu = CpuState::new();
+        cpu.x[5] = 0xFFFFFFFF_12345678;
+        assert_eq!(cpu.read_w(5), 0x12345678);
+    }
+
+    #[test]
+    fn test_write_w_zero_extends() {
+        let mut cpu = CpuState::new();
+        cpu.x[3] = 0xFFFFFFFF_FFFFFFFF;
+        cpu.write_w(3, 0x80000001);
+        assert_eq!(cpu.x[3], 0x00000000_80000001);
+    }
+
+    // ── NZCV ───────────────────────────────────────────────────────
+
+    #[test]
+    fn test_update_nzcv64_zero() {
+        let mut cpu = CpuState::new();
+        cpu.update_nzcv64(0, false, false);
+        assert!(cpu.nzcv.z);
+        assert!(!cpu.nzcv.n);
+    }
+
+    #[test]
+    fn test_update_nzcv64_negative() {
+        let mut cpu = CpuState::new();
+        cpu.update_nzcv64(u64::MAX, false, false); // -1 in two's complement
+        assert!(cpu.nzcv.n);
+        assert!(!cpu.nzcv.z);
+    }
+
+    #[test]
+    fn test_update_nzcv64_carry() {
+        let mut cpu = CpuState::new();
+        cpu.update_nzcv64(1, true, false);
+        assert!(cpu.nzcv.c);
+        assert!(!cpu.nzcv.v);
+    }
+
+    #[test]
+    fn test_update_nzcv64_overflow() {
+        let mut cpu = CpuState::new();
+        cpu.update_nzcv64(1, false, true);
+        assert!(cpu.nzcv.v);
+        assert!(!cpu.nzcv.c);
+    }
+
+    #[test]
+    fn test_update_nzcv32_zero() {
+        let mut cpu = CpuState::new();
+        cpu.update_nzcv32(0, false, false);
+        assert!(cpu.nzcv.z);
+        assert!(!cpu.nzcv.n);
+    }
+
+    #[test]
+    fn test_update_nzcv32_negative() {
+        let mut cpu = CpuState::new();
+        cpu.update_nzcv32(0x80000000, false, false);
+        assert!(cpu.nzcv.n);
+        assert!(!cpu.nzcv.z);
+    }
+
+    #[test]
+    fn test_update_nzcv32_carry_and_overflow() {
+        let mut cpu = CpuState::new();
+        cpu.update_nzcv32(0, true, true);
+        assert!(cpu.nzcv.z);
+        assert!(cpu.nzcv.c);
+        assert!(cpu.nzcv.v);
+    }
+
+    // ── SIMD/FP registers ──────────────────────────────────────────
+
+    #[test]
+    fn test_write_read_d_roundtrip() {
+        let mut cpu = CpuState::new();
+        cpu.write_d(0, 0xDEADBEEFCAFEBABE);
+        assert_eq!(cpu.read_d(0), 0xDEADBEEFCAFEBABE);
+    }
+
+    #[test]
+    fn test_write_read_s_roundtrip() {
+        let mut cpu = CpuState::new();
+        cpu.write_s(0, 0x3F800000); // 1.0f32
+        assert_eq!(cpu.read_s(0), 0x3F800000);
+    }
+
+    #[test]
+    fn test_write_read_q_roundtrip() {
+        let mut cpu = CpuState::new();
+        let val: u128 = 0xDEADBEEFCAFEBABE_0123456789ABCDEF;
+        cpu.write_q(0, val);
+        assert_eq!(cpu.read_q(0), val);
+    }
+
+    #[test]
+    fn test_write_read_h_roundtrip() {
+        let mut cpu = CpuState::new();
+        cpu.write_h(0, 0xBEEF);
+        assert_eq!(cpu.read_h(0), 0xBEEF);
+    }
+
+    #[test]
+    fn test_write_d_zeroes_upper_bits() {
+        let mut cpu = CpuState::new();
+        cpu.write_q(0, u128::MAX);
+        cpu.write_d(0, 0x1234);
+        assert_eq!(cpu.read_q(0), 0x1234);
+    }
+
+    #[test]
+    fn test_write_s_zeroes_upper_bits() {
+        let mut cpu = CpuState::new();
+        cpu.write_q(0, u128::MAX);
+        cpu.write_s(0, 0x42);
+        assert_eq!(cpu.read_q(0), 0x42);
+    }
+
+    // ── Condition ──────────────────────────────────────────────────
+
+    #[test]
+    fn test_condition_from_bits_roundtrip() {
+        let expected = [
+            Condition::Eq, Condition::Ne, Condition::Cs, Condition::Cc,
+            Condition::Mi, Condition::Pl, Condition::Vs, Condition::Vc,
+            Condition::Hi, Condition::Ls, Condition::Ge, Condition::Lt,
+            Condition::Gt, Condition::Le, Condition::Al, Condition::Nv,
+        ];
+        for (i, &cond) in expected.iter().enumerate() {
+            assert_eq!(Condition::from_bits(i as u32), cond, "mismatch at bits={i}");
+        }
+    }
+
+    #[test]
+    fn test_condition_eval_eq_z_set() {
+        let flags = Nzcv { n: false, z: true, c: false, v: false };
+        assert!(Condition::Eq.eval(flags));
+    }
+
+    #[test]
+    fn test_condition_eval_eq_z_clear() {
+        let flags = Nzcv { n: false, z: false, c: false, v: false };
+        assert!(!Condition::Eq.eval(flags));
+    }
+
+    #[test]
+    fn test_condition_eval_ge_n_eq_v() {
+        // N==V (both false) → GE true
+        let flags = Nzcv { n: false, z: false, c: false, v: false };
+        assert!(Condition::Ge.eval(flags));
+        // N==V (both true) → GE true
+        let flags = Nzcv { n: true, z: false, c: false, v: true };
+        assert!(Condition::Ge.eval(flags));
+        // N!=V → GE false
+        let flags = Nzcv { n: true, z: false, c: false, v: false };
+        assert!(!Condition::Ge.eval(flags));
+    }
+
+    #[test]
+    fn test_condition_eval_gt() {
+        // !Z && N==V → true
+        let flags = Nzcv { n: false, z: false, c: false, v: false };
+        assert!(Condition::Gt.eval(flags));
+        // Z==1 → false even if N==V
+        let flags = Nzcv { n: false, z: true, c: false, v: false };
+        assert!(!Condition::Gt.eval(flags));
+        // N!=V → false
+        let flags = Nzcv { n: true, z: false, c: false, v: false };
+        assert!(!Condition::Gt.eval(flags));
+    }
+
+    #[test]
+    fn test_condition_eval_al_always_true() {
+        let flags = Nzcv { n: false, z: false, c: false, v: false };
+        assert!(Condition::Al.eval(flags));
+        let flags = Nzcv { n: true, z: true, c: true, v: true };
+        assert!(Condition::Al.eval(flags));
     }
 }

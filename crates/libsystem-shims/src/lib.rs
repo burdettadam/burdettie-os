@@ -1,4 +1,4 @@
-//! Controlled system library shims for the burdetty-os runtime.
+//! Controlled system library shims for the burdettie-os runtime.
 //!
 //! Each shim is a Rust function with `extern "C"` ABI that can be
 //! registered in the `ShimTable` and resolved by the runtime's symbol
@@ -23,6 +23,7 @@
 //! pointers. They must maintain C ABI compatibility and handle all
 //! inputs defensively.
 
+pub(crate) mod darwin_compat;
 pub(crate) mod dispatch;
 pub(crate) mod lifecycle;
 pub(crate) mod mach;
@@ -30,9 +31,13 @@ pub mod process;
 pub(crate) mod ptrauth;
 pub(crate) mod pthread;
 pub(crate) mod random;
+pub(crate) mod socket;
 pub mod table;
 pub(crate) mod tls;
+pub(crate) mod cross_platform;
+pub(crate) mod darwin_stubs;
 
+pub use darwin_compat::DarwinCompatShims;
 pub use dispatch::DispatchShims;
 pub use lifecycle::LifecycleShims;
 pub use mach::MachShims;
@@ -40,6 +45,8 @@ pub use process::ProcessShims;
 pub use ptrauth::PtrauthShims;
 pub use pthread::PthreadShims;
 pub use random::RandomShims;
+pub use socket::SocketShims;
+pub use darwin_stubs::install_darwin_stubs;
 pub use table::{ShimEntry, ShimTable};
 pub use tls::TlsShims;
 
@@ -54,6 +61,17 @@ pub fn install_default_shims(table: &mut ShimTable, config: &ShimConfig) {
     PtrauthShims::install(table);
     LifecycleShims::install(table);
     RandomShims::install(table);
+    SocketShims::install(table);
+    DarwinCompatShims::install(table);
+    cross_platform::install_cross_platform_shims(table);
+    darwin_stubs::install_darwin_stubs(table);
+}
+
+/// Reset process-global shim state so the runtime can be reused in-process.
+pub fn reset_runtime_state_for_reuse() {
+    process::clear_env_overrides();
+    TlsShims::reset();
+    LifecycleShims::reset();
 }
 
 /// Configuration for shim behavior.
@@ -74,7 +92,7 @@ pub struct ShimConfig {
 impl Default for ShimConfig {
     fn default() -> Self {
         Self {
-            process_name: "burdetty-os".to_string(),
+            process_name: "burdettie-os".to_string(),
             executable_path: "/usr/local/bin/app".to_string(),
             argc: 1,
             argv: vec!["app".to_string()],

@@ -307,6 +307,24 @@ pub extern "C" fn shim_nscalendar_date_by_adding_components(
     nsdate::shim_nsdate_date_with_ti_since_ref(0, 0, new_cf_time)
 }
 
+/// `+[NSCalendar autoupdatingCurrentCalendar]` — returns same as `currentCalendar`.
+pub extern "C" fn shim_nscalendar_auto_updating_current_calendar(_cls: u64, _cmd: u64) -> u64 {
+    shim_nscalendar_current_calendar(_cls, _cmd)
+}
+
+/// `-[NSCalendar locale]` — returns current locale.
+pub extern "C" fn shim_nscalendar_locale(_obj: u64, _cmd: u64) -> u64 {
+    if _obj == 0 {
+        return 0;
+    }
+    crate::nslocale::shim_nslocale_current_locale(0, 0)
+}
+
+/// `-[NSCalendar setLocale:]` — no-op.
+pub extern "C" fn shim_nscalendar_set_locale(_obj: u64, _cmd: u64, _locale: u64) {
+    // no-op
+}
+
 /// `-[NSCalendar description]` — returns a description string.
 pub extern "C" fn shim_nscalendar_description(obj: u64, _cmd: u64) -> u64 {
     if obj == 0 {
@@ -322,4 +340,85 @@ pub extern "C" fn shim_nscalendar_description(obj: u64, _cmd: u64) -> u64 {
     let desc = format!("<NSCalendar: {id_str}>");
     let c_str = std::ffi::CString::new(desc).unwrap_or_default();
     cfstring::shim_cf_string_create_with_cstring(0, c_str.as_ptr(), 0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shim_test_helpers::*;
+
+    #[test]
+    fn current_calendar_non_zero() {
+        let cal = shim_nscalendar_current_calendar(0, 0);
+        assert_ne!(cal, 0);
+    }
+
+    #[test]
+    fn current_calendar_is_singleton() {
+        let a = shim_nscalendar_current_calendar(0, 0);
+        let b = shim_nscalendar_current_calendar(0, 0);
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn calendar_identifier_gregorian() {
+        let cal = shim_nscalendar_current_calendar(0, 0);
+        let ident = shim_nscalendar_identifier(cal, 0);
+        assert_ne!(ident, 0);
+        assert_string_eq(ident, "gregorian");
+        free_obj(ident);
+    }
+
+    #[test]
+    fn calendar_with_identifier_custom() {
+        let id_str = make_string("buddhist");
+        let cal = shim_nscalendar_with_identifier(0, 0, id_str);
+        assert_ne!(cal, 0);
+        let ident = shim_nscalendar_identifier(cal, 0);
+        assert_string_eq(ident, "buddhist");
+        free_obj(ident);
+        // cal allocated by alloc_nscalendar — leak acceptable in test
+        free_obj(id_str);
+    }
+
+    #[test]
+    fn nil_safety() {
+        assert_eq!(shim_nscalendar_identifier(0, 0), 0);
+        assert_eq!(shim_nscalendar_components_from_date(0, 0, 0, 0), 0);
+        assert_eq!(shim_nscalendar_date_from_components(0, 0, 0), 0);
+        assert_eq!(shim_nscalendar_date_by_adding_components(0, 0, 0, 0, 0), 0);
+        shim_nscalendar_set_locale(0, 0, 0); // must not crash
+        assert_eq!(shim_nscalendar_locale(0, 0), 0);
+    }
+
+    #[test]
+    fn auto_updating_current_calendar_is_singleton() {
+        let a = shim_nscalendar_current_calendar(0, 0);
+        let b = shim_nscalendar_auto_updating_current_calendar(0, 0);
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn locale_returns_non_zero() {
+        let cal = shim_nscalendar_current_calendar(0, 0);
+        let loc = shim_nscalendar_locale(cal, 0);
+        assert_ne!(loc, 0);
+    }
+
+    #[test]
+    fn set_locale_is_noop() {
+        let cal = shim_nscalendar_current_calendar(0, 0);
+        shim_nscalendar_set_locale(cal, 0, 0xDEAD);
+        // does not crash — locale still returns current locale
+        let loc = shim_nscalendar_locale(cal, 0);
+        assert_ne!(loc, 0);
+    }
+
+    #[test]
+    fn description_non_zero() {
+        let cal = shim_nscalendar_current_calendar(0, 0);
+        let desc = shim_nscalendar_description(cal, 0);
+        assert_ne!(desc, 0);
+        free_obj(desc);
+    }
 }

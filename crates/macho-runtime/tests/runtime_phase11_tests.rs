@@ -3,13 +3,41 @@
 
 mod common;
 
+/// Subprocess entry point — runs one fixture when invoked as a child.
+#[test]
+fn __subprocess_runner() {
+    common::subprocess_entry_point();
+}
+
+fn run_exception_fixture(name: &str) -> Option<common::IsolatedRun> {
+    let binary = common::fixtures_dir().join(name).join("app");
+    if !binary.exists() {
+        eprintln!("Skipping: fixture not found at {}", binary.display());
+        return None;
+    }
+    Some(common::run_in_subprocess_with_output(&binary))
+}
+
+fn assert_output_contains_in_order(output: &str, required: &[&str]) {
+    let mut pos = 0usize;
+    for needle in required {
+        let remaining = &output[pos..];
+        let found = remaining.find(needle).unwrap_or_else(|| {
+            panic!(
+                "expected output to contain '{needle}' after byte {pos}, full output:\n{output}"
+            )
+        });
+        pos += found + needle.len();
+    }
+}
+
 // ── Phase 11: NSValue, NSUUID, NSLocale, NSTimeZone, NSCalendar ────
 
 #[test]
 fn runtime_nsvalue_class_registered() {
     let Some(_result) = common::run_fixture("return42/app") else { return };
 
-    let rt = objc_runtime::OBJC_RUNTIME.lock().unwrap();
+    let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
 
     let cls = rt
@@ -24,7 +52,7 @@ fn runtime_nsvalue_class_registered() {
 fn runtime_nsuuid_class_registered() {
     let Some(_result) = common::run_fixture("return42/app") else { return };
 
-    let rt = objc_runtime::OBJC_RUNTIME.lock().unwrap();
+    let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
 
     let cls = rt.get_class("NSUUID").expect("NSUUID should be registered");
@@ -36,7 +64,7 @@ fn runtime_nsuuid_class_registered() {
 fn runtime_nslocale_class_registered() {
     let Some(_result) = common::run_fixture("return42/app") else { return };
 
-    let rt = objc_runtime::OBJC_RUNTIME.lock().unwrap();
+    let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
 
     let cls = rt
@@ -50,7 +78,7 @@ fn runtime_nslocale_class_registered() {
 fn runtime_nstimezone_class_registered() {
     let Some(_result) = common::run_fixture("return42/app") else { return };
 
-    let rt = objc_runtime::OBJC_RUNTIME.lock().unwrap();
+    let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
 
     let cls = rt
@@ -64,7 +92,7 @@ fn runtime_nstimezone_class_registered() {
 fn runtime_nscalendar_class_registered() {
     let Some(_result) = common::run_fixture("return42/app") else { return };
 
-    let rt = objc_runtime::OBJC_RUNTIME.lock().unwrap();
+    let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
 
     let cls = rt
@@ -114,7 +142,7 @@ fn runtime_nscalendar_basics_exit_zero() {
 fn runtime_nsnumberformatter_class_registered() {
     let Some(_result) = common::run_fixture("return42/app") else { return };
 
-    let rt = objc_runtime::OBJC_RUNTIME.lock().unwrap();
+    let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
 
     let cls = rt
@@ -143,7 +171,7 @@ fn runtime_nsnumberformatter_basics_exit_zero() {
 fn runtime_nsindexset_class_registered() {
     let Some(_result) = common::run_fixture("return42/app") else { return };
 
-    let rt = objc_runtime::OBJC_RUNTIME.lock().unwrap();
+    let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
 
     let cls = rt
@@ -170,7 +198,7 @@ fn runtime_nsindexset_basics_exit_zero() {
 fn runtime_nssortdescriptor_class_registered() {
     let Some(_result) = common::run_fixture("return42/app") else { return };
 
-    let rt = objc_runtime::OBJC_RUNTIME.lock().unwrap();
+    let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
 
     let cls = rt
@@ -194,7 +222,7 @@ fn runtime_nssortdescriptor_basics_exit_zero() {
 fn runtime_nstimer_class_registered() {
     let Some(_result) = common::run_fixture("return42/app") else { return };
 
-    let rt = objc_runtime::OBJC_RUNTIME.lock().unwrap();
+    let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
 
     let cls = rt
@@ -210,7 +238,73 @@ fn runtime_nstimer_basics_exit_zero() {
     assert_eq!(result.exit_code, 0, "nstimer_basics should exit 0");
 }
 
-// NOTE: try_catch_test removed — @catch in loaded code requires full unwind
-// info registration which is future work. When implemented, the compat_score
-// regression gate (which currently skips minimal_throw and try_catch_test)
-// will cover this fixture.
+// ── Exception fixtures via subprocess isolation ───────────────────
+
+#[test]
+fn runtime_minimal_throw_catches_exception_in_subprocess() {
+    let Some(run) = run_exception_fixture("minimal_throw") else { return };
+
+    match &run.result {
+        common::IsolatedResult::Completed { exit_code } => {
+            assert_eq!(*exit_code, 0, "minimal_throw should exit 0");
+        }
+        common::IsolatedResult::RuntimeError(msg) => {
+            panic!(
+                "minimal_throw returned a runtime error: {msg}\nstdout:\n{}\nstderr:\n{}",
+                run.stdout, run.stderr
+            );
+        }
+        common::IsolatedResult::Crashed(msg) => {
+            panic!(
+                "minimal_throw crashed: {msg}\nstdout:\n{}\nstderr:\n{}",
+                run.stdout, run.stderr
+            );
+        }
+    }
+
+    assert_output_contains_in_order(&run.stdout, &["start", "in try", "caught: Test", "OK"]);
+    assert!(
+        !run.stdout.contains("FAIL"),
+        "minimal_throw should not print failure markers, got:\n{}",
+        run.stdout
+    );
+}
+
+#[test]
+fn runtime_try_catch_test_handles_nested_catch_and_finally_in_subprocess() {
+    let Some(run) = run_exception_fixture("try_catch_test") else { return };
+
+    match &run.result {
+        common::IsolatedResult::Completed { exit_code } => {
+            assert_eq!(*exit_code, 0, "try_catch_test should exit 0");
+        }
+        common::IsolatedResult::RuntimeError(msg) => {
+            panic!(
+                "try_catch_test returned a runtime error: {msg}\nstdout:\n{}\nstderr:\n{}",
+                run.stdout, run.stderr
+            );
+        }
+        common::IsolatedResult::Crashed(msg) => {
+            panic!(
+                "try_catch_test crashed: {msg}\nstdout:\n{}\nstderr:\n{}",
+                run.stdout, run.stderr
+            );
+        }
+    }
+
+    assert_output_contains_in_order(
+        &run.stdout,
+        &[
+            "caught: TestException",
+            "in try",
+            "inner caught: Inner",
+            "outer caught: Outer",
+            "OK",
+        ],
+    );
+    assert!(
+        !run.stdout.contains("FAIL"),
+        "try_catch_test should not print failure markers, got:\n{}",
+        run.stdout
+    );
+}

@@ -27,7 +27,7 @@ macro_rules! register_shims {
 #[derive(Debug, Clone)]
 pub struct ShimEntry {
     /// The symbol name (with leading underscore, e.g. "_printf").
-    pub name: String,
+    pub name: &'static str,
     /// The function pointer address.
     pub address: u64,
     /// Human-readable description for debugging.
@@ -39,9 +39,9 @@ pub struct ShimEntry {
 /// The table is populated at runtime startup before fixups are applied.
 /// During fixup resolution, the runtime checks the shim table first,
 /// then falls back to image exports and finally the host process.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct ShimTable {
-    entries: HashMap<String, ShimEntry>,
+    entries: HashMap<&'static str, ShimEntry>,
 }
 
 impl ShimTable {
@@ -49,14 +49,26 @@ impl ShimTable {
         Self::default()
     }
 
+    /// Create a shim table with pre-reserved capacity.
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            entries: HashMap::with_capacity(capacity),
+        }
+    }
+
+    /// Reserve additional capacity for upcoming shim registrations.
+    pub fn reserve(&mut self, additional: usize) {
+        self.entries.reserve(additional);
+    }
+
     /// Register a shim function under the given symbol name.
     ///
     /// The name should include the leading underscore (e.g. `_getprogname`).
-    pub fn register(&mut self, name: &str, address: u64, description: &'static str) {
+    pub fn register(&mut self, name: &'static str, address: u64, description: &'static str) {
         self.entries.insert(
-            name.to_string(),
+            name,
             ShimEntry {
-                name: name.to_string(),
+                name,
                 address,
                 description,
             },
@@ -96,7 +108,7 @@ impl ShimTable {
 
     /// Get all registered symbol names (sorted for deterministic output).
     pub fn symbol_names(&self) -> Vec<&str> {
-        let mut names: Vec<&str> = self.entries.keys().map(|s| s.as_str()).collect();
+        let mut names: Vec<&str> = self.entries.keys().copied().collect();
         names.sort();
         names
     }
@@ -149,5 +161,29 @@ mod tests {
         table.register("_foo", 2, "second");
         assert_eq!(table.resolve("_foo"), Some(2));
         assert_eq!(table.len(), 1);
+    }
+
+    #[test]
+    fn with_capacity_and_reserve_preserve_behavior() {
+        let mut table = ShimTable::with_capacity(16);
+        table.reserve(8);
+        table.register("_foo", 1, "test");
+        table.register("_bar", 2, "test");
+
+        assert_eq!(table.resolve("_foo"), Some(1));
+        assert_eq!(table.resolve("_bar"), Some(2));
+        assert_eq!(table.len(), 2);
+    }
+
+    #[test]
+    fn iter_exposes_registered_name_without_duplication_logic() {
+        let mut table = ShimTable::new();
+        table.register("_foo", 1, "test foo");
+
+        let entries: Vec<&ShimEntry> = table.iter().collect();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].name, "_foo");
+        assert_eq!(entries[0].address, 1);
+        assert_eq!(entries[0].description, "test foo");
     }
 }

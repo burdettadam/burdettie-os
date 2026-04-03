@@ -36,7 +36,7 @@ pub extern "C" fn shim_invoke(obj: u64, _cmd: u64) {
     }
 
     // Look up the IMP via the runtime
-    let guard = match objc_runtime::OBJC_RUNTIME.lock() {
+    let guard = match objc_runtime::OBJC_RUNTIME.read() {
         Ok(g) => g,
         Err(e) => e.into_inner(),
     };
@@ -175,4 +175,48 @@ pub fn create_invocation(sig: u64, target: u64, sel: u64, args: &[u64]) -> u64 {
     }
 
     inv
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shim_test_helpers::*;
+
+    #[test]
+    fn invoke_nil_is_safe() {
+        // obj=0 must return without panic
+        shim_invoke(0, 0);
+    }
+
+    #[test]
+    fn invoke_with_target_nil_is_safe() {
+        shim_invoke_with_target(0, 0, 0);
+    }
+
+    #[test]
+    fn invoke_no_target_returns_early() {
+        // Create an invocation with no target/sel — invoke should no-op gracefully
+        let inv = create_invocation(0, 0, 0, &[]);
+        assert_ne!(inv, 0);
+        // target=0 inside the invocation → early exit, no panic
+        shim_invoke(inv, 0);
+        free_obj(inv);
+    }
+
+    #[test]
+    fn create_invocation_allocates_object() {
+        let inv = create_invocation(0, 0, 0, &[]);
+        assert_ne!(inv, 0);
+        // ISA should be nsinvocation class
+        assert_eq!(read_field(inv, 0), crate::nsobj::nsinvocation_class_addr());
+        free_obj(inv);
+    }
+
+    #[test]
+    fn create_invocation_with_args() {
+        // Verify that extra args are accepted without panicking.
+        let inv = create_invocation(0, 0, 0, &[0xAA, 0xBB]);
+        assert_ne!(inv, 0);
+        free_obj(inv);
+    }
 }

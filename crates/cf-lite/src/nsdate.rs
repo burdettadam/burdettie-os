@@ -146,6 +146,55 @@ pub extern "C" fn shim_nsdate_description(obj: u64, _cmd: u64) -> u64 {
     crate::cfstring::alloc_nsstring_from_cstr(cstr.as_ptr())
 }
 
+/// `-[NSDate earlierDate:]` — return the earlier of self and other.
+pub extern "C" fn shim_nsdate_earlier_date(obj: u64, _cmd: u64, other: u64) -> u64 {
+    if obj == 0 {
+        return other;
+    }
+    if other == 0 {
+        return obj;
+    }
+    let ti_self = unsafe { *((obj as usize + NSDATE_TI_OFF) as *const f64) };
+    let ti_other = unsafe { *((other as usize + NSDATE_TI_OFF) as *const f64) };
+    if ti_self <= ti_other {
+        obj
+    } else {
+        other
+    }
+}
+
+/// `-[NSDate laterDate:]` — return the later of self and other.
+pub extern "C" fn shim_nsdate_later_date(obj: u64, _cmd: u64, other: u64) -> u64 {
+    if obj == 0 {
+        return other;
+    }
+    if other == 0 {
+        return obj;
+    }
+    let ti_self = unsafe { *((obj as usize + NSDATE_TI_OFF) as *const f64) };
+    let ti_other = unsafe { *((other as usize + NSDATE_TI_OFF) as *const f64) };
+    if ti_self >= ti_other {
+        obj
+    } else {
+        other
+    }
+}
+
+/// Apple's distantFuture: ~4001-01-01 as CF absolute time.
+const DISTANT_FUTURE_TI: f64 = 63_113_904_000.0;
+/// Apple's distantPast: ~0001-01-01 as CF absolute time.
+const DISTANT_PAST_TI: f64 = -63_114_076_800.0;
+
+/// `+[NSDate distantFuture]` — a date far in the future.
+pub extern "C" fn shim_nsdate_distant_future(_cls: u64, _cmd: u64) -> u64 {
+    alloc_nsdate(DISTANT_FUTURE_TI)
+}
+
+/// `+[NSDate distantPast]` — a date far in the past.
+pub extern "C" fn shim_nsdate_distant_past(_cls: u64, _cmd: u64) -> u64 {
+    alloc_nsdate(DISTANT_PAST_TI)
+}
+
 /// Convert days since Unix epoch to (year, month, day).
 fn days_to_ymd(mut days: i64) -> (i64, i64, i64) {
     // Civil calendar algorithm
@@ -160,4 +209,148 @@ fn days_to_ymd(mut days: i64) -> (i64, i64, i64) {
     let m = if mp < 10 { mp + 3 } else { mp - 9 };
     let y = if m <= 2 { y + 1 } else { y };
     (y, m, d)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shim_test_helpers::*;
+
+    #[test]
+    fn alloc_and_read_ti_since_ref() {
+        let d = alloc_nsdate(0.0);
+        assert_ne!(d, 0);
+        let ti = shim_nsdate_ti_since_ref(d, 0);
+        assert!((ti - 0.0).abs() < 1e-9);
+        free_obj(d);
+    }
+
+    #[test]
+    fn ti_since_1970_offset() {
+        // CF reference = 2001-01-01 → Unix offset = 978307200
+        let d = alloc_nsdate(0.0);
+        let ti = shim_nsdate_ti_since_1970(d, 0);
+        assert!((ti - CF_EPOCH_OFFSET).abs() < 1.0, "expected ~{CF_EPOCH_OFFSET} got {ti}");
+        free_obj(d);
+    }
+
+    #[test]
+    fn is_equal_to_date_same_value() {
+        let a = alloc_nsdate(1234.5);
+        let b = alloc_nsdate(1234.5);
+        assert_eq!(shim_nsdate_is_equal_to_date(a, 0, b), 1);
+        free_obj(a);
+        free_obj(b);
+    }
+
+    #[test]
+    fn is_equal_to_date_different_values() {
+        let a = alloc_nsdate(1000.0);
+        let b = alloc_nsdate(2000.0);
+        assert_eq!(shim_nsdate_is_equal_to_date(a, 0, b), 0);
+        free_obj(a);
+        free_obj(b);
+    }
+
+    #[test]
+    fn compare_ordering() {
+        let a = alloc_nsdate(100.0);
+        let b = alloc_nsdate(200.0);
+        assert_eq!(shim_nsdate_compare(a, 0, b), -1);
+        assert_eq!(shim_nsdate_compare(b, 0, a), 1);
+        assert_eq!(shim_nsdate_compare(a, 0, a), 0);
+        free_obj(a);
+        free_obj(b);
+    }
+
+    #[test]
+    fn date_by_adding_interval() {
+        let d = alloc_nsdate(1000.0);
+        let d2 = shim_nsdate_date_by_adding(d, 0, 60.0);
+        assert_ne!(d2, 0);
+        let ti = shim_nsdate_ti_since_ref(d2, 0);
+        assert!((ti - 1060.0).abs() < 1e-9);
+        free_obj(d);
+        free_obj(d2);
+    }
+
+    #[test]
+    fn nil_safety() {
+        assert_eq!(shim_nsdate_ti_since_ref(0, 0), 0.0);
+        assert_eq!(shim_nsdate_ti_since_1970(0, 0), 0.0);
+        assert_eq!(shim_nsdate_ti_since_now(0, 0), 0.0);
+        assert_eq!(shim_nsdate_is_equal_to_date(0, 0, 0), 0);
+        assert_eq!(shim_nsdate_date_by_adding(0, 0, 1.0), 0);
+    }
+
+    #[test]
+    fn description_non_zero() {
+        let d = alloc_nsdate(0.0);
+        let desc = shim_nsdate_description(d, 0);
+        assert_ne!(desc, 0);
+        // Should contain "2001" — CF reference date year
+        let s = read_string(desc);
+        assert!(s.contains("2001"), "expected year 2001 in '{s}'");
+        free_obj(d);
+        free_obj(desc);
+    }
+
+    #[test]
+    fn earlier_date_returns_earlier() {
+        let a = alloc_nsdate(100.0);
+        let b = alloc_nsdate(200.0);
+        assert_eq!(shim_nsdate_earlier_date(a, 0, b), a);
+        assert_eq!(shim_nsdate_earlier_date(b, 0, a), a);
+        free_obj(a);
+        free_obj(b);
+    }
+
+    #[test]
+    fn later_date_returns_later() {
+        let a = alloc_nsdate(100.0);
+        let b = alloc_nsdate(200.0);
+        assert_eq!(shim_nsdate_later_date(a, 0, b), b);
+        assert_eq!(shim_nsdate_later_date(b, 0, a), b);
+        free_obj(a);
+        free_obj(b);
+    }
+
+    #[test]
+    fn earlier_later_nil_safety() {
+        let d = alloc_nsdate(100.0);
+        assert_eq!(shim_nsdate_earlier_date(0, 0, d), d);
+        assert_eq!(shim_nsdate_earlier_date(d, 0, 0), d);
+        assert_eq!(shim_nsdate_later_date(0, 0, d), d);
+        assert_eq!(shim_nsdate_later_date(d, 0, 0), d);
+        free_obj(d);
+    }
+
+    #[test]
+    fn distant_future_is_positive() {
+        let d = shim_nsdate_distant_future(0, 0);
+        assert_ne!(d, 0);
+        let ti = shim_nsdate_ti_since_ref(d, 0);
+        assert!(ti > 1e9, "distantFuture should be far in the future, got {ti}");
+        free_obj(d);
+    }
+
+    #[test]
+    fn distant_past_is_negative() {
+        let d = shim_nsdate_distant_past(0, 0);
+        assert_ne!(d, 0);
+        let ti = shim_nsdate_ti_since_ref(d, 0);
+        assert!(ti < -1e9, "distantPast should be far in the past, got {ti}");
+        free_obj(d);
+    }
+
+    #[test]
+    fn distant_future_is_later_than_distant_past() {
+        let future = shim_nsdate_distant_future(0, 0);
+        let past = shim_nsdate_distant_past(0, 0);
+        assert_eq!(shim_nsdate_compare(future, 0, past), 1);
+        assert_eq!(shim_nsdate_earlier_date(future, 0, past), past);
+        assert_eq!(shim_nsdate_later_date(future, 0, past), future);
+        free_obj(future);
+        free_obj(past);
+    }
 }

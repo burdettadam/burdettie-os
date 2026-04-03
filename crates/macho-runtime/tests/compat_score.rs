@@ -1,9 +1,9 @@
 //! Compatibility scoring — runs every fixture through the runtime pipeline
 //! and produces a per-fixture scorecard across 7 dimensions.
 //!
-//! Most fixtures run **in-process** for speed.  Fixtures known to crash
-//! (e.g. @throw without unwind-info registration) run in a **subprocess**
-//! so a SIGABRT doesn't take down the rest of the scorecard.
+//! Most fixtures run **in-process** for speed.  A small number of fixtures
+//! still run in a **subprocess** so a fatal regression cannot take down the
+//! entire scorecard binary.
 
 mod common;
 
@@ -81,16 +81,13 @@ fn discover_fixtures() -> Vec<(String, PathBuf)> {
 fn expected_exit(name: &str) -> i32 {
     match name {
         "return42" => 42,
-        "appkit_bootstrap" => 1,
         _ => 0,
     }
 }
 
-/// Fixtures that are known to crash the process (not recoverable in-process).
-/// These are excluded from the regression gate but still appear in the scorecard.
-fn is_known_crash(name: &str) -> bool {
-    // @throw / @try / @catch require the host unwinder to find the loaded
-    // binary's LSDA — not yet supported.  These fixtures SIGABRT.
+/// Fixtures that should keep subprocess isolation because exception-regression
+/// failures can still be process-fatal.
+fn requires_subprocess(name: &str) -> bool {
     matches!(name, "minimal_throw" | "try_catch_test")
 }
 
@@ -206,7 +203,7 @@ fn score_fixture_inprocess(name: &str, binary: &Path) -> FixtureScore {
 /// Score a fixture — uses subprocess isolation for known-crash fixtures,
 /// in-process execution for everything else.
 fn score_fixture(name: &str, binary: &Path) -> FixtureScore {
-    if is_known_crash(name) {
+    if requires_subprocess(name) {
         score_fixture_subprocess(name, binary)
     } else {
         score_fixture_inprocess(name, binary)
@@ -216,8 +213,8 @@ fn score_fixture(name: &str, binary: &Path) -> FixtureScore {
 /// Combined compatibility scorecard and regression gate.
 ///
 /// Runs every fixture once (in-process for speed, subprocess for
-/// known-crash fixtures), prints the scorecard, then asserts all
-/// non-known-crash fixtures pass.
+/// subprocess-isolated exception fixtures), prints the scorecard, then asserts
+/// every fixture passes.
 #[test]
 fn compat_score_regression_gate() {
     let fixtures = discover_fixtures();
@@ -328,11 +325,10 @@ fn compat_score_regression_gate() {
     );
     println!();
 
-    // Regression gate: assert all non-known-crash fixtures pass.
-    // Known-crash fixtures appear in the scorecard but are excluded from the gate.
+    // Regression gate: assert every fixture passes.
     let failures: Vec<String> = scores
         .iter()
-        .filter(|s| !s.exit_correct && !is_known_crash(&s.name))
+        .filter(|s| !s.exit_correct)
         .map(|s| {
             if let Some(err) = &s.error {
                 format!("{}: error — {err}", s.name)

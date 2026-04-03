@@ -15,6 +15,7 @@
 //! can be registered with the NSDictionary function pointers directly.
 
 use crate::cfstring;
+use crate::nsnumber;
 
 const COUNT_OFF: usize = 8;
 const KEYS_OFF: usize = 16;
@@ -22,6 +23,75 @@ const VALS_OFF: usize = 24;
 const CAP_OFF: usize = 32;
 
 const INITIAL_CAPACITY: u64 = 4;
+
+/// Retain an object stored in a collection so it stays alive.
+/// Skips nil and objects that aren't heap-allocated.
+fn retain_stored(obj: u64) {
+    if obj != 0 {
+        objc_runtime::refcount::REFCOUNTS
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .retain(obj);
+    }
+}
+
+/// Copy a dictionary key.
+///
+/// Apple's NSDictionary always calls `-[key copyWithZone:]` before
+/// storing. For CFString/NSString keys we snapshot the content into a
+/// new immutable string so that mutable-buffer reuse by callers does
+/// not corrupt existing entries.  Non-string keys are passed through.
+fn copy_key(key: u64) -> u64 {
+    if key == 0 {
+        return 0;
+    }
+    if let Some(s) = cfstring::extract_cfstring_cstr(key) {
+        let c = std::ffi::CString::new(s).unwrap_or_default();
+        cfstring::shim_cf_string_create_with_cstring(0, c.as_ptr(), 0)
+    } else {
+        key
+    }
+}
+
+fn normalized_capacity(capacity: u64) -> u64 {
+    if capacity == 0 {
+        INITIAL_CAPACITY
+    } else {
+        capacity
+    }
+}
+
+fn init_dictionary_storage(obj: u64, capacity: u64) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
+
+    let cap = normalized_capacity(capacity);
+    let key_buf = crate::pal_alloc().calloc(cap as usize, 8) as u64;
+    let val_buf = crate::pal_alloc().calloc(cap as usize, 8) as u64;
+
+    unsafe {
+        if *(obj as *const u64) == 0 {
+            *(obj as *mut u64) = crate::nsobj::nsmutabledictionary_class_addr();
+        }
+
+        let old_keys = *((obj as usize + KEYS_OFF) as *const u64);
+        let old_vals = *((obj as usize + VALS_OFF) as *const u64);
+        if old_keys != 0 {
+            crate::pal_alloc().free(old_keys as *mut u8);
+        }
+        if old_vals != 0 {
+            crate::pal_alloc().free(old_vals as *mut u8);
+        }
+
+        *((obj as usize + COUNT_OFF) as *mut u64) = 0;
+        *((obj as usize + KEYS_OFF) as *mut u64) = key_buf;
+        *((obj as usize + VALS_OFF) as *mut u64) = val_buf;
+        *((obj as usize + CAP_OFF) as *mut u64) = cap;
+    }
+
+    obj
+}
 
 /// `+[NSMutableDictionary dictionary]` — creates an empty mutable dictionary.
 pub extern "C" fn shim_nsmutabledict_dictionary(cls: u64, _cmd: u64) -> u64 {
@@ -39,36 +109,72 @@ pub extern "C" fn shim_nsmutabledict_dictionary_with_capacity(
         return 0;
     }
 
-    let cap = if capacity == 0 {
-        INITIAL_CAPACITY
-    } else {
-        capacity
-    };
-
     let obj = crate::pal_alloc().calloc(1, 40) as u64;
     if obj == 0 {
         return 0;
     }
 
-    // Set ISA = NSMutableDictionary class
     unsafe {
         *(obj as *mut u64) = crate::nsobj::nsmutabledictionary_class_addr();
     }
 
-    // Allocate key and value buffers
-    let key_buf = crate::pal_alloc().calloc(cap as usize, 8) as u64;
-    let val_buf = crate::pal_alloc().calloc(cap as usize, 8) as u64;
-    unsafe {
-        *((obj as usize + KEYS_OFF) as *mut u64) = key_buf;
-        *((obj as usize + VALS_OFF) as *mut u64) = val_buf;
-        *((obj as usize + CAP_OFF) as *mut u64) = cap;
-    }
+    init_dictionary_storage(obj, capacity);
+
+    let cap = normalized_capacity(capacity);
 
     log::debug!(
         "NSMutableDictionary dictionary → {:#x} (capacity {})",
         obj,
         cap
     );
+    obj
+}
+
+/// `-[NSMutableDictionary initWithCapacity:]` — initializes an allocated
+/// mutable dictionary instance with storage for the requested capacity.
+pub extern "C" fn shim_nsmutabledict_init_with_capacity(
+    obj: u64,
+    _cmd: u64,
+    capacity: u64,
+) -> u64 {
+    init_dictionary_storage(obj, capacity)
+}
+
+/// `-[NSMutableDictionary initWithDictionary:]` — initializes an allocated
+/// mutable dictionary instance by copying all key-value pairs from the source.
+pub extern "C" fn shim_nsmutabledict_init_with_dictionary(
+    obj: u64,
+    _cmd: u64,
+    source: u64,
+) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
+
+    let count = if source == 0 {
+        0
+    } else {
+        crate::nsdictionary::helpers_pub::dict_count_pub(source)
+    };
+    let cap = if count == 0 { INITIAL_CAPACITY } else { count };
+    init_dictionary_storage(obj, cap);
+
+    if source == 0 {
+        return obj;
+    }
+
+    let keys = crate::nsdictionary::helpers_pub::dict_keys_pub(source);
+    let vals = crate::nsdictionary::helpers_pub::dict_vals_pub(source);
+    if keys == 0 || vals == 0 {
+        return obj;
+    }
+
+    for i in 0..count as usize {
+        let key = unsafe { *((keys as usize + i * 8) as *const u64) };
+        let val = unsafe { *((vals as usize + i * 8) as *const u64) };
+        shim_nsmutabledict_set_object_for_key(obj, 0, val, key);
+    }
+
     obj
 }
 
@@ -113,6 +219,7 @@ fn find_key_index(obj: u64, key: u64) -> Option<usize> {
     }
 
     let key_cstr = cfstring::extract_cfstring_cstr(key);
+    let key_is_num = nsnumber::is_nsnumber(key);
 
     for i in 0..count {
         let k = unsafe { *((keys as usize + i * 8) as *const u64) };
@@ -126,12 +233,19 @@ fn find_key_index(obj: u64, key: u64) -> Option<usize> {
                 }
             }
         }
+        if key_is_num && nsnumber::is_nsnumber(k) && nsnumber::nsnumber_values_equal(key, k) {
+            return Some(i);
+        }
     }
     None
 }
 
 /// `-[NSMutableDictionary setObject:forKey:]` — sets a key-value pair.
 /// If the key already exists, updates the value. Otherwise appends.
+///
+/// Apple's NSDictionary always copies keys via `-[key copy]`.  We
+/// snapshot string content here so that callers who reuse a mutable
+/// buffer for the key get correct behaviour.
 pub extern "C" fn shim_nsmutabledict_set_object_for_key(
     obj: u64,
     _cmd: u64,
@@ -142,8 +256,15 @@ pub extern "C" fn shim_nsmutabledict_set_object_for_key(
         return 0;
     }
 
+    // Snapshot the key: Apple's NSDictionary copies keys on insertion.
+    let key_copy = copy_key(key);
+
+    // Retain the value so it stays alive while stored in the dict.
+    retain_stored(val);
+    retain_stored(key_copy);
+
     // Check if key already exists → update in place
-    if let Some(i) = find_key_index(obj, key) {
+    if let Some(i) = find_key_index(obj, key_copy) {
         let vals = unsafe { *((obj as usize + VALS_OFF) as *const u64) };
         if vals != 0 {
             unsafe {
@@ -164,7 +285,7 @@ pub extern "C" fn shim_nsmutabledict_set_object_for_key(
 
     if keys != 0 && vals != 0 {
         unsafe {
-            *((keys as usize + count as usize * 8) as *mut u64) = key;
+            *((keys as usize + count as usize * 8) as *mut u64) = key_copy;
             *((vals as usize + count as usize * 8) as *mut u64) = val;
             *((obj as usize + COUNT_OFF) as *mut u64) = count + 1;
         }
@@ -250,6 +371,41 @@ pub extern "C" fn shim_nsmutabledict_add_entries_from_dictionary(
         let k = unsafe { *((keys as usize + i * 8) as *const u64) };
         let v = unsafe { *((vals as usize + i * 8) as *const u64) };
         shim_nsmutabledict_set_object_for_key(obj, 0, v, k);
+    }
+    0
+}
+
+/// `-[NSMutableDictionary removeObjectsForKeys:]` — remove all entries whose
+/// key appears in the given NSArray.
+pub extern "C" fn shim_nsmutabledict_remove_objects_for_keys(
+    obj: u64,
+    _cmd: u64,
+    keys: u64,
+) -> u64 {
+    if obj == 0 || keys == 0 {
+        return 0;
+    }
+    let n = crate::nsarray::shim_nsarray_count(keys, 0);
+    for i in 0..n {
+        let k = crate::nsarray::shim_nsarray_object_at_index(keys, 0, i);
+        shim_nsmutabledict_remove_object_for_key(obj, 0, k);
+    }
+    0
+}
+
+/// `-[NSMutableDictionary setDictionary:]` — replace all contents with entries
+/// from `other`.  Clears current entries then copies from `other`.
+pub extern "C" fn shim_nsmutabledict_set_dictionary(
+    obj: u64,
+    _cmd: u64,
+    other: u64,
+) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
+    shim_nsmutabledict_remove_all_objects(obj, 0);
+    if other != 0 {
+        shim_nsmutabledict_add_entries_from_dictionary(obj, 0, other);
     }
     0
 }

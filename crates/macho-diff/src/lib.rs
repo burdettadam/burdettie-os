@@ -175,3 +175,234 @@ impl DiffReport {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── compare_dylibs ─────────────────────────────────────────
+
+    #[test]
+    fn compare_dylibs_empty_inputs() {
+        let report = DiffReport::compare_dylibs(&[], &[]);
+        assert!(report.is_clean());
+        assert!(report.matches.is_empty());
+        assert!(report.warnings.is_empty());
+    }
+
+    #[test]
+    fn compare_dylibs_all_match() {
+        let planned = vec!["libSystem".to_string(), "libc++".to_string()];
+        let observed = vec![
+            "/usr/lib/libSystem.B.dylib".to_string(),
+            "/usr/lib/libc++.1.dylib".to_string(),
+        ];
+        let report = DiffReport::compare_dylibs(&planned, &observed);
+        assert!(report.is_clean());
+        assert_eq!(report.matches.len(), 2);
+    }
+
+    #[test]
+    fn compare_dylibs_missing_from_host() {
+        let planned = vec!["libFoo".to_string()];
+        let observed: Vec<String> = Vec::new();
+        let report = DiffReport::compare_dylibs(&planned, &observed);
+        assert!(!report.is_clean());
+        assert_eq!(report.mismatches.len(), 1);
+        assert_eq!(report.mismatches[0].category, "dylib");
+    }
+
+    #[test]
+    fn compare_dylibs_extra_on_host() {
+        let planned: Vec<String> = Vec::new();
+        let observed = vec!["/usr/lib/libExtra.dylib".to_string()];
+        let report = DiffReport::compare_dylibs(&planned, &observed);
+        assert!(report.is_clean()); // extras are warnings, not mismatches
+        assert_eq!(report.warnings.len(), 1);
+        assert!(report.warnings[0].contains("libExtra"));
+    }
+
+    // ── compare_segments ───────────────────────────────────────
+
+    #[test]
+    fn compare_segments_empty_inputs() {
+        let report = DiffReport::compare_segments(&[], &[]);
+        assert!(report.is_clean());
+        assert!(report.matches.is_empty());
+    }
+
+    #[test]
+    fn compare_segments_exact_match() {
+        let planned = vec![("__TEXT".to_string(), 0x1000u64, 0x4000u64)];
+        let observed = vec![ObservedSegment {
+            name: "__TEXT".to_string(),
+            vmaddr: 0x1000,
+            vmsize: 0x4000,
+        }];
+        let report = DiffReport::compare_segments(&planned, &observed);
+        assert!(report.is_clean());
+        assert_eq!(report.matches.len(), 1);
+    }
+
+    #[test]
+    fn compare_segments_vmaddr_mismatch() {
+        let planned = vec![("__TEXT".to_string(), 0x1000u64, 0x4000u64)];
+        let observed = vec![ObservedSegment {
+            name: "__TEXT".to_string(),
+            vmaddr: 0x2000,
+            vmsize: 0x4000,
+        }];
+        let report = DiffReport::compare_segments(&planned, &observed);
+        assert!(!report.is_clean());
+        assert!(report
+            .mismatches
+            .iter()
+            .any(|m| m.category == "segment_vmaddr"));
+    }
+
+    #[test]
+    fn compare_segments_vmsize_mismatch() {
+        let planned = vec![("__DATA".to_string(), 0x5000u64, 0x1000u64)];
+        let observed = vec![ObservedSegment {
+            name: "__DATA".to_string(),
+            vmaddr: 0x5000,
+            vmsize: 0x2000,
+        }];
+        let report = DiffReport::compare_segments(&planned, &observed);
+        assert!(!report.is_clean());
+        assert!(report
+            .mismatches
+            .iter()
+            .any(|m| m.category == "segment_vmsize"));
+    }
+
+    #[test]
+    fn compare_segments_missing_from_host() {
+        let planned = vec![("__LINKEDIT".to_string(), 0x8000u64, 0x1000u64)];
+        let observed: Vec<ObservedSegment> = Vec::new();
+        let report = DiffReport::compare_segments(&planned, &observed);
+        assert!(!report.is_clean());
+        assert_eq!(report.mismatches[0].category, "segment");
+    }
+
+    #[test]
+    fn compare_segments_extra_on_host() {
+        let planned: Vec<(String, u64, u64)> = Vec::new();
+        let observed = vec![ObservedSegment {
+            name: "__EXTRA".to_string(),
+            vmaddr: 0xA000,
+            vmsize: 0x1000,
+        }];
+        let report = DiffReport::compare_segments(&planned, &observed);
+        assert!(report.is_clean());
+        assert_eq!(report.warnings.len(), 1);
+        assert!(report.warnings[0].contains("__EXTRA"));
+    }
+
+    // ── full_compare ───────────────────────────────────────────
+
+    #[test]
+    fn full_compare_all_clean() {
+        let planned_dylibs = vec!["libSystem".to_string()];
+        let observed_dylibs = vec!["/usr/lib/libSystem.B.dylib".to_string()];
+        let planned_segments = vec![("__TEXT".to_string(), 0x1000u64, 0x4000u64)];
+        let observed_segments = vec![ObservedSegment {
+            name: "__TEXT".to_string(),
+            vmaddr: 0x1000,
+            vmsize: 0x4000,
+        }];
+        let report = DiffReport::full_compare(
+            &planned_dylibs,
+            &observed_dylibs,
+            &planned_segments,
+            &observed_segments,
+            Some(0x1234),
+            Some(0x1234),
+        );
+        assert!(report.is_clean());
+        assert!(report
+            .matches
+            .iter()
+            .any(|m| m.contains("entry point matches")));
+    }
+
+    #[test]
+    fn full_compare_entry_mismatch() {
+        let report = DiffReport::full_compare(&[], &[], &[], &[], Some(0x100), Some(0x200));
+        assert!(!report.is_clean());
+        assert!(report
+            .mismatches
+            .iter()
+            .any(|m| m.category == "entry_point"));
+    }
+
+    #[test]
+    fn full_compare_entry_not_observed() {
+        let report = DiffReport::full_compare(&[], &[], &[], &[], Some(0x100), None);
+        assert!(report.is_clean()); // warning, not mismatch
+        assert!(report
+            .warnings
+            .iter()
+            .any(|w| w.contains("not observed")));
+    }
+
+    #[test]
+    fn full_compare_both_entries_none() {
+        let report = DiffReport::full_compare(&[], &[], &[], &[], None, None);
+        assert!(report.is_clean());
+        assert!(report.warnings.is_empty());
+    }
+
+    #[test]
+    fn full_compare_composite_dylib_and_segment_issues() {
+        let planned_dylibs = vec!["libFoo".to_string()];
+        let observed_dylibs: Vec<String> = Vec::new();
+        let planned_segments = vec![("__TEXT".to_string(), 0x1000u64, 0x4000u64)];
+        let observed_segments = vec![ObservedSegment {
+            name: "__TEXT".to_string(),
+            vmaddr: 0x2000,
+            vmsize: 0x4000,
+        }];
+        let report = DiffReport::full_compare(
+            &planned_dylibs,
+            &observed_dylibs,
+            &planned_segments,
+            &observed_segments,
+            None,
+            None,
+        );
+        assert!(!report.is_clean());
+        // Should have both dylib and segment mismatches
+        assert!(report.mismatches.iter().any(|m| m.category == "dylib"));
+        assert!(report
+            .mismatches
+            .iter()
+            .any(|m| m.category == "segment_vmaddr"));
+    }
+
+    // ── DiffReport helpers ─────────────────────────────────────
+
+    #[test]
+    fn is_clean_true_when_no_mismatches() {
+        let report = DiffReport {
+            matches: vec!["ok".into()],
+            mismatches: Vec::new(),
+            warnings: vec!["warn".into()],
+        };
+        assert!(report.is_clean());
+    }
+
+    #[test]
+    fn is_clean_false_when_mismatches_present() {
+        let report = DiffReport {
+            matches: Vec::new(),
+            mismatches: vec![Mismatch {
+                category: "test".into(),
+                expected: "a".into(),
+                observed: "b".into(),
+            }],
+            warnings: Vec::new(),
+        };
+        assert!(!report.is_clean());
+    }
+}

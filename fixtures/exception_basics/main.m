@@ -1,7 +1,7 @@
 // exception_basics — fixture: NSException class methods + property access.
-// NOTE: @try/@catch/@throw support requires unwind info registration for mapped
-// code, which is future work. This fixture tests NSException allocation,
-// property accessors, and description — all of which work through the loader.
+// Full @try/@catch/@throw coverage now lives in `minimal_throw` and
+// `try_catch_test`. This fixture intentionally stays focused on NSException
+// allocation, property accessors, and description through the loader.
 //
 // Compiled with:
 //   xcrun clang -fno-objc-arc -framework Foundation -arch arm64 -o app main.m

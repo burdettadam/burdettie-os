@@ -87,6 +87,7 @@ impl Label {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use graphics_core::{SoftwareRenderer, Surface};
 
     #[test]
     fn label_basic() {
@@ -100,5 +101,92 @@ mod tests {
         l.set_text("World");
         assert_eq!(l.text(), "World");
         assert!(l.view().needs_display());
+    }
+
+    #[test]
+    fn label_draw_no_panic() {
+        let mut l = Label::new(Rect::new(0.0, 0.0, 80.0, 20.0), "Draw me");
+        let mut surface = Surface::new(100, 30);
+        let mut renderer = SoftwareRenderer::new(&mut surface);
+        l.draw(&mut renderer);
+    }
+
+    #[test]
+    fn label_intrinsic_content_size() {
+        let l = Label::new(Rect::new(0.0, 0.0, 200.0, 30.0), "Some text");
+        let size = l.intrinsic_content_size();
+        assert!(size.width.unwrap() > 0.0, "width should be positive for non-empty text");
+        assert!(size.height.unwrap() > 0.0, "height should be positive");
+    }
+
+    #[test]
+    fn label_intrinsic_empty_text() {
+        let l = Label::new(Rect::new(0.0, 0.0, 200.0, 30.0), "");
+        let size = l.intrinsic_content_size();
+        // Width should be minimal (just padding) for empty text
+        let l2 = Label::new(Rect::new(0.0, 0.0, 200.0, 30.0), "Hello");
+        let size2 = l2.intrinsic_content_size();
+        assert!(size.width.unwrap() < size2.width.unwrap(), "empty text should have smaller width");
+    }
+
+    #[test]
+    fn label_set_font() {
+        let mut l = Label::new(Rect::new(0.0, 0.0, 200.0, 30.0), "Text");
+        let size_before = l.intrinsic_content_size();
+        l.set_font(Font { size: 24.0, ..Font::default() });
+        let size_after = l.intrinsic_content_size();
+        // Bigger font should change intrinsic size
+        assert_ne!(size_before.width.unwrap(), size_after.width.unwrap());
+    }
+
+    #[test]
+    fn label_set_text_color() {
+        let mut l = Label::new(Rect::new(0.0, 0.0, 100.0, 20.0), "Colored");
+        l.set_text_color(Color::RED);
+        // text_color is private, but set_text_color should not panic
+        // and should mark needs_display
+        assert!(l.view().needs_display());
+    }
+
+    #[test]
+    fn label_hidden() {
+        let mut l = Label::new(Rect::new(0.0, 0.0, 100.0, 20.0), "Hidden");
+        l.view_mut().hidden = true;
+        assert!(l.view().hidden);
+
+        // Drawing a hidden label should be a no-op (no panic)
+        let mut surface = Surface::new(100, 30);
+        let mut renderer = SoftwareRenderer::new(&mut surface);
+        l.draw(&mut renderer);
+    }
+
+    #[test]
+    fn label_view_frame() {
+        let frame = Rect::new(10.0, 20.0, 150.0, 40.0);
+        let l = Label::new(frame, "Frame test");
+        assert_eq!(l.view().frame(), frame);
+    }
+
+    #[test]
+    fn label_view_tag() {
+        let mut l = Label::new(Rect::new(0.0, 0.0, 100.0, 20.0), "Tagged");
+        l.view_mut().tag = 42;
+        assert_eq!(l.view().tag, 42);
+    }
+
+    #[test]
+    fn label_set_text_updates() {
+        let mut l = Label::new(Rect::new(0.0, 0.0, 100.0, 20.0), "Initial");
+        assert_eq!(l.text(), "Initial");
+        l.set_text("Updated text content");
+        assert_eq!(l.text(), "Updated text content");
+    }
+
+    #[test]
+    fn label_default_text_color() {
+        let l = Label::new(Rect::new(0.0, 0.0, 100.0, 20.0), "Default color");
+        // text_color defaults to BLACK; since it's a private field in the same
+        // module, we can access it directly in tests.
+        assert_eq!(l.text_color, Color::BLACK);
     }
 }

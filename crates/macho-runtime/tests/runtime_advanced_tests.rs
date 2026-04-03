@@ -15,7 +15,7 @@ fn runtime_collection_enum_exit_zero() {
 fn runtime_nsenumerator_class_registered() {
     let Some(_result) = common::run_fixture("collection_enum/app") else { return };
 
-    let rt = objc_runtime::OBJC_RUNTIME.lock().unwrap();
+    let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
 
     let nsenum = rt
@@ -43,7 +43,7 @@ fn runtime_nsdate_basics_exit_zero() {
 fn runtime_nsdate_class_registered() {
     let Some(_result) = common::run_fixture("nsdate_basics/app") else { return };
 
-    let rt = objc_runtime::OBJC_RUNTIME.lock().unwrap();
+    let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
 
     let nsdate = rt.get_class("NSDate").expect("NSDate should be registered");
@@ -69,7 +69,7 @@ fn runtime_nsuserdefaults_basics_exit_zero() {
 fn runtime_nsuserdefaults_class_registered() {
     let Some(_result) = common::run_fixture("nsuserdefaults_basics/app") else { return };
 
-    let rt = objc_runtime::OBJC_RUNTIME.lock().unwrap();
+    let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
 
     let nsud = rt
@@ -94,7 +94,7 @@ fn runtime_nsset_basics_exit_zero() {
 fn runtime_nsset_class_registered() {
     let Some(_result) = common::run_fixture("nsset_basics/app") else { return };
 
-    let rt = objc_runtime::OBJC_RUNTIME.lock().unwrap();
+    let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
 
     let nsset = rt.get_class("NSSet").expect("NSSet should be registered");
@@ -122,7 +122,7 @@ fn runtime_nsurl_basics_exit_zero() {
 fn runtime_nsurl_class_registered() {
     let Some(_result) = common::run_fixture("nsurl_basics/app") else { return };
 
-    let rt = objc_runtime::OBJC_RUNTIME.lock().unwrap();
+    let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
 
     let nsurl = rt.get_class("NSURL").expect("NSURL should be registered");
@@ -143,7 +143,7 @@ fn runtime_nsnull_basics_exit_zero() {
 fn runtime_nsnull_class_registered() {
     let Some(_result) = common::run_fixture("nsnull_basics/app") else { return };
 
-    let rt = objc_runtime::OBJC_RUNTIME.lock().unwrap();
+    let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
 
     let nsnull = rt.get_class("NSNull").expect("NSNull should be registered");
@@ -156,7 +156,7 @@ fn runtime_nsnull_class_registered() {
 fn runtime_nsdateformatter_class_registered() {
     let Some(_result) = common::run_fixture("return42/app") else { return };
 
-    let rt = objc_runtime::OBJC_RUNTIME.lock().unwrap();
+    let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
 
     let cls = rt
@@ -177,7 +177,7 @@ fn runtime_nsdateformatter_basics_exit_zero() {
 fn runtime_nscharacterset_class_registered() {
     let Some(_result) = common::run_fixture("return42/app") else { return };
 
-    let rt = objc_runtime::OBJC_RUNTIME.lock().unwrap();
+    let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
 
     let cls = rt
@@ -200,7 +200,7 @@ fn runtime_nscharacterset_basics_exit_zero() {
 fn runtime_nsnotificationcenter_class_registered() {
     let Some(_result) = common::run_fixture("return42/app") else { return };
 
-    let rt = objc_runtime::OBJC_RUNTIME.lock().unwrap();
+    let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
 
     let cls = rt

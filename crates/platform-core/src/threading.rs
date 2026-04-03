@@ -56,3 +56,22 @@ pub trait Threading: Send + Sync {
     /// Destroy the condition variable.
     fn cond_destroy(&self, ptr: CondPtr);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mutex_ptr_is_mut_u8() {
+        let ptr: MutexPtr = std::ptr::null_mut();
+        let _: *mut u8 = ptr; // compile-time proof
+        assert!(ptr.is_null());
+    }
+
+    #[test]
+    fn cond_ptr_is_mut_u8() {
+        let ptr: CondPtr = std::ptr::null_mut();
+        let _: *mut u8 = ptr; // compile-time proof
+        assert!(ptr.is_null());
+    }
+}

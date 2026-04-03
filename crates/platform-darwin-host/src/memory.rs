@@ -71,3 +71,46 @@ fn prot_to_mmap(p: Protection) -> libc::c_int {
     }
     flags
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn page_size_power_of_two() {
+        let m = DarwinMemoryMapper;
+        let ps = m.page_size();
+        assert!(ps > 0);
+        assert!(ps.is_power_of_two(), "page_size {ps} is not a power of 2");
+    }
+
+    #[test]
+    fn map_anonymous_succeeds_and_zeroed() {
+        let m = DarwinMemoryMapper;
+        let size = m.page_size();
+        let ptr = m.map_anonymous(size).unwrap();
+        assert!(!ptr.is_null());
+        let slice = unsafe { std::slice::from_raw_parts(ptr, size) };
+        assert!(slice.iter().all(|&b| b == 0));
+        m.unmap(ptr, size).unwrap();
+    }
+
+    #[test]
+    fn protect_read_only() {
+        let m = DarwinMemoryMapper;
+        let size = m.page_size();
+        let ptr = m.map_anonymous(size).unwrap();
+        m.protect(ptr, size, Protection::READ_ONLY).unwrap();
+        // Can still read
+        let _val = unsafe { *ptr };
+        m.unmap(ptr, size).unwrap();
+    }
+
+    #[test]
+    fn unmap_succeeds() {
+        let m = DarwinMemoryMapper;
+        let size = m.page_size();
+        let ptr = m.map_anonymous(size).unwrap();
+        assert!(m.unmap(ptr, size).is_ok());
+    }
+}

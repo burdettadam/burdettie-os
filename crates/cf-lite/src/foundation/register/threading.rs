@@ -27,6 +27,10 @@ pub fn register_nstimer_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nstimer::shim_nstimer_description as u64,
                 "@@:",
             ),
+            me("fireDate", nstimer::shim_nstimer_fire_date as u64, "@@:"),
+            me("setFireDate:", nstimer::shim_nstimer_set_fire_date as u64, "v@:@"),
+            me("tolerance", nstimer::shim_nstimer_tolerance as u64, "d@:"),
+            me("setTolerance:", nstimer::shim_nstimer_set_tolerance as u64, "v@:d"),
         ],
         class_methods: vec![
             me(
@@ -80,11 +84,67 @@ pub fn register_nsthread_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nsthread::shim_nsthread_description as u64,
                 "@@:",
             ),
+            me(
+                "initWithTarget:selector:object:",
+                nsthread::shim_nsthread_init_with_target as u64,
+                "@@:@:@",
+            ),
+            me("start", nsthread::shim_nsthread_start as u64, "v@:"),
+            me(
+                "isExecuting",
+                nsthread::shim_nsthread_is_executing as u64,
+                "B@:",
+            ),
+            me(
+                "isFinished",
+                nsthread::shim_nsthread_is_finished as u64,
+                "B@:",
+            ),
+            me(
+                "threadDictionary",
+                nsthread::shim_nsthread_thread_dictionary as u64,
+                "@@:",
+            ),
+            me(
+                "threadPriority",
+                nsthread::shim_nsthread_thread_priority as u64,
+                "d@:",
+            ),
+            me(
+                "setThreadPriority:",
+                nsthread::shim_nsthread_set_thread_priority as u64,
+                "v@:d",
+            ),
+            me(
+                "qualityOfService",
+                nsthread::shim_nsthread_quality_of_service as u64,
+                "q@:",
+            ),
+            me(
+                "setQualityOfService:",
+                nsthread::shim_nsthread_set_quality_of_service as u64,
+                "v@:q",
+            ),
+            me(
+                "stackSize",
+                nsthread::shim_nsthread_stack_size as u64,
+                "Q@:",
+            ),
+            me(
+                "setStackSize:",
+                nsthread::shim_nsthread_set_stack_size as u64,
+                "v@:Q",
+            ),
         ],
         class_methods: vec![
             me(
                 "currentThread",
                 nsthread::shim_nsthread_current_thread as u64,
+                "@@:",
+            ),
+            me(
+                "mainThread",
+                nsthread::shim_nsthread_main_thread as u64,
                 "@@:",
             ),
             me(
@@ -102,11 +162,16 @@ pub fn register_nsthread_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nsthread::shim_nsthread_sleep_for_time_interval as u64,
                 "v@:d",
             ),
+            me(
+                "detachNewThreadSelector:toTarget:withObject:",
+                nsthread::shim_nsthread_detach as u64,
+                "v@::@@",
+            ),
         ],
         ivars: vec![],
         properties: vec![],
         protocol_names: Vec::new(),
-        instance_size: 24,
+        instance_size: 48,
         is_root: false,
         is_meta: false,
         superclass_addr: Some(nsobj::nsobject_class_addr()),
@@ -210,6 +275,11 @@ pub fn register_nscondition_class(rt: &mut objc_runtime::ObjcRuntime) {
                 "broadcast",
                 nslock::shim_nscondition_broadcast as u64,
                 "v@:",
+            ),
+            me(
+                "waitUntilDate:",
+                nslock::shim_nscondition_wait_until_date as u64,
+                "c@:@",
             ),
             me("name", nslock::shim_nscondition_name as u64, "@@:"),
             me("setName:", nslock::shim_nscondition_set_name as u64, "v@:@"),
@@ -381,6 +451,8 @@ pub fn register_nsoperationqueue_class(rt: &mut objc_runtime::ObjcRuntime) {
             me("setMaxConcurrentOperationCount:", nsoperation::shim_queue_set_max_concurrent as u64, "v@:q"),
             me("maxConcurrentOperationCount", nsoperation::shim_queue_max_concurrent as u64, "q@:"),
             me("description", nsoperation::shim_queue_description as u64, "@@:"),
+            me("qualityOfService", nsoperation::shim_queue_quality_of_service as u64, "q@:"),
+            me("setQualityOfService:", nsoperation::shim_queue_set_quality_of_service as u64, "v@:q"),
         ],
         class_methods: vec![
             me("alloc", nsoperation::shim_queue_alloc as u64, "@@:"),

@@ -71,7 +71,7 @@ export DARWIN_RUNTIME_ROOT="/Volumes/darwin-runtime"
 export DARWIN_LOADER_ROOT="$DARWIN_RUNTIME_ROOT"
 export PATH="$DARWIN_RUNTIME_ROOT/bin:$PATH"
 
-echo "burdetty-os runtime environment loaded"
+echo "burdettie-os runtime environment loaded"
 echo "  Root:     $DARWIN_RUNTIME_ROOT"
 echo "  Fixtures: $DARWIN_RUNTIME_ROOT/fixtures/"
 echo "  Shell:    runtime-shell"

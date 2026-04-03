@@ -1,4 +1,4 @@
-# burdetty-os Demo Guide
+# burdettie-os Demo Guide
 
 Everything you need to build, package, and run the full demo — from CLI
 scorecard to GUI applications.
@@ -53,10 +53,10 @@ darwin> exit
 ./packaging/bundle-runtime.sh --release
 
 # Build Docker image from the bundle
-docker build -f docker/Dockerfile.demo -t burdetty-os-demo dist/
+docker build -f docker/Dockerfile.demo -t burdettie-os-demo dist/
 
 # Run interactively
-docker run -it --rm burdetty-os-demo
+docker run -it --rm burdettie-os-demo
 ```
 
 ### Option C: VM with Virtualization.framework
@@ -106,7 +106,7 @@ darwin-runtime/
 3. Boot banner displays runtime stats:
    ```
    ╔═══════════════════════════════════════════════════╗
-   ║  burdetty-os Runtime Environment v0.1       ║
+   ║  burdettie-os Runtime Environment v0.1       ║
    ║  Compatibility: 62/62 (100%)                      ║
    ║  Foundation classes: 40 | Shim functions: 59      ║
    ║  Type 'help' for commands, 'gui' for GUI demos    ║

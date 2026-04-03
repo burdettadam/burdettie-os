@@ -47,7 +47,11 @@ impl HostSymbolResolver for DarwinSymbolResolver {
 
     fn open_library(&self, path: &str) -> Option<*mut ()> {
         let c_str = std::ffi::CString::new(path).ok()?;
-        let handle = unsafe { libc::dlopen(c_str.as_ptr(), libc::RTLD_LAZY) };
+        // RTLD_GLOBAL makes the library's symbols visible via RTLD_DEFAULT,
+        // allowing later dlsym(RTLD_DEFAULT, ...) calls (e.g. in DataSymbolStore)
+        // to find private symbols like ___NSArray0__struct that live inside these
+        // frameworks but are not in the initial dyld shared-cache export table.
+        let handle = unsafe { libc::dlopen(c_str.as_ptr(), libc::RTLD_LAZY | libc::RTLD_GLOBAL) };
         if handle.is_null() {
             None
         } else {
@@ -57,5 +61,35 @@ impl HostSymbolResolver for DarwinSymbolResolver {
 
     fn default_handle(&self) -> *mut () {
         self.default_handle as *mut ()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_handle_nonnull() {
+        let r = DarwinSymbolResolver::new();
+        assert!(!r.default_handle().is_null());
+    }
+
+    #[test]
+    fn resolve_printf() {
+        let r = DarwinSymbolResolver::new();
+        assert!(r.resolve("printf").is_some());
+    }
+
+    #[test]
+    fn resolve_nonexistent() {
+        let r = DarwinSymbolResolver::new();
+        assert!(r.resolve("nonexistent_symbol_xyz_123").is_none());
+    }
+
+    #[test]
+    fn new_and_default_equivalent() {
+        let a = DarwinSymbolResolver::new();
+        let b = DarwinSymbolResolver::default();
+        assert_eq!(a.default_handle(), b.default_handle());
     }
 }

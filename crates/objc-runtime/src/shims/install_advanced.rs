@@ -19,6 +19,8 @@ use super::lifecycle::{
     shim_objc_store_weak, shim_objc_sync_enter, shim_objc_sync_exit, shim_objc_terminate,
     shim_object_get_ivar, shim_object_set_ivar, shim_property_get_attributes,
     shim_property_get_name,
+    // Method type introspection (Task 3)
+    shim_method_copy_return_type, shim_method_copy_argument_type,
     // Dynamic class creation shims
     shim_objc_allocate_class_pair, shim_objc_register_class_pair,
     shim_objc_dispose_class_pair, shim_objc_duplicate_class,
@@ -31,6 +33,12 @@ use super::lifecycle::{
     shim_class_add_protocol,
     shim_protocol_copy_method_description_list, shim_protocol_get_method_description,
     shim_protocol_copy_property_list, shim_protocol_get_property,
+    // Legacy exception API
+    shim_objc_exception_try_enter, shim_objc_exception_try_exit,
+    shim_objc_exception_extract, shim_objc_exception_match,
+    shim_ns_set_uncaught_exception_handler, shim_ns_get_uncaught_exception_handler,
+    // Guest-side ObjC personality function (no host ObjC)
+    shim_objc_personality_v0,
 };
 
 /// Method manipulation: add, replace, exchange, get implementation.
@@ -48,6 +56,8 @@ pub(super) fn install_method_shims(table: &mut ShimTable) {
         ("_method_getNumberOfArguments", shim_method_get_number_of_arguments as u64, "method_getNumberOfArguments → arg count"),
         ("_class_getMethodImplementation", shim_class_get_method_implementation as u64, "class_getMethodImplementation → IMP via msg_lookup"),
         ("_class_getClassMethod", shim_class_get_class_method as u64, "class_getClassMethod → lookup class method"),
+        ("_method_copyReturnType", shim_method_copy_return_type as u64, "method_copyReturnType → return type encoding string"),
+        ("_method_copyArgumentType", shim_method_copy_argument_type as u64, "method_copyArgumentType → argument type encoding string"),
     );
 }
 
@@ -87,6 +97,15 @@ pub(super) fn install_exception_shims(table: &mut ShimTable) {
         ("_objc_terminate", shim_objc_terminate as u64, "objc_terminate → abort on uncaught exception"),
         ("_objc_sync_enter", shim_objc_sync_enter as u64, "objc_sync_enter → @synchronized lock"),
         ("_objc_sync_exit", shim_objc_sync_exit as u64, "objc_sync_exit → @synchronized unlock"),
+        ("_objc_exception_tryEnter", shim_objc_exception_try_enter as u64, "objc_exception_tryEnter → legacy @try enter"),
+        ("_objc_exception_tryExit", shim_objc_exception_try_exit as u64, "objc_exception_tryExit → legacy @try exit"),
+        ("_objc_exception_extract", shim_objc_exception_extract as u64, "objc_exception_extract → get thrown exception"),
+        ("_objc_exception_match", shim_objc_exception_match as u64, "objc_exception_match → @catch class matching"),
+        ("_NSSetUncaughtExceptionHandler", shim_ns_set_uncaught_exception_handler as u64, "NSSetUncaughtExceptionHandler"),
+        ("_NSGetUncaughtExceptionHandler", shim_ns_get_uncaught_exception_handler as u64, "NSGetUncaughtExceptionHandler"),
+        // Guest-side ObjC personality function — replaces host libobjc __objc_personality_v0.
+        // Uses DWARF LSDA parsing + our class hierarchy; no host ObjC calls.
+        ("___objc_personality_v0", shim_objc_personality_v0 as u64, "__objc_personality_v0 (guest LSDA parser, Linux-first)")
     );
 }
 

@@ -66,6 +66,11 @@ pub extern "C" fn shim_nscondition_broadcast(obj: u64, _cmd: u64) {
     crate::pal_threading().cond_broadcast(cond_ptr(obj));
 }
 
+/// `-[NSCondition waitUntilDate:]` — timed wait stub; returns YES immediately.
+pub extern "C" fn shim_nscondition_wait_until_date(_obj: u64, _cmd: u64, _date: u64) -> u8 {
+    1
+}
+
 /// `-[NSCondition name]`
 pub extern "C" fn shim_nscondition_name(obj: u64, _cmd: u64) -> u64 {
     if obj == 0 {
@@ -92,4 +97,52 @@ pub extern "C" fn shim_nscondition_dealloc(obj: u64, _cmd: u64) {
     crate::pal_threading().cond_destroy(cond_ptr(obj));
     crate::pal_threading().mutex_destroy(mutex_ptr(obj));
     crate::pal_alloc().free(obj as *mut u8);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shim_test_helpers::*;
+
+    #[test]
+    fn alloc_sets_isa() {
+        let obj = shim_nscondition_alloc(0, 0);
+        assert_ne!(obj, 0);
+        let isa = read_field(obj, 0);
+        assert_eq!(isa, nsobj::nscondition_class_addr());
+        free_obj(obj);  // no init, skip dealloc to avoid destroying uninit mutex
+    }
+
+    #[test]
+    fn nil_safety_lock_unlock() {
+        shim_nscondition_lock(0, 0);
+        shim_nscondition_unlock(0, 0);
+        shim_nscondition_signal(0, 0);
+        shim_nscondition_broadcast(0, 0);
+        shim_nscondition_wait(0, 0);
+        // no panic = pass
+    }
+
+    #[test]
+    fn nil_safety_name() {
+        assert_eq!(shim_nscondition_name(0, 0), 0);
+        shim_nscondition_set_name(0, 0, 42);
+        // no panic = pass
+    }
+
+    #[test]
+    fn set_and_get_name() {
+        let obj = shim_nscondition_alloc(0, 0);
+        assert_ne!(obj, 0);
+        let name = make_string("myCond");
+        shim_nscondition_set_name(obj, 0, name);
+        assert_eq!(shim_nscondition_name(obj, 0), name);
+        free_obj(obj);
+        free_obj(name);
+    }
+
+    #[test]
+    fn wait_until_date_returns_true() {
+        assert_eq!(shim_nscondition_wait_until_date(0, 0, 0), 1);
+    }
 }

@@ -1,12 +1,13 @@
 [package]
 name         = "cf-lite"
-description  = "Foundation/CoreFoundation shims for burdetty-os"
+description  = "Foundation/CoreFoundation shims for burdettie-os"
 version.workspace      = true
 edition.workspace      = true
 license.workspace      = true
 rust-version.workspace = true
 
 [dependencies]
+core-foundation-lite = { workspace = true }
 libsystem-shims      = { workspace = true }
 objc-runtime         = { workspace = true }
 platform-core        = { workspace = true }
@@ -14,6 +15,10 @@ log                  = { workspace = true }
 libc                 = { workspace = true }
 regex                = { workspace = true }
 serde_json           = { workspace = true }
+ureq                 = { workspace = true }
+plist                = { workspace = true }
+quick-xml            = { workspace = true }
+arboard = { version = "3.6.1", optional = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 platform-darwin-host = { workspace = true }
@@ -26,3 +31,6 @@ cc = "1"
 
 [lints]
 workspace = true
+
+[features]
+arboard = ["dep:arboard"]

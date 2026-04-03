@@ -165,3 +165,131 @@ impl PathResolver {
         None
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn path_resolver_new_stores_rpaths() {
+        let pr = PathResolver::new(
+            PathBuf::from("/usr/bin/myapp"),
+            vec!["@executable_path/../lib".into(), "/opt/lib".into()],
+        );
+        assert_eq!(pr.executable_path, PathBuf::from("/usr/bin/myapp"));
+        // rpaths should be expanded: @executable_path → /usr/bin (parent of exe)
+        assert_eq!(pr.rpaths.len(), 2);
+        assert_eq!(pr.rpaths[0], PathBuf::from("/usr/bin/../lib"));
+        assert_eq!(pr.rpaths[1], PathBuf::from("/opt/lib"));
+    }
+
+    #[test]
+    fn path_resolver_loader_differs_from_exe() {
+        let pr = PathResolver::new_with_loader(
+            PathBuf::from("/usr/bin/myapp"),
+            PathBuf::from("/usr/lib/plugins/myplugin.dylib"),
+            vec!["@loader_path/../frameworks".into()],
+        );
+        assert_eq!(pr.executable_path, PathBuf::from("/usr/bin/myapp"));
+        assert_eq!(
+            pr.loader_path,
+            PathBuf::from("/usr/lib/plugins/myplugin.dylib")
+        );
+        // rpath should expand @loader_path relative to plugin dir
+        assert_eq!(
+            pr.rpaths[0],
+            PathBuf::from("/usr/lib/plugins/../frameworks")
+        );
+    }
+
+    #[test]
+    fn path_resolver_env_stored() {
+        let mut env = SearchEnv::default();
+        env.library_path.push(PathBuf::from("/custom/lib"));
+        let pr = PathResolver::new_with_env(
+            PathBuf::from("/usr/bin/myapp"),
+            vec![],
+            env,
+        );
+        assert_eq!(pr.search_env.library_path, vec![PathBuf::from("/custom/lib")]);
+    }
+
+    #[test]
+    fn resolve_rpath_prefix_no_rpaths_returns_none() {
+        let pr = PathResolver::new(PathBuf::from("/usr/bin/myapp"), vec![]);
+        assert!(pr.resolve("@rpath/libfoo.dylib").is_none());
+    }
+
+    #[test]
+    fn resolve_executable_path_prefix() {
+        let dir = tempfile::tempdir().expect("create tempdir");
+        let exe = dir.path().join("myapp");
+        fs::write(&exe, b"").unwrap();
+        let lib = dir.path().join("libfoo.dylib");
+        fs::write(&lib, b"").unwrap();
+
+        let pr = PathResolver::new(exe, vec![]);
+        let result = pr.resolve("@executable_path/libfoo.dylib");
+        assert!(result.is_some(), "should resolve @executable_path/libfoo.dylib");
+        assert_eq!(result.unwrap(), lib);
+    }
+
+    #[test]
+    fn resolve_loader_path_prefix() {
+        let dir = tempfile::tempdir().expect("create tempdir");
+        let exe = dir.path().join("bin").join("myapp");
+        fs::create_dir_all(exe.parent().unwrap()).unwrap();
+        fs::write(&exe, b"").unwrap();
+
+        let loader_dir = dir.path().join("plugins");
+        fs::create_dir_all(&loader_dir).unwrap();
+        let loader = loader_dir.join("myplugin.dylib");
+        fs::write(&loader, b"").unwrap();
+        let lib = loader_dir.join("libfoo.dylib");
+        fs::write(&lib, b"").unwrap();
+
+        let pr = PathResolver::new_with_loader(exe, loader, vec![]);
+        let result = pr.resolve("@loader_path/libfoo.dylib");
+        assert!(result.is_some(), "should resolve @loader_path/libfoo.dylib");
+        assert_eq!(result.unwrap(), lib);
+    }
+
+    #[test]
+    fn resolve_absolute_path() {
+        let dir = tempfile::tempdir().expect("create tempdir");
+        let lib = dir.path().join("libfoo.dylib");
+        fs::write(&lib, b"").unwrap();
+
+        let pr = PathResolver::new(PathBuf::from("/usr/bin/myapp"), vec![]);
+        let result = pr.resolve(lib.to_str().unwrap());
+        assert!(result.is_some(), "absolute path to existing file should resolve");
+        assert_eq!(result.unwrap(), lib);
+    }
+
+    #[test]
+    fn resolve_rpath_expands_first_match() {
+        let dir = tempfile::tempdir().expect("create tempdir");
+        let exe = dir.path().join("myapp");
+        fs::write(&exe, b"").unwrap();
+
+        // Create two rpath dirs; only the second has the library
+        let rp1 = dir.path().join("rpath1");
+        fs::create_dir_all(&rp1).unwrap();
+        let rp2 = dir.path().join("rpath2");
+        fs::create_dir_all(&rp2).unwrap();
+        let lib = rp2.join("libfoo.dylib");
+        fs::write(&lib, b"").unwrap();
+
+        let pr = PathResolver::new(
+            exe,
+            vec![
+                rp1.to_str().unwrap().to_string(),
+                rp2.to_str().unwrap().to_string(),
+            ],
+        );
+        let result = pr.resolve("@rpath/libfoo.dylib");
+        assert!(result.is_some(), "should find file via second rpath");
+        assert_eq!(result.unwrap(), lib);
+    }
+}

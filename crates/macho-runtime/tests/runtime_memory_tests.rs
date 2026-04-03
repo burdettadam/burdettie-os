@@ -37,7 +37,7 @@ fn runtime_nsstring_mutable_nslog_captures() {
 fn runtime_nsstring_mutable_class_hierarchy() {
     let Some(_result) = common::run_fixture("nsstring_mutable/app") else { return };
 
-    let rt = objc_runtime::OBJC_RUNTIME.lock().unwrap();
+    let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
 
     // NSMutableString exists and its superclass is NSString
@@ -112,7 +112,7 @@ fn runtime_autorelease_nslog_captures() {
 fn runtime_autorelease_nsobject_memory_methods() {
     let Some(_result) = common::run_fixture("autorelease/app") else { return };
 
-    let rt = objc_runtime::OBJC_RUNTIME.lock().unwrap();
+    let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
 
     // NSObject should have memory management methods
@@ -161,7 +161,7 @@ fn runtime_introspection_nslog_captures() {
 fn runtime_introspection_shims_resolvable() {
     let Some(_result) = common::run_fixture("runtime_introspection/app") else { return };
 
-    let rt = objc_runtime::OBJC_RUNTIME.lock().unwrap();
+    let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
 
     // Probe class should exist with its methods
@@ -209,7 +209,7 @@ fn runtime_property_introspection_nslog_captures() {
 fn runtime_property_introspection_class_has_ivars() {
     let Some(_result) = common::run_fixture("property_introspection/app") else { return };
 
-    let rt = objc_runtime::OBJC_RUNTIME.lock().unwrap();
+    let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
 
     let vehicle = rt.get_class("Vehicle").expect("Vehicle class should exist");

@@ -255,6 +255,26 @@ pub extern "C" fn shim_nsurlcomponents_set_query_items(
     0
 }
 
+// ── Percent-encoded accessors (pass-through to normal path/query) ──
+
+pub extern "C" fn shim_nsurlcomponents_percent_encoded_query(obj: u64, _cmd: u64) -> u64 {
+    get_str_field(obj, QUERY_OFF)
+}
+
+pub extern "C" fn shim_nsurlcomponents_set_percent_encoded_query(obj: u64, _cmd: u64, query: u64) {
+    if obj == 0 { return; }
+    set_str_field(obj, QUERY_OFF, query);
+}
+
+pub extern "C" fn shim_nsurlcomponents_percent_encoded_path(obj: u64, _cmd: u64) -> u64 {
+    get_str_field(obj, PATH_OFF)
+}
+
+pub extern "C" fn shim_nsurlcomponents_set_percent_encoded_path(obj: u64, _cmd: u64, path: u64) {
+    if obj == 0 { return; }
+    set_str_field(obj, PATH_OFF, path);
+}
+
 pub extern "C" fn shim_nsurlcomponents_description(obj: u64, _cmd: u64) -> u64 {
     shim_nsurlcomponents_string(obj, 0)
 }
@@ -303,4 +323,447 @@ pub extern "C" fn shim_nsurlqueryitem_description(obj: u64, _cmd: u64) -> u64 {
         .unwrap_or("(null)");
     let desc = format!("{name}={val}");
     make_nsstring(&desc)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shim_test_helpers::*;
+
+    // ── NSURLComponents: new ───────────────────────────────────
+
+    #[test]
+    fn new_returns_valid_obj() {
+        let obj = shim_nsurlcomponents_new(0, 0);
+        assert_ne!(obj, 0);
+        // All fields should be zero/nil
+        assert_eq!(read_field(obj, SCHEME_OFF), 0);
+        assert_eq!(read_field(obj, HOST_OFF), 0);
+        assert_eq!(read_field(obj, PORT_OFF), 0);
+        assert_eq!(read_field(obj, PATH_OFF), 0);
+        assert_eq!(read_field(obj, QUERY_OFF), 0);
+        assert_eq!(read_field(obj, FRAGMENT_OFF), 0);
+        free_obj(obj);
+    }
+
+    // ── NSURLComponents: componentsWithString: ─────────────────
+
+    #[test]
+    fn with_string_parses_full_url() {
+        let url = make_string("https://example.com:8080/path?q=1#frag");
+        let obj = shim_nsurlcomponents_with_string(0, 0, url);
+        assert_ne!(obj, 0);
+        assert_string_eq(read_field(obj, SCHEME_OFF), "https");
+        assert_string_eq(read_field(obj, HOST_OFF), "example.com");
+        // port is an NSNumber
+        let port_ptr = read_field(obj, PORT_OFF);
+        assert_ne!(port_ptr, 0);
+        assert_eq!(crate::nsnumber::shim_nsnumber_integer_value(port_ptr, 0), 8080);
+        assert_string_eq(read_field(obj, PATH_OFF), "/path");
+        assert_string_eq(read_field(obj, QUERY_OFF), "q=1");
+        assert_string_eq(read_field(obj, FRAGMENT_OFF), "frag");
+        free_obj(obj);
+    }
+
+    #[test]
+    fn with_string_no_port_no_query_no_fragment() {
+        let url = make_string("http://host/some/path");
+        let obj = shim_nsurlcomponents_with_string(0, 0, url);
+        assert_ne!(obj, 0);
+        assert_string_eq(read_field(obj, SCHEME_OFF), "http");
+        assert_string_eq(read_field(obj, HOST_OFF), "host");
+        assert_eq!(read_field(obj, PORT_OFF), 0);
+        assert_string_eq(read_field(obj, PATH_OFF), "/some/path");
+        assert_eq!(read_field(obj, QUERY_OFF), 0);
+        assert_eq!(read_field(obj, FRAGMENT_OFF), 0);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn with_string_nil_url() {
+        let obj = shim_nsurlcomponents_with_string(0, 0, 0);
+        // Returns an allocated but empty components object
+        assert_ne!(obj, 0);
+        assert_eq!(read_field(obj, SCHEME_OFF), 0);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn with_string_no_scheme() {
+        let url = make_string("/just/a/path");
+        let obj = shim_nsurlcomponents_with_string(0, 0, url);
+        assert_ne!(obj, 0);
+        assert_eq!(read_field(obj, SCHEME_OFF), 0);
+        assert_string_eq(read_field(obj, PATH_OFF), "/just/a/path");
+        free_obj(obj);
+    }
+
+    // ── Getters: nil safety ────────────────────────────────────
+
+    #[test]
+    fn scheme_nil_returns_0() {
+        assert_eq!(shim_nsurlcomponents_scheme(0, 0), 0);
+    }
+
+    #[test]
+    fn host_nil_returns_0() {
+        assert_eq!(shim_nsurlcomponents_host(0, 0), 0);
+    }
+
+    #[test]
+    fn port_nil_returns_0() {
+        assert_eq!(shim_nsurlcomponents_port(0, 0), 0);
+    }
+
+    #[test]
+    fn path_nil_returns_0() {
+        assert_eq!(shim_nsurlcomponents_path(0, 0), 0);
+    }
+
+    #[test]
+    fn query_nil_returns_0() {
+        assert_eq!(shim_nsurlcomponents_query(0, 0), 0);
+    }
+
+    #[test]
+    fn fragment_nil_returns_0() {
+        assert_eq!(shim_nsurlcomponents_fragment(0, 0), 0);
+    }
+
+    // ── Getters: normal operation ──────────────────────────────
+
+    #[test]
+    fn getters_return_fields() {
+        let obj = shim_nsurlcomponents_new(0, 0);
+        let s = make_string("val");
+        write_field(obj, SCHEME_OFF, s);
+        assert_eq!(shim_nsurlcomponents_scheme(obj, 0), s);
+        assert_eq!(shim_nsurlcomponents_host(obj, 0), 0);
+        free_obj(obj);
+    }
+
+    // ── Setters ────────────────────────────────────────────────
+
+    #[test]
+    fn set_scheme() {
+        let obj = shim_nsurlcomponents_new(0, 0);
+        let s = make_string("https");
+        let ret = shim_nsurlcomponents_set_scheme(obj, 0, s);
+        assert_eq!(ret, 0);
+        assert_string_eq(shim_nsurlcomponents_scheme(obj, 0), "https");
+        free_obj(obj);
+    }
+
+    #[test]
+    fn set_host() {
+        let obj = shim_nsurlcomponents_new(0, 0);
+        let s = make_string("example.com");
+        shim_nsurlcomponents_set_host(obj, 0, s);
+        assert_string_eq(shim_nsurlcomponents_host(obj, 0), "example.com");
+        free_obj(obj);
+    }
+
+    #[test]
+    fn set_port() {
+        let obj = shim_nsurlcomponents_new(0, 0);
+        let port = crate::nsnumber::make_nsnumber_int(443);
+        shim_nsurlcomponents_set_port(obj, 0, port);
+        let p = shim_nsurlcomponents_port(obj, 0);
+        assert_eq!(crate::nsnumber::shim_nsnumber_integer_value(p, 0), 443);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn set_path() {
+        let obj = shim_nsurlcomponents_new(0, 0);
+        let s = make_string("/api/v1");
+        shim_nsurlcomponents_set_path(obj, 0, s);
+        assert_string_eq(shim_nsurlcomponents_path(obj, 0), "/api/v1");
+        free_obj(obj);
+    }
+
+    #[test]
+    fn set_query() {
+        let obj = shim_nsurlcomponents_new(0, 0);
+        let s = make_string("key=val");
+        shim_nsurlcomponents_set_query(obj, 0, s);
+        assert_string_eq(shim_nsurlcomponents_query(obj, 0), "key=val");
+        free_obj(obj);
+    }
+
+    #[test]
+    fn set_fragment() {
+        let obj = shim_nsurlcomponents_new(0, 0);
+        let s = make_string("section1");
+        shim_nsurlcomponents_set_fragment(obj, 0, s);
+        assert_string_eq(shim_nsurlcomponents_fragment(obj, 0), "section1");
+        free_obj(obj);
+    }
+
+    // ── URL reconstruction ─────────────────────────────────────
+
+    #[test]
+    fn url_nil_returns_0() {
+        assert_eq!(shim_nsurlcomponents_url(0, 0), 0);
+    }
+
+    #[test]
+    fn url_reconstructs_full() {
+        let obj = shim_nsurlcomponents_new(0, 0);
+        shim_nsurlcomponents_set_scheme(obj, 0, make_string("https"));
+        shim_nsurlcomponents_set_host(obj, 0, make_string("example.com"));
+        shim_nsurlcomponents_set_port(obj, 0, crate::nsnumber::make_nsnumber_int(8080));
+        shim_nsurlcomponents_set_path(obj, 0, make_string("/path"));
+        shim_nsurlcomponents_set_query(obj, 0, make_string("q=1"));
+        shim_nsurlcomponents_set_fragment(obj, 0, make_string("top"));
+        let url = shim_nsurlcomponents_url(obj, 0);
+        assert_ne!(url, 0);
+        let abs = crate::nsurl::shim_nsurl_absolute_string(url, 0);
+        assert_string_eq(abs, "https://example.com:8080/path?q=1#top");
+        free_obj(obj);
+    }
+
+    #[test]
+    fn url_empty_components() {
+        let obj = shim_nsurlcomponents_new(0, 0);
+        let url = shim_nsurlcomponents_url(obj, 0);
+        // Empty URL string — nsurl_url_with_string returns an NSURL wrapping empty string
+        // Just verify no crash
+        let _ = url;
+        free_obj(obj);
+    }
+
+    // ── string ─────────────────────────────────────────────────
+
+    #[test]
+    fn string_nil_returns_0() {
+        assert_eq!(shim_nsurlcomponents_string(0, 0), 0);
+    }
+
+    #[test]
+    fn string_returns_reconstructed() {
+        let obj = shim_nsurlcomponents_new(0, 0);
+        shim_nsurlcomponents_set_scheme(obj, 0, make_string("http"));
+        shim_nsurlcomponents_set_host(obj, 0, make_string("host"));
+        shim_nsurlcomponents_set_path(obj, 0, make_string("/p"));
+        let s = shim_nsurlcomponents_string(obj, 0);
+        assert_ne!(s, 0);
+        assert_string_eq(s, "http://host/p");
+        free_obj(obj);
+    }
+
+    // ── description ────────────────────────────────────────────
+
+    #[test]
+    fn description_nil_returns_0() {
+        assert_eq!(shim_nsurlcomponents_description(0, 0), 0);
+    }
+
+    // ── queryItems ─────────────────────────────────────────────
+
+    #[test]
+    fn query_items_nil_returns_0() {
+        assert_eq!(shim_nsurlcomponents_query_items(0, 0), 0);
+    }
+
+    #[test]
+    fn query_items_no_query_returns_empty_array() {
+        let obj = shim_nsurlcomponents_new(0, 0);
+        let arr = shim_nsurlcomponents_query_items(obj, 0);
+        assert_ne!(arr, 0);
+        assert_eq!(crate::nsarray::shim_nsarray_count(arr, 0), 0);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn query_items_parses_pairs() {
+        let obj = shim_nsurlcomponents_new(0, 0);
+        shim_nsurlcomponents_set_query(obj, 0, make_string("a=1&b=2"));
+        let arr = shim_nsurlcomponents_query_items(obj, 0);
+        assert_eq!(crate::nsarray::shim_nsarray_count(arr, 0), 2);
+
+        let item0 = crate::nsarray::shim_nsarray_object_at_index(arr, 0, 0);
+        assert_string_eq(shim_nsurlqueryitem_name(item0, 0), "a");
+        assert_string_eq(shim_nsurlqueryitem_value(item0, 0), "1");
+
+        let item1 = crate::nsarray::shim_nsarray_object_at_index(arr, 0, 1);
+        assert_string_eq(shim_nsurlqueryitem_name(item1, 0), "b");
+        assert_string_eq(shim_nsurlqueryitem_value(item1, 0), "2");
+        free_obj(obj);
+    }
+
+    #[test]
+    fn query_items_name_only_no_value() {
+        let obj = shim_nsurlcomponents_new(0, 0);
+        shim_nsurlcomponents_set_query(obj, 0, make_string("flag"));
+        let arr = shim_nsurlcomponents_query_items(obj, 0);
+        assert_eq!(crate::nsarray::shim_nsarray_count(arr, 0), 1);
+        let item = crate::nsarray::shim_nsarray_object_at_index(arr, 0, 0);
+        assert_string_eq(shim_nsurlqueryitem_name(item, 0), "flag");
+        assert_eq!(shim_nsurlqueryitem_value(item, 0), 0);
+        free_obj(obj);
+    }
+
+    // ── setQueryItems: ─────────────────────────────────────────
+
+    #[test]
+    fn set_query_items_nil_obj() {
+        assert_eq!(shim_nsurlcomponents_set_query_items(0, 0, 0), 0);
+    }
+
+    #[test]
+    fn set_query_items_nil_items_clears_query() {
+        let obj = shim_nsurlcomponents_new(0, 0);
+        shim_nsurlcomponents_set_query(obj, 0, make_string("old=val"));
+        shim_nsurlcomponents_set_query_items(obj, 0, 0);
+        assert_eq!(read_field(obj, QUERY_OFF), 0);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn set_query_items_builds_query_string() {
+        let obj = shim_nsurlcomponents_new(0, 0);
+
+        let qi1 = shim_nsurlqueryitem_with_name_value(0, 0, make_string("x"), make_string("10"));
+        let qi2 = shim_nsurlqueryitem_with_name_value(0, 0, make_string("y"), make_string("20"));
+        let items = crate::nsarray::make_nsarray(&[qi1, qi2]);
+
+        shim_nsurlcomponents_set_query_items(obj, 0, items);
+        assert_string_eq(read_field(obj, QUERY_OFF), "x=10&y=20");
+        free_obj(obj);
+    }
+
+    #[test]
+    fn set_query_items_name_only() {
+        let obj = shim_nsurlcomponents_new(0, 0);
+        let qi = shim_nsurlqueryitem_with_name_value(0, 0, make_string("solo"), 0);
+        let items = crate::nsarray::make_nsarray(&[qi]);
+        shim_nsurlcomponents_set_query_items(obj, 0, items);
+        assert_string_eq(read_field(obj, QUERY_OFF), "solo");
+        free_obj(obj);
+    }
+
+    // ── NSURLQueryItem ─────────────────────────────────────────
+
+    #[test]
+    fn queryitem_with_name_value() {
+        let name = make_string("key");
+        let val = make_string("val");
+        let qi = shim_nsurlqueryitem_with_name_value(0, 0, name, val);
+        assert_ne!(qi, 0);
+        assert_string_eq(shim_nsurlqueryitem_name(qi, 0), "key");
+        assert_string_eq(shim_nsurlqueryitem_value(qi, 0), "val");
+        free_obj(qi);
+    }
+
+    #[test]
+    fn queryitem_nil_value() {
+        let qi = shim_nsurlqueryitem_with_name_value(0, 0, make_string("k"), 0);
+        assert_ne!(qi, 0);
+        assert_string_eq(shim_nsurlqueryitem_name(qi, 0), "k");
+        assert_eq!(shim_nsurlqueryitem_value(qi, 0), 0);
+        free_obj(qi);
+    }
+
+    #[test]
+    fn queryitem_name_nil_returns_0() {
+        assert_eq!(shim_nsurlqueryitem_name(0, 0), 0);
+    }
+
+    #[test]
+    fn queryitem_value_nil_returns_0() {
+        assert_eq!(shim_nsurlqueryitem_value(0, 0), 0);
+    }
+
+    #[test]
+    fn queryitem_description_nil_returns_0() {
+        assert_eq!(shim_nsurlqueryitem_description(0, 0), 0);
+    }
+
+    #[test]
+    fn queryitem_description_format() {
+        let qi = shim_nsurlqueryitem_with_name_value(0, 0, make_string("color"), make_string("red"));
+        let desc = shim_nsurlqueryitem_description(qi, 0);
+        assert_ne!(desc, 0);
+        assert_string_eq(desc, "color=red");
+        free_obj(qi);
+    }
+
+    #[test]
+    fn queryitem_description_nil_value() {
+        let qi = shim_nsurlqueryitem_with_name_value(0, 0, make_string("flag"), 0);
+        let desc = shim_nsurlqueryitem_description(qi, 0);
+        assert_string_eq(desc, "flag=(null)");
+        free_obj(qi);
+    }
+
+    // ── Roundtrip ──────────────────────────────────────────────
+
+    #[test]
+    fn parse_then_reconstruct_roundtrip() {
+        let url = make_string("https://api.example.com/v2/items?sort=name&limit=10#results");
+        let obj = shim_nsurlcomponents_with_string(0, 0, url);
+        let s = shim_nsurlcomponents_string(obj, 0);
+        assert_ne!(s, 0);
+        assert_string_eq(s, "https://api.example.com/v2/items?sort=name&limit=10#results");
+        free_obj(obj);
+    }
+
+    #[test]
+    fn with_string_scheme_only() {
+        let url = make_string("ftp://");
+        let obj = shim_nsurlcomponents_with_string(0, 0, url);
+        assert_ne!(obj, 0);
+        assert_string_eq(read_field(obj, SCHEME_OFF), "ftp");
+        // host/path/etc should be nil
+        assert_eq!(read_field(obj, HOST_OFF), 0);
+        assert_eq!(read_field(obj, PATH_OFF), 0);
+        free_obj(obj);
+    }
+
+    // ── percent-encoded accessors ──────────────────────────────
+
+    #[test]
+    fn percent_encoded_query_nil_returns_0() {
+        assert_eq!(shim_nsurlcomponents_percent_encoded_query(0, 0), 0);
+    }
+
+    #[test]
+    fn percent_encoded_query_returns_query() {
+        let obj = shim_nsurlcomponents_new(0, 0);
+        let q = make_string("a%20b=1");
+        shim_nsurlcomponents_set_percent_encoded_query(obj, 0, q);
+        assert_string_eq(shim_nsurlcomponents_percent_encoded_query(obj, 0), "a%20b=1");
+        // Also visible through regular query getter
+        assert_string_eq(shim_nsurlcomponents_query(obj, 0), "a%20b=1");
+        free_obj(obj);
+    }
+
+    #[test]
+    fn set_percent_encoded_query_nil_obj() {
+        // Must not crash
+        shim_nsurlcomponents_set_percent_encoded_query(0, 0, 0);
+    }
+
+    #[test]
+    fn percent_encoded_path_nil_returns_0() {
+        assert_eq!(shim_nsurlcomponents_percent_encoded_path(0, 0), 0);
+    }
+
+    #[test]
+    fn percent_encoded_path_returns_path() {
+        let obj = shim_nsurlcomponents_new(0, 0);
+        let p = make_string("/foo%20bar/baz");
+        shim_nsurlcomponents_set_percent_encoded_path(obj, 0, p);
+        assert_string_eq(shim_nsurlcomponents_percent_encoded_path(obj, 0), "/foo%20bar/baz");
+        // Also visible through regular path getter
+        assert_string_eq(shim_nsurlcomponents_path(obj, 0), "/foo%20bar/baz");
+        free_obj(obj);
+    }
+
+    #[test]
+    fn set_percent_encoded_path_nil_obj() {
+        // Must not crash
+        shim_nsurlcomponents_set_percent_encoded_path(0, 0, 0);
+    }
 }

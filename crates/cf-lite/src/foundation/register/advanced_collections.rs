@@ -77,6 +77,41 @@ pub fn register_nsindexset_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nsindexset::shim_nsindexset_description as u64,
                 "@@:",
             ),
+            me(
+                "addIndex:",
+                nsindexset::shim_nsindexset_add_index as u64,
+                "v@:Q",
+            ),
+            me(
+                "addIndexesInRange:",
+                nsindexset::shim_nsindexset_add_indexes_in_range as u64,
+                "v@:QQ",
+            ),
+            me(
+                "removeIndex:",
+                nsindexset::shim_nsindexset_remove_index as u64,
+                "v@:Q",
+            ),
+            me(
+                "removeAllIndexes",
+                nsindexset::shim_nsindexset_remove_all as u64,
+                "v@:",
+            ),
+            me(
+                "enumerateIndexesUsingBlock:",
+                nsindexset::shim_nsindexset_enumerate_indexes_using_block as u64,
+                "v@:@?",
+            ),
+            me(
+                "indexesPassingTest:",
+                nsindexset::shim_nsindexset_indexes_passing_test as u64,
+                "@@:@?",
+            ),
+            me(
+                "countOfIndexesInRange:",
+                nsindexset::shim_nsindexset_count_of_indexes_in_range as u64,
+                "Q@:QQ",
+            ),
         ],
         class_methods: vec![
             me(
@@ -234,6 +269,11 @@ pub fn register_nscache_class(rt: &mut objc_runtime::ObjcRuntime) {
             me("removeAllObjects", nscache::shim_nscache_remove_all as u64, "v@:"),
             me("setCountLimit:", nscache::shim_nscache_set_count_limit as u64, "v@:Q"),
             me("countLimit", nscache::shim_nscache_count_limit as u64, "Q@:"),
+            me("totalCostLimit", nscache::shim_nscache_total_cost_limit as u64, "Q@:"),
+            me("setTotalCostLimit:", nscache::shim_nscache_set_total_cost_limit as u64, "v@:Q"),
+            me("delegate", nscache::shim_nscache_delegate as u64, "@@:"),
+            me("setDelegate:", nscache::shim_nscache_set_delegate as u64, "v@:@"),
+            me("evictsObjectsWithDiscardedContent", nscache::shim_nscache_evicts_on_memory_warning as u64, "c@:"),
             me("setName:", nscache::shim_nscache_set_name as u64, "v@:@"),
             me("name", nscache::shim_nscache_name as u64, "@@:"),
             me("description", nscache::shim_nscache_description as u64, "@@:"),
@@ -306,6 +346,8 @@ pub fn register_nshashtable_class(rt: &mut objc_runtime::ObjcRuntime) {
             me("containsObject:", nshashtable::shim_hashtable_contains as u64, "B@:@"),
             me("count", nshashtable::shim_hashtable_count as u64, "Q@:"),
             me("allObjects", nshashtable::shim_hashtable_all_objects as u64, "@@:"),
+            me("anyObject", nshashtable::shim_hashtable_any_object as u64, "@@:"),
+            me("setRepresentation", nshashtable::shim_hashtable_set_representation as u64, "@@:"),
             me("description", nshashtable::shim_hashtable_description as u64, "@@:"),
         ],
         class_methods: vec![

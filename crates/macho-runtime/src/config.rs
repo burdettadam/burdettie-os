@@ -41,6 +41,10 @@ pub struct ShimSet {
     pub foundation: bool,
     /// Install random number shims (arc4random, arc4random_buf, arc4random_uniform)
     pub random: bool,
+    /// Install macOS-specific platform stubs (Security, Authorization, Network, Carbon,
+    /// sysmon, DataDetectors, container, NStatManager, ServiceManagement, AudioToolbox, etc.)
+    /// Only meaningful on macOS; on Linux this is always false.
+    pub darwin_stubs: bool,
 }
 
 impl Default for ShimSet {
@@ -56,6 +60,10 @@ impl Default for ShimSet {
             objc: true,
             foundation: true,
             random: true,
+            #[cfg(target_os = "macos")]
+            darwin_stubs: true,
+            #[cfg(not(target_os = "macos"))]
+            darwin_stubs: false,
         }
     }
 }
@@ -65,9 +73,6 @@ pub struct RuntimeConfig {
     /// Security policy to evaluate before execution.
     /// `None` means skip security evaluation entirely.
     pub security_policy: Option<TrustPolicy>,
-    /// Whether to allow dlsym fallback to the host process for symbol resolution.
-    /// When true, unresolved symbols are looked up via the StubResolver safe-list.
-    pub host_fallback: bool,
     /// Which shim categories to install.
     pub shim_set: ShimSet,
     /// Environment variables available to the running binary.
@@ -95,7 +100,6 @@ impl RuntimeConfig {
             .to_string();
         Self {
             security_policy: None,
-            host_fallback: true,
             shim_set: ShimSet::default(),
             env_overrides: Vec::new(),
             process_name: name,
@@ -109,7 +113,110 @@ impl RuntimeConfig {
     pub fn secure(binary_path: &std::path::Path) -> Self {
         let mut cfg = Self::permissive(binary_path);
         cfg.security_policy = Some(TrustPolicy::apple_default());
-        cfg.host_fallback = true;
         cfg
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn shim_set_default_all_true() {
+        let s = ShimSet::default();
+        assert!(s.process);
+        assert!(s.tls);
+        assert!(s.dispatch);
+        assert!(s.pthread);
+        assert!(s.mach);
+        assert!(s.lifecycle);
+        assert!(s.ptrauth);
+        assert!(s.objc);
+        assert!(s.foundation);
+        assert!(s.random);
+    }
+
+    #[test]
+    fn shim_set_clone() {
+        let mut original = ShimSet::default();
+        original.objc = false;
+        let cloned = original.clone();
+        assert_eq!(cloned.objc, false);
+        assert_eq!(cloned.process, true);
+    }
+
+    #[test]
+    fn shim_set_debug() {
+        let s = ShimSet::default();
+        let dbg = format!("{:?}", s);
+        assert!(dbg.contains("ShimSet"));
+        assert!(dbg.contains("process"));
+    }
+
+    #[test]
+    fn shim_set_selective_disable() {
+        let mut s = ShimSet::default();
+        s.dispatch = false;
+        s.foundation = false;
+        assert!(!s.dispatch);
+        assert!(!s.foundation);
+        assert!(s.process);
+        assert!(s.tls);
+    }
+
+    #[test]
+    fn permissive_config_has_no_policy() {
+        let cfg = RuntimeConfig::permissive(Path::new("/tmp/test_binary"));
+        assert!(cfg.security_policy.is_none());
+        assert_eq!(cfg.process_name, "test_binary");
+        assert!(cfg.shim_set.process);
+    }
+
+    #[test]
+    fn secure_config_has_policy() {
+        let cfg = RuntimeConfig::secure(Path::new("/tmp/secure_app"));
+        assert!(cfg.security_policy.is_some());
+    }
+
+    #[test]
+    fn secure_config_path() {
+        let cfg = RuntimeConfig::secure(Path::new("/usr/local/bin/myapp"));
+        assert_eq!(cfg.process_path, Path::new("/usr/local/bin/myapp"));
+        assert_eq!(cfg.process_name, "myapp");
+    }
+
+    #[test]
+    fn permissive_vs_secure() {
+        let perm = RuntimeConfig::permissive(Path::new("/tmp/app"));
+        let sec = RuntimeConfig::secure(Path::new("/tmp/app"));
+        assert!(perm.security_policy.is_none());
+        assert!(sec.security_policy.is_some());
+        // Both should have the same defaults for shims and process info
+        assert_eq!(perm.process_name, sec.process_name);
+        assert!(perm.shim_set.objc);
+        assert!(sec.shim_set.objc);
+    }
+
+    #[test]
+    fn shim_set_all_disabled() {
+        let s = ShimSet {
+            process: false,
+            tls: false,
+            dispatch: false,
+            pthread: false,
+            mach: false,
+            lifecycle: false,
+            ptrauth: false,
+            objc: false,
+            foundation: false,
+            random: false,
+            darwin_stubs: false,
+        };
+        assert!(!s.process);
+        assert!(!s.tls);
+        assert!(!s.dispatch);
+        assert!(!s.objc);
+        assert!(!s.foundation);
     }
 }

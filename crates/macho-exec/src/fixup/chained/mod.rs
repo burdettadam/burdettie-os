@@ -3,11 +3,47 @@
 mod imports;
 mod walk;
 
+use std::sync::atomic::{AtomicU64, Ordering};
+
 use macho_parse::ParsedMachO;
 use macho_types::load_command::{LoadCommandPayload, LoadCommandType};
 
 use super::resolver::SymbolResolver;
 use crate::{ExecError, MappedImage, MappedSegment};
+
+// ── Unresolved-bind trap ────────────────────────────────────────────
+//
+// When a symbol bind cannot be resolved, we write the address of
+// `unresolved_bind_trap` into the GOT slot instead of leaving the raw
+// chained-fixup metadata.  This converts hard SIGSEGV / SIGBUS crashes
+// into a deterministic log + abort that names the call site.
+
+/// Counter of how many unresolved-bind GOT slots have been written.
+static UNRESOLVED_BIND_COUNT: AtomicU64 = AtomicU64::new(0);
+
+/// Trap function installed in every GOT slot whose symbol could not be
+/// resolved.  When guest code calls through such a slot it lands here
+/// instead of crashing on a garbage pointer.
+extern "C" fn unresolved_bind_trap() -> u64 {
+    log::error!(
+        "FATAL: guest code called an unresolved symbol (bind trap hit, \
+         {} unresolved slots total)",
+        UNRESOLVED_BIND_COUNT.load(Ordering::Relaxed),
+    );
+    // Return 0 rather than aborting — many callers check for NULL and
+    // this lets execution continue when possible.
+    0
+}
+
+/// Address of the trap function, suitable for writing into GOT slots.
+fn trap_addr() -> u64 {
+    unresolved_bind_trap as *const () as u64
+}
+
+/// Public accessor for the trap address, used by classic bind paths.
+pub fn unresolved_bind_trap_addr() -> u64 {
+    trap_addr()
+}
 
 /// A parsed import entry from the chained fixups imports table.
 #[derive(Debug)]
@@ -67,6 +103,11 @@ pub fn apply_chained_fixups(
         imports_format,
     );
 
+    log::debug!(
+        "chained fixups: imports_count={imports_count}, imports_format={imports_format}, parsed={} imports",
+        imports.len()
+    );
+
     if starts_offset + 4 > buf.len() {
         return Ok((0, 0));
     }
@@ -112,6 +153,9 @@ pub fn apply_chained_fixups(
 
         let page_size = u16::from_le_bytes([buf[abs + 4], buf[abs + 5]]) as usize;
         let pointer_format = u16::from_le_bytes([buf[abs + 6], buf[abs + 7]]);
+        log::debug!(
+            "chained fixups: seg[{seg_i}] pointer_format={pointer_format}, page_size={page_size}, seg_info_offset={seg_info_offset:#x}"
+        );
         let segment_offset = u64::from_le_bytes([
             buf[abs + 8],
             buf[abs + 9],
@@ -131,8 +175,14 @@ pub fn apply_chained_fixups(
 
         let mapped_seg = find_mapped_segment_for_chain(image, parsed, seg_i, segment_offset);
         let Some(mapped_seg) = mapped_seg else {
+            log::debug!("chained fixups: seg[{seg_i}] no mapped segment found");
             continue;
         };
+
+        log::debug!(
+            "chained fixups: seg[{seg_i}] page_count={page_count}, mapped segment base={:p}, size={}",
+            mapped_seg.base, mapped_seg.size
+        );
 
         for page_i in 0..page_count {
             let ps_off = page_starts_base + page_i * 2;
@@ -173,6 +223,10 @@ fn find_mapped_segment_for_chain<'a>(
 }
 
 /// Resolve a chained bind import and write the address, returning true if bound.
+///
+/// If the symbol cannot be resolved, writes the address of
+/// [`unresolved_bind_trap`] so that calling through the GOT slot
+/// produces a deterministic diagnostic instead of a hard crash.
 fn resolve_and_write_bind(
     seg: &MappedSegment,
     offset: usize,
@@ -181,26 +235,36 @@ fn resolve_and_write_bind(
     imports: &[ChainedImport],
     resolver: &dyn SymbolResolver,
 ) -> bool {
-    let Some(import) = imports.get(ordinal) else {
-        log::warn!(
-            "chained bind: ordinal {ordinal} out of range (have {})",
-            imports.len()
-        );
-        return false;
+    let addr = match resolve_bind_addr(ordinal, addend, imports, resolver) {
+        Some(a) => a,
+        None => {
+            // Install the trap so the slot is callable without crashing.
+            UNRESOLVED_BIND_COUNT.fetch_add(1, Ordering::Relaxed);
+            trap_addr()
+        }
     };
+    unsafe {
+        let ptr = seg.base.add(offset) as *mut u64;
+        ptr.write_unaligned(addr);
+    }
+    true
+}
+
+/// Resolve a chained bind import, returning the address or None.
+///
+/// Used by walk.rs for both plain and auth binds (auth binds PAC-sign afterward).
+fn resolve_bind_addr(
+    ordinal: usize,
+    addend: u64,
+    imports: &[ChainedImport],
+    resolver: &dyn SymbolResolver,
+) -> Option<u64> {
+    let import = imports.get(ordinal)?;
 
     if let Some(addr) = resolver.resolve(&import.name) {
-        unsafe {
-            let ptr = seg.base.add(offset) as *mut u64;
-            ptr.write_unaligned(addr + addend);
-        }
-        true
+        Some(addr + addend)
     } else if import.weak {
-        unsafe {
-            let ptr = seg.base.add(offset) as *mut u64;
-            ptr.write_unaligned(0);
-        }
-        true
+        Some(0)
     } else {
         log::debug!(
             "chained bind: could not resolve import #{ordinal} '{}'",
@@ -210,7 +274,7 @@ fn resolve_and_write_bind(
             ordinal,
             symbol: import.name.clone(),
         });
-        false
+        None
     }
 }
 

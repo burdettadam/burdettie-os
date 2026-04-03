@@ -36,7 +36,7 @@ fn alloc_nstimer(interval: f64, block: u64, repeats: bool) -> u64 {
 
 /// `+[NSTimer scheduledTimerWithTimeInterval:repeats:block:]`
 ///
-/// Creates a timer; does NOT actually schedule it (no run loop).
+/// Creates a timer and schedules it on the current run loop.
 /// The block signature is `void (^)(NSTimer *)`.
 pub extern "C" fn shim_nstimer_scheduled_with_block(
     _cls: u64,
@@ -45,7 +45,11 @@ pub extern "C" fn shim_nstimer_scheduled_with_block(
     repeats: u64,
     block: u64,
 ) -> u64 {
-    alloc_nstimer(interval, block, repeats != 0)
+    let t = alloc_nstimer(interval, block, repeats != 0);
+    if t != 0 {
+        crate::nsrunloop::shim_nsrunloop_add_timer_for_mode(0, 0, t, 0);
+    }
+    t
 }
 
 /// `+[NSTimer timerWithTimeInterval:repeats:block:]`
@@ -61,8 +65,9 @@ pub extern "C" fn shim_nstimer_timer_with_block(
 
 /// `+[NSTimer scheduledTimerWithTimeInterval:target:selector:userInfo:repeats:]`
 ///
-/// Target/selector variant — we store the target pointer in the block field
-/// and the selector can't easily be captured, so this is a no-op stub.
+/// Target/selector variant — creates and schedules on the current run loop.
+/// We store the target pointer in the block field; the selector cannot be
+/// captured so invoking the target is a no-op.
 pub extern "C" fn shim_nstimer_scheduled_with_target(
     _cls: u64,
     _cmd: u64,
@@ -72,7 +77,11 @@ pub extern "C" fn shim_nstimer_scheduled_with_target(
     _info: u64,
     repeats: u64,
 ) -> u64 {
-    alloc_nstimer(interval, 0, repeats != 0)
+    let t = alloc_nstimer(interval, 0, repeats != 0);
+    if t != 0 {
+        crate::nsrunloop::shim_nsrunloop_add_timer_for_mode(0, 0, t, 0);
+    }
+    t
 }
 
 // ── Instance methods ───────────────────────────────────────────────
@@ -143,4 +152,158 @@ pub extern "C" fn shim_nstimer_description(obj: u64, _cmd: u64) -> u64 {
     let desc = format!("<NSTimer: interval={interval}, valid={valid}>");
     let c_str = std::ffi::CString::new(desc).unwrap_or_default();
     cfstring::shim_cf_string_create_with_cstring(0, c_str.as_ptr(), 0)
+}
+
+/// `-[NSTimer fireDate]` — returns an NSDate representing when the timer fires.
+///
+/// Simplified: returns an NSDate with the current time.
+pub extern "C" fn shim_nstimer_fire_date(obj: u64, _cmd: u64) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
+    crate::nsdate::shim_nsdate_date(0, 0)
+}
+
+/// `-[NSTimer setFireDate:]` — no-op stub.
+pub extern "C" fn shim_nstimer_set_fire_date(_obj: u64, _cmd: u64, _date: u64) {}
+
+/// `-[NSTimer tolerance]` — returns 0.0.
+pub extern "C" fn shim_nstimer_tolerance(_obj: u64, _cmd: u64) -> f64 {
+    0.0
+}
+
+/// `-[NSTimer setTolerance:]` — no-op stub.
+pub extern "C" fn shim_nstimer_set_tolerance(_obj: u64, _cmd: u64, _tolerance: f64) {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shim_test_helpers::*;
+
+    #[test]
+    fn timer_with_block_is_valid() {
+        let t = shim_nstimer_timer_with_block(0, 0, 1.5, 0, 0);
+        assert_ne!(t, 0);
+        assert_eq!(shim_nstimer_is_valid(t, 0), 1);
+        let interval = shim_nstimer_time_interval(t, 0);
+        assert!((interval - 1.5).abs() < 1e-9, "expected 1.5 got {interval}");
+        free_obj(t);
+    }
+
+    #[test]
+    fn scheduled_with_block_also_valid() {
+        let t = shim_nstimer_scheduled_with_block(0, 0, 2.0, 1, 0);
+        assert_ne!(t, 0);
+        assert_eq!(shim_nstimer_is_valid(t, 0), 1);
+        assert!((shim_nstimer_time_interval(t, 0) - 2.0).abs() < 1e-9);
+        free_obj(t);
+    }
+
+    #[test]
+    fn time_interval_nil_returns_zero() {
+        assert!((shim_nstimer_time_interval(0, 0)).abs() < 1e-9);
+    }
+
+    #[test]
+    fn is_valid_nil_returns_zero() {
+        assert_eq!(shim_nstimer_is_valid(0, 0), 0);
+    }
+
+    #[test]
+    fn invalidate_clears_valid_flag() {
+        let t = shim_nstimer_timer_with_block(0, 0, 0.5, 0, 0);
+        assert_eq!(shim_nstimer_is_valid(t, 0), 1);
+        shim_nstimer_invalidate(t, 0);
+        assert_eq!(shim_nstimer_is_valid(t, 0), 0);
+        free_obj(t);
+    }
+
+    #[test]
+    fn fire_nil_is_noop() {
+        shim_nstimer_fire(0, 0); // must not crash
+    }
+
+    #[test]
+    fn fire_non_repeating_without_block_auto_invalidates() {
+        // repeats=0, block=0: fire should auto-invalidate a non-repeating timer
+        let t = shim_nstimer_scheduled_with_block(0, 0, 0.1, 0, 0);
+        assert_eq!(shim_nstimer_is_valid(t, 0), 1);
+        shim_nstimer_fire(t, 0);
+        assert_eq!(shim_nstimer_is_valid(t, 0), 0, "non-repeating timer must auto-invalidate after fire");
+        free_obj(t);
+    }
+
+    #[test]
+    fn scheduled_with_target_stores_interval() {
+        let t = shim_nstimer_scheduled_with_target(0, 0, 5.0, 0, 0, 0, 0);
+        assert_ne!(t, 0);
+        assert_eq!(shim_nstimer_is_valid(t, 0), 1);
+        assert!((shim_nstimer_time_interval(t, 0) - 5.0).abs() < 1e-9);
+        free_obj(t);
+    }
+
+    #[test]
+    fn description_returns_nonempty_string() {
+        let t = shim_nstimer_timer_with_block(0, 0, 1.0, 0, 0);
+        let desc = shim_nstimer_description(t, 0);
+        assert_ne!(desc, 0);
+        free_obj(t);
+    }
+
+    #[test]
+    fn description_nil_returns_zero() {
+        assert_eq!(shim_nstimer_description(0, 0), 0);
+    }
+
+    #[test]
+    fn nstimer_create_valid() {
+        let t = shim_nstimer_scheduled_with_block(0, 0, 1.0, 0, 0);
+        assert_ne!(t, 0);
+        assert_eq!(shim_nstimer_is_valid(t, 0), 1);
+        free_obj(t);
+    }
+
+    #[test]
+    fn nstimer_invalidate_makes_invalid() {
+        let t = shim_nstimer_timer_with_block(0, 0, 0.5, 0, 0);
+        assert_eq!(shim_nstimer_is_valid(t, 0), 1);
+        shim_nstimer_invalidate(t, 0);
+        assert_eq!(shim_nstimer_is_valid(t, 0), 0);
+        free_obj(t);
+    }
+
+    #[test]
+    fn fire_date_returns_nsdate() {
+        let t = shim_nstimer_timer_with_block(0, 0, 1.0, 0, 0);
+        let date = shim_nstimer_fire_date(t, 0);
+        assert_ne!(date, 0, "fireDate should return a non-nil NSDate");
+        free_obj(t);
+    }
+
+    #[test]
+    fn fire_date_nil_returns_zero() {
+        assert_eq!(shim_nstimer_fire_date(0, 0), 0);
+    }
+
+    #[test]
+    fn set_fire_date_noop() {
+        let t = shim_nstimer_timer_with_block(0, 0, 1.0, 0, 0);
+        shim_nstimer_set_fire_date(t, 0, 0); // must not crash
+        assert_eq!(shim_nstimer_is_valid(t, 0), 1);
+        free_obj(t);
+    }
+
+    #[test]
+    fn tolerance_returns_zero() {
+        let t = shim_nstimer_timer_with_block(0, 0, 1.0, 0, 0);
+        assert!((shim_nstimer_tolerance(t, 0)).abs() < 1e-9);
+        free_obj(t);
+    }
+
+    #[test]
+    fn set_tolerance_noop() {
+        let t = shim_nstimer_timer_with_block(0, 0, 1.0, 0, 0);
+        shim_nstimer_set_tolerance(t, 0, 0.5); // must not crash
+        free_obj(t);
+    }
 }

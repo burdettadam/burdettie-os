@@ -8,22 +8,19 @@
 use macho_types::segment::Segment;
 use platform_core::unwind::UnwindRegistry;
 
-/// Register a mapped image's unwind sections via the platform registry.
-///
-/// Parses the Mach-O segments to find `__unwind_info` and `__eh_frame`
-/// sections, then calls `registry.register()`.
-pub fn register_unwind_info(
-    segments: &[Segment],
-    slide: i64,
-    registry: &dyn UnwindRegistry,
-) {
+#[derive(Clone, Copy)]
+struct UnwindSections {
+    text_start: usize,
+    text_end: usize,
+    compact_unwind: Option<(usize, usize)>,
+    eh_frame: Option<(usize, usize)>,
+}
+
+fn collect_unwind_sections(segments: &[Segment], slide: i64) -> Option<UnwindSections> {
     let text_seg = segments.iter().find(|s| s.name == "__TEXT");
     let text_exec_seg = segments.iter().find(|s| s.name == "__TEXT_EXEC");
 
-    let Some(primary) = text_seg.or(text_exec_seg) else {
-        return;
-    };
-
+    let primary = text_seg.or(text_exec_seg)?;
     let text_start = (primary.vmaddr as i64 + slide) as usize;
     let text_end = text_start + primary.vmsize as usize;
 
@@ -53,32 +50,77 @@ pub fn register_unwind_info(
     }
 
     if compact_unwind.is_none() && eh_frame.is_none() {
-        return;
+        return None;
     }
 
-    log::debug!(
-        "unwind: registering image at {:#x}..{:#x} (compact={:?}, eh_frame={:?})",
+    Some(UnwindSections {
         text_start,
         text_end,
         compact_unwind,
         eh_frame,
+    })
+}
+
+/// Generate a runtime-ready `.eh_frame` buffer for a mapped image when only
+/// compact unwind info is available.
+pub fn synthesize_runtime_eh_frame(segments: &[Segment], slide: i64) -> Option<Vec<u8>> {
+    let sections = collect_unwind_sections(segments, slide)?;
+    if sections.eh_frame.is_some() {
+        return None;
+    }
+
+    let (addr, len) = sections.compact_unwind?;
+    let cu_slice = unsafe { std::slice::from_raw_parts(addr as *const u8, len) };
+    let entries = crate::compact_to_ehframe::parse_compact_unwind(cu_slice);
+    if entries.is_empty() {
+        return None;
+    }
+
+    let eh = crate::compact_to_ehframe::generate_eh_frame_runtime(&entries, sections.text_start);
+    (!eh.is_empty()).then_some(eh)
+}
+
+/// Register a mapped image's unwind sections via the platform registry.
+///
+/// Parses the Mach-O segments to find `__unwind_info` and `__eh_frame`
+/// sections, then calls `registry.register()`.
+pub fn register_unwind_info(
+    segments: &[Segment],
+    slide: i64,
+    registry: &dyn UnwindRegistry,
+    generated_eh_frame: Option<&[u8]>,
+) {
+    let Some(sections) = collect_unwind_sections(segments, slide) else {
+        return;
+    };
+
+    let eh_frame = generated_eh_frame
+        .map(|buf| (buf.as_ptr() as usize, buf.len()))
+        .or(sections.eh_frame);
+    let compact_unwind = sections.compact_unwind;
+
+    log::debug!(
+        "unwind: registering image at {:#x}..{:#x} (compact={:?}, eh_frame={:?})",
+        sections.text_start,
+        sections.text_end,
+        compact_unwind,
+        eh_frame,
     );
 
-    if let Err(e) = registry.register(text_start, text_end, compact_unwind, eh_frame) {
-        log::warn!("unwind: failed to register image at {:#x}: {e}", text_start);
+    if let Err(e) = registry.register(sections.text_start, sections.text_end, compact_unwind, eh_frame) {
+        log::warn!("unwind: failed to register image at {:#x}: {e}", sections.text_start);
     }
 }
 
 /// Remove a mapped image from the unwind registry.
 #[allow(dead_code)]
 pub fn unregister_unwind_info(segments: &[Segment], slide: i64, registry: &dyn UnwindRegistry) {
-    let Some(text_seg) = segments.iter().find(|s| s.name == "__TEXT") else {
+    let Some(sections) = collect_unwind_sections(segments, slide) else {
         return;
     };
 
-    let text_start = (text_seg.vmaddr as i64 + slide) as usize;
-    if let Err(e) = registry.unregister(text_start) {
-        log::warn!("unwind: failed to unregister image at {:#x}: {e}", text_start);
+    if let Err(e) = registry.unregister(sections.text_start) {
+        log::warn!("unwind: failed to unregister image at {:#x}: {e}", sections.text_start);
     }
 }
 
@@ -91,7 +133,7 @@ mod tests {
 
     /// Test registry that records register/unregister calls.
     struct RecordingRegistry {
-        registered: Mutex<Vec<(usize, usize)>>,
+        registered: Mutex<Vec<(usize, usize, Option<(usize, usize)>, Option<(usize, usize)>)>>,
         unregistered: Mutex<Vec<usize>>,
     }
 
@@ -109,10 +151,13 @@ mod tests {
             &self,
             text_start: usize,
             text_end: usize,
-            _compact_unwind: Option<(usize, usize)>,
-            _eh_frame: Option<(usize, usize)>,
+            compact_unwind: Option<(usize, usize)>,
+            eh_frame: Option<(usize, usize)>,
         ) -> Result<(), platform_core::PalError> {
-            self.registered.lock().unwrap_or_else(|e| e.into_inner()).push((text_start, text_end));
+            self.registered
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .push((text_start, text_end, compact_unwind, eh_frame));
             Ok(())
         }
 
@@ -174,7 +219,7 @@ mod tests {
         let seg = make_text_segment(0x1_0000_0000, 0x1000, true, false);
         let segments = vec![seg];
 
-        register_unwind_info(&segments, 0, &reg);
+        register_unwind_info(&segments, 0, &reg, None);
         assert_eq!(reg.registered.lock().unwrap_or_else(|e| e.into_inner()).len(), 1);
         assert_eq!(reg.registered.lock().unwrap_or_else(|e| e.into_inner())[0].0, 0x1_0000_0000);
 
@@ -200,7 +245,7 @@ mod tests {
         };
         let segments = vec![seg];
 
-        register_unwind_info(&segments, 0, &reg);
+        register_unwind_info(&segments, 0, &reg, None);
         assert!(reg.registered.lock().unwrap_or_else(|e| e.into_inner()).is_empty());
     }
 
@@ -210,7 +255,58 @@ mod tests {
         let seg = make_text_segment(0x3_0000_0000, 0x2000, true, true);
         let segments = vec![seg];
 
-        register_unwind_info(&segments, 0, &noop);
+        register_unwind_info(&segments, 0, &noop, None);
         unregister_unwind_info(&segments, 0, &noop);
+    }
+
+    #[test]
+    fn unregister_without_text_segment_is_noop() {
+        let reg = RecordingRegistry::new();
+        let seg = Segment {
+            name: "__DATA".to_string(),
+            vmaddr: 0x4_0000_0000,
+            vmsize: 0x1000,
+            fileoff: 0,
+            filesize: 0x1000,
+            maxprot: VmProt::READ | VmProt::WRITE,
+            initprot: VmProt::READ | VmProt::WRITE,
+            nsects: 0,
+            flags: 0,
+            sections: vec![],
+        };
+        let segments = vec![seg];
+        unregister_unwind_info(&segments, 0, &reg);
+        assert!(reg.unregistered.lock().unwrap_or_else(|e| e.into_inner()).is_empty());
+    }
+
+    #[test]
+    fn register_with_slide_applies_offset() {
+        let reg = RecordingRegistry::new();
+        let seg = make_text_segment(0x1_0000_0000, 0x1000, true, false);
+        let segments = vec![seg];
+
+        let slide: i64 = 0x1000;
+        register_unwind_info(&segments, slide, &reg, None);
+
+        let registered = reg.registered.lock().unwrap_or_else(|e| e.into_inner());
+        assert_eq!(registered.len(), 1);
+        // text_start = vmaddr + slide
+        assert_eq!(registered[0].0, 0x1_0000_0000 + 0x1000);
+    }
+
+    #[test]
+    fn generated_eh_frame_keeps_compact_unwind_registered() {
+        let reg = RecordingRegistry::new();
+        let seg = make_text_segment(0x5_0000_0000, 0x1000, true, false);
+        let segments = vec![seg];
+        let generated = vec![1u8, 2, 3, 4];
+
+        register_unwind_info(&segments, 0, &reg, Some(&generated));
+
+        let registered = reg.registered.lock().unwrap_or_else(|e| e.into_inner());
+        assert_eq!(registered.len(), 1);
+        assert_eq!(registered[0].0, 0x5_0000_0000);
+        assert_eq!(registered[0].2, Some((0x5_0000_0100, 0x60)));
+        assert_eq!(registered[0].3, Some((generated.as_ptr() as usize, generated.len())));
     }
 }

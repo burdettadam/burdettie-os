@@ -16,7 +16,10 @@ observed/
 # Build artifacts
 dist/
 *.dmg
-burdetty-os.tar.gz
+burdettie-os.tar.gz
+
+# Extracted Mach-O tools for Docker testing
+docker/xcode-tools/
 
 # Swift build artifacts
 vm-image/.build/

@@ -114,7 +114,9 @@ fn runtime_nonexistent_file() {
 }
 
 #[test]
-fn runtime_no_host_fallback() {
+fn runtime_self_hosted_return42() {
+    // Verify return42 runs correctly with the always-on StubResolver
+    // (safe-symbol C stdlib pass-through) and no host ObjC escape hatch.
     let _lock = RUNTIME_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let fixture = fixtures_dir().join("return42/return42");
     if !fixture.exists() {
@@ -122,13 +124,11 @@ fn runtime_no_host_fallback() {
         return;
     }
 
-    let mut config = RuntimeConfig::permissive(&fixture);
-    config.host_fallback = false;
-
+    let config = RuntimeConfig::permissive(&fixture);
     let result = Runtime::load_and_run(&fixture, &config);
     match result {
         Ok(r) => assert_eq!(r.exit_code, 42),
-        Err(e) => eprintln!("Expected: no host fallback may fail: {e}"),
+        Err(e) => eprintln!("run failed: {e}"),
     }
 }
 
@@ -185,11 +185,21 @@ fn runtime_dylib_chain_images_counted() {
 fn runtime_shim_count_with_all_categories() {
     let Some(result) = common::run_fixture("return42/return42") else { return };
 
-    // Shim count with all categories (updated after adding new shims).
-    #[cfg(target_os = "macos")]
-    assert_eq!(result.shims_installed, 351, "expected 351 shims installed");
-    #[cfg(not(target_os = "macos"))]
-    assert_eq!(result.shims_installed, 351, "expected 351 shims installed");
+    use libsystem_shims::ShimConfig;
+    use macho_runtime::{RuntimeContext, ShimSet};
+
+    let expected = RuntimeContext::new(&ShimConfig::default(), &ShimSet::default())
+        .shim_table
+        .len();
+
+    assert!(
+        expected >= 450,
+        "expected full runtime shim install to remain in the broad-coverage range"
+    );
+    assert_eq!(
+        result.shims_installed, expected,
+        "fixture runtime should install the same shim set as a default RuntimeContext"
+    );
 }
 
 // ── Tracing tests ──────────────────────────────────────────────────

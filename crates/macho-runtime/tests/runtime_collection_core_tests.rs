@@ -43,7 +43,7 @@ fn runtime_nsarray_basics_exit_zero() {
 fn runtime_nsarray_class_registered() {
     let Some(_result) = common::run_fixture("nsarray_basics/app") else { return };
 
-    let guard = objc_runtime::OBJC_RUNTIME.lock().unwrap();
+    let guard = objc_runtime::OBJC_RUNTIME.read().unwrap();
     if let Some(rt) = guard.as_ref() {
         let nsarray = rt.get_class("NSArray").expect("NSArray registered");
         assert_eq!(nsarray.name, "NSArray");
@@ -81,7 +81,7 @@ fn runtime_nsnumber_basics_exit_zero() {
 fn runtime_nsnumber_class_registered() {
     let Some(_result) = common::run_fixture("nsnumber_basics/app") else { return };
 
-    let guard = objc_runtime::OBJC_RUNTIME.lock().unwrap();
+    let guard = objc_runtime::OBJC_RUNTIME.read().unwrap();
     if let Some(rt) = guard.as_ref() {
         let nsnumber = rt.get_class("NSNumber").expect("NSNumber registered");
         assert_eq!(nsnumber.name, "NSNumber");
@@ -119,7 +119,7 @@ fn runtime_nsdictionary_basics_exit_zero() {
 fn runtime_nsdictionary_class_registered() {
     let Some(_result) = common::run_fixture("nsdictionary_basics/app") else { return };
 
-    let guard = objc_runtime::OBJC_RUNTIME.lock().unwrap();
+    let guard = objc_runtime::OBJC_RUNTIME.read().unwrap();
     if let Some(rt) = guard.as_ref() {
         let nsdict = rt
             .get_class("NSDictionary")

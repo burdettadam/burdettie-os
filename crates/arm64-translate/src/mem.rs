@@ -309,3 +309,142 @@ impl Memory {
         self.translate_strict(addr, 1).is_some()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_helpers::*;
+
+    #[test]
+    fn test_write_read_u8() {
+        let mut t = test_interp(&[]);
+        t.write_data_u8(0, 0xAB);
+        assert_eq!(t.read_data_u8(0), 0xAB);
+    }
+
+    #[test]
+    fn test_write_read_u16() {
+        let mut t = test_interp(&[]);
+        t.write_data_u16(0, 0xBEEF);
+        assert_eq!(t.read_data_u16(0), 0xBEEF);
+    }
+
+    #[test]
+    fn test_write_read_u32() {
+        let mut t = test_interp(&[]);
+        t.write_data_u32(0, 0xDEAD_BEEF);
+        assert_eq!(t.read_data_u32(0), 0xDEAD_BEEF);
+    }
+
+    #[test]
+    fn test_write_read_u64() {
+        let mut t = test_interp(&[]);
+        t.write_data_u64(0, 0xCAFE_BABE_DEAD_BEEF);
+        assert_eq!(t.read_data_u64(0), 0xCAFE_BABE_DEAD_BEEF);
+    }
+
+    #[test]
+    fn test_write_read_u128() {
+        let mut t = test_interp(&[]);
+        let val: u128 = 0x0123_4567_89AB_CDEF_FEDC_BA98_7654_3210;
+        t.write_data_u128(0, val);
+        assert_eq!(t.read_data_u128(0), val);
+    }
+
+    #[test]
+    fn test_read_u32_mapped_code_region() {
+        let t = test_interp(&[enc_nop()]);
+        // The NOP instruction should be readable from the code region via read_u32_mapped.
+        let val = t.interp.mem.read_u32_mapped(t.code_base);
+        assert_eq!(val, Some(enc_nop()));
+    }
+
+    #[test]
+    fn test_is_valid_mapped() {
+        let t = test_interp(&[]);
+        // Code region is mapped.
+        assert!(t.interp.mem.is_valid(t.code_base));
+        // Data region is mapped (same 8K allocation).
+        assert!(t.interp.mem.is_valid(t.data_base));
+    }
+
+    #[test]
+    fn test_is_valid_unmapped() {
+        let t = test_interp(&[]);
+        // Address 0x1 is not in any mapped region.
+        assert!(!t.interp.mem.is_valid(0x1));
+    }
+
+    #[test]
+    fn test_initial_sp_in_stack() {
+        let t = test_interp(&[]);
+        let sp = t.interp.mem.initial_sp();
+        // SP should be within the stack region (stack_top - 256).
+        assert_eq!(sp, t.interp.mem.stack_top - 256);
+        // SP should be in a valid mapped region.
+        assert!(t.interp.mem.is_valid(sp));
+    }
+
+    #[test]
+    fn test_write_multiple_read_back() {
+        let mut t = test_interp(&[]);
+        t.write_data_u32(0, 0xAAAA_AAAA);
+        t.write_data_u32(4, 0xBBBB_BBBB);
+        t.write_data_u32(8, 0xCCCC_CCCC);
+        // Read in order.
+        assert_eq!(t.read_data_u32(0), 0xAAAA_AAAA);
+        assert_eq!(t.read_data_u32(4), 0xBBBB_BBBB);
+        assert_eq!(t.read_data_u32(8), 0xCCCC_CCCC);
+        // Read in reverse order.
+        assert_eq!(t.read_data_u32(8), 0xCCCC_CCCC);
+        assert_eq!(t.read_data_u32(4), 0xBBBB_BBBB);
+        assert_eq!(t.read_data_u32(0), 0xAAAA_AAAA);
+    }
+
+    #[test]
+    fn test_read_cstring() {
+        let mut t = test_interp(&[]);
+        let msg = b"hello\0";
+        for (i, &b) in msg.iter().enumerate() {
+            t.write_data_u8(i as u64, b);
+        }
+        let s = t.interp.mem.read_cstring(t.data_base).unwrap();
+        assert_eq!(s, "hello");
+    }
+
+    #[test]
+    fn test_read_cstring_truncation() {
+        let mut t = test_interp(&[]);
+        // Write "abc\0xyz" — read_cstring should stop at the NUL.
+        for (i, &b) in b"abc\0xyz".iter().enumerate() {
+            t.write_data_u8(i as u64, b);
+        }
+        let s = t.interp.mem.read_cstring(t.data_base).unwrap();
+        assert_eq!(s, "abc");
+    }
+
+    #[test]
+    fn test_read_unmapped_returns_none() {
+        let t = test_interp(&[]);
+        // host_passthrough is false by default, so 0x1 should return None.
+        assert!(t.interp.mem.read_u64(0x1).is_none());
+    }
+
+    #[test]
+    fn test_write_unmapped_returns_false() {
+        let t = test_interp(&[]);
+        // Writing to an unmapped address should return false.
+        assert!(!t.interp.mem.write_u64(0x1, 0x1234));
+    }
+
+    #[test]
+    fn test_endianness_little_endian() {
+        let mut t = test_interp(&[]);
+        // Write 0xDEADBEEF as u32, then read byte at same address → least significant byte.
+        t.write_data_u32(0, 0xDEAD_BEEF);
+        assert_eq!(t.read_data_u8(0), 0xEF); // LSB first (little-endian)
+        assert_eq!(t.read_data_u8(1), 0xBE);
+        assert_eq!(t.read_data_u8(2), 0xAD);
+        assert_eq!(t.read_data_u8(3), 0xDE);
+    }
+}

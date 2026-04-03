@@ -1,0 +1,15 @@
+[package]
+name         = "macho-shared-cache"
+description  = "Parser for Apple dyld_shared_cache files"
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+rust-version.workspace = true
+
+[dependencies]
+macho-types = { workspace = true }
+log         = { workspace = true }
+thiserror   = { workspace = true }
+
+[lints]
+workspace = true

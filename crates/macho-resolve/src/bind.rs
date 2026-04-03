@@ -49,6 +49,59 @@ impl BindingReport {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_binding(name: &str, bound: bool, is_weak: bool) -> SymbolBinding {
+        SymbolBinding {
+            name: name.to_string(),
+            dylib_ordinal: 1,
+            resolved_in: if bound {
+                Some("/usr/lib/libSystem.B.dylib".into())
+            } else {
+                None
+            },
+            address: if bound { Some(0x1000) } else { None },
+            is_weak,
+            bound,
+        }
+    }
+
+    #[test]
+    fn binding_report_empty_is_complete() {
+        let report = BindingReport {
+            bindings: vec![],
+            failed: vec![],
+            bound_count: 0,
+            weak_unbound_count: 0,
+        };
+        assert!(report.is_complete());
+    }
+
+    #[test]
+    fn binding_report_all_resolved_is_complete() {
+        let report = BindingReport {
+            bindings: vec![make_binding("_foo", true, false), make_binding("_bar", true, false)],
+            failed: vec![],
+            bound_count: 2,
+            weak_unbound_count: 0,
+        };
+        assert!(report.is_complete());
+    }
+
+    #[test]
+    fn binding_report_unresolved_not_complete() {
+        let report = BindingReport {
+            bindings: vec![make_binding("_foo", false, false)],
+            failed: vec!["_foo".to_string()],
+            bound_count: 0,
+            weak_unbound_count: 0,
+        };
+        assert!(!report.is_complete());
+    }
+}
+
 /// Cache of loaded export tries keyed by file path.
 struct ExportCache {
     cache: HashMap<String, Vec<ExportedSymbol>>,

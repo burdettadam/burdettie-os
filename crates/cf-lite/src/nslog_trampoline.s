@@ -1,4 +1,4 @@
-// ARM64 NSLog variadic trampoline for burdetty-os.
+// ARM64 NSLog variadic trampoline for burdettie-os.
 //
 // ARM64 macOS variadic calling convention:
 //   x0 = format (named parameter, in register)

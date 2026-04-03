@@ -286,3 +286,205 @@ fn infer_stages(msg: &str) -> Stages {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── infer_stages ───────────────────────────────────────────
+
+    #[test]
+    fn infer_stages_parse_error() {
+        let stages = infer_stages("invalid magic number");
+        assert!(!stages.parse);
+        assert!(!stages.load);
+    }
+
+    #[test]
+    fn infer_stages_truncated() {
+        let stages = infer_stages("file truncated at offset 0x100");
+        assert!(!stages.parse);
+    }
+
+    #[test]
+    fn infer_stages_dependency_not_found() {
+        let stages = infer_stages("dependency not found: libFoo.dylib");
+        assert!(stages.parse);
+        assert!(!stages.load);
+        assert!(!stages.fixups);
+    }
+
+    #[test]
+    fn infer_stages_map_failure() {
+        let stages = infer_stages("failed to map segment __TEXT");
+        assert!(stages.parse);
+        assert!(!stages.load);
+    }
+
+    #[test]
+    fn infer_stages_fixup_failure() {
+        let stages = infer_stages("fixup target segment index 5 out of range");
+        assert!(stages.parse);
+        assert!(stages.load);
+        assert!(!stages.fixups);
+        assert!(!stages.enter_main);
+    }
+
+    #[test]
+    fn infer_stages_bind_failure() {
+        let stages = infer_stages("failed to bind symbol _foo");
+        assert!(stages.parse);
+        assert!(stages.load);
+        assert!(!stages.fixups);
+    }
+
+    #[test]
+    fn infer_stages_rebase_failure() {
+        let stages = infer_stages("rebase offset out of bounds");
+        assert!(stages.parse);
+        assert!(stages.load);
+        assert!(!stages.fixups);
+    }
+
+    #[test]
+    fn infer_stages_entry_failure() {
+        let stages = infer_stages("no entry point found");
+        assert!(stages.parse);
+        assert!(stages.load);
+        assert!(stages.fixups);
+        assert!(!stages.enter_main);
+    }
+
+    #[test]
+    fn infer_stages_crash() {
+        let stages = infer_stages("SIGSEGV at 0xdeadbeef");
+        assert!(stages.parse);
+        assert!(stages.load);
+        assert!(stages.fixups);
+        assert!(stages.enter_main);
+        assert!(!stages.complete);
+    }
+
+    #[test]
+    fn infer_stages_unknown_error() {
+        let stages = infer_stages("something completely unexpected happened");
+        // Falls through to default — assumed crash during execution
+        assert!(stages.parse);
+        assert!(stages.load);
+        assert!(stages.fixups);
+        assert!(stages.enter_main);
+        assert!(!stages.complete);
+        assert!(!stages.exit_correct);
+    }
+
+    // ── extract_quoted ─────────────────────────────────────────
+
+    #[test]
+    fn extract_quoted_simple() {
+        assert_eq!(extract_quoted("unresolved symbol '_foo'"), Some("_foo".into()));
+    }
+
+    #[test]
+    fn extract_quoted_no_quotes() {
+        assert_eq!(extract_quoted("no quotes here"), None);
+    }
+
+    #[test]
+    fn extract_quoted_single_quote_only() {
+        assert_eq!(extract_quoted("just one ' quote"), None);
+    }
+
+    #[test]
+    fn extract_quoted_empty_quotes() {
+        assert_eq!(extract_quoted("empty '' value"), Some("".into()));
+    }
+
+    // ── extract_after ──────────────────────────────────────────
+
+    #[test]
+    fn extract_after_found() {
+        assert_eq!(
+            extract_after("selector 'doSomething:' not found", "selector '"),
+            Some("doSomething:".into())
+        );
+    }
+
+    #[test]
+    fn extract_after_prefix_missing() {
+        assert_eq!(extract_after("no match here", "selector '"), None);
+    }
+
+    #[test]
+    fn extract_after_no_closing_quote() {
+        assert_eq!(extract_after("selector 'broken", "selector '"), None);
+    }
+
+    // ── discover_corpus ────────────────────────────────────────
+
+    #[test]
+    fn discover_corpus_nonexistent_dir() {
+        let entries = discover_corpus(std::path::Path::new("/tmp/nonexistent_corpus_dir_xyz"));
+        assert!(entries.is_empty());
+    }
+
+    // ── read_meta ──────────────────────────────────────────────
+
+    #[test]
+    fn read_meta_missing_file() {
+        let (cat, exit) = read_meta(std::path::Path::new("/tmp/no_such_dir_xyz"));
+        assert_eq!(cat, "unknown");
+        assert_eq!(exit, 0);
+    }
+
+    #[test]
+    fn read_meta_with_valid_json() {
+        let dir = std::env::temp_dir().join("compat_runner_test_meta");
+        let _ = std::fs::create_dir_all(&dir);
+        std::fs::write(
+            dir.join("meta.json"),
+            r#"{"category": "foundation", "expected_exit": 42}"#,
+        )
+        .unwrap();
+        let (cat, exit) = read_meta(&dir);
+        assert_eq!(cat, "foundation");
+        assert_eq!(exit, 42);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn read_meta_with_invalid_json() {
+        let dir = std::env::temp_dir().join("compat_runner_test_meta_bad");
+        let _ = std::fs::create_dir_all(&dir);
+        std::fs::write(dir.join("meta.json"), "not json!").unwrap();
+        let (cat, exit) = read_meta(&dir);
+        assert_eq!(cat, "unknown");
+        assert_eq!(exit, 0);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    // ── generate_report ────────────────────────────────────────
+
+    #[test]
+    fn generate_report_empty_entries() {
+        let report = crate::generate_report(&[]);
+        assert_eq!(report.summary.total, 0);
+        assert_eq!(report.summary.passed, 0);
+        assert_eq!(report.summary.pass_rate, 0.0);
+    }
+
+    // ── run_binary missing path ────────────────────────────────
+
+    #[test]
+    fn run_binary_missing_path() {
+        let entry = CorpusEntry {
+            name: "ghost".into(),
+            path: "/tmp/no_such_binary_xyz".into(),
+            category: "test".into(),
+            expected_exit: 0,
+        };
+        let result = run_binary(&entry);
+        assert!(!result.success);
+        assert!(result.error.as_ref().unwrap().contains("not found"));
+        assert!(!result.stages.parse);
+    }
+}

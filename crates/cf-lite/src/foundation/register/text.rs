@@ -69,6 +69,36 @@ pub fn register_nscharacterset_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nscharacterset::shim_nscharacterset_with_characters_in_string as u64,
                 "@@:@",
             ),
+            me(
+                "URLQueryAllowedCharacterSet",
+                nscharacterset::shim_nscharacterset_url_query_allowed as u64,
+                "@@:",
+            ),
+            me(
+                "URLPathAllowedCharacterSet",
+                nscharacterset::shim_nscharacterset_url_path_allowed as u64,
+                "@@:",
+            ),
+            me(
+                "URLHostAllowedCharacterSet",
+                nscharacterset::shim_nscharacterset_url_host_allowed as u64,
+                "@@:",
+            ),
+            me(
+                "URLFragmentAllowedCharacterSet",
+                nscharacterset::shim_nscharacterset_url_fragment_allowed as u64,
+                "@@:",
+            ),
+            me(
+                "URLUserAllowedCharacterSet",
+                nscharacterset::shim_nscharacterset_url_user_allowed as u64,
+                "@@:",
+            ),
+            me(
+                "URLPasswordAllowedCharacterSet",
+                nscharacterset::shim_nscharacterset_url_password_allowed as u64,
+                "@@:",
+            ),
         ],
         ivars: vec![],
         properties: vec![],
@@ -167,6 +197,7 @@ pub fn register_nsregularexpression_class(rt: &mut objc_runtime::ObjcRuntime) {
         name: "NSRegularExpression".to_string(),
         mapped_addr: class_addr,
         methods: vec![
+            me("initWithPattern:options:error:", nsregularexpression::shim_regex_init_with_pattern as u64, "@@:@Q^@"),
             me("pattern", nsregularexpression::shim_regex_pattern as u64, "@@:"),
             me("options", nsregularexpression::shim_regex_options as u64, "Q@:"),
             me("numberOfMatchesInString:options:range:", nsregularexpression::shim_regex_number_of_matches as u64, "Q@:@Q{_NSRange=QQ}"),
@@ -175,9 +206,11 @@ pub fn register_nsregularexpression_class(rt: &mut objc_runtime::ObjcRuntime) {
             me("enumerateMatchesInString:options:range:usingBlock:", nsregularexpression::shim_regex_enumerate_matches as u64, "v@:@Q{_NSRange=QQ}@?"),
             me("stringByReplacingMatchesInString:options:range:withTemplate:", nsregularexpression::shim_regex_replace as u64, "@@:@Q{_NSRange=QQ}@"),
             me("description", nsregularexpression::shim_regex_description as u64, "@@:"),
+            me("replacementStringForResult:inString:offset:template:", nsregularexpression::shim_nsregex_replacement_string_for_result as u64, "@@:@@q@"),
         ],
         class_methods: vec![
             me("regularExpressionWithPattern:options:error:", nsregularexpression::shim_regex_with_pattern as u64, "@@:@Q^@"),
+            me("escapedPatternForString:", nsregularexpression::shim_nsregex_escaped_pattern_for_string as u64, "@@:@"),
         ],
         ivars: vec![],
         properties: vec![],
@@ -237,6 +270,7 @@ pub fn register_nspredicate_class(rt: &mut objc_runtime::ObjcRuntime) {
         class_methods: vec![
             me("predicateWithFormat:", nspredicate::shim_predicate_with_format as u64, "@@:@"),
             me("predicateWithValue:", nspredicate::shim_predicate_with_value as u64, "@@:B"),
+            me("predicateWithBlock:", nspredicate::shim_predicate_with_block as u64, "@@:@?"),
         ],
         ivars: vec![],
         properties: vec![],

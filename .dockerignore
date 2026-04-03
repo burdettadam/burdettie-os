@@ -1,7 +1,7 @@
 target/
 .git/
 *.dmg
-burdetty-os.tar.gz
+burdettie-os.tar.gz
 dist/
 observed/
 vm-image/.build/

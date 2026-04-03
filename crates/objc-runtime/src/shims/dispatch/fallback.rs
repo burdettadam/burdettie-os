@@ -27,7 +27,7 @@ pub extern "C" fn shim_objc_msg_send_rust(
         .to_str()
         .unwrap_or("");
 
-    let guard = match OBJC_RUNTIME.lock() {
+    let guard = match OBJC_RUNTIME.read() {
         Ok(g) => g,
         Err(e) => e.into_inner(),
     };
@@ -98,4 +98,47 @@ pub extern "C" fn shim_objc_msg_send_super2_rust(
     let f: extern "C" fn(u64, u64, u64, u64, u64, u64, u64, u64) -> u64 =
         unsafe { std::mem::transmute(imp) };
     f(receiver, a1, a2, a3, a4, a5, a6, a7)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn msg_send_rust_nil_receiver() {
+        // obj (a0) == 0 → immediate return 0.
+        assert_eq!(shim_objc_msg_send_rust(0, 0, 0, 0, 0, 0, 0, 0), 0);
+    }
+
+    #[test]
+    fn msg_send_super_rust_null() {
+        // Build a super struct with receiver=0, super_class=0.
+        let super_struct: [u64; 2] = [0, 0];
+        let ptr = super_struct.as_ptr() as u64;
+        // receiver == 0 → objc_msg_super_lookup_imp returns 0 → returns 0.
+        assert_eq!(
+            shim_objc_msg_send_super_rust(ptr, 0, 0, 0, 0, 0, 0, 0),
+            0
+        );
+    }
+
+    #[test]
+    fn msg_send_super2_rust_null() {
+        let super_struct: [u64; 2] = [0, 0];
+        let ptr = super_struct.as_ptr() as u64;
+        assert_eq!(
+            shim_objc_msg_send_super2_rust(ptr, 0, 0, 0, 0, 0, 0, 0),
+            0
+        );
+    }
+
+    #[test]
+    #[ignore = "shim_objc_msg_send_rust calls process::abort() for unknown ISA"]
+    fn msg_send_rust_invalid_obj() {
+        // Would require an obj whose ISA isn't registered, but the function
+        // calls std::process::abort() in that case — can't assert in-process.
+        let fake_obj: Box<u64> = Box::new(0xDEAD_0000_0000_0000);
+        let obj_addr = &*fake_obj as *const u64 as u64;
+        let _ = shim_objc_msg_send_rust(obj_addr, 0, 0, 0, 0, 0, 0, 0);
+    }
 }

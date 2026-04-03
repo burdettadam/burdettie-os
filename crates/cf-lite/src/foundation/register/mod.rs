@@ -16,7 +16,12 @@ mod invocation;
 mod text;
 mod advanced_collections;
 mod appkit;
-mod gap_analysis;
+mod gap_data;
+mod gap_network;
+mod gap_streams;
+mod xcode_stubs;
+mod measurement;
+mod framework_stubs;
 
 pub use string::*;
 pub use object::*;
@@ -31,15 +36,20 @@ pub use invocation::*;
 pub use text::*;
 pub use advanced_collections::*;
 pub use appkit::*;
-pub use gap_analysis::*;
+pub use gap_data::*;
+pub use gap_network::*;
+pub use gap_streams::*;
+pub use xcode_stubs::*;
+pub use measurement::*;
+pub use framework_stubs::*;
 
 use objc_runtime::MethodEntry;
 
 /// Concise constructor for `MethodEntry`.
-fn me(sel: &str, imp: u64, enc: &str) -> MethodEntry {
+fn me(sel: &'static str, imp: u64, enc: &'static str) -> MethodEntry {
     MethodEntry {
-        selector: sel.to_string(),
+        selector: sel.into(),
         imp,
-        type_encoding: enc.to_string(),
+        type_encoding: enc.into(),
     }
 }

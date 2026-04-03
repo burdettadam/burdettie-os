@@ -30,19 +30,31 @@ members = [
     "crates/ui-view",
     "crates/ui-controls",
     "crates/window-backend-darwin",
+    "crates/window-backend-linux",
     "crates/compat-runner",
     "crates/darwin-runtime-ffi",
     "crates/arm64-translate",
+    "crates/perf-bench",
+    "crates/libdispatch-sys",
+    "crates/core-foundation-lite",
+    "crates/cg-shims",
+    "crates/icu-shims",
+    "crates/macho-shared-cache",
+    "crates/trust-eval",
+    "crates/swift-stub-gen",
     "apps/hello-darwin",
     "apps/control-gallery",
     "apps/foundation-explorer",
 ]
 
 [workspace.package]
-version      = "0.1.0"
-edition      = "2021"
-license      = "MIT OR Apache-2.0"
-rust-version = "1.82"
+version       = "0.1.0"
+edition       = "2021"
+license       = "MIT OR Apache-2.0"
+rust-version  = "1.82"
+repository    = "https://github.com/burdettadam/burdettie-os"
+homepage      = "https://github.com/burdettadam/burdettie-os"
+documentation = "https://github.com/burdettadam/burdettie-os/tree/main/docs"
 
 [workspace.dependencies]
 # Internal crates
@@ -75,9 +87,17 @@ app-kit-lite   = { path = "crates/app-kit-lite" }
 ui-view        = { path = "crates/ui-view" }
 ui-controls    = { path = "crates/ui-controls" }
 window-backend-darwin = { path = "crates/window-backend-darwin" }
+window-backend-linux  = { path = "crates/window-backend-linux" }
 compat-runner         = { path = "crates/compat-runner" }
 darwin-runtime-ffi    = { path = "crates/darwin-runtime-ffi" }
 arm64-translate       = { path = "crates/arm64-translate" }
+perf-bench            = { path = "crates/perf-bench" }
+libdispatch-sys       = { path = "crates/libdispatch-sys" }
+core-foundation-lite  = { path = "crates/core-foundation-lite" }
+cg-shims              = { path = "crates/cg-shims" }
+icu-shims             = { path = "crates/icu-shims" }
+macho-shared-cache    = { path = "crates/macho-shared-cache" }
+trust-eval            = { path = "crates/trust-eval" }
 hello-darwin          = { path = "apps/hello-darwin" }
 control-gallery       = { path = "apps/control-gallery" }
 foundation-explorer   = { path = "apps/foundation-explorer" }
@@ -94,6 +114,10 @@ log       = "0.4"
 env_logger = "0.11"
 libc      = "0.2"
 tempfile  = "3"
+toml      = "0.8"
+ureq      = { version = "3", features = ["rustls"] }
+plist     = "1"
+quick-xml = "0.37"
 
 # ── Workspace-wide lints ────────────────────────────────────────────
 # Inherited by every crate via `[lints] workspace = true`.

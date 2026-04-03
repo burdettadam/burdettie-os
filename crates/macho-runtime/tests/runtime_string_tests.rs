@@ -108,7 +108,7 @@ fn runtime_objc_inherit_superclass_chain() {
     let Some(_result) = common::run_fixture("objc_inherit/app") else { return };
 
     // Verify superclass chain is parsed
-    let guard = objc_runtime::OBJC_RUNTIME.lock().unwrap();
+    let guard = objc_runtime::OBJC_RUNTIME.read().unwrap();
     if let Some(rt) = guard.as_ref() {
         let shape = rt.get_class("Shape").expect("Shape should be registered");
         assert!(shape.superclass_addr.is_none(), "Shape is root class");

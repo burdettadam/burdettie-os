@@ -33,7 +33,7 @@ pub extern "C" fn forwarding_trampoline(
 
     // Step 1: Look up methodSignatureForSelector: IMP
     let sig_imp = {
-        let guard = match OBJC_RUNTIME.lock() {
+        let guard = match OBJC_RUNTIME.read() {
             Ok(g) => g,
             Err(e) => e.into_inner(),
         };
@@ -55,7 +55,7 @@ pub extern "C" fn forwarding_trampoline(
 
     if signature == 0 {
         let dnr_imp = {
-            let guard = match OBJC_RUNTIME.lock() {
+            let guard = match OBJC_RUNTIME.read() {
                 Ok(g) => g,
                 Err(e) => e.into_inner(),
             };
@@ -84,7 +84,7 @@ pub extern "C" fn forwarding_trampoline(
     }
 
     let inv_isa = {
-        let guard = match OBJC_RUNTIME.lock() {
+        let guard = match OBJC_RUNTIME.read() {
             Ok(g) => g,
             Err(e) => e.into_inner(),
         };
@@ -123,7 +123,7 @@ pub extern "C" fn forwarding_trampoline(
 
     // Step 3: Look up and call forwardInvocation:
     let fwd_imp = {
-        let guard = match OBJC_RUNTIME.lock() {
+        let guard = match OBJC_RUNTIME.read() {
             Ok(g) => g,
             Err(e) => e.into_inner(),
         };
@@ -159,4 +159,14 @@ pub extern "C" fn forwarding_trampoline(
     }
 
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn forwarding_nil_receiver_returns_zero() {
+        assert_eq!(forwarding_trampoline(0, 0, 0, 0, 0, 0, 0, 0), 0);
+    }
 }

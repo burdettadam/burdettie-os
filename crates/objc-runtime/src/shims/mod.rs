@@ -23,6 +23,7 @@ pub use dispatch::objc_msg_send_addr;
 
 // Re-export NSObject memory-management method shims for Foundation registration.
 pub use lifecycle::{
+    host_nsexception_ehtype_addr,
     shim_nsobject_autorelease, shim_nsobject_dealloc, shim_nsobject_release, shim_nsobject_retain,
     shim_nsobject_retain_count,
 };
@@ -51,6 +52,6 @@ impl ObjcShims {
         install_advanced::install_associated_shims(table);
         install_advanced::install_protocol_shims(table);
         install_advanced::install_dynamic_class_shims(table);
-        log::debug!("ObjcShims: registered 98 ObjC runtime shims");
+        log::debug!("ObjcShims: registered 112 ObjC runtime shims");
     }
 }

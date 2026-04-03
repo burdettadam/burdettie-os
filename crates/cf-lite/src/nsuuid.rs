@@ -140,3 +140,93 @@ pub extern "C" fn shim_nsuuid_is_equal(obj: u64, _cmd: u64, other: u64) -> u8 {
 pub extern "C" fn shim_nsuuid_description(obj: u64, _cmd: u64) -> u64 {
     shim_nsuuid_uuid_string(obj, _cmd)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shim_test_helpers::*;
+
+    // Note: shim_nsuuid_uuid() and shim_nsuuid_init() call crate::platform().rng()
+    // and cannot be unit-tested without a platform provider configured.
+
+    fn make_zeroed_uuid() -> u64 {
+        alloc_obj(NSUUID_SIZE, crate::nsobj::nsuuid_class_addr())
+    }
+
+    #[test]
+    fn init_with_uuid_string_roundtrip() {
+        let uuid_str = make_string("CAFEBABE-CAFE-4ABE-8ABE-CAFEBABECAFE");
+        let obj = make_zeroed_uuid();
+        let result = shim_nsuuid_init_with_uuid_string(obj, 0, uuid_str);
+        assert_eq!(result, obj, "init should return self on success");
+        let out = shim_nsuuid_uuid_string(obj, 0);
+        assert_ne!(out, 0);
+        assert_string_eq(out, "CAFEBABE-CAFE-4ABE-8ABE-CAFEBABECAFE");
+        free_obj(obj);
+    }
+
+    #[test]
+    fn init_with_invalid_uuid_string_returns_nil() {
+        let bad = make_string("not-a-uuid");
+        let obj = make_zeroed_uuid();
+        let result = shim_nsuuid_init_with_uuid_string(obj, 0, bad);
+        assert_eq!(result, 0);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn init_with_nil_string_returns_nil() {
+        let obj = make_zeroed_uuid();
+        assert_eq!(shim_nsuuid_init_with_uuid_string(obj, 0, 0), 0);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn uuid_string_nil_returns_zero() {
+        assert_eq!(shim_nsuuid_uuid_string(0, 0), 0);
+    }
+
+    #[test]
+    fn is_equal_same_bytes() {
+        let s = make_string("AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA");
+        let a = make_zeroed_uuid();
+        let b = make_zeroed_uuid();
+        shim_nsuuid_init_with_uuid_string(a, 0, s);
+        shim_nsuuid_init_with_uuid_string(b, 0, s);
+        assert_eq!(shim_nsuuid_is_equal(a, 0, b), 1);
+        free_obj(a);
+        free_obj(b);
+    }
+
+    #[test]
+    fn is_equal_different_bytes() {
+        let s1 = make_string("AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA");
+        let s2 = make_string("BBBBBBBB-BBBB-4BBB-8BBB-BBBBBBBBBBBB");
+        let a = make_zeroed_uuid();
+        let b = make_zeroed_uuid();
+        shim_nsuuid_init_with_uuid_string(a, 0, s1);
+        shim_nsuuid_init_with_uuid_string(b, 0, s2);
+        assert_eq!(shim_nsuuid_is_equal(a, 0, b), 0);
+        free_obj(a);
+        free_obj(b);
+    }
+
+    #[test]
+    fn is_equal_nil_returns_zero() {
+        let obj = make_zeroed_uuid();
+        assert_eq!(shim_nsuuid_is_equal(obj, 0, 0), 0);
+        assert_eq!(shim_nsuuid_is_equal(0, 0, obj), 0);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn description_matches_uuid_string() {
+        let s = make_string("12345678-1234-4234-A234-123456789ABC");
+        let obj = make_zeroed_uuid();
+        shim_nsuuid_init_with_uuid_string(obj, 0, s);
+        let desc = shim_nsuuid_description(obj, 0);
+        assert_ne!(desc, 0);
+        assert_string_eq(desc, "12345678-1234-4234-A234-123456789ABC");
+        free_obj(obj);
+    }
+}

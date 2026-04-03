@@ -318,3 +318,146 @@ pub extern "C" fn shim_nsset_enumerate_objects_using_block(obj: u64, _cmd: u64, 
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shim_test_helpers::*;
+
+    #[test]
+    fn empty_set_count_zero() {
+        let set = shim_nsset_set(0, 0);
+        assert_ne!(set, 0);
+        assert_eq!(shim_nsset_count(set, 0), 0);
+        free_obj(set);
+    }
+
+    #[test]
+    fn set_with_objects_count_basic() {
+        let a = make_string("alpha");
+        let b = make_string("beta");
+        let c = make_string("gamma");
+        let buf = make_u64_array(&[a, b, c]);
+        let set = shim_nsset_with_objects_count(0, 0, buf, 3);
+        assert_ne!(set, 0);
+        assert_eq!(shim_nsset_count(set, 0), 3);
+        free_buf(buf);
+        free_obj(set);
+    }
+
+    #[test]
+    fn deduplication_removes_string_duplicates() {
+        let a = make_string("dup");
+        let b = make_string("dup"); // different pointer, same content
+        let buf = make_u64_array(&[a, b]);
+        let set = shim_nsset_with_objects_count(0, 0, buf, 2);
+        assert_eq!(shim_nsset_count(set, 0), 1);
+        free_buf(buf);
+        free_obj(set);
+    }
+
+    #[test]
+    fn contains_object_true_and_false() {
+        let a = make_string("apple");
+        let b = make_string("banana");
+        let c = make_string("cherry");
+        let buf = make_u64_array(&[a, b]);
+        let set = shim_nsset_with_objects_count(0, 0, buf, 2);
+        assert_eq!(shim_nsset_contains_object(set, 0, a), 1);
+        assert_eq!(shim_nsset_contains_object(set, 0, b), 1);
+        assert_eq!(shim_nsset_contains_object(set, 0, c), 0);
+        free_buf(buf);
+        free_obj(set);
+    }
+
+    #[test]
+    fn member_returns_element_or_nil() {
+        let a = make_string("hello");
+        let b = make_string("world");
+        let buf = make_u64_array(&[a]);
+        let set = shim_nsset_with_objects_count(0, 0, buf, 1);
+        assert_ne!(shim_nsset_member(set, 0, a), 0);
+        assert_eq!(shim_nsset_member(set, 0, b), 0);
+        free_buf(buf);
+        free_obj(set);
+    }
+
+    #[test]
+    fn any_object_returns_element_or_nil() {
+        let a = make_string("item");
+        let buf = make_u64_array(&[a]);
+        let set = shim_nsset_with_objects_count(0, 0, buf, 1);
+        assert_ne!(shim_nsset_any_object(set, 0), 0);
+        let empty = shim_nsset_set(0, 0);
+        assert_eq!(shim_nsset_any_object(empty, 0), 0);
+        free_buf(buf);
+        free_obj(set);
+        free_obj(empty);
+    }
+
+    #[test]
+    fn is_subset_of_set() {
+        let x = make_string("x");
+        let y = make_string("y");
+        let z = make_string("z");
+        let buf_xy = make_u64_array(&[x, y]);
+        let buf_xyz = make_u64_array(&[x, y, z]);
+        let sub = shim_nsset_with_objects_count(0, 0, buf_xy, 2);
+        let sup = shim_nsset_with_objects_count(0, 0, buf_xyz, 3);
+        assert_eq!(shim_nsset_is_subset_of_set(sub, 0, sup), 1);
+        assert_eq!(shim_nsset_is_subset_of_set(sup, 0, sub), 0);
+        free_buf(buf_xy);
+        free_buf(buf_xyz);
+        free_obj(sub);
+        free_obj(sup);
+    }
+
+    #[test]
+    fn intersects_set_shared_element() {
+        let shared = make_string("shared");
+        let left = make_string("left-only");
+        let right = make_string("right-only");
+        let buf1 = make_u64_array(&[shared, left]);
+        let buf2 = make_u64_array(&[shared, right]);
+        let s1 = shim_nsset_with_objects_count(0, 0, buf1, 2);
+        let s2 = shim_nsset_with_objects_count(0, 0, buf2, 2);
+        assert_eq!(shim_nsset_intersects_set(s1, 0, s2), 1);
+        free_buf(buf1);
+        free_buf(buf2);
+        free_obj(s1);
+        free_obj(s2);
+    }
+
+    #[test]
+    fn is_equal_to_set_same_pointers() {
+        let a = make_string("foo");
+        let b = make_string("bar");
+        let buf1 = make_u64_array(&[a, b]);
+        let buf2 = make_u64_array(&[a, b]);
+        let s1 = shim_nsset_with_objects_count(0, 0, buf1, 2);
+        let s2 = shim_nsset_with_objects_count(0, 0, buf2, 2);
+        assert_eq!(shim_nsset_is_equal_to_set(s1, 0, s2), 1);
+        free_buf(buf1);
+        free_buf(buf2);
+        free_obj(s1);
+        free_obj(s2);
+    }
+
+    #[test]
+    fn description_returns_nonzero() {
+        let a = make_string("item1");
+        let buf = make_u64_array(&[a]);
+        let set = shim_nsset_with_objects_count(0, 0, buf, 1);
+        assert_ne!(shim_nsset_description(set, 0), 0);
+        free_buf(buf);
+        free_obj(set);
+    }
+
+    #[test]
+    fn nil_safety() {
+        assert_eq!(shim_nsset_count(0, 0), 0);
+        assert_eq!(shim_nsset_contains_object(0, 0, 0), 0);
+        assert_eq!(shim_nsset_any_object(0, 0), 0);
+        assert_eq!(shim_nsset_description(0, 0), 0);
+    }
+}

@@ -12,6 +12,17 @@ pub trait MemoryMapper: Send + Sync {
     /// The region should be zero-filled and page-aligned.
     fn map_anonymous(&self, size: usize) -> Result<*mut u8, PalError>;
 
+    /// Allocate memory for a loaded Mach-O image that will later need
+    /// per-segment protections including execute permission.
+    ///
+    /// On standard configurations this falls back to [`map_anonymous`].
+    /// On hardened Linux (SELinux `deny_execmem`), the implementation uses
+    /// `memfd_create` so that `protect()` can transition pages to
+    /// `PROT_READ|PROT_EXEC` without violating the W^X policy.
+    fn map_image_pages(&self, size: usize) -> Result<*mut u8, PalError> {
+        self.map_anonymous(size)
+    }
+
     /// Change memory protection on a region.
     fn protect(&self, addr: *mut u8, size: usize, prot: Protection) -> Result<(), PalError>;
 

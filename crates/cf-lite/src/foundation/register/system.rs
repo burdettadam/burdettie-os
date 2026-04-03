@@ -30,6 +30,16 @@ pub fn register_nsprocessinfo_class(rt: &mut objc_runtime::ObjcRuntime) {
                 "@@:",
             ),
             me(
+                "operatingSystemVersion",
+                nsprocessinfo::shim_nsprocessinfo_operating_system_version as u64,
+                "{_NSOperatingSystemVersion=qqq}@:",
+            ),
+            me(
+                "isOperatingSystemAtLeastVersion:",
+                nsprocessinfo::shim_nsprocessinfo_is_operating_system_at_least_version as u64,
+                "B@:{_NSOperatingSystemVersion=qqq}",
+            ),
+            me(
                 "arguments",
                 nsprocessinfo::shim_nsprocessinfo_arguments as u64,
                 "@@:",
@@ -48,6 +58,26 @@ pub fn register_nsprocessinfo_class(rt: &mut objc_runtime::ObjcRuntime) {
                 "description",
                 nsprocessinfo::shim_nsprocessinfo_description as u64,
                 "@@:",
+            ),
+            me(
+                "globallyUniqueString",
+                nsprocessinfo::shim_nsprocessinfo_globally_unique_string as u64,
+                "@@:",
+            ),
+            me(
+                "activeProcessorCount",
+                nsprocessinfo::shim_nsprocessinfo_active_processor_count as u64,
+                "Q@:",
+            ),
+            me(
+                "physicalMemory",
+                nsprocessinfo::shim_nsprocessinfo_physical_memory as u64,
+                "Q@:",
+            ),
+            me(
+                "systemUptime",
+                nsprocessinfo::shim_nsprocessinfo_system_uptime as u64,
+                "d@:",
             ),
         ],
         class_methods: vec![me(
@@ -78,32 +108,25 @@ pub fn register_nsbundle_class(rt: &mut objc_runtime::ObjcRuntime) {
         name: "NSBundle".to_string(),
         mapped_addr: class_addr,
         methods: vec![
-            me(
-                "bundlePath",
-                nsbundle::shim_nsbundle_bundle_path as u64,
-                "@@:",
-            ),
-            me(
-                "resourcePath",
-                nsbundle::shim_nsbundle_resource_path as u64,
-                "@@:",
-            ),
-            me(
-                "executablePath",
-                nsbundle::shim_nsbundle_executable_path as u64,
-                "@@:",
-            ),
-            me(
-                "bundleIdentifier",
-                nsbundle::shim_nsbundle_bundle_identifier as u64,
-                "@@:",
-            ),
+            me("bundlePath", nsbundle::shim_nsbundle_bundle_path as u64, "@@:"),
+            me("bundleURL", nsbundle::shim_nsbundle_bundle_url as u64, "@@:"),
+            me("resourcePath", nsbundle::shim_nsbundle_resource_path as u64, "@@:"),
+            me("executablePath", nsbundle::shim_nsbundle_executable_path as u64, "@@:"),
+            me("executableURL", nsbundle::shim_nsbundle_executable_url as u64, "@@:"),
+            me("bundleIdentifier", nsbundle::shim_nsbundle_bundle_identifier as u64, "@@:"),
+            me("infoDictionary", nsbundle::shim_nsbundle_info_dictionary as u64, "@@:"),
+            me("objectForInfoDictionaryKey:", nsbundle::shim_nsbundle_object_for_info_key as u64, "@@:@"),
+            me("pathForResource:ofType:", nsbundle::shim_nsbundle_path_for_resource as u64, "@@:@@"),
+            me("loadNibNamed:owner:topLevelObjects:", nsbundle::shim_nsbundle_load_nib_named as u64, "B@:@@^@"),
+            me("URLForResource:withExtension:", nsbundle::shim_nsbundle_url_for_resource as u64, "@@:@@"),
+            me("localizedStringForKey:value:table:", nsbundle::shim_nsbundle_localized_string as u64, "@@:@@@"),
         ],
-        class_methods: vec![me(
-            "mainBundle",
-            nsbundle::shim_nsbundle_main_bundle as u64,
-            "@@:",
-        )],
+        class_methods: vec![
+            me("mainBundle", nsbundle::shim_nsbundle_main_bundle as u64, "@@:"),
+            me("allFrameworks", nsbundle::shim_nsbundle_all_frameworks as u64, "@@:"),
+            me("bundleWithPath:", nsbundle::shim_nsbundle_bundle_with_path as u64, "@@:@"),
+            me("bundleForClass:", nsbundle::shim_nsbundle_bundle_for_class as u64, "@@:@"),
+        ],
         ivars: vec![],
         properties: vec![],
         protocol_names: Vec::new(),
@@ -143,8 +166,68 @@ pub fn register_nsfilemanager_class(rt: &mut objc_runtime::ObjcRuntime) {
                 "@@:",
             ),
             me(
+                "changeCurrentDirectoryPath:",
+                nsfilemanager::shim_nsfilemanager_change_current_directory_path as u64,
+                "B@:@",
+            ),
+            me(
                 "contentsOfDirectoryAtPath:error:",
                 nsfilemanager::shim_nsfilemanager_contents_of_directory_at_path as u64,
+                "@@:@^@",
+            ),
+            me(
+                "copyItemAtPath:toPath:error:",
+                nsfilemanager::shim_nsfilemanager_copy_item as u64,
+                "B@:@@^@",
+            ),
+            me(
+                "moveItemAtPath:toPath:error:",
+                nsfilemanager::shim_nsfilemanager_move_item as u64,
+                "B@:@@^@",
+            ),
+            me(
+                "removeItemAtPath:error:",
+                nsfilemanager::shim_nsfilemanager_remove_item as u64,
+                "B@:@^@",
+            ),
+            me(
+                "createDirectoryAtPath:withIntermediateDirectories:attributes:error:",
+                nsfilemanager::shim_nsfilemanager_create_directory as u64,
+                "B@:@B@@^@",
+            ),
+            me(
+                "attributesOfItemAtPath:error:",
+                nsfilemanager::shim_nsfilemanager_attributes_of_item as u64,
+                "@@:@^@",
+            ),
+            me(
+                "createFileAtPath:contents:attributes:",
+                nsfilemanager::shim_nsfilemanager_create_file as u64,
+                "c@:@@@",
+            ),
+            me(
+                "contentsAtPath:",
+                nsfilemanager::shim_nsfilemanager_contents_at_path as u64,
+                "@@:@",
+            ),
+            me(
+                "isReadableFileAtPath:",
+                nsfilemanager::shim_nsfilemanager_is_readable_file as u64,
+                "c@:@",
+            ),
+            me(
+                "isWritableFileAtPath:",
+                nsfilemanager::shim_nsfilemanager_is_writable_file as u64,
+                "c@:@",
+            ),
+            me(
+                "isDeletableFileAtPath:",
+                nsfilemanager::shim_nsfilemanager_is_deletable_file as u64,
+                "c@:@",
+            ),
+            me(
+                "subpathsOfDirectoryAtPath:error:",
+                nsfilemanager::shim_nsfilemanager_subpaths_of_directory as u64,
                 "@@:@^@",
             ),
         ],
@@ -176,6 +259,12 @@ pub fn register_nsuserdefaults_class(rt: &mut objc_runtime::ObjcRuntime) {
         name: "NSUserDefaults".to_string(),
         mapped_addr: class_addr,
         methods: vec![
+            me("init", nsuserdefaults::shim_nsuserdefaults_init as u64, "@@:"),
+            me(
+                "initWithSuiteName:",
+                nsuserdefaults::shim_nsuserdefaults_init_with_suite_name as u64,
+                "@@:@",
+            ),
             me(
                 "objectForKey:",
                 nsuserdefaults::shim_nsuserdefaults_object_for_key as u64,
@@ -210,6 +299,26 @@ pub fn register_nsuserdefaults_class(rt: &mut objc_runtime::ObjcRuntime) {
                 "removeObjectForKey:",
                 nsuserdefaults::shim_nsuserdefaults_remove_object as u64,
                 "v@:@",
+            ),
+            me(
+                "registerDefaults:",
+                nsuserdefaults::shim_nsuserdefaults_register_defaults as u64,
+                "v@:@",
+            ),
+            me(
+                "addSuiteNamed:",
+                nsuserdefaults::shim_nsuserdefaults_add_suite_named as u64,
+                "v@:@",
+            ),
+            me(
+                "removeSuiteNamed:",
+                nsuserdefaults::shim_nsuserdefaults_remove_suite_named as u64,
+                "v@:@",
+            ),
+            me(
+                "volatileDomainForName:",
+                nsuserdefaults::shim_nsuserdefaults_volatile_domain_for_name as u64,
+                "@@:@",
             ),
             me(
                 "synchronize",
@@ -250,6 +359,16 @@ pub fn register_nsuserdefaults_class(rt: &mut objc_runtime::ObjcRuntime) {
                 "dictionaryForKey:",
                 nsuserdefaults::shim_nsuserdefaults_dictionary_for_key as u64,
                 "@@:@",
+            ),
+            me(
+                "URLForKey:",
+                nsuserdefaults::shim_nsuserdefaults_url_for_key as u64,
+                "@@:@",
+            ),
+            me(
+                "dictionaryRepresentation",
+                nsuserdefaults::shim_nsuserdefaults_dictionary_representation as u64,
+                "@@:",
             ),
         ],
         class_methods: vec![me(

@@ -23,11 +23,36 @@ use crate::nsobj;
 pub use helpers::make_nsdictionary;
 use helpers::{dict_count, dict_keys, dict_vals, find_key_index, COUNT_OFF, KEYS_OFF, VALS_OFF};
 
+fn dictionary_from_path(path: &str) -> u64 {
+    crate::nspropertylistserialization::parse_plist_file(path)
+}
+
 /// Public accessors for dict layout helpers (used by NSJSONSerialization etc.).
 pub mod helpers_pub {
     pub fn dict_count_pub(obj: u64) -> u64 { super::helpers::dict_count(obj) }
     pub fn dict_keys_pub(obj: u64) -> u64 { super::helpers::dict_keys(obj) }
     pub fn dict_vals_pub(obj: u64) -> u64 { super::helpers::dict_vals(obj) }
+}
+
+fn collect_pairs(obj: u64) -> (Vec<u64>, Vec<u64>) {
+    if obj == 0 {
+        return (Vec::new(), Vec::new());
+    }
+
+    let count = dict_count(obj) as usize;
+    let keys = dict_keys(obj);
+    let vals = dict_vals(obj);
+    if count == 0 || keys == 0 || vals == 0 {
+        return (Vec::new(), Vec::new());
+    }
+
+    let mut collected_keys = Vec::with_capacity(count);
+    let mut collected_vals = Vec::with_capacity(count);
+    for i in 0..count {
+        collected_keys.push(unsafe { *((keys as usize + i * 8) as *const u64) });
+        collected_vals.push(unsafe { *((vals as usize + i * 8) as *const u64) });
+    }
+    (collected_keys, collected_vals)
 }
 
 // ── Class methods ──────────────────────────────────────────────────
@@ -89,6 +114,79 @@ pub extern "C" fn shim_nsdictionary_with_objects_for_keys_count(
         cnt
     );
     obj
+}
+
+/// `+[NSDictionary dictionaryWithContentsOfFile:]`
+pub extern "C" fn shim_nsdictionary_with_contents_of_file(
+    _cls: u64,
+    _cmd: u64,
+    path: u64,
+) -> u64 {
+    if path == 0 {
+        return 0;
+    }
+
+    let Some(path_str) = cfstring::extract_cfstring_cstr(path) else {
+        return 0;
+    };
+
+    dictionary_from_path(path_str)
+}
+
+/// `+[NSDictionary dictionaryWithContentsOfURL:]`
+pub extern "C" fn shim_nsdictionary_with_contents_of_url(
+    _cls: u64,
+    _cmd: u64,
+    url: u64,
+) -> u64 {
+    if url == 0 {
+        return 0;
+    }
+
+    let path = crate::nsurl::shim_nsurl_path(url, 0);
+    if path == 0 {
+        return 0;
+    }
+
+    shim_nsdictionary_with_contents_of_file(_cls, _cmd, path)
+}
+
+/// `+[NSDictionary dictionaryWithContentsOfURL:error:]`
+pub extern "C" fn shim_nsdictionary_with_contents_of_url_error(
+    _cls: u64,
+    _cmd: u64,
+    url: u64,
+    error: *mut u64,
+) -> u64 {
+    if !error.is_null() {
+        unsafe {
+            *error = 0;
+        }
+    }
+
+    shim_nsdictionary_with_contents_of_url(_cls, _cmd, url)
+}
+
+// ── Additional class methods ───────────────────────────────────────
+
+/// `+[NSDictionary dictionaryWithObject:forKey:]` — creates a single-entry dictionary.
+pub extern "C" fn shim_nsdictionary_with_object_for_key(
+    _cls: u64,
+    _cmd: u64,
+    object: u64,
+    key: u64,
+) -> u64 {
+    make_nsdictionary(&[key], &[object])
+}
+
+/// `+[NSDictionary dictionaryWithDictionary:]` — creates a new dictionary copying all
+/// entries from the source dictionary.
+pub extern "C" fn shim_nsdictionary_with_dictionary(_cls: u64, _cmd: u64, source: u64) -> u64 {
+    if source == 0 {
+        return make_nsdictionary(&[], &[]);
+    }
+    let (keys, vals) = collect_pairs(source);
+    make_nsdictionary(&keys, &vals)
 }
 
 // ── Instance methods ───────────────────────────────────────────────
@@ -185,6 +283,49 @@ pub extern "C" fn shim_nsdictionary_description(obj: u64, _cmd: u64) -> u64 {
     cfstring::shim_cf_string_create_with_cstring(0, c_str.as_ptr(), 0)
 }
 
+/// `-[NSDictionary copy]` — immutable dictionaries return self.
+pub extern "C" fn shim_nsdictionary_copy(obj: u64, _cmd: u64) -> u64 {
+    objc_runtime::shim_nsobject_retain(obj, 0)
+}
+
+/// `-[NSDictionary mutableCopy]` — creates an NSMutableDictionary copy.
+pub extern "C" fn shim_nsdictionary_mutable_copy(obj: u64, _cmd: u64) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
+
+    let (keys, vals) = collect_pairs(obj);
+    let copy = crate::nsmutabledict::shim_nsmutabledict_dictionary_with_capacity(
+        nsobj::nsmutabledictionary_class_addr(),
+        0,
+        keys.len() as u64,
+    );
+    if copy == 0 {
+        return 0;
+    }
+
+    for i in 0..keys.len() {
+        crate::nsmutabledict::shim_nsmutabledict_set_object_for_key(copy, 0, vals[i], keys[i]);
+    }
+
+    copy
+}
+
+/// `-[NSMutableDictionary copy]` — creates an immutable NSDictionary copy.
+pub extern "C" fn shim_nsmutabledict_copy(obj: u64, _cmd: u64) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
+
+    let (keys, vals) = collect_pairs(obj);
+    make_nsdictionary(&keys, &vals)
+}
+
+/// `-[NSMutableDictionary mutableCopy]` — creates a new mutable copy.
+pub extern "C" fn shim_nsmutabledict_mutable_copy(obj: u64, _cmd: u64) -> u64 {
+    shim_nsdictionary_mutable_copy(obj, _cmd)
+}
+
 /// `-[NSDictionary enumerateKeysAndObjectsUsingBlock:]`
 ///
 /// Calls `block(key, obj, &stop)` for each key-value pair.
@@ -216,4 +357,62 @@ pub extern "C" fn shim_nsdictionary_enumerate_keys_and_objects_using_block(
             break;
         }
     }
+}
+
+/// `-[NSDictionary isEqualToDictionary:]` — compares two dictionaries.
+/// Returns 1 if both have the same count and identical key-value pairs
+/// (compared by pointer equality and string content), 0 otherwise.
+pub extern "C" fn shim_nsdictionary_is_equal_to_dictionary(
+    obj: u64,
+    _cmd: u64,
+    other: u64,
+) -> u8 {
+    if obj == other {
+        return 1;
+    }
+    if obj == 0 || other == 0 {
+        return 0;
+    }
+    let count_a = dict_count(obj);
+    let count_b = dict_count(other);
+    if count_a != count_b {
+        return 0;
+    }
+    let keys_a = dict_keys(obj);
+    let vals_a = dict_vals(obj);
+    if keys_a == 0 || vals_a == 0 {
+        // Both have count 0 (checked above) or missing buffers
+        return if count_a == 0 { 1 } else { 0 };
+    }
+    for i in 0..count_a as usize {
+        let ka = unsafe { *((keys_a as usize + i * 8) as *const u64) };
+        let va = unsafe { *((vals_a as usize + i * 8) as *const u64) };
+        // Look up key in other dict
+        let vb = shim_nsdictionary_object_for_key(other, 0, ka);
+        if vb == 0 {
+            return 0;
+        }
+        // Compare values
+        if va == vb {
+            continue;
+        }
+        // String content comparison
+        let sa = cfstring::extract_cfstring_cstr(va);
+        let sb = cfstring::extract_cfstring_cstr(vb);
+        match (sa, sb) {
+            (Some(a), Some(b)) if a == b => continue,
+            _ => return 0,
+        }
+    }
+    1
+}
+
+/// `-[NSDictionary writeToFile:atomically:]` — stub that always returns 0.
+pub extern "C" fn shim_nsdictionary_write_to_file(
+    _obj: u64,
+    _cmd: u64,
+    _path: u64,
+    _atomically: u8,
+) -> u8 {
+    0
 }

@@ -1,4 +1,4 @@
-# Architecture Plan — burdetty-os
+# Architecture Plan — burdettie-os
 
 > A Rust-based Mach-O loader laboratory aligned with Apple's dyld architecture,
 > POSIX dynamic linking standards, and Darwin security model.

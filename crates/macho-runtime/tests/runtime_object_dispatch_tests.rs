@@ -15,7 +15,7 @@ fn runtime_nsobject_methods_exit_zero() {
 fn runtime_nsobject_methods_metaclass_dispatch() {
     let Some(_result) = common::run_fixture("nsobject_methods/app") else { return };
 
-    let guard = objc_runtime::OBJC_RUNTIME.lock().unwrap();
+    let guard = objc_runtime::OBJC_RUNTIME.read().unwrap();
     if let Some(rt) = guard.as_ref() {
         // Widget and BaseObj should be registered
         let widget = rt.get_class("Widget").expect("Widget should be registered");
@@ -80,7 +80,7 @@ fn runtime_objc_super_exit_zero() {
 fn runtime_objc_super_class_hierarchy() {
     let Some(_result) = common::run_fixture("objc_super/app") else { return };
 
-    let guard = objc_runtime::OBJC_RUNTIME.lock().unwrap();
+    let guard = objc_runtime::OBJC_RUNTIME.read().unwrap();
     if let Some(rt) = guard.as_ref() {
         // Three-level hierarchy: Puppy → Dog → Animal → NSObject
         let puppy = rt.get_class("Puppy").expect("Puppy should be registered");
@@ -137,7 +137,7 @@ fn runtime_nsstring_dynamic_exit_zero() {
 fn runtime_nsstring_class_hierarchy() {
     let Some(_result) = common::run_fixture("nsstring_dynamic/app") else { return };
 
-    let guard = objc_runtime::OBJC_RUNTIME.lock().unwrap();
+    let guard = objc_runtime::OBJC_RUNTIME.read().unwrap();
     if let Some(rt) = guard.as_ref() {
         // NSObject → NSString → __NSCFConstantString
         let nsobject = rt.get_class("NSObject").expect("NSObject registered");

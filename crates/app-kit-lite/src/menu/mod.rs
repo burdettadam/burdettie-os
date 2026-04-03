@@ -44,6 +44,16 @@ impl ModifierFlags {
             control: false,
         }
     }
+
+    /// Convert from the window-backend `Modifiers` type.
+    pub fn from_backend_modifiers(m: &window_backend::Modifiers) -> Self {
+        Self {
+            command: m.command,
+            shift: m.shift,
+            option: m.option,
+            control: m.control,
+        }
+    }
 }
 
 /// A keyboard shortcut associated with a menu item.

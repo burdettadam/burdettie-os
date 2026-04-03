@@ -204,7 +204,7 @@ fn dispatch_observation(observer: u64, key_path: u64, object: u64, change: u64, 
     let isa = unsafe { *(observer as *const u64) };
     let sel_name = "observeValueForKeyPath:ofObject:change:context:";
 
-    let guard = match OBJC_RUNTIME.lock() {
+    let guard = match OBJC_RUNTIME.read() {
         Ok(g) => g,
         Err(e) => e.into_inner(),
     };
@@ -243,4 +243,338 @@ pub fn observer_count(obj: u64, key_path: &str) -> usize {
 #[allow(dead_code)]
 pub fn clear_all_observers() {
     with_observers(|map| map.clear());
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shim_test_helpers::*;
+
+    /// Helper: reset global observer state before each logical test.
+    fn reset() {
+        clear_all_observers();
+    }
+
+    // ── addObserver:forKeyPath:options:context: ────────────────────
+
+    #[test]
+    fn add_observer_basic() {
+        let obj = alloc_obj_fake(16);
+        let observer = alloc_obj_fake(16);
+        let key = make_string("name");
+
+        shim_nsobject_add_observer(obj, 0, observer, key, 0, 0);
+        assert_eq!(observer_count(obj, "name"), 1);
+
+        free_obj(observer);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn add_observer_multiple() {
+        let obj = alloc_obj_fake(16);
+        let obs1 = alloc_obj_fake(16);
+        let obs2 = alloc_obj_fake(16);
+        let key = make_string("score");
+
+        shim_nsobject_add_observer(obj, 0, obs1, key, 0, 0);
+        shim_nsobject_add_observer(obj, 0, obs2, key, 0, 0);
+        assert_eq!(observer_count(obj, "score"), 2);
+
+        free_obj(obs2);
+        free_obj(obs1);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn add_observer_different_keys() {
+        let obj = alloc_obj_fake(16);
+        let observer = alloc_obj_fake(16);
+        let key_a = make_string("alpha");
+        let key_b = make_string("beta");
+
+        shim_nsobject_add_observer(obj, 0, observer, key_a, 0, 0);
+        shim_nsobject_add_observer(obj, 0, observer, key_b, 0, 0);
+        assert_eq!(observer_count(obj, "alpha"), 1);
+        assert_eq!(observer_count(obj, "beta"), 1);
+
+        free_obj(observer);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn add_observer_with_initial_option() {
+        let obj = alloc_obj_fake(16);
+        let observer = alloc_obj_fake(16);
+        let key = make_string("value");
+
+        // NSK_VO_OPTION_INITIAL triggers dispatch_observation which will
+        // gracefully no-op because the ObjC runtime is not initialized.
+        shim_nsobject_add_observer(obj, 0, observer, key, NSK_VO_OPTION_INITIAL, 0);
+        assert_eq!(observer_count(obj, "value"), 1);
+
+        free_obj(observer);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn add_observer_with_context() {
+        let obj = alloc_obj_fake(16);
+        let observer = alloc_obj_fake(16);
+        let key = make_string("ctx");
+
+        shim_nsobject_add_observer(obj, 0, observer, key, 0, 0xBEEF);
+        assert_eq!(observer_count(obj, "ctx"), 1);
+
+        free_obj(observer);
+        free_obj(obj);
+    }
+
+    // ── addObserver nil safety ─────────────────────────────────────
+
+    #[test]
+    fn add_observer_nil_obj() {
+        let observer = alloc_obj_fake(16);
+        let key = make_string("x");
+        shim_nsobject_add_observer(0, 0, observer, key, 0, 0);
+        // Should be a no-op — nothing registered
+        free_obj(observer);
+    }
+
+    #[test]
+    fn add_observer_nil_observer() {
+        let obj = alloc_obj_fake(16);
+        let key = make_string("x");
+        shim_nsobject_add_observer(obj, 0, 0, key, 0, 0);
+        assert_eq!(observer_count(obj, "x"), 0);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn add_observer_nil_key_path() {
+        let obj = alloc_obj_fake(16);
+        let observer = alloc_obj_fake(16);
+        shim_nsobject_add_observer(obj, 0, observer, 0, 0, 0);
+        // No crash, nothing registered
+        free_obj(observer);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn add_observer_all_nil() {
+        shim_nsobject_add_observer(0, 0, 0, 0, 0, 0);
+        // Must not crash
+    }
+
+    // ── removeObserver:forKeyPath: ─────────────────────────────────
+
+    #[test]
+    fn remove_observer_basic() {
+        let obj = alloc_obj_fake(16);
+        let observer = alloc_obj_fake(16);
+        let key = make_string("name");
+
+        shim_nsobject_add_observer(obj, 0, observer, key, 0, 0);
+        assert_eq!(observer_count(obj, "name"), 1);
+
+        let key2 = make_string("name");
+        shim_nsobject_remove_observer(obj, 0, observer, key2);
+        assert_eq!(observer_count(obj, "name"), 0);
+
+        free_obj(observer);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn remove_observer_leaves_others() {
+        let obj = alloc_obj_fake(16);
+        let obs1 = alloc_obj_fake(16);
+        let obs2 = alloc_obj_fake(16);
+        let key = make_string("score");
+
+        shim_nsobject_add_observer(obj, 0, obs1, key, 0, 0);
+        let key2 = make_string("score");
+        shim_nsobject_add_observer(obj, 0, obs2, key2, 0, 0);
+        assert_eq!(observer_count(obj, "score"), 2);
+
+        let key3 = make_string("score");
+        shim_nsobject_remove_observer(obj, 0, obs1, key3);
+        assert_eq!(observer_count(obj, "score"), 1);
+
+        free_obj(obs2);
+        free_obj(obs1);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn remove_observer_double_remove() {
+        let obj = alloc_obj_fake(16);
+        let observer = alloc_obj_fake(16);
+        let key = make_string("name");
+
+        shim_nsobject_add_observer(obj, 0, observer, key, 0, 0);
+
+        let k1 = make_string("name");
+        shim_nsobject_remove_observer(obj, 0, observer, k1);
+        assert_eq!(observer_count(obj, "name"), 0);
+
+        // Second remove should be a no-op
+        let k2 = make_string("name");
+        shim_nsobject_remove_observer(obj, 0, observer, k2);
+        assert_eq!(observer_count(obj, "name"), 0);
+
+        free_obj(observer);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn remove_observer_wrong_key() {
+        let obj = alloc_obj_fake(16);
+        let observer = alloc_obj_fake(16);
+        let key = make_string("name");
+
+        shim_nsobject_add_observer(obj, 0, observer, key, 0, 0);
+
+        let wrong = make_string("other");
+        shim_nsobject_remove_observer(obj, 0, observer, wrong);
+        // Original registration untouched
+        assert_eq!(observer_count(obj, "name"), 1);
+
+        free_obj(observer);
+        free_obj(obj);
+    }
+
+    // ── removeObserver nil safety ──────────────────────────────────
+
+    #[test]
+    fn remove_observer_nil_obj() {
+        let observer = alloc_obj_fake(16);
+        let key = make_string("x");
+        shim_nsobject_remove_observer(0, 0, observer, key);
+        free_obj(observer);
+    }
+
+    #[test]
+    fn remove_observer_nil_key_path() {
+        let obj = alloc_obj_fake(16);
+        let observer = alloc_obj_fake(16);
+        shim_nsobject_remove_observer(obj, 0, observer, 0);
+        free_obj(observer);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn remove_observer_nil_observer() {
+        let obj = alloc_obj_fake(16);
+        let key = make_string("x");
+        // nil observer — should not crash, effectively no-op
+        shim_nsobject_remove_observer(obj, 0, 0, key);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn remove_observer_all_nil() {
+        shim_nsobject_remove_observer(0, 0, 0, 0);
+    }
+
+    // ── willChangeValueForKey: ─────────────────────────────────────
+
+    #[test]
+    fn will_change_value_noop() {
+        let obj = alloc_obj_fake(16);
+        let key = make_string("test");
+        shim_nsobject_will_change_value_for_key(obj, 0, key);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn will_change_value_nil_obj() {
+        shim_nsobject_will_change_value_for_key(0, 0, 0);
+    }
+
+    // ── didChangeValueForKey: ──────────────────────────────────────
+
+    #[test]
+    fn did_change_value_no_observers() {
+        let obj = alloc_obj_fake(16);
+        let key = make_string("value");
+        // No observers registered — should be a harmless no-op
+        shim_nsobject_did_change_value_for_key(obj, 0, key);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn did_change_value_nil_obj() {
+        shim_nsobject_did_change_value_for_key(0, 0, 0);
+    }
+
+    #[test]
+    fn did_change_value_nil_key() {
+        let obj = alloc_obj_fake(16);
+        shim_nsobject_did_change_value_for_key(obj, 0, 0);
+        free_obj(obj);
+    }
+
+    // ── observeValueForKeyPath:ofObject:change:context: ────────────
+
+    #[test]
+    fn observe_value_default_noop() {
+        shim_nsobject_observe_value(1, 0, 0, 0, 0, 0);
+    }
+
+    #[test]
+    fn observe_value_all_nil() {
+        shim_nsobject_observe_value(0, 0, 0, 0, 0, 0);
+    }
+
+    // ── observer_count & clear_all_observers helpers ───────────────
+
+    #[test]
+    fn observer_count_empty() {
+        assert_eq!(observer_count(0xABC, "anything"), 0);
+    }
+
+    #[test]
+    fn clear_all_observers_works() {
+        let obj = alloc_obj_fake(16);
+        let observer = alloc_obj_fake(16);
+        let k1 = make_string("a");
+        let k2 = make_string("b");
+
+        shim_nsobject_add_observer(obj, 0, observer, k1, 0, 0);
+        shim_nsobject_add_observer(obj, 0, observer, k2, 0, 0);
+        assert_eq!(observer_count(obj, "a"), 1);
+        assert_eq!(observer_count(obj, "b"), 1);
+
+        clear_all_observers();
+        assert_eq!(observer_count(obj, "a"), 0);
+        assert_eq!(observer_count(obj, "b"), 0);
+
+        free_obj(observer);
+        free_obj(obj);
+    }
+
+    // ── Add-then-remove round trip ─────────────────────────────────
+
+    #[test]
+    fn add_remove_round_trip() {
+        let obj = alloc_obj_fake(16);
+        let obs = alloc_obj_fake(16);
+        let key = make_string("count");
+
+        shim_nsobject_add_observer(obj, 0, obs, key, 0, 42);
+        assert_eq!(observer_count(obj, "count"), 1);
+
+        let key2 = make_string("count");
+        shim_nsobject_remove_observer(obj, 0, obs, key2);
+        assert_eq!(observer_count(obj, "count"), 0);
+
+        // Re-add should work
+        let key3 = make_string("count");
+        shim_nsobject_add_observer(obj, 0, obs, key3, 0, 99);
+        assert_eq!(observer_count(obj, "count"), 1);
+
+        free_obj(obs);
+        free_obj(obj);
+    }
 }

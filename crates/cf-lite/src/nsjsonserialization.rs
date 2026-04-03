@@ -236,3 +236,284 @@ pub extern "C" fn shim_is_valid_json_object(_cls: u64, _cmd: u64, obj: u64) -> u
         0
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shim_test_helpers::*;
+
+    // ── helpers ────────────────────────────────────────────────────
+
+    /// Build an NSData from a JSON byte string.
+    fn json_data(s: &str) -> u64 {
+        crate::nsdata::make_nsdata(s.as_bytes())
+    }
+
+    /// Read the raw bytes out of an NSData object as a String.
+    fn nsdata_to_string(data: u64) -> String {
+        assert_ne!(data, 0, "expected non-nil NSData");
+        let len = read_field(data, 8) as usize;
+        let ptr = read_field(data, 16) as *const u8;
+        assert!(!ptr.is_null());
+        let slice = unsafe { std::slice::from_raw_parts(ptr, len) };
+        String::from_utf8_lossy(slice).to_string()
+    }
+
+    // ── shim_json_object_with_data ────────────────────────────────
+
+    #[test]
+    fn parse_simple_dict() {
+        let data = json_data(r#"{"key":"value"}"#);
+        let obj = shim_json_object_with_data(0, 0, data, 0, 0);
+        assert_ne!(obj, 0);
+        // Result should be an NSDictionary
+        let isa = read_field(obj, 0);
+        assert_eq!(isa, nsobj::nsdictionary_class_addr());
+        // count == 1
+        let count = nsdictionary::helpers_pub::dict_count_pub(obj);
+        assert_eq!(count, 1);
+        // Read the key and value
+        let keys_ptr = nsdictionary::helpers_pub::dict_keys_pub(obj);
+        let vals_ptr = nsdictionary::helpers_pub::dict_vals_pub(obj);
+        let key = unsafe { *(keys_ptr as *const u64) };
+        let val = unsafe { *(vals_ptr as *const u64) };
+        assert_eq!(cfstring::extract_cfstring_cstr(key), Some("key"));
+        assert_eq!(cfstring::extract_cfstring_cstr(val), Some("value"));
+        free_obj(data);
+    }
+
+    #[test]
+    fn parse_simple_array() {
+        let data = json_data(r#"[1,2,3]"#);
+        let obj = shim_json_object_with_data(0, 0, data, 0, 0);
+        assert_ne!(obj, 0);
+        let isa = read_field(obj, 0);
+        assert_eq!(isa, nsobj::nsarray_class_addr());
+        let count = read_field(obj, 8);
+        assert_eq!(count, 3);
+        free_obj(data);
+    }
+
+    #[test]
+    fn parse_nested_object() {
+        let data = json_data(r#"{"a":{"b":1}}"#);
+        let obj = shim_json_object_with_data(0, 0, data, 0, 0);
+        assert_ne!(obj, 0);
+        // outer dict
+        let count = nsdictionary::helpers_pub::dict_count_pub(obj);
+        assert_eq!(count, 1);
+        // inner value should be another dict
+        let vals_ptr = nsdictionary::helpers_pub::dict_vals_pub(obj);
+        let inner = unsafe { *(vals_ptr as *const u64) };
+        let inner_isa = read_field(inner, 0);
+        assert_eq!(inner_isa, nsobj::nsdictionary_class_addr());
+        free_obj(data);
+    }
+
+    #[test]
+    fn parse_null_value() {
+        let data = json_data(r#"{"x":null}"#);
+        let obj = shim_json_object_with_data(0, 0, data, 0, 0);
+        assert_ne!(obj, 0);
+        let vals_ptr = nsdictionary::helpers_pub::dict_vals_pub(obj);
+        let val = unsafe { *(vals_ptr as *const u64) };
+        // null maps to NSNull — check ISA
+        let isa = read_field(val, 0);
+        assert_eq!(isa, nsobj::nsnull_class_addr());
+        free_obj(data);
+    }
+
+    #[test]
+    fn parse_bool_and_number() {
+        let data = json_data(r#"[true, false, 42, 3.14]"#);
+        let obj = shim_json_object_with_data(0, 0, data, 0, 0);
+        assert_ne!(obj, 0);
+        let count = read_field(obj, 8);
+        assert_eq!(count, 4);
+        free_obj(data);
+    }
+
+    #[test]
+    fn parse_empty_object() {
+        let data = json_data(r#"{}"#);
+        let obj = shim_json_object_with_data(0, 0, data, 0, 0);
+        assert_ne!(obj, 0);
+        let isa = read_field(obj, 0);
+        assert_eq!(isa, nsobj::nsdictionary_class_addr());
+        let count = nsdictionary::helpers_pub::dict_count_pub(obj);
+        assert_eq!(count, 0);
+        free_obj(data);
+    }
+
+    #[test]
+    fn parse_empty_array() {
+        let data = json_data(r#"[]"#);
+        let obj = shim_json_object_with_data(0, 0, data, 0, 0);
+        assert_ne!(obj, 0);
+        let isa = read_field(obj, 0);
+        assert_eq!(isa, nsobj::nsarray_class_addr());
+        let count = read_field(obj, 8);
+        assert_eq!(count, 0);
+        free_obj(data);
+    }
+
+    #[test]
+    fn parse_nil_data_returns_zero() {
+        let result = shim_json_object_with_data(0, 0, 0, 0, 0);
+        assert_eq!(result, 0);
+    }
+
+    #[test]
+    fn parse_invalid_json_returns_zero() {
+        let data = json_data("not json at all");
+        let result = shim_json_object_with_data(0, 0, data, 0, 0);
+        assert_eq!(result, 0);
+        free_obj(data);
+    }
+
+    #[test]
+    fn parse_invalid_json_sets_error() {
+        let data = json_data("{bad}");
+        let mut err: u64 = 0;
+        let err_ptr = &mut err as *mut u64 as u64;
+        let result = shim_json_object_with_data(0, 0, data, 0, err_ptr);
+        assert_eq!(result, 0);
+        assert_ne!(err, 0, "error_out should be set on parse failure");
+        free_obj(data);
+    }
+
+    #[test]
+    fn parse_empty_data_returns_zero() {
+        let data = crate::nsdata::make_nsdata(&[]);
+        let result = shim_json_object_with_data(0, 0, data, 0, 0);
+        assert_eq!(result, 0);
+        free_obj(data);
+    }
+
+    // ── shim_data_with_json_object ────────────────────────────────
+
+    #[test]
+    fn serialize_dict_to_json() {
+        let key = make_string("name");
+        let val = make_string("Alice");
+        let dict = nsdictionary::make_nsdictionary(&[key], &[val]);
+        let data = shim_data_with_json_object(0, 0, dict, 0, 0);
+        assert_ne!(data, 0);
+        let json_str = nsdata_to_string(data);
+        assert!(json_str.contains("\"name\""));
+        assert!(json_str.contains("\"Alice\""));
+    }
+
+    #[test]
+    fn serialize_array_to_json() {
+        let s1 = make_string("hello");
+        let s2 = make_string("world");
+        let arr = nsarray::make_nsarray(&[s1, s2]);
+        let data = shim_data_with_json_object(0, 0, arr, 0, 0);
+        assert_ne!(data, 0);
+        let json_str = nsdata_to_string(data);
+        assert!(json_str.contains("\"hello\""));
+        assert!(json_str.contains("\"world\""));
+    }
+
+    #[test]
+    fn serialize_empty_dict() {
+        let dict = nsdictionary::make_nsdictionary(&[], &[]);
+        let data = shim_data_with_json_object(0, 0, dict, 0, 0);
+        assert_ne!(data, 0);
+        let json_str = nsdata_to_string(data);
+        assert_eq!(json_str, "{}");
+    }
+
+    #[test]
+    fn serialize_empty_array() {
+        let arr = nsarray::make_nsarray(&[]);
+        let data = shim_data_with_json_object(0, 0, arr, 0, 0);
+        assert_ne!(data, 0);
+        let json_str = nsdata_to_string(data);
+        assert_eq!(json_str, "[]");
+    }
+
+    #[test]
+    fn serialize_pretty_printed() {
+        let dict = nsdictionary::make_nsdictionary(&[], &[]);
+        let data = shim_data_with_json_object(0, 0, dict, PRETTY_PRINTED, 0);
+        assert_ne!(data, 0);
+        let json_str = nsdata_to_string(data);
+        // Pretty printed empty dict is still just "{}"
+        assert!(json_str.contains('{'));
+    }
+
+    #[test]
+    fn serialize_nil_obj_returns_zero() {
+        let result = shim_data_with_json_object(0, 0, 0, 0, 0);
+        assert_eq!(result, 0);
+    }
+
+    // ── roundtrip ────────────────────────────────────────────────
+
+    #[test]
+    fn roundtrip_dict() {
+        let input = r#"{"greeting":"hi"}"#;
+        let data_in = json_data(input);
+        let obj = shim_json_object_with_data(0, 0, data_in, 0, 0);
+        assert_ne!(obj, 0);
+        let data_out = shim_data_with_json_object(0, 0, obj, 0, 0);
+        assert_ne!(data_out, 0);
+        let output = nsdata_to_string(data_out);
+        assert!(output.contains("\"greeting\""));
+        assert!(output.contains("\"hi\""));
+        free_obj(data_in);
+    }
+
+    #[test]
+    fn roundtrip_array_of_numbers() {
+        let input = r#"[10,20,30]"#;
+        let data_in = json_data(input);
+        let obj = shim_json_object_with_data(0, 0, data_in, 0, 0);
+        assert_ne!(obj, 0);
+        let data_out = shim_data_with_json_object(0, 0, obj, 0, 0);
+        assert_ne!(data_out, 0);
+        let output = nsdata_to_string(data_out);
+        assert!(output.contains("10"));
+        assert!(output.contains("20"));
+        assert!(output.contains("30"));
+        free_obj(data_in);
+    }
+
+    // ── shim_is_valid_json_object ─────────────────────────────────
+
+    #[test]
+    fn valid_json_object_array() {
+        let arr = nsarray::make_nsarray(&[]);
+        let result = shim_is_valid_json_object(0, 0, arr);
+        assert_eq!(result, 1);
+    }
+
+    #[test]
+    fn valid_json_object_dict() {
+        let dict = nsdictionary::make_nsdictionary(&[], &[]);
+        let result = shim_is_valid_json_object(0, 0, dict);
+        assert_eq!(result, 1);
+    }
+
+    #[test]
+    fn valid_json_object_string_is_invalid() {
+        let s = make_string("hello");
+        let result = shim_is_valid_json_object(0, 0, s);
+        assert_eq!(result, 0);
+    }
+
+    #[test]
+    fn valid_json_object_nil_returns_zero() {
+        let result = shim_is_valid_json_object(0, 0, 0);
+        assert_eq!(result, 0);
+    }
+
+    #[test]
+    fn valid_json_object_number_is_invalid() {
+        let num = nsnumber::make_nsnumber_int(42);
+        let result = shim_is_valid_json_object(0, 0, num);
+        assert_eq!(result, 0);
+    }
+}

@@ -233,6 +233,69 @@ pub extern "C" fn shim_nsvalue_description(obj: u64, _cmd: u64) -> u64 {
     cfstring::shim_cf_string_create_with_cstring(0, c_str.as_ptr(), 0)
 }
 
+/// `-[NSValue initWithBytes:objCType:]` — initialize value from raw bytes + type encoding.
+pub extern "C" fn shim_nsvalue_init_with_bytes_objctype(
+    obj: u64,
+    _cmd: u64,
+    bytes: u64,
+    type_str: u64,
+) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
+    // Set ISA (may already be set from alloc, but be safe)
+    unsafe {
+        *(obj as *mut u64) = nsobj::nsvalue_class_addr();
+    }
+    // Determine size from type encoding (simple heuristic: up to 32 bytes)
+    let copy_len = if type_str != 0 {
+        let c = unsafe { std::ffi::CStr::from_ptr(type_str as *const std::ffi::c_char) };
+        let s = c.to_str().unwrap_or("");
+        type_encoding_size(s).min(32)
+    } else {
+        8
+    };
+    // Copy bytes into value storage (offset 8)
+    if bytes != 0 {
+        unsafe {
+            let dst = (obj as *mut u8).add(8);
+            std::ptr::copy_nonoverlapping(bytes as *const u8, dst, copy_len);
+        }
+    }
+    // Store type pointer at offset 40 (slot 5)
+    unsafe {
+        *((obj as *mut u64).add(5)) = type_str;
+    }
+    obj
+}
+
+/// `-[NSValue isEqualToValue:]` — compare stored bytes of two NSValue objects.
+pub extern "C" fn shim_nsvalue_is_equal_to_value(obj: u64, _cmd: u64, other: u64) -> u8 {
+    if obj == 0 || other == 0 {
+        return 0;
+    }
+    if obj == other {
+        return 1;
+    }
+    // Compare the 32 bytes of value storage (offsets 8..40)
+    let a = unsafe { std::slice::from_raw_parts((obj as *const u8).add(8), 32) };
+    let b = unsafe { std::slice::from_raw_parts((other as *const u8).add(8), 32) };
+    if a == b { 1 } else { 0 }
+}
+
+/// Estimate byte size for a simple ObjC type encoding.
+fn type_encoding_size(enc: &str) -> usize {
+    match enc {
+        "c" | "C" | "B" => 1,
+        "s" | "S" => 2,
+        "i" | "I" | "f" => 4,
+        "q" | "Q" | "d" | "^v" | "@" | "#" | ":" => 8,
+        _ if enc.contains("CGRect") || enc.contains("NSEdgeInsets") => 32,
+        _ if enc.contains("CGPoint") | enc.contains("CGSize") | enc.contains("NSRange") => 16,
+        _ => 8,
+    }
+}
+
 // ── NSStringFrom* free functions ───────────────────────────────────
 //
 // These are C functions (not ObjC methods) that convert CG/NS types to
@@ -268,4 +331,155 @@ pub extern "C" fn shim_nsstringfromrange(location: u64, length: u64) -> u64 {
     let s = format!("{{{location}, {length}}}");
     let c = std::ffi::CString::new(s).unwrap_or_default();
     cfstring::shim_cf_string_create_with_cstring(0, c.as_ptr(), 0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shim_test_helpers::*;
+
+    #[test]
+    fn range_roundtrip() {
+        let val = shim_nsvalue_value_with_range(0, 0, 10, 5);
+        assert_ne!(val, 0);
+        assert_eq!(shim_nsvalue_range_value(val, 0), 10);
+        // hi slot = length
+        assert_eq!(read_field(val, 16), 5);
+        free_obj(val);
+    }
+
+    #[test]
+    fn pointer_roundtrip() {
+        let val = shim_nsvalue_value_with_pointer(0, 0, 0xCAFE_BABE);
+        assert_eq!(shim_nsvalue_pointer_value(val, 0), 0xCAFE_BABE);
+        free_obj(val);
+    }
+
+    #[test]
+    fn point_roundtrip() {
+        let val = shim_nsvalue_value_with_point(0, 0, 1.5, 2.5);
+        assert_ne!(val, 0);
+        let x_bits = shim_nsvalue_point_value(val, 0);
+        assert_eq!(f64::from_bits(x_bits), 1.5);
+        let y_bits = read_field(val, 16);
+        assert_eq!(f64::from_bits(y_bits), 2.5);
+        free_obj(val);
+    }
+
+    #[test]
+    fn size_roundtrip() {
+        let val = shim_nsvalue_value_with_size(0, 0, 100.0, 200.0);
+        let w_bits = shim_nsvalue_size_value(val, 0);
+        assert_eq!(f64::from_bits(w_bits), 100.0);
+        let h_bits = read_field(val, 16);
+        assert_eq!(f64::from_bits(h_bits), 200.0);
+        free_obj(val);
+    }
+
+    #[test]
+    fn rect_roundtrip() {
+        let val = shim_nsvalue_value_with_rect(0, 0, 10.0, 20.0, 300.0, 400.0);
+        // Read all four doubles from the value data
+        let x = f64::from_bits(read_field(val, 8));
+        let y = f64::from_bits(read_field(val, 16));
+        let w = f64::from_bits(read_field(val, 24));
+        let h = f64::from_bits(read_field(val, 32));
+        assert_eq!(x, 10.0);
+        assert_eq!(y, 20.0);
+        assert_eq!(w, 300.0);
+        assert_eq!(h, 400.0);
+        free_obj(val);
+    }
+
+    #[test]
+    fn objc_type_encoding() {
+        let range_val = shim_nsvalue_value_with_range(0, 0, 0, 0);
+        let type_ptr = shim_nsvalue_objc_type(range_val, 0);
+        assert_ne!(type_ptr, 0);
+        let c_str = unsafe { std::ffi::CStr::from_ptr(type_ptr as *const std::ffi::c_char) };
+        assert_eq!(c_str.to_str().unwrap(), "{_NSRange=QQ}");
+        free_obj(range_val);
+    }
+
+    #[test]
+    fn nil_returns_zero() {
+        assert_eq!(shim_nsvalue_range_value(0, 0), 0);
+        assert_eq!(shim_nsvalue_pointer_value(0, 0), 0);
+        assert_eq!(shim_nsvalue_objc_type(0, 0), 0);
+    }
+
+    #[test]
+    fn string_from_range() {
+        let s = shim_nsstringfromrange(3, 7);
+        assert_string_eq(s, "{3, 7}");
+    }
+
+    #[test]
+    fn string_from_point() {
+        let s = shim_nsstringfrompoint(1.5, 2.5);
+        assert_string_eq(s, "{1.5, 2.5}");
+    }
+
+    #[test]
+    fn string_from_size() {
+        let s = shim_nsstringfromsize(100.0, 200.0);
+        assert_string_eq(s, "{100, 200}");
+    }
+
+    #[test]
+    fn string_from_rect() {
+        let s = shim_nsstringfromrect(0.0, 0.0, 1024.0, 768.0);
+        assert_string_eq(s, "{{0, 0}, {1024, 768}}");
+    }
+
+    #[test]
+    fn init_with_bytes_roundtrip() {
+        let obj = alloc_obj(NSVALUE_SIZE, crate::nsobj::nsvalue_class_addr());
+        let data: u64 = 42;
+        let type_enc = b"q\0";
+        let result = shim_nsvalue_init_with_bytes_objctype(
+            obj,
+            0,
+            &data as *const u64 as u64,
+            type_enc.as_ptr() as u64,
+        );
+        assert_eq!(result, obj);
+        assert_eq!(read_field(obj, 8), 42);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn init_with_bytes_nil() {
+        assert_eq!(shim_nsvalue_init_with_bytes_objctype(0, 0, 0, 0), 0);
+    }
+
+    #[test]
+    fn is_equal_to_value_same() {
+        let a = shim_nsvalue_value_with_range(0, 0, 10, 20);
+        let b = shim_nsvalue_value_with_range(0, 0, 10, 20);
+        assert_eq!(shim_nsvalue_is_equal_to_value(a, 0, b), 1);
+        free_obj(a);
+        free_obj(b);
+    }
+
+    #[test]
+    fn is_equal_to_value_different() {
+        let a = shim_nsvalue_value_with_range(0, 0, 10, 20);
+        let b = shim_nsvalue_value_with_range(0, 0, 10, 30);
+        assert_eq!(shim_nsvalue_is_equal_to_value(a, 0, b), 0);
+        free_obj(a);
+        free_obj(b);
+    }
+
+    #[test]
+    fn is_equal_to_value_nil() {
+        assert_eq!(shim_nsvalue_is_equal_to_value(0, 0, 0), 0);
+    }
+
+    #[test]
+    fn is_equal_to_value_self() {
+        let a = shim_nsvalue_value_with_range(0, 0, 5, 5);
+        assert_eq!(shim_nsvalue_is_equal_to_value(a, 0, a), 1);
+        free_obj(a);
+    }
 }

@@ -1,6 +1,6 @@
 # Mach-O Loader Technical Reference
 
-> Comprehensive research for burdetty-os architecture planning.
+> Comprehensive research for burdettie-os architecture planning.
 > Sources: Apple open-source dyld/XNU, System V ABI, POSIX.1-2017, Apple developer documentation.
 
 ---
@@ -1118,7 +1118,7 @@ dyld processes `__interpose` sections during fixup:
   - **Resolver**: processes imports/relocations
   - **Init runner**: calls `DllMain()` in dependency order
 
-**Relevant patterns for burdetty-os**:
+**Relevant patterns for burdettie-os**:
 - Use a "preloader" that only does minimal mapping, then hands off to a more complex loader
 - Maintain a clean separation between the format parser and the loading logic
 - Test against known-good behavior (Wine has extensive test suites)
@@ -1148,7 +1148,7 @@ dyld processes `__interpose` sections during fixup:
 - No symbol versioning complexity (minimal support)
 - No `LD_AUDIT` or `dlmopen()` complexity
 
-**Design principles applicable to burdetty-os**:
+**Design principles applicable to burdettie-os**:
 1. **Single-pass loading**: Load all dependencies, then relocate all at once, then run initializers
 2. **Minimal state**: Very few global variables; most state is per-loaded-object
 3. **Dependency graph as simple linked list**: Each loaded DSO has a pointer to its next
@@ -1157,8 +1157,8 @@ dyld processes `__interpose` sections during fixup:
 6. **Clean error handling**: Each failure point has a clear error message
 
 **Specific patterns to adopt**:
-- musl's `struct dso` is the equivalent of burdetty-os's per-image data structure
-- musl's `load_library()` → `map_library()` → `relocate()` → `do_init_fini()` pipeline maps cleanly to the burdetty-os crate architecture
+- musl's `struct dso` is the equivalent of burdettie-os's per-image data structure
+- musl's `load_library()` → `map_library()` → `relocate()` → `do_init_fini()` pipeline maps cleanly to the burdettie-os crate architecture
 
 ### 5.5 FreeBSD Mach-O Support
 
@@ -1196,17 +1196,17 @@ pub struct MachO<'a> {
 - Cross-format: same crate handles ELF, PE, Mach-O, archives
 - Endian-aware: uses `scroll` crate for endian-safe parsing
 
-**Modules relevant to burdetty-os**:
+**Modules relevant to burdettie-os**:
 - `goblin::mach::load_command` — comprehensive load command parsing
 - `goblin::mach::exports` — export trie walking
 - `goblin::mach::imports` — bind opcode interpretation
 - `goblin::mach::bind_opcodes` — raw opcode definitions
 - `goblin::mach::segment` — segment and section iteration
 
-**Comparison with burdetty-os's `macho-parse`**:
+**Comparison with burdettie-os's `macho-parse`**:
 - `goblin` is a general-purpose parser; `macho-parse` can be more focused
 - `goblin` proves that zero-copy Mach-O parsing in Rust is practical and performant
-- burdetty-os should consider using `goblin` as a reference implementation or even a dependency for validation
+- burdettie-os should consider using `goblin` as a reference implementation or even a dependency for validation
 
 ### 5.7 Published Research and Formal Work
 
@@ -1238,28 +1238,28 @@ pub struct MachO<'a> {
 
 Based on the survey of these projects:
 
-1. **Layered architecture** (musl, Wine, burdetty-os's current design):
+1. **Layered architecture** (musl, Wine, burdettie-os's current design):
    ```
    Parse → Plan → Resolve → Bind → Execute
    ```
    Each layer is independently testable.
 
-2. **Fixture-driven testing** (Wine, burdetty-os's current approach):
+2. **Fixture-driven testing** (Wine, burdettie-os's current approach):
    Known-good binaries with expected outputs, compared against host behavior.
 
-3. **JSON-serializable intermediate representations** (burdetty-os's invariant):
+3. **JSON-serializable intermediate representations** (burdettie-os's invariant):
    Every stage emits JSON. This enables diff-based testing and CI integration.
 
-4. **Separation of "can parse" from "will execute"** (goblin, burdetty-os):
+4. **Separation of "can parse" from "will execute"** (goblin, burdettie-os):
    The parser should never crash on malformed input; it should return structured errors.
 
 5. **Security as a separate concern** (dyld's `ProcessConfig::Security`):
    Security policy decisions should be centralized and checked before any loading occurs.
 
-6. **Incremental capability** (burdetty-os's phased roadmap):
+6. **Incremental capability** (burdettie-os's phased roadmap):
    Start with inspection, progress to planning, then execution. Don't try to build a full loader from day one.
 
-7. **Reference validation** (burdetty-os's `macho-diff`):
+7. **Reference validation** (burdettie-os's `macho-diff`):
    Always compare computed results against ground truth from the real OS.
 
 ---

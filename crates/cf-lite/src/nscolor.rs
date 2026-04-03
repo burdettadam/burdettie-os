@@ -72,3 +72,325 @@ pub extern "C" fn shim_nscolor_alpha_component(obj: u64, _cmd: u64) -> f64 {
     if obj == 0 { return 0.0; }
     unsafe { *((obj as usize + 32) as *const f64) }
 }
+
+// ── System / semantic colors (AppKit Dark Mode–aware) ──────────
+
+/// `+[NSColor controlColor]`
+pub extern "C" fn shim_nscolor_control_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(1.0, 1.0, 1.0, 1.0) }
+/// `+[NSColor controlBackgroundColor]`
+pub extern "C" fn shim_nscolor_control_background_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(1.0, 1.0, 1.0, 1.0) }
+/// `+[NSColor controlTextColor]`
+pub extern "C" fn shim_nscolor_control_text_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.0, 0.0, 0.0, 1.0) }
+/// `+[NSColor disabledControlTextColor]`
+pub extern "C" fn shim_nscolor_disabled_control_text_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.5, 0.5, 0.5, 1.0) }
+/// `+[NSColor selectedControlColor]`
+pub extern "C" fn shim_nscolor_selected_control_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.0, 0.48, 1.0, 1.0) }
+/// `+[NSColor selectedTextBackgroundColor]`
+pub extern "C" fn shim_nscolor_selected_text_background_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.71, 0.84, 1.0, 1.0) }
+/// `+[NSColor selectedTextColor]`
+pub extern "C" fn shim_nscolor_selected_text_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.0, 0.0, 0.0, 1.0) }
+/// `+[NSColor textColor]`
+pub extern "C" fn shim_nscolor_text_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.0, 0.0, 0.0, 1.0) }
+/// `+[NSColor textBackgroundColor]`
+pub extern "C" fn shim_nscolor_text_background_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(1.0, 1.0, 1.0, 1.0) }
+/// `+[NSColor windowBackgroundColor]`
+pub extern "C" fn shim_nscolor_window_background_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.93, 0.93, 0.93, 1.0) }
+/// `+[NSColor windowFrameTextColor]`
+pub extern "C" fn shim_nscolor_window_frame_text_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.0, 0.0, 0.0, 1.0) }
+/// `+[NSColor labelColor]`
+pub extern "C" fn shim_nscolor_label_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.0, 0.0, 0.0, 1.0) }
+/// `+[NSColor secondaryLabelColor]`
+pub extern "C" fn shim_nscolor_secondary_label_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.24, 0.24, 0.26, 0.6) }
+/// `+[NSColor tertiaryLabelColor]`
+pub extern "C" fn shim_nscolor_tertiary_label_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.24, 0.24, 0.26, 0.3) }
+/// `+[NSColor quaternaryLabelColor]`
+pub extern "C" fn shim_nscolor_quaternary_label_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.24, 0.24, 0.26, 0.18) }
+/// `+[NSColor separatorColor]`
+pub extern "C" fn shim_nscolor_separator_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.0, 0.0, 0.0, 0.1) }
+/// `+[NSColor gridColor]`
+pub extern "C" fn shim_nscolor_grid_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.85, 0.85, 0.85, 1.0) }
+/// `+[NSColor highlightColor]`
+pub extern "C" fn shim_nscolor_highlight_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(1.0, 1.0, 1.0, 1.0) }
+/// `+[NSColor shadowColor]`
+pub extern "C" fn shim_nscolor_shadow_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.0, 0.0, 0.0, 1.0) }
+
+/// `+[NSColor colorWithWhite:alpha:]`
+pub extern "C" fn shim_nscolor_with_white_alpha(_cls: u64, _cmd: u64, w: f64, a: f64) -> u64 {
+    alloc_color(w, w, w, a)
+}
+
+/// `+[NSColor colorWithHue:saturation:brightness:alpha:]`
+pub extern "C" fn shim_nscolor_with_hsba(_cls: u64, _cmd: u64, h: f64, s: f64, b: f64, a: f64) -> u64 {
+    let (r, g, bl) = hsb_to_rgb(h, s, b);
+    alloc_color(r, g, bl, a)
+}
+
+// ── HSB instance methods ───────────────────────────────────────
+
+/// `-[NSColor hueComponent]`
+pub extern "C" fn shim_nscolor_hue_component(obj: u64, _cmd: u64) -> f64 {
+    if obj == 0 { return 0.0; }
+    let r = unsafe { *((obj as usize + 8) as *const f64) };
+    let g = unsafe { *((obj as usize + 16) as *const f64) };
+    let b = unsafe { *((obj as usize + 24) as *const f64) };
+    let (h, _, _) = rgb_to_hsb(r, g, b);
+    h
+}
+
+/// `-[NSColor saturationComponent]`
+pub extern "C" fn shim_nscolor_saturation_component(obj: u64, _cmd: u64) -> f64 {
+    if obj == 0 { return 0.0; }
+    let r = unsafe { *((obj as usize + 8) as *const f64) };
+    let g = unsafe { *((obj as usize + 16) as *const f64) };
+    let b = unsafe { *((obj as usize + 24) as *const f64) };
+    let (_, s, _) = rgb_to_hsb(r, g, b);
+    s
+}
+
+/// `-[NSColor brightnessComponent]`
+pub extern "C" fn shim_nscolor_brightness_component(obj: u64, _cmd: u64) -> f64 {
+    if obj == 0 { return 0.0; }
+    let r = unsafe { *((obj as usize + 8) as *const f64) };
+    let g = unsafe { *((obj as usize + 16) as *const f64) };
+    let b = unsafe { *((obj as usize + 24) as *const f64) };
+    let (_, _, v) = rgb_to_hsb(r, g, b);
+    v
+}
+
+/// `-[NSColor colorUsingColorSpace:]` — returns self (all colors stored in device RGB).
+pub extern "C" fn shim_nscolor_color_using_color_space(obj: u64, _cmd: u64, _cs: u64) -> u64 {
+    obj
+}
+
+/// `-[NSColor getRed:green:blue:alpha:]` — writes components into out-pointers.
+pub extern "C" fn shim_nscolor_get_rgba(obj: u64, _cmd: u64, r: *mut f64, g: *mut f64, b: *mut f64, a: *mut f64) {
+    if obj == 0 { return; }
+    unsafe {
+        if !r.is_null() { *r = *((obj as usize + 8) as *const f64); }
+        if !g.is_null() { *g = *((obj as usize + 16) as *const f64); }
+        if !b.is_null() { *b = *((obj as usize + 24) as *const f64); }
+        if !a.is_null() { *a = *((obj as usize + 32) as *const f64); }
+    }
+}
+
+// ── Color conversion helpers ───────────────────────────────────
+
+fn rgb_to_hsb(r: f64, g: f64, b: f64) -> (f64, f64, f64) {
+    let max = r.max(g).max(b);
+    let min = r.min(g).min(b);
+    let delta = max - min;
+    let brightness = max;
+    if delta < 1e-10 {
+        return (0.0, 0.0, brightness);
+    }
+    let saturation = delta / max;
+    let hue = if (max - r).abs() < 1e-10 {
+        (g - b) / delta + if g < b { 6.0 } else { 0.0 }
+    } else if (max - g).abs() < 1e-10 {
+        (b - r) / delta + 2.0
+    } else {
+        (r - g) / delta + 4.0
+    } / 6.0;
+    (hue, saturation, brightness)
+}
+
+fn hsb_to_rgb(h: f64, s: f64, b: f64) -> (f64, f64, f64) {
+    if s < 1e-10 {
+        return (b, b, b);
+    }
+    let h = (h - h.floor()) * 6.0;
+    let i = h.floor() as u32;
+    let f = h - h.floor();
+    let p = b * (1.0 - s);
+    let q = b * (1.0 - s * f);
+    let t = b * (1.0 - s * (1.0 - f));
+    match i % 6 {
+        0 => (b, t, p),
+        1 => (q, b, p),
+        2 => (p, b, t),
+        3 => (p, q, b),
+        4 => (t, p, b),
+        _ => (b, p, q),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shim_test_helpers::*;
+
+    const SIZE: usize = 40;
+
+    fn read_f64(obj: u64, offset: usize) -> f64 {
+        unsafe { *((obj as usize + offset) as *const f64) }
+    }
+
+    fn assert_color(obj: u64, r: f64, g: f64, b: f64, a: f64) {
+        assert_ne!(obj, 0, "expected non-null color");
+        assert_eq!(read_f64(obj, 8), r, "red mismatch");
+        assert_eq!(read_f64(obj, 16), g, "green mismatch");
+        assert_eq!(read_f64(obj, 24), b, "blue mismatch");
+        assert_eq!(read_f64(obj, 32), a, "alpha mismatch");
+    }
+
+    // --- factory class methods ---
+
+    #[test]
+    fn white_color() {
+        let c = shim_nscolor_white_color(0, 0);
+        assert_color(c, 1.0, 1.0, 1.0, 1.0);
+        assert_eq!(read_field(c, 0), crate::nsobj::nscolor_class_addr());
+        free_obj(c);
+    }
+
+    #[test]
+    fn black_color() {
+        let c = shim_nscolor_black_color(0, 0);
+        assert_color(c, 0.0, 0.0, 0.0, 1.0);
+        free_obj(c);
+    }
+
+    #[test]
+    fn red_color() {
+        let c = shim_nscolor_red_color(0, 0);
+        assert_color(c, 1.0, 0.0, 0.0, 1.0);
+        free_obj(c);
+    }
+
+    #[test]
+    fn green_color() {
+        let c = shim_nscolor_green_color(0, 0);
+        assert_color(c, 0.0, 1.0, 0.0, 1.0);
+        free_obj(c);
+    }
+
+    #[test]
+    fn blue_color() {
+        let c = shim_nscolor_blue_color(0, 0);
+        assert_color(c, 0.0, 0.0, 1.0, 1.0);
+        free_obj(c);
+    }
+
+    #[test]
+    fn clear_color() {
+        let c = shim_nscolor_clear_color(0, 0);
+        assert_color(c, 0.0, 0.0, 0.0, 0.0);
+        free_obj(c);
+    }
+
+    #[test]
+    fn gray_color() {
+        let c = shim_nscolor_gray_color(0, 0);
+        assert_color(c, 0.5, 0.5, 0.5, 1.0);
+        free_obj(c);
+    }
+
+    // --- colorWithRed:green:blue:alpha: ---
+
+    #[test]
+    fn with_rgba_basic() {
+        let c = shim_nscolor_with_rgba(0, 0, 0.2, 0.4, 0.6, 0.8);
+        assert_color(c, 0.2, 0.4, 0.6, 0.8);
+        free_obj(c);
+    }
+
+    #[test]
+    fn with_rgba_zeros() {
+        let c = shim_nscolor_with_rgba(0, 0, 0.0, 0.0, 0.0, 0.0);
+        assert_color(c, 0.0, 0.0, 0.0, 0.0);
+        free_obj(c);
+    }
+
+    #[test]
+    fn with_rgba_ones() {
+        let c = shim_nscolor_with_rgba(0, 0, 1.0, 1.0, 1.0, 1.0);
+        assert_color(c, 1.0, 1.0, 1.0, 1.0);
+        free_obj(c);
+    }
+
+    // --- component getters ---
+
+    #[test]
+    fn red_component() {
+        let c = alloc_color(0.25, 0.5, 0.75, 1.0);
+        assert_eq!(shim_nscolor_red_component(c, 0), 0.25);
+        free_obj(c);
+    }
+
+    #[test]
+    fn green_component() {
+        let c = alloc_color(0.25, 0.5, 0.75, 1.0);
+        assert_eq!(shim_nscolor_green_component(c, 0), 0.5);
+        free_obj(c);
+    }
+
+    #[test]
+    fn blue_component() {
+        let c = alloc_color(0.25, 0.5, 0.75, 1.0);
+        assert_eq!(shim_nscolor_blue_component(c, 0), 0.75);
+        free_obj(c);
+    }
+
+    #[test]
+    fn alpha_component() {
+        let c = alloc_color(0.25, 0.5, 0.75, 0.9);
+        assert_eq!(shim_nscolor_alpha_component(c, 0), 0.9);
+        free_obj(c);
+    }
+
+    // --- nil safety for component getters ---
+
+    #[test]
+    fn red_component_nil() {
+        assert_eq!(shim_nscolor_red_component(0, 0), 0.0);
+    }
+
+    #[test]
+    fn green_component_nil() {
+        assert_eq!(shim_nscolor_green_component(0, 0), 0.0);
+    }
+
+    #[test]
+    fn blue_component_nil() {
+        assert_eq!(shim_nscolor_blue_component(0, 0), 0.0);
+    }
+
+    #[test]
+    fn alpha_component_nil() {
+        assert_eq!(shim_nscolor_alpha_component(0, 0), 0.0);
+    }
+
+    // --- ISA is correct for all factory methods ---
+
+    #[test]
+    fn factory_methods_set_correct_isa() {
+        let isa = crate::nsobj::nscolor_class_addr();
+        let colors = [
+            shim_nscolor_black_color(0, 0),
+            shim_nscolor_red_color(0, 0),
+            shim_nscolor_green_color(0, 0),
+            shim_nscolor_blue_color(0, 0),
+            shim_nscolor_clear_color(0, 0),
+            shim_nscolor_gray_color(0, 0),
+            shim_nscolor_with_rgba(0, 0, 0.1, 0.2, 0.3, 0.4),
+        ];
+        for c in &colors {
+            assert_eq!(read_field(*c, 0), isa, "ISA mismatch for color at {c:#x}");
+        }
+        for c in colors {
+            free_obj(c);
+        }
+    }
+
+    // --- round-trip: create via factory, read via component getter ---
+
+    #[test]
+    fn roundtrip_components() {
+        let c = shim_nscolor_with_rgba(0, 0, 0.1, 0.2, 0.3, 0.4);
+        assert_eq!(shim_nscolor_red_component(c, 0), 0.1);
+        assert_eq!(shim_nscolor_green_component(c, 0), 0.2);
+        assert_eq!(shim_nscolor_blue_component(c, 0), 0.3);
+        assert_eq!(shim_nscolor_alpha_component(c, 0), 0.4);
+        free_obj(c);
+    }
+}

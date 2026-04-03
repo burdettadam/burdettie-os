@@ -220,3 +220,193 @@ pub fn run_fixture_full(
 
     Ok((plan, observation, init_order))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_empty_input() {
+        let (segments, entry) = parse_otool_load_commands("");
+        assert!(segments.is_empty());
+        assert!(entry.is_none());
+    }
+
+    #[test]
+    fn parse_lc_main() {
+        let input = "\
+Load command 1
+      cmd LC_MAIN
+  cmdsize 24
+  entryoff 0x3DE0
+ stacksize 0
+";
+        let (segments, entry) = parse_otool_load_commands(input);
+        assert!(segments.is_empty());
+        assert_eq!(entry, Some(0x3DE0));
+    }
+
+    #[test]
+    fn parse_lc_segment_64() {
+        let input = "\
+Load command 0
+      cmd LC_SEGMENT_64
+  cmdsize 232
+  segname __TEXT
+   vmaddr 0x0000000100000000
+   vmsize 0x0000000000004000
+  fileoff 0
+ filesize 16384
+";
+        let (segments, entry) = parse_otool_load_commands(input);
+        assert_eq!(segments.len(), 1);
+        assert_eq!(segments[0].name, "__TEXT");
+        assert_eq!(segments[0].vmaddr, 0x100000000);
+        assert_eq!(segments[0].vmsize, 0x4000);
+        assert!(entry.is_none());
+    }
+
+    #[test]
+    fn parse_multiple_segments() {
+        let input = "\
+Load command 0
+      cmd LC_SEGMENT_64
+  cmdsize 232
+  segname __TEXT
+   vmaddr 0x0000000100000000
+   vmsize 0x0000000000004000
+  fileoff 0
+ filesize 16384
+Load command 1
+      cmd LC_SEGMENT_64
+  cmdsize 312
+  segname __DATA
+   vmaddr 0x0000000100004000
+   vmsize 0x0000000000001000
+  fileoff 16384
+ filesize 4096
+";
+        let (segments, entry) = parse_otool_load_commands(input);
+        assert_eq!(segments.len(), 2);
+        assert_eq!(segments[0].name, "__TEXT");
+        assert_eq!(segments[0].vmaddr, 0x100000000);
+        assert_eq!(segments[1].name, "__DATA");
+        assert_eq!(segments[1].vmaddr, 0x100004000);
+        assert_eq!(segments[1].vmsize, 0x1000);
+    }
+
+    #[test]
+    fn parse_no_entry_point() {
+        let input = "\
+Load command 0
+      cmd LC_SEGMENT_64
+  cmdsize 232
+  segname __TEXT
+   vmaddr 0x0000000100000000
+   vmsize 0x0000000000004000
+";
+        let (segments, entry) = parse_otool_load_commands(input);
+        assert_eq!(segments.len(), 1);
+        assert!(entry.is_none());
+    }
+
+    #[test]
+    fn parse_hex_vmaddr() {
+        let input = "\
+Load command 0
+      cmd LC_SEGMENT_64
+  cmdsize 72
+  segname __DATA_CONST
+   vmaddr 0x00000001000a8000
+   vmsize 0x0000000000010000
+";
+        let (segments, _) = parse_otool_load_commands(input);
+        assert_eq!(segments.len(), 1);
+        assert_eq!(segments[0].vmaddr, 0x1000a8000);
+        assert_eq!(segments[0].vmsize, 0x10000);
+    }
+
+    #[test]
+    fn parse_pagezero() {
+        let input = "\
+Load command 0
+      cmd LC_SEGMENT_64
+  cmdsize 72
+  segname __PAGEZERO
+   vmaddr 0x0000000000000000
+   vmsize 0x0000000100000000
+";
+        let (segments, _) = parse_otool_load_commands(input);
+        assert_eq!(segments.len(), 1);
+        assert_eq!(segments[0].name, "__PAGEZERO");
+        assert_eq!(segments[0].vmaddr, 0);
+        assert_eq!(segments[0].vmsize, 0x100000000);
+    }
+
+    #[test]
+    fn parse_malformed_ignored() {
+        let input = "\
+this is garbage
+random text here
+Load command ??
+  not a real segment
+vmaddr without prefix
+";
+        let (segments, entry) = parse_otool_load_commands(input);
+        assert!(segments.is_empty());
+        assert!(entry.is_none());
+    }
+
+    #[test]
+    fn parse_lc_main_hex_entryoff() {
+        let input = "\
+Load command 5
+      cmd LC_MAIN
+  cmdsize 24
+  entryoff 0x3DE0
+ stacksize 0
+";
+        let (_, entry) = parse_otool_load_commands(input);
+        assert_eq!(entry, Some(0x3DE0));
+    }
+
+    #[test]
+    fn parse_full_realistic_output() {
+        let input = "\
+/usr/bin/true:
+Load command 0
+      cmd LC_SEGMENT_64
+  cmdsize 72
+  segname __PAGEZERO
+   vmaddr 0x0000000000000000
+   vmsize 0x0000000100000000
+Load command 1
+      cmd LC_SEGMENT_64
+  cmdsize 232
+  segname __TEXT
+   vmaddr 0x0000000100000000
+   vmsize 0x0000000000004000
+  fileoff 0
+ filesize 16384
+Load command 2
+      cmd LC_SEGMENT_64
+  cmdsize 312
+  segname __DATA
+   vmaddr 0x0000000100004000
+   vmsize 0x0000000000001000
+  fileoff 16384
+ filesize 4096
+Load command 3
+      cmd LC_MAIN
+  cmdsize 24
+  entryoff 0x3DE0
+ stacksize 0
+";
+        let (segments, entry) = parse_otool_load_commands(input);
+        assert_eq!(segments.len(), 3);
+        assert_eq!(segments[0].name, "__PAGEZERO");
+        assert_eq!(segments[1].name, "__TEXT");
+        assert_eq!(segments[2].name, "__DATA");
+        assert_eq!(entry, Some(0x3DE0));
+    }
+}

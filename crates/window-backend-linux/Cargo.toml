@@ -1,0 +1,17 @@
+[package]
+name         = "window-backend-linux"
+description  = "Cross-platform window backend using winit (works on Linux, macOS, Windows)"
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+rust-version.workspace = true
+
+[dependencies]
+window-backend = { workspace = true }
+graphics-core  = { workspace = true }
+log            = { workspace = true }
+winit          = "0.30"
+softbuffer     = "0.4"
+
+[lints]
+workspace = true

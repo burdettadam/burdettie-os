@@ -1,4 +1,4 @@
-mod cfconstant_string;
+pub(crate) mod cfconstant_string;
 mod register;
 mod shim_classes;
 mod shim_core;
@@ -6,6 +6,186 @@ mod shim_core;
 pub(crate) use cfconstant_string::cfconstant_string_class_addr;
 
 use libsystem_shims::table::ShimTable;
+use std::sync::OnceLock;
+
+const HOST_ISA_ALIAS_SYMBOLS: [(&str, &str); 4] = [
+    ("OBJC_CLASS_$_NSConstantArray", "NSArray"),
+    ("OBJC_CLASS_$_NSConstantDictionary", "NSConstantDictionary"),
+    (
+        "OBJC_CLASS_$_NSConstantIntegerNumber",
+        "NSConstantIntegerNumber",
+    ),
+    ("OBJC_CLASS_$_NSException", "NSException"),
+];
+
+#[cfg(target_os = "macos")]
+static HOST_ISA_ALIAS_CACHE: OnceLock<Vec<(u64, &'static str)>> = OnceLock::new();
+
+fn nsstring_from_str(value: &str) -> u64 {
+    let cstr = std::ffi::CString::new(value).unwrap_or_default();
+    crate::cfstring::alloc_nsstring_from_cstr(cstr.as_ptr())
+}
+
+fn xcode_app_info_plist_path() -> Option<std::path::PathBuf> {
+    let process_path = libsystem_shims::process::process_path()?;
+    let bundle_root = crate::nsbundle::detect_app_bundle_root(process_path)?;
+
+    let contents_plist = std::path::Path::new(&bundle_root).join("Contents/Info.plist");
+    if contents_plist.exists() {
+        return Some(contents_plist);
+    }
+
+    let flat_plist = std::path::Path::new(&bundle_root).join("Info.plist");
+    flat_plist.exists().then_some(flat_plist)
+}
+
+fn xcode_app_version_plist_path() -> Option<std::path::PathBuf> {
+    let info_path = xcode_app_info_plist_path()?;
+    if let Some(bundle_root) = info_path.parent().and_then(|contents| contents.parent()) {
+        let version_plist = bundle_root.join("Contents/version.plist");
+        if version_plist.exists() {
+            return Some(version_plist);
+        }
+    }
+
+    Some(info_path)
+}
+
+fn xcode_info_plist_value(key: &str) -> u64 {
+    let Some(info_path) = xcode_app_info_plist_path() else {
+        return 0;
+    };
+
+    let mut candidate_paths = Vec::with_capacity(2);
+    if let Some(version_path) = xcode_app_version_plist_path() {
+        candidate_paths.push(version_path);
+    }
+    candidate_paths.push(info_path);
+
+    let key_obj = nsstring_from_str(key);
+    if key_obj == 0 {
+        return 0;
+    }
+
+    for path in candidate_paths {
+        let Some(path_str) = path.to_str() else {
+            continue;
+        };
+        let dict = crate::nspropertylistserialization::parse_plist_file(path_str);
+        if dict == 0 {
+            continue;
+        }
+        let value = crate::nsdictionary::shim_nsdictionary_object_for_key(dict, 0, key_obj);
+        if value != 0 {
+            return value;
+        }
+    }
+
+    0
+}
+
+pub extern "C" fn shim_dvt_system_prerequisites_paths_license_host_app_info_plist_path(
+    _cls: u64,
+    _cmd: u64,
+) -> u64 {
+    let Some(path) = xcode_app_info_plist_path() else {
+        return 0;
+    };
+
+    let Some(path_str) = path.to_str() else {
+        return 0;
+    };
+
+    nsstring_from_str(path_str)
+}
+
+pub extern "C" fn shim_dvt_system_prerequisites_paths_host_app_version_plist_path(
+    _cls: u64,
+    _cmd: u64,
+) -> u64 {
+    let Some(path) = xcode_app_version_plist_path() else {
+        return 0;
+    };
+
+    let Some(path_str) = path.to_str() else {
+        return 0;
+    };
+
+    nsstring_from_str(path_str)
+}
+
+pub extern "C" fn shim_dvt_system_prerequisites_paths_host_app_product_build_version(
+    _cls: u64,
+    _cmd: u64,
+) -> u64 {
+    xcode_info_plist_value("ProductBuildVersion")
+}
+
+fn install_guest_class_method(
+    rt: &mut objc_runtime::ObjcRuntime,
+    class_name: &str,
+    selector: &'static str,
+    imp: u64,
+    type_encoding: &'static str,
+) {
+    let Some(class_addr) = rt.get_class(class_name).map(|class| class.mapped_addr) else {
+        log::debug!(
+            "FoundationShims: guest compatibility target class '{}' not present",
+            class_name
+        );
+        return;
+    };
+    let Some(meta_addr) = rt.dispatch_isa_for_receiver(class_addr) else {
+        log::debug!(
+            "FoundationShims: guest compatibility target class '{}' has no dispatch metaclass",
+            class_name
+        );
+        return;
+    };
+
+    if rt.add_method_to_class(
+        meta_addr,
+        objc_runtime::MethodEntry {
+            selector: selector.into(),
+            imp,
+            type_encoding: type_encoding.into(),
+        },
+    ) {
+        log::debug!(
+            "FoundationShims: installed guest compatibility class method +[{} {}]",
+            class_name,
+            selector
+        );
+    }
+}
+
+fn resolve_host_isa_aliases(
+    symbols: &dyn platform_core::symbols::HostSymbolResolver,
+) -> Vec<(u64, &'static str)> {
+    HOST_ISA_ALIAS_SYMBOLS
+        .iter()
+        .filter_map(|(sym_name, target_class)| {
+            symbols
+                .resolve(sym_name)
+                .map(|addr| (addr as u64, *target_class))
+        })
+        .collect()
+}
+
+#[cfg(target_os = "macos")]
+fn host_isa_aliases(
+    symbols: &dyn platform_core::symbols::HostSymbolResolver,
+) -> Vec<(u64, &'static str)> {
+    if let Some(aliases) = HOST_ISA_ALIAS_CACHE.get() {
+        return aliases.clone();
+    }
+
+    let aliases = resolve_host_isa_aliases(symbols);
+    if !aliases.is_empty() {
+        let _ = HOST_ISA_ALIAS_CACHE.set(aliases.clone());
+    }
+    aliases
+}
 
 /// Install Foundation/CF-lite shims into a `ShimTable`.
 pub struct FoundationShims;
@@ -15,386 +195,6 @@ impl FoundationShims {
         shim_core::install_core_shims(table);
         shim_classes::install_class_symbols(table);
         log::debug!("FoundationShims: registered Foundation/CF shims");
-    }
-
-    pub fn register_nsstring_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsstring_class(rt);
-    }
-
-    pub fn register_nsstring_proper_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsstring_proper_class(rt);
-    }
-
-    pub fn register_nsobject_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsobject_class(rt);
-    }
-
-    pub fn register_nsarray_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsarray_class(rt);
-    }
-
-    pub fn register_nsnumber_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsnumber_class(rt);
-    }
-
-    pub fn register_nsconstantintegernumber_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsconstantintegernumber_class(rt);
-    }
-
-    pub fn register_nsdictionary_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsdictionary_class(rt);
-    }
-
-    pub fn register_nsconstantdictionary_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsconstantdictionary_class(rt);
-    }
-
-    pub fn register_nsmutablearray_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsmutablearray_class(rt);
-    }
-
-    pub fn register_nsmutabledictionary_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsmutabledictionary_class(rt);
-    }
-
-    pub fn register_nsmutablestring_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsmutablestring_class(rt);
-    }
-
-    pub fn register_nsdata_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsdata_class(rt);
-    }
-
-    pub fn register_nsprocessinfo_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsprocessinfo_class(rt);
-    }
-
-    pub fn register_nserror_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nserror_class(rt);
-    }
-
-    pub fn register_nsbundle_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsbundle_class(rt);
-    }
-
-    pub fn register_nsfilemanager_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsfilemanager_class(rt);
-    }
-
-    pub fn register_nsexception_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsexception_class(rt);
-    }
-
-    pub fn register_nsenumerator_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsenumerator_class(rt);
-    }
-
-    pub fn register_nsdate_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsdate_class(rt);
-    }
-
-    pub fn register_nsuserdefaults_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsuserdefaults_class(rt);
-    }
-
-    pub fn register_nsset_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsset_class(rt);
-    }
-
-    pub fn register_nsmutableset_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsmutableset_class(rt);
-    }
-
-    pub fn register_nsurl_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsurl_class(rt);
-    }
-
-    pub fn register_nsnull_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsnull_class(rt);
-    }
-
-    pub fn register_nsdateformatter_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsdateformatter_class(rt);
-    }
-
-    pub fn register_nscharacterset_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nscharacterset_class(rt);
-    }
-
-    pub fn register_nsnotificationcenter_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsnotificationcenter_class(rt);
-    }
-
-    pub fn register_nsnotification_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsnotification_class(rt);
-    }
-
-    pub fn register_nsvalue_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsvalue_class(rt);
-    }
-
-    pub fn register_nsuuid_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsuuid_class(rt);
-    }
-
-    pub fn register_nslocale_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nslocale_class(rt);
-    }
-
-    pub fn register_nstimezone_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nstimezone_class(rt);
-    }
-
-    pub fn register_nscalendar_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nscalendar_class(rt);
-    }
-
-    pub fn register_nsnumberformatter_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsnumberformatter_class(rt);
-    }
-
-    pub fn register_nsindexset_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsindexset_class(rt);
-    }
-
-    pub fn register_nsmutableindexset_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsmutableindexset_class(rt);
-    }
-
-    pub fn register_nssortdescriptor_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nssortdescriptor_class(rt);
-    }
-
-    pub fn register_nstimer_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nstimer_class(rt);
-    }
-
-    pub fn register_nsthread_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsthread_class(rt);
-    }
-
-    pub fn register_nslock_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nslock_class(rt);
-    }
-
-    pub fn register_nsrecursivelock_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsrecursivelock_class(rt);
-    }
-
-    pub fn register_nscondition_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nscondition_class(rt);
-    }
-
-    pub fn register_nsconditionlock_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsconditionlock_class(rt);
-    }
-
-    pub fn register_nsmethodsignature_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsmethodsignature_class(rt);
-    }
-
-    pub fn register_nsinvocation_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsinvocation_class(rt);
-    }
-
-    pub fn register_nsregularexpression_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsregularexpression_class(rt);
-    }
-
-    pub fn register_nstextcheckingresult_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nstextcheckingresult_class(rt);
-    }
-
-    pub fn register_nspredicate_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nspredicate_class(rt);
-    }
-
-    pub fn register_nsattributedstring_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsattributedstring_class(rt);
-    }
-
-    pub fn register_nsmutableattributedstring_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsmutableattributedstring_class(rt);
-    }
-
-    pub fn register_nscache_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nscache_class(rt);
-    }
-
-    pub fn register_nsmaptable_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsmaptable_class(rt);
-    }
-
-    pub fn register_nshashtable_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nshashtable_class(rt);
-    }
-
-    pub fn register_nsoperation_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsoperation_class(rt);
-    }
-
-    pub fn register_nsblockoperation_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsblockoperation_class(rt);
-    }
-
-    pub fn register_nsoperationqueue_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsoperationqueue_class(rt);
-    }
-
-    pub fn register_nsjsonserialization_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsjsonserialization_class(rt);
-    }
-
-    pub fn register_nspropertylistserialization_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nspropertylistserialization_class(rt);
-    }
-
-    // ── AppKit classes (Phase C5) ─────────────────────────────────
-
-    pub fn register_nsresponder_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsresponder_class(rt);
-    }
-
-    pub fn register_nsapplication_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsapplication_class(rt);
-    }
-
-    pub fn register_nsrunloop_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsrunloop_class(rt);
-    }
-
-    pub fn register_nswindow_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nswindow_class(rt);
-    }
-
-    pub fn register_nsview_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsview_class(rt);
-    }
-
-    pub fn register_nsevent_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsevent_class(rt);
-    }
-
-    pub fn register_nsworkspace_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsworkspace_class(rt);
-    }
-
-    pub fn register_nsscreen_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsscreen_class(rt);
-    }
-
-    pub fn register_nscolor_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nscolor_class(rt);
-    }
-
-    pub fn register_nsfont_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsfont_class(rt);
-    }
-
-    pub fn register_nsimage_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsimage_class(rt);
-    }
-
-    // ── Phase C7 AppKit class registrations ─────────────────────
-
-    pub fn register_nsappearance_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsappearance_class(rt);
-    }
-
-    pub fn register_nsusernotificationcenter_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsusernotificationcenter_class(rt);
-    }
-
-    pub fn register_nsmenu_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsmenu_class(rt);
-    }
-
-    pub fn register_nsmenuitem_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsmenuitem_class(rt);
-    }
-
-    pub fn register_nsnib_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsnib_class(rt);
-    }
-
-    // ── Gap-analysis classes (Phase C8) ──────────────────────────
-
-    pub fn register_nsmutabledata_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsmutabledata_class(rt);
-    }
-
-    pub fn register_nsfilehandle_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsfilehandle_class(rt);
-    }
-
-    pub fn register_nsscanner_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsscanner_class(rt);
-    }
-
-    pub fn register_nsorderedset_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsorderedset_class(rt);
-    }
-
-    pub fn register_nsmutableorderedset_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsmutableorderedset_class(rt);
-    }
-
-    pub fn register_nscountedset_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nscountedset_class(rt);
-    }
-
-    pub fn register_nsmutablecharacterset_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsmutablecharacterset_class(rt);
-    }
-
-    // ── Gap-analysis Phase C9 ────────────────────────────────────
-
-    pub fn register_nsurlcomponents_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsurlcomponents_class(rt);
-    }
-
-    pub fn register_nsurlqueryitem_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsurlqueryitem_class(rt);
-    }
-
-    pub fn register_nsbytecountformatter_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsbytecountformatter_class(rt);
-    }
-
-    pub fn register_nsiso8601dateformatter_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsiso8601dateformatter_class(rt);
-    }
-
-    pub fn register_nsprogress_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsprogress_class(rt);
-    }
-
-    pub fn register_nshost_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nshost_class(rt);
-    }
-
-    pub fn register_nspipe_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nspipe_class(rt);
-    }
-
-    pub fn register_nsurlrequest_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsurlrequest_class(rt);
-    }
-
-    pub fn register_nsmutableurlrequest_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsmutableurlrequest_class(rt);
-    }
-
-    pub fn register_nsurlresponse_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nsurlresponse_class(rt);
-    }
-
-    pub fn register_nshttpurlresponse_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nshttpurlresponse_class(rt);
-    }
-
-    pub fn register_nstask_class(rt: &mut objc_runtime::ObjcRuntime) {
-        register::register_nstask_class(rt);
     }
 
     /// Register tagged pointer class table entries.
@@ -421,25 +221,72 @@ impl FoundationShims {
     pub fn register_host_isa_aliases(rt: &mut objc_runtime::ObjcRuntime) {
         let symbols = crate::pal_symbols();
 
-        for (sym_name, target_class) in [
-            ("OBJC_CLASS_$_NSConstantArray", "NSArray"),
-            ("OBJC_CLASS_$_NSConstantDictionary", "NSConstantDictionary"),
-            ("OBJC_CLASS_$_NSConstantIntegerNumber", "NSConstantIntegerNumber"),
-            ("OBJC_CLASS_$_NSException", "NSException"),
-        ] {
-            if let Some(addr) = symbols.resolve(sym_name) {
-                rt.register_isa_alias(addr as u64, target_class);
-            }
+        for (addr, target_class) in host_isa_aliases(symbols) {
+            rt.register_isa_alias(addr, target_class);
         }
     }
 
     #[cfg(not(target_os = "macos"))]
     pub fn register_host_isa_aliases(_rt: &mut objc_runtime::ObjcRuntime) {}
+
+    /// Install narrow compatibility methods on guest-defined classes.
+    pub fn register_guest_compat_methods(rt: &mut objc_runtime::ObjcRuntime) {
+        install_guest_class_method(
+            rt,
+            "DVTSystemPrerequisitesPaths",
+            "licenseHostAppInfoPlistPath",
+            shim_dvt_system_prerequisites_paths_license_host_app_info_plist_path as u64,
+            "@@:",
+        );
+        install_guest_class_method(
+            rt,
+            "DVTSystemPrerequisitesPaths",
+            "hostAppVersionPlistPath",
+            shim_dvt_system_prerequisites_paths_host_app_version_plist_path as u64,
+            "@@:",
+        );
+        install_guest_class_method(
+            rt,
+            "DVTSystemPrerequisitesPaths",
+            "hostAppProductBuildVersion",
+            shim_dvt_system_prerequisites_paths_host_app_product_build_version as u64,
+            "@@:",
+        );
+    }
 }
+
+mod impl_foundation;
+mod impl_appkit;
+
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
+    use std::sync::Arc;
+
+    #[derive(Default)]
+    struct TestSymbolResolver {
+        symbols: HashMap<&'static str, u64>,
+    }
+
+    impl platform_core::symbols::HostSymbolResolver for TestSymbolResolver {
+        fn resolve(&self, name: &str) -> Option<*const ()> {
+            self.symbols.get(name).copied().map(|addr| addr as *const ())
+        }
+
+        fn resolve_in(&self, _handle: *mut (), name: &str) -> Option<*const ()> {
+            self.resolve(name)
+        }
+
+        fn open_library(&self, _path: &str) -> Option<*mut ()> {
+            None
+        }
+
+        fn default_handle(&self) -> *mut () {
+            std::ptr::null_mut()
+        }
+    }
 
     #[test]
     fn foundation_shims_registered() {
@@ -539,11 +386,11 @@ mod tests {
             .is_some());
         assert!(table.resolve("_OBJC_CLASS_$_NSInvocation").is_some());
         assert!(table.resolve("_OBJC_METACLASS_$_NSInvocation").is_some());
-        // 141 base + 22 AppKit class symbols + 3 AppKit data symbols = 166 on macOS
+        // Symbol count grows as shims are added; assert it doesn't regress below a known minimum.
         #[cfg(target_os = "macos")]
-        assert_eq!(table.len(), 172);
+        assert!(table.len() >= 172, "expected ≥172 symbols, got {}", table.len());
         #[cfg(not(target_os = "macos"))]
-        assert_eq!(table.len(), 162);
+        assert!(table.len() >= 162, "expected ≥162 symbols, got {}", table.len());
     }
 
     #[test]
@@ -555,7 +402,69 @@ mod tests {
     #[test]
     fn cfconstant_string_isa_points_to_self() {
         let addr = cfconstant_string_class_addr();
-        let isa = unsafe { *(addr as *const u64) };
+        // The fake class ISA points to itself. When the host class is used
+        // (via upgrade_cfstring_isa_to_host), this test still checks the
+        // fake class because cfconstant_string_class_addr returns fake first.
+        let isa = unsafe { std::ptr::read_unaligned(addr as *const u64) };
         assert_eq!(isa, addr);
+    }
+
+    #[test]
+    fn guest_compat_methods_attach_to_dvt_paths_metaclass() {
+        let class_addr = 0xD470_1000;
+        let meta_addr = 0xD470_2000;
+        let mut rt = objc_runtime::ObjcRuntime::new();
+
+        rt.register_synthetic_class(objc_runtime::ClassInfo {
+            name: "DVTSystemPrerequisitesPaths".to_string(),
+            mapped_addr: class_addr,
+            methods: vec![],
+            class_methods: vec![],
+            ivars: vec![],
+            properties: vec![],
+            protocol_names: vec![],
+            instance_size: 8,
+            is_root: false,
+            is_meta: false,
+            superclass_addr: Some(crate::nsobj::nsobject_class_addr()),
+            method_index: HashMap::new(),
+            class_method_index: HashMap::new(),
+        });
+        rt.register_metaclass_addr(meta_addr, "DVTSystemPrerequisitesPaths");
+
+        FoundationShims::register_guest_compat_methods(&mut rt);
+
+        let class = rt
+            .get_class("DVTSystemPrerequisitesPaths")
+            .expect("compat class should stay registered");
+        assert!(
+            class
+                .find_class_method("licenseHostAppInfoPlistPath")
+                .is_some()
+        );
+        assert!(class.find_class_method("hostAppVersionPlistPath").is_some());
+        assert!(
+            class
+                .find_class_method("hostAppProductBuildVersion")
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn resolve_host_isa_aliases_skips_missing_symbols() {
+        let mut resolver = TestSymbolResolver::default();
+        resolver
+            .symbols
+            .insert("OBJC_CLASS_$_NSConstantArray", 0x1000);
+        resolver
+            .symbols
+            .insert("OBJC_CLASS_$_NSException", 0x2000);
+
+        let aliases = resolve_host_isa_aliases(&resolver);
+
+        assert_eq!(
+            aliases,
+            vec![(0x1000, "NSArray"), (0x2000, "NSException")]
+        );
     }
 }

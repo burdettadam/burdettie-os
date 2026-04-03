@@ -91,7 +91,13 @@ pub fn is_fat(data: &[u8]) -> bool {
 ///
 /// Returns the byte sub-slice containing the Mach-O for the requested arch.
 pub fn fat_slice_for_cpu(data: &[u8], cpu: CpuType) -> Result<&[u8], ParseError> {
-    fat_slice_for_cpu_subtype(data, cpu, None)
+    // For Arm64, prefer the non-PAC (Arm64All) subtype over Arm64E.
+    let preferred = if cpu == CpuType::Arm64 {
+        Some(CpuSubtype::Arm64All)
+    } else {
+        None
+    };
+    fat_slice_for_cpu_subtype(data, cpu, preferred)
 }
 
 /// Extract the raw slice for a specific CPU type and optional subtype.
@@ -125,6 +131,10 @@ pub fn fat_slice_for_cpu_subtype(
     for arch in &fat.arches {
         let arch_u32: u32 = arch.cpu_type.into();
         if arch_u32 == target_u32 {
+            let arch_sub = CpuSubtype::from_pair(arch.cpu_type, arch.cpu_subtype);
+            if arch_sub == CpuSubtype::Arm64E {
+                log::warn!("fat binary: selecting arm64e slice (no plain arm64 available); PAC features may not be fully supported");
+            }
             let start = arch.offset as usize;
             let end = start + arch.size as usize;
             return Ok(&data[start..end]);

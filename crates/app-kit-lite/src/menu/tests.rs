@@ -186,3 +186,87 @@ fn modifier_flags_default() {
     let flags = ModifierFlags::default();
     assert_eq!(flags, ModifierFlags::NONE);
 }
+
+#[test]
+fn menu_item_set_title_changes_title() {
+    let mut item = NSMenuItem::new("Old");
+    assert_eq!(item.title(), "Old");
+    item.set_title("New");
+    assert_eq!(item.title(), "New");
+}
+
+#[test]
+fn menu_item_set_key_equivalent_after_construction() {
+    let mut item = NSMenuItem::new("Save");
+    assert!(item.key_equivalent().is_none());
+    item.set_key_equivalent(KeyEquivalent::command(KeyCode::S));
+    let ke = item.key_equivalent().unwrap();
+    assert_eq!(ke.key, KeyCode::S);
+    assert!(ke.modifiers.command);
+}
+
+#[test]
+fn menu_set_title_mutates() {
+    let mut menu = NSMenu::new("A");
+    assert_eq!(menu.title(), "A");
+    menu.set_title("B");
+    assert_eq!(menu.title(), "B");
+}
+
+#[test]
+fn modifier_flags_from_backend_modifiers_all_set() {
+    let m = window_backend::Modifiers {
+        command: true,
+        shift: true,
+        option: true,
+        control: true,
+    };
+    let flags = ModifierFlags::from_backend_modifiers(&m);
+    assert!(flags.command);
+    assert!(flags.shift);
+    assert!(flags.option);
+    assert!(flags.control);
+}
+
+#[test]
+fn modifier_flags_from_backend_modifiers_none_set() {
+    let m = window_backend::Modifiers {
+        command: false,
+        shift: false,
+        option: false,
+        control: false,
+    };
+    let flags = ModifierFlags::from_backend_modifiers(&m);
+    assert_eq!(flags, ModifierFlags::NONE);
+}
+
+#[test]
+fn key_equivalent_display_shift_command() {
+    let ke = KeyEquivalent::new(KeyCode::N, ModifierFlags::shift_command());
+    let s = format!("{ke}");
+    assert!(s.contains('\u{21E7}')); // ⇧
+    assert!(s.contains('\u{2318}')); // ⌘
+}
+
+#[test]
+fn key_equivalent_display_option() {
+    let ke = KeyEquivalent::new(
+        KeyCode::O,
+        ModifierFlags {
+            option: true,
+            ..ModifierFlags::NONE
+        },
+    );
+    let s = format!("{ke}");
+    assert!(s.contains('\u{2325}')); // ⌥
+}
+
+#[test]
+fn menu_item_disabled() {
+    let mut item = NSMenuItem::new("Action");
+    assert!(item.is_enabled());
+    item.set_enabled(false);
+    assert!(!item.is_enabled());
+    item.set_enabled(true);
+    assert!(item.is_enabled());
+}

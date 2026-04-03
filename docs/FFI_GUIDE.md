@@ -23,7 +23,7 @@ header at `crates/darwin-runtime-ffi/include/darwin_runtime.h`.
 ./packaging/install.sh --prefix ~/darwin-runtime
 
 # Or via Homebrew
-brew install --build-from-source burdetty-os/tap/darwin-runtime
+brew install --build-from-source burdettie-os/tap/darwin-runtime
 ```
 
 After installation, `pkg-config darwin-runtime --exists` returns 0.
@@ -154,7 +154,7 @@ idiomatic Swift wrapper.
 ```swift
 // Package.swift
 dependencies: [
-    .package(path: "../path/to/burdetty-os/swift"),
+    .package(path: "../path/to/burdettie-os/swift"),
 ]
 ```
 

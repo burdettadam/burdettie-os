@@ -106,3 +106,29 @@ pub unsafe extern "C" fn darwin_runtime_run_secure(path: *const c_char) -> Darwi
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::error::darwin_runtime_last_error;
+
+    #[test]
+    fn run_null_path() {
+        clear_last_error();
+        let r = unsafe { darwin_runtime_run(std::ptr::null()) };
+        assert_eq!(r.exit_code, -1);
+        assert_eq!(r.error, 1);
+        let err = darwin_runtime_last_error();
+        assert!(!err.is_null());
+    }
+
+    #[test]
+    fn run_secure_null_path() {
+        clear_last_error();
+        let r = unsafe { darwin_runtime_run_secure(std::ptr::null()) };
+        assert_eq!(r.exit_code, -1);
+        assert_eq!(r.error, 1);
+        let err = darwin_runtime_last_error();
+        assert!(!err.is_null());
+    }
+}

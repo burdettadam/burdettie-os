@@ -71,6 +71,13 @@ pub struct MappedImage {
 unsafe impl Send for MappedImage {}
 
 impl MappedImage {
+    /// The preferred load address (lowest vmaddr among mapped segments).
+    ///
+    /// Export trie offsets are relative to this address.
+    pub fn preferred_base(&self) -> u64 {
+        self.segments.iter().map(|s| s.vmaddr).min().unwrap_or(0)
+    }
+
     /// Map all segments from a MappingPlan into the current process.
     ///
     /// Creates a single contiguous anonymous mapping that covers the
@@ -137,9 +144,10 @@ impl MappedImage {
         // Round up to page boundary
         let alloc_size = (total_vm_span + page_size - 1) & !(page_size - 1);
 
-        // Allocate one contiguous anonymous RW region
+        // Allocate one contiguous image region (memfd-backed on Linux for
+        // proper W^X support, anonymous on macOS).
         let alloc_base = mapper
-            .map_anonymous(alloc_size)
+            .map_image_pages(alloc_size)
             .map_err(|e| ExecError::MmapFailed {
                 segment: "contiguous_region".to_string(),
                 source: std::io::Error::other(e.to_string()),
@@ -203,17 +211,81 @@ impl MappedImage {
     /// Tighten memory protections to match declared segment permissions.
     ///
     /// Must be called after all fixups have been applied.
-    /// Uses mprotect on each segment's sub-region within the contiguous
-    /// allocation.
+    ///
+    /// Uses page-aware protection: when the host page size is larger than
+    /// the Mach-O segment alignment, multiple segments may share a host
+    /// page.  In that case the page receives the **union** of the
+    /// segments' declared permissions so that no segment loses access.
     pub fn protect(&self) -> Result<(), ExecError> {
+        let page_size = self.mapper.page_size();
+        self.protect_page_aware(page_size)
+    }
+
+    /// Internal page-aware protection implementation.
+    fn protect_page_aware(&self, page_size: usize) -> Result<(), ExecError> {
+        use std::collections::BTreeMap;
+        let page_mask = !(page_size - 1);
+
+        // Collect per-page protection requirements across all segments.
+        let mut page_prots: BTreeMap<usize, Protection> = BTreeMap::new();
         for seg in &self.segments {
+            let seg_start = seg.base as usize;
+            let seg_end = seg_start + seg.size;
             let prot = vmprot_to_protection(seg.protection);
-            self.mapper.protect(seg.base, seg.size, prot).map_err(|e| {
-                ExecError::MprotectFailed {
-                    segment: seg.name.clone(),
-                    source: std::io::Error::other(e.to_string()),
+
+            let first_page = seg_start & page_mask;
+            let last_page_end = (seg_end + page_size - 1) & page_mask;
+            let mut page = first_page;
+            while page < last_page_end {
+                let entry = page_prots.entry(page).or_insert(Protection::NONE);
+                *entry = entry.union(prot);
+                page += page_size;
+            }
+        }
+
+        // Coalesce contiguous pages with identical protections into single
+        // mprotect calls to minimise syscalls.
+        let mut iter = page_prots.iter().peekable();
+        while let Some((&start, &prot)) = iter.next() {
+            let mut end = start + page_size;
+            while let Some(&&next_addr) = iter.peek().map(|(a, _)| a) {
+                if next_addr == end {
+                    if let Some((_, &next_prot)) = iter.peek() {
+                        if next_prot == prot {
+                            end += page_size;
+                            iter.next();
+                            continue;
+                        }
+                    }
                 }
-            })?;
+                break;
+            }
+            self.mapper
+                .protect(start as *mut u8, end - start, prot)
+                .map_err(|e| ExecError::MprotectFailed {
+                    segment: format!("pages {start:#x}..{end:#x}"),
+                    source: std::io::Error::other(e.to_string()),
+                })?;
+        }
+        Ok(())
+    }
+
+    /// Make executable segments (like __TEXT) RX so code can run.
+    ///
+    /// Call this before constructors — they need __TEXT executable but
+    /// __DATA_CONST must stay writable for C++ static initializer writes.
+    /// After constructors, call `protect()` to finalize __DATA_CONST → R.
+    pub fn protect_executable(&self) -> Result<(), ExecError> {
+        for seg in &self.segments {
+            let declared = vmprot_to_protection(seg.protection);
+            if declared.execute {
+                self.mapper.protect(seg.base, seg.size, declared).map_err(|e| {
+                    ExecError::MprotectFailed {
+                        segment: seg.name.clone(),
+                        source: std::io::Error::other(e.to_string()),
+                    }
+                })?;
+            }
         }
         Ok(())
     }

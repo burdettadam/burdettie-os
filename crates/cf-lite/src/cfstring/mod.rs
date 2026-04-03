@@ -1,4 +1,4 @@
-//! CFString / NSString implementation for burdetty-os.
+//! CFString / NSString implementation for burdettie-os.
 //!
 //! Layout matches Apple's CFConstantString (32 bytes):
 //!   offset  0: isa          (u64)
@@ -122,10 +122,20 @@ pub fn extract_cfstring_cstr(obj: u64) -> Option<&'static str> {
     if ptr.is_null() {
         return None;
     }
+    // Reject obviously-invalid pointers before doing any unsafe reads:
+    //   - Values below the first page (0x1000) are always unmapped.
+    //   - Bit 63 set means tagged pointer (handled elsewhere).
+    if obj < 0x1000 || (obj >> 63) != 0 {
+        return None;
+    }
     // Use read_unaligned: __CFConstantString objects from loaded binaries
     // may reside at addresses that are not 8-byte aligned.
     let c_str_ptr = unsafe { std::ptr::read_unaligned((ptr.add(16)) as *const u64) };
     if c_str_ptr == 0 {
+        return None;
+    }
+    // Reject garbage c_str_ptr values by the same bounds check.
+    if c_str_ptr < 0x1000 || (c_str_ptr >> 63) != 0 {
         return None;
     }
     // SAFETY: c_str_ptr was produced by CString::into_raw, which guarantees
@@ -277,9 +287,10 @@ mod tests {
     }
 
     #[test]
-    fn copy_returns_self() {
+    fn copy_returns_self_for_immutable() {
         let s = make_str("test");
-        assert_eq!(shim_nsstring_copy(s, 0), s);
+        let c = shim_nsstring_copy(s, 0);
+        assert_eq!(c, s, "immutable NSString copy should return self");
     }
 
     #[test]

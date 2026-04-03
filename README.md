@@ -1,4 +1,4 @@
-# burdetty-os
+# burdettie-os
 
 A Rust-based non-GUI macOS runtime for studying, reproducing, and executing macOS Mach-O binaries.
 
@@ -104,15 +104,15 @@ To package as a bootable demo image:
 ```bash
 ./packaging/build.sh --release
 ./packaging/bundle-runtime.sh --release
-./packaging/make-vm-image.sh          # creates burdetty-os.dmg
+./packaging/make-vm-image.sh          # creates burdettie-os.dmg
 ```
 
 Or build a Docker image (CLI only):
 
 ```bash
 ./packaging/bundle-runtime.sh --release
-docker build -f docker/Dockerfile.demo -t burdetty-os-demo dist/
-docker run -it --rm burdetty-os-demo
+docker build -f docker/Dockerfile.demo -t burdettie-os-demo dist/
+docker run -it --rm burdettie-os-demo
 ```
 
 See [docs/DEMO.md](docs/DEMO.md) for the full demo guide.
@@ -133,7 +133,8 @@ See [docs/DEMO.md](docs/DEMO.md) for the full demo guide.
 
 > **Usable non-GUI macOS runtime for Objective-C/Foundation CLI software**
 
-See [docs/roadmap.md](docs/roadmap.md) for the full roadmap and target matrix.
+See [docs/FEATURES.md](docs/FEATURES.md) for the full feature reference and
+[docs/ROADMAP.md](docs/ROADMAP.md) for the strategic roadmap and target matrix.
 
 ## Prerequisites
 
@@ -153,7 +154,7 @@ can be called from C, Swift, Python, or any language with C FFI support.
 ./packaging/install.sh
 
 # Or via Homebrew
-brew install --build-from-source burdetty-os/tap/darwin-runtime
+brew install --build-from-source burdettie-os/tap/darwin-runtime
 ```
 
 ### C

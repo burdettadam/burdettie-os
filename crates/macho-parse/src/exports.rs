@@ -174,6 +174,114 @@ pub fn parse_export_trie(trie_data: &[u8]) -> Vec<ExportedSymbol> {
     results
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_symbol(name: &str, flags: u64, address: u64) -> ExportedSymbol {
+        ExportedSymbol {
+            name: name.to_string(),
+            flags,
+            address,
+            reexport_ordinal: None,
+            reexport_name: None,
+        }
+    }
+
+    #[test]
+    fn kind_regular() {
+        let sym = make_symbol("_main", EXPORT_SYMBOL_FLAGS_KIND_REGULAR, 0x1000);
+        assert_eq!(sym.kind(), "regular");
+    }
+
+    #[test]
+    fn kind_thread_local() {
+        let sym = make_symbol("_tls_var", EXPORT_SYMBOL_FLAGS_KIND_THREAD_LOCAL, 0x2000);
+        assert_eq!(sym.kind(), "thread-local");
+    }
+
+    #[test]
+    fn kind_absolute() {
+        let sym = make_symbol("_abs", EXPORT_SYMBOL_FLAGS_KIND_ABSOLUTE, 0x3000);
+        assert_eq!(sym.kind(), "absolute");
+    }
+
+    #[test]
+    fn kind_unknown_for_out_of_range() {
+        let sym = make_symbol("_mystery", 0x03, 0x4000);
+        assert_eq!(sym.kind(), "unknown");
+    }
+
+    #[test]
+    fn kind_masks_non_kind_bits() {
+        // STUB_AND_RESOLVER (0x10) with kind bits = 0 → "regular"
+        let sym = make_symbol("_stub", EXPORT_SYMBOL_FLAGS_STUB_AND_RESOLVER, 0x5000);
+        assert_eq!(sym.kind(), "regular");
+    }
+
+    #[test]
+    fn is_weak_flag() {
+        let sym = make_symbol("_weak", EXPORT_SYMBOL_FLAGS_WEAK_DEFINITION, 0x6000);
+        assert!(sym.is_weak());
+        let sym2 = make_symbol("_strong", 0, 0x7000);
+        assert!(!sym2.is_weak());
+    }
+
+    #[test]
+    fn is_reexport_flag() {
+        let sym = make_symbol("_re", EXPORT_SYMBOL_FLAGS_REEXPORT, 0);
+        assert!(sym.is_reexport());
+        let sym2 = make_symbol("_local", 0, 0x1000);
+        assert!(!sym2.is_reexport());
+    }
+
+    #[test]
+    fn read_uleb128_single_byte() {
+        let data = [0x05];
+        let mut pos = 0;
+        assert_eq!(read_uleb128(&data, &mut pos), 5);
+        assert_eq!(pos, 1);
+    }
+
+    #[test]
+    fn read_uleb128_multi_byte() {
+        // 624485 = 0xE5 0x8E 0x26
+        let data = [0xE5, 0x8E, 0x26];
+        let mut pos = 0;
+        assert_eq!(read_uleb128(&data, &mut pos), 624485);
+        assert_eq!(pos, 3);
+    }
+
+    #[test]
+    fn read_uleb128_empty() {
+        let data: [u8; 0] = [];
+        let mut pos = 0;
+        assert_eq!(read_uleb128(&data, &mut pos), 0);
+    }
+
+    #[test]
+    fn read_cstring_simple() {
+        let data = b"hello\0world\0";
+        let mut pos = 0;
+        assert_eq!(read_cstring(data, &mut pos), "hello");
+        assert_eq!(pos, 6); // past the NUL
+        assert_eq!(read_cstring(data, &mut pos), "world");
+    }
+
+    #[test]
+    fn read_cstring_empty_string() {
+        let data = b"\0rest";
+        let mut pos = 0;
+        assert_eq!(read_cstring(data, &mut pos), "");
+        assert_eq!(pos, 1);
+    }
+
+    #[test]
+    fn parse_export_trie_empty() {
+        assert!(parse_export_trie(&[]).is_empty());
+    }
+}
+
 /// Extract exported symbols from a parsed Mach-O.
 pub fn extract_exports(parsed: &super::ParsedMachO, raw_data: &[u8]) -> Vec<ExportedSymbol> {
     // Try LC_DYLD_EXPORTS_TRIE first (modern)

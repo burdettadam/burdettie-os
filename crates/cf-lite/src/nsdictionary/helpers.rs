@@ -1,6 +1,7 @@
 //! NSDictionary helper functions: layout constants, factory, and key lookup.
 
 use crate::cfstring;
+use crate::nsnumber;
 use crate::nsobj;
 
 // ── Dynamic NSDictionary layout (our objects) ──────────────────
@@ -76,6 +77,7 @@ pub(super) fn find_key_index(obj: u64, key: u64) -> Option<usize> {
     }
 
     let key_cstr = cfstring::extract_cfstring_cstr(key);
+    let key_is_num = nsnumber::is_nsnumber(key);
 
     for i in 0..count {
         let k = unsafe { *((keys as usize + i * 8) as *const u64) };
@@ -90,6 +92,10 @@ pub(super) fn find_key_index(obj: u64, key: u64) -> Option<usize> {
                     return Some(i);
                 }
             }
+        }
+        // NSNumber value equality
+        if key_is_num && nsnumber::is_nsnumber(k) && nsnumber::nsnumber_values_equal(key, k) {
+            return Some(i);
         }
     }
     None

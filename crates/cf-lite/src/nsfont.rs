@@ -60,3 +60,105 @@ pub extern "C" fn shim_nsfont_point_size(obj: u64, _cmd: u64) -> f64 {
 pub extern "C" fn shim_nsfont_family_name(obj: u64, cmd: u64) -> u64 {
     shim_nsfont_font_name(obj, cmd)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shim_test_helpers::*;
+
+    #[test]
+    fn test_alloc_font() {
+        let font = alloc_font("Helvetica", 14.0);
+        assert_ne!(font, 0);
+        let name_ptr = read_field(font, NAME_OFF);
+        assert_ne!(name_ptr, 0);
+        assert_string_eq(name_ptr, "Helvetica");
+        let size = unsafe { *((font as usize + SIZE_OFF) as *const f64) };
+        assert_eq!(size, 14.0);
+        let isa = read_field(font, 0);
+        assert_eq!(isa, crate::nsobj::nsfont_class_addr());
+        free_obj(font);
+    }
+
+    #[test]
+    fn test_system_font_of_size() {
+        let font = shim_nsfont_system_font_of_size(0, 0, 12.0);
+        assert_ne!(font, 0);
+        let name = shim_nsfont_font_name(font, 0);
+        assert_string_eq(name, ".AppleSystemUIFont");
+        assert_eq!(shim_nsfont_point_size(font, 0), 12.0);
+        free_obj(font);
+    }
+
+    #[test]
+    fn test_bold_system_font_of_size() {
+        let font = shim_nsfont_bold_system_font_of_size(0, 0, 18.0);
+        assert_ne!(font, 0);
+        let name = shim_nsfont_font_name(font, 0);
+        assert_string_eq(name, ".AppleSystemUIFontBold");
+        assert_eq!(shim_nsfont_point_size(font, 0), 18.0);
+        free_obj(font);
+    }
+
+    #[test]
+    fn test_label_font_of_size() {
+        let font = shim_nsfont_label_font_of_size(0, 0, 10.0);
+        assert_ne!(font, 0);
+        let name = shim_nsfont_font_name(font, 0);
+        assert_string_eq(name, ".AppleSystemUIFont");
+        assert_eq!(shim_nsfont_point_size(font, 0), 10.0);
+        free_obj(font);
+    }
+
+    #[test]
+    fn test_system_font_size() {
+        let sz = shim_nsfont_system_font_size(0, 0);
+        assert_eq!(sz, 13.0);
+    }
+
+    #[test]
+    fn test_font_name() {
+        let font = alloc_font("Courier", 9.0);
+        let name = shim_nsfont_font_name(font, 0);
+        assert_string_eq(name, "Courier");
+        free_obj(font);
+    }
+
+    #[test]
+    fn test_font_name_nil() {
+        assert_eq!(shim_nsfont_font_name(0, 0), 0);
+    }
+
+    #[test]
+    fn test_point_size() {
+        let font = alloc_font("Menlo", 15.5);
+        assert_eq!(shim_nsfont_point_size(font, 0), 15.5);
+        free_obj(font);
+    }
+
+    #[test]
+    fn test_point_size_nil() {
+        assert_eq!(shim_nsfont_point_size(0, 0), 0.0);
+    }
+
+    #[test]
+    fn test_family_name() {
+        let font = alloc_font("Times", 11.0);
+        let family = shim_nsfont_family_name(font, 0);
+        assert_string_eq(family, "Times");
+        free_obj(font);
+    }
+
+    #[test]
+    fn test_family_name_nil() {
+        assert_eq!(shim_nsfont_family_name(0, 0), 0);
+    }
+
+    #[test]
+    fn test_system_font_zero_size() {
+        let font = shim_nsfont_system_font_of_size(0, 0, 0.0);
+        assert_ne!(font, 0);
+        assert_eq!(shim_nsfont_point_size(font, 0), 0.0);
+        free_obj(font);
+    }
+}

@@ -44,6 +44,15 @@ fn make_temp_fixtures() -> tempfile::TempDir {
     fs::create_dir_all(&f4).unwrap();
     fs::write(f4.join("bad_magic"), b"junk").unwrap();
 
+    // Exception fixtures should now be included.
+    let f5 = root.join("minimal_throw");
+    fs::create_dir_all(&f5).unwrap();
+    fs::write(f5.join("app"), b"fake").unwrap();
+
+    let f6 = root.join("try_catch_test");
+    fs::create_dir_all(&f6).unwrap();
+    fs::write(f6.join("app"), b"fake").unwrap();
+
     dir
 }
 
@@ -80,6 +89,22 @@ fn discover_fixtures_skips_malformed() {
     assert!(
         !names.contains(&"malformed"),
         "should skip malformed directory"
+    );
+}
+
+#[test]
+fn discover_fixtures_includes_exception_fixtures() {
+    let tmp = make_temp_fixtures();
+    let fixtures = discover_fixtures(tmp.path());
+
+    let names: Vec<&str> = fixtures.iter().map(|(n, _)| n.as_str()).collect();
+    assert!(
+        names.contains(&"minimal_throw"),
+        "should include minimal_throw now that exception handling works"
+    );
+    assert!(
+        names.contains(&"try_catch_test"),
+        "should include try_catch_test now that exception handling works"
     );
 }
 
@@ -148,7 +173,6 @@ fn real_fixtures_dir() -> Option<PathBuf> {
 fn expected_exit(name: &str) -> i32 {
     match name {
         "return42" => 42,
-        "appkit_bootstrap" => 1,
         _ => 0,
     }
 }
@@ -220,7 +244,7 @@ fn build_hello_app(scorecard_fn: impl FnMut() -> String + 'static) -> HeadlessAp
     let mut app = HeadlessApp::new();
 
     // Title label (index 0)
-    let mut title = Label::new(Rect::default(), "Running on burdetty-os runtime v0.1");
+    let mut title = Label::new(Rect::default(), "Running on burdettie-os runtime v0.1");
     title.view_mut().layout_id = Some(title_id);
     app.add_label(title);
 
@@ -280,7 +304,7 @@ fn hello_app_initial_state() {
     assert_eq!(app.button_count(), 2);
     assert_eq!(
         app.label_text(0),
-        "Running on burdetty-os runtime v0.1"
+        "Running on burdettie-os runtime v0.1"
     );
     assert_eq!(app.label_text(1), "Press a button to begin.");
     assert_eq!(app.button_title(0), "Run Scorecard");

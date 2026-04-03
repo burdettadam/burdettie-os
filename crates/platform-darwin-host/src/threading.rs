@@ -84,3 +84,64 @@ impl Threading for PosixThreading {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mutex_size_positive() {
+        let t = PosixThreading;
+        assert!(t.mutex_size() > 0);
+    }
+
+    #[test]
+    fn cond_size_positive() {
+        let t = PosixThreading;
+        assert!(t.cond_size() > 0);
+    }
+
+    #[test]
+    fn mutex_lifecycle() {
+        let t = PosixThreading;
+        let mut buf = vec![0u8; t.mutex_size()];
+        let ptr = buf.as_mut_ptr();
+        t.mutex_init(ptr);
+        t.mutex_lock(ptr);
+        t.mutex_unlock(ptr);
+        t.mutex_destroy(ptr);
+    }
+
+    #[test]
+    fn recursive_mutex_double_lock() {
+        let t = PosixThreading;
+        let mut buf = vec![0u8; t.mutex_size()];
+        let ptr = buf.as_mut_ptr();
+        t.mutex_init_recursive(ptr);
+        t.mutex_lock(ptr);
+        t.mutex_lock(ptr); // second lock from same thread should succeed
+        t.mutex_unlock(ptr);
+        t.mutex_unlock(ptr);
+        t.mutex_destroy(ptr);
+    }
+
+    #[test]
+    fn mutex_trylock_unlocked() {
+        let t = PosixThreading;
+        let mut buf = vec![0u8; t.mutex_size()];
+        let ptr = buf.as_mut_ptr();
+        t.mutex_init(ptr);
+        assert!(t.mutex_trylock(ptr));
+        t.mutex_unlock(ptr);
+        t.mutex_destroy(ptr);
+    }
+
+    #[test]
+    fn cond_lifecycle() {
+        let t = PosixThreading;
+        let mut buf = vec![0u8; t.cond_size()];
+        let ptr = buf.as_mut_ptr();
+        t.cond_init(ptr);
+        t.cond_destroy(ptr);
+    }
+}

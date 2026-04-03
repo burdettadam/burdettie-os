@@ -145,3 +145,69 @@ fn parse_date_with_format(
 
     Some((year, month, day, hour, min, sec))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shim_test_helpers::*;
+
+    /// Allocate a minimal NSDateFormatter (32 bytes) with no format string set.
+    fn make_formatter() -> u64 {
+        let obj = crate::pal_alloc().calloc(1, 32) as u64;
+        assert_ne!(obj, 0);
+        obj // format_ptr = 0 → uses default "yyyy-MM-dd HH:mm:ss"
+    }
+
+    #[test]
+    fn nil_obj_returns_zero() {
+        let s = make_string("2001-01-01 00:00:00");
+        assert_eq!(shim_nsdateformatter_date_from_string(0, 0, s), 0);
+        free_obj(s);
+    }
+
+    #[test]
+    fn nil_string_returns_zero() {
+        let fmt = make_formatter();
+        assert_eq!(shim_nsdateformatter_date_from_string(fmt, 0, 0), 0);
+        free_obj(fmt);
+    }
+
+    #[test]
+    fn parse_cf_reference_date() {
+        // 2001-01-01 00:00:00 is CF absolute time 0
+        let fmt = make_formatter();
+        let s = make_string("2001-01-01 00:00:00");
+        let date = shim_nsdateformatter_date_from_string(fmt, 0, s);
+        assert_ne!(date, 0);
+        let ti = crate::nsdate::shim_nsdate_ti_since_ref(date, 0);
+        assert!(ti.abs() < 2.0, "expected CF time ~0 for CF reference date, got {ti}");
+        free_obj(fmt);
+        free_obj(s);
+        free_obj(date);
+    }
+
+    #[test]
+    fn parse_custom_format() {
+        let fmt = make_formatter();
+        let fmt_str = make_string("yyyy/MM/dd");
+        // Set format_ptr at offset 24
+        unsafe { *((fmt as usize + 24) as *mut u64) = fmt_str; }
+        let s = make_string("2001/01/01");
+        let date = shim_nsdateformatter_date_from_string(fmt, 0, s);
+        assert_ne!(date, 0);
+        free_obj(fmt);
+        free_obj(s);
+        free_obj(date);
+    }
+
+    #[test]
+    fn parse_unparseable_returns_zero() {
+        let fmt = make_formatter();
+        let s = make_string("not a date");
+        let date = shim_nsdateformatter_date_from_string(fmt, 0, s);
+        // Returns 0 (couldn't parse numbers)
+        assert_eq!(date, 0);
+        free_obj(fmt);
+        free_obj(s);
+    }
+}

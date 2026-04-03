@@ -17,7 +17,7 @@
 use crate::cfstring;
 
 const TAG_INT: u64 = 0;
-const TAG_DOUBLE: u64 = 1;
+pub(crate) const TAG_DOUBLE: u64 = 1;
 const TAG_BOOL: u64 = 2;
 
 const TYPE_TAG_OFF: usize = 8;
@@ -46,6 +46,27 @@ fn read_number(obj: u64) -> (u64, u64) {
 /// Public accessor for cross-module use (e.g., NSJSONSerialization).
 pub fn read_number_pub(obj: u64) -> (u64, u64) {
     read_number(obj)
+}
+
+/// Check if an object is an NSNumber (dynamic or constant integer).
+pub fn is_nsnumber(obj: u64) -> bool {
+    if obj == 0 { return false; }
+    let isa = unsafe { std::ptr::read_unaligned(obj as *const u64) };
+    isa == crate::nsobj::nsnumber_class_addr()
+        || isa == crate::nsobj::nsconstantintegernumber_class_addr()
+}
+
+/// Compare two NSNumber objects for value equality.
+/// Both must be NSNumbers. Returns true if their double values are equal.
+pub fn nsnumber_values_equal(a: u64, b: u64) -> bool {
+    let (_, ra) = read_number(a);
+    let (ta, _) = read_number(a);
+    let (_, rb) = read_number(b);
+    let (tb, _) = read_number(b);
+    // Fast path: same tag and same raw bits
+    if ta == tb && ra == rb { return true; }
+    // Slow path: compare as f64
+    shim_nsnumber_double_value(a, 0) == shim_nsnumber_double_value(b, 0)
 }
 
 /// Extract an integer value from a tagged pointer NSNumber (tag index 2).

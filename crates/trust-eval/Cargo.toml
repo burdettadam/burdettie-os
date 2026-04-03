@@ -1,0 +1,16 @@
+[package]
+name         = "trust-eval"
+description  = "X.509 certificate chain validation using webpki (for Security.framework shims)"
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+rust-version.workspace = true
+
+[dependencies]
+webpki           = { package = "rustls-webpki", version = "0.103", features = ["ring", "std"] }
+webpki-roots     = "1"
+pki-types        = { package = "rustls-pki-types", version = "1" }
+log              = { workspace = true }
+
+[lints]
+workspace = true

@@ -10,6 +10,7 @@
 
 use std::fmt;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use serde::Serialize;
 
@@ -104,6 +105,22 @@ impl RuntimeTracer {
         if let Ok(mut guard) = self.events.lock() {
             guard.push(event);
         }
+    }
+
+    /// Record a machine-parseable performance timing event.
+    pub fn record_perf_timing(&self, scope: &str, name: &str, duration: Duration) {
+        self.record(
+            EventKind::Pipeline,
+            format!("perf|{scope}|timing|{name}|{}", duration.as_micros()),
+        );
+    }
+
+    /// Record a machine-parseable performance counter event.
+    pub fn record_perf_counter(&self, scope: &str, name: &str, value: u64) {
+        self.record(
+            EventKind::Pipeline,
+            format!("perf|{scope}|counter|{name}|{value}"),
+        );
     }
 
     /// Return all collected events.
@@ -224,6 +241,18 @@ mod tests {
     }
 
     #[test]
+    fn perf_helpers_emit_pipeline_events() {
+        let tracer = RuntimeTracer::new();
+        tracer.record_perf_timing("map_images", "deps_total_us", Duration::from_micros(123));
+        tracer.record_perf_counter("map_images", "deps_loaded", 7);
+
+        let events = tracer.events_of(EventKind::Pipeline);
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0].message, "perf|map_images|timing|deps_total_us|123");
+        assert_eq!(events[1].message, "perf|map_images|counter|deps_loaded|7");
+    }
+
+    #[test]
     fn disabled_tracer_is_noop() {
         let tracer = RuntimeTracer::disabled();
         tracer.record(EventKind::Pipeline, "should be ignored");
@@ -280,5 +309,150 @@ mod tests {
         assert_eq!(v["events"][0]["kind"], "ImageLoad");
         assert_eq!(v["events"][0]["message"], "loaded main");
         assert_eq!(v["events"][1]["kind"], "Pipeline");
+    }
+
+    #[test]
+    fn event_kind_display() {
+        assert_eq!(EventKind::ImageLoad.to_string(), "image-load");
+        assert_eq!(EventKind::SelectorRegistration.to_string(), "selector-reg");
+        assert_eq!(EventKind::ClassRegistration.to_string(), "class-reg");
+        assert_eq!(EventKind::CategoryMerge.to_string(), "category-merge");
+        assert_eq!(EventKind::MethodLookup.to_string(), "method-lookup");
+        assert_eq!(EventKind::BlockLifecycle.to_string(), "block-lifecycle");
+        assert_eq!(EventKind::RetainRelease.to_string(), "retain-release");
+        assert_eq!(EventKind::FoundationCreate.to_string(), "foundation-create");
+        assert_eq!(EventKind::Pipeline.to_string(), "pipeline");
+    }
+
+    #[test]
+    fn event_kind_equality() {
+        assert_eq!(EventKind::ImageLoad, EventKind::ImageLoad);
+        assert_eq!(EventKind::Pipeline, EventKind::Pipeline);
+        assert_ne!(EventKind::ImageLoad, EventKind::Pipeline);
+        assert_ne!(EventKind::ClassRegistration, EventKind::CategoryMerge);
+    }
+
+    #[test]
+    fn tracer_is_enabled() {
+        let enabled = RuntimeTracer::new();
+        assert!(enabled.is_enabled());
+
+        let disabled = RuntimeTracer::disabled();
+        assert!(!disabled.is_enabled());
+    }
+
+    #[test]
+    fn tracer_default() {
+        let tracer = RuntimeTracer::default();
+        // Default derive: AtomicBool defaults to false, so disabled
+        assert!(!tracer.is_enabled());
+        assert_eq!(tracer.count(), 0);
+    }
+
+    #[test]
+    fn tracer_debug_format() {
+        let tracer = RuntimeTracer::new();
+        tracer.record(EventKind::Pipeline, "step");
+        let dbg = format!("{:?}", tracer);
+        assert!(dbg.contains("RuntimeTracer"));
+        assert!(dbg.contains("1"));
+    }
+
+    #[test]
+    fn disabled_tracer_discards() {
+        let tracer = RuntimeTracer::disabled();
+        tracer.record(EventKind::ImageLoad, "img1");
+        tracer.record(EventKind::ClassRegistration, "cls1");
+        tracer.record(EventKind::Pipeline, "step1");
+        assert!(tracer.events().is_empty());
+        assert!(tracer.events_of(EventKind::ImageLoad).is_empty());
+    }
+
+    #[test]
+    fn events_of_filters_by_kind() {
+        let tracer = RuntimeTracer::new();
+        tracer.record(EventKind::ImageLoad, "img1");
+        tracer.record(EventKind::ClassRegistration, "cls1");
+        tracer.record(EventKind::ImageLoad, "img2");
+        tracer.record(EventKind::MethodLookup, "lookup1");
+        tracer.record(EventKind::ClassRegistration, "cls2");
+        tracer.record(EventKind::ImageLoad, "img3");
+
+        assert_eq!(tracer.events_of(EventKind::ImageLoad).len(), 3);
+        assert_eq!(tracer.events_of(EventKind::ClassRegistration).len(), 2);
+        assert_eq!(tracer.events_of(EventKind::MethodLookup).len(), 1);
+        assert!(tracer.events_of(EventKind::RetainRelease).is_empty());
+    }
+
+    #[test]
+    fn count_of_counts_correctly() {
+        let tracer = RuntimeTracer::new();
+        tracer.record(EventKind::FoundationCreate, "obj1");
+        tracer.record(EventKind::FoundationCreate, "obj2");
+        tracer.record(EventKind::FoundationCreate, "obj3");
+        tracer.record(EventKind::Pipeline, "step");
+
+        assert_eq!(tracer.count_of(EventKind::FoundationCreate), 3);
+        assert_eq!(tracer.count_of(EventKind::Pipeline), 1);
+        assert_eq!(tracer.count_of(EventKind::BlockLifecycle), 0);
+        assert_eq!(tracer.count(), 4);
+    }
+
+    #[test]
+    fn to_json_pretty_valid_json() {
+        let tracer = RuntimeTracer::new();
+        tracer.record(EventKind::ImageLoad, "loaded main");
+        tracer.record(EventKind::SelectorRegistration, "sel: init");
+
+        let pretty = tracer.to_json_pretty();
+        let v: serde_json::Value = serde_json::from_str(&pretty).expect("valid JSON");
+
+        assert_eq!(v["schema_version"], TRACER_SCHEMA_VERSION);
+        assert_eq!(v["event_count"], 2);
+        assert!(v["events"].is_array());
+        // Pretty output should contain newlines
+        assert!(pretty.contains('\n'));
+    }
+
+    #[test]
+    fn clear_empties_events() {
+        let tracer = RuntimeTracer::new();
+        tracer.record(EventKind::ImageLoad, "img");
+        tracer.record(EventKind::Pipeline, "step");
+        assert_eq!(tracer.count(), 2);
+
+        tracer.clear();
+        assert!(tracer.events().is_empty());
+        assert!(tracer.events_of(EventKind::ImageLoad).is_empty());
+        assert_eq!(tracer.count_of(EventKind::Pipeline), 0);
+    }
+
+    #[test]
+    fn to_json_pretty_has_newlines() {
+        let tracer = RuntimeTracer::new();
+        tracer.record(EventKind::ImageLoad, "img");
+        let pretty = tracer.to_json_pretty();
+        assert!(pretty.contains('\n'));
+    }
+
+    #[test]
+    fn to_json_empty_tracer() {
+        let tracer = RuntimeTracer::new();
+        let json = tracer.to_json();
+        let v: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
+        assert_eq!(v["schema_version"], TRACER_SCHEMA_VERSION);
+        assert_eq!(v["event_count"], 0);
+        assert_eq!(v["events"].as_array().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn runtime_event_clone() {
+        let event = RuntimeEvent {
+            kind: EventKind::MethodLookup,
+            message: "lookup init".to_string(),
+        };
+        let cloned = event.clone();
+        assert_eq!(cloned.kind, event.kind);
+        assert_eq!(cloned.message, event.message);
     }
 }

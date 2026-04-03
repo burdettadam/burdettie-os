@@ -41,6 +41,20 @@ PROGRAMS=(
     data_buffer
     scanner_parse
     ordered_collections
+    # Phase C9
+    byte_format
+    host_info
+    pipe_io
+    progress_track
+    url_builder
+    # Phase C10
+    stream_io
+    xml_parse
+    url_session
+    archive_data
+    # Xcode CLI / subprocess
+    subprocess_capture
+    xcrun_query
 )
 
 BUILT=0

@@ -32,6 +32,7 @@ pub(super) fn install_class_symbols(table: &mut ShimTable) {
     register_class!(table, "NSTimeZone", nsobj::nstimezone_class_addr(), nsobj::nstimezone_metaclass_addr());
     register_class!(table, "NSCalendar", nsobj::nscalendar_class_addr(), nsobj::nscalendar_metaclass_addr());
     register_class!(table, "NSNumberFormatter", nsobj::nsnumberformatter_class_addr(), nsobj::nsnumberformatter_metaclass_addr());
+    register_class!(table, "NSDecimalNumber", nsobj::nsdecimalnumber_class_addr(), nsobj::nsdecimalnumber_metaclass_addr());
     register_class!(table, "NSIndexSet", nsobj::nsindexset_class_addr(), nsobj::nsindexset_metaclass_addr());
     register_class!(table, "NSMutableIndexSet", nsobj::nsmutableindexset_class_addr(), nsobj::nsmutableindexset_metaclass_addr());
     register_class!(table, "NSSortDescriptor", nsobj::nssortdescriptor_class_addr(), nsobj::nssortdescriptor_metaclass_addr());
@@ -72,68 +73,19 @@ pub(super) fn install_class_symbols(table: &mut ShimTable) {
     register_class!(table, "NSMenuItem", nsobj::nsmenuitem_class_addr(), nsobj::nsmenuitem_metaclass_addr());
     register_class!(table, "NSNib", nsobj::nsnib_class_addr(), nsobj::nsnib_metaclass_addr());
 
-    // ── Synthetic _OBJC_EHTYPE_$_NSException ──────────────────────────
-    // On macOS, @catch(NSException *) uses the personality function
-    // __objc_personality_v0, which requires an objc_ehtype_t struct whose
-    // vtable == &objc_ehtype_vtable[2].  We create a static struct with
-    // the right layout and lazily initialise the vtable + class pointers.
-    {
-        use std::cell::UnsafeCell;
-        use std::sync::Once;
-
-        #[repr(C)]
-        struct SyntheticEhtype {
-            vtable: u64,
-            name: u64,
-            cls: u64,
-        }
-        struct SyncEhtype(UnsafeCell<SyntheticEhtype>);
-        unsafe impl Sync for SyncEhtype {}
-
-        static EHTYPE: SyncEhtype = SyncEhtype(UnsafeCell::new(SyntheticEhtype {
-            vtable: 0,
-            name: 0,
-            cls: 0,
-        }));
-        static EHTYPE_INIT: Once = Once::new();
-
-        EHTYPE_INIT.call_once(|| {
-            static NSEXCEPTION_NAME: &[u8] = b"NSException\0";
-            let vtable: u64;
-
-            #[cfg(target_os = "macos")]
-            {
-                let sym = unsafe {
-                    libc::dlsym(
-                        libc::RTLD_DEFAULT as *mut std::ffi::c_void,
-                        c"objc_ehtype_vtable".as_ptr(),
-                    )
-                };
-                vtable = if sym.is_null() {
-                    0
-                } else {
-                    unsafe { (sym as *const *const u8).add(2) as u64 }
-                };
-            }
-            #[cfg(not(target_os = "macos"))]
-            {
-                vtable = 0;
-            }
-
-            unsafe {
-                let p = EHTYPE.0.get();
-                (*p).vtable = vtable;
-                (*p).name = NSEXCEPTION_NAME.as_ptr() as u64;
-                (*p).cls = nsobj::nsexception_class_addr();
-            }
-        });
-
-        table.register(
-            "_OBJC_EHTYPE_$_NSException",
-            EHTYPE.0.get() as u64,
-            "NSException EHTYPE (synthetic, for @catch matching)",
-        );
-    }
+    // ── _OBJC_EHTYPE_$_NSException ───────────────────────────────────
+    // Our guest-side personality function (shim_objc_personality_v0) reads the
+    // type table's EHTYPE via LSDA and passes it directly to shim_objc_exception_match
+    // as a catch_cls for ISA-chain comparison.  The ISA of any thrown NSException
+    // instance is nsexception_class_addr(), so we store that address here instead
+    // of the host EHTYPE struct.  The host `__objc_personality_v0` is never called
+    // (___objc_personality_v0 in the shim table is our own guest personality), so
+    // we don't need a host-compatible typeinfo here.
+    table.register(
+        "_OBJC_EHTYPE_$_NSException",
+        nsobj::nsexception_class_addr(),
+        "NSException EHTYPE → synthetic class addr for shim_objc_personality_v0 matching",
+    );
 
     // ── NSConstant* class symbols (self-hosted) ────────────────────
     // The compiler embeds constant objects (@[], @{}, @(int)) whose ISA

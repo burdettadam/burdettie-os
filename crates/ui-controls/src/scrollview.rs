@@ -290,4 +290,108 @@ mod tests {
         let mut renderer = graphics_core::SoftwareRenderer::new(&mut surface);
         sv.draw(&mut renderer); // should not panic
     }
+
+    #[test]
+    fn scrollview_clamp_offset_negative() {
+        let mut sv = ScrollView::new(Rect::new(0.0, 0.0, 200.0, 100.0));
+        sv.set_content_size(400.0, 500.0);
+        sv.set_content_offset(Point::new(-10.0, -20.0));
+        assert_eq!(sv.content_offset().x, 0.0);
+        assert_eq!(sv.content_offset().y, 0.0);
+    }
+
+    #[test]
+    fn scrollview_clamp_offset_max() {
+        let mut sv = ScrollView::new(Rect::new(0.0, 0.0, 200.0, 100.0));
+        sv.set_content_size(200.0, 500.0);
+        sv.set_content_offset(Point::new(0.0, 600.0));
+        assert_eq!(sv.content_offset().y, 400.0);
+    }
+
+    #[test]
+    fn scrollview_clamp_offset_horizontal() {
+        let mut sv = ScrollView::new(Rect::new(0.0, 0.0, 200.0, 100.0));
+        sv.set_content_size(400.0, 100.0);
+        sv.set_content_offset(Point::new(300.0, 0.0));
+        assert_eq!(sv.content_offset().x, 200.0);
+    }
+
+    #[test]
+    fn scrollview_disable_vertical() {
+        let mut sv = ScrollView::new(Rect::new(0.0, 0.0, 200.0, 100.0));
+        sv.set_content_size(200.0, 500.0);
+        sv.set_vertical_scroll_enabled(false);
+        assert!(!sv.can_scroll_vertically());
+    }
+
+    #[test]
+    fn scrollview_scroll_by_clamps() {
+        let mut sv = ScrollView::new(Rect::new(0.0, 0.0, 200.0, 100.0));
+        sv.set_content_size(200.0, 500.0);
+        sv.scroll_by(0.0, 9999.0);
+        assert_eq!(sv.content_offset().y, 400.0);
+    }
+
+    #[test]
+    fn scrollview_content_shrink_reclamps() {
+        let mut sv = ScrollView::new(Rect::new(0.0, 0.0, 200.0, 100.0));
+        sv.set_content_size(200.0, 1000.0);
+        sv.set_content_offset(Point::new(0.0, 800.0));
+        assert_eq!(sv.content_offset().y, 800.0);
+        // Shrink content — offset must be re-clamped
+        sv.set_content_size(200.0, 300.0);
+        assert_eq!(sv.content_offset().y, 200.0);
+    }
+
+    #[test]
+    fn scrollview_no_scroll_when_content_fits() {
+        let mut sv = ScrollView::new(Rect::new(0.0, 0.0, 200.0, 100.0));
+        sv.set_content_size(200.0, 100.0);
+        assert!(!sv.can_scroll_vertically());
+        assert!(!sv.can_scroll_horizontally());
+    }
+
+    #[test]
+    fn scrollview_shows_indicators() {
+        let sv = ScrollView::new(Rect::new(0.0, 0.0, 200.0, 100.0));
+        assert!(sv.shows_indicators);
+        let mut sv = sv;
+        sv.set_shows_indicators(false);
+        assert!(!sv.shows_indicators);
+    }
+
+    #[test]
+    fn scrollview_view_access() {
+        let mut sv = ScrollView::new(Rect::new(0.0, 0.0, 200.0, 100.0));
+        assert_eq!(sv.view().frame.width, 200.0);
+        sv.view_mut().background_color = Color::new(1.0, 0.0, 0.0, 1.0);
+        assert_eq!(sv.view().background_color.r, 1.0);
+    }
+
+    #[test]
+    fn scrollview_draw_no_panic() {
+        let mut sv = ScrollView::new(Rect::new(0.0, 0.0, 200.0, 100.0));
+        let mut surface = graphics_core::Surface::new(200, 100);
+        let mut renderer = graphics_core::SoftwareRenderer::new(&mut surface);
+        sv.draw(&mut renderer);
+    }
+
+    #[test]
+    fn scrollview_draw_with_indicators_no_panic() {
+        let mut sv = ScrollView::new(Rect::new(0.0, 0.0, 200.0, 100.0));
+        sv.set_content_size(400.0, 500.0);
+        sv.set_content_offset(Point::new(50.0, 100.0));
+        let mut surface = graphics_core::Surface::new(200, 100);
+        let mut renderer = graphics_core::SoftwareRenderer::new(&mut surface);
+        sv.draw(&mut renderer);
+    }
+
+    #[test]
+    fn scrollview_draw_hidden_no_panic() {
+        let mut sv = ScrollView::new(Rect::new(0.0, 0.0, 200.0, 100.0));
+        sv.view_mut().hidden = true;
+        let mut surface = graphics_core::Surface::new(200, 100);
+        let mut renderer = graphics_core::SoftwareRenderer::new(&mut surface);
+        sv.draw(&mut renderer);
+    }
 }

@@ -22,6 +22,51 @@ pub fn register_nsdata_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nsdata::shim_nsdata_is_equal_to_data as u64,
                 "B@:@",
             ),
+            me(
+                "writeToFile:atomically:",
+                nsdata::shim_nsdata_write_to_file_atomically as u64,
+                "B@:@B",
+            ),
+            me(
+                "base64EncodedStringWithOptions:",
+                nsdata::shim_nsdata_base64_encoded_string_with_options as u64,
+                "@@:Q",
+            ),
+            me(
+                "initWithBase64EncodedString:options:",
+                nsdata::shim_nsdata_init_with_base64_encoded_string as u64,
+                "@@:@Q",
+            ),
+            me(
+                "base64EncodedDataWithOptions:",
+                nsdata::shim_nsdata_base64_encoded_data_with_options as u64,
+                "@@:Q",
+            ),
+            me(
+                "subdataWithRange:",
+                nsdata::shim_nsdata_subdata_with_range as u64,
+                "@@:QQ",
+            ),
+            me(
+                "getBytes:length:",
+                nsdata::shim_nsdata_get_bytes_length as u64,
+                "v@:^vQ",
+            ),
+            me(
+                "getBytes:range:",
+                nsdata::shim_nsdata_get_bytes_range as u64,
+                "v@:^vQQ",
+            ),
+            me(
+                "writeToFile:options:error:",
+                nsdata::shim_nsdata_write_to_file_options_error as u64,
+                "c@:@QQ",
+            ),
+            me(
+                "writeToURL:atomically:",
+                nsdata::shim_nsdata_write_to_url_atomically as u64,
+                "c@:@c",
+            ),
         ],
         class_methods: vec![
             me(
@@ -30,6 +75,11 @@ pub fn register_nsdata_class(rt: &mut objc_runtime::ObjcRuntime) {
                 "@@:^vQ",
             ),
             me("data", nsdata::shim_nsdata_data as u64, "@@:"),
+            me(
+                "dataWithContentsOfFile:",
+                nsdata::shim_nsdata_data_with_contents_of_file as u64,
+                "@@:@",
+            ),
         ],
         ivars: vec![],
         properties: vec![],
@@ -77,13 +127,60 @@ pub fn register_nsurl_class(rt: &mut objc_runtime::ObjcRuntime) {
             ),
             me("isFileURL", nsurl::shim_nsurl_is_file_url as u64, "B@:"),
             me("scheme", nsurl::shim_nsurl_scheme as u64, "@@:"),
+            me("standardizedURL", nsurl::shim_nsurl_standardized_url as u64, "@@:"),
             me("description", nsurl::shim_nsurl_description as u64, "@@:"),
+            me("absoluteURL", nsurl::shim_nsurl_absolute_url as u64, "@@:"),
+            me(
+                "URLByDeletingLastPathComponent",
+                nsurl::shim_nsurl_url_by_deleting_last_path_component as u64,
+                "@@:",
+            ),
+            me(
+                "URLByDeletingPathExtension",
+                nsurl::shim_nsurl_url_by_deleting_path_extension as u64,
+                "@@:",
+            ),
+            me(
+                "URLByAppendingPathExtension:",
+                nsurl::shim_nsurl_url_by_appending_path_extension as u64,
+                "@@:@",
+            ),
+            me(
+                "pathComponents",
+                nsurl::shim_nsurl_path_components as u64,
+                "@@:",
+            ),
+            me(
+                "checkResourceIsReachableAndReturnError:",
+                nsurl::shim_nsurl_check_resource_is_reachable as u64,
+                "c@:^@",
+            ),
+            me(
+                "initWithString:",
+                nsurl::shim_nsurl_init_with_string as u64,
+                "@@:@",
+            ),
+            me(
+                "initWithString:relativeToURL:",
+                nsurl::shim_nsurl_init_with_string_relative as u64,
+                "@@:@@",
+            ),
+            me(
+                "resourceSpecifier",
+                nsurl::shim_nsurl_resource_specifier as u64,
+                "@@:",
+            ),
         ],
         class_methods: vec![
             me(
                 "fileURLWithPath:",
                 nsurl::shim_nsurl_file_url_with_path as u64,
                 "@@:@",
+            ),
+            me(
+                "fileURLWithPath:isDirectory:",
+                nsurl::shim_nsurl_file_url_with_path_is_directory as u64,
+                "@@:@B",
             ),
             me(
                 "URLWithString:",

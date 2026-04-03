@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# build.sh — Full build + test + package pipeline for burdetty-os.
+# build.sh — Full build + test + package pipeline for burdettie-os.
 #
 # Usage:
 #   ./packaging/build.sh              # default: debug build + tests
@@ -40,7 +40,7 @@ for arg in "$@"; do
 done
 
 echo "╔══════════════════════════════════════════════════════╗"
-echo "║  burdetty-os — build pipeline                 ║"
+echo "║  burdettie-os — build pipeline                 ║"
 echo "║  profile: $PROFILE                                      ║"
 echo "╚══════════════════════════════════════════════════════╝"
 echo ""

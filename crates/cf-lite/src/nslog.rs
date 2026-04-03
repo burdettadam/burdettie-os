@@ -74,9 +74,8 @@ pub extern "C" fn shim_nslog_inner(format: u64, a1: u64, a2: u64, a3: u64) {
         Some(s) => {
             let expanded = expand_format(s, &[a1, a2, a3]);
             // Capture for test verification
-            if let Ok(mut buf) = NSLOG_CAPTURE.lock() {
-                buf.push(expanded.clone());
-            }
+            let mut buf = NSLOG_CAPTURE.lock().unwrap_or_else(|e| e.into_inner());
+            buf.push(expanded.clone());
             eprintln!("{}", expanded);
         }
         None => {
@@ -87,3 +86,39 @@ pub extern "C" fn shim_nslog_inner(format: u64, a1: u64, a2: u64, a3: u64) {
 
 /// Simple format string expansion — delegates to format module.
 pub(crate) use crate::format::expand_format;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shim_test_helpers::*;
+
+    #[test]
+    fn drain_initially_empty() {
+        let _ = drain_captured_nslog(); // flush any prior output
+        let lines = drain_captured_nslog();
+        assert!(lines.is_empty());
+    }
+
+    #[test]
+    fn nil_format_is_safe() {
+        // shim_nslog_inner with format=0 must not panic
+        shim_nslog_inner(0, 0, 0, 0);
+    }
+
+    #[test]
+    fn captures_log_output() {
+        let _ = drain_captured_nslog();
+        let fmt = make_string("cf_lite_nslog_sentinel_xyz789");
+        shim_nslog_inner(fmt, 0, 0, 0);
+        let lines = drain_captured_nslog();
+        assert!(
+            lines.iter().any(|l| l == "cf_lite_nslog_sentinel_xyz789"),
+            "Expected sentinel in NSLog capture, got: {lines:?}"
+        );
+    }
+
+    #[test]
+    fn trampoline_addr_is_nonzero() {
+        assert_ne!(nslog_trampoline_addr(), 0);
+    }
+}

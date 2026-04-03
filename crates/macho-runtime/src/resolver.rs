@@ -1,23 +1,30 @@
-//! Composite symbol resolver: shims → registry → host fallback.
+//! Composite symbol resolver: shims → data symbols → safe-symbol StubResolver.
 //!
 //! The resolution chain tries each source in order. This is the core
 //! mechanism that lets us intercept system library calls with our shims
-//! while still letting through the 70+ safe symbols via StubResolver.
+//! while still letting through the curated safe-list of C stdlib symbols
+//! via the always-active StubResolver.
 
 use libsystem_shims::ShimTable;
-use macho_exec::{StubResolver, SymbolResolver};
+use macho_exec::{StubResolver, SymbolResolver, DataSymbolStore};
 
-/// Layered resolver: shim table first, then optional host fallback.
+/// Layered resolver: shim table first, then DataSymbolStore, then StubResolver.
 pub struct CompositeResolver<'a> {
     shim_table: &'a ShimTable,
-    host_fallback: Option<&'a StubResolver>,
+    data_symbols: &'a DataSymbolStore,
+    stub_resolver: Option<&'a StubResolver>,
 }
 
 impl<'a> CompositeResolver<'a> {
-    pub fn new(shim_table: &'a ShimTable, host_fallback: Option<&'a StubResolver>) -> Self {
+    pub fn new(
+        shim_table: &'a ShimTable,
+        data_symbols: &'a DataSymbolStore,
+        stub_resolver: Option<&'a StubResolver>,
+    ) -> Self {
         Self {
             shim_table,
-            host_fallback,
+            data_symbols,
+            stub_resolver,
         }
     }
 }
@@ -34,10 +41,16 @@ impl SymbolResolver for CompositeResolver<'_> {
             return Some(addr);
         }
 
-        // 2. Try host fallback (StubResolver with safe allowlist)
-        if let Some(stub) = self.host_fallback {
+        // 2. Try DataSymbolStore for constant data symbols (works on Linux too)
+        if let Some(addr) = self.data_symbols.resolve(symbol_name) {
+            log::trace!("resolved '{}' via DataSymbolStore", symbol_name);
+            return Some(addr);
+        }
+
+        // 3. Try StubResolver for safe C stdlib / system symbols (macOS host dlsym)
+        if let Some(stub) = self.stub_resolver {
             if let Some(addr) = stub.resolve(symbol_name) {
-                log::trace!("resolved '{}' via host fallback", symbol_name);
+                log::trace!("resolved '{}' via StubResolver safe-list", symbol_name);
                 return Some(addr);
             }
         }
@@ -67,7 +80,8 @@ mod tests {
         table.register("_printf", 0x1234, "test shim");
 
         let stub = test_stub_resolver();
-        let composite = CompositeResolver::new(&table, Some(&stub));
+        let data = DataSymbolStore::new();
+        let composite = CompositeResolver::new(&table, &data, Some(&stub));
 
         // Should resolve to our shim address, not the host's printf
         let addr = composite.resolve("_printf").unwrap();
@@ -75,20 +89,26 @@ mod tests {
     }
 
     #[test]
-    fn falls_through_to_host() {
+    fn data_symbol_store_tier() {
         let table = ShimTable::new(); // empty
         let stub = test_stub_resolver();
-        let composite = CompositeResolver::new(&table, Some(&stub));
+        let data = DataSymbolStore::new();
+        let composite = CompositeResolver::new(&table, &data, Some(&stub));
 
-        // strlen should resolve via host StubResolver
-        assert!(composite.resolve("_strlen").is_some());
+        // XPC type tokens should resolve via DataSymbolStore
+        let addr = composite.resolve("__xpc_type_dictionary");
+        assert!(addr.is_some(), "DataSymbolStore should resolve __xpc_type_dictionary");
+        assert_ne!(addr.unwrap(), 0, "resolved address must be non-NULL");
     }
 
     #[test]
-    fn no_fallback_returns_none() {
-        let table = ShimTable::new();
-        let composite = CompositeResolver::new(&table, None);
+    fn falls_through_to_stub_resolver() {
+        let table = ShimTable::new(); // empty
+        let stub = test_stub_resolver();
+        let data = DataSymbolStore::new();
+        let composite = CompositeResolver::new(&table, &data, Some(&stub));
 
-        assert!(composite.resolve("_strlen").is_none());
+        // strlen should resolve via the safe-symbol StubResolver
+        assert!(composite.resolve("_strlen").is_some());
     }
 }

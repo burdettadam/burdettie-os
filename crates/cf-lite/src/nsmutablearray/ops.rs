@@ -74,6 +74,13 @@ pub extern "C" fn shim_nsmutablearray_remove_object(obj: u64, _cmd: u64, target:
                 }
             }
             write_idx += 1;
+        } else {
+            crate::nsarray::release_collection_object(elem);
+        }
+    }
+    for idx in write_idx..count {
+        unsafe {
+            *((elems as usize + idx * 8) as *mut u64) = 0;
         }
     }
     unsafe {
@@ -112,4 +119,240 @@ pub extern "C" fn shim_nsmutablearray_exchange_object_at_index(
         std::ptr::swap(p1, p2);
     }
     0
+}
+
+/// `-[NSMutableArray removeObjectsAtIndexes:]`
+pub extern "C" fn shim_nsmutablearray_remove_objects_at_indexes(
+    obj: u64,
+    _cmd: u64,
+    indexes: u64,
+) -> u64 {
+    if obj == 0 || indexes == 0 {
+        return 0;
+    }
+
+    let count = unsafe { *((obj as usize + NSMUTABLEARRAY_COUNT_OFF) as *const u64) };
+    for idx in (0..count).rev() {
+        if crate::nsindexset::shim_nsindexset_contains_index(indexes, 0, idx) != 0 {
+            super::shim_nsmutablearray_remove_object_at_index(obj, 0, idx);
+        }
+    }
+    0
+}
+
+/// `-[NSMutableArray sortUsingDescriptors:]` — sort using NSSortDescriptor array.
+/// No-op stub: descriptor-based sorting requires runtime introspection of key paths
+/// and comparator selectors that the shim environment doesn't fully support yet.
+pub extern "C" fn shim_nsmutablearray_sort_using_descriptors(obj: u64, _cmd: u64, _descriptors: u64) {
+    if obj == 0 {
+        return;
+    }
+    // No-op: NSSortDescriptor resolution not yet implemented.
+    log::debug!("NSMutableArray sortUsingDescriptors: stub (no-op)");
+}
+
+/// `-[NSMutableArray removeObjectsInRange:]` — removes elements in the given range
+/// by shifting remaining elements down. Takes location (u64) and length (u64).
+pub extern "C" fn shim_nsmutablearray_remove_objects_in_range(
+    obj: u64,
+    _cmd: u64,
+    location: u64,
+    length: u64,
+) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
+    let count = unsafe { *((obj as usize + NSMUTABLEARRAY_COUNT_OFF) as *const u64) };
+    let loc = location as usize;
+    let len = length as usize;
+    if len == 0 {
+        return 0;
+    }
+    if loc + len > count as usize {
+        eprintln!(
+            "NSMutableArray removeObjectsInRange: range {},{} out of bounds for count={}",
+            loc, len, count
+        );
+        return 0;
+    }
+    // Remove from back to front so indices remain valid
+    for i in (loc..loc + len).rev() {
+        super::shim_nsmutablearray_remove_object_at_index(obj, 0, i as u64);
+    }
+    0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::nsindexset;
+    use crate::shim_test_helpers::*;
+    use crate::nsmutablearray::{NSMUTABLEARRAY_COUNT_OFF, NSMUTABLEARRAY_ELEMS_OFF};
+
+    const CAP_OFF: usize = 24;
+
+    fn make_array_with(items: &[u64]) -> u64 {
+        let cap = if items.is_empty() { 4 } else { items.len() * 2 };
+        let obj = crate::pal_alloc().calloc(1, 32) as u64;
+        let buf = crate::pal_alloc().calloc(cap, 8) as u64;
+        write_field(obj, 0, 0xDEAD);
+        write_field(obj, NSMUTABLEARRAY_ELEMS_OFF, buf);
+        write_field(obj, CAP_OFF, cap as u64);
+        for (i, &item) in items.iter().enumerate() {
+            write_field(buf, i * 8, item);
+        }
+        write_field(obj, NSMUTABLEARRAY_COUNT_OFF, items.len() as u64);
+        obj
+    }
+
+    fn free_array(obj: u64) {
+        free_buf(read_field(obj, NSMUTABLEARRAY_ELEMS_OFF));
+        free_obj(obj);
+    }
+
+    #[test]
+    fn nil_sort_is_noop() {
+        shim_nsmutablearray_sort_using_comparator(0, 0, 0);
+    }
+
+    #[test]
+    fn nil_remove_object_is_noop() {
+        assert_eq!(shim_nsmutablearray_remove_object(0, 0, 0xABC), 0);
+    }
+
+    #[test]
+    fn remove_object_decreases_count() {
+        let s1 = make_string("aa");
+        let s2 = make_string("bb");
+        let s3 = make_string("cc");
+        let arr = make_array_with(&[s1, s2, s3]);
+        shim_nsmutablearray_remove_object(arr, 0, s2);
+        assert_eq!(read_field(arr, NSMUTABLEARRAY_COUNT_OFF), 2);
+        let buf = read_field(arr, NSMUTABLEARRAY_ELEMS_OFF);
+        assert_eq!(read_field(buf, 0), s1);
+        assert_eq!(read_field(buf, 8), s3);
+        free_array(arr);
+    }
+
+    #[test]
+    fn nil_add_objects_from_array_is_noop() {
+        assert_eq!(shim_nsmutablearray_add_objects_from_array(0, 0, 0xABC), 0);
+        assert_eq!(shim_nsmutablearray_add_objects_from_array(0xABC, 0, 0), 0);
+    }
+
+    #[test]
+    fn exchange_swaps_elements() {
+        let arr = make_array_with(&[0xAA, 0xBB, 0xCC]);
+        shim_nsmutablearray_exchange_object_at_index(arr, 0, 0, 2);
+        let buf = read_field(arr, NSMUTABLEARRAY_ELEMS_OFF);
+        assert_eq!(read_field(buf, 0), 0xCC);
+        assert_eq!(read_field(buf, 8), 0xBB);
+        assert_eq!(read_field(buf, 16), 0xAA);
+        free_array(arr);
+    }
+
+    #[test]
+    fn exchange_out_of_bounds_is_noop() {
+        let arr = make_array_with(&[0xAA, 0xBB]);
+        shim_nsmutablearray_exchange_object_at_index(arr, 0, 0, 5);
+        let buf = read_field(arr, NSMUTABLEARRAY_ELEMS_OFF);
+        assert_eq!(read_field(buf, 0), 0xAA);
+        free_array(arr);
+    }
+
+    #[test]
+    fn remove_objects_at_indexes_removes_in_descending_order() {
+        let arr = make_array_with(&[0xAA, 0xBB, 0xCC, 0xDD]);
+        let indexes = nsindexset::shim_nsindexset_index_set(0, 0);
+        nsindexset::shim_nsindexset_add_index(indexes, 0, 1);
+        nsindexset::shim_nsindexset_add_index(indexes, 0, 3);
+
+        shim_nsmutablearray_remove_objects_at_indexes(arr, 0, indexes);
+
+        assert_eq!(read_field(arr, NSMUTABLEARRAY_COUNT_OFF), 2);
+        let buf = read_field(arr, NSMUTABLEARRAY_ELEMS_OFF);
+        assert_eq!(read_field(buf, 0), 0xAA);
+        assert_eq!(read_field(buf, 8), 0xCC);
+        free_obj(indexes);
+        free_array(arr);
+    }
+
+    #[test]
+    fn nil_remove_objects_at_indexes_is_noop() {
+        assert_eq!(shim_nsmutablearray_remove_objects_at_indexes(0, 0, 0xABC), 0);
+        assert_eq!(shim_nsmutablearray_remove_objects_at_indexes(0xABC, 0, 0), 0);
+    }
+
+    // ── removeObjectsInRange: tests ──────────────────────────────
+
+    #[test]
+    fn remove_objects_in_range_nil_safe() {
+        assert_eq!(shim_nsmutablearray_remove_objects_in_range(0, 0, 0, 2), 0);
+    }
+
+    #[test]
+    fn remove_objects_in_range_zero_length_is_noop() {
+        let arr = make_array_with(&[0xAA, 0xBB, 0xCC]);
+        shim_nsmutablearray_remove_objects_in_range(arr, 0, 1, 0);
+        assert_eq!(read_field(arr, NSMUTABLEARRAY_COUNT_OFF), 3);
+        free_array(arr);
+    }
+
+    #[test]
+    fn remove_objects_in_range_middle() {
+        let arr = make_array_with(&[0xAA, 0xBB, 0xCC, 0xDD]);
+        shim_nsmutablearray_remove_objects_in_range(arr, 0, 1, 2);
+        assert_eq!(read_field(arr, NSMUTABLEARRAY_COUNT_OFF), 2);
+        let buf = read_field(arr, NSMUTABLEARRAY_ELEMS_OFF);
+        assert_eq!(read_field(buf, 0), 0xAA);
+        assert_eq!(read_field(buf, 8), 0xDD);
+        free_array(arr);
+    }
+
+    #[test]
+    fn remove_objects_in_range_all() {
+        let arr = make_array_with(&[0xAA, 0xBB, 0xCC]);
+        shim_nsmutablearray_remove_objects_in_range(arr, 0, 0, 3);
+        assert_eq!(read_field(arr, NSMUTABLEARRAY_COUNT_OFF), 0);
+        free_array(arr);
+    }
+
+    #[test]
+    fn remove_objects_in_range_out_of_bounds_returns_zero() {
+        let arr = make_array_with(&[0xAA, 0xBB]);
+        let result = shim_nsmutablearray_remove_objects_in_range(arr, 0, 1, 5);
+        assert_eq!(result, 0);
+        // Count should be unchanged
+        assert_eq!(read_field(arr, NSMUTABLEARRAY_COUNT_OFF), 2);
+        free_array(arr);
+    }
+
+    // ── sortUsingDescriptors: tests ────────────────────────────
+
+    #[test]
+    fn sort_using_descriptors_nil_safe() {
+        shim_nsmutablearray_sort_using_descriptors(0, 0, 0);
+    }
+
+    #[test]
+    fn sort_using_descriptors_is_noop_stub() {
+        let arr = make_array_with(&[0xCC, 0xAA, 0xBB]);
+        shim_nsmutablearray_sort_using_descriptors(arr, 0, 0xDEAD);
+        // Order should be unchanged (no-op)
+        let buf = read_field(arr, NSMUTABLEARRAY_ELEMS_OFF);
+        assert_eq!(read_field(buf, 0), 0xCC);
+        assert_eq!(read_field(buf, 8), 0xAA);
+        assert_eq!(read_field(buf, 16), 0xBB);
+        free_array(arr);
+    }
+
+    #[test]
+    fn remove_objects_in_range_from_start() {
+        let arr = make_array_with(&[0xAA, 0xBB, 0xCC]);
+        shim_nsmutablearray_remove_objects_in_range(arr, 0, 0, 2);
+        assert_eq!(read_field(arr, NSMUTABLEARRAY_COUNT_OFF), 1);
+        let buf = read_field(arr, NSMUTABLEARRAY_ELEMS_OFF);
+        assert_eq!(read_field(buf, 0), 0xCC);
+        free_array(arr);
+    }
 }

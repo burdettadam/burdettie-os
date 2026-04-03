@@ -1,0 +1,840 @@
+//! CF collection functions: CFArray, CFDictionary, CFData, CFURL, CFBundle, CFBoolean.
+
+use std::path::Path;
+
+use crate::nsobj;
+
+// ── CFArray C functions ────────────────────────────────────────────
+
+/// `CFArrayRef CFArrayCreate(CFAllocatorRef, const void **values, CFIndex numValues, const CFArrayCallBacks *)`
+pub extern "C" fn shim_cf_array_create(
+    _alloc: u64,
+    values: *const u64,
+    num_values: i64,
+    _callbacks: u64,
+) -> u64 {
+    if num_values <= 0 || values.is_null() {
+        return crate::nsarray::make_nsarray(&[]);
+    }
+    let items =
+        unsafe { std::slice::from_raw_parts(values, num_values as usize) };
+    crate::nsarray::make_nsarray(items)
+}
+
+/// `CFIndex CFArrayGetCount(CFArrayRef theArray)`
+pub extern "C" fn shim_cf_array_get_count(array: u64) -> i64 {
+    if array == 0 {
+        return 0;
+    }
+    unsafe { *((array as usize + 8) as *const u64) as i64 }
+}
+
+/// `const void *CFArrayGetValueAtIndex(CFArrayRef theArray, CFIndex idx)`
+pub extern "C" fn shim_cf_array_get_value_at_index(array: u64, idx: i64) -> u64 {
+    if array == 0 {
+        return 0;
+    }
+    let count = unsafe { *((array as usize + 8) as *const u64) };
+    if idx < 0 || idx as u64 >= count {
+        return 0;
+    }
+    let elems = unsafe { *((array as usize + 16) as *const u64) };
+    if elems == 0 {
+        return 0;
+    }
+    unsafe { *((elems as usize + idx as usize * 8) as *const u64) }
+}
+
+// ── CFDictionary C functions ───────────────────────────────────────
+
+/// `CFDictionaryRef CFDictionaryCreate(CFAllocatorRef, const void **keys, const void **values, CFIndex numValues, ...)`
+pub extern "C" fn shim_cf_dictionary_create(
+    _alloc: u64,
+    keys: *const u64,
+    values: *const u64,
+    num_values: i64,
+    _key_cbs: u64,
+    _val_cbs: u64,
+) -> u64 {
+    if num_values <= 0 || keys.is_null() || values.is_null() {
+        return crate::nsdictionary::make_nsdictionary(&[], &[]);
+    }
+    let n = num_values as usize;
+    let k_slice = unsafe { std::slice::from_raw_parts(keys, n) };
+    let v_slice = unsafe { std::slice::from_raw_parts(values, n) };
+    crate::nsdictionary::make_nsdictionary(k_slice, v_slice)
+}
+
+/// `CFIndex CFDictionaryGetCount(CFDictionaryRef theDict)`
+pub extern "C" fn shim_cf_dictionary_get_count(dict: u64) -> i64 {
+    if dict == 0 {
+        return 0;
+    }
+    unsafe { *((dict as usize + 8) as *const u64) as i64 }
+}
+
+/// `const void *CFDictionaryGetValue(CFDictionaryRef theDict, const void *key)`
+pub extern "C" fn shim_cf_dictionary_get_value(dict: u64, key: u64) -> u64 {
+    if dict == 0 || key == 0 {
+        return 0;
+    }
+    crate::nsdictionary::shim_nsdictionary_object_for_key(dict, 0, key)
+}
+
+// ── CFData C functions ─────────────────────────────────────────────
+
+/// `CFDataRef CFDataCreate(CFAllocatorRef, const UInt8 *bytes, CFIndex length)`
+pub extern "C" fn shim_cf_data_create(
+    _alloc: u64,
+    bytes: *const u8,
+    length: i64,
+) -> u64 {
+    if length <= 0 || bytes.is_null() {
+        return crate::nsdata::make_nsdata(&[]);
+    }
+    let slice = unsafe { std::slice::from_raw_parts(bytes, length as usize) };
+    crate::nsdata::make_nsdata(slice)
+}
+
+/// `const UInt8 *CFDataGetBytePtr(CFDataRef theData)`
+pub extern "C" fn shim_cf_data_get_byte_ptr(data: u64) -> u64 {
+    if data == 0 {
+        return 0;
+    }
+    unsafe { *((data as usize + 16) as *const u64) }
+}
+
+/// `CFIndex CFDataGetLength(CFDataRef theData)`
+pub extern "C" fn shim_cf_data_get_length(data: u64) -> i64 {
+    if data == 0 {
+        return 0;
+    }
+    unsafe { *((data as usize + 8) as *const u64) as i64 }
+}
+
+// ── CFURL C functions ──────────────────────────────────────────────
+
+/// `CFURLRef CFURLCreateWithString(CFAllocatorRef, CFStringRef urlString, CFURLRef baseURL)`
+pub extern "C" fn shim_cf_url_create_with_string(
+    _alloc: u64,
+    url_string: u64,
+    _base_url: u64,
+) -> u64 {
+    if url_string == 0 {
+        return 0;
+    }
+    // Delegate to NSURL's URLWithString: — same object, toll-free
+    crate::nsurl::shim_nsurl_url_with_string(nsobj::nsurl_class_addr(), 0, url_string)
+}
+
+/// `CFStringRef CFURLGetString(CFURLRef anURL)`
+pub extern "C" fn shim_cf_url_get_string(url: u64) -> u64 {
+    if url == 0 {
+        return 0;
+    }
+    crate::nsurl::shim_nsurl_absolute_string(url, 0)
+}
+
+/// `CFURLRef CFURLCreateWithFileSystemPath(CFAllocatorRef, CFStringRef path, CFURLPathStyle, Boolean isDirectory)`
+pub extern "C" fn shim_cf_url_create_with_file_system_path(
+    _alloc: u64,
+    path: u64,
+    _path_style: i64,
+    _is_dir: u8,
+) -> u64 {
+    if path == 0 {
+        return 0;
+    }
+    crate::nsurl::shim_nsurl_file_url_with_path(nsobj::nsurl_class_addr(), 0, path)
+}
+
+// ── CFBundle C functions ───────────────────────────────────────────
+
+/// `CFBundleRef CFBundleGetMainBundle(void)`
+pub extern "C" fn shim_cf_bundle_get_main_bundle() -> u64 {
+    crate::nsbundle::shim_nsbundle_main_bundle(nsobj::nsbundle_class_addr(), 0)
+}
+
+/// `CFURLRef CFBundleCopyBundleURL(CFBundleRef bundle)`
+pub extern "C" fn shim_cf_bundle_copy_bundle_url(bundle: u64) -> u64 {
+    if bundle == 0 {
+        return 0;
+    }
+    let path = crate::nsbundle::shim_nsbundle_bundle_path(bundle, 0);
+    if path == 0 {
+        return 0;
+    }
+    crate::nsurl::shim_nsurl_file_url_with_path(nsobj::nsurl_class_addr(), 0, path)
+}
+
+/// `CFDictionaryRef CFBundleCopyInfoDictionaryForURL(CFURLRef url)`
+pub extern "C" fn shim_cf_bundle_copy_info_dictionary_for_url(url: u64) -> u64 {
+    if url == 0 {
+        log::debug!("CFBundleCopyInfoDictionaryForURL: nil URL; falling back to process executable path");
+        if let Some(path) = libsystem_shims::process::process_path() {
+            return copy_info_dictionary_for_path(path);
+        }
+        return 0;
+    }
+
+    let path_ns = crate::nsurl::shim_nsurl_path(url, 0);
+    if path_ns == 0 {
+        log::debug!("CFBundleCopyInfoDictionaryForURL: no path for URL {url:#x}");
+        return 0;
+    }
+
+    let Some(path) = crate::cfstring::extract_cfstring_cstr(path_ns) else {
+        log::debug!("CFBundleCopyInfoDictionaryForURL: non-string path for URL {url:#x}");
+        return 0;
+    };
+
+    copy_info_dictionary_for_path(path)
+}
+
+fn copy_info_dictionary_for_path(path: &str) -> u64 {
+    log::debug!("CFBundleCopyInfoDictionaryForURL: path={path}");
+
+    let path_obj = Path::new(path);
+    if path_obj.is_file() {
+        let dict = crate::nspropertylistserialization::parse_embedded_plist_file(path);
+        if dict != 0 {
+            log::debug!("CFBundleCopyInfoDictionaryForURL: using embedded plist from executable {path}");
+            return dict;
+        }
+    }
+
+    let bundle_path = if path_obj
+        .file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.ends_with(".app"))
+    {
+        Some(path.to_string())
+    } else if let Some(root) = crate::nsbundle::detect_app_bundle_root(path) {
+        Some(root)
+    } else if path_obj.join("Contents/Info.plist").exists() || path_obj.join("Info.plist").exists() {
+        Some(path.to_string())
+    } else {
+        path_obj.parent().and_then(|parent| {
+            let has_plist = parent.join("Contents/Info.plist").exists() || parent.join("Info.plist").exists();
+            has_plist.then(|| parent.to_string_lossy().to_string())
+        })
+    };
+
+    let Some(bundle_path) = bundle_path else {
+        log::debug!("CFBundleCopyInfoDictionaryForURL: no bundle path resolved for {path}");
+        return 0;
+    };
+
+    log::debug!("CFBundleCopyInfoDictionaryForURL: resolved bundle path={bundle_path}");
+
+    let cstr = std::ffi::CString::new(bundle_path.clone()).unwrap_or_default();
+    let bundle_path_ns = crate::cfstring::alloc_nsstring_from_cstr(cstr.as_ptr());
+    if bundle_path_ns == 0 {
+        return 0;
+    }
+
+    let bundle = crate::nsbundle::shim_nsbundle_bundle_with_path(nsobj::nsbundle_class_addr(), 0, bundle_path_ns);
+    if bundle == 0 {
+        log::debug!("CFBundleCopyInfoDictionaryForURL: bundleWithPath failed for {bundle_path}");
+        return 0;
+    }
+
+    let dict = crate::nsbundle::shim_nsbundle_info_dictionary(bundle, 0);
+    log::debug!("CFBundleCopyInfoDictionaryForURL: infoDictionary result={dict:#x}");
+    dict
+}
+
+// ── kCFBooleanTrue/False data symbols ──────────────────────────────
+
+use std::sync::LazyLock;
+
+/// Boolean singletons — real NSNumber objects with ISA + tag(2=bool) + value.
+/// Layout: [isa: u64, tag: u64, value: u64] = 24 bytes.
+static K_CF_BOOLEAN_TRUE_OBJ: LazyLock<[u64; 3]> =
+    LazyLock::new(|| [nsobj::nsnumber_class_addr(), 2, 1]);
+static K_CF_BOOLEAN_FALSE_OBJ: LazyLock<[u64; 3]> =
+    LazyLock::new(|| [nsobj::nsnumber_class_addr(), 2, 0]);
+
+/// Address of kCFBooleanTrue — a real NSNumber(bool=1) object.
+pub fn kcf_boolean_true_addr() -> u64 {
+    &*K_CF_BOOLEAN_TRUE_OBJ as *const [u64; 3] as u64
+}
+
+/// Address of kCFBooleanFalse — a real NSNumber(bool=0) object.
+pub fn kcf_boolean_false_addr() -> u64 {
+    &*K_CF_BOOLEAN_FALSE_OBJ as *const [u64; 3] as u64
+}
+
+// ── CFNumber C functions ───────────────────────────────────────────
+
+/// CFNumber type constants — subset of `CFNumberType` enum.
+/// kCFNumberSInt8Type = 1, ..., kCFNumberDoubleType = 13, kCFNumberNSIntegerType = 15.
+
+/// `CFNumberRef CFNumberCreate(CFAllocatorRef, CFNumberType, const void *valuePtr)`
+pub extern "C" fn shim_cf_number_create(_alloc: u64, the_type: i32, value_ptr: *const u8) -> u64 {
+    if value_ptr.is_null() {
+        return 0;
+    }
+    match the_type {
+        // SInt8 (1), SInt16 (2), SInt32 (3), CharType (7), ShortType (8), IntType (9)
+        1 | 7 => {
+            let v = unsafe { *(value_ptr as *const i8) } as i64;
+            crate::nsnumber::make_nsnumber_int(v)
+        }
+        2 | 8 => {
+            let v = unsafe { std::ptr::read_unaligned(value_ptr as *const i16) } as i64;
+            crate::nsnumber::make_nsnumber_int(v)
+        }
+        3 | 9 => {
+            let v = unsafe { std::ptr::read_unaligned(value_ptr as *const i32) } as i64;
+            crate::nsnumber::make_nsnumber_int(v)
+        }
+        // SInt64 (4), LongType (10), LongLongType (11), NSIntegerType (15), CFIndexType (14)
+        4 | 10 | 11 | 14 | 15 => {
+            let v = unsafe { std::ptr::read_unaligned(value_ptr as *const i64) };
+            crate::nsnumber::make_nsnumber_int(v)
+        }
+        // Float32Type (5), FloatType (12)
+        5 | 12 => {
+            let v = unsafe { std::ptr::read_unaligned(value_ptr as *const f32) } as f64;
+            crate::nsnumber::make_nsnumber_double(v)
+        }
+        // Float64Type (6), DoubleType (13)
+        6 | 13 => {
+            let v = unsafe { std::ptr::read_unaligned(value_ptr as *const f64) };
+            crate::nsnumber::make_nsnumber_double(v)
+        }
+        _ => {
+            // Unknown type — try to read as i64
+            let v = unsafe { std::ptr::read_unaligned(value_ptr as *const i64) };
+            crate::nsnumber::make_nsnumber_int(v)
+        }
+    }
+}
+
+/// `Boolean CFNumberGetValue(CFNumberRef number, CFNumberType theType, void *valuePtr)`
+pub extern "C" fn shim_cf_number_get_value(number: u64, the_type: i32, value_ptr: *mut u8) -> u8 {
+    if number == 0 || value_ptr.is_null() {
+        return 0;
+    }
+    let (tag, raw) = crate::nsnumber::read_number_pub(number);
+    match the_type {
+        1 | 7 => {
+            let v: i8 = match tag { 1 => f64::from_bits(raw) as i8, _ => raw as i64 as i8 };
+            unsafe { *(value_ptr as *mut i8) = v; }
+        }
+        2 | 8 => {
+            let v: i16 = match tag { 1 => f64::from_bits(raw) as i16, _ => raw as i64 as i16 };
+            unsafe { std::ptr::write_unaligned(value_ptr as *mut i16, v); }
+        }
+        3 | 9 => {
+            let v: i32 = match tag { 1 => f64::from_bits(raw) as i32, _ => raw as i64 as i32 };
+            unsafe { std::ptr::write_unaligned(value_ptr as *mut i32, v); }
+        }
+        4 | 10 | 11 | 14 | 15 => {
+            let v: i64 = match tag { 1 => f64::from_bits(raw) as i64, _ => raw as i64 };
+            unsafe { std::ptr::write_unaligned(value_ptr as *mut i64, v); }
+        }
+        5 | 12 => {
+            let v: f32 = match tag { 1 => f64::from_bits(raw) as f32, _ => raw as i64 as f32 };
+            unsafe { std::ptr::write_unaligned(value_ptr as *mut f32, v); }
+        }
+        6 | 13 => {
+            let v: f64 = match tag { 1 => f64::from_bits(raw), _ => raw as i64 as f64 };
+            unsafe { std::ptr::write_unaligned(value_ptr as *mut f64, v); }
+        }
+        _ => return 0,
+    }
+    1
+}
+
+/// `CFNumberType CFNumberGetType(CFNumberRef number)`
+pub extern "C" fn shim_cf_number_get_type(number: u64) -> i32 {
+    if number == 0 {
+        return 0;
+    }
+    let (tag, _) = crate::nsnumber::read_number_pub(number);
+    match tag {
+        0 | 2 => 4, // SInt64 for int and bool
+        1 => 13,     // kCFNumberDoubleType
+        _ => 4,
+    }
+}
+
+/// `CFComparisonResult CFNumberCompare(CFNumberRef, CFNumberRef, void *)`
+pub extern "C" fn shim_cf_number_compare(a: u64, b: u64, _context: u64) -> i32 {
+    if a == 0 || b == 0 {
+        return 0;
+    }
+    let va = crate::nsnumber::shim_nsnumber_double_value(a, 0);
+    let vb = crate::nsnumber::shim_nsnumber_double_value(b, 0);
+    if va < vb { -1 } else if va > vb { 1 } else { 0 }
+}
+
+/// `Boolean CFNumberIsFloatType(CFNumberRef number)`
+pub extern "C" fn shim_cf_number_is_float_type(number: u64) -> u8 {
+    if number == 0 {
+        return 0;
+    }
+    let (tag, _) = crate::nsnumber::read_number_pub(number);
+    u8::from(tag == 1) // TAG_DOUBLE
+}
+
+// ── CFString expanded C functions ──────────────────────────────────
+
+/// `Boolean CFStringGetCString(CFStringRef, char *buffer, CFIndex bufferSize, CFStringEncoding)`
+pub extern "C" fn shim_cf_string_get_cstring(
+    string: u64,
+    buffer: *mut u8,
+    buffer_size: i64,
+    _encoding: u32,
+) -> u8 {
+    if string == 0 || buffer.is_null() || buffer_size <= 0 {
+        return 0;
+    }
+    let c_str_ptr = crate::cfstring::shim_cf_string_get_cstring_ptr(string, 0);
+    if c_str_ptr.is_null() {
+        // Null-terminate the empty buffer
+        unsafe { *buffer = 0; }
+        return 0;
+    }
+    let src = unsafe { std::ffi::CStr::from_ptr(c_str_ptr) };
+    let src_bytes = src.to_bytes_with_nul();
+    let max = buffer_size as usize;
+    if src_bytes.len() > max {
+        // Doesn't fit — truncate and null-terminate
+        unsafe {
+            std::ptr::copy_nonoverlapping(src_bytes.as_ptr(), buffer, max - 1);
+            *buffer.add(max - 1) = 0;
+        }
+        return 0;
+    }
+    unsafe {
+        std::ptr::copy_nonoverlapping(src_bytes.as_ptr(), buffer, src_bytes.len());
+    }
+    1
+}
+
+/// `CFStringRef CFStringCreateCopy(CFAllocatorRef, CFStringRef)`
+pub extern "C" fn shim_cf_string_create_copy(_alloc: u64, string: u64) -> u64 {
+    if string == 0 {
+        return 0;
+    }
+    // Our CFStrings are immutable with refcounting — just retain and return.
+    super::shim_cf_retain(string)
+}
+
+/// `CFComparisonResult CFStringCompare(CFStringRef, CFStringRef, CFStringCompareFlags)`
+pub extern "C" fn shim_cf_string_compare(a: u64, b: u64, flags: u64) -> i32 {
+    if a == 0 && b == 0 { return 0; }
+    if a == 0 { return -1; }
+    if b == 0 { return 1; }
+    let a_ptr = crate::cfstring::shim_cf_string_get_cstring_ptr(a, 0);
+    let b_ptr = crate::cfstring::shim_cf_string_get_cstring_ptr(b, 0);
+    if a_ptr.is_null() || b_ptr.is_null() {
+        return 0;
+    }
+    let a_str = unsafe { std::ffi::CStr::from_ptr(a_ptr) }.to_string_lossy();
+    let b_str = unsafe { std::ffi::CStr::from_ptr(b_ptr) }.to_string_lossy();
+
+    let case_insensitive = flags & 1 != 0; // kCFCompareCaseInsensitive = 1
+    let result = if case_insensitive {
+        a_str.to_lowercase().cmp(&b_str.to_lowercase())
+    } else {
+        a_str.cmp(&b_str)
+    };
+    match result {
+        std::cmp::Ordering::Less => -1,
+        std::cmp::Ordering::Equal => 0,
+        std::cmp::Ordering::Greater => 1,
+    }
+}
+
+/// `CFStringRef CFStringCreateWithCharacters(CFAllocatorRef, const UniChar *, CFIndex)`
+pub extern "C" fn shim_cf_string_create_with_characters(
+    _alloc: u64,
+    chars: *const u16,
+    num_chars: i64,
+) -> u64 {
+    if chars.is_null() || num_chars <= 0 {
+        return crate::cfstring::shim_cf_string_create_with_cstring(0, b"\0".as_ptr().cast(), 0);
+    }
+    let slice = unsafe { std::slice::from_raw_parts(chars, num_chars as usize) };
+    let s = String::from_utf16_lossy(slice);
+    let cstr = std::ffi::CString::new(s).unwrap_or_default();
+    crate::cfstring::shim_cf_string_create_with_cstring(0, cstr.as_ptr(), 0)
+}
+
+/// `UniChar CFStringGetCharacterAtIndex(CFStringRef, CFIndex)`
+pub extern "C" fn shim_cf_string_get_character_at_index(string: u64, idx: i64) -> u16 {
+    if string == 0 || idx < 0 {
+        return 0;
+    }
+    let c_str_ptr = crate::cfstring::shim_cf_string_get_cstring_ptr(string, 0);
+    if c_str_ptr.is_null() {
+        return 0;
+    }
+    let s = unsafe { std::ffi::CStr::from_ptr(c_str_ptr) }.to_string_lossy();
+    let utf16: Vec<u16> = s.encode_utf16().collect();
+    utf16.get(idx as usize).copied().unwrap_or(0)
+}
+
+/// `CFRange CFStringFind(CFStringRef string, CFStringRef stringToFind, CFStringCompareFlags)`
+/// Returns a CFRange (location: i64, length: i64). Packed into two i64s.
+/// We return location in the low 64 bits and length in the high 64 bits via
+/// a pointer argument (Apple ABI returns large structs via sret pointer).
+pub extern "C" fn shim_cf_string_find(string: u64, to_find: u64, flags: u64) -> u64 {
+    // Returns kCFNotFound (-1) packed: location = -1, length = 0
+    const NOT_FOUND: u64 = u64::MAX; // location=-1 as unsigned
+    if string == 0 || to_find == 0 {
+        return NOT_FOUND;
+    }
+    let a_ptr = crate::cfstring::shim_cf_string_get_cstring_ptr(string, 0);
+    let b_ptr = crate::cfstring::shim_cf_string_get_cstring_ptr(to_find, 0);
+    if a_ptr.is_null() || b_ptr.is_null() {
+        return NOT_FOUND;
+    }
+    let haystack = unsafe { std::ffi::CStr::from_ptr(a_ptr) }.to_string_lossy();
+    let needle = unsafe { std::ffi::CStr::from_ptr(b_ptr) }.to_string_lossy();
+
+    let case_insensitive = flags & 1 != 0;
+    let pos = if case_insensitive {
+        haystack.to_lowercase().find(&needle.to_lowercase())
+    } else {
+        haystack.find(needle.as_ref())
+    };
+
+    match pos {
+        Some(loc) => loc as u64, // location; length would be in high bits for full struct
+        None => NOT_FOUND,
+    }
+}
+
+// ── CFRunLoop C functions ──────────────────────────────────────────
+
+/// `CFRunLoopRef CFRunLoopGetCurrent(void)`
+pub extern "C" fn shim_cf_run_loop_get_current() -> u64 {
+    crate::nsrunloop::shim_nsrunloop_current_run_loop(0, 0)
+}
+
+/// `CFRunLoopRef CFRunLoopGetMain(void)`
+pub extern "C" fn shim_cf_run_loop_get_main() -> u64 {
+    crate::nsrunloop::shim_nsrunloop_main_run_loop(0, 0)
+}
+
+/// `void CFRunLoopRun(void)`
+pub extern "C" fn shim_cf_run_loop_run() {
+    let rl = shim_cf_run_loop_get_current();
+    crate::nsrunloop::shim_nsrunloop_run(rl, 0);
+}
+
+/// `SInt32 CFRunLoopRunInMode(CFStringRef mode, CFTimeInterval seconds, Boolean returnAfterSourceHandled)`
+pub extern "C" fn shim_cf_run_loop_run_in_mode(
+    _mode: u64,
+    seconds: f64,
+    _return_after_source: u8,
+) -> i32 {
+    let rl = shim_cf_run_loop_get_current();
+    // Create a date `seconds` from now. NSDate epoch = CFAbsoluteTime 2001-01-01.
+    // For simplicity, fire timers and return kCFRunLoopRunTimedOut (2).
+    let ms = (seconds * 1000.0) as u64;
+    if ms > 0 {
+        // Create a date `seconds` from now and run until it
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs_f64();
+        let date = crate::nsdate::alloc_nsdate(now + seconds);
+        crate::nsrunloop::shim_nsrunloop_run_until_date(rl, 0, date);
+    }
+    2 // kCFRunLoopRunTimedOut
+}
+
+/// `void CFRunLoopStop(CFRunLoopRef rl)`
+pub extern "C" fn shim_cf_run_loop_stop(_rl: u64) {
+    // Our NSRunLoop exits once timers are drained; this is a no-op for now.
+    log::debug!("CFRunLoopStop called");
+}
+
+/// `void CFRunLoopAddTimer(CFRunLoopRef rl, CFRunLoopTimerRef timer, CFStringRef mode)`
+pub extern "C" fn shim_cf_run_loop_add_timer(rl: u64, timer: u64, mode: u64) {
+    let run_loop = if rl == 0 { shim_cf_run_loop_get_current() } else { rl };
+    crate::nsrunloop::shim_nsrunloop_add_timer_for_mode(run_loop, 0, timer, mode);
+}
+
+/// `void CFRunLoopAddSource(CFRunLoopRef rl, CFRunLoopSourceRef source, CFStringRef mode)`
+pub extern "C" fn shim_cf_run_loop_add_source(_rl: u64, _source: u64, _mode: u64) {
+    // Stub — run loop sources are not currently modeled.
+    log::debug!("CFRunLoopAddSource: stub (source={:#x})", _source);
+}
+
+/// CFRunLoop mode constants — addresses of pre-allocated NSString objects.
+pub fn kcf_run_loop_default_mode_addr() -> u64 {
+    crate::nsrunloop::nsdefault_run_loop_mode_addr()
+}
+
+pub fn kcf_run_loop_common_modes_addr() -> u64 {
+    crate::nsrunloop::nsrun_loop_common_modes_addr()
+}
+
+// ── CFAllocator stubs ──────────────────────────────────────────────
+
+/// `CFAllocatorRef CFAllocatorGetDefault(void)`
+pub extern "C" fn shim_cf_allocator_get_default() -> u64 {
+    crate::cfstring::kcf_allocator_default_addr()
+}
+
+/// `void *CFAllocatorAllocate(CFAllocatorRef, CFIndex size, CFOptionFlags)`
+pub extern "C" fn shim_cf_allocator_allocate(_alloc: u64, size: i64, _flags: u64) -> u64 {
+    if size <= 0 {
+        return 0;
+    }
+    crate::pal_alloc().calloc(1, size as usize) as u64
+}
+
+/// `void CFAllocatorDeallocate(CFAllocatorRef, void *ptr)`
+pub extern "C" fn shim_cf_allocator_deallocate(_alloc: u64, ptr: u64) {
+    if ptr != 0 {
+        unsafe { libc::free(ptr as *mut libc::c_void); }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shim_test_helpers::*;
+
+    #[cfg(target_os = "macos")]
+    fn host_cf_symbol(name: &[u8]) -> *mut libc::c_void {
+        static COREFOUNDATION_HANDLE: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+
+        let handle = *COREFOUNDATION_HANDLE.get_or_init(|| unsafe {
+            libc::dlopen(
+                b"/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation\0"
+                    .as_ptr()
+                    .cast(),
+                libc::RTLD_LAZY,
+            ) as usize
+        }) as *mut libc::c_void;
+
+        assert!(
+            !handle.is_null(),
+            "failed to open CoreFoundation for host test helper"
+        );
+
+        let symbol = unsafe { libc::dlsym(handle, name.as_ptr() as *const std::ffi::c_char) };
+        let symbol = if symbol.is_null() {
+            unsafe { libc::dlsym(libc::RTLD_DEFAULT, name.as_ptr() as *const std::ffi::c_char) }
+        } else {
+            symbol
+        };
+        assert!(
+            !symbol.is_null(),
+            "missing host symbol: {}",
+            String::from_utf8_lossy(&name[..name.len().saturating_sub(1)])
+        );
+        symbol
+    }
+
+    #[cfg(target_os = "macos")]
+    fn host_cf_release(obj: u64) {
+        type HostCFReleaseFn = unsafe extern "C" fn(u64);
+
+        if obj == 0 {
+            return;
+        }
+
+        let cf_release: HostCFReleaseFn = unsafe { std::mem::transmute(host_cf_symbol(b"CFRelease\0")) };
+        unsafe { cf_release(obj) };
+    }
+
+    #[cfg(target_os = "macos")]
+    fn host_cfurl_create_with_file_system_path(path: &str, is_directory: bool) -> u64 {
+        type HostCFStringCreateWithCStringFn = unsafe extern "C" fn(u64, *const std::ffi::c_char, u32) -> u64;
+        type HostCFURLCreateWithFileSystemPathFn = unsafe extern "C" fn(u64, u64, i64, u8) -> u64;
+
+        let cf_string_create: HostCFStringCreateWithCStringFn = unsafe {
+            std::mem::transmute(host_cf_symbol(b"CFStringCreateWithCString\0"))
+        };
+        let cf_url_create_with_file_system_path: HostCFURLCreateWithFileSystemPathFn = unsafe {
+            std::mem::transmute(host_cf_symbol(b"CFURLCreateWithFileSystemPath\0"))
+        };
+
+        let cstr = std::ffi::CString::new(path).unwrap();
+        let host_path = unsafe {
+            cf_string_create(0, cstr.as_ptr(), crate::cfstring::K_CF_STRING_ENCODING_UTF8)
+        };
+        let url = unsafe {
+            cf_url_create_with_file_system_path(0, host_path, 0, u8::from(is_directory))
+        };
+        host_cf_release(host_path);
+        url
+    }
+
+    #[test]
+    fn array_create_empty() {
+        let arr = shim_cf_array_create(0, std::ptr::null(), 0, 0);
+        assert_ne!(arr, 0);
+        assert_eq!(shim_cf_array_get_count(arr), 0);
+        free_obj(arr);
+    }
+
+    #[test]
+    fn array_create_with_items() {
+        let a = make_string("hello");
+        let b = make_string("world");
+        let items = [a, b];
+        let arr = shim_cf_array_create(0, items.as_ptr(), 2, 0);
+        assert_ne!(arr, 0);
+        assert_eq!(shim_cf_array_get_count(arr), 2);
+        assert_eq!(shim_cf_array_get_value_at_index(arr, 0), a);
+        assert_eq!(shim_cf_array_get_value_at_index(arr, 1), b);
+        free_obj(arr);
+    }
+
+    #[test]
+    fn array_get_count_nil() {
+        assert_eq!(shim_cf_array_get_count(0), 0);
+    }
+
+    #[test]
+    fn array_get_value_out_of_bounds_and_nil() {
+        let items: [u64; 1] = [42];
+        let arr = shim_cf_array_create(0, items.as_ptr(), 1, 0);
+        assert_eq!(shim_cf_array_get_value_at_index(arr, 5), 0);
+        assert_eq!(shim_cf_array_get_value_at_index(arr, -1), 0);
+        assert_eq!(shim_cf_array_get_value_at_index(0, 0), 0);
+        free_obj(arr);
+    }
+
+    #[test]
+    fn data_create_roundtrip() {
+        let bytes: [u8; 3] = [10, 20, 30];
+        let data = shim_cf_data_create(0, bytes.as_ptr(), 3);
+        assert_ne!(data, 0);
+        assert_eq!(shim_cf_data_get_length(data), 3);
+        let ptr = shim_cf_data_get_byte_ptr(data);
+        assert_ne!(ptr, 0);
+        let slice = unsafe { std::slice::from_raw_parts(ptr as *const u8, 3) };
+        assert_eq!(slice, &bytes);
+        free_obj(data);
+    }
+
+    #[test]
+    fn data_nil_safety() {
+        assert_eq!(shim_cf_data_get_length(0), 0);
+        assert_eq!(shim_cf_data_get_byte_ptr(0), 0);
+    }
+
+    #[test]
+    fn dictionary_create_and_get() {
+        let k = make_string("mykey");
+        let v = make_string("myval");
+        let keys = [k];
+        let vals = [v];
+        let dict = shim_cf_dictionary_create(0, keys.as_ptr(), vals.as_ptr(), 1, 0, 0);
+        assert_ne!(dict, 0);
+        assert_eq!(shim_cf_dictionary_get_count(dict), 1);
+        assert_eq!(shim_cf_dictionary_get_value(dict, k), v);
+        free_obj(dict);
+    }
+
+    #[test]
+    fn dictionary_nil_safety() {
+        assert_eq!(shim_cf_dictionary_get_count(0), 0);
+        assert_eq!(shim_cf_dictionary_get_value(0, 0), 0);
+    }
+
+    #[test]
+    fn boolean_singletons_distinct_and_non_zero() {
+        let t = kcf_boolean_true_addr();
+        let f = kcf_boolean_false_addr();
+        assert_ne!(t, 0);
+        assert_ne!(f, 0);
+        assert_ne!(t, f);
+    }
+
+    #[test]
+    fn bundle_copy_info_dictionary_for_url_detects_bundle_from_executable_path() {
+        let root = std::env::temp_dir().join(format!(
+            "cf_lite_bundle_info_dict_{}_{}",
+            std::process::id(),
+            std::thread::current().name().unwrap_or("t")
+        ));
+        let app_dir = root.join("TestXcode.app");
+        let contents_dir = app_dir.join("Contents");
+        let tool_dir = contents_dir.join("Developer/usr/bin");
+        std::fs::create_dir_all(&tool_dir).unwrap();
+
+        let plist = contents_dir.join("Info.plist");
+        std::fs::write(
+            &plist,
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleIdentifier</key>
+  <string>com.example.TestXcode</string>
+</dict>
+</plist>
+"#,
+        )
+        .unwrap();
+
+        let exe_path = tool_dir.join("testtool");
+        let exe_ns = crate::shim_test_helpers::make_string(exe_path.to_string_lossy().as_ref());
+        let url = crate::nsurl::shim_nsurl_file_url_with_path(nsobj::nsurl_class_addr(), 0, exe_ns);
+        let dict = shim_cf_bundle_copy_info_dictionary_for_url(url);
+
+        assert_ne!(dict, 0);
+        let key = crate::shim_test_helpers::make_string("CFBundleIdentifier");
+        let value = crate::nsdictionary::shim_nsdictionary_object_for_key(dict, 0, key);
+        crate::shim_test_helpers::assert_string_eq(value, "com.example.TestXcode");
+
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn bundle_copy_info_dictionary_for_host_url_detects_bundle_from_executable_path() {
+        let root = std::env::temp_dir().join(format!(
+            "cf_lite_bundle_info_host_url_{}_{}",
+            std::process::id(),
+            std::thread::current().name().unwrap_or("t")
+        ));
+        let app_dir = root.join("TestXcode.app");
+        let contents_dir = app_dir.join("Contents");
+        let tool_dir = contents_dir.join("Developer/usr/bin");
+        std::fs::create_dir_all(&tool_dir).unwrap();
+
+        let plist = contents_dir.join("Info.plist");
+        std::fs::write(
+            &plist,
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleIdentifier</key>
+  <string>com.example.HostURLTestXcode</string>
+</dict>
+</plist>
+"#,
+        )
+        .unwrap();
+
+        let exe_path = tool_dir.join("testtool");
+        std::fs::write(&exe_path, b"#!/bin/sh\n").unwrap();
+
+        let url = host_cfurl_create_with_file_system_path(exe_path.to_string_lossy().as_ref(), false);
+        let dict = shim_cf_bundle_copy_info_dictionary_for_url(url);
+
+        assert_ne!(dict, 0);
+        let key = crate::shim_test_helpers::make_string("CFBundleIdentifier");
+        let value = crate::nsdictionary::shim_nsdictionary_object_for_key(dict, 0, key);
+        crate::shim_test_helpers::assert_string_eq(value, "com.example.HostURLTestXcode");
+
+        host_cf_release(url);
+        let _ = std::fs::remove_dir_all(root);
+    }
+}
+

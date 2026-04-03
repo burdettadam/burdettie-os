@@ -28,7 +28,7 @@ pub extern "C" fn shim_nsobject_responds_to_selector(obj: u64, _cmd: u64, sel: u
     let sel_cstr = unsafe { std::ffi::CStr::from_ptr(sel as *const std::ffi::c_char) };
     let sel_str = sel_cstr.to_str().unwrap_or("");
 
-    let guard = match objc_runtime::OBJC_RUNTIME.lock() {
+    let guard = match objc_runtime::OBJC_RUNTIME.read() {
         Ok(g) => g,
         Err(e) => e.into_inner(),
     };
@@ -49,7 +49,7 @@ pub extern "C" fn shim_nsobject_is_kind_of_class(obj: u64, _cmd: u64, cls: u64) 
 
     let isa = unsafe { *(obj as *const u64) };
 
-    let guard = match objc_runtime::OBJC_RUNTIME.lock() {
+    let guard = match objc_runtime::OBJC_RUNTIME.read() {
         Ok(g) => g,
         Err(e) => e.into_inner(),
     };
@@ -94,7 +94,7 @@ pub extern "C" fn shim_nsobject_class_alloc(cls: u64, _cmd: u64) -> u64 {
         return 0;
     }
 
-    let guard = match objc_runtime::OBJC_RUNTIME.lock() {
+    let guard = match objc_runtime::OBJC_RUNTIME.read() {
         Ok(g) => g,
         Err(e) => e.into_inner(),
     };
@@ -121,6 +121,43 @@ pub extern "C" fn shim_nsobject_class_new(cls: u64, cmd: u64) -> u64 {
     shim_nsobject_class_alloc(cls, cmd)
 }
 
+/// `+[NSObject isSubclassOfClass:]` — returns YES if the receiver is
+/// a subclass of (or identical to) `target_cls`.
+pub extern "C" fn shim_nsobject_is_subclass_of_class(
+    cls: u64,
+    _cmd: u64,
+    target_cls: u64,
+) -> u8 {
+    if cls == 0 || target_cls == 0 {
+        return 0;
+    }
+
+    let guard = match objc_runtime::OBJC_RUNTIME.read() {
+        Ok(g) => g,
+        Err(e) => e.into_inner(),
+    };
+    let Some(rt) = guard.as_ref() else { return 0 };
+
+    // Walk the superclass chain from cls upward.
+    let mut current = Some(cls);
+    let mut depth = 0;
+    while let Some(addr) = current {
+        if depth > 64 {
+            break;
+        }
+        if addr == target_cls {
+            return 1;
+        }
+        if let Some(class_info) = rt.get_class_by_addr(addr) {
+            current = class_info.superclass_addr;
+        } else {
+            break;
+        }
+        depth += 1;
+    }
+    0
+}
+
 // ── NSObject forwarding methods ────────────────────────────────────
 
 /// `-[NSObject methodSignatureForSelector:]`
@@ -140,7 +177,7 @@ pub extern "C" fn shim_nsobject_method_signature_for_selector(
             .unwrap_or("")
     };
 
-    let guard = match objc_runtime::OBJC_RUNTIME.lock() {
+    let guard = match objc_runtime::OBJC_RUNTIME.read() {
         Ok(g) => g,
         Err(e) => e.into_inner(),
     };
@@ -201,7 +238,7 @@ pub extern "C" fn shim_nsobject_does_not_recognize_selector(obj: u64, _cmd: u64,
 
     // Resolve the class name for the error message.
     let class_name = {
-        let guard = match objc_runtime::OBJC_RUNTIME.lock() {
+        let guard = match objc_runtime::OBJC_RUNTIME.read() {
             Ok(g) => g,
             Err(e) => e.into_inner(),
         };
@@ -238,6 +275,81 @@ pub extern "C" fn shim_nsobject_does_not_recognize_selector(obj: u64, _cmd: u64,
     objc_runtime::shim_objc_exception_throw(exc);
 }
 
+/// `-[NSObject superclass]` — returns the superclass address.
+pub extern "C" fn shim_nsobject_superclass(obj: u64, _cmd: u64) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
+    let isa = unsafe { *(obj as *const u64) };
+    let guard = match objc_runtime::OBJC_RUNTIME.read() {
+        Ok(g) => g,
+        Err(e) => e.into_inner(),
+    };
+    let Some(rt) = guard.as_ref() else { return 0 };
+    if let Some(class_info) = rt.get_class_by_addr(isa) {
+        class_info.superclass_addr.unwrap_or(0)
+    } else {
+        0
+    }
+}
+
+/// `-[NSObject className]` — returns an NSString with the class name.
+pub extern "C" fn shim_nsobject_class_name(obj: u64, _cmd: u64) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
+    let isa = unsafe { *(obj as *const u64) };
+    let guard = match objc_runtime::OBJC_RUNTIME.read() {
+        Ok(g) => g,
+        Err(e) => e.into_inner(),
+    };
+    let Some(rt) = guard.as_ref() else { return 0 };
+    let name = rt
+        .get_class_by_addr(isa)
+        .map(|c| c.name.clone())
+        .unwrap_or_default();
+    drop(guard);
+    let cstr = std::ffi::CString::new(name).unwrap_or_default();
+    crate::cfstring::alloc_nsstring_from_cstr(cstr.as_ptr())
+}
+
+/// `-[NSObject debugDescription]` — returns `"<ClassName: 0xaddr>"`.
+pub extern "C" fn shim_nsobject_debug_description(obj: u64, _cmd: u64) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
+    let isa = unsafe { *(obj as *const u64) };
+    let guard = match objc_runtime::OBJC_RUNTIME.read() {
+        Ok(g) => g,
+        Err(e) => e.into_inner(),
+    };
+    let class_name = guard
+        .as_ref()
+        .and_then(|rt| rt.get_class_by_addr(isa).map(|c| c.name.clone()))
+        .unwrap_or_else(|| format!("{:#x}", isa));
+    drop(guard);
+    let desc = format!("<{}: {:#x}>", class_name, obj);
+    let cstr = std::ffi::CString::new(desc).unwrap_or_default();
+    crate::cfstring::alloc_nsstring_from_cstr(cstr.as_ptr())
+}
+
+/// `+[NSObject superclass]` — returns the superclass of the class.
+pub extern "C" fn shim_nsobject_class_superclass(cls: u64, _cmd: u64) -> u64 {
+    if cls == 0 {
+        return 0;
+    }
+    let guard = match objc_runtime::OBJC_RUNTIME.read() {
+        Ok(g) => g,
+        Err(e) => e.into_inner(),
+    };
+    let Some(rt) = guard.as_ref() else { return 0 };
+    if let Some(class_info) = rt.get_class_by_addr(cls) {
+        class_info.superclass_addr.unwrap_or(0)
+    } else {
+        0
+    }
+}
+
 /// `+[NSObject resolveInstanceMethod:]` — default returns NO.
 pub extern "C" fn shim_nsobject_resolve_instance_method(
     _cls: u64,
@@ -254,4 +366,77 @@ pub extern "C" fn shim_nsobject_resolve_class_method(
     _sel: u64,
 ) -> u8 {
     0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shim_test_helpers::*;
+
+    #[test]
+    fn init_returns_self() {
+        let obj = alloc_obj_fake(16);
+        assert_eq!(shim_nsobject_init(obj, 0), obj);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn self_returns_self() {
+        let obj = alloc_obj_fake(16);
+        assert_eq!(shim_nsobject_self(obj, 0), obj);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn class_returns_isa() {
+        let isa = 0xDEAD_BEEF_u64;
+        let obj = alloc_obj(16, isa);
+        assert_eq!(shim_nsobject_class(obj, 0), isa);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn class_nil_returns_zero() {
+        assert_eq!(shim_nsobject_class(0, 0), 0);
+    }
+
+    #[test]
+    fn responds_to_selector_nil_returns_zero() {
+        assert_eq!(shim_nsobject_responds_to_selector(0, 0, 0), 0);
+    }
+
+    #[test]
+    fn is_kind_of_class_nil_returns_zero() {
+        assert_eq!(shim_nsobject_is_kind_of_class(0, 0, 0), 0);
+    }
+
+    #[test]
+    fn resolve_instance_method_returns_zero() {
+        assert_eq!(shim_nsobject_resolve_instance_method(0, 0, 0), 0);
+    }
+
+    #[test]
+    fn resolve_class_method_returns_zero() {
+        assert_eq!(shim_nsobject_resolve_class_method(0, 0, 0), 0);
+    }
+
+    #[test]
+    fn superclass_nil_returns_zero() {
+        assert_eq!(shim_nsobject_superclass(0, 0), 0);
+    }
+
+    #[test]
+    fn class_name_nil_returns_zero() {
+        assert_eq!(shim_nsobject_class_name(0, 0), 0);
+    }
+
+    #[test]
+    fn debug_description_nil_returns_zero() {
+        assert_eq!(shim_nsobject_debug_description(0, 0), 0);
+    }
+
+    #[test]
+    fn class_superclass_nil_returns_zero() {
+        assert_eq!(shim_nsobject_class_superclass(0, 0), 0);
+    }
 }

@@ -8,7 +8,13 @@
 
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::ffi::c_void;
 use std::sync::Mutex;
+
+#[cfg(target_os = "macos")]
+unsafe extern "C" {
+    fn malloc_size(ptr: *const c_void) -> usize;
+}
 
 /// Global reference-counting state (shared across all threads).
 pub static REFCOUNTS: Mutex<RefCountTable> = Mutex::new(RefCountTable { counts: None });
@@ -84,6 +90,35 @@ impl RefCountTable {
     pub fn reset(&mut self) {
         self.counts = None;
     }
+}
+
+pub fn object_appears_heap_allocated(obj: u64) -> bool {
+    if obj == 0 {
+        return false;
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        unsafe { malloc_size(obj as *const c_void) != 0 }
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        true
+    }
+}
+
+pub fn deallocate_tracked_object(obj: u64, context: &str) {
+    if !object_appears_heap_allocated(obj) {
+        log::debug!(
+            "{context}: skipping deallocation for non-malloc object {:#x}",
+            obj
+        );
+        return;
+    }
+
+    log::debug!("{context}: deallocating {:#x}", obj);
+    crate::pal_alloc().free(obj as *mut u8);
 }
 
 /// Stack of autorelease pools.

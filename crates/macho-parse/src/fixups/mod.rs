@@ -259,3 +259,91 @@ pub fn extract_fixups(parsed: &crate::ParsedMachO, raw_data: &[u8]) -> Fixups {
 
     Fixups::empty()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fixups_empty_has_no_entries() {
+        let f = Fixups::empty();
+        assert!(matches!(f.model, FixupModel::None));
+        assert!(f.rebases.is_empty());
+        assert!(f.binds.is_empty());
+        assert!(f.weak_binds.is_empty());
+        assert!(f.lazy_binds.is_empty());
+        assert!(f.chained.is_empty());
+    }
+
+    #[test]
+    fn uleb128_single_byte() {
+        let data = [0x7F];
+        let mut pos = 0;
+        assert_eq!(read_uleb128(&data, &mut pos), 127);
+        assert_eq!(pos, 1);
+    }
+
+    #[test]
+    fn uleb128_multi_byte() {
+        // 300 = 0xAC 0x02
+        let data = [0xAC, 0x02];
+        let mut pos = 0;
+        assert_eq!(read_uleb128(&data, &mut pos), 300);
+        assert_eq!(pos, 2);
+    }
+
+    #[test]
+    fn uleb128_zero() {
+        let data = [0x00];
+        let mut pos = 0;
+        assert_eq!(read_uleb128(&data, &mut pos), 0);
+    }
+
+    #[test]
+    fn sleb128_positive() {
+        // 42 = 0x2A (single byte, high bit clear, sign bit clear)
+        let data = [0x2A];
+        let mut pos = 0;
+        assert_eq!(read_sleb128(&data, &mut pos), 42);
+    }
+
+    #[test]
+    fn sleb128_negative() {
+        // -1 = 0x7F (single byte, bit 6 set → sign extend)
+        let data = [0x7F];
+        let mut pos = 0;
+        assert_eq!(read_sleb128(&data, &mut pos), -1);
+    }
+
+    #[test]
+    fn sleb128_negative_multi_byte() {
+        // -128 = 0x80 0x7F
+        let data = [0x80, 0x7F];
+        let mut pos = 0;
+        assert_eq!(read_sleb128(&data, &mut pos), -128);
+    }
+
+    #[test]
+    fn cstring_basic() {
+        let data = b"foo\0bar";
+        let mut pos = 0;
+        assert_eq!(read_cstring(data, &mut pos), "foo");
+        assert_eq!(pos, 4);
+    }
+
+    #[test]
+    fn cstring_at_end_no_nul() {
+        let data = b"abc";
+        let mut pos = 0;
+        assert_eq!(read_cstring(data, &mut pos), "abc");
+        assert_eq!(pos, 3);
+    }
+
+    #[test]
+    fn fixup_model_debug() {
+        let m = FixupModel::Chained { pointer_format: 6 };
+        let dbg = format!("{:?}", m);
+        assert!(dbg.contains("Chained"));
+        assert!(dbg.contains("6"));
+    }
+}

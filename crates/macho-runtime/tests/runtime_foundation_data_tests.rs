@@ -15,7 +15,7 @@ fn runtime_nsdata_basics_exit_zero() {
 fn runtime_nsdata_class_registered() {
     let Some(_result) = common::run_fixture("nsdata_basics/app") else { return };
 
-    let rt = objc_runtime::OBJC_RUNTIME.lock().unwrap();
+    let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
 
     let nsdata = rt.get_class("NSData").expect("NSData should be registered");
@@ -51,7 +51,7 @@ fn runtime_nsstring_path_exit_zero() {
 fn runtime_nsstring_path_methods_registered() {
     let Some(_result) = common::run_fixture("nsstring_path/app") else { return };
 
-    let rt = objc_runtime::OBJC_RUNTIME.lock().unwrap();
+    let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
 
     let nsstring = rt
@@ -102,7 +102,7 @@ fn runtime_nsprocessinfo_basics_exit_zero() {
 fn runtime_nsprocessinfo_class_registered() {
     let Some(_result) = common::run_fixture("nsprocessinfo_basics/app") else { return };
 
-    let rt = objc_runtime::OBJC_RUNTIME.lock().unwrap();
+    let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
 
     let nspi = rt
@@ -140,7 +140,7 @@ fn runtime_blocks_foundation_exit_zero() {
 fn runtime_blocks_foundation_methods_registered() {
     let Some(_result) = common::run_fixture("blocks_foundation/app") else { return };
 
-    let rt = objc_runtime::OBJC_RUNTIME.lock().unwrap();
+    let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
 
     let nsarray = rt

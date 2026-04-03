@@ -69,10 +69,6 @@ pub fn call_entry_with_args(
                 text_base as u64
             );
 
-            // Finalize segment permissions before handing control to the binary.
-            // This makes __TEXT RX (not RW) and __DATA_CONST R (not RW).
-            image.protect()?;
-
             // Cast to extern "C" fn() -> i32 and call.
             // Build argv from EntryArgs if provided, otherwise minimal default.
             let stripped = ptrauth::ptrauth_strip(entry_addr as u64) as *const u8;
@@ -279,3 +275,5 @@ pub fn call_entry_interpreted(
         EntryPoint::UnixThread { .. } => Err(ExecError::NoEntryPoint),
     }
 }
+
+

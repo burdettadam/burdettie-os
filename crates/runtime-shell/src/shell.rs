@@ -14,8 +14,6 @@ pub struct Session {
     pub trace_enabled: bool,
     /// Security policy mode.
     pub policy_mode: PolicyMode,
-    /// Whether to allow host fallback for unresolved symbols.
-    pub host_fallback: bool,
     /// Serialization lock for runtime calls (global ObjC state).
     pub runtime_lock: Mutex<()>,
 }
@@ -83,7 +81,7 @@ fn print_banner(session: &Session) {
 
     println!();
     println!("╔══════════════════════════════════════════════════════╗");
-    println!("║           burdetty-os runtime shell            ║");
+    println!("║           burdettie-os runtime shell            ║");
     println!("╠══════════════════════════════════════════════════════╣");
     println!("║                                                      ║");
     println!(
@@ -125,7 +123,6 @@ pub fn run() {
         fixtures_root: find_fixtures_root(),
         trace_enabled: false,
         policy_mode: PolicyMode::Permissive,
-        host_fallback: true,
         runtime_lock: Mutex::new(()),
     };
 
@@ -179,7 +176,9 @@ pub fn run() {
             "score" | "scorecard" => commands::scorecard(&session),
             "trace" => commands::trace(args, &mut session),
             "policy" => commands::policy(args, &mut session),
-            "hostfallback" => commands::host_fallback(args, &mut session),
+            "hostfallback" => {
+                println!("Host fallback has been removed. The safe-symbol StubResolver is always active.");
+            }
             "info" => commands::info(&session),
             "banner" => print_banner(&session),
             "gui" => commands::gui(args, &session),

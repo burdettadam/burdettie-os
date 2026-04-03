@@ -62,3 +62,54 @@ pub extern "C" fn shim_nspipe_description(obj: u64, _cmd: u64) -> u64 {
     if obj == 0 { return 0; }
     make_nsstring("<NSPipe>")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shim_test_helpers::*;
+
+    // Note: NSPipe creates real OS pipe file descriptors via libc::pipe().
+    // The inner NSFileHandle objects and underlying fds are intentionally
+    // leaked in these tests (OS closes them on process exit).
+
+    #[test]
+    fn pipe_returns_nonzero() {
+        let p = shim_nspipe_pipe(0, 0);
+        assert_ne!(p, 0);
+        free_obj(p);
+    }
+
+    #[test]
+    fn pipe_read_and_write_handles_are_nonzero() {
+        let p = shim_nspipe_pipe(0, 0);
+        assert_ne!(p, 0);
+        assert_ne!(shim_nspipe_file_handle_for_reading(p, 0), 0);
+        assert_ne!(shim_nspipe_file_handle_for_writing(p, 0), 0);
+        free_obj(p);
+    }
+
+    #[test]
+    fn pipe_read_and_write_handles_are_different() {
+        let p = shim_nspipe_pipe(0, 0);
+        let read_fh = shim_nspipe_file_handle_for_reading(p, 0);
+        let write_fh = shim_nspipe_file_handle_for_writing(p, 0);
+        assert_ne!(read_fh, write_fh);
+        free_obj(p);
+    }
+
+    #[test]
+    fn nil_obj_returns_zero() {
+        assert_eq!(shim_nspipe_file_handle_for_reading(0, 0), 0);
+        assert_eq!(shim_nspipe_file_handle_for_writing(0, 0), 0);
+        assert_eq!(shim_nspipe_description(0, 0), 0);
+    }
+
+    #[test]
+    fn description_is_nspipe_string() {
+        let p = shim_nspipe_pipe(0, 0);
+        let desc = shim_nspipe_description(p, 0);
+        assert_ne!(desc, 0);
+        assert_string_eq(desc, "<NSPipe>");
+        free_obj(p);
+    }
+}

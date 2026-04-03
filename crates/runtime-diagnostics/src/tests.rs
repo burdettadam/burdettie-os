@@ -1,8 +1,14 @@
 use crate::{DiagEvent, emit, drain, clear, has_events, event_count, snapshot};
+use crate::{drain_stamped, snapshot_stamped, total_emitted};
 use crate::ring::{DiagRing, DiagCategory};
+use std::sync::Mutex;
+
+/// Serialize tests that use the process-global diagnostic ring.
+static COLLECTOR_TEST_LOCK: Mutex<()> = Mutex::new(());
 
 #[test]
 fn emit_and_drain() {
+    let _guard = COLLECTOR_TEST_LOCK.lock().unwrap();
     clear();
     emit(DiagEvent::ClassMissing { name: "Foo".into() });
     emit(DiagEvent::SymbolMissing { name: "_bar".into() });
@@ -17,6 +23,7 @@ fn emit_and_drain() {
 
 #[test]
 fn snapshot_does_not_clear() {
+    let _guard = COLLECTOR_TEST_LOCK.lock().unwrap();
     clear();
     emit(DiagEvent::ClassMissing { name: "A".into() });
     let snap = snapshot();
@@ -287,4 +294,102 @@ fn ring_category_of_all_variants() {
     for e in &events {
         let _ = DiagCategory::of(e);
     }
+}
+
+// ── Collector API tests ─────────────────────────────────────────────
+
+#[test]
+fn drain_stamped_has_seq_numbers() {
+    let _guard = COLLECTOR_TEST_LOCK.lock().unwrap();
+    clear();
+    emit(DiagEvent::ClassMissing { name: "A".into() });
+    emit(DiagEvent::SymbolMissing { name: "_b".into() });
+    emit(DiagEvent::ClassMissing { name: "C".into() });
+
+    let stamped = drain_stamped();
+    assert_eq!(stamped.len(), 3);
+    // Sequence numbers should be monotonically increasing
+    assert!(stamped[0].seq < stamped[1].seq);
+    assert!(stamped[1].seq < stamped[2].seq);
+    // Verify event content is preserved
+    assert_eq!(stamped[0].event, DiagEvent::ClassMissing { name: "A".into() });
+    assert_eq!(stamped[2].event, DiagEvent::ClassMissing { name: "C".into() });
+    // Buffer should be empty after drain
+    assert_eq!(event_count(), 0);
+}
+
+#[test]
+fn total_emitted_counts_all() {
+    let _guard = COLLECTOR_TEST_LOCK.lock().unwrap();
+    clear();
+    for i in 0..5 {
+        emit(DiagEvent::SymbolMissing { name: format!("sym{i}") });
+    }
+    let before = total_emitted();
+    // total_emitted counts all events ever pushed into the global ring
+    // Since the global ring is shared, just verify we got at least 5
+    assert!(before >= 5, "total_emitted={before}");
+    clear();
+    // total_emitted does not reset on clear
+    let after = total_emitted();
+    assert!(after >= before, "after={after} before={before}");
+}
+
+#[test]
+fn snapshot_stamped_returns_copies_with_seq() {
+    let _guard = COLLECTOR_TEST_LOCK.lock().unwrap();
+    clear();
+    emit(DiagEvent::HostFallback {
+        reason: "test".into(),
+        selector: "init".into(),
+        receiver: 0x10,
+    });
+    emit(DiagEvent::ClassMissing { name: "Foo".into() });
+
+    let stamped = snapshot_stamped();
+    assert_eq!(stamped.len(), 2);
+    assert!(stamped[0].seq < stamped[1].seq);
+    // Snapshot should NOT clear the buffer
+    assert_eq!(event_count(), 2);
+    clear();
+}
+
+#[test]
+fn category_counters_all_fields() {
+    // Use a fresh ring so we can check exact counts
+    let mut ring = DiagRing::with_capacity(64);
+    ring.push(DiagEvent::SelectorMissing {
+        selector: "foo".into(), class_name: "Bar".into(), receiver: 0,
+    });
+    ring.push(DiagEvent::ForwardingEntered {
+        selector: "x".into(), receiver: 0, isa: 0,
+    });
+    ring.push(DiagEvent::ClassMissing { name: "A".into() });
+    ring.push(DiagEvent::SymbolBlocked { name: "s".into() });
+    ring.push(DiagEvent::SymbolMissing { name: "t".into() });
+    ring.push(DiagEvent::HostFallback {
+        reason: "r".into(), selector: "s".into(), receiver: 0,
+    });
+    ring.push(DiagEvent::MethodDispatch {
+        selector: "m".into(), isa: 0, imp: 0,
+    });
+    ring.push(DiagEvent::ResourceRequest {
+        kind: "dylib".into(), name: "lib".into(),
+    });
+
+    assert_eq!(ring.counters.selector_dispatch, 2); // SelectorMissing + ForwardingEntered
+    assert_eq!(ring.counters.class_lookup, 1);
+    assert_eq!(ring.counters.symbol_resolution, 2); // SymbolBlocked + SymbolMissing
+    assert_eq!(ring.counters.host_fallback, 1);
+    assert_eq!(ring.counters.method_trace, 1);
+    assert_eq!(ring.counters.resource_graph, 1);
+    assert_eq!(ring.counters.total(), 8);
+}
+
+#[test]
+fn diag_event_display_class_missing() {
+    let ev = DiagEvent::ClassMissing { name: "NSWidgetController".into() };
+    let s = format!("{ev}");
+    assert!(s.contains("class missing"));
+    assert!(s.contains("NSWidgetController"));
 }

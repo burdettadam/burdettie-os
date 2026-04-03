@@ -261,3 +261,36 @@ fn flatten_cubic(
     flatten_cubic(p0, m01, m012, mid, tol, out);
     flatten_cubic(mid, m123, m23, p3, tol, out);
 }
+
+impl BezierPath {
+    /// Compute the axis-aligned bounding box of all control points in the path.
+    pub fn bounding_box(&self) -> crate::geometry::Rect {
+        let mut min_x = f64::MAX;
+        let mut min_y = f64::MAX;
+        let mut max_x = f64::MIN;
+        let mut max_y = f64::MIN;
+
+        let mut visit = |p: Point| {
+            if p.x < min_x { min_x = p.x; }
+            if p.y < min_y { min_y = p.y; }
+            if p.x > max_x { max_x = p.x; }
+            if p.y > max_y { max_y = p.y; }
+        };
+
+        for el in &self.elements {
+            match *el {
+                PathElement::MoveTo(p) | PathElement::LineTo(p) => visit(p),
+                PathElement::QuadTo { ctrl, end } => { visit(ctrl); visit(end); }
+                PathElement::CubicTo { ctrl1, ctrl2, end } => {
+                    visit(ctrl1); visit(ctrl2); visit(end);
+                }
+                PathElement::Close => {}
+            }
+        }
+
+        if min_x > max_x {
+            return crate::geometry::Rect::ZERO;
+        }
+        crate::geometry::Rect::new(min_x, min_y, max_x - min_x, max_y - min_y)
+    }
+}

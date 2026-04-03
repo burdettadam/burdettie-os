@@ -1,4 +1,4 @@
-//! C-ABI FFI wrapper for the burdetty-os runtime.
+//! C-ABI FFI wrapper for the burdettie-os runtime.
 //!
 //! Exposes the runtime's core functionality through stable `extern "C"` functions
 //! that can be called from C, Swift, Python, or any language with C FFI support.
@@ -44,5 +44,25 @@ pub extern "C" fn darwin_runtime_version() -> DarwinVersion {
         major: 0,
         minor: 1,
         patch: 0,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn version_returns_expected() {
+        let v = darwin_runtime_version();
+        assert_eq!(v.major, 0);
+        assert!(v.minor >= 1);
+    }
+
+    #[test]
+    fn version_struct_fields() {
+        let v = darwin_runtime_version();
+        assert_eq!(v.major, 0);
+        assert_eq!(v.minor, 1);
+        assert_eq!(v.patch, 0);
     }
 }

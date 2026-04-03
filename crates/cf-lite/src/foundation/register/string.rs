@@ -30,9 +30,102 @@ pub fn register_nsstring_class(rt: &mut objc_runtime::ObjcRuntime) {
                 "r*@:",
             ),
             me(
+                "cStringUsingEncoding:",
+                cfstring::shim_nsstring_cstring_using_encoding as u64,
+                "r*:@Q",
+            ),
+            me(
                 "description",
                 cfstring::shim_nsstring_description as u64,
                 "@@:",
+            ),
+            me("path", cfstring::shim_nsstring_path as u64, "@@:"),
+            me(
+                "dataUsingEncoding:",
+                cfstring::shim_nsstring_data_using_encoding as u64,
+                "@@:Q",
+            ),
+            me(
+                "dataUsingEncoding:allowLossyConversion:",
+                cfstring::shim_nsstring_data_using_encoding_lossy as u64,
+                "@@:QB",
+            ),
+            me(
+                "stringByResolvingSymlinksInPath",
+                cfstring::shim_nsstring_string_by_resolving_symlinks_in_path as u64,
+                "@@:",
+            ),
+            me(
+                "stringByStandardizingPath",
+                cfstring::shim_nsstring_string_by_standardizing_path as u64,
+                "@@:",
+            ),
+            me(
+                "stringByExpandingTildeInPath",
+                cfstring::shim_nsstring_string_by_expanding_tilde_in_path as u64,
+                "@@:",
+            ),
+            me(
+                "stringByAppendingPathExtension:",
+                cfstring::shim_nsstring_string_by_appending_path_extension as u64,
+                "@@:@",
+            ),
+            me(
+                "pathComponents",
+                cfstring::shim_nsstring_path_components as u64,
+                "@@:",
+            ),
+            me(
+                "localizedCaseInsensitiveCompare:",
+                cfstring::shim_nsstring_localized_case_insensitive_compare as u64,
+                "q@:@",
+            ),
+            me(
+                "localizedCompare:",
+                cfstring::shim_nsstring_localized_compare as u64,
+                "q@:@",
+            ),
+            me(
+                "precomposedStringWithCanonicalMapping",
+                cfstring::shim_nsstring_precomposed_string_with_canonical_mapping as u64,
+                "@@:",
+            ),
+            me(
+                "decomposedStringWithCanonicalMapping",
+                cfstring::shim_nsstring_decomposed_string_with_canonical_mapping as u64,
+                "@@:",
+            ),
+            me(
+                "stringByAddingPercentEncodingWithAllowedCharacters:",
+                cfstring::shim_nsstring_string_by_adding_percent_encoding as u64,
+                "@@:@",
+            ),
+            me(
+                "stringByRemovingPercentEncoding",
+                cfstring::shim_nsstring_string_by_removing_percent_encoding as u64,
+                "@@:",
+            ),
+            me(
+                "lengthOfBytesUsingEncoding:",
+                cfstring::shim_nsstring_length_of_bytes_using_encoding as u64,
+                "Q@:Q",
+            ),
+            me(
+                "maximumLengthOfBytesUsingEncoding:",
+                cfstring::shim_nsstring_maximum_length_of_bytes_using_encoding as u64,
+                "Q@:Q",
+            ),
+            // Mutation methods — shared 32-byte layout allows in-place
+            // mutation of heap-allocated CFStrings (used by atos etc.).
+            me(
+                "appendString:",
+                nsmutablestring::shim_nsmutablestring_append_string as u64,
+                "v@:@",
+            ),
+            me(
+                "appendFormat:",
+                nsmutablestring::shim_nsmutablestring_append_format as u64,
+                "v@:@",
             ),
         ],
         class_methods: vec![],
@@ -65,10 +158,16 @@ pub fn register_nsstring_proper_class(rt: &mut objc_runtime::ObjcRuntime) {
                 "r*@:",
             ),
             me(
+                "cStringUsingEncoding:",
+                cfstring::shim_nsstring_cstring_using_encoding as u64,
+                "r*:@Q",
+            ),
+            me(
                 "description",
                 cfstring::shim_nsstring_description as u64,
                 "@@:",
             ),
+            me("path", cfstring::shim_nsstring_path as u64, "@@:"),
             me(
                 "initWithUTF8String:",
                 cfstring::shim_nsstring_init_with_utf8string as u64,
@@ -78,6 +177,11 @@ pub fn register_nsstring_proper_class(rt: &mut objc_runtime::ObjcRuntime) {
                 "initWithData:encoding:",
                 cfstring::shim_nsstring_init_with_data_encoding as u64,
                 "@@:@Q",
+            ),
+            me(
+                "initWithContentsOfFile:encoding:error:",
+                cfstring::shim_nsstring_init_with_contents_of_file_encoding_error as u64,
+                "@@:@Q^@",
             ),
             me(
                 "isEqualToString:",
@@ -120,8 +224,18 @@ pub fn register_nsstring_proper_class(rt: &mut objc_runtime::ObjcRuntime) {
                 "@@:",
             ),
             me("compare:", cfstring::shim_nsstring_compare as u64, "q@:@"),
+            me(
+                "compare:options:",
+                cfstring::shim_nsstring_compare_options as u64,
+                "q@:@@Q",
+            ),
             me("copy", cfstring::shim_nsstring_copy as u64, "@@:"),
             me("hash", cfstring::shim_nsstring_hash as u64, "Q@:"),
+            me(
+                "writeToFile:atomically:encoding:error:",
+                cfstring::shim_nsstring_write_to_file as u64,
+                "c@:@cQ^@",
+            ),
             me(
                 "stringByReplacingOccurrencesOfString:withString:",
                 cfstring::shim_nsstring_string_by_replacing as u64,
@@ -136,6 +250,21 @@ pub fn register_nsstring_proper_class(rt: &mut objc_runtime::ObjcRuntime) {
                 "rangeOfString:",
                 cfstring::shim_nsstring_range_of_string as u64,
                 "{_NSRange=QQ}@:@",
+            ),
+            me(
+                "rangeOfString:options:",
+                cfstring::shim_nsstring_range_of_string_options as u64,
+                "{_NSRange=QQ}@:@Q",
+            ),
+            me(
+                "rangeOfString:options:range:",
+                cfstring::shim_nsstring_range_of_string_options_range as u64,
+                "{_NSRange=QQ}@:@Q{_NSRange=QQ}",
+            ),
+            me(
+                "matchMemberOfArray:fromPosition:whichMember:",
+                cfstring::shim_nsstring_match_member_of_array_from_position_which_member as u64,
+                "{_NSRange=QQ}@:@Q^q",
             ),
             me(
                 "integerValue",
@@ -181,6 +310,16 @@ pub fn register_nsstring_proper_class(rt: &mut objc_runtime::ObjcRuntime) {
                 "isAbsolutePath",
                 cfstring::shim_nsstring_is_absolute_path as u64,
                 "B@:",
+            ),
+            me(
+                "stringByResolvingSymlinksInPath",
+                cfstring::shim_nsstring_string_by_resolving_symlinks_in_path as u64,
+                "@@:",
+            ),
+            me(
+                "stringByStandardizingPath",
+                cfstring::shim_nsstring_string_by_standardizing_path as u64,
+                "@@:",
             ),
             me(
                 "stringByTrimmingCharactersInSet:",
@@ -232,12 +371,122 @@ pub fn register_nsstring_proper_class(rt: &mut objc_runtime::ObjcRuntime) {
                 cfstring::shim_nsstring_is_equal as u64,
                 "B@:@",
             ),
+            me(
+                "dataUsingEncoding:",
+                cfstring::shim_nsstring_data_using_encoding as u64,
+                "@@:Q",
+            ),
+            me(
+                "dataUsingEncoding:allowLossyConversion:",
+                cfstring::shim_nsstring_data_using_encoding_lossy as u64,
+                "@@:QB",
+            ),
+            me(
+                "initWithFormat:",
+                cfstring::shim_nsstring_init_with_format as u64,
+                "@@:@",
+            ),
+            me(
+                "initWithFormat:arguments:",
+                cfstring::shim_nsstring_init_with_format_arguments as u64,
+                "@@:@^v",
+            ),
+            me(
+                "stringByReplacingUnicodeCharacterEscapeSequences:",
+                cfstring::shim_nsstring_string_by_replacing_unicode_escapes as u64,
+                "@@:B",
+            ),
+            me(
+                "stringByExpandingTildeInPath",
+                cfstring::shim_nsstring_string_by_expanding_tilde_in_path as u64,
+                "@@:",
+            ),
+            me(
+                "stringByAppendingPathExtension:",
+                cfstring::shim_nsstring_string_by_appending_path_extension as u64,
+                "@@:@",
+            ),
+            me(
+                "pathComponents",
+                cfstring::shim_nsstring_path_components as u64,
+                "@@:",
+            ),
+            me(
+                "localizedCaseInsensitiveCompare:",
+                cfstring::shim_nsstring_localized_case_insensitive_compare as u64,
+                "q@:@",
+            ),
+            me(
+                "localizedCompare:",
+                cfstring::shim_nsstring_localized_compare as u64,
+                "q@:@",
+            ),
+            me(
+                "precomposedStringWithCanonicalMapping",
+                cfstring::shim_nsstring_precomposed_string_with_canonical_mapping as u64,
+                "@@:",
+            ),
+            me(
+                "decomposedStringWithCanonicalMapping",
+                cfstring::shim_nsstring_decomposed_string_with_canonical_mapping as u64,
+                "@@:",
+            ),
+            me(
+                "stringByAddingPercentEncodingWithAllowedCharacters:",
+                cfstring::shim_nsstring_string_by_adding_percent_encoding as u64,
+                "@@:@",
+            ),
+            me(
+                "stringByRemovingPercentEncoding",
+                cfstring::shim_nsstring_string_by_removing_percent_encoding as u64,
+                "@@:",
+            ),
+            me(
+                "initWithBytes:length:encoding:",
+                cfstring::shim_nsstring_init_with_bytes_length_encoding as u64,
+                "@@:^vQQ",
+            ),
+            me(
+                "lengthOfBytesUsingEncoding:",
+                cfstring::shim_nsstring_length_of_bytes_using_encoding as u64,
+                "Q@:Q",
+            ),
+            me(
+                "maximumLengthOfBytesUsingEncoding:",
+                cfstring::shim_nsstring_maximum_length_of_bytes_using_encoding as u64,
+                "Q@:Q",
+            ),
         ],
         class_methods: vec![
             me(
                 "stringWithUTF8String:",
                 cfstring::shim_nsstring_string_with_utf8string as u64,
                 "@@:*",
+            ),
+            me(
+                "stringWithString:",
+                cfstring::shim_nsstring_string_with_string as u64,
+                "@@:@",
+            ),
+            me(
+                "stringWithCString:encoding:",
+                cfstring::shim_nsstring_string_with_cstring_encoding as u64,
+                "@@:*Q",
+            ),
+            me(
+                "localizedNameOfStringEncoding:",
+                cfstring::shim_nsstring_localized_name_of_string_encoding as u64,
+                "@@:Q",
+            ),
+            me(
+                "stringWithContentsOfFile:encoding:error:",
+                cfstring::shim_nsstring_string_with_contents_of_file_encoding_error as u64,
+                "@@:@Q^@",
+            ),
+            me(
+                "stringWithContentsOfURL:usedEncoding:error:",
+                cfstring::shim_nsstring_string_with_contents_of_url_used_encoding_error as u64,
+                "@@:@@^@",
             ),
             me(
                 "stringWithFormat:",
@@ -268,6 +517,16 @@ pub fn register_nsmutablestring_class(rt: &mut objc_runtime::ObjcRuntime) {
         name: "NSMutableString".to_string(),
         mapped_addr: class_addr,
         methods: vec![
+            me(
+                "initWithCapacity:",
+                nsmutablestring::shim_nsmutablestring_init_with_capacity as u64,
+                "@@:Q",
+            ),
+            me(
+                "initWithFormat:",
+                nsmutablestring::shim_nsmutablestring_init_with_format as u64,
+                "@@:@",
+            ),
             // Inherited read methods (same 32-byte layout as NSString)
             me("length", cfstring::shim_nsstring_length as u64, "Q@:"),
             me(
@@ -276,10 +535,16 @@ pub fn register_nsmutablestring_class(rt: &mut objc_runtime::ObjcRuntime) {
                 "r*@:",
             ),
             me(
+                "cStringUsingEncoding:",
+                cfstring::shim_nsstring_cstring_using_encoding as u64,
+                "r*:@Q",
+            ),
+            me(
                 "description",
                 cfstring::shim_nsstring_description as u64,
                 "@@:",
             ),
+            me("path", cfstring::shim_nsstring_path as u64, "@@:"),
             me(
                 "isEqualToString:",
                 cfstring::shim_nsstring_is_equal_to_string as u64,
@@ -296,6 +561,11 @@ pub fn register_nsmutablestring_class(rt: &mut objc_runtime::ObjcRuntime) {
                 "B@:@",
             ),
             me("hash", cfstring::shim_nsstring_hash as u64, "Q@:"),
+            me(
+                "writeToFile:atomically:encoding:error:",
+                cfstring::shim_nsstring_write_to_file as u64,
+                "c@:@cQ^@",
+            ),
             // Mutation methods
             me(
                 "initWithString:",
@@ -305,6 +575,11 @@ pub fn register_nsmutablestring_class(rt: &mut objc_runtime::ObjcRuntime) {
             me(
                 "appendString:",
                 nsmutablestring::shim_nsmutablestring_append_string as u64,
+                "v@:@",
+            ),
+            me(
+                "appendFormat:",
+                nsmutablestring::shim_nsmutablestring_append_format as u64,
                 "v@:@",
             ),
             me(
@@ -327,12 +602,34 @@ pub fn register_nsmutablestring_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nsmutablestring::shim_nsmutablestring_set_string as u64,
                 "v@:@",
             ),
+            me(
+                "clear",
+                nsmutablestring::shim_nsmutablestring_clear as u64,
+                "v@:",
+            ),
+            me(
+                "replaceOccurrencesOfString:withString:options:range:",
+                nsmutablestring::shim_nsmutablestring_replace_occurrences as u64,
+                "Q@:@@QQQ",
+            ),
         ],
-        class_methods: vec![me(
-            "string",
-            nsmutablestring::shim_nsmutablestring_string as u64,
-            "@@:",
-        )],
+        class_methods: vec![
+            me(
+                "string",
+                nsmutablestring::shim_nsmutablestring_string as u64,
+                "@@:",
+            ),
+            me(
+                "stringWithCapacity:",
+                nsmutablestring::shim_nsmutablestring_string_with_capacity as u64,
+                "@@:Q",
+            ),
+            me(
+                "stringWithFormat:",
+                nsmutablestring::string_with_format_trampoline_addr(),
+                "@@:@",
+            ),
+        ],
         ivars: vec![],
         properties: vec![],
         protocol_names: Vec::new(),

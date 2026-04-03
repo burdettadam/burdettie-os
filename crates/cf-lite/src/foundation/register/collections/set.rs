@@ -152,6 +152,11 @@ pub fn register_nsmutableset_class(rt: &mut objc_runtime::ObjcRuntime) {
                 "v@:@",
             ),
             me(
+                "addObjectsFromArray:",
+                nsmutableset::shim_nsmutableset_add_objects_from_array as u64,
+                "v@:@",
+            ),
+            me(
                 "removeObject:",
                 nsmutableset::shim_nsmutableset_remove_object as u64,
                 "v@:@",

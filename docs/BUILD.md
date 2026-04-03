@@ -11,8 +11,8 @@
 
 ```bash
 # Clone and build
-git clone <repo-url> burdetty-os
-cd burdetty-os
+git clone <repo-url> burdettie-os
+cd burdettie-os
 
 # Full pipeline: format → clippy → build → fixtures → test
 ./packaging/build.sh
@@ -97,13 +97,13 @@ require ARM64 macOS.
 
 ```bash
 # Build the dev image
-docker build -f docker/Dockerfile.dev -t burdetty-os-dev .
+docker build -f docker/Dockerfile.dev -t burdettie-os-dev .
 
 # Run clippy in container
-docker run --rm burdetty-os-dev
+docker run --rm burdettie-os-dev
 
 # Run unit tests in container
-docker run --rm burdetty-os-dev cargo test \
+docker run --rm burdettie-os-dev cargo test \
     -p platform-core -p macho-types -p macho-parse \
     -p macho-map -p macho-objc -p macho-resolve \
     -p macho-run-plan -p macho-diff -p trust-policy \
@@ -122,11 +122,11 @@ Build on macOS first, then create the image from the bundle.
 ./packaging/bundle-runtime.sh --release
 
 # 2. Create demo image
-docker build -f docker/Dockerfile.demo -t burdetty-os-demo dist/
+docker build -f docker/Dockerfile.demo -t burdettie-os-demo dist/
 
 # 3. Explore
-docker run --rm burdetty-os-demo
-docker run --rm burdetty-os-demo macho-inspect fixtures/simple_cli/app
+docker run --rm burdettie-os-demo
+docker run --rm burdettie-os-demo macho-inspect fixtures/simple_cli/app
 ```
 
 ## CI Pipeline

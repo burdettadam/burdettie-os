@@ -40,6 +40,12 @@ pub fn register_nsdictionary_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nsdictionary::shim_nsdictionary_description as u64,
                 "@@:",
             ),
+            me("copy", nsdictionary::shim_nsdictionary_copy as u64, "@@:"),
+            me(
+                "mutableCopy",
+                nsdictionary::shim_nsdictionary_mutable_copy as u64,
+                "@@:",
+            ),
             me(
                 "enumerateKeysAndObjectsUsingBlock:",
                 nsdictionary::shim_nsdictionary_enumerate_keys_and_objects_using_block as u64,
@@ -60,12 +66,49 @@ pub fn register_nsdictionary_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nskeyvaluecoding::shim_dict_value_for_key_path as u64,
                 "@@:@",
             ),
+            me(
+                "isEqualToDictionary:",
+                nsdictionary::shim_nsdictionary_is_equal_to_dictionary as u64,
+                "c@:@",
+            ),
+            me(
+                "writeToFile:atomically:",
+                nsdictionary::shim_nsdictionary_write_to_file as u64,
+                "c@:@c",
+            ),
         ],
-        class_methods: vec![me(
-            "dictionaryWithObjects:forKeys:count:",
-            nsdictionary::shim_nsdictionary_with_objects_for_keys_count as u64,
-            "@@:^@^@Q",
-        )],
+        class_methods: vec![
+            me(
+                "dictionaryWithObjects:forKeys:count:",
+                nsdictionary::shim_nsdictionary_with_objects_for_keys_count as u64,
+                "@@:^@^@Q",
+            ),
+            me(
+                "dictionaryWithContentsOfFile:",
+                nsdictionary::shim_nsdictionary_with_contents_of_file as u64,
+                "@@:@",
+            ),
+            me(
+                "dictionaryWithContentsOfURL:",
+                nsdictionary::shim_nsdictionary_with_contents_of_url as u64,
+                "@@:@",
+            ),
+            me(
+                "dictionaryWithContentsOfURL:error:",
+                nsdictionary::shim_nsdictionary_with_contents_of_url_error as u64,
+                "@@:@^@",
+            ),
+            me(
+                "dictionaryWithObject:forKey:",
+                nsdictionary::shim_nsdictionary_with_object_for_key as u64,
+                "@@:@@",
+            ),
+            me(
+                "dictionaryWithDictionary:",
+                nsdictionary::shim_nsdictionary_with_dictionary as u64,
+                "@@:@",
+            ),
+        ],
         ivars: vec![],
         properties: vec![],
         protocol_names: Vec::new(),
@@ -97,6 +140,8 @@ pub fn register_nsconstantdictionary_class(rt: &mut objc_runtime::ObjcRuntime) {
             me("allKeys", nsdictionary::shim_nsdictionary_all_keys as u64, "@@:"),
             me("allValues", nsdictionary::shim_nsdictionary_all_values as u64, "@@:"),
             me("description", nsdictionary::shim_nsdictionary_description as u64, "@@:"),
+            me("copy", nsdictionary::shim_nsdictionary_copy as u64, "@@:"),
+            me("mutableCopy", nsdictionary::shim_nsdictionary_mutable_copy as u64, "@@:"),
             me("enumerateKeysAndObjectsUsingBlock:", nsdictionary::shim_nsdictionary_enumerate_keys_and_objects_using_block as u64, "v@:@?"),
             me("keyEnumerator", nsenumerator::shim_nsdictionary_key_enumerator as u64, "@@:"),
             me("valueForKey:", nsdictionary::shim_nsdictionary_object_for_key as u64, "@@:@"),
@@ -126,6 +171,16 @@ pub fn register_nsmutabledictionary_class(rt: &mut objc_runtime::ObjcRuntime) {
         name: "NSMutableDictionary".to_string(),
         mapped_addr: class_addr,
         methods: vec![
+            me(
+                "initWithCapacity:",
+                nsmutabledict::shim_nsmutabledict_init_with_capacity as u64,
+                "@@:Q",
+            ),
+            me(
+                "initWithDictionary:",
+                nsmutabledict::shim_nsmutabledict_init_with_dictionary as u64,
+                "@@:@",
+            ),
             me("count", nsdictionary::shim_nsdictionary_count as u64, "Q@:"),
             me(
                 "objectForKey:",
@@ -150,6 +205,12 @@ pub fn register_nsmutabledictionary_class(rt: &mut objc_runtime::ObjcRuntime) {
             me(
                 "description",
                 nsdictionary::shim_nsdictionary_description as u64,
+                "@@:",
+            ),
+            me("copy", nsdictionary::shim_nsmutabledict_copy as u64, "@@:"),
+            me(
+                "mutableCopy",
+                nsdictionary::shim_nsmutabledict_mutable_copy as u64,
                 "@@:",
             ),
             me(
@@ -196,6 +257,26 @@ pub fn register_nsmutabledictionary_class(rt: &mut objc_runtime::ObjcRuntime) {
                 "addEntriesFromDictionary:",
                 nsmutabledict::shim_nsmutabledict_add_entries_from_dictionary as u64,
                 "v@:@",
+            ),
+            me(
+                "removeObjectsForKeys:",
+                nsmutabledict::shim_nsmutabledict_remove_objects_for_keys as u64,
+                "v@:@",
+            ),
+            me(
+                "setDictionary:",
+                nsmutabledict::shim_nsmutabledict_set_dictionary as u64,
+                "v@:@",
+            ),
+            me(
+                "isEqualToDictionary:",
+                nsdictionary::shim_nsdictionary_is_equal_to_dictionary as u64,
+                "c@:@",
+            ),
+            me(
+                "writeToFile:atomically:",
+                nsdictionary::shim_nsdictionary_write_to_file as u64,
+                "c@:@c",
             ),
         ],
         class_methods: vec![

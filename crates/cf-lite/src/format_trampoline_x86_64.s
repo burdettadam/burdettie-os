@@ -1,4 +1,4 @@
-// x86_64 stringWithFormat: variadic trampoline for burdetty-os.
+// x86_64 stringWithFormat: variadic trampoline for burdettie-os.
 //
 // When the ObjC runtime dispatches +[NSString stringWithFormat:], the
 // IMP is called with the x86_64 ObjC calling convention:

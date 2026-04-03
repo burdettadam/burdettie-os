@@ -63,7 +63,7 @@ jobs:
       - name: Upload bundle artifact
         uses: actions/upload-artifact@v4
         with:
-          name: burdetty-os-bundle
+          name: burdettie-os-bundle
           path: dist/
           retention-days: 14
 
@@ -95,12 +95,12 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build dev image
-        run: docker build -f docker/Dockerfile.dev -t burdetty-os-dev .
+        run: docker build -f docker/Dockerfile.dev -t burdettie-os-dev .
 
       - name: Run checks in container
         run: |
-          docker run --rm burdetty-os-dev
-          docker run --rm burdetty-os-dev cargo test \
+          docker run --rm burdettie-os-dev
+          docker run --rm burdettie-os-dev cargo test \
             -p platform-core -p macho-types -p macho-parse \
             -p macho-map -p macho-objc -p macho-resolve \
             -p macho-run-plan -p macho-diff -p trust-policy \

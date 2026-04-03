@@ -1,0 +1,19 @@
+[package]
+name         = "perf-bench"
+description  = "Performance matrix — compare loader overhead against Apple's native stack"
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+rust-version.workspace = true
+
+[dependencies]
+macho-runtime  = { workspace = true }
+runtime-diagnostics = { workspace = true }
+serde          = { workspace = true }
+serde_json     = { workspace = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+platform-darwin-host = { workspace = true }
+
+[lints]
+workspace = true

@@ -73,6 +73,24 @@ pub extern "C" fn shim_nsoperation_start(obj: u64, _cmd: u64) {
     unsafe { *((obj + 16) as *mut u64) = 1; } // finished
 }
 
+/// `-[NSOperation isReady]` — always returns YES (basic stub).
+pub extern "C" fn shim_nsoperation_is_ready(_obj: u64, _cmd: u64) -> u8 {
+    1
+}
+
+/// `-[NSOperation isAsynchronous]` — returns NO (synchronous execution).
+pub extern "C" fn shim_nsoperation_is_asynchronous(_obj: u64, _cmd: u64) -> u8 {
+    0
+}
+
+/// `-[NSOperation qualityOfService]` — returns NSQualityOfServiceDefault (-1).
+pub extern "C" fn shim_nsoperation_quality_of_service(_obj: u64, _cmd: u64) -> i64 {
+    -1
+}
+
+/// `-[NSOperation setQualityOfService:]` — no-op stub.
+pub extern "C" fn shim_nsoperation_set_quality_of_service(_obj: u64, _cmd: u64, _qos: i64) {}
+
 // ── NSBlockOperation ───────────────────────────────────────────────
 
 /// `+[NSBlockOperation blockOperationWithBlock:]`
@@ -192,4 +210,136 @@ pub extern "C" fn shim_queue_description(obj: u64, _cmd: u64) -> u64 {
     let desc = format!("<NSOperationQueue: {name_str}>");
     let c_desc = std::ffi::CString::new(desc).unwrap_or_default();
     cfstring::shim_cf_string_create_with_cstring(0, c_desc.as_ptr(), 0)
+}
+
+/// `-[NSOperationQueue qualityOfService]` — returns NSQualityOfServiceDefault (-1).
+pub extern "C" fn shim_queue_quality_of_service(_obj: u64, _cmd: u64) -> i64 {
+    -1
+}
+
+/// `-[NSOperationQueue setQualityOfService:]` — no-op stub.
+pub extern "C" fn shim_queue_set_quality_of_service(_obj: u64, _cmd: u64, _qos: i64) {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shim_test_helpers::*;
+
+    #[test]
+    fn operation_alloc_init_clean() {
+        let op = shim_nsoperation_alloc(0, 0);
+        assert_ne!(op, 0);
+        assert_eq!(shim_nsoperation_init(op, 0), op);
+        assert_eq!(shim_nsoperation_is_cancelled(op, 0), 0);
+        assert_eq!(shim_nsoperation_is_finished(op, 0), 0);
+        free_obj(op);
+    }
+
+    #[test]
+    fn operation_nil_safety() {
+        assert_eq!(shim_nsoperation_is_cancelled(0, 0), 0);
+        assert_eq!(shim_nsoperation_is_finished(0, 0), 0);
+        shim_nsoperation_cancel(0, 0);
+        shim_nsoperation_start(0, 0);
+    }
+
+    #[test]
+    fn operation_cancel_sets_flag() {
+        let op = shim_nsoperation_alloc(0, 0);
+        assert_eq!(shim_nsoperation_is_cancelled(op, 0), 0);
+        shim_nsoperation_cancel(op, 0);
+        assert_eq!(shim_nsoperation_is_cancelled(op, 0), 1);
+        free_obj(op);
+    }
+
+    #[test]
+    fn operation_start_sets_finished() {
+        let op = shim_nsoperation_alloc(0, 0);
+        shim_nsoperation_start(op, 0);
+        assert_eq!(shim_nsoperation_is_finished(op, 0), 1);
+        free_obj(op);
+    }
+
+    #[test]
+    fn operation_start_when_cancelled_skips_execution() {
+        let op = shim_nsoperation_alloc(0, 0);
+        shim_nsoperation_cancel(op, 0);
+        shim_nsoperation_start(op, 0);
+        // start bails early if cancelled — finished remains 0
+        assert_eq!(shim_nsoperation_is_finished(op, 0), 0);
+        free_obj(op);
+    }
+
+    #[test]
+    fn queue_alloc_init_and_suspend_round_trip() {
+        let q = shim_queue_alloc(0, 0);
+        assert_ne!(q, 0);
+        assert_eq!(shim_queue_is_suspended(q, 0), 0);
+        shim_queue_set_suspended(q, 0, 1);
+        assert_eq!(shim_queue_is_suspended(q, 0), 1);
+        shim_queue_set_suspended(q, 0, 0);
+        assert_eq!(shim_queue_is_suspended(q, 0), 0);
+        free_obj(q);
+    }
+
+    #[test]
+    fn queue_add_operation_executes_synchronously() {
+        let q = shim_queue_alloc(0, 0);
+        let op = shim_nsoperation_alloc(0, 0);
+        shim_queue_add_operation(q, 0, op);
+        assert_eq!(shim_nsoperation_is_finished(op, 0), 1);
+        free_obj(q);
+        free_obj(op);
+    }
+
+    #[test]
+    fn queue_name_round_trip() {
+        let q = shim_queue_alloc(0, 0);
+        assert_eq!(shim_queue_name(q, 0), 0);
+        let name = make_string("my-queue");
+        shim_queue_set_name(q, 0, name);
+        assert_string_eq(shim_queue_name(q, 0), "my-queue");
+        free_obj(q);
+    }
+
+    #[test]
+    fn queue_description_unnamed() {
+        let q = shim_queue_alloc(0, 0);
+        let d = shim_queue_description(q, 0);
+        assert_ne!(d, 0);
+        assert_string_eq(d, "<NSOperationQueue: <unnamed>>");
+        free_obj(q);
+    }
+
+    #[test]
+    fn operation_is_ready_returns_true() {
+        assert_eq!(shim_nsoperation_is_ready(0, 0), 1);
+    }
+
+    #[test]
+    fn operation_is_asynchronous_returns_false() {
+        assert_eq!(shim_nsoperation_is_asynchronous(0, 0), 0);
+    }
+
+    #[test]
+    fn operation_quality_of_service_returns_default() {
+        assert_eq!(shim_nsoperation_quality_of_service(0, 0), -1);
+    }
+
+    #[test]
+    fn operation_set_quality_of_service_is_noop() {
+        shim_nsoperation_set_quality_of_service(0, 0, 0x21);
+        // no panic = pass
+    }
+
+    #[test]
+    fn queue_quality_of_service_returns_default() {
+        assert_eq!(shim_queue_quality_of_service(0, 0), -1);
+    }
+
+    #[test]
+    fn queue_set_quality_of_service_is_noop() {
+        shim_queue_set_quality_of_service(0, 0, 0x21);
+        // no panic = pass
+    }
 }

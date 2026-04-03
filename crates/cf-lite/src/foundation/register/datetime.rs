@@ -46,6 +46,16 @@ pub fn register_nsdate_class(rt: &mut objc_runtime::ObjcRuntime) {
             ),
             me("compare:", nsdate::shim_nsdate_compare as u64, "q@:@"),
             me("description", nsdate::shim_nsdate_description as u64, "@@:"),
+            me(
+                "earlierDate:",
+                nsdate::shim_nsdate_earlier_date as u64,
+                "@@:@",
+            ),
+            me(
+                "laterDate:",
+                nsdate::shim_nsdate_later_date as u64,
+                "@@:@",
+            ),
         ],
         class_methods: vec![
             me("date", nsdate::shim_nsdate_date as u64, "@@:"),
@@ -58,6 +68,16 @@ pub fn register_nsdate_class(rt: &mut objc_runtime::ObjcRuntime) {
                 "dateWithTimeIntervalSinceReferenceDate:",
                 nsdate::shim_nsdate_date_with_ti_since_ref as u64,
                 "@@:d",
+            ),
+            me(
+                "distantFuture",
+                nsdate::shim_nsdate_distant_future as u64,
+                "@@:",
+            ),
+            me(
+                "distantPast",
+                nsdate::shim_nsdate_distant_past as u64,
+                "@@:",
             ),
         ],
         ivars: vec![],
@@ -127,6 +147,36 @@ pub fn register_nsdateformatter_class(rt: &mut objc_runtime::ObjcRuntime) {
                 "dateFromString:",
                 nsdateformatter::shim_nsdateformatter_date_from_string as u64,
                 "@@:@",
+            ),
+            me(
+                "locale",
+                nsdateformatter::shim_nsdateformatter_locale as u64,
+                "@@:",
+            ),
+            me(
+                "setLocale:",
+                nsdateformatter::shim_nsdateformatter_set_locale as u64,
+                "v@:@",
+            ),
+            me(
+                "calendar",
+                nsdateformatter::shim_nsdateformatter_calendar as u64,
+                "@@:",
+            ),
+            me(
+                "setCalendar:",
+                nsdateformatter::shim_nsdateformatter_set_calendar as u64,
+                "v@:@",
+            ),
+            me(
+                "timeZone",
+                nsdateformatter::shim_nsdateformatter_time_zone as u64,
+                "@@:",
+            ),
+            me(
+                "setTimeZone:",
+                nsdateformatter::shim_nsdateformatter_set_time_zone as u64,
+                "v@:@",
             ),
         ],
         class_methods: vec![],
@@ -250,6 +300,16 @@ pub fn register_nscalendar_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nscalendar::shim_nscalendar_description as u64,
                 "@@:",
             ),
+            me(
+                "locale",
+                nscalendar::shim_nscalendar_locale as u64,
+                "@@:",
+            ),
+            me(
+                "setLocale:",
+                nscalendar::shim_nscalendar_set_locale as u64,
+                "v@:@",
+            ),
         ],
         class_methods: vec![
             me(
@@ -261,6 +321,11 @@ pub fn register_nscalendar_class(rt: &mut objc_runtime::ObjcRuntime) {
                 "calendarWithIdentifier:",
                 nscalendar::shim_nscalendar_with_identifier as u64,
                 "@@:@",
+            ),
+            me(
+                "autoupdatingCurrentCalendar",
+                nscalendar::shim_nscalendar_auto_updating_current_calendar as u64,
+                "@@:",
             ),
         ],
         ivars: vec![],
@@ -317,11 +382,23 @@ pub fn register_nslocale_class(rt: &mut objc_runtime::ObjcRuntime) {
                 "@@:",
             ),
         ],
-        class_methods: vec![me(
-            "currentLocale",
-            nslocale::shim_nslocale_current_locale as u64,
-            "@@:",
-        )],
+        class_methods: vec![
+            me(
+                "currentLocale",
+                nslocale::shim_nslocale_current_locale as u64,
+                "@@:",
+            ),
+            me(
+                "systemLocale",
+                nslocale::shim_nslocale_system_locale as u64,
+                "@@:",
+            ),
+            me(
+                "preferredLanguages",
+                nslocale::shim_nslocale_preferred_languages as u64,
+                "@@:",
+            ),
+        ],
         ivars: vec![],
         properties: vec![],
         protocol_names: Vec::new(),

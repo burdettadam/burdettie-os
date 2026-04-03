@@ -143,3 +143,124 @@ pub struct InitializerInfo {
     pub has_objc_load: bool,
     pub init_steps: Vec<String>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── supports_objc2 (bit 0x20) ──────────────────────────────────
+
+    #[test]
+    fn supports_objc2_set() {
+        let info = ObjcImageInfo { version: 0, flags: 0x20 };
+        assert!(info.supports_objc2());
+    }
+
+    #[test]
+    fn supports_objc2_unset() {
+        let info = ObjcImageInfo { version: 0, flags: 0x00 };
+        assert!(!info.supports_objc2());
+    }
+
+    #[test]
+    fn supports_objc2_with_other_bits() {
+        // Other bits set but not 0x20
+        let info = ObjcImageInfo { version: 0, flags: 0x04 };
+        assert!(!info.supports_objc2());
+    }
+
+    // ── requires_gc (bit 0x04) ─────────────────────────────────────
+
+    #[test]
+    fn requires_gc_set() {
+        let info = ObjcImageInfo { version: 0, flags: 0x04 };
+        assert!(info.requires_gc());
+    }
+
+    #[test]
+    fn requires_gc_unset() {
+        let info = ObjcImageInfo { version: 0, flags: 0x00 };
+        assert!(!info.requires_gc());
+    }
+
+    // ── is_simulated (bit 0x200) ───────────────────────────────────
+
+    #[test]
+    fn is_simulated_set() {
+        let info = ObjcImageInfo { version: 0, flags: 0x200 };
+        assert!(info.is_simulated());
+    }
+
+    #[test]
+    fn is_simulated_unset() {
+        let info = ObjcImageInfo { version: 0, flags: 0x00 };
+        assert!(!info.is_simulated());
+    }
+
+    // ── swift_version (bits [15:8]) ────────────────────────────────
+
+    #[test]
+    fn swift_version_five() {
+        let info = ObjcImageInfo { version: 0, flags: 5 << 8 };
+        assert_eq!(info.swift_version(), 5);
+    }
+
+    #[test]
+    fn swift_version_zero() {
+        let info = ObjcImageInfo { version: 0, flags: 0x00 };
+        assert_eq!(info.swift_version(), 0);
+    }
+
+    #[test]
+    fn swift_version_seven() {
+        let info = ObjcImageInfo { version: 0, flags: 7 << 8 };
+        assert_eq!(info.swift_version(), 7);
+    }
+
+    // ── combined flags ─────────────────────────────────────────────
+
+    #[test]
+    fn combined_flags_objc2_swift5() {
+        // 0x20 (objc2) | (5 << 8) (swift 5) = 0x520
+        let info = ObjcImageInfo { version: 0, flags: 0x520 };
+        assert!(info.supports_objc2());
+        assert!(!info.requires_gc());
+        assert!(!info.is_simulated());
+        assert_eq!(info.swift_version(), 5);
+    }
+
+    #[test]
+    fn all_flags_set() {
+        // is_simulated (bit 9) overlaps with swift_version byte [15:8]
+        // flags 0x0724 → swift_version = (0x0724 >> 8) & 0xFF = 7
+        let info = ObjcImageInfo { version: 0, flags: 0x0724 };
+        assert!(info.supports_objc2());
+        assert!(info.requires_gc());
+        assert!(info.is_simulated());
+        assert_eq!(info.swift_version(), 7);
+    }
+
+    #[test]
+    fn objc_presence_no_sections() {
+        let presence = ObjcPresence {
+            has_objc: false,
+            sections_found: vec![],
+        };
+        assert!(!presence.has_objc);
+        assert!(presence.sections_found.is_empty());
+    }
+
+    #[test]
+    fn objc_presence_has_sections_and_objc() {
+        let presence = ObjcPresence {
+            has_objc: true,
+            sections_found: vec![
+                "__objc_classlist".to_string(),
+                "__objc_selrefs".to_string(),
+            ],
+        };
+        assert!(presence.has_objc);
+        assert_eq!(presence.sections_found.len(), 2);
+        assert!(presence.sections_found.contains(&"__objc_classlist".to_string()));
+    }
+}

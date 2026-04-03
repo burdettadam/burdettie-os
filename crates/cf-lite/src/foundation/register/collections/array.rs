@@ -14,6 +14,11 @@ pub fn register_nsarray_class(rt: &mut objc_runtime::ObjcRuntime) {
         name: "NSArray".to_string(),
         mapped_addr: class_addr,
         methods: vec![
+            me(
+                "initWithObjects:",
+                nsarray::shim_nsarray_init_with_objects as u64,
+                "@@:@",
+            ),
             me("count", nsarray::shim_nsarray_count as u64, "Q@:"),
             me(
                 "objectAtIndex:",
@@ -56,6 +61,11 @@ pub fn register_nsarray_class(rt: &mut objc_runtime::ObjcRuntime) {
                 "@@:@?",
             ),
             me(
+                "sortedArrayUsingSelector:",
+                nsarray::ops::shim_nsarray_sorted_array_using_selector as u64,
+                "@@::",
+            ),
+            me(
                 "objectEnumerator",
                 nsenumerator::shim_nsarray_object_enumerator as u64,
                 "@@:",
@@ -64,6 +74,11 @@ pub fn register_nsarray_class(rt: &mut objc_runtime::ObjcRuntime) {
                 "indexOfObject:",
                 nsarray::ops::shim_nsarray_index_of_object as u64,
                 "Q@:@",
+            ),
+            me(
+                "indexOfObjectPassingTest:",
+                nsarray::ops::shim_nsarray_index_of_object_passing_test as u64,
+                "Q@:@?",
             ),
             me(
                 "isEqualToArray:",
@@ -85,12 +100,50 @@ pub fn register_nsarray_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nsarray::ops::shim_nsarray_filtered_using_predicate as u64,
                 "@@:@",
             ),
+            me("copy", nsarray::ops::shim_nsarray_copy as u64, "@@:"),
+            me(
+                "mutableCopy",
+                nsarray::ops::shim_nsarray_mutable_copy as u64,
+                "@@:",
+            ),
+            me(
+                "countByEnumeratingWithState:objects:count:",
+                nsarray::shim_nsarray_count_by_enumerating_with_state as u64,
+                "Q@:^Q^@Q",
+            ),
+            me(
+                "componentsJoinedByString:",
+                nsarray::ops::shim_nsarray_components_joined_by_string as u64,
+                "@@:@",
+            ),
+            me(
+                "reverseObjectEnumerator",
+                nsenumerator::shim_nsarray_reverse_object_enumerator as u64,
+                "@@:",
+            ),
+            me(
+                "initWithArray:",
+                nsarray::shim_nsarray_init_with_array as u64,
+                "@@:@",
+            ),
         ],
-        class_methods: vec![me(
-            "arrayWithObjects:count:",
-            nsarray::shim_nsarray_array_with_objects_count as u64,
-            "@@:^@Q",
-        )],
+        class_methods: vec![
+            me(
+                "arrayWithObject:",
+                nsarray::shim_nsarray_array_with_object as u64,
+                "@@:@",
+            ),
+            me(
+                "arrayWithObjects:count:",
+                nsarray::shim_nsarray_array_with_objects_count as u64,
+                "@@:^@Q",
+            ),
+            me(
+                "arrayWithObjects:",
+                nsarray::shim_nsarray_array_with_objects as u64,
+                "@@:@",
+            ),
+        ],
         ivars: vec![],
         properties: vec![],
         protocol_names: Vec::new(),
@@ -114,6 +167,21 @@ pub fn register_nsmutablearray_class(rt: &mut objc_runtime::ObjcRuntime) {
         name: "NSMutableArray".to_string(),
         mapped_addr: class_addr,
         methods: vec![
+            me(
+                "initWithCapacity:",
+                nsmutablearray::shim_nsmutablearray_init_with_capacity as u64,
+                "@@:Q",
+            ),
+            me(
+                "initWithObjects:",
+                nsmutablearray::shim_nsmutablearray_init_with_objects as u64,
+                "@@:@",
+            ),
+            me(
+                "initWithArray:",
+                nsmutablearray::shim_nsmutablearray_init_with_array as u64,
+                "@@:@",
+            ),
             me("count", nsarray::shim_nsarray_count as u64, "Q@:"),
             me(
                 "objectAtIndex:",
@@ -166,6 +234,11 @@ pub fn register_nsmutablearray_class(rt: &mut objc_runtime::ObjcRuntime) {
                 "v@:Q@",
             ),
             me(
+                "setObject:atIndexedSubscript:",
+                nsmutablearray::shim_nsmutablearray_set_object_at_indexed_subscript as u64,
+                "v@:@Q",
+            ),
+            me(
                 "removeAllObjects",
                 nsmutablearray::shim_nsmutablearray_remove_all_objects as u64,
                 "v@:",
@@ -186,9 +259,19 @@ pub fn register_nsmutablearray_class(rt: &mut objc_runtime::ObjcRuntime) {
                 "@@:@?",
             ),
             me(
+                "sortedArrayUsingSelector:",
+                nsarray::ops::shim_nsarray_sorted_array_using_selector as u64,
+                "@@::",
+            ),
+            me(
                 "sortUsingComparator:",
                 nsmutablearray::ops::shim_nsmutablearray_sort_using_comparator as u64,
                 "v@:@?",
+            ),
+            me(
+                "sortUsingDescriptors:",
+                nsmutablearray::ops::shim_nsmutablearray_sort_using_descriptors as u64,
+                "v@:@",
             ),
             me(
                 "objectEnumerator",
@@ -198,6 +281,11 @@ pub fn register_nsmutablearray_class(rt: &mut objc_runtime::ObjcRuntime) {
             me(
                 "removeObject:",
                 nsmutablearray::ops::shim_nsmutablearray_remove_object as u64,
+                "v@:@",
+            ),
+            me(
+                "removeObjectsAtIndexes:",
+                nsmutablearray::ops::shim_nsmutablearray_remove_objects_at_indexes as u64,
                 "v@:@",
             ),
             me(
@@ -211,9 +299,40 @@ pub fn register_nsmutablearray_class(rt: &mut objc_runtime::ObjcRuntime) {
                 "v@:QQ",
             ),
             me(
+                "removeObjectsInRange:",
+                nsmutablearray::ops::shim_nsmutablearray_remove_objects_in_range as u64,
+                "v@:QQ",
+            ),
+            me(
                 "indexOfObject:",
                 nsarray::ops::shim_nsarray_index_of_object as u64,
                 "Q@:@",
+            ),
+            me(
+                "indexOfObjectPassingTest:",
+                nsarray::ops::shim_nsarray_index_of_object_passing_test as u64,
+                "Q@:@?",
+            ),
+            me(
+                "countByEnumeratingWithState:objects:count:",
+                nsarray::shim_nsarray_count_by_enumerating_with_state as u64,
+                "Q@:^Q^@Q",
+            ),
+            me("copy", nsarray::ops::shim_nsmutablearray_copy as u64, "@@:"),
+            me(
+                "mutableCopy",
+                nsarray::ops::shim_nsmutablearray_mutable_copy as u64,
+                "@@:",
+            ),
+            me(
+                "componentsJoinedByString:",
+                nsarray::ops::shim_nsarray_components_joined_by_string as u64,
+                "@@:@",
+            ),
+            me(
+                "reverseObjectEnumerator",
+                nsenumerator::shim_nsarray_reverse_object_enumerator as u64,
+                "@@:",
             ),
         ],
         class_methods: vec![
@@ -230,6 +349,11 @@ pub fn register_nsmutablearray_class(rt: &mut objc_runtime::ObjcRuntime) {
             me(
                 "arrayWithArray:",
                 nsmutablearray::shim_nsmutablearray_array_with_array as u64,
+                "@@:@",
+            ),
+            me(
+                "arrayWithObjects:",
+                nsmutablearray::shim_nsmutablearray_array_with_objects as u64,
                 "@@:@",
             ),
         ],

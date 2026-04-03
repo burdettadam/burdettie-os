@@ -14,7 +14,6 @@ pub fn help() {
     println!("  gui [app]           Launch a GUI demo app");
     println!("  trace on|off        Toggle runtime event tracing");
     println!("  policy perm|secure  Toggle security policy mode");
-    println!("  hostfallback on|off Toggle host symbol fallback");
     println!("  info                Show current session settings");
     println!("  banner              Reprint the boot banner");
     println!("  help                Show this help");
@@ -90,8 +89,6 @@ pub fn run_demo(args: &[&str], session: &mut Session) {
         PolicyMode::Permissive => macho_runtime::RuntimeConfig::permissive(&binary),
         PolicyMode::Secure => macho_runtime::RuntimeConfig::secure(&binary),
     };
-
-    config.host_fallback = session.host_fallback;
 
     if session.trace_enabled {
         config.tracer = Some(macho_runtime::RuntimeTracer::new());
@@ -302,27 +299,6 @@ pub fn policy(args: &[&str], session: &mut Session) {
     }
 }
 
-/// Toggle host symbol fallback.
-pub fn host_fallback(args: &[&str], session: &mut Session) {
-    match args.first().copied() {
-        Some("on" | "1" | "true" | "yes") => {
-            session.host_fallback = true;
-            println!("Host fallback enabled (unresolved symbols may use host runtime).");
-        }
-        Some("off" | "0" | "false" | "no") => {
-            session.host_fallback = false;
-            println!("Host fallback disabled (fully self-hosted; unresolved symbols will fail).");
-        }
-        _ => {
-            println!(
-                "Host fallback is currently: {}",
-                if session.host_fallback { "on" } else { "off" }
-            );
-            println!("Usage: hostfallback on|off");
-        }
-    }
-}
-
 /// Show current session info.
 pub fn info(session: &Session) {
     println!("Session:");
@@ -332,10 +308,7 @@ pub fn info(session: &Session) {
         "  Tracing:   {}",
         if session.trace_enabled { "on" } else { "off" }
     );
-    println!(
-        "  Host fallback: {}",
-        if session.host_fallback { "on" } else { "off" }
-    );
+    println!("  Host fallback: always-on (safe-symbol StubResolver)");
 
     let fixture_count = std::fs::read_dir(&session.fixtures_root)
         .map(|entries| {

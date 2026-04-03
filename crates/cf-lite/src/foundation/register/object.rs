@@ -118,10 +118,30 @@ pub fn register_nsobject_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nsobj::shim_nsobject_does_not_recognize_selector as u64,
                 "v@::",
             ),
+            me(
+                "superclass",
+                nsobj::shim_nsobject_superclass as u64,
+                "#@:",
+            ),
+            me(
+                "className",
+                nsobj::shim_nsobject_class_name as u64,
+                "@@:",
+            ),
+            me(
+                "debugDescription",
+                nsobj::shim_nsobject_debug_description as u64,
+                "@@:",
+            ),
         ],
         class_methods: vec![
             me("alloc", nsobj::shim_nsobject_class_alloc as u64, "@@:"),
             me("new", nsobj::shim_nsobject_class_new as u64, "@@:"),
+            me(
+                "isSubclassOfClass:",
+                nsobj::shim_nsobject_is_subclass_of_class as u64,
+                "B@:#",
+            ),
             me(
                 "resolveInstanceMethod:",
                 nsobj::shim_nsobject_resolve_instance_method as u64,
@@ -136,6 +156,11 @@ pub fn register_nsobject_class(rt: &mut objc_runtime::ObjcRuntime) {
                 "methodSignatureForSelector:",
                 nsobj::shim_nsobject_class_method_signature_for_selector as u64,
                 "@@::",
+            ),
+            me(
+                "superclass",
+                nsobj::shim_nsobject_class_superclass as u64,
+                "#@:",
             ),
         ],
         ivars: vec![],

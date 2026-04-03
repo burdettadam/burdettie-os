@@ -11,7 +11,10 @@
 use graphics_core::Point;
 
 use crate::scene::AppScene;
-use crate::{Button, Label, TextField};
+use crate::{
+    Button, Checkbox, ComboBox, ImageView, Label, ProgressBar, RadioButton, Slider, TabView,
+    TextField,
+};
 
 /// A headless GUI application for testing.
 ///
@@ -74,6 +77,34 @@ impl HeadlessApp {
 
     pub fn add_textfield(&mut self, tf: TextField) {
         self.scene.add_textfield(tf);
+    }
+
+    pub fn add_checkbox(&mut self, cb: Checkbox) {
+        self.scene.add_checkbox(cb);
+    }
+
+    pub fn add_radiobutton(&mut self, rb: RadioButton) {
+        self.scene.add_radiobutton(rb);
+    }
+
+    pub fn add_slider(&mut self, slider: Slider) {
+        self.scene.add_slider(slider);
+    }
+
+    pub fn add_progressbar(&mut self, pb: ProgressBar) {
+        self.scene.add_progressbar(pb);
+    }
+
+    pub fn add_combobox(&mut self, cb: ComboBox) {
+        self.scene.add_combobox(cb);
+    }
+
+    pub fn add_tabview(&mut self, tv: TabView) {
+        self.scene.add_tabview(tv);
+    }
+
+    pub fn add_imageview(&mut self, iv: ImageView) {
+        self.scene.add_imageview(iv);
     }
 
     pub fn on_button_click(
@@ -169,12 +200,96 @@ impl HeadlessApp {
     pub fn textfields(&self) -> &[TextField] {
         self.scene.textfields()
     }
+
+    pub fn checkboxes(&self) -> &[Checkbox] {
+        self.scene.checkboxes()
+    }
+
+    pub fn checkbox_count(&self) -> usize {
+        self.scene.checkbox_count()
+    }
+
+    pub fn radiobuttons(&self) -> &[RadioButton] {
+        self.scene.radiobuttons()
+    }
+
+    pub fn radiobutton_count(&self) -> usize {
+        self.scene.radiobutton_count()
+    }
+
+    pub fn sliders(&self) -> &[Slider] {
+        self.scene.sliders()
+    }
+
+    pub fn slider_count(&self) -> usize {
+        self.scene.slider_count()
+    }
+
+    pub fn progressbars(&self) -> &[ProgressBar] {
+        self.scene.progressbars()
+    }
+
+    pub fn progressbar_count(&self) -> usize {
+        self.scene.progressbar_count()
+    }
+
+    pub fn comboboxes(&self) -> &[ComboBox] {
+        self.scene.comboboxes()
+    }
+
+    pub fn combobox_count(&self) -> usize {
+        self.scene.combobox_count()
+    }
+
+    pub fn tabviews(&self) -> &[TabView] {
+        self.scene.tabviews()
+    }
+
+    pub fn tabview_count(&self) -> usize {
+        self.scene.tabview_count()
+    }
+
+    pub fn imageviews(&self) -> &[ImageView] {
+        self.scene.imageviews()
+    }
+
+    pub fn imageview_count(&self) -> usize {
+        self.scene.imageview_count()
+    }
+
+    pub fn add_scrollview(&mut self, sv: crate::ScrollView) {
+        self.scene.add_scrollview(sv);
+    }
+
+    pub fn scrollviews(&self) -> &[crate::ScrollView] {
+        self.scene.scrollviews()
+    }
+
+    pub fn scrollview_count(&self) -> usize {
+        self.scene.scrollview_count()
+    }
+
+    /// Simulate a scroll event with the given delta.
+    pub fn scroll(&mut self, dx: f64, dy: f64) -> bool {
+        self.scene.handle_scroll(dx, dy)
+    }
+
+    /// Simulate a key press.
+    pub fn key_down(&mut self, key: window_backend::KeyCode) -> bool {
+        self.scene.handle_key_down(key)
+    }
+
+    /// Get the currently focused textfield index, if any.
+    pub fn focused_textfield_index(&self) -> Option<usize> {
+        self.scene.focused_textfield_index()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use graphics_core::Rect;
+    use crate::{Checkbox, ComboBox, ImageView, ProgressBar, RadioButton, Slider, TabView};
 
     #[test]
     fn add_controls() {
@@ -327,5 +442,221 @@ mod tests {
         // Backspace via scene
         app.scene_mut().handle_backspace();
         assert_eq!(app.textfield_text(0), "hell");
+    }
+
+    #[test]
+    fn add_checkbox_and_count() {
+        let mut app = HeadlessApp::new();
+        app.add_checkbox(Checkbox::new(Rect::new(0.0, 0.0, 120.0, 20.0), "Option A"));
+        app.add_checkbox(Checkbox::new(Rect::new(0.0, 30.0, 120.0, 20.0), "Option B"));
+        assert_eq!(app.checkbox_count(), 2);
+        assert_eq!(app.checkboxes()[0].title(), "Option A");
+        assert_eq!(app.checkboxes()[1].title(), "Option B");
+    }
+
+    #[test]
+    fn add_slider_and_count() {
+        let mut app = HeadlessApp::new();
+        let slider = Slider::new(Rect::new(0.0, 0.0, 200.0, 20.0), 0.0, 100.0);
+        app.add_slider(slider);
+        assert_eq!(app.slider_count(), 1);
+        assert_eq!(app.sliders()[0].value(), 0.0);
+        assert_eq!(app.sliders()[0].max_value(), 100.0);
+    }
+
+    #[test]
+    fn add_progressbar_and_count() {
+        let mut app = HeadlessApp::new();
+        let mut pb = ProgressBar::new(Rect::new(0.0, 0.0, 200.0, 8.0));
+        pb.set_progress(0.5);
+        app.add_progressbar(pb);
+        assert_eq!(app.progressbar_count(), 1);
+        assert!((app.progressbars()[0].progress() - 0.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn add_combobox_and_count() {
+        let mut app = HeadlessApp::new();
+        let mut cb = ComboBox::new(Rect::new(0.0, 0.0, 150.0, 25.0));
+        cb.add_item("Red");
+        cb.add_item("Green");
+        cb.add_item("Blue");
+        app.add_combobox(cb);
+        assert_eq!(app.combobox_count(), 1);
+        assert_eq!(app.comboboxes()[0].item_count(), 3);
+    }
+
+    #[test]
+    fn add_tabview_and_count() {
+        let mut app = HeadlessApp::new();
+        let mut tv = TabView::new(Rect::new(0.0, 0.0, 300.0, 200.0));
+        tv.add_tab("Tab 1");
+        tv.add_tab("Tab 2");
+        app.add_tabview(tv);
+        assert_eq!(app.tabview_count(), 1);
+        assert_eq!(app.tabviews()[0].tab_count(), 2);
+    }
+
+    #[test]
+    fn add_imageview_and_count() {
+        let mut app = HeadlessApp::new();
+        app.add_imageview(ImageView::new(Rect::new(0.0, 0.0, 64.0, 64.0)));
+        assert_eq!(app.imageview_count(), 1);
+        assert!(!app.imageviews()[0].has_image());
+    }
+
+    #[test]
+    fn add_radiobutton_and_count() {
+        let mut app = HeadlessApp::new();
+        app.add_radiobutton(RadioButton::new(Rect::new(0.0, 0.0, 120.0, 20.0), "Choice A", 1));
+        assert_eq!(app.radiobutton_count(), 1);
+        assert_eq!(app.radiobuttons()[0].title(), "Choice A");
+        assert_eq!(app.radiobuttons()[0].group_id(), 1);
+    }
+
+    #[test]
+    fn render_with_all_controls() {
+        let mut app = HeadlessApp::new();
+        app.add_label(Label::new(Rect::new(0.0, 0.0, 100.0, 20.0), "Lbl"));
+        app.add_button(Button::new(Rect::new(0.0, 25.0, 80.0, 25.0), "Btn"));
+        app.add_textfield(TextField::new(Rect::new(0.0, 55.0, 200.0, 24.0)));
+        app.add_checkbox(Checkbox::new(Rect::new(0.0, 85.0, 120.0, 20.0), "CB"));
+        app.add_radiobutton(RadioButton::new(Rect::new(0.0, 110.0, 120.0, 20.0), "RB", 0));
+        app.add_slider(Slider::new(Rect::new(0.0, 135.0, 200.0, 20.0), 0.0, 1.0));
+        app.add_progressbar(ProgressBar::new(Rect::new(0.0, 160.0, 200.0, 8.0)));
+        app.add_combobox(ComboBox::new(Rect::new(0.0, 175.0, 150.0, 25.0)));
+        app.add_tabview(TabView::new(Rect::new(0.0, 205.0, 300.0, 100.0)));
+        app.add_imageview(ImageView::new(Rect::new(0.0, 310.0, 64.0, 64.0)));
+        let surface = app.render(400, 400);
+        assert_eq!(surface.width(), 400);
+        assert_eq!(surface.height(), 400);
+    }
+
+    #[test]
+    fn mixed_controls_scene() {
+        let mut app = HeadlessApp::new();
+        app.add_label(Label::new(Rect::new(0.0, 0.0, 100.0, 20.0), "Title"));
+        app.add_button(Button::new(Rect::new(0.0, 25.0, 80.0, 25.0), "Go"));
+        app.add_checkbox(Checkbox::new(Rect::new(0.0, 55.0, 120.0, 20.0), "Check"));
+        app.add_slider(Slider::new(Rect::new(0.0, 80.0, 200.0, 20.0), 0.0, 10.0));
+        assert_eq!(app.label_count(), 1);
+        assert_eq!(app.button_count(), 1);
+        assert_eq!(app.checkbox_count(), 1);
+        assert_eq!(app.slider_count(), 1);
+    }
+
+    #[test]
+    fn scroll_wheel_forwarded_to_scrollview() {
+        use crate::ScrollView;
+        let mut app = HeadlessApp::new();
+        let mut sv = ScrollView::new(Rect::new(0.0, 0.0, 200.0, 100.0));
+        sv.set_content_size(400.0, 300.0);
+        app.add_scrollview(sv);
+
+        assert_eq!(app.scrollview_count(), 1);
+        // Initially at origin
+        let offset = app.scrollviews()[0].content_offset();
+        assert!((offset.x).abs() < f64::EPSILON);
+        assert!((offset.y).abs() < f64::EPSILON);
+
+        // Scroll by positive delta
+        let consumed = app.scroll(10.0, 20.0);
+        assert!(consumed);
+        let offset = app.scrollviews()[0].content_offset();
+        assert!((offset.x - 10.0).abs() < f64::EPSILON);
+        assert!((offset.y - 20.0).abs() < f64::EPSILON);
+
+        // Scroll again (accumulates)
+        app.scroll(5.0, 5.0);
+        let offset = app.scrollviews()[0].content_offset();
+        assert!((offset.x - 15.0).abs() < f64::EPSILON);
+        assert!((offset.y - 25.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn scroll_no_scrollview_is_noop() {
+        let mut app = HeadlessApp::new();
+        let consumed = app.scroll(10.0, 10.0);
+        assert!(!consumed);
+    }
+
+    #[test]
+    fn tab_cycles_textfield_focus() {
+        use window_backend::KeyCode;
+        let mut app = HeadlessApp::new();
+        app.add_textfield(TextField::new(Rect::new(0.0, 0.0, 200.0, 24.0)));
+        app.add_textfield(TextField::new(Rect::new(0.0, 30.0, 200.0, 24.0)));
+
+        // Initially no focus
+        assert_eq!(app.focused_textfield_index(), None);
+
+        // Tab focuses first textfield
+        assert!(app.key_down(KeyCode::Tab));
+        assert_eq!(app.focused_textfield_index(), Some(0));
+
+        // Tab cycles to second
+        assert!(app.key_down(KeyCode::Tab));
+        assert_eq!(app.focused_textfield_index(), Some(1));
+
+        // Tab wraps back to first
+        assert!(app.key_down(KeyCode::Tab));
+        assert_eq!(app.focused_textfield_index(), Some(0));
+    }
+
+    #[test]
+    fn tab_no_textfields_is_noop() {
+        use window_backend::KeyCode;
+        let mut app = HeadlessApp::new();
+        let consumed = app.key_down(KeyCode::Tab);
+        assert!(!consumed);
+    }
+
+    #[test]
+    fn space_activates_button() {
+        use window_backend::KeyCode;
+        let mut app = HeadlessApp::new();
+        app.add_label(Label::new(Rect::new(0.0, 0.0, 200.0, 20.0), "before"));
+        app.add_button(Button::new(Rect::new(0.0, 30.0, 80.0, 25.0), "Act"));
+        app.on_button_click(|_idx, labels, _tfs| {
+            labels[0].set_text("activated");
+        });
+
+        assert_eq!(app.label_text(0), "before");
+        assert!(app.key_down(KeyCode::Space));
+        assert_eq!(app.label_text(0), "activated");
+    }
+
+    #[test]
+    fn return_activates_button() {
+        use window_backend::KeyCode;
+        let mut app = HeadlessApp::new();
+        app.add_label(Label::new(Rect::new(0.0, 0.0, 200.0, 20.0), "before"));
+        app.add_button(Button::new(Rect::new(0.0, 30.0, 80.0, 25.0), "Act"));
+        app.on_button_click(|_idx, labels, _tfs| {
+            labels[0].set_text("done");
+        });
+
+        assert!(app.key_down(KeyCode::Return));
+        assert_eq!(app.label_text(0), "done");
+    }
+
+    #[test]
+    fn arrow_keys_adjust_slider() {
+        use window_backend::KeyCode;
+        let mut app = HeadlessApp::new();
+        app.add_slider(Slider::new(Rect::new(0.0, 0.0, 200.0, 20.0), 0.0, 100.0));
+        // Slider starts at 0.0
+
+        // Right arrow increases by 1% of range = 1.0
+        assert!(app.key_down(KeyCode::Right));
+        assert!((app.sliders()[0].value() - 1.0).abs() < f64::EPSILON);
+
+        // Left arrow decreases by 1% of range = 1.0
+        assert!(app.key_down(KeyCode::Left));
+        assert!((app.sliders()[0].value() - 0.0).abs() < f64::EPSILON);
+
+        // Left at minimum stays at minimum (clamped)
+        assert!(app.key_down(KeyCode::Left));
+        assert!((app.sliders()[0].value() - 0.0).abs() < f64::EPSILON);
     }
 }

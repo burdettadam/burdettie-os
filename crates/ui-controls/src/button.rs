@@ -158,4 +158,104 @@ mod tests {
         b.perform_click();
         assert!(!clicked.get());
     }
+
+    #[test]
+    fn button_set_title() {
+        let mut b = Button::new(Rect::new(0.0, 0.0, 80.0, 30.0), "Old");
+        b.set_title("New");
+        assert_eq!(b.title(), "New");
+    }
+
+    #[test]
+    fn button_set_title_color() {
+        let mut b = Button::new(Rect::new(0.0, 0.0, 80.0, 30.0), "OK");
+        b.set_title_color(Color::new(1.0, 0.0, 0.0, 1.0));
+    }
+
+    #[test]
+    fn button_intrinsic_content_size() {
+        let b = Button::new(Rect::new(0.0, 0.0, 80.0, 30.0), "Hello");
+        let size = b.intrinsic_content_size();
+        let w = size.width.unwrap();
+        let h = size.height.unwrap();
+        assert!(w > 0.0);
+        assert!(h > 0.0);
+        // Width should be proportional to title length: 5 chars should produce
+        // a wider button than just the padding.
+        assert!(w > 24.0);
+    }
+
+    #[test]
+    fn button_intrinsic_size_varies_with_title() {
+        let short = Button::new(Rect::new(0.0, 0.0, 80.0, 30.0), "A");
+        let long = Button::new(Rect::new(0.0, 0.0, 80.0, 30.0), "LongTitle");
+        assert!(long.intrinsic_content_size().width.unwrap() > short.intrinsic_content_size().width.unwrap());
+    }
+
+    #[test]
+    fn button_view_access() {
+        let frame = Rect::new(10.0, 20.0, 100.0, 40.0);
+        let mut b = Button::new(frame, "V");
+        assert_eq!(b.view().frame, frame);
+        assert_eq!(b.view_mut().frame, frame);
+    }
+
+    #[test]
+    fn button_draw_no_panic() {
+        use graphics_core::{SoftwareRenderer, Surface};
+        let mut surface = Surface::new(100, 50);
+        let mut renderer = SoftwareRenderer::new(&mut surface);
+        let mut b = Button::new(Rect::new(0.0, 0.0, 80.0, 30.0), "Draw");
+        b.draw(&mut renderer);
+    }
+
+    #[test]
+    fn button_draw_disabled_no_panic() {
+        use graphics_core::{SoftwareRenderer, Surface};
+        let mut surface = Surface::new(100, 50);
+        let mut renderer = SoftwareRenderer::new(&mut surface);
+        let mut b = Button::new(Rect::new(0.0, 0.0, 80.0, 30.0), "Dis");
+        b.set_enabled(false);
+        b.draw(&mut renderer);
+    }
+
+    #[test]
+    fn button_draw_hidden_no_panic() {
+        use graphics_core::{SoftwareRenderer, Surface};
+        let mut surface = Surface::new(100, 50);
+        let mut renderer = SoftwareRenderer::new(&mut surface);
+        let mut b = Button::new(Rect::new(0.0, 0.0, 80.0, 30.0), "Hidden");
+        b.view_mut().hidden = true;
+        b.draw(&mut renderer);
+    }
+
+    #[test]
+    fn button_re_enable() {
+        let clicked = Rc::new(Cell::new(false));
+        let clicked2 = clicked.clone();
+        let mut b = Button::new(Rect::new(0.0, 0.0, 80.0, 30.0), "Re");
+        b.set_action(move || clicked2.set(true));
+        b.set_enabled(false);
+        assert!(!b.is_enabled());
+        b.set_enabled(true);
+        assert!(b.is_enabled());
+        b.perform_click();
+        assert!(clicked.get());
+    }
+
+    #[test]
+    fn button_no_action_click() {
+        let b = Button::new(Rect::new(0.0, 0.0, 80.0, 30.0), "NoOp");
+        b.perform_click();
+    }
+
+    #[test]
+    fn button_default_colors() {
+        let b = Button::new(Rect::new(0.0, 0.0, 80.0, 30.0), "C");
+        let bg = b.view().background_color;
+        assert!((bg.r - 0.85).abs() < f64::EPSILON);
+        assert!((bg.g - 0.85).abs() < f64::EPSILON);
+        assert!((bg.b - 0.85).abs() < f64::EPSILON);
+        assert!((bg.a - 1.0).abs() < f64::EPSILON);
+    }
 }

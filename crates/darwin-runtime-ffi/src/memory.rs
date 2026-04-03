@@ -51,3 +51,27 @@ pub unsafe extern "C" fn darwin_method_list_free(methods: *mut DarwinMethodInfo,
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn string_free_null_no_panic() {
+        unsafe { darwin_string_free(std::ptr::null_mut()) };
+    }
+
+    #[test]
+    fn method_list_free_null_no_panic() {
+        unsafe { darwin_method_list_free(std::ptr::null_mut(), 0) };
+    }
+
+    #[test]
+    fn class_list_free_null_no_panic() {
+        let empty = DarwinClassList {
+            names: std::ptr::null_mut(),
+            count: 0,
+        };
+        unsafe { darwin_class_list_free(empty) };
+    }
+}

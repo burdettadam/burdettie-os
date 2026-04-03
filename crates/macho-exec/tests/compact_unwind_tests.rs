@@ -134,3 +134,51 @@ fn autorelease_has_multiple_entries() {
     let eh = generate_eh_frame(&entries, 0x1_0000_4000);
     assert!(!eh.is_empty());
 }
+
+#[test]
+fn minimal_throw_compact_unwind_carries_exception_metadata() {
+    let Some(data) = read_fixture("minimal_throw/app") else {
+        return;
+    };
+    let Some(cu_data) = extract_unwind_info(&data) else {
+        panic!("minimal_throw/app should have __unwind_info");
+    };
+
+    let entries = parse_compact_unwind(&cu_data);
+    assert!(!entries.is_empty(), "minimal_throw should parse compact unwind entries");
+    assert!(
+        entries.iter().any(|entry| entry.personality_slot_offset.is_some()),
+        "minimal_throw should expose an exception personality slot"
+    );
+    assert!(
+        entries.iter().any(|entry| entry.lsda_offset.is_some()),
+        "minimal_throw should expose LSDA data for catch matching"
+    );
+
+    let eh = generate_eh_frame(&entries, 0x3_0000_0000);
+    assert!(!eh.is_empty(), "minimal_throw should synthesize a non-empty eh_frame");
+}
+
+#[test]
+fn try_catch_test_compact_unwind_carries_exception_metadata() {
+    let Some(data) = read_fixture("try_catch_test/app") else {
+        return;
+    };
+    let Some(cu_data) = extract_unwind_info(&data) else {
+        panic!("try_catch_test/app should have __unwind_info");
+    };
+
+    let entries = parse_compact_unwind(&cu_data);
+    assert!(!entries.is_empty(), "try_catch_test should parse compact unwind entries");
+    assert!(
+        entries.iter().any(|entry| entry.personality_slot_offset.is_some()),
+        "try_catch_test should expose an exception personality slot"
+    );
+    assert!(
+        entries.iter().any(|entry| entry.lsda_offset.is_some()),
+        "try_catch_test should expose LSDA data for catch matching"
+    );
+
+    let eh = generate_eh_frame(&entries, 0x4_0000_0000);
+    assert!(!eh.is_empty(), "try_catch_test should synthesize a non-empty eh_frame");
+}

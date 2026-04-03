@@ -39,3 +39,30 @@ pub extern "C" fn shim_nsnull_description(obj: u64, _cmd: u64) -> u64 {
     let c_str = c"<null>";
     cfstring::shim_cf_string_create_with_cstring(0, c_str.as_ptr(), 0)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shim_test_helpers::*;
+
+    #[test]
+    fn null_singleton_is_stable() {
+        let a = shim_nsnull_null(0, 0);
+        let b = shim_nsnull_null(0, 0);
+        assert_ne!(a, 0);
+        assert_eq!(a, b, "NSNull should return the same singleton");
+    }
+
+    #[test]
+    fn null_description() {
+        let null = shim_nsnull_null(0, 0);
+        let desc = shim_nsnull_description(null, 0);
+        assert_ne!(desc, 0);
+        assert_string_eq(desc, "<null>");
+    }
+
+    #[test]
+    fn nil_description_returns_zero() {
+        assert_eq!(shim_nsnull_description(0, 0), 0);
+    }
+}

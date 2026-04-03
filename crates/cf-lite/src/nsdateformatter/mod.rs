@@ -144,3 +144,169 @@ pub extern "C" fn shim_nsdateformatter_string_from_date(obj: u64, _cmd: u64, dat
     let cstr = std::ffi::CString::new(formatted).unwrap_or_default();
     cfstring::alloc_nsstring_from_cstr(cstr.as_ptr())
 }
+
+/// `-[NSDateFormatter locale]` — returns current locale.
+pub extern "C" fn shim_nsdateformatter_locale(_obj: u64, _cmd: u64) -> u64 {
+    if _obj == 0 {
+        return 0;
+    }
+    crate::nslocale::shim_nslocale_current_locale(0, 0)
+}
+
+/// `-[NSDateFormatter setLocale:]` — no-op.
+pub extern "C" fn shim_nsdateformatter_set_locale(_obj: u64, _cmd: u64, _locale: u64) {
+    // no-op
+}
+
+/// `-[NSDateFormatter calendar]` — returns current calendar.
+pub extern "C" fn shim_nsdateformatter_calendar(_obj: u64, _cmd: u64) -> u64 {
+    if _obj == 0 {
+        return 0;
+    }
+    crate::nscalendar::shim_nscalendar_current_calendar(0, 0)
+}
+
+/// `-[NSDateFormatter setCalendar:]` — no-op.
+pub extern "C" fn shim_nsdateformatter_set_calendar(_obj: u64, _cmd: u64, _cal: u64) {
+    // no-op
+}
+
+/// `-[NSDateFormatter timeZone]` — returns system time zone.
+pub extern "C" fn shim_nsdateformatter_time_zone(_obj: u64, _cmd: u64) -> u64 {
+    if _obj == 0 {
+        return 0;
+    }
+    crate::nstimezone::shim_nstimezone_system_timezone(0, 0)
+}
+
+/// `-[NSDateFormatter setTimeZone:]` — no-op.
+pub extern "C" fn shim_nsdateformatter_set_time_zone(_obj: u64, _cmd: u64, _tz: u64) {
+    // no-op
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shim_test_helpers::*;
+
+    fn make_formatter() -> u64 {
+        alloc_obj_fake(32)
+    }
+
+    #[test]
+    fn nil_date_format_returns_zero() {
+        assert_eq!(shim_nsdateformatter_date_format(0, 0), 0);
+    }
+
+    #[test]
+    fn nil_date_style_returns_zero() {
+        assert_eq!(shim_nsdateformatter_date_style(0, 0), 0);
+    }
+
+    #[test]
+    fn nil_time_style_returns_zero() {
+        assert_eq!(shim_nsdateformatter_time_style(0, 0), 0);
+    }
+
+    #[test]
+    fn init_returns_self() {
+        let obj = make_formatter();
+        assert_eq!(shim_nsdateformatter_init(obj, 0), obj);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn date_format_roundtrip() {
+        let obj = make_formatter();
+        let fmt = make_string("yyyy-MM-dd");
+        shim_nsdateformatter_set_date_format(obj, 0, fmt);
+        assert_eq!(shim_nsdateformatter_date_format(obj, 0), fmt);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn date_style_roundtrip() {
+        let obj = make_formatter();
+        shim_nsdateformatter_set_date_style(obj, 0, 2);
+        assert_eq!(shim_nsdateformatter_date_style(obj, 0), 2);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn time_style_roundtrip() {
+        let obj = make_formatter();
+        shim_nsdateformatter_set_time_style(obj, 0, 3);
+        assert_eq!(shim_nsdateformatter_time_style(obj, 0), 3);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn set_date_format_nil_obj_is_noop() {
+        shim_nsdateformatter_set_date_format(0, 0, 0xABC);
+    }
+
+    #[test]
+    fn locale_returns_non_zero() {
+        let obj = make_formatter();
+        let loc = shim_nsdateformatter_locale(obj, 0);
+        assert_ne!(loc, 0);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn locale_nil_returns_zero() {
+        assert_eq!(shim_nsdateformatter_locale(0, 0), 0);
+    }
+
+    #[test]
+    fn set_locale_is_noop() {
+        let obj = make_formatter();
+        shim_nsdateformatter_set_locale(obj, 0, 0xDEAD);
+        // does not crash
+        free_obj(obj);
+    }
+
+    #[test]
+    fn calendar_returns_non_zero() {
+        let obj = make_formatter();
+        let cal = shim_nsdateformatter_calendar(obj, 0);
+        assert_ne!(cal, 0);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn calendar_nil_returns_zero() {
+        assert_eq!(shim_nsdateformatter_calendar(0, 0), 0);
+    }
+
+    #[test]
+    fn set_calendar_is_noop() {
+        let obj = make_formatter();
+        shim_nsdateformatter_set_calendar(obj, 0, 0xDEAD);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn time_zone_nil_returns_zero() {
+        assert_eq!(shim_nsdateformatter_time_zone(0, 0), 0);
+    }
+
+    // Note: shim_nsdateformatter_time_zone() with a non-nil obj calls
+    // shim_nstimezone_system_timezone() which requires a platform provider.
+    // Cannot be tested in unit tests without one configured.
+
+    #[test]
+    fn set_time_zone_is_noop() {
+        let obj = make_formatter();
+        shim_nsdateformatter_set_time_zone(obj, 0, 0xDEAD);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn string_from_date_nil_returns_zero() {
+        let obj = make_formatter();
+        assert_eq!(shim_nsdateformatter_string_from_date(obj, 0, 0), 0);
+        assert_eq!(shim_nsdateformatter_string_from_date(0, 0, 0xBEEF), 0);
+        free_obj(obj);
+    }
+}

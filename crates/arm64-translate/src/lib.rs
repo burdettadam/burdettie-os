@@ -16,7 +16,11 @@ pub mod cpu;
 pub mod decode;
 pub mod ffi;
 pub mod interp;
+pub mod jit;
 pub mod mem;
+
+#[cfg(test)]
+pub mod test_helpers;
 
 pub use cpu::CpuState;
 pub use decode::Instruction;

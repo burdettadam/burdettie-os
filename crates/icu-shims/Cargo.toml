@@ -1,0 +1,20 @@
+[package]
+name         = "icu-shims"
+description  = "ICU-backed i18n shims using icu4x for guest Mach-O binaries"
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+rust-version.workspace = true
+
+[dependencies]
+libsystem-shims = { workspace = true }
+log             = { workspace = true }
+icu_collator    = "2"
+icu_calendar    = "2"
+icu_datetime    = "2"
+icu_decimal     = "2"
+icu_locale      = "2"
+icu_segmenter   = "2"
+
+[lints]
+workspace = true

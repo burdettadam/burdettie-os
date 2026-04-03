@@ -95,3 +95,41 @@ impl platform_core::PlatformProvider for DarwinHostPlatform {
         &self.threading
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use platform_core::PlatformProvider;
+
+    #[test]
+    fn new_does_not_panic() {
+        let _p = DarwinHostPlatform::new();
+    }
+
+    #[test]
+    fn default_works() {
+        let _p = DarwinHostPlatform::default();
+    }
+
+    #[test]
+    fn all_providers_accessible() {
+        let p = DarwinHostPlatform::new();
+        // Each accessor should return without panic
+        let _ = p.alloc();
+        let _ = p.memory();
+        let _ = p.symbols();
+        let _ = p.unwind();
+        let _ = p.clock();
+        let _ = p.rng();
+        let _ = p.process();
+        let _ = p.fs();
+        let _ = p.hash();
+        let _ = p.threading();
+    }
+
+    #[test]
+    fn provider_as_trait_object() {
+        let p: Box<dyn PlatformProvider> = Box::new(DarwinHostPlatform::new());
+        assert!(p.process().pid() > 0);
+    }
+}

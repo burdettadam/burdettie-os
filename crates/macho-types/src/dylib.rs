@@ -32,3 +32,45 @@ impl DylibRef {
         format!("{maj}.{min}.{pat}")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn decode_version_10_6_0() {
+        assert_eq!(DylibRef::decode_version(0x000A_0600), (10, 6, 0));
+    }
+
+    #[test]
+    fn decode_version_zero() {
+        assert_eq!(DylibRef::decode_version(0), (0, 0, 0));
+    }
+
+    #[test]
+    fn decode_version_max() {
+        assert_eq!(DylibRef::decode_version(0xFFFF_FFFF), (0xFFFF, 0xFF, 0xFF));
+    }
+
+    #[test]
+    fn current_version_string_formats() {
+        let d = DylibRef {
+            name: String::new(),
+            compatibility_version: 0,
+            current_version: 0x000C_0301,
+            timestamp: 0,
+        };
+        assert_eq!(d.current_version_string(), "12.3.1");
+    }
+
+    #[test]
+    fn compat_version_string_formats() {
+        let d = DylibRef {
+            name: String::new(),
+            compatibility_version: 0x0001_0000,
+            current_version: 0,
+            timestamp: 0,
+        };
+        assert_eq!(d.compat_version_string(), "1.0.0");
+    }
+}

@@ -1,11 +1,27 @@
 use super::color::Color;
 use super::font::Font;
-use super::geometry::{Point, Rect};
+use super::geometry::{Point, Rect, Size};
 use super::gradient::Gradient;
 use super::image_buf::ImageBuffer;
 use super::path::BezierPath;
 use super::shadow::Shadow;
 use super::text_layout::AttributedLayout;
+
+// ── Line style enums ───────────────────────────────────────────────
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum LineJoin {
+    Miter,
+    Round,
+    Bevel,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum LineCap {
+    Butt,
+    Round,
+    Square,
+}
 
 // ── Renderer trait ─────────────────────────────────────────────────
 
@@ -101,4 +117,87 @@ pub trait Renderer {
         // Default: just draw without shadow.
         draw_fn(self);
     }
+
+    /// Push a clip rectangle onto the clip stack. All subsequent drawing
+    /// is restricted to this rect (intersected with any existing clip).
+    fn push_clip(&mut self, _rect: Rect) {
+        // Default: no-op (unclipped)
+    }
+
+    /// Pop the most recent clip rectangle, restoring the previous clip.
+    fn pop_clip(&mut self) {
+        // Default: no-op
+    }
+
+    /// Get the current clip rectangle (if any).
+    fn current_clip(&self) -> Option<Rect> {
+        None
+    }
+
+    // ── Transform / State Stack ────────────────────────────────────
+
+    /// Save the current graphics state (clip, transform) onto a stack.
+    fn save(&mut self) {
+        // Default: no-op
+    }
+
+    /// Restore the most recently saved graphics state.
+    fn restore(&mut self) {
+        // Default: no-op
+    }
+
+    /// Translate all subsequent drawing by (dx, dy).
+    fn translate(&mut self, _dx: f64, _dy: f64) {
+        // Default: no-op
+    }
+
+    /// Scale all subsequent drawing by (sx, sy) around the origin.
+    fn scale(&mut self, _sx: f64, _sy: f64) {
+        // Default: no-op
+    }
+
+    /// Rotate all subsequent drawing by the given angle in radians.
+    fn rotate(&mut self, _angle_radians: f64) {
+        // Default: no-op
+    }
+
+    /// Measure the size a text string would occupy when rendered.
+    fn measure_text(&self, text: &str, font: &Font) -> Size {
+        let avg_char_width = font.size * 0.6;
+        let width = text.len() as f64 * avg_char_width;
+        let height = font.size * 1.2;
+        Size::new(width, height)
+    }
+
+    /// Draw text wrapped within a bounding rect.
+    fn draw_text_in_rect(&mut self, text: &str, rect: Rect, font: &Font, color: Color) {
+        self.draw_text(text, Point::new(rect.x, rect.y), font, color);
+    }
+
+    /// Clip subsequent drawing to the interior of a path.
+    /// Default implementation degrades to a bounding-box rect clip.
+    fn clip_to_path(&mut self, path: &BezierPath) {
+        let bbox = path.bounding_box();
+        self.push_clip(bbox);
+    }
+
+    // ── Line style ─────────────────────────────────────────────────
+
+    fn set_line_join(&mut self, _join: LineJoin) {}
+    fn set_line_cap(&mut self, _cap: LineCap) {}
+    fn line_join(&self) -> LineJoin { LineJoin::Miter }
+    fn line_cap(&self) -> LineCap { LineCap::Butt }
+
+    // ── Opacity ────────────────────────────────────────────────────
+
+    fn set_opacity(&mut self, _opacity: f64) {}
+    fn opacity(&self) -> f64 { 1.0 }
+
+    // ── Arc / sector ───────────────────────────────────────────────
+
+    /// Draw a filled arc (pie sector).
+    fn fill_arc(&mut self, _center: Point, _radius: f64, _start_angle: f64, _end_angle: f64, _color: Color) {}
+
+    /// Draw an arc outline.
+    fn stroke_arc(&mut self, _center: Point, _radius: f64, _start_angle: f64, _end_angle: f64, _color: Color, _width: f64) {}
 }

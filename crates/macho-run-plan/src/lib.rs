@@ -243,3 +243,253 @@ impl ExecutionPlan {
         out
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use macho_map::MapRegion;
+    use macho_resolve::{DependencyEdge, DependencyGraph, ImageNode};
+    use macho_types::segment::VmProt;
+    use trust_policy::{GateDecision, SecurityVerdict};
+
+    /// Helper to build a minimal ExecutionPlan with no deps and no security.
+    fn minimal_plan(path: &str) -> ExecutionPlan {
+        ExecutionPlan {
+            binary_path: PathBuf::from(path),
+            mapping: MappingPlan { regions: vec![] },
+            dependencies: ResolutionPlan {
+                graph: DependencyGraph {
+                    nodes: vec![],
+                    edges: vec![],
+                },
+                rpaths: vec![],
+                unresolved: vec![],
+                transitive: false,
+            },
+            objc: ObjcPresence {
+                has_objc: false,
+                sections_found: vec![],
+            },
+            objc_metadata: None,
+            initializers: None,
+            symbol_bindings: None,
+            security: None,
+            init_order: vec![],
+            entry: None,
+        }
+    }
+
+    #[test]
+    fn display_contains_binary_path() {
+        let plan = minimal_plan("/usr/local/bin/hello");
+        let out = plan.display();
+        assert!(out.contains("/usr/local/bin/hello"));
+        assert!(out.contains("Load main binary"));
+    }
+
+    #[test]
+    fn empty_plan_display() {
+        let plan = minimal_plan("/tmp/empty");
+        let out = plan.display();
+        // Should still produce load step and init/binding steps
+        assert!(out.contains("Load main binary"));
+        assert!(out.contains("Build symbol binding order"));
+        assert!(out.contains("Run initializers"));
+    }
+
+    #[test]
+    fn plan_init_order_empty() {
+        let plan = minimal_plan("/tmp/nodeps");
+        assert!(plan.init_order.is_empty());
+        // Display should not mention dependency edges
+        let out = plan.display();
+        assert!(!out.contains("Resolve"));
+    }
+
+    #[test]
+    fn display_with_mapping_regions() {
+        let mut plan = minimal_plan("/tmp/mapped");
+        plan.mapping.regions.push(MapRegion {
+            segment_name: "__TEXT".to_string(),
+            vmaddr: 0x1_0000_0000,
+            vmsize: 0x4000,
+            fileoff: 0,
+            filesize: 0x4000,
+            protection: VmProt::READ | VmProt::EXECUTE,
+            max_protection: VmProt::READ | VmProt::EXECUTE,
+            zerofill_size: 0,
+        });
+        let out = plan.display();
+        assert!(out.contains("__TEXT"));
+        assert!(out.contains("Map"));
+    }
+
+    #[test]
+    fn display_with_entry_main() {
+        let mut plan = minimal_plan("/tmp/entry");
+        plan.entry = Some(EntryPoint::Main {
+            entry_offset: 0x1234,
+            stack_size: 0,
+        });
+        let out = plan.display();
+        assert!(out.contains("LC_MAIN"));
+        assert!(out.contains("0x1234"));
+    }
+
+    #[test]
+    fn display_with_entry_unixthread() {
+        let mut plan = minimal_plan("/tmp/old");
+        plan.entry = Some(EntryPoint::UnixThread {
+            entry_address: 0xdead_beef,
+        });
+        let out = plan.display();
+        assert!(out.contains("LC_UNIXTHREAD"));
+        assert!(out.contains("0xdeadbeef"));
+    }
+
+    #[test]
+    fn security_report_all_passed() {
+        let mut plan = minimal_plan("/tmp/secure");
+        plan.security = Some(SecurityReport {
+            decisions: vec![GateDecision {
+                gate: "codesign".to_string(),
+                verdict: SecurityVerdict::Allow,
+            }],
+            allowed: true,
+            denied_reasons: vec![],
+            strip_dyld_env: false,
+            hardened_runtime: false,
+            cs_info: None,
+        });
+        let out = plan.display();
+        assert!(out.contains("Security: all gates passed"));
+        assert!(!out.contains("DENIED"));
+    }
+
+    #[test]
+    fn security_report_denied() {
+        let mut plan = minimal_plan("/tmp/denied");
+        plan.security = Some(SecurityReport {
+            decisions: vec![GateDecision {
+                gate: "codesign".to_string(),
+                verdict: SecurityVerdict::Deny {
+                    reason: "unsigned".to_string(),
+                },
+            }],
+            allowed: false,
+            denied_reasons: vec!["unsigned binary".to_string()],
+            strip_dyld_env: true,
+            hardened_runtime: true,
+            cs_info: None,
+        });
+        let out = plan.display();
+        assert!(out.contains("Security: DENIED"));
+        assert!(out.contains("unsigned binary"));
+        assert!(out.contains("DYLD_*"));
+        assert!(out.contains("Hardened runtime"));
+    }
+
+    #[test]
+    fn display_with_dependency_edges() {
+        let mut plan = minimal_plan("/tmp/deps");
+        plan.dependencies.graph.nodes.push(ImageNode {
+            index: 0,
+            path: PathBuf::from("/tmp/deps"),
+            install_name: None,
+            depth: 0,
+        });
+        plan.dependencies.graph.nodes.push(ImageNode {
+            index: 1,
+            path: PathBuf::from("/usr/lib/libSystem.B.dylib"),
+            install_name: Some("/usr/lib/libSystem.B.dylib".to_string()),
+            depth: 1,
+        });
+        plan.dependencies.graph.edges.push(DependencyEdge {
+            from: 0,
+            to: 1,
+            raw_name: "/usr/lib/libSystem.B.dylib".to_string(),
+        });
+        let out = plan.display();
+        assert!(out.contains("Resolve"));
+        assert!(out.contains("libSystem.B.dylib"));
+    }
+
+    #[test]
+    fn display_with_unresolved() {
+        let mut plan = minimal_plan("/tmp/missing");
+        plan.dependencies
+            .unresolved
+            .push("/usr/lib/libmissing.dylib".to_string());
+        let out = plan.display();
+        assert!(out.contains("[UNRESOLVED]"));
+        assert!(out.contains("libmissing.dylib"));
+    }
+
+    #[test]
+    fn display_with_objc_metadata_shows_counts() {
+        let mut plan = minimal_plan("/tmp/objc");
+        plan.objc.has_objc = true;
+        plan.objc_metadata = Some(macho_objc::ObjcMetadata {
+            presence: macho_objc::ObjcPresence {
+                has_objc: true,
+                sections_found: vec!["__objc_classlist".to_string()],
+            },
+            class_refs: vec![],
+            categories: vec![],
+            protocols: vec![],
+            category_count: 3,
+            protocol_count: 2,
+            selectors: vec![],
+            selref_addrs: vec![],
+            image_info: None,
+        });
+        let out = plan.display();
+        assert!(out.contains("ObjC:"), "output was: {out}");
+        assert!(out.contains("3 categories"), "output was: {out}");
+        assert!(out.contains("2 protocols"), "output was: {out}");
+    }
+
+    #[test]
+    fn display_bind_failed_shows_failed_symbols() {
+        let mut plan = minimal_plan("/tmp/bindfail");
+        plan.symbol_bindings = Some(BindingReport {
+            bindings: vec![],
+            failed: vec!["_missing_sym".to_string(), "_another_sym".to_string()],
+            bound_count: 5,
+            weak_unbound_count: 0,
+        });
+        let out = plan.display();
+        assert!(out.contains("[BIND FAILED]"), "output was: {out}");
+        assert!(out.contains("_missing_sym"), "output was: {out}");
+        assert!(out.contains("_another_sym"), "output was: {out}");
+        assert!(out.contains("2 failed"), "output was: {out}");
+    }
+
+    #[test]
+    fn display_security_with_cs_info() {
+        let mut plan = minimal_plan("/tmp/cs");
+        plan.security = Some(SecurityReport {
+            decisions: vec![],
+            allowed: true,
+            denied_reasons: vec![],
+            strip_dyld_env: false,
+            hardened_runtime: true,
+            cs_info: Some(trust_policy::CodeSignatureInfo {
+                present: true,
+                adhoc: true,
+                runtime: true,
+                restrict: false,
+                library_validation: false,
+                get_task_allow: true,
+                identity: "com.example.test".to_string(),
+                team_id: String::new(),
+                cd_hash: "abc123".to_string(),
+                has_cms_signature: false,
+                has_entitlements: true,
+            }),
+        });
+        let out = plan.display();
+        assert!(out.contains("Security: all gates passed"), "output was: {out}");
+        assert!(out.contains("Hardened runtime"), "output was: {out}");
+    }
+}

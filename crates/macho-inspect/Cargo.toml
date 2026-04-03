@@ -18,12 +18,18 @@ macho-run-plan = { workspace = true }
 macho-exec     = { workspace = true }
 macho-objc     = { workspace = true }
 macho-map      = { workspace = true }
+macho-runtime  = { workspace = true }
+libsystem-shims = { workspace = true }
+objc-runtime   = { workspace = true }
+cf-lite        = { workspace = true }
 runtime-diagnostics = { workspace = true }
 platform-core  = { workspace = true }
 trust-policy   = { workspace = true }
 clap           = { workspace = true }
 serde_json     = { workspace = true }
 serde          = { workspace = true }
+env_logger     = { workspace = true }
+log            = { workspace = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 platform-darwin-host = { workspace = true }

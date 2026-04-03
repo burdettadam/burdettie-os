@@ -1,8 +1,9 @@
 //! Chain walking logic for chained fixups.
 
 use super::resolve_and_write_bind;
+use super::resolve_bind_addr;
 use super::ChainedImport;
-use crate::ptrauth::AuthMetadata;
+use crate::ptrauth::{pac_sign_pointer, AuthMetadata};
 use crate::MappedSegment;
 
 use super::super::resolver::SymbolResolver;
@@ -36,6 +37,9 @@ pub(super) fn walk_chain(
             1 | 12 | 13 => {
                 let is_auth = (raw >> 63) & 1 == 1;
                 let is_bind = (raw >> 62) & 1 == 1;
+                log::trace!(
+                    "arm64e chain at +{offset:#x}: raw={raw:#018x}, is_auth={is_auth}, is_bind={is_bind}"
+                );
 
                 if is_bind {
                     let (ordinal, next) = if pointer_format == 13 {
@@ -44,13 +48,11 @@ pub(super) fn walk_chain(
                         (ord, n)
                     } else {
                         let ord = (raw & 0xFFFF) as usize;
-                        let n = if is_auth {
-                            ((raw >> 32) & 0x7FF) as usize
-                        } else {
-                            ((raw >> 51) & 0x7FF) as usize
-                        };
+                        // next is always bits 51-61 for formats 1/12
+                        let n = ((raw >> 51) & 0x7FF) as usize;
                         (ord, n)
                     };
+                    log::trace!("  bind: ordinal={ordinal}, next={next} (stride={stride})");
 
                     if is_auth {
                         let meta = AuthMetadata::from_auth_bind(raw);
@@ -58,9 +60,26 @@ pub(super) fn walk_chain(
                             "arm64e auth-bind at +{offset:#x}: ordinal={ordinal}, key={}, addrDiv={}, diversity={:#06x}",
                             meta.key, meta.addr_diversity, meta.diversity
                         );
-                    }
-
-                    if resolve_and_write_bind(seg, offset, ordinal, 0, imports, resolver) {
+                        // Auth bind: resolve, PAC-sign, then write.
+                        // On failure install the trap address (unsigned).
+                        let addr = match resolve_bind_addr(ordinal, 0, imports, resolver) {
+                            Some(a) => {
+                                let slot_addr = seg.base as u64 + offset as u64;
+                                unsafe {
+                                    pac_sign_pointer(a, meta.key, slot_addr, meta.diversity, meta.addr_diversity)
+                                }
+                            }
+                            None => {
+                                super::UNRESOLVED_BIND_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                super::trap_addr()
+                            }
+                        };
+                        unsafe {
+                            let ptr = seg.base.add(offset) as *mut u64;
+                            ptr.write_unaligned(addr);
+                        }
+                        binds += 1;
+                    } else if resolve_and_write_bind(seg, offset, ordinal, 0, imports, resolver) {
                         binds += 1;
                     }
                     if next == 0 {
@@ -68,28 +87,41 @@ pub(super) fn walk_chain(
                     }
                     offset += next * stride;
                 } else {
-                    let next = if is_auth {
-                        ((raw >> 32) & 0x7FF) as usize
+                    // next is always bits 51-61 for formats 1/12
+                    let next = if pointer_format == 13 {
+                        ((raw >> 24) & 0x7FF) as usize
                     } else {
                         ((raw >> 51) & 0x7FF) as usize
                     };
 
+                    // Format 12/13 (USERLAND): targets are offsets from preferred_base.
+                    // Format 1: targets are absolute vmaddrs.
+                    let is_userland = pointer_format == 12 || pointer_format == 13;
+                    let base_for_rebase = if is_userland { preferred_base } else { 0 };
+
                     let target = if is_auth {
                         let meta = AuthMetadata::from_auth_entry(raw);
+                        let raw_target = base_for_rebase + (raw & 0xFFFFFFFF);
                         log::trace!(
-                            "arm64e auth-rebase at +{offset:#x}: target={:#x}, key={}, addrDiv={}, diversity={:#06x}",
-                            raw & 0xFFFFFFFF, meta.key, meta.addr_diversity, meta.diversity
+                            "arm64e auth-rebase at +{offset:#x}: target_off={:#x}, resolved={:#x}, key={}, addrDiv={}, diversity={:#06x}",
+                            raw & 0xFFFFFFFF, raw_target, meta.key, meta.addr_diversity, meta.diversity
                         );
-                        (raw & 0xFFFFFFFF) as i64 + slide
+                        let rebased = (raw_target as i64 + slide) as u64;
+                        // Auth rebase: PAC-sign the rebased pointer
+                        let slot_addr = seg.base as u64 + offset as u64;
+                        unsafe {
+                            pac_sign_pointer(rebased, meta.key, slot_addr, meta.diversity, meta.addr_diversity)
+                        }
                     } else {
                         let target43 = raw & 0x7FF_FFFF_FFFF;
                         let high8 = (raw >> 43) & 0xFF;
-                        ((high8 << 56) | target43) as i64 + slide
+                        let raw_target = base_for_rebase + ((high8 << 56) | target43);
+                        (raw_target as i64 + slide) as u64
                     };
 
                     unsafe {
                         let ptr = seg.base.add(offset) as *mut u64;
-                        ptr.write_unaligned(target as u64);
+                        ptr.write_unaligned(target);
                     }
                     rebases += 1;
                     if next == 0 {
@@ -113,9 +145,10 @@ pub(super) fn walk_chain(
                     let target = raw & 0x0F_FFFF_FFFF;
                     let high8 = (raw >> 36) & 0xFF;
                     let rebased = (preferred_base + (high8 << 56 | target)) as i64 + slide;
+                    let rebased_u = rebased as u64;
                     unsafe {
                         let ptr = seg.base.add(offset) as *mut u64;
-                        ptr.write_unaligned(rebased as u64);
+                        ptr.write_unaligned(rebased_u);
                     }
                     rebases += 1;
                 }

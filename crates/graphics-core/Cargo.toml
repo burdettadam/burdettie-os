@@ -1,6 +1,6 @@
 [package]
 name        = "graphics-core"
-description = "2D drawing primitives and renderer trait for burdetty-os GUI framework"
+description = "2D drawing primitives and renderer trait for burdettie-os GUI framework"
 version.workspace      = true
 edition.workspace      = true
 license.workspace      = true

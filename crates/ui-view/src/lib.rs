@@ -381,4 +381,125 @@ mod tests {
 
         assert!(!v.needs_display());
     }
+
+    #[test]
+    fn view_draw_calls_subviews() {
+        let mut parent = View::new(Rect::new(0.0, 0.0, 200.0, 200.0));
+        let child = View::new(Rect::new(10.0, 10.0, 50.0, 50.0));
+        parent.add_subview(child);
+
+        // Both should need display initially
+        assert!(parent.needs_display());
+        assert!(parent.subviews()[0].needs_display());
+
+        let mut surface = graphics_core::Surface::new(200, 200);
+        let mut renderer = graphics_core::SoftwareRenderer::new(&mut surface);
+        parent.draw(&mut renderer);
+
+        // After draw, both parent and child should have needs_display cleared
+        assert!(!parent.needs_display());
+        assert!(!parent.subviews()[0].needs_display());
+    }
+
+    #[test]
+    fn view_hit_test_returns_none_for_outside() {
+        let v = View::new(Rect::new(50.0, 50.0, 100.0, 100.0));
+        // All four sides outside
+        assert!(v.hit_test(Point::new(0.0, 0.0)).is_none());
+        assert!(v.hit_test(Point::new(200.0, 75.0)).is_none());
+        assert!(v.hit_test(Point::new(75.0, 200.0)).is_none());
+        assert!(v.hit_test(Point::new(49.0, 75.0)).is_none());
+    }
+
+    #[test]
+    fn view_hit_test_returns_self_for_inside() {
+        let mut v = View::new(Rect::new(10.0, 10.0, 80.0, 80.0));
+        v.tag = 7;
+        let hit = v.hit_test(Point::new(50.0, 50.0));
+        assert!(hit.is_some());
+        assert_eq!(hit.unwrap().tag, 7);
+    }
+
+    #[test]
+    fn view_hidden_skips_hit_test() {
+        let mut parent = View::new(Rect::new(0.0, 0.0, 200.0, 200.0));
+        parent.hidden = true;
+        let mut child = View::new(Rect::new(10.0, 10.0, 50.0, 50.0));
+        child.tag = 99;
+        parent.add_subview(child);
+
+        // Even though the point is inside both parent and child, hidden parent returns None
+        assert!(parent.hit_test(Point::new(30.0, 30.0)).is_none());
+    }
+
+    #[test]
+    fn view_bounds_default() {
+        let v = View::new(Rect::new(50.0, 100.0, 200.0, 150.0));
+        // Bounds origin should be (0,0), dimensions should match frame
+        assert_eq!(v.bounds.x, 0.0);
+        assert_eq!(v.bounds.y, 0.0);
+        assert_eq!(v.bounds.width, 200.0);
+        assert_eq!(v.bounds.height, 150.0);
+    }
+
+    #[test]
+    fn view_hit_test_mut_returns_mutable() {
+        let mut parent = View::new(Rect::new(0.0, 0.0, 200.0, 200.0));
+        let mut child = View::new(Rect::new(10.0, 10.0, 80.0, 80.0));
+        child.tag = 55;
+        parent.add_subview(child);
+
+        let hit = parent.hit_test_mut(Point::new(50.0, 50.0));
+        assert!(hit.is_some());
+        let hit = hit.unwrap();
+        assert_eq!(hit.tag, 55);
+        hit.tag = 99;
+        // Verify mutation persisted
+        assert_eq!(parent.subviews()[0].tag, 99);
+    }
+
+    #[test]
+    fn view_apply_layout() {
+        use layout::{LayoutEngine, ViewId, LayoutConstraint, LayoutAttribute, LayoutRelation};
+
+        let mut root = View::new(Rect::new(0.0, 0.0, 400.0, 300.0));
+        let mut child = View::new(Rect::new(0.0, 0.0, 0.0, 0.0));
+        child.layout_id = Some(ViewId(1));
+        root.add_subview(child);
+
+        let mut engine = LayoutEngine::new(Rect::new(0.0, 0.0, 400.0, 300.0));
+        engine.add_constraint(LayoutConstraint::constant(
+            ViewId(1), LayoutAttribute::Width, LayoutRelation::Equal, 100.0,
+        ));
+        engine.add_constraint(LayoutConstraint::constant(
+            ViewId(1), LayoutAttribute::Height, LayoutRelation::Equal, 50.0,
+        ));
+        engine.add_constraint(LayoutConstraint::constant(
+            ViewId(1), LayoutAttribute::Left, LayoutRelation::Equal, 10.0,
+        ));
+        engine.add_constraint(LayoutConstraint::constant(
+            ViewId(1), LayoutAttribute::Top, LayoutRelation::Equal, 20.0,
+        ));
+
+        root.apply_layout(&engine);
+
+        let child_frame = root.subviews()[0].frame;
+        assert!((child_frame.width - 100.0).abs() < 2.0, "w={}", child_frame.width);
+        assert!((child_frame.height - 50.0).abs() < 2.0, "h={}", child_frame.height);
+        assert!((child_frame.x - 10.0).abs() < 2.0, "x={}", child_frame.x);
+        assert!((child_frame.y - 20.0).abs() < 2.0, "y={}", child_frame.y);
+    }
+
+    #[test]
+    fn view_set_needs_display() {
+        let mut v = View::new(Rect::new(0.0, 0.0, 100.0, 100.0));
+        // Draw to clear needs_display
+        let mut surface = graphics_core::Surface::new(100, 100);
+        let mut renderer = graphics_core::SoftwareRenderer::new(&mut surface);
+        v.draw(&mut renderer);
+        assert!(!v.needs_display());
+
+        v.set_needs_display();
+        assert!(v.needs_display());
+    }
 }

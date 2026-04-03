@@ -1,4 +1,4 @@
-//! ObjC runtime for burdetty-os.
+//! ObjC runtime for burdettie-os.
 //!
 //! Provides class registration, selector interning, method dispatch
 //! (`objc_msgSend`), and object allocation for Mach-O binaries with
@@ -19,6 +19,7 @@
 //! implements enough to run simple ObjC binaries without Foundation.
 
 pub(crate) mod blocks;
+pub mod backend;
 mod class;
 pub mod refcount;
 pub mod shims;
@@ -26,6 +27,7 @@ pub mod shims;
 pub use class::{ClassInfo, MethodEntry, ObjcRuntime, ProtocolInfo, OBJC_RUNTIME};
 pub use shims::ObjcShims;
 pub use shims::{
+    host_nsexception_ehtype_addr,
     shim_nsobject_autorelease, shim_nsobject_dealloc, shim_nsobject_release, shim_nsobject_retain,
     shim_nsobject_retain_count, shim_objc_exception_throw,
     shim_class_conforms_to_protocol,

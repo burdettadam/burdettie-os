@@ -4,7 +4,7 @@ use libsystem_shims::register_shims;
 use libsystem_shims::table::ShimTable;
 
 use crate::{cf_core, cfstring, nslog, nsobj, nsvalue};
-use crate::{nsapplication, nsrunloop};
+use crate::{foundation_constants, nsapplication, nsrunloop, nspasteboard};
 use super::cfconstant_string::cfconstant_string_class_addr;
 
 /// Register core CF/Foundation shims and the first group of class data symbols.
@@ -12,6 +12,7 @@ pub(super) fn install_core_shims(table: &mut ShimTable) {
     // NSLog + CFConstantString
     register_shims!(table,
         ("_NSLog", nslog::nslog_trampoline_addr(), "NSLog → fprintf(stderr, ...)"),
+        ("__NSIsNSString", cf_core::shim_ns_is_nsstring as u64, "__NSIsNSString → string/CFString predicate"),
         ("___CFConstantStringClassReference", cfconstant_string_class_addr(), "CFConstantString class reference (data symbol)"),
     );
 
@@ -156,6 +157,63 @@ pub(super) fn install_core_shims(table: &mut ShimTable) {
         ("_OBJC_METACLASS_$_NSHTTPURLResponse", nsobj::nshttpurlresponse_metaclass_addr(), "NSHTTPURLResponse metaclass data symbol"),
         ("_OBJC_CLASS_$_NSTask", nsobj::nstask_class_addr(), "NSTask class data symbol"),
         ("_OBJC_METACLASS_$_NSTask", nsobj::nstask_metaclass_addr(), "NSTask metaclass data symbol"),
+        ("_OBJC_CLASS_$_PKBundleComponentVersion", nsobj::pkbundlecomponentversion_class_addr(), "PKBundleComponentVersion class data symbol"),
+        ("_OBJC_METACLASS_$_PKBundleComponentVersion", nsobj::pkbundlecomponentversion_metaclass_addr(), "PKBundleComponentVersion metaclass data symbol"),
+        // Phase C10
+        ("_OBJC_CLASS_$_NSStream", nsobj::nsstream_class_addr(), "NSStream class data symbol"),
+        ("_OBJC_METACLASS_$_NSStream", nsobj::nsstream_metaclass_addr(), "NSStream metaclass data symbol"),
+        ("_OBJC_CLASS_$_NSInputStream", nsobj::nsinputstream_class_addr(), "NSInputStream class data symbol"),
+        ("_OBJC_METACLASS_$_NSInputStream", nsobj::nsinputstream_metaclass_addr(), "NSInputStream metaclass data symbol"),
+        ("_OBJC_CLASS_$_NSOutputStream", nsobj::nsoutputstream_class_addr(), "NSOutputStream class data symbol"),
+        ("_OBJC_METACLASS_$_NSOutputStream", nsobj::nsoutputstream_metaclass_addr(), "NSOutputStream metaclass data symbol"),
+        ("_OBJC_CLASS_$_NSXMLParser", nsobj::nsxmlparser_class_addr(), "NSXMLParser class data symbol"),
+        ("_OBJC_METACLASS_$_NSXMLParser", nsobj::nsxmlparser_metaclass_addr(), "NSXMLParser metaclass data symbol"),
+        ("_OBJC_CLASS_$_NSURLSession", nsobj::nsurlsession_class_addr(), "NSURLSession class data symbol"),
+        ("_OBJC_METACLASS_$_NSURLSession", nsobj::nsurlsession_metaclass_addr(), "NSURLSession metaclass data symbol"),
+        ("_OBJC_CLASS_$_NSURLSessionConfiguration", nsobj::nsurlsessionconfiguration_class_addr(), "NSURLSessionConfiguration class data symbol"),
+        ("_OBJC_METACLASS_$_NSURLSessionConfiguration", nsobj::nsurlsessionconfiguration_metaclass_addr(), "NSURLSessionConfiguration metaclass data symbol"),
+        ("_OBJC_CLASS_$_NSURLSessionDataTask", nsobj::nsurlsessiondatatask_class_addr(), "NSURLSessionDataTask class data symbol"),
+        ("_OBJC_METACLASS_$_NSURLSessionDataTask", nsobj::nsurlsessiondatatask_metaclass_addr(), "NSURLSessionDataTask metaclass data symbol"),
+        ("_OBJC_CLASS_$_NSKeyedArchiver", nsobj::nskeyedarchiver_class_addr(), "NSKeyedArchiver class data symbol"),
+        ("_OBJC_METACLASS_$_NSKeyedArchiver", nsobj::nskeyedarchiver_metaclass_addr(), "NSKeyedArchiver metaclass data symbol"),
+        ("_OBJC_CLASS_$_NSKeyedUnarchiver", nsobj::nskeyedunarchiver_class_addr(), "NSKeyedUnarchiver class data symbol"),
+        ("_OBJC_METACLASS_$_NSKeyedUnarchiver", nsobj::nskeyedunarchiver_metaclass_addr(), "NSKeyedUnarchiver metaclass data symbol"),
+        ("_OBJC_CLASS_$_NSURLCredential", nsobj::nsurlcredential_class_addr(), "NSURLCredential class data symbol"),
+        ("_OBJC_METACLASS_$_NSURLCredential", nsobj::nsurlcredential_metaclass_addr(), "NSURLCredential metaclass data symbol"),
+        ("_OBJC_CLASS_$_NSURLCredentialStorage", nsobj::nsurlcredentialstorage_class_addr(), "NSURLCredentialStorage class data symbol"),
+        ("_OBJC_METACLASS_$_NSURLCredentialStorage", nsobj::nsurlcredentialstorage_metaclass_addr(), "NSURLCredentialStorage metaclass data symbol"),
+        ("_OBJC_CLASS_$_NSHTTPCookie", nsobj::nshttpcookie_class_addr(), "NSHTTPCookie class data symbol"),
+        ("_OBJC_METACLASS_$_NSHTTPCookie", nsobj::nshttpcookie_metaclass_addr(), "NSHTTPCookie metaclass data symbol"),
+        ("_OBJC_CLASS_$_NSHTTPCookieStorage", nsobj::nshttpcookiestorage_class_addr(), "NSHTTPCookieStorage class data symbol"),
+        ("_OBJC_METACLASS_$_NSHTTPCookieStorage", nsobj::nshttpcookiestorage_metaclass_addr(), "NSHTTPCookieStorage metaclass data symbol"),
+        ("_OBJC_CLASS_$_NSAutoreleasePool", nsobj::nsautoreleasepool_class_addr(), "NSAutoreleasePool class data symbol"),
+        ("_OBJC_METACLASS_$_NSAutoreleasePool", nsobj::nsautoreleasepool_metaclass_addr(), "NSAutoreleasePool metaclass data symbol"),
+        // NSPasteboard class data symbols
+        ("_OBJC_CLASS_$_NSPasteboard", nsobj::nspasteboard_class_addr(), "NSPasteboard class data symbol"),
+        ("_OBJC_METACLASS_$_NSPasteboard", nsobj::nspasteboard_metaclass_addr(), "NSPasteboard metaclass data symbol"),
+        // NSUnit / NSMeasurement class data symbols
+        ("_OBJC_CLASS_$_NSUnit", nsobj::nsunit_class_addr(), "NSUnit class data symbol"),
+        ("_OBJC_METACLASS_$_NSUnit", nsobj::nsunit_metaclass_addr(), "NSUnit metaclass data symbol"),
+        ("_OBJC_CLASS_$_NSDimension", nsobj::nsdimension_class_addr(), "NSDimension class data symbol"),
+        ("_OBJC_METACLASS_$_NSDimension", nsobj::nsdimension_metaclass_addr(), "NSDimension metaclass data symbol"),
+        ("_OBJC_CLASS_$_NSMeasurement", nsobj::nsmeasurement_class_addr(), "NSMeasurement class data symbol"),
+        ("_OBJC_METACLASS_$_NSMeasurement", nsobj::nsmeasurement_metaclass_addr(), "NSMeasurement metaclass data symbol"),
+        ("_OBJC_CLASS_$_NSUnitLength", nsobj::nsunitlength_class_addr(), "NSUnitLength class data symbol"),
+        ("_OBJC_METACLASS_$_NSUnitLength", nsobj::nsunitlength_metaclass_addr(), "NSUnitLength metaclass data symbol"),
+        ("_OBJC_CLASS_$_NSUnitMass", nsobj::nsunitmass_class_addr(), "NSUnitMass class data symbol"),
+        ("_OBJC_METACLASS_$_NSUnitMass", nsobj::nsunitmass_metaclass_addr(), "NSUnitMass metaclass data symbol"),
+        ("_OBJC_CLASS_$_NSUnitTemperature", nsobj::nsunittemperature_class_addr(), "NSUnitTemperature class data symbol"),
+        ("_OBJC_METACLASS_$_NSUnitTemperature", nsobj::nsunittemperature_metaclass_addr(), "NSUnitTemperature metaclass data symbol"),
+        ("_OBJC_CLASS_$_NSUnitVolume", nsobj::nsunitvolume_class_addr(), "NSUnitVolume class data symbol"),
+        ("_OBJC_METACLASS_$_NSUnitVolume", nsobj::nsunitvolume_metaclass_addr(), "NSUnitVolume metaclass data symbol"),
+        ("_OBJC_CLASS_$_NSUnitAngle", nsobj::nsunitangle_class_addr(), "NSUnitAngle class data symbol"),
+        ("_OBJC_METACLASS_$_NSUnitAngle", nsobj::nsunitangle_metaclass_addr(), "NSUnitAngle metaclass data symbol"),
+        ("_OBJC_CLASS_$_NSUnitSpeed", nsobj::nsunitspeed_class_addr(), "NSUnitSpeed class data symbol"),
+        ("_OBJC_METACLASS_$_NSUnitSpeed", nsobj::nsunitspeed_metaclass_addr(), "NSUnitSpeed metaclass data symbol"),
+        ("_OBJC_CLASS_$_NSUnitDuration", nsobj::nsunitduration_class_addr(), "NSUnitDuration class data symbol"),
+        ("_OBJC_METACLASS_$_NSUnitDuration", nsobj::nsunitduration_metaclass_addr(), "NSUnitDuration metaclass data symbol"),
+        ("_OBJC_CLASS_$_NSMeasurementFormatter", nsobj::nsmeasurementformatter_class_addr(), "NSMeasurementFormatter class data symbol"),
+        ("_OBJC_METACLASS_$_NSMeasurementFormatter", nsobj::nsmeasurementformatter_metaclass_addr(), "NSMeasurementFormatter metaclass data symbol"),
     );
 
     // NSURL class/metaclass data symbols
@@ -185,6 +243,7 @@ pub(super) fn install_core_shims(table: &mut ShimTable) {
         ("_CFEqual", cf_core::shim_cf_equal as u64, "CFEqual shim"),
         ("_CFHash", cf_core::shim_cf_hash as u64, "CFHash shim"),
         ("_CFCopyDescription", cf_core::shim_cf_copy_description as u64, "CFCopyDescription shim"),
+        ("_CFPreferencesCopyValue", cf_core::shim_cf_preferences_copy_value as u64, "CFPreferencesCopyValue shim"),
     );
 
     // CF type ID getters
@@ -231,6 +290,7 @@ pub(super) fn install_core_shims(table: &mut ShimTable) {
     register_shims!(table,
         ("_CFBundleGetMainBundle", cf_core::shim_cf_bundle_get_main_bundle as u64, "CFBundleGetMainBundle shim"),
         ("_CFBundleCopyBundleURL", cf_core::shim_cf_bundle_copy_bundle_url as u64, "CFBundleCopyBundleURL shim"),
+        ("_CFBundleCopyInfoDictionaryForURL", cf_core::shim_cf_bundle_copy_info_dictionary_for_url as u64, "CFBundleCopyInfoDictionaryForURL shim"),
     );
 
     // CF boolean/null data symbols
@@ -246,5 +306,212 @@ pub(super) fn install_core_shims(table: &mut ShimTable) {
         ("_NSApp", nsapplication::nsapp_global_addr(), "NSApp global variable (data symbol)"),
         ("_NSDefaultRunLoopMode", nsrunloop::nsdefault_run_loop_mode_addr(), "NSDefaultRunLoopMode constant string"),
         ("_NSRunLoopCommonModes", nsrunloop::nsrun_loop_common_modes_addr(), "NSRunLoopCommonModes constant string"),
+    );
+
+    // CFString encoding conversion functions
+    register_shims!(table,
+        ("_CFStringConvertEncodingToNSStringEncoding", cf_core::shim_cf_string_convert_encoding_to_nsstring_encoding as u64, "CFStringConvertEncodingToNSStringEncoding shim"),
+        ("_CFStringConvertIANACharSetNameToEncoding", cf_core::shim_cf_string_convert_iana_charset_name_to_encoding as u64, "CFStringConvertIANACharSetNameToEncoding shim"),
+    );
+
+    // ___NSArray0__struct — empty immutable array singleton
+    register_shims!(table,
+        ("____NSArray0__struct", cf_core::nsarray0_struct_addr(), "___NSArray0__struct empty array sentinel"),
+    );
+
+    // XCStringsParser.framework class symbols
+    register_shims!(table,
+        ("_OBJC_CLASS_$_XCStringsdataEntry", nsobj::xcstringsdataentry_class_addr(), "XCStringsdataEntry class"),
+        ("_OBJC_CLASS_$_XCStringsdataTable", nsobj::xcstringsdatatable_class_addr(), "XCStringsdataTable class"),
+        ("_OBJC_CLASS_$_XCStringsdataFile", nsobj::xcstringsdatafile_class_addr(), "XCStringsdataFile class"),
+    );
+
+    // CoreData class/metaclass data symbols
+    register_shims!(table,
+        ("_OBJC_CLASS_$_NSManagedObjectContext",      nsobj::nsmanagedobjectcontext_class_addr(),      "NSManagedObjectContext class"),
+        ("_OBJC_METACLASS_$_NSManagedObjectContext",  nsobj::nsmanagedobjectcontext_metaclass_addr(),  "NSManagedObjectContext metaclass"),
+        ("_OBJC_CLASS_$_NSPersistentStoreCoordinator", nsobj::nspersistentstorecoordinator_class_addr(), "NSPersistentStoreCoordinator class"),
+        ("_OBJC_METACLASS_$_NSPersistentStoreCoordinator", nsobj::nspersistentstorecoordinator_metaclass_addr(), "NSPersistentStoreCoordinator metaclass"),
+        ("_OBJC_CLASS_$_NSFetchRequest",              nsobj::nsfetchrequest_class_addr(),              "NSFetchRequest class"),
+        ("_OBJC_METACLASS_$_NSFetchRequest",          nsobj::nsfetchrequest_metaclass_addr(),          "NSFetchRequest metaclass"),
+        ("_OBJC_CLASS_$_NSManagedObject",             nsobj::nsmanagedobject_class_addr(),             "NSManagedObject class"),
+        ("_OBJC_METACLASS_$_NSManagedObject",         nsobj::nsmanagedobject_metaclass_addr(),         "NSManagedObject metaclass"),
+        ("_OBJC_CLASS_$_NSEntityDescription",         nsobj::nsentitydescription_class_addr(),         "NSEntityDescription class"),
+        ("_OBJC_METACLASS_$_NSEntityDescription",     nsobj::nsentitydescription_metaclass_addr(),     "NSEntityDescription metaclass"),
+        ("_OBJC_CLASS_$_NSManagedObjectModel",        nsobj::nsmanagedobjectmodel_class_addr(),        "NSManagedObjectModel class"),
+        ("_OBJC_METACLASS_$_NSManagedObjectModel",    nsobj::nsmanagedobjectmodel_metaclass_addr(),    "NSManagedObjectModel metaclass"),
+    );
+
+    // AVFoundation class/metaclass data symbols
+    register_shims!(table,
+        ("_OBJC_CLASS_$_AVAudioPlayer",     nsobj::avaudioplayer_class_addr(),     "AVAudioPlayer class"),
+        ("_OBJC_METACLASS_$_AVAudioPlayer", nsobj::avaudioplayer_metaclass_addr(), "AVAudioPlayer metaclass"),
+        ("_OBJC_CLASS_$_AVAudioRecorder",     nsobj::avaudiorecorder_class_addr(),     "AVAudioRecorder class"),
+        ("_OBJC_METACLASS_$_AVAudioRecorder", nsobj::avaudiorecorder_metaclass_addr(), "AVAudioRecorder metaclass"),
+        ("_OBJC_CLASS_$_AVAudioEngine",     nsobj::avaudioengine_class_addr(),     "AVAudioEngine class"),
+        ("_OBJC_METACLASS_$_AVAudioEngine", nsobj::avaudioengine_metaclass_addr(), "AVAudioEngine metaclass"),
+        ("_OBJC_CLASS_$_AVCaptureDevice",     nsobj::avcapturedevice_class_addr(),     "AVCaptureDevice class"),
+        ("_OBJC_METACLASS_$_AVCaptureDevice", nsobj::avcapturedevice_metaclass_addr(), "AVCaptureDevice metaclass"),
+        ("_OBJC_CLASS_$_AVCaptureSession",     nsobj::avcapturesession_class_addr(),     "AVCaptureSession class"),
+        ("_OBJC_METACLASS_$_AVCaptureSession", nsobj::avcapturesession_metaclass_addr(), "AVCaptureSession metaclass"),
+        ("_OBJC_CLASS_$_AVPlayer",     nsobj::avplayer_class_addr(),     "AVPlayer class"),
+        ("_OBJC_METACLASS_$_AVPlayer", nsobj::avplayer_metaclass_addr(), "AVPlayer metaclass"),
+    );
+
+    // CoreLocation class/metaclass data symbols
+    register_shims!(table,
+        ("_OBJC_CLASS_$_CLLocationManager",     nsobj::cllocationmanager_class_addr(),     "CLLocationManager class"),
+        ("_OBJC_METACLASS_$_CLLocationManager", nsobj::cllocationmanager_metaclass_addr(), "CLLocationManager metaclass"),
+        ("_OBJC_CLASS_$_CLLocation",     nsobj::cllocation_class_addr(),     "CLLocation class"),
+        ("_OBJC_METACLASS_$_CLLocation", nsobj::cllocation_metaclass_addr(), "CLLocation metaclass"),
+        ("_OBJC_CLASS_$_CLGeocoder",     nsobj::clgeocoder_class_addr(),     "CLGeocoder class"),
+        ("_OBJC_METACLASS_$_CLGeocoder", nsobj::clgeocoder_metaclass_addr(), "CLGeocoder metaclass"),
+    );
+
+    // CoreBluetooth class/metaclass data symbols
+    register_shims!(table,
+        ("_OBJC_CLASS_$_CBCentralManager",     nsobj::cbcentralmanager_class_addr(),     "CBCentralManager class"),
+        ("_OBJC_METACLASS_$_CBCentralManager", nsobj::cbcentralmanager_metaclass_addr(), "CBCentralManager metaclass"),
+        ("_OBJC_CLASS_$_CBPeripheralManager",     nsobj::cbperipheralmanager_class_addr(),     "CBPeripheralManager class"),
+        ("_OBJC_METACLASS_$_CBPeripheralManager", nsobj::cbperipheralmanager_metaclass_addr(), "CBPeripheralManager metaclass"),
+    );
+
+    // Foundation string constant data symbols (pointer-stable)
+    register_shims!(table,
+        ("_NSStreamDataWrittenToMemoryStreamKey", foundation_constants::nsstream_data_written_to_memory_key_addr(), "NSStreamDataWrittenToMemoryStreamKey"),
+        ("_NSCocoaErrorDomain", foundation_constants::nscocoa_error_domain_addr(), "NSCocoaErrorDomain constant string"),
+        ("_NSPOSIXErrorDomain", foundation_constants::nsposix_error_domain_addr(), "NSPOSIXErrorDomain constant string"),
+        ("_NSURLErrorDomain", foundation_constants::nsurl_error_domain_addr(), "NSURLErrorDomain constant string"),
+        ("_NSMachErrorDomain", foundation_constants::nsmach_error_domain_addr(), "NSMachErrorDomain constant string"),
+        ("_NSLocalizedDescriptionKey", foundation_constants::nslocalized_description_key_addr(), "NSLocalizedDescriptionKey constant string"),
+        ("_NSLocalizedFailureReasonErrorKey", foundation_constants::nslocalized_failure_reason_key_addr(), "NSLocalizedFailureReasonErrorKey constant string"),
+        ("_NSFilePathErrorKey", foundation_constants::nsfile_path_error_key_addr(), "NSFilePathErrorKey constant string"),
+        ("_NSUserDefaultsDidChangeNotification", foundation_constants::nsuserdefaults_did_change_notification_addr(), "NSUserDefaultsDidChangeNotification constant string"),
+        ("_kCFBundleShortVersionStringKey", foundation_constants::cfbundle_short_version_string_key_addr(), "kCFBundleShortVersionStringKey constant string"),
+        ("__kCFBundleShortVersionStringKey", foundation_constants::cfbundle_short_version_string_key_addr(), "__kCFBundleShortVersionStringKey constant string"),
+        ("_kCFBundleVersionKey", foundation_constants::cfbundle_version_key_addr(), "kCFBundleVersionKey constant string"),
+    );
+
+    // CFNumber C functions
+    register_shims!(table,
+        ("_CFNumberCreate", cf_core::shim_cf_number_create as u64, "CFNumberCreate → create number from type+ptr"),
+        ("_CFNumberGetValue", cf_core::shim_cf_number_get_value as u64, "CFNumberGetValue → extract value by type"),
+        ("_CFNumberGetType", cf_core::shim_cf_number_get_type as u64, "CFNumberGetType → CFNumberType enum"),
+        ("_CFNumberCompare", cf_core::shim_cf_number_compare as u64, "CFNumberCompare → numeric ordering"),
+        ("_CFNumberIsFloatType", cf_core::shim_cf_number_is_float_type as u64, "CFNumberIsFloatType → Boolean"),
+    );
+
+    // CFString expanded C functions
+    register_shims!(table,
+        ("_CFStringGetCString", cf_core::shim_cf_string_get_cstring as u64, "CFStringGetCString → copy to C buffer"),
+        ("_CFStringCreateCopy", cf_core::shim_cf_string_create_copy as u64, "CFStringCreateCopy → immutable copy"),
+        ("_CFStringCompare", cf_core::shim_cf_string_compare as u64, "CFStringCompare → lexical ordering"),
+        ("_CFStringCreateWithCharacters", cf_core::shim_cf_string_create_with_characters as u64, "CFStringCreateWithCharacters → from UTF-16"),
+        ("_CFStringGetCharacterAtIndex", cf_core::shim_cf_string_get_character_at_index as u64, "CFStringGetCharacterAtIndex → UniChar"),
+        ("_CFStringFind", cf_core::shim_cf_string_find as u64, "CFStringFind → substring search"),
+    );
+
+    // CFRunLoop C functions
+    register_shims!(table,
+        ("_CFRunLoopGetCurrent", cf_core::shim_cf_run_loop_get_current as u64, "CFRunLoopGetCurrent → current thread run loop"),
+        ("_CFRunLoopGetMain", cf_core::shim_cf_run_loop_get_main as u64, "CFRunLoopGetMain → main thread run loop"),
+        ("_CFRunLoopRun", cf_core::shim_cf_run_loop_run as u64, "CFRunLoopRun → run default mode"),
+        ("_CFRunLoopRunInMode", cf_core::shim_cf_run_loop_run_in_mode as u64, "CFRunLoopRunInMode → timed mode run"),
+        ("_CFRunLoopStop", cf_core::shim_cf_run_loop_stop as u64, "CFRunLoopStop → exit run loop"),
+        ("_CFRunLoopAddTimer", cf_core::shim_cf_run_loop_add_timer as u64, "CFRunLoopAddTimer → schedule timer"),
+        ("_CFRunLoopAddSource", cf_core::shim_cf_run_loop_add_source as u64, "CFRunLoopAddSource → add input source"),
+        ("_kCFRunLoopDefaultMode", cf_core::kcf_run_loop_default_mode_addr(), "kCFRunLoopDefaultMode constant string"),
+        ("_kCFRunLoopCommonModes", cf_core::kcf_run_loop_common_modes_addr(), "kCFRunLoopCommonModes constant string"),
+    );
+
+    // CFAllocator C functions
+    register_shims!(table,
+        ("_CFAllocatorGetDefault", cf_core::shim_cf_allocator_get_default as u64, "CFAllocatorGetDefault → default allocator"),
+        ("_CFAllocatorAllocate", cf_core::shim_cf_allocator_allocate as u64, "CFAllocatorAllocate → calloc wrapper"),
+        ("_CFAllocatorDeallocate", cf_core::shim_cf_allocator_deallocate as u64, "CFAllocatorDeallocate → free wrapper"),
+    );
+
+    // CFMutableArray C functions
+    register_shims!(table,
+        ("_CFArrayCreateMutable", cf_core::shim_cf_array_create_mutable as u64, "CFArrayCreateMutable → NSMutableArray"),
+        ("_CFArrayAppendValue", cf_core::shim_cf_array_append_value as u64, "CFArrayAppendValue → addObject:"),
+        ("_CFArrayInsertValueAtIndex", cf_core::shim_cf_array_insert_value_at_index as u64, "CFArrayInsertValueAtIndex → insertObject:atIndex:"),
+        ("_CFArrayRemoveValueAtIndex", cf_core::shim_cf_array_remove_value_at_index as u64, "CFArrayRemoveValueAtIndex → removeObjectAtIndex:"),
+        ("_CFArraySetValueAtIndex", cf_core::shim_cf_array_set_value_at_index as u64, "CFArraySetValueAtIndex → replaceObjectAtIndex:withObject:"),
+        ("_CFArrayRemoveAllValues", cf_core::shim_cf_array_remove_all_values as u64, "CFArrayRemoveAllValues → removeAllObjects"),
+        ("_CFArraySortValues", cf_core::shim_cf_array_sort_values as u64, "CFArraySortValues → stub no-op"),
+    );
+
+    // CFMutableDictionary C functions
+    register_shims!(table,
+        ("_CFDictionaryCreateMutable", cf_core::shim_cf_dictionary_create_mutable as u64, "CFDictionaryCreateMutable → NSMutableDictionary"),
+        ("_CFDictionarySetValue", cf_core::shim_cf_dictionary_set_value as u64, "CFDictionarySetValue → setObject:forKey:"),
+        ("_CFDictionaryAddValue", cf_core::shim_cf_dictionary_add_value as u64, "CFDictionaryAddValue → setObject:forKey:"),
+        ("_CFDictionaryReplaceValue", cf_core::shim_cf_dictionary_replace_value as u64, "CFDictionaryReplaceValue → replace if exists"),
+        ("_CFDictionaryRemoveValue", cf_core::shim_cf_dictionary_remove_value as u64, "CFDictionaryRemoveValue → removeObjectForKey:"),
+        ("_CFDictionaryRemoveAllValues", cf_core::shim_cf_dictionary_remove_all_values as u64, "CFDictionaryRemoveAllValues → removeAllObjects"),
+    );
+
+    // CFSet / CFMutableSet C functions
+    register_shims!(table,
+        ("_CFSetCreate", cf_core::shim_cf_set_create as u64, "CFSetCreate → NSSet"),
+        ("_CFSetGetTypeID", cf_core::shim_cf_set_get_type_id as u64, "CFSetGetTypeID"),
+        ("_CFSetGetCount", cf_core::shim_cf_set_get_count as u64, "CFSetGetCount → count"),
+        ("_CFSetContainsValue", cf_core::shim_cf_set_contains_value as u64, "CFSetContainsValue → containsObject:"),
+        ("_CFSetGetValues", cf_core::shim_cf_set_get_values as u64, "CFSetGetValues → copy pointers"),
+        ("_CFSetCreateMutable", cf_core::shim_cf_set_create_mutable as u64, "CFSetCreateMutable → NSMutableSet"),
+        ("_CFSetAddValue", cf_core::shim_cf_set_add_value as u64, "CFSetAddValue → addObject:"),
+        ("_CFSetRemoveValue", cf_core::shim_cf_set_remove_value as u64, "CFSetRemoveValue → removeObject:"),
+        ("_CFSetRemoveAllValues", cf_core::shim_cf_set_remove_all_values as u64, "CFSetRemoveAllValues → removeAllObjects"),
+    );
+
+    // CFUUID C functions
+    register_shims!(table,
+        ("_CFUUIDCreate", cf_core::shim_cf_uuid_create as u64, "CFUUIDCreate → new random UUID"),
+        ("_CFUUIDCreateString", cf_core::shim_cf_uuid_create_string as u64, "CFUUIDCreateString → UUID string"),
+        ("_CFUUIDCreateFromString", cf_core::shim_cf_uuid_create_from_string as u64, "CFUUIDCreateFromString → parse string"),
+        ("_CFUUIDGetUUIDBytes", cf_core::shim_cf_uuid_get_uuid_bytes as u64, "CFUUIDGetUUIDBytes → stub 0"),
+        ("_CFUUIDCreateFromUUIDBytes", cf_core::shim_cf_uuid_create_from_uuid_bytes as u64, "CFUUIDCreateFromUUIDBytes → new UUID"),
+    );
+
+    // CFByteOrder C functions
+    register_shims!(table,
+        ("_CFByteOrderGetCurrent", cf_core::shim_cf_byte_order_get_current as u64, "CFByteOrderGetCurrent → 1 (little-endian)"),
+        ("_CFSwapInt16BigToHost", cf_core::shim_cf_swap_int16_big_to_host as u64, "CFSwapInt16BigToHost"),
+        ("_CFSwapInt32BigToHost", cf_core::shim_cf_swap_int32_big_to_host as u64, "CFSwapInt32BigToHost"),
+        ("_CFSwapInt64BigToHost", cf_core::shim_cf_swap_int64_big_to_host as u64, "CFSwapInt64BigToHost"),
+        ("_CFSwapInt16HostToBig", cf_core::shim_cf_swap_int16_host_to_big as u64, "CFSwapInt16HostToBig"),
+        ("_CFSwapInt32HostToBig", cf_core::shim_cf_swap_int32_host_to_big as u64, "CFSwapInt32HostToBig"),
+        ("_CFSwapInt64HostToBig", cf_core::shim_cf_swap_int64_host_to_big as u64, "CFSwapInt64HostToBig"),
+        ("_CFSwapInt16LittleToHost", cf_core::shim_cf_swap_int16_little_to_host as u64, "CFSwapInt16LittleToHost"),
+        ("_CFSwapInt32LittleToHost", cf_core::shim_cf_swap_int32_little_to_host as u64, "CFSwapInt32LittleToHost"),
+        ("_CFSwapInt64LittleToHost", cf_core::shim_cf_swap_int64_little_to_host as u64, "CFSwapInt64LittleToHost"),
+        ("_CFSwapInt16HostToLittle", cf_core::shim_cf_swap_int16_host_to_little as u64, "CFSwapInt16HostToLittle"),
+        ("_CFSwapInt32HostToLittle", cf_core::shim_cf_swap_int32_host_to_little as u64, "CFSwapInt32HostToLittle"),
+        ("_CFSwapInt64HostToLittle", cf_core::shim_cf_swap_int64_host_to_little as u64, "CFSwapInt64HostToLittle"),
+        ("_CFConvertFloat64SwappedToHost", cf_core::shim_cf_convert_float64_swapped_to_host as u64, "CFConvertFloat64SwappedToHost"),
+        ("_CFConvertFloat32HostToSwapped", cf_core::shim_cf_convert_float32_host_to_swapped as u64, "CFConvertFloat32HostToSwapped"),
+    );
+
+    // CFPropertyList C functions
+    register_shims!(table,
+        ("_CFPropertyListCreateWithData", cf_core::shim_cf_property_list_create_with_data as u64, "CFPropertyListCreateWithData → parse plist"),
+        ("_CFPropertyListCreateData", cf_core::shim_cf_property_list_create_data as u64, "CFPropertyListCreateData → serialize plist"),
+        ("_CFPropertyListIsValid", cf_core::shim_cf_property_list_is_valid as u64, "CFPropertyListIsValid → validate"),
+    );
+
+    // NSPasteboard C-level function stubs (for programs that call +[NSPasteboard generalPasteboard] directly)
+    register_shims!(table,
+        ("_NSPasteboardTypeString", nspasteboard::ns_pasteboard_type_string_addr(), "NSPasteboardTypeString constant"),
+        ("_NSPasteboardTypeRTF", nspasteboard::ns_pasteboard_type_rtf_addr(), "NSPasteboardTypeRTF constant"),
+        ("_NSPasteboardTypeHTML", nspasteboard::ns_pasteboard_type_html_addr(), "NSPasteboardTypeHTML constant"),
+        ("_NSPasteboardTypeTIFF", nspasteboard::ns_pasteboard_type_tiff_addr(), "NSPasteboardTypeTIFF constant"),
+        ("_NSPasteboardTypePNG", nspasteboard::ns_pasteboard_type_png_addr(), "NSPasteboardTypePNG constant"),
+        ("_NSPasteboardTypePDF", nspasteboard::ns_pasteboard_type_pdf_addr(), "NSPasteboardTypePDF constant"),
+        ("_NSPasteboardTypeFileURL", nspasteboard::ns_pasteboard_type_file_url_addr(), "NSPasteboardTypeFileURL constant"),
+        ("_NSPasteboardTypeURL", nspasteboard::ns_pasteboard_type_url_addr(), "NSPasteboardTypeURL constant"),
+        ("_NSStringPboardType", nspasteboard::ns_string_pasteboard_type_addr(), "NSStringPboardType (legacy)"),
+        ("_NSRTFPboardType", nspasteboard::ns_rtf_pasteboard_type_addr(), "NSRTFPboardType (legacy)"),
+        ("_NSFilenamesPboardType", nspasteboard::ns_file_names_pasteboard_type_addr(), "NSFilenamesPboardType (legacy)"),
     );
 }

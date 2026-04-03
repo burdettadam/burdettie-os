@@ -19,7 +19,7 @@ fn capitalize_first(s: &str) -> String {
 }
 
 /// Search for a getter accessor on `obj` and call it if found.
-pub(super) fn try_getter_accessor(obj: u64, key: &str) -> Option<u64> {
+pub(crate) fn try_getter_accessor(obj: u64, key: &str) -> Option<u64> {
     use objc_runtime::OBJC_RUNTIME;
 
     let cap_key = capitalize_first(key);
@@ -32,7 +32,7 @@ pub(super) fn try_getter_accessor(obj: u64, key: &str) -> Option<u64> {
 
     let isa = unsafe { *(obj as *const u64) };
 
-    let mut guard = OBJC_RUNTIME.lock().unwrap_or_else(|e| e.into_inner());
+    let mut guard = OBJC_RUNTIME.write().unwrap_or_else(|e| e.into_inner());
     let rt = guard.as_mut()?;
 
     for sel_name in &candidates {
@@ -52,7 +52,7 @@ pub(super) fn try_getter_accessor(obj: u64, key: &str) -> Option<u64> {
 }
 
 /// Search for a setter accessor on `obj` and call it if found.
-pub(super) fn try_setter_accessor(obj: u64, key: &str, value: u64) -> bool {
+pub(crate) fn try_setter_accessor(obj: u64, key: &str, value: u64) -> bool {
     use objc_runtime::OBJC_RUNTIME;
 
     let cap_key = capitalize_first(key);
@@ -63,7 +63,7 @@ pub(super) fn try_setter_accessor(obj: u64, key: &str, value: u64) -> bool {
 
     let isa = unsafe { *(obj as *const u64) };
 
-    let mut guard = match OBJC_RUNTIME.lock() {
+    let mut guard = match OBJC_RUNTIME.write() {
         Ok(g) => g,
         Err(e) => e.into_inner(),
     };
@@ -89,12 +89,12 @@ pub(super) fn try_setter_accessor(obj: u64, key: &str, value: u64) -> bool {
 }
 
 /// Try to read an ivar directly. Returns Some(value) if found.
-pub(super) fn try_ivar_read(obj: u64, key: &str) -> Option<u64> {
+pub(crate) fn try_ivar_read(obj: u64, key: &str) -> Option<u64> {
     use objc_runtime::OBJC_RUNTIME;
 
     let isa = unsafe { *(obj as *const u64) };
 
-    let guard = OBJC_RUNTIME.lock().unwrap_or_else(|e| e.into_inner());
+    let guard = OBJC_RUNTIME.read().unwrap_or_else(|e| e.into_inner());
     let rt = guard.as_ref()?;
     let class = rt.get_class_by_addr(isa)?;
 
@@ -131,12 +131,12 @@ pub(super) fn try_ivar_read(obj: u64, key: &str) -> Option<u64> {
 }
 
 /// Try to write an ivar directly. Returns true if the ivar was found and written.
-pub(super) fn try_ivar_write(obj: u64, key: &str, value: u64) -> bool {
+pub(crate) fn try_ivar_write(obj: u64, key: &str, value: u64) -> bool {
     use objc_runtime::OBJC_RUNTIME;
 
     let isa = unsafe { *(obj as *const u64) };
 
-    let guard = OBJC_RUNTIME.lock().unwrap_or_else(|e| e.into_inner());
+    let guard = OBJC_RUNTIME.read().unwrap_or_else(|e| e.into_inner());
     let rt = guard.as_ref();
     let Some(rt) = rt else {
         return false;

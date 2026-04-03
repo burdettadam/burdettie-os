@@ -15,6 +15,59 @@ use std::time::{Duration, Instant};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TimerToken(u64);
 
+/// Alias used by the public `Timer` API.
+pub type TimerId = TimerToken;
+
+// ── Public Timer ───────────────────────────────────────────────────
+
+/// A standalone timer that can be fired manually or scheduled on a `RunLoop`.
+pub struct Timer {
+    pub interval: Duration,
+    pub repeats: bool,
+    pub callback: Box<dyn FnMut() + Send>,
+    pub next_fire: Instant,
+    pub valid: bool,
+}
+
+impl Timer {
+    /// Create a new timer that will first fire after `interval`.
+    pub fn new(interval: Duration, repeats: bool, callback: impl FnMut() + Send + 'static) -> Self {
+        Self {
+            interval,
+            repeats,
+            callback: Box::new(callback),
+            next_fire: Instant::now() + interval,
+            valid: true,
+        }
+    }
+
+    /// Mark the timer as invalid; it will never fire again.
+    pub fn invalidate(&mut self) {
+        self.valid = false;
+    }
+
+    /// Whether the timer is still valid.
+    pub fn is_valid(&self) -> bool {
+        self.valid
+    }
+
+    /// Fire the timer's callback immediately.
+    ///
+    /// For repeating timers, `next_fire` is updated.
+    /// For non-repeating timers, the timer is auto-invalidated.
+    pub fn fire(&mut self) {
+        if !self.valid {
+            return;
+        }
+        (self.callback)();
+        if self.repeats {
+            self.next_fire = Instant::now() + self.interval;
+        } else {
+            self.valid = false;
+        }
+    }
+}
+
 // ── Timer entry (internal) ─────────────────────────────────────────
 
 struct TimerEntry {
@@ -157,6 +210,31 @@ impl RunLoop {
     /// Cancel a previously scheduled timer.
     pub fn cancel_timer(&self, token: TimerToken) {
         self.cancelled.lock().unwrap_or_else(|e| e.into_inner()).push(token);
+    }
+
+    /// Schedule a `Timer` on this run loop, returning a `TimerId`.
+    pub fn add_timer(&self, timer: Timer) -> TimerId {
+        let token = TimerToken(self.next_token.fetch_add(1, Ordering::SeqCst));
+        let entry = TimerEntry {
+            token,
+            fire_at: timer.next_fire,
+            interval: timer.interval,
+            repeats: timer.repeats,
+            callback: timer.callback,
+            cancelled: !timer.valid,
+        };
+        self.timers.lock().unwrap_or_else(|e| e.into_inner()).push(entry);
+        token
+    }
+
+    /// Cancel a timer by its `TimerId`.
+    pub fn invalidate_timer(&self, id: TimerId) {
+        self.cancel_timer(id);
+    }
+
+    /// Fire all expired timers. Returns the number of timers fired.
+    pub fn process_timers(&self) -> usize {
+        self.fire_timers()
     }
 
     // ── Internal ───────────────────────────────────────────────
@@ -326,5 +404,279 @@ mod tests {
 
         rl.run_once();
         assert_eq!(counter.load(Ordering::SeqCst), 5);
+    }
+
+    // ── TimerToken tests ───────────────────────────────────────
+
+    #[test]
+    fn timer_token_equality() {
+        let a = TimerToken(42);
+        let b = TimerToken(42);
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn timer_token_inequality() {
+        let a = TimerToken(1);
+        let b = TimerToken(2);
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn timer_token_debug() {
+        let token = TimerToken(99);
+        let debug = format!("{:?}", token);
+        assert!(debug.contains("99"), "Debug output was: {debug}");
+    }
+
+    #[test]
+    fn timer_token_hash() {
+        use std::collections::HashMap;
+        let token = TimerToken(7);
+        let mut map = HashMap::new();
+        map.insert(token, "hello");
+        assert_eq!(map.get(&TimerToken(7)), Some(&"hello"));
+    }
+
+    #[test]
+    fn timer_token_copy() {
+        let a = TimerToken(10);
+        let b = a; // Copy
+        let c = a; // still valid — not moved
+        assert_eq!(b, c);
+    }
+
+    // ── RunLoop construction / state ───────────────────────────
+
+    #[test]
+    fn runloop_default_trait() {
+        let rl = RunLoop::default();
+        assert!(!rl.is_running());
+    }
+
+    #[test]
+    fn runloop_initial_state() {
+        let rl = RunLoop::new();
+        assert!(!rl.is_running());
+    }
+
+    #[test]
+    fn runloop_run_once_empty() {
+        let rl = RunLoop::new();
+        assert_eq!(rl.run_once(), 0);
+    }
+
+    #[test]
+    fn runloop_is_running_during_run() {
+        let rl = Arc::new(RunLoop::new());
+        let was_running = Arc::new(AtomicBool::new(false));
+        let wr = was_running.clone();
+        let rl2 = rl.clone();
+        let rl3 = rl.clone();
+
+        rl.perform(move || {
+            wr.store(rl2.is_running(), Ordering::SeqCst);
+            rl3.stop();
+        });
+
+        rl.run();
+        assert!(was_running.load(Ordering::SeqCst));
+    }
+
+    // ── Edge cases ─────────────────────────────────────────────
+
+    #[test]
+    fn cancel_nonexistent_timer() {
+        let rl = RunLoop::new();
+        // Should not panic
+        rl.cancel_timer(TimerToken(999));
+        rl.run_once();
+    }
+
+    #[test]
+    fn perform_after_run_once() {
+        let rl = RunLoop::new();
+        let counter = Arc::new(AtomicI32::new(0));
+
+        // First run_once — nothing enqueued
+        rl.run_once();
+
+        // Enqueue after run_once
+        let c = counter.clone();
+        rl.perform(move || {
+            c.fetch_add(1, Ordering::SeqCst);
+        });
+
+        // Should fire on next run_once
+        rl.run_once();
+        assert_eq!(counter.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn timer_ordering() {
+        let rl = RunLoop::new();
+        let order = Arc::new(Mutex::new(Vec::new()));
+
+        let o1 = order.clone();
+        rl.schedule_timer(Duration::from_millis(1), false, move || {
+            o1.lock().unwrap().push(1);
+        });
+
+        let o2 = order.clone();
+        rl.schedule_timer(Duration::from_millis(5), false, move || {
+            o2.lock().unwrap().push(2);
+        });
+
+        // Wait for both to be ready
+        std::thread::sleep(Duration::from_millis(10));
+        rl.run_once();
+
+        let fired = order.lock().unwrap();
+        assert_eq!(*fired, vec![1, 2]);
+    }
+
+    #[test]
+    fn run_once_returns_total_count() {
+        let rl = RunLoop::new();
+
+        // Enqueue 2 blocks
+        rl.perform(|| {});
+        rl.perform(|| {});
+
+        // Schedule 1 timer that fires immediately
+        rl.schedule_timer(Duration::from_millis(1), false, || {});
+        std::thread::sleep(Duration::from_millis(5));
+
+        assert_eq!(rl.run_once(), 3);
+    }
+
+    #[test]
+    fn many_timers() {
+        let rl = RunLoop::new();
+        let counter = Arc::new(AtomicI32::new(0));
+
+        for _ in 0..10 {
+            let c = counter.clone();
+            rl.schedule_timer(Duration::from_millis(1), false, move || {
+                c.fetch_add(1, Ordering::SeqCst);
+            });
+        }
+
+        std::thread::sleep(Duration::from_millis(5));
+        rl.run_once();
+        assert_eq!(counter.load(Ordering::SeqCst), 10);
+    }
+
+    #[test]
+    fn cancel_already_fired_timer() {
+        let rl = RunLoop::new();
+        let counter = Arc::new(AtomicI32::new(0));
+
+        let c = counter.clone();
+        let token = rl.schedule_timer(Duration::from_millis(1), false, move || {
+            c.fetch_add(1, Ordering::SeqCst);
+        });
+
+        std::thread::sleep(Duration::from_millis(5));
+        rl.run_once();
+        assert_eq!(counter.load(Ordering::SeqCst), 1);
+
+        // Cancel after it already fired — should not panic
+        rl.cancel_timer(token);
+        rl.run_once();
+    }
+
+    #[test]
+    fn perform_order() {
+        let rl = RunLoop::new();
+        let order = Arc::new(Mutex::new(Vec::new()));
+
+        for i in 0..5 {
+            let o = order.clone();
+            rl.perform(move || {
+                o.lock().unwrap().push(i);
+            });
+        }
+
+        rl.run_once();
+        let result = order.lock().unwrap();
+        assert_eq!(*result, vec![0, 1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn cancel_before_fire_prevents_execution() {
+        let rl = RunLoop::new();
+        let counter = Arc::new(AtomicI32::new(0));
+        let c = counter.clone();
+        let token = rl.schedule_timer(Duration::from_millis(1), false, move || {
+            c.fetch_add(1, Ordering::SeqCst);
+        });
+
+        // Cancel immediately, before it has a chance to fire
+        rl.cancel_timer(token);
+
+        // Wait long enough that the timer would have fired
+        std::thread::sleep(Duration::from_millis(10));
+        rl.run_once();
+        assert_eq!(counter.load(Ordering::SeqCst), 0);
+    }
+
+    // ── Public Timer struct tests ──────────────────────────────
+
+    #[test]
+    fn timer_new_is_valid() {
+        let t = Timer::new(Duration::from_secs(1), false, || {});
+        assert!(t.is_valid());
+    }
+
+    #[test]
+    fn timer_invalidate() {
+        let mut t = Timer::new(Duration::from_secs(1), false, || {});
+        t.invalidate();
+        assert!(!t.is_valid());
+    }
+
+    #[test]
+    fn timer_fires_callback() {
+        let counter = Arc::new(AtomicI32::new(0));
+        let c = counter.clone();
+        let mut t = Timer::new(Duration::from_secs(1), false, move || {
+            c.fetch_add(1, Ordering::SeqCst);
+        });
+        t.fire();
+        assert_eq!(counter.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn timer_repeating_reschedules() {
+        let mut t = Timer::new(Duration::from_millis(100), true, || {});
+        let first = t.next_fire;
+        std::thread::sleep(Duration::from_millis(5));
+        t.fire();
+        assert!(t.next_fire > first, "next_fire should advance after fire");
+        assert!(t.is_valid(), "repeating timer stays valid");
+    }
+
+    #[test]
+    fn timer_non_repeating_invalidates_after_fire() {
+        let mut t = Timer::new(Duration::from_millis(1), false, || {});
+        assert!(t.is_valid());
+        t.fire();
+        assert!(!t.is_valid(), "non-repeating timer auto-invalidates");
+    }
+
+    #[test]
+    fn schedule_and_process_timers() {
+        let rl = RunLoop::new();
+        let counter = Arc::new(AtomicI32::new(0));
+        let c = counter.clone();
+        let timer = Timer::new(Duration::from_millis(0), false, move || {
+            c.fetch_add(1, Ordering::SeqCst);
+        });
+        rl.add_timer(timer);
+        std::thread::sleep(Duration::from_millis(5));
+        let fired = rl.process_timers();
+        assert!(fired >= 1);
+        assert_eq!(counter.load(Ordering::SeqCst), 1);
     }
 }

@@ -13,11 +13,14 @@ fn objc_shims_registered() {
     assert!(table.resolve("_class_getName").is_some());
     assert!(table.resolve("__objc_empty_cache").is_some());
     assert!(table.resolve("_objc_autoreleasePoolPush").is_some());
+    assert!(table.resolve("__objc_autoreleasePoolPush").is_some());
     assert!(table.resolve("_objc_autoreleasePoolPop").is_some());
+    assert!(table.resolve("__objc_autoreleasePoolPop").is_some());
     assert!(table.resolve("_objc_retain").is_some());
     assert!(table.resolve("_objc_release").is_some());
     assert!(table.resolve("_objc_storeStrong").is_some());
     assert!(table.resolve("_objc_alloc").is_some());
+    assert!(table.resolve("_objc_allocWithZone").is_some());
     assert!(table.resolve("_objc_alloc_init").is_some());
     assert!(table.resolve("_objc_opt_self").is_some());
     assert!(table.resolve("_objc_autorelease").is_some());
@@ -101,5 +104,36 @@ fn objc_shims_registered() {
     assert!(table.resolve("_objc_msgSend_fp2ret").is_some());
     assert!(table.resolve("_objc_msgSendSuper_stret").is_some());
     assert!(table.resolve("_objc_msgSendSuper2_stret").is_some());
-    assert_eq!(table.len(), 104);
+    // Class enumeration shims (Task 1)
+    assert!(table.resolve("_objc_getClassList").is_some());
+    assert!(table.resolve("_objc_copyClassList").is_some());
+    assert!(table.resolve("_class_getImageName").is_some());
+    // Block IMP shims (Task 2)
+    assert!(table.resolve("_imp_implementationWithBlock").is_some());
+    assert!(table.resolve("_imp_getBlock").is_some());
+    assert!(table.resolve("_imp_removeBlock").is_some());
+    // Method type introspection (Task 3)
+    assert!(table.resolve("_method_copyReturnType").is_some());
+    assert!(table.resolve("_method_copyArgumentType").is_some());
+    assert!(table.resolve("_objc_opt_new").is_some());
+    // Property access shims
+    assert!(table.resolve("_objc_getProperty").is_some());
+    assert!(table.resolve("_objc_setProperty_atomic").is_some());
+    assert!(table.resolve("_objc_setProperty_atomic_copy").is_some());
+    assert!(table.resolve("_objc_copyStruct").is_some());
+    assert!(table.resolve("_objc_enumerationMutation").is_some());
+    // Block object lifecycle
+    assert!(table.resolve("__Block_object_assign").is_some());
+    assert!(table.resolve("__Block_object_dispose").is_some());
+    // Legacy exception API + NSUncaughtExceptionHandler
+    assert!(table.resolve("_objc_exception_tryEnter").is_some());
+    assert!(table.resolve("_objc_exception_tryExit").is_some());
+    assert!(table.resolve("_objc_exception_extract").is_some());
+    assert!(table.resolve("_objc_exception_match").is_some());
+    assert!(table.resolve("_NSSetUncaughtExceptionHandler").is_some());
+    assert!(table.resolve("_NSGetUncaughtExceptionHandler").is_some());
+    // Metaclass + object class name introspection
+    assert!(table.resolve("_objc_getMetaClass").is_some());
+    assert!(table.resolve("_object_getClassName").is_some());
+    assert_eq!(table.len(), 132);
 }

@@ -219,6 +219,8 @@ mod entitlement_tests {
             code_directory: None,
             entitlements_plist: None,
             has_cms_signature: false,
+            cms_data: None,
+            cd_data: None,
         };
         assert!(cs.entitlement_keys().is_empty());
     }
@@ -243,6 +245,8 @@ mod entitlement_tests {
             code_directory: None,
             entitlements_plist: Some(xml.to_string()),
             has_cms_signature: false,
+            cms_data: None,
+            cd_data: None,
         };
         let keys = cs.entitlement_keys();
         assert_eq!(keys.len(), 1);
@@ -266,6 +270,8 @@ mod entitlement_tests {
             code_directory: None,
             entitlements_plist: Some(xml.to_string()),
             has_cms_signature: false,
+            cms_data: None,
+            cd_data: None,
         };
         let keys = cs.entitlement_keys();
         assert_eq!(keys.len(), 1);
@@ -296,6 +302,8 @@ mod entitlement_tests {
             code_directory: None,
             entitlements_plist: Some(xml.to_string()),
             has_cms_signature: false,
+            cms_data: None,
+            cd_data: None,
         };
         let keys = cs.entitlement_keys();
         assert_eq!(keys.len(), 3);
@@ -326,6 +334,8 @@ mod entitlement_tests {
             code_directory: None,
             entitlements_plist: Some(xml.to_string()),
             has_cms_signature: false,
+            cms_data: None,
+            cd_data: None,
         };
         let keys = cs.entitlement_keys();
         assert_eq!(keys.len(), 1);
@@ -346,6 +356,8 @@ mod entitlement_tests {
             code_directory: None,
             entitlements_plist: Some(xml.to_string()),
             has_cms_signature: false,
+            cms_data: None,
+            cd_data: None,
         };
         assert!(cs.entitlement_keys().is_empty());
     }

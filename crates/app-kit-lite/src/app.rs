@@ -9,6 +9,19 @@ use crate::responder::Responder;
 use runloop_core::RunLoop;
 use window_backend::{WindowBackend, WindowEvent};
 
+/// Visual appearance / theme for the application.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Appearance {
+    /// Standard light mode.
+    Aqua,
+    /// Dark mode.
+    DarkAqua,
+    /// High-contrast light mode.
+    HighContrastAqua,
+    /// High-contrast dark mode.
+    HighContrastDarkAqua,
+}
+
 /// Application delegate callbacks.
 pub trait AppDelegate: Send {
     fn application_did_finish_launching(&self) {}
@@ -32,6 +45,10 @@ pub struct NSApplication {
     event_handlers: Mutex<Vec<EventHandler>>,
     /// The application-level menu bar.
     main_menu: Mutex<Option<NSMenu>>,
+    /// Tracked modifier key state from the backend.
+    tracked_modifiers: Mutex<ModifierFlags>,
+    /// Current application appearance.
+    appearance: Mutex<Appearance>,
 }
 
 impl NSApplication {
@@ -45,6 +62,8 @@ impl NSApplication {
             exit_code: AtomicI32::new(0),
             event_handlers: Mutex::new(Vec::new()),
             main_menu: Mutex::new(None),
+            tracked_modifiers: Mutex::new(ModifierFlags::default()),
+            appearance: Mutex::new(Appearance::Aqua),
         }
     }
 
@@ -76,6 +95,16 @@ impl NSApplication {
     /// Access the main menu (returns lock guard).
     pub fn main_menu(&self) -> std::sync::MutexGuard<'_, Option<NSMenu>> {
         self.main_menu.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Get the current effective appearance.
+    pub fn effective_appearance(&self) -> Appearance {
+        *self.appearance.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Set the application appearance.
+    pub fn set_appearance(&self, appearance: Appearance) {
+        *self.appearance.lock().unwrap_or_else(|e| e.into_inner()) = appearance;
     }
 
     /// Try to dispatch a key as a menu shortcut. Returns true if handled.
@@ -167,8 +196,12 @@ impl NSApplication {
                 WindowEvent::CloseRequested(_) => {
                     self.terminate(0);
                 }
+                WindowEvent::ModifiersChanged(_, mods) => {
+                    let flags = ModifierFlags::from_backend_modifiers(&mods);
+                    *self.tracked_modifiers.lock().unwrap_or_else(|e| e.into_inner()) = flags;
+                }
                 WindowEvent::KeyDown(_, key) => {
-                    let modifiers = ModifierFlags::default();
+                    let modifiers = *self.tracked_modifiers.lock().unwrap_or_else(|e| e.into_inner());
                     // Try menu key equivalents first
                     if !self.perform_key_equivalent(key, modifiers) {
                         let event = Event::KeyDown { key, modifiers };
@@ -176,17 +209,16 @@ impl NSApplication {
                     }
                 }
                 WindowEvent::KeyUp(_, key) => {
+                    let modifiers = *self.tracked_modifiers.lock().unwrap_or_else(|e| e.into_inner());
                     let event = Event::KeyUp {
                         key,
-                        modifiers: ModifierFlags::default(),
+                        modifiers,
                     };
                     self.dispatch_event(&event);
                 }
-                WindowEvent::CharacterInput(_, _) => {
-                    // Character input is handled by the view layer
-                }
-                WindowEvent::ModifiersChanged(_, _) => {
-                    // Modifier state is tracked by the backend/view layer
+                WindowEvent::CharacterInput(_, text) => {
+                    let event = Event::CharacterInput { text };
+                    self.dispatch_event(&event);
                 }
                 WindowEvent::MouseDown(_, x, y, button) => {
                     let event = Event::MouseDown {
@@ -208,11 +240,15 @@ impl NSApplication {
                     };
                     self.dispatch_event(&event);
                 }
-                WindowEvent::ScrollWheel(_, _, _) => {
-                    // Scroll events are handled by the view layer
+                WindowEvent::ScrollWheel(_, dx, dy) => {
+                    let event = Event::ScrollWheel { delta_x: dx, delta_y: dy };
+                    self.dispatch_event(&event);
                 }
                 WindowEvent::Resized(_, _, _) | WindowEvent::RedrawRequested(_) => {
                     // Handled by the view layer
+                }
+                _ => {
+                    // Other events (ThemeChanged, Focused, DroppedFile, etc.)
                 }
             }
         }
@@ -349,5 +385,273 @@ mod tests {
         app.run_once();
 
         assert!(!app.is_running());
+    }
+
+    #[test]
+    fn app_new_not_running() {
+        let app = NSApplication::new();
+        assert!(!app.is_running());
+    }
+
+    #[test]
+    fn app_set_delegate() {
+        let app = NSApplication::new();
+        let launched = Arc::new(AtomicBool::new(false));
+        let terminated = Arc::new(AtomicBool::new(false));
+        app.set_delegate(Box::new(TestDelegate {
+            launched: launched.clone(),
+            terminated: terminated.clone(),
+        }));
+        // Should not panic; delegate not yet called
+        assert!(!launched.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn app_terminate_stops_running() {
+        let app = NSApplication::new();
+        app.running.store(true, Ordering::SeqCst);
+        assert!(app.is_running());
+        app.terminate(0);
+        assert!(!app.is_running());
+    }
+
+    #[test]
+    fn app_menu_key_equivalent() {
+        let app = NSApplication::new();
+        let fired = Arc::new(AtomicBool::new(false));
+        let f = fired.clone();
+
+        let mut menu = NSMenu::new("Main");
+        menu.add_item(crate::NSMenuItem::with_action(
+            "Quit",
+            Some(crate::KeyEquivalent::command(window_backend::KeyCode::Q)),
+            move || {
+                f.store(true, Ordering::SeqCst);
+            },
+        ));
+        app.set_main_menu(menu);
+
+        let handled = app.perform_key_equivalent(
+            window_backend::KeyCode::Q,
+            ModifierFlags::COMMAND,
+        );
+        assert!(handled);
+        assert!(fired.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn app_menu_key_equivalent_miss() {
+        let app = NSApplication::new();
+        let mut menu = NSMenu::new("Main");
+        menu.add_item(crate::NSMenuItem::with_action(
+            "Quit",
+            Some(crate::KeyEquivalent::command(window_backend::KeyCode::Q)),
+            || {},
+        ));
+        app.set_main_menu(menu);
+
+        let handled = app.perform_key_equivalent(
+            window_backend::KeyCode::W,
+            ModifierFlags::COMMAND,
+        );
+        assert!(!handled);
+    }
+
+    #[test]
+    fn app_responder_chain_terminates() {
+        let app = NSApplication::new();
+        assert!(app.next_responder().is_none());
+    }
+
+    #[test]
+    fn app_run_once_no_backend() {
+        let app = NSApplication::new();
+        app.run_once(); // should not panic
+    }
+
+    #[test]
+    fn app_delegate_lifecycle() {
+        let app = NSApplication::new();
+        let launched = Arc::new(AtomicBool::new(false));
+        let terminated = Arc::new(AtomicBool::new(false));
+
+        app.set_delegate(Box::new(TestDelegate {
+            launched: launched.clone(),
+            terminated: terminated.clone(),
+        }));
+
+        // Simulate the run/terminate cycle without blocking
+        app.running.store(true, Ordering::SeqCst);
+
+        // Manually fire did_finish_launching
+        if let Some(d) = app.delegate.lock().unwrap().as_ref() {
+            d.application_did_finish_launching();
+        }
+        assert!(launched.load(Ordering::SeqCst));
+
+        app.terminate(0);
+
+        // Manually fire will_terminate
+        if let Some(d) = app.delegate.lock().unwrap().as_ref() {
+            d.application_will_terminate();
+        }
+        assert!(terminated.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn app_modifier_tracking() {
+        let app = NSApplication::new();
+        let backend = window_backend::HeadlessBackend::new();
+        let wid = backend.create_window(window_backend::WindowConfig::default());
+
+        // Inject ModifiersChanged with command=true, then KeyDown Q
+        backend.inject_event(WindowEvent::ModifiersChanged(
+            wid,
+            window_backend::Modifiers {
+                command: true,
+                shift: false,
+                option: false,
+                control: false,
+            },
+        ));
+        backend.inject_event(WindowEvent::KeyDown(wid, window_backend::KeyCode::Q));
+
+        let got_cmd = Arc::new(AtomicBool::new(false));
+        let g = got_cmd.clone();
+        app.add_event_handler(move |event| {
+            if let Event::KeyDown { modifiers, .. } = event {
+                if modifiers.command {
+                    g.store(true, Ordering::SeqCst);
+                }
+            }
+        });
+
+        app.set_backend(Box::new(backend));
+        app.run_once();
+
+        assert!(got_cmd.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn app_scroll_wheel_dispatched() {
+        let app = NSApplication::new();
+        let backend = window_backend::HeadlessBackend::new();
+        let wid = backend.create_window(window_backend::WindowConfig::default());
+
+        backend.inject_event(WindowEvent::ScrollWheel(wid, 1.0, -2.0));
+
+        let received = Arc::new(AtomicBool::new(false));
+        let r = received.clone();
+        app.add_event_handler(move |event| {
+            if matches!(event, Event::ScrollWheel { .. }) {
+                r.store(true, Ordering::SeqCst);
+            }
+        });
+
+        app.set_backend(Box::new(backend));
+        app.run_once();
+
+        assert!(received.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn app_character_input_dispatched() {
+        let app = NSApplication::new();
+        let backend = window_backend::HeadlessBackend::new();
+        let wid = backend.create_window(window_backend::WindowConfig::default());
+
+        backend.inject_event(WindowEvent::CharacterInput(wid, "a".to_string()));
+
+        let received = Arc::new(AtomicBool::new(false));
+        let r = received.clone();
+        app.add_event_handler(move |event| {
+            if matches!(event, Event::CharacterInput { .. }) {
+                r.store(true, Ordering::SeqCst);
+            }
+        });
+
+        app.set_backend(Box::new(backend));
+        app.run_once();
+
+        assert!(received.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn app_mouse_moved_dispatched() {
+        let app = NSApplication::new();
+        let backend = window_backend::HeadlessBackend::new();
+        let wid = backend.create_window(window_backend::WindowConfig::default());
+
+        backend.inject_event(WindowEvent::MouseMoved(wid, 100.0, 200.0));
+
+        let received = Arc::new(AtomicBool::new(false));
+        let r = received.clone();
+        app.add_event_handler(move |event| {
+            if matches!(event, Event::MouseMoved { .. }) {
+                r.store(true, Ordering::SeqCst);
+            }
+        });
+
+        app.set_backend(Box::new(backend));
+        app.run_once();
+
+        assert!(received.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn app_mouse_up_dispatched() {
+        let app = NSApplication::new();
+        let backend = window_backend::HeadlessBackend::new();
+        let wid = backend.create_window(window_backend::WindowConfig::default());
+
+        backend.inject_event(WindowEvent::MouseUp(
+            wid,
+            50.0,
+            75.0,
+            window_backend::MouseButton::Left,
+        ));
+
+        let received = Arc::new(AtomicBool::new(false));
+        let r = received.clone();
+        app.add_event_handler(move |event| {
+            if matches!(event, Event::MouseUp { .. }) {
+                r.store(true, Ordering::SeqCst);
+            }
+        });
+
+        app.set_backend(Box::new(backend));
+        app.run_once();
+
+        assert!(received.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn appearance_default_aqua() {
+        let app = NSApplication::new();
+        assert_eq!(app.effective_appearance(), Appearance::Aqua);
+    }
+
+    #[test]
+    fn set_appearance_dark() {
+        let app = NSApplication::new();
+        app.set_appearance(Appearance::DarkAqua);
+        assert_eq!(app.effective_appearance(), Appearance::DarkAqua);
+    }
+
+    #[test]
+    fn appearance_equality() {
+        assert_eq!(Appearance::Aqua, Appearance::Aqua);
+        assert_eq!(Appearance::DarkAqua, Appearance::DarkAqua);
+        assert_ne!(Appearance::Aqua, Appearance::DarkAqua);
+        assert_ne!(Appearance::HighContrastAqua, Appearance::HighContrastDarkAqua);
+    }
+
+    #[test]
+    fn appearance_high_contrast() {
+        let app = NSApplication::new();
+        app.set_appearance(Appearance::HighContrastAqua);
+        assert_eq!(app.effective_appearance(), Appearance::HighContrastAqua);
+        app.set_appearance(Appearance::HighContrastDarkAqua);
+        assert_eq!(app.effective_appearance(), Appearance::HighContrastDarkAqua);
     }
 }

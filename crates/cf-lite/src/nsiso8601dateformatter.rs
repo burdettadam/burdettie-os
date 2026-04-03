@@ -176,3 +176,63 @@ pub extern "C" fn shim_iso8601_description(obj: u64, _cmd: u64) -> u64 {
     if obj == 0 { return 0; }
     make_nsstring("<NSISO8601DateFormatter>")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shim_test_helpers::*;
+
+    #[test]
+    fn alloc_and_init() {
+        let obj = shim_iso8601_alloc(0, 0);
+        assert_ne!(obj, 0);
+        let obj = shim_iso8601_init(obj, 0);
+        assert_ne!(obj, 0);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn format_options_roundtrip() {
+        let obj = shim_iso8601_alloc(0, 0);
+        shim_iso8601_set_format_options(obj, 0, 0x1F);
+        assert_eq!(shim_iso8601_format_options(obj, 0), 0x1F);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn string_from_date_cf_epoch() {
+        // CF reference date (ti=0) → 2001-01-01T00:00:00Z
+        let date = crate::nsdate::alloc_nsdate(0.0);
+        let obj = shim_iso8601_alloc(0, 0);
+        let s = shim_iso8601_string_from_date(obj, 0, date);
+        assert_ne!(s, 0);
+        let sv = read_string(s);
+        assert!(sv.starts_with("2001-01-01"), "expected 2001-01-01 prefix in '{sv}'");
+        free_obj(date);
+        free_obj(obj);
+        free_obj(s);
+    }
+
+    #[test]
+    fn date_from_string_roundtrip() {
+        let date = crate::nsdate::alloc_nsdate(0.0);
+        let obj = shim_iso8601_alloc(0, 0);
+        let s = shim_iso8601_string_from_date(obj, 0, date);
+        let date2 = shim_iso8601_date_from_string(obj, 0, s);
+        assert_ne!(date2, 0);
+        let ti = crate::nsdate::shim_nsdate_ti_since_ref(date2, 0);
+        assert!(ti.abs() < 2.0, "expected ~0 CF time after round-trip, got {ti}");
+        free_obj(date);
+        free_obj(date2);
+        free_obj(obj);
+        free_obj(s);
+    }
+
+    #[test]
+    fn nil_safety() {
+        assert_eq!(shim_iso8601_string_from_date(0, 0, 0), 0);
+        assert_eq!(shim_iso8601_date_from_string(0, 0, 0), 0);
+        assert_eq!(shim_iso8601_description(0, 0), 0);
+        assert_eq!(shim_iso8601_format_options(0, 0), 0);
+    }
+}

@@ -243,3 +243,337 @@ pub extern "C" fn shim_mutable_attrstr_replace_chars(
     let new_nsstr = cfstring::shim_cf_string_create_with_cstring(0, c_str.as_ptr(), 0);
     unsafe { *((obj + 8) as *mut u64) = new_nsstr; }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shim_test_helpers::*;
+
+    // ── alloc ──────────────────────────────────────────────────────
+
+    #[test]
+    fn alloc_returns_nonzero_with_correct_isa() {
+        let obj = shim_attrstr_alloc(0, 0);
+        assert_ne!(obj, 0);
+        assert_eq!(read_field(obj, 0), nsobj::nsattributedstring_class_addr());
+        free_obj(obj);
+    }
+
+    #[test]
+    fn mutable_alloc_returns_nonzero_with_correct_isa() {
+        let obj = shim_mutable_attrstr_alloc(0, 0);
+        assert_ne!(obj, 0);
+        assert_eq!(read_field(obj, 0), nsobj::nsmutableattributedstring_class_addr());
+        free_obj(obj);
+    }
+
+    // ── initWithString ─────────────────────────────────────────────
+
+    #[test]
+    fn init_with_string_basic() {
+        let obj = shim_attrstr_alloc(0, 0);
+        let s = make_string("hello");
+        let ret = shim_attrstr_init_with_string(obj, 0, s);
+        assert_eq!(ret, obj);
+        assert_eq!(read_field(obj, 8), s); // string_ptr
+        assert_eq!(read_field(obj, 16), 0); // attrs_count = 0
+        free_obj(obj);
+    }
+
+    #[test]
+    fn init_with_string_nil_obj() {
+        assert_eq!(shim_attrstr_init_with_string(0, 0, 42), 0);
+    }
+
+    #[test]
+    fn init_with_string_empty_string() {
+        let obj = shim_attrstr_alloc(0, 0);
+        let s = make_string("");
+        let ret = shim_attrstr_init_with_string(obj, 0, s);
+        assert_eq!(ret, obj);
+        assert_eq!(shim_attrstr_length(obj, 0), 0);
+        free_obj(obj);
+    }
+
+    // ── initWithString:attributes: ─────────────────────────────────
+
+    #[test]
+    fn init_with_string_attributes_basic() {
+        let obj = shim_attrstr_alloc(0, 0);
+        let s = make_string("hi");
+        let key = make_string("font");
+        let val = make_string("Helvetica");
+        let dict = crate::nsdictionary::make_nsdictionary(&[key], &[val]);
+        let ret = shim_attrstr_init_with_string_attributes(obj, 0, s, dict);
+        assert_eq!(ret, obj);
+        assert_eq!(read_field(obj, 8), s);
+        assert_eq!(read_field(obj, 16), 1); // one attr run
+        assert_ne!(read_field(obj, 24), 0); // attrs_ptr set
+        free_obj(obj);
+    }
+
+    #[test]
+    fn init_with_string_attributes_nil_obj() {
+        assert_eq!(shim_attrstr_init_with_string_attributes(0, 0, 1, 1), 0);
+    }
+
+    #[test]
+    fn init_with_string_attributes_nil_attrs() {
+        let obj = shim_attrstr_alloc(0, 0);
+        let s = make_string("test");
+        let ret = shim_attrstr_init_with_string_attributes(obj, 0, s, 0);
+        assert_eq!(ret, obj);
+        assert_eq!(read_field(obj, 16), 0); // no attr runs
+        free_obj(obj);
+    }
+
+    #[test]
+    fn init_with_string_attributes_nil_string() {
+        let obj = shim_attrstr_alloc(0, 0);
+        let dict = crate::nsdictionary::make_nsdictionary(&[], &[]);
+        let ret = shim_attrstr_init_with_string_attributes(obj, 0, 0, dict);
+        assert_eq!(ret, obj);
+        // str_len is 0 when string is nil, so no attr run created
+        assert_eq!(read_field(obj, 16), 0);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn init_with_string_attributes_empty_string() {
+        let obj = shim_attrstr_alloc(0, 0);
+        let s = make_string("");
+        let dict = crate::nsdictionary::make_nsdictionary(&[make_string("k")], &[make_string("v")]);
+        let ret = shim_attrstr_init_with_string_attributes(obj, 0, s, dict);
+        assert_eq!(ret, obj);
+        // Empty string → str_len = 0, no attr run even with dict
+        assert_eq!(read_field(obj, 16), 0);
+        free_obj(obj);
+    }
+
+    // ── string accessor ────────────────────────────────────────────
+
+    #[test]
+    fn string_accessor_returns_backing_string() {
+        let obj = shim_attrstr_alloc(0, 0);
+        let s = make_string("world");
+        shim_attrstr_init_with_string(obj, 0, s);
+        assert_eq!(shim_attrstr_string(obj, 0), s);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn string_accessor_nil_returns_zero() {
+        assert_eq!(shim_attrstr_string(0, 0), 0);
+    }
+
+    // ── length ─────────────────────────────────────────────────────
+
+    #[test]
+    fn length_basic() {
+        let obj = shim_attrstr_alloc(0, 0);
+        let s = make_string("abcde");
+        shim_attrstr_init_with_string(obj, 0, s);
+        assert_eq!(shim_attrstr_length(obj, 0), 5);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn length_nil_returns_zero() {
+        assert_eq!(shim_attrstr_length(0, 0), 0);
+    }
+
+    #[test]
+    fn length_nil_backing_string() {
+        let obj = shim_attrstr_alloc(0, 0);
+        // string_ptr is 0 (calloc'd)
+        assert_eq!(shim_attrstr_length(obj, 0), 0);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn length_empty_string() {
+        let obj = shim_attrstr_alloc(0, 0);
+        let s = make_string("");
+        shim_attrstr_init_with_string(obj, 0, s);
+        assert_eq!(shim_attrstr_length(obj, 0), 0);
+        free_obj(obj);
+    }
+
+    // ── attributesAtIndex:effectiveRange: ──────────────────────────
+
+    #[test]
+    fn attributes_at_index_no_attrs_returns_empty_dict() {
+        let obj = shim_attrstr_alloc(0, 0);
+        let s = make_string("test");
+        shim_attrstr_init_with_string(obj, 0, s);
+        let dict = shim_attrstr_attributes_at_index(obj, 0, 0, 0);
+        assert_ne!(dict, 0); // returns empty dict, not nil
+        free_obj(obj);
+    }
+
+    #[test]
+    fn attributes_at_index_with_attrs() {
+        let obj = shim_attrstr_alloc(0, 0);
+        let s = make_string("hi");
+        let key = make_string("color");
+        let val = make_string("red");
+        let dict = crate::nsdictionary::make_nsdictionary(&[key], &[val]);
+        shim_attrstr_init_with_string_attributes(obj, 0, s, dict);
+        // The single attr run spans [0, 2), so index 0 should hit it
+        let result = shim_attrstr_attributes_at_index(obj, 0, 0, 0);
+        assert_eq!(result, dict);
+        // Index 1 should also be in range
+        let result1 = shim_attrstr_attributes_at_index(obj, 0, 1, 0);
+        assert_eq!(result1, dict);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn attributes_at_index_out_of_range() {
+        let obj = shim_attrstr_alloc(0, 0);
+        let s = make_string("hi");
+        let key = make_string("k");
+        let val = make_string("v");
+        let dict = crate::nsdictionary::make_nsdictionary(&[key], &[val]);
+        shim_attrstr_init_with_string_attributes(obj, 0, s, dict);
+        // Index 2 is past the run [0,2)
+        let result = shim_attrstr_attributes_at_index(obj, 0, 2, 0);
+        // Should return empty dict (not the attrs dict)
+        assert_ne!(result, dict);
+        assert_ne!(result, 0);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn attributes_at_index_nil_returns_zero() {
+        assert_eq!(shim_attrstr_attributes_at_index(0, 0, 0, 0), 0);
+    }
+
+    // ── description ────────────────────────────────────────────────
+
+    #[test]
+    fn description_basic() {
+        let obj = shim_attrstr_alloc(0, 0);
+        let s = make_string("hello");
+        shim_attrstr_init_with_string(obj, 0, s);
+        let desc = shim_attrstr_description(obj, 0);
+        assert_ne!(desc, 0);
+        let desc_str = read_string(desc);
+        assert!(desc_str.contains("hello"), "description should contain the string: {desc_str}");
+        assert!(desc_str.contains("0 attr runs"), "description should show attr count: {desc_str}");
+        free_obj(obj);
+    }
+
+    #[test]
+    fn description_nil_returns_zero() {
+        assert_eq!(shim_attrstr_description(0, 0), 0);
+    }
+
+    // ── mutable initWithString ─────────────────────────────────────
+
+    #[test]
+    fn mutable_init_with_string_basic() {
+        let obj = shim_mutable_attrstr_alloc(0, 0);
+        let s = make_string("mutable");
+        let ret = shim_mutable_attrstr_init_with_string(obj, 0, s);
+        assert_eq!(ret, obj);
+        assert_eq!(read_field(obj, 0), nsobj::nsmutableattributedstring_class_addr());
+        assert_eq!(read_field(obj, 8), s);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn mutable_init_with_string_nil_obj() {
+        assert_eq!(shim_mutable_attrstr_init_with_string(0, 0, 42), 0);
+    }
+
+    // ── mutable addAttribute:value:range: ──────────────────────────
+
+    #[test]
+    fn add_attribute_basic() {
+        let obj = shim_mutable_attrstr_alloc(0, 0);
+        let s = make_string("hello");
+        shim_mutable_attrstr_init_with_string(obj, 0, s);
+        let attr_name = make_string("NSFont");
+        let value = make_string("Courier");
+        shim_mutable_attrstr_add_attribute(obj, 0, attr_name, value, 0, 5);
+        assert_eq!(read_field(obj, 16), 1); // attrs_count = 1
+        assert_ne!(read_field(obj, 24), 0); // attrs_ptr set
+        // Verify the run via attributes_at_index
+        let dict = shim_attrstr_attributes_at_index(obj, 0, 0, 0);
+        assert_ne!(dict, 0);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn add_attribute_multiple() {
+        let obj = shim_mutable_attrstr_alloc(0, 0);
+        let s = make_string("hello world");
+        shim_mutable_attrstr_init_with_string(obj, 0, s);
+        shim_mutable_attrstr_add_attribute(obj, 0, make_string("a"), make_string("1"), 0, 5);
+        shim_mutable_attrstr_add_attribute(obj, 0, make_string("b"), make_string("2"), 6, 5);
+        assert_eq!(read_field(obj, 16), 2); // two runs
+        free_obj(obj);
+    }
+
+    #[test]
+    fn add_attribute_nil_obj_does_not_crash() {
+        shim_mutable_attrstr_add_attribute(0, 0, 1, 1, 0, 1);
+    }
+
+    // ── mutable replaceCharactersInRange:withString: ───────────────
+
+    #[test]
+    fn replace_chars_basic() {
+        let obj = shim_mutable_attrstr_alloc(0, 0);
+        let s = make_string("hello world");
+        shim_mutable_attrstr_init_with_string(obj, 0, s);
+        let replacement = make_string("rust");
+        shim_mutable_attrstr_replace_chars(obj, 0, 6, 5, replacement);
+        let new_str = shim_attrstr_string(obj, 0);
+        assert_string_eq(new_str, "hello rust");
+        free_obj(obj);
+    }
+
+    #[test]
+    fn replace_chars_insert_at_beginning() {
+        let obj = shim_mutable_attrstr_alloc(0, 0);
+        let s = make_string("world");
+        shim_mutable_attrstr_init_with_string(obj, 0, s);
+        let replacement = make_string("hello ");
+        shim_mutable_attrstr_replace_chars(obj, 0, 0, 0, replacement);
+        let new_str = shim_attrstr_string(obj, 0);
+        assert_string_eq(new_str, "hello world");
+        free_obj(obj);
+    }
+
+    #[test]
+    fn replace_chars_delete_range() {
+        let obj = shim_mutable_attrstr_alloc(0, 0);
+        let s = make_string("abcdef");
+        shim_mutable_attrstr_init_with_string(obj, 0, s);
+        // Replace "cd" (range 2..4) with empty string
+        let replacement = make_string("");
+        shim_mutable_attrstr_replace_chars(obj, 0, 2, 2, replacement);
+        let new_str = shim_attrstr_string(obj, 0);
+        assert_string_eq(new_str, "abef");
+        free_obj(obj);
+    }
+
+    #[test]
+    fn replace_chars_nil_replacement() {
+        let obj = shim_mutable_attrstr_alloc(0, 0);
+        let s = make_string("abcdef");
+        shim_mutable_attrstr_init_with_string(obj, 0, s);
+        // nil replacement acts as empty string
+        shim_mutable_attrstr_replace_chars(obj, 0, 2, 2, 0);
+        let new_str = shim_attrstr_string(obj, 0);
+        assert_string_eq(new_str, "abef");
+        free_obj(obj);
+    }
+
+    #[test]
+    fn replace_chars_nil_obj_does_not_crash() {
+        shim_mutable_attrstr_replace_chars(0, 0, 0, 1, 0);
+    }
+}

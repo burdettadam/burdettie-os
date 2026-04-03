@@ -117,6 +117,31 @@ fn multi_image_dylib_chain() {
     assert_eq!(result.exit_code, 0, "dylib_chain app should return 0");
 }
 
+#[test]
+fn load_preparsed_matches_load_results() {
+    let Some(data) = read_fixture("dylib_chain/app") else {
+        return;
+    };
+
+    let mut via_load = ImageRegistry::new(default_mapper(), default_unwind());
+    let load_idx = via_load.load("app", data.clone()).expect("load app via parse");
+
+    let parsed = parse(&data).expect("parse app");
+    let mut via_preparsed = ImageRegistry::new(default_mapper(), default_unwind());
+    let preparsed_idx = via_preparsed
+        .load_preparsed("app", std::sync::Arc::new(parsed), std::sync::Arc::from(data))
+        .expect("load app via preparsed path");
+
+    let loaded = &via_load.images()[load_idx];
+    let preparsed = &via_preparsed.images()[preparsed_idx];
+
+    assert_eq!(preparsed.install_name, loaded.install_name);
+    assert_eq!(preparsed.parsed.commands.len(), loaded.parsed.commands.len());
+    assert_eq!(preparsed.parsed.dylibs.len(), loaded.parsed.dylibs.len());
+    assert_eq!(preparsed.exports.len(), loaded.exports.len());
+    assert_eq!(preparsed.image.segments.len(), loaded.image.segments.len());
+}
+
 // ── Weak import tests ──────────────────────────────────────────────
 
 #[test]

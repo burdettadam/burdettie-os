@@ -1,5 +1,25 @@
-// ARM64 objc_msgSend trampoline for burdetty-os.
+// ARM64 objc_msgSend trampoline for burdettie-os.
 //
+// Cross-platform: builds on macOS (Mach-O) and Linux (ELF).
+// Mach-O uses _underscore C symbol prefix and @PAGE/@PAGEOFF relocations.
+// ELF uses bare names and GOT-relative addressing for external symbols
+// (required for PIC shared libraries on Linux).
+
+#ifdef __APPLE__
+#define CSYM(name) _##name
+// macOS: direct page-relative addressing
+#define LOAD_GLOBAL(reg, sym) \
+    adrp reg, sym@PAGE ; \
+    ldr  reg, [reg, sym@PAGEOFF]
+#else
+#define CSYM(name) name
+// Linux ELF: GOT-relative addressing (external symbols in PIC)
+#define LOAD_GLOBAL(reg, sym) \
+    adrp reg, :got:sym ; \
+    ldr  reg, [reg, :got_lo12:sym] ; \
+    ldr  reg, [reg]
+#endif
+
 // Preserves the entire argument register file (x0-x7, x8, d0-d7) across
 // the class-table lookup, then tail-calls the resolved IMP. This is
 // required for correct calling-convention behavior — a Rust
@@ -22,14 +42,14 @@
 // x8 is preserved through the trampoline. Apple defines it as an alias.
 // Similarly, objc_msgSend_fp2ret is identical (fp2ret only matters on x86).
 
-.global _shim_objc_msg_send_asm
-.global _shim_objc_msg_send_stret_asm
-.global _shim_objc_msg_send_fp2ret_asm
+.global CSYM(shim_objc_msg_send_asm)
+.global CSYM(shim_objc_msg_send_stret_asm)
+.global CSYM(shim_objc_msg_send_fp2ret_asm)
 .p2align 4
 
-_shim_objc_msg_send_asm:
-_shim_objc_msg_send_stret_asm:
-_shim_objc_msg_send_fp2ret_asm:
+CSYM(shim_objc_msg_send_asm):
+CSYM(shim_objc_msg_send_stret_asm):
+CSYM(shim_objc_msg_send_fp2ret_asm):
     // ── nil check ──────────────────────────────────────────
     cbz     x0, .Lnil_return
 
@@ -62,7 +82,7 @@ _shim_objc_msg_send_fp2ret_asm:
     // x1 = SEL  (already in x1)
     // Call Rust lookup: extern "C" fn(self: u64, sel: u64) -> u64
     //   Returns: x0 = IMP
-    bl      _objc_msg_lookup_imp
+    bl      CSYM(objc_msg_lookup_imp)
 
     // IMP is now in x0 — move to x16 (intra-procedure-call scratch)
     mov     x16, x0
@@ -110,12 +130,12 @@ _shim_objc_msg_send_fp2ret_asm:
 //      struct pointer — the IMP's self parameter must be the object).
 //   5. Tail-call the IMP.
 
-.global _shim_objc_msg_send_super_asm
-.global _shim_objc_msg_send_super_stret_asm
+.global CSYM(shim_objc_msg_send_super_asm)
+.global CSYM(shim_objc_msg_send_super_stret_asm)
 .p2align 4
 
-_shim_objc_msg_send_super_asm:
-_shim_objc_msg_send_super_stret_asm:
+CSYM(shim_objc_msg_send_super_asm):
+CSYM(shim_objc_msg_send_super_stret_asm):
     // Read objc_super struct *before* saving registers.
     // x9 = receiver, x10 = super_class
     ldr     x9,  [x0, #0]      // receiver = objc_super->receiver
@@ -147,7 +167,7 @@ _shim_objc_msg_send_super_stret_asm:
     mov     x1, x10             // arg1 = super_class
     // x1 had SEL, but we saved it. Load SEL from the saved x1:
     ldr     x2, [sp, #8]        // arg2 = saved x1 = SEL
-    bl      _objc_msg_super_lookup_imp
+    bl      CSYM(objc_msg_super_lookup_imp)
 
     // IMP → x16
     mov     x16, x0
@@ -184,12 +204,12 @@ _shim_objc_msg_send_super_stret_asm:
 // x0 = pointer to struct objc_super { id receiver; Class current_class; }
 // x1 = SEL
 
-.global _shim_objc_msg_send_super2_asm
-.global _shim_objc_msg_send_super2_stret_asm
+.global CSYM(shim_objc_msg_send_super2_asm)
+.global CSYM(shim_objc_msg_send_super2_stret_asm)
 .p2align 4
 
-_shim_objc_msg_send_super2_asm:
-_shim_objc_msg_send_super2_stret_asm:
+CSYM(shim_objc_msg_send_super2_asm):
+CSYM(shim_objc_msg_send_super2_stret_asm):
     // Read objc_super struct
     ldr     x9,  [x0, #0]      // receiver
     ldr     x10, [x0, #8]      // current_class (NOT the super)
@@ -215,7 +235,7 @@ _shim_objc_msg_send_super2_stret_asm:
     mov     x0, x9
     mov     x1, x10
     ldr     x2, [sp, #8]        // SEL from saved x1
-    bl      _objc_msg_super2_lookup_imp
+    bl      CSYM(objc_msg_super2_lookup_imp)
 
     mov     x16, x0
 
@@ -239,5 +259,80 @@ _shim_objc_msg_send_super2_stret_asm:
 
     // ── tail call ──────────────────────────────────────────
     br      x16
+
+
+// ── Host-object forwarding trampoline ──────────────────────────────
+//
+// Called as an IMP when the receiver's ISA is not registered in the
+// guest ObjC runtime (i.e. it's a real host Foundation object returned
+// by a host API like CFPreferencesCopyValue).
+//
+// Re-interns the guest selector through host sel_registerName, then
+// tail-calls host objc_msgSend with the correct host SEL.
+//
+// Preserves all argument registers (x0-x7, x8, d0-d7) so methods
+// with float args or large-struct returns work correctly.
+//
+// Reads function pointers from Rust globals:
+//   HOST_SEL_REGISTER_NAME — host sel_registerName()
+//   HOST_OBJC_MSG_SEND     — host objc_msgSend()
+
+.global CSYM(host_objc_forward_asm)
+.p2align 4
+
+CSYM(host_objc_forward_asm):
+    // x0 = obj, x1 = guest SEL (C string), x2-x7 = args
+    // x8 = struct return ptr, d0-d7 = float args
+
+    // ── save state ─────────────────────────────────────────
+    sub     sp, sp, #176
+
+    stp     x0, x1, [sp, #0]
+    stp     x2, x3, [sp, #16]
+    stp     x4, x5, [sp, #32]
+    stp     x6, x7, [sp, #48]
+    stp     d0, d1, [sp, #64]
+    stp     d2, d3, [sp, #80]
+    stp     d4, d5, [sp, #96]
+    stp     d6, d7, [sp, #112]
+    stp     x30, x8, [sp, #128]
+
+    // ── re-intern selector ─────────────────────────────────
+    // Load HOST_SEL_REGISTER_NAME function pointer
+    LOAD_GLOBAL(x17, CSYM(HOST_SEL_REGISTER_NAME))
+    cbz     x17, .Lhost_fwd_nil
+
+    // Call sel_registerName(guest_SEL)
+    mov     x0, x1              // x0 = guest SEL string
+    blr     x17                 // x0 = host SEL
+    str     x0, [sp, #8]       // overwrite saved x1 with host SEL
+
+    // ── load host objc_msgSend ─────────────────────────────
+    LOAD_GLOBAL(x17, CSYM(HOST_OBJC_MSG_SEND))
+    cbz     x17, .Lhost_fwd_nil
+
+    // ── restore state ──────────────────────────────────────
+    ldp     x30, x8, [sp, #128]
+    ldp     d0, d1, [sp, #64]
+    ldp     d2, d3, [sp, #80]
+    ldp     d4, d5, [sp, #96]
+    ldp     d6, d7, [sp, #112]
+    ldp     x0, x1, [sp, #0]   // x1 = host SEL (overwritten above)
+    ldp     x2, x3, [sp, #16]
+    ldp     x4, x5, [sp, #32]
+    ldp     x6, x7, [sp, #48]
+
+    add     sp, sp, #176
+
+    // ── tail-call host objc_msgSend ────────────────────────
+    br      x17
+
+.Lhost_fwd_nil:
+    // Host functions not available — return nil
+    ldp     x30, x8, [sp, #128]
+    add     sp, sp, #176
+    mov     x0, #0
+    fmov    d0, xzr
+    ret
 
 

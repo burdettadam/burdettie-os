@@ -23,7 +23,8 @@
 //! +24  void (*dispose)(...)     // present if BLOCK_HAS_COPY_DISPOSE
 //! ```
 
-use std::sync::OnceLock;
+use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
 
 use crate::refcount::REFCOUNTS;
 
@@ -214,6 +215,156 @@ pub extern "C" fn shim_objc_retain_block(block: u64) -> u64 {
     shim_block_copy(block)
 }
 
+// ── imp_implementationWithBlock / imp_getBlock / imp_removeBlock ───
+
+/// Global table mapping IMP addresses back to their source block.
+/// Used by imp_getBlock and imp_removeBlock.
+static IMP_BLOCK_MAP: Mutex<Option<HashMap<u64, u64>>> = Mutex::new(None);
+
+fn imp_block_map_insert(imp: u64, block: u64) {
+    let mut guard = IMP_BLOCK_MAP.lock().unwrap_or_else(|e| e.into_inner());
+    guard.get_or_insert_with(HashMap::new).insert(imp, block);
+}
+
+fn imp_block_map_get(imp: u64) -> Option<u64> {
+    let guard = IMP_BLOCK_MAP.lock().unwrap_or_else(|e| e.into_inner());
+    guard.as_ref().and_then(|m| m.get(&imp).copied())
+}
+
+fn imp_block_map_remove(imp: u64) -> Option<u64> {
+    let mut guard = IMP_BLOCK_MAP.lock().unwrap_or_else(|e| e.into_inner());
+    guard.as_mut().and_then(|m| m.remove(&imp))
+}
+
+/// `IMP imp_implementationWithBlock(id block)`
+///
+/// Creates an IMP from a block. We copy the block (to retain it),
+/// extract its invoke function pointer, and store the mapping so that
+/// imp_getBlock and imp_removeBlock can operate on it.
+///
+/// Returns the block's invoke function pointer as the IMP.
+/// If the invoke pointer collides with a prior mapping, the new block
+/// wins (matching Apple behavior for same-signature blocks).
+pub extern "C" fn shim_imp_implementation_with_block(block: u64) -> u64 {
+    if block == 0 {
+        return 0;
+    }
+    let copied = shim_block_copy(block);
+    if copied == 0 {
+        return 0;
+    }
+    // invoke is at offset +16 in Block_literal
+    let invoke = unsafe { *((copied as usize + 16) as *const u64) };
+    if invoke == 0 {
+        return 0;
+    }
+    imp_block_map_insert(invoke, copied);
+    invoke
+}
+
+/// `id imp_getBlock(IMP imp)`
+///
+/// Returns the block associated with an IMP created by
+/// imp_implementationWithBlock, or NULL if no block is associated.
+pub extern "C" fn shim_imp_get_block(imp: u64) -> u64 {
+    if imp == 0 {
+        return 0;
+    }
+    imp_block_map_get(imp).unwrap_or(0)
+}
+
+/// `BOOL imp_removeBlock(IMP imp)`
+///
+/// Removes the block association for the given IMP and releases the block.
+/// Returns 1 (YES) if a block was removed, 0 (NO) otherwise.
+pub extern "C" fn shim_imp_remove_block(imp: u64) -> u8 {
+    if imp == 0 {
+        return 0;
+    }
+    if let Some(block) = imp_block_map_remove(imp) {
+        shim_block_release(block);
+        1
+    } else {
+        0
+    }
+}
+
+// ── _Block_object_assign / _Block_object_dispose ──────────────────
+
+// Flags for _Block_object_assign / _Block_object_dispose.
+// From Block_private.h:
+const BLOCK_FIELD_IS_OBJECT: u32 = 3; // captured ObjC object
+const BLOCK_FIELD_IS_BLOCK: u32 = 7; // captured __block block
+const BLOCK_FIELD_IS_BYREF: u32 = 8; // captured __block variable
+const BLOCK_BYREF_CALLER: u32 = 128; // called from byref copy/dispose helper
+
+/// `void _Block_object_assign(void *destAddr, const void *object, const int flags)`
+///
+/// Called inside block copy helpers to retain/copy captured objects.
+/// - BLOCK_FIELD_IS_OBJECT → retain the object
+/// - BLOCK_FIELD_IS_BLOCK  → Block_copy the nested block
+/// - BLOCK_FIELD_IS_BYREF  → copy the __block byref struct (simplified: memcpy pointer)
+pub extern "C" fn shim_block_object_assign(dest_addr: u64, object: u64, flags: u32) {
+    if dest_addr == 0 || object == 0 {
+        return;
+    }
+    let kind = flags & 0xFF; // low byte is the field type
+    match kind {
+        BLOCK_FIELD_IS_OBJECT => {
+            // Retain the ObjC object and store pointer
+            crate::refcount::REFCOUNTS
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .retain(object);
+            unsafe { *(dest_addr as *mut u64) = object; }
+        }
+        BLOCK_FIELD_IS_BLOCK => {
+            // Block_copy the nested block
+            let copied = shim_block_copy(object);
+            unsafe { *(dest_addr as *mut u64) = copied; }
+        }
+        _ if kind == BLOCK_FIELD_IS_BYREF || kind == (BLOCK_FIELD_IS_BYREF | BLOCK_BYREF_CALLER) => {
+            // __block byref: just store the pointer (simplified)
+            unsafe { *(dest_addr as *mut u64) = object; }
+        }
+        _ => {
+            // Unknown flag combination — store pointer as-is
+            log::debug!("_Block_object_assign: unknown flags {:#x}, storing pointer", flags);
+            unsafe { *(dest_addr as *mut u64) = object; }
+        }
+    }
+}
+
+/// `void _Block_object_dispose(const void *object, const int flags)`
+///
+/// Called inside block dispose helpers to release captured objects.
+/// - BLOCK_FIELD_IS_OBJECT → release the object
+/// - BLOCK_FIELD_IS_BLOCK  → Block_release the nested block
+/// - BLOCK_FIELD_IS_BYREF  → release the __block byref struct (simplified: no-op)
+pub extern "C" fn shim_block_object_dispose(object: u64, flags: u32) {
+    if object == 0 {
+        return;
+    }
+    let kind = flags & 0xFF;
+    match kind {
+        BLOCK_FIELD_IS_OBJECT => {
+            let remaining = crate::refcount::REFCOUNTS
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .release(object);
+            if remaining == 0 {
+                crate::refcount::deallocate_tracked_object(object, "block_object_dispose");
+            }
+        }
+        BLOCK_FIELD_IS_BLOCK => {
+            shim_block_release(object);
+        }
+        _ => {
+            // __block byref or unknown — no-op
+        }
+    }
+}
+
 // ── Tests ──────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -358,5 +509,144 @@ mod tests {
         shim_block_release(heap);
         shim_block_release(heap);
         // After double release the block is freed — no crash means success
+    }
+
+    // ── imp_implementationWithBlock tests ──────────────────────────
+
+    #[test]
+    fn imp_implementation_with_block_null() {
+        assert_eq!(shim_imp_implementation_with_block(0), 0);
+    }
+
+    #[test]
+    fn imp_implementation_with_block_stores() {
+        // Create a fake global block with an invoke pointer
+        #[repr(C)]
+        struct FakeBlock {
+            isa: u64,
+            flags: u32,
+            reserved: u32,
+            invoke: u64,
+            descriptor: u64,
+        }
+        let blk = FakeBlock {
+            isa: global_block_class_addr(),
+            flags: BLOCK_IS_GLOBAL,
+            reserved: 0,
+            invoke: 0xCAFE_1234,
+            descriptor: 0,
+        };
+        let addr = &blk as *const _ as u64;
+        let imp = shim_imp_implementation_with_block(addr);
+        assert_ne!(imp, 0, "should return non-zero IMP");
+        assert_eq!(imp, 0xCAFE_1234, "IMP should be the block's invoke pointer");
+    }
+
+    #[test]
+    fn imp_get_block_returns_stored() {
+        #[repr(C)]
+        struct FakeBlock {
+            isa: u64,
+            flags: u32,
+            reserved: u32,
+            invoke: u64,
+            descriptor: u64,
+        }
+        let blk = FakeBlock {
+            isa: global_block_class_addr(),
+            flags: BLOCK_IS_GLOBAL,
+            reserved: 0,
+            invoke: 0xCAFE_5678,
+            descriptor: 0,
+        };
+        let addr = &blk as *const _ as u64;
+        let imp = shim_imp_implementation_with_block(addr);
+        let got = shim_imp_get_block(imp);
+        // For global blocks, block_copy returns the same pointer
+        assert_eq!(got, addr);
+    }
+
+    #[test]
+    fn imp_get_block_unknown() {
+        assert_eq!(shim_imp_get_block(0xDEAD_9999), 0);
+    }
+
+    #[test]
+    fn imp_remove_block_removes() {
+        #[repr(C)]
+        struct FakeBlock {
+            isa: u64,
+            flags: u32,
+            reserved: u32,
+            invoke: u64,
+            descriptor: u64,
+        }
+        let blk = FakeBlock {
+            isa: global_block_class_addr(),
+            flags: BLOCK_IS_GLOBAL,
+            reserved: 0,
+            invoke: 0xCAFE_ABCD,
+            descriptor: 0,
+        };
+        let addr = &blk as *const _ as u64;
+        let imp = shim_imp_implementation_with_block(addr);
+        assert_eq!(shim_imp_remove_block(imp), 1);
+        // After removal, get_block should return 0
+        assert_eq!(shim_imp_get_block(imp), 0);
+    }
+
+    #[test]
+    fn imp_remove_block_unknown() {
+        assert_eq!(shim_imp_remove_block(0xDEAD_AAAA), 0);
+    }
+
+    // ── _Block_object_assign / _Block_object_dispose tests ─────────
+
+    #[test]
+    fn block_object_assign_null_dest_is_noop() {
+        shim_block_object_assign(0, 0xBEEF, BLOCK_FIELD_IS_OBJECT); // must not crash
+    }
+
+    #[test]
+    fn block_object_assign_null_object_is_noop() {
+        let mut dest: u64 = 0;
+        shim_block_object_assign(&mut dest as *mut u64 as u64, 0, BLOCK_FIELD_IS_OBJECT);
+        assert_eq!(dest, 0);
+    }
+
+    #[test]
+    fn block_object_assign_object_stores_and_retains() {
+        let obj = crate::pal_alloc().calloc(1, 8) as u64;
+        assert_ne!(obj, 0);
+        let mut dest: u64 = 0;
+        shim_block_object_assign(&mut dest as *mut u64 as u64, obj, BLOCK_FIELD_IS_OBJECT);
+        assert_eq!(dest, obj);
+        // Object was retained — refcount should be > 0
+        let count = crate::refcount::REFCOUNTS
+            .lock()
+            .unwrap()
+            .count(obj);
+        assert!(count >= 1);
+        // Clean up
+        crate::refcount::REFCOUNTS.lock().unwrap().release(obj);
+        crate::pal_alloc().free(obj as *mut u8);
+    }
+
+    #[test]
+    fn block_object_assign_byref_stores_pointer() {
+        let obj = 0xCAFE_1234u64;
+        let mut dest: u64 = 0;
+        shim_block_object_assign(&mut dest as *mut u64 as u64, obj, BLOCK_FIELD_IS_BYREF);
+        assert_eq!(dest, obj);
+    }
+
+    #[test]
+    fn block_object_dispose_null_is_noop() {
+        shim_block_object_dispose(0, BLOCK_FIELD_IS_OBJECT); // must not crash
+    }
+
+    #[test]
+    fn block_object_dispose_byref_is_noop() {
+        shim_block_object_dispose(0xBEEF, BLOCK_FIELD_IS_BYREF); // must not crash
     }
 }

@@ -134,10 +134,16 @@ define_class_pair!(root NSOBJECT_CLASS_DATA, NSOBJECT_METACLASS_DATA, NSOBJECT_I
     meta_addr: nsobject_metaclass_addr);
 
 // The macro must be visible to submodules (macro defined before mod declarations).
-mod class_pairs;
+mod class_pairs_foundation;
+mod class_pairs_appkit;
+mod class_pairs_gap;
+mod class_pairs_xcode;
 mod methods;
 
-pub use class_pairs::*;
+pub use class_pairs_foundation::*;
+pub use class_pairs_appkit::*;
+pub use class_pairs_gap::*;
+pub use class_pairs_xcode::*;
 pub use methods::*;
 
 #[cfg(test)]
@@ -160,14 +166,14 @@ mod tests {
     fn nsobject_class_isa_points_to_metaclass() {
         let class_addr = nsobject_class_addr();
         let meta_addr = nsobject_metaclass_addr();
-        let isa = unsafe { *(class_addr as *const u64) };
+        let isa = unsafe { (class_addr as *const u64).read_unaligned() };
         assert_eq!(isa, meta_addr);
     }
 
     #[test]
     fn nsobject_metaclass_isa_points_to_self() {
         let meta_addr = nsobject_metaclass_addr();
-        let isa = unsafe { *(meta_addr as *const u64) };
+        let isa = unsafe { (meta_addr as *const u64).read_unaligned() };
         assert_eq!(isa, meta_addr);
     }
 

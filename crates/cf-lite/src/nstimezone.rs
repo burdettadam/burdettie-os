@@ -188,3 +188,98 @@ pub extern "C" fn shim_nstimezone_description(obj: u64, _cmd: u64) -> u64 {
     let c_str = std::ffi::CString::new(desc).unwrap_or_default();
     cfstring::shim_cf_string_create_with_cstring(0, c_str.as_ptr(), 0)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shim_test_helpers::*;
+
+    // Note: shim_nstimezone_system_timezone() and shim_nstimezone_local_timezone()
+    // call crate::platform().clock() via detect_system_timezone() and cannot be
+    // tested without a platform provider configured.
+    //
+    // Internal alloc: alloc_nstimezone() stores a heap-allocated C string for the
+    // name. free_obj() leaks this buffer, which is acceptable in unit tests.
+
+    #[test]
+    fn with_name_utc() {
+        let name_str = make_string("UTC");
+        let tz = shim_nstimezone_with_name(0, 0, name_str);
+        assert_ne!(tz, 0);
+        assert_eq!(shim_nstimezone_seconds_from_gmt(tz, 0), 0);
+        assert_string_eq(shim_nstimezone_name(tz, 0), "UTC");
+        free_obj(tz);
+    }
+
+    #[test]
+    fn with_abbreviation_pst() {
+        let abbr = make_string("PST");
+        let tz = shim_nstimezone_with_abbreviation(0, 0, abbr);
+        assert_ne!(tz, 0);
+        assert_eq!(shim_nstimezone_seconds_from_gmt(tz, 0), -28800);
+        free_obj(tz);
+    }
+
+    #[test]
+    fn with_abbreviation_jst() {
+        let abbr = make_string("JST");
+        let tz = shim_nstimezone_with_abbreviation(0, 0, abbr);
+        assert_ne!(tz, 0);
+        assert_eq!(shim_nstimezone_seconds_from_gmt(tz, 0), 32400);
+        free_obj(tz);
+    }
+
+    #[test]
+    fn for_seconds_from_gmt_zero_is_gmt() {
+        let tz = shim_nstimezone_for_seconds_from_gmt(0, 0, 0);
+        assert_ne!(tz, 0);
+        assert_string_eq(shim_nstimezone_name(tz, 0), "GMT");
+        assert_eq!(shim_nstimezone_seconds_from_gmt(tz, 0), 0);
+        free_obj(tz);
+    }
+
+    #[test]
+    fn for_seconds_from_gmt_positive_hour() {
+        let tz = shim_nstimezone_for_seconds_from_gmt(0, 0, 3600);
+        assert_ne!(tz, 0);
+        assert_string_eq(shim_nstimezone_name(tz, 0), "GMT+1");
+        assert_eq!(shim_nstimezone_seconds_from_gmt(tz, 0), 3600);
+        free_obj(tz);
+    }
+
+    #[test]
+    fn for_seconds_from_gmt_negative() {
+        let tz = shim_nstimezone_for_seconds_from_gmt(0, 0, -18000);
+        assert_ne!(tz, 0);
+        assert_string_eq(shim_nstimezone_name(tz, 0), "GMT-5");
+        assert_eq!(shim_nstimezone_seconds_from_gmt(tz, 0), -18000);
+        free_obj(tz);
+    }
+
+    #[test]
+    fn abbreviation_matches_name() {
+        let name_str = make_string("CET");
+        let tz = shim_nstimezone_with_name(0, 0, name_str);
+        assert_string_eq(shim_nstimezone_abbreviation(tz, 0), "CET");
+        assert_string_eq(shim_nstimezone_name(tz, 0), "CET");
+        free_obj(tz);
+    }
+
+    #[test]
+    fn description_shows_name_and_offset() {
+        let tz = shim_nstimezone_for_seconds_from_gmt(0, 0, 3600);
+        let desc = shim_nstimezone_description(tz, 0);
+        assert_ne!(desc, 0);
+        assert_string_eq(desc, "GMT+1 (GMT+1)");
+        free_obj(tz);
+    }
+
+    #[test]
+    fn nil_safety() {
+        assert_eq!(shim_nstimezone_with_name(0, 0, 0), 0);
+        assert_eq!(shim_nstimezone_with_abbreviation(0, 0, 0), 0);
+        assert_eq!(shim_nstimezone_seconds_from_gmt(0, 0), 0);
+        assert_eq!(shim_nstimezone_name(0, 0), 0);
+        assert_eq!(shim_nstimezone_description(0, 0), 0);
+    }
+}

@@ -24,6 +24,64 @@ const NSMUTABLEARRAY_CAP_OFF: usize = 24;
 
 const INITIAL_CAPACITY: u64 = 4;
 
+fn retain_array_element(element: u64) {
+    crate::nsarray::retain_collection_object(element);
+}
+
+fn release_array_element(element: u64) {
+    crate::nsarray::release_collection_object(element);
+}
+
+fn release_array_elements(elems: u64, count: usize) {
+    if elems == 0 || count == 0 {
+        return;
+    }
+
+    for i in 0..count {
+        let element = unsafe { *((elems as usize + i * 8) as *const u64) };
+        release_array_element(element);
+        unsafe {
+            *((elems as usize + i * 8) as *mut u64) = 0;
+        }
+    }
+}
+
+fn normalized_capacity(capacity: u64) -> u64 {
+    if capacity == 0 {
+        INITIAL_CAPACITY
+    } else {
+        capacity
+    }
+}
+
+fn init_array_storage(obj: u64, capacity: u64) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
+
+    let cap = normalized_capacity(capacity);
+    let buf = crate::pal_alloc().calloc(cap as usize, 8) as u64;
+
+    unsafe {
+        if *(obj as *const u64) == 0 {
+            *(obj as *mut u64) = crate::nsobj::nsmutablearray_class_addr();
+        }
+
+        let old_count = *((obj as usize + NSMUTABLEARRAY_COUNT_OFF) as *const u64) as usize;
+        let old_buf = *((obj as usize + NSMUTABLEARRAY_ELEMS_OFF) as *const u64);
+        if old_buf != 0 {
+            release_array_elements(old_buf, old_count);
+            crate::pal_alloc().free(old_buf as *mut u8);
+        }
+
+        *((obj as usize + NSMUTABLEARRAY_COUNT_OFF) as *mut u64) = 0;
+        *((obj as usize + NSMUTABLEARRAY_ELEMS_OFF) as *mut u64) = buf;
+        *((obj as usize + NSMUTABLEARRAY_CAP_OFF) as *mut u64) = cap;
+    }
+
+    obj
+}
+
 /// `+[NSMutableArray array]` — creates an empty mutable array.
 pub extern "C" fn shim_nsmutablearray_array(cls: u64, _cmd: u64) -> u64 {
     shim_nsmutablearray_array_with_capacity(cls, _cmd, INITIAL_CAPACITY)
@@ -48,6 +106,44 @@ pub extern "C" fn shim_nsmutablearray_array_with_array(cls: u64, _cmd: u64, sour
     new_arr
 }
 
+/// `+[NSMutableArray arrayWithObjects:]` — creates a mutable array from
+/// inline variadic object arguments terminated by nil.
+pub extern "C" fn shim_nsmutablearray_array_with_objects(
+    cls: u64,
+    _cmd: u64,
+    first: u64,
+    second: u64,
+    third: u64,
+    fourth: u64,
+    fifth: u64,
+    sixth: u64,
+    seventh: u64,
+    eighth: u64,
+) -> u64 {
+    if cls == 0 {
+        return 0;
+    }
+
+    let items = crate::nsarray::collect_variadic_object_args(&[
+        first, second, third, fourth, fifth, sixth, seventh, eighth,
+    ]);
+    let cap = if items.is_empty() {
+        INITIAL_CAPACITY
+    } else {
+        items.len() as u64
+    };
+    let obj = shim_nsmutablearray_array_with_capacity(cls, _cmd, cap);
+    if obj == 0 {
+        return 0;
+    }
+
+    for item in items {
+        shim_nsmutablearray_add_object(obj, 0, item);
+    }
+
+    obj
+}
+
 /// `+[NSMutableArray arrayWithCapacity:]` — creates an empty mutable array
 /// with pre-allocated capacity.
 pub extern "C" fn shim_nsmutablearray_array_with_capacity(
@@ -59,35 +155,88 @@ pub extern "C" fn shim_nsmutablearray_array_with_capacity(
         return 0;
     }
 
-    let cap = if capacity == 0 {
-        INITIAL_CAPACITY
-    } else {
-        capacity
-    };
-
     let obj = crate::pal_alloc().calloc(1, 32) as u64;
     if obj == 0 {
         return 0;
     }
 
-    // Set ISA = NSMutableArray class
     unsafe {
         *(obj as *mut u64) = crate::nsobj::nsmutablearray_class_addr();
     }
 
-    // count = 0 (already zeroed by calloc)
-    // Allocate elements buffer
-    let buf = crate::pal_alloc().calloc(cap as usize, 8) as u64;
-    if buf != 0 {
-        unsafe {
-            *((obj as usize + NSMUTABLEARRAY_ELEMS_OFF) as *mut u64) = buf;
-        }
-    }
-    unsafe {
-        *((obj as usize + NSMUTABLEARRAY_CAP_OFF) as *mut u64) = cap;
-    }
+    init_array_storage(obj, capacity);
+
+    let cap = normalized_capacity(capacity);
 
     log::debug!("NSMutableArray array → {:#x} (capacity {})", obj, cap);
+    obj
+}
+
+/// `-[NSMutableArray initWithCapacity:]` — initializes an allocated mutable
+/// array instance with storage for the requested capacity.
+pub extern "C" fn shim_nsmutablearray_init_with_capacity(
+    obj: u64,
+    _cmd: u64,
+    capacity: u64,
+) -> u64 {
+    init_array_storage(obj, capacity)
+}
+
+/// `-[NSMutableArray initWithArray:]` — initializes an allocated mutable array
+/// instance by copying all elements from the source array.
+pub extern "C" fn shim_nsmutablearray_init_with_array(obj: u64, _cmd: u64, source: u64) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
+
+    let count = if source == 0 {
+        0
+    } else {
+        crate::nsarray::shim_nsarray_count(source, 0)
+    };
+    let cap = if count == 0 { INITIAL_CAPACITY } else { count };
+    init_array_storage(obj, cap);
+
+    for i in 0..count {
+        let elem = crate::nsarray::shim_nsarray_object_at_index(source, 0, i);
+        shim_nsmutablearray_add_object(obj, 0, elem);
+    }
+
+    obj
+}
+
+/// `-[NSMutableArray initWithObjects:]` — initializes an allocated mutable
+/// array instance from inline variadic object arguments terminated by nil.
+pub extern "C" fn shim_nsmutablearray_init_with_objects(
+    obj: u64,
+    _cmd: u64,
+    first: u64,
+    second: u64,
+    third: u64,
+    fourth: u64,
+    fifth: u64,
+    sixth: u64,
+    seventh: u64,
+    eighth: u64,
+) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
+
+    let items = crate::nsarray::collect_variadic_object_args(&[
+        first, second, third, fourth, fifth, sixth, seventh, eighth,
+    ]);
+    let cap = if items.is_empty() {
+        INITIAL_CAPACITY
+    } else {
+        items.len() as u64
+    };
+    init_array_storage(obj, cap);
+
+    for item in items {
+        shim_nsmutablearray_add_object(obj, 0, item);
+    }
+
     obj
 }
 
@@ -127,6 +276,7 @@ pub extern "C" fn shim_nsmutablearray_add_object(obj: u64, _cmd: u64, element: u
         return 0;
     }
 
+    retain_array_element(element);
     unsafe {
         *((elems as usize + count as usize * 8) as *mut u64) = element;
         *((obj as usize + NSMUTABLEARRAY_COUNT_OFF) as *mut u64) = count + 1;
@@ -164,6 +314,7 @@ pub extern "C" fn shim_nsmutablearray_insert_object_at_index(
         return 0;
     }
 
+    retain_array_element(element);
     // Shift elements [index..count) right by one slot
     if index < count {
         unsafe {
@@ -205,6 +356,8 @@ pub extern "C" fn shim_nsmutablearray_remove_object_at_index(
         return 0;
     }
 
+    let removed = unsafe { *((elems as usize + index as usize * 8) as *const u64) };
+
     // Shift elements [index+1..count) left by one slot
     if index + 1 < count {
         unsafe {
@@ -215,8 +368,10 @@ pub extern "C" fn shim_nsmutablearray_remove_object_at_index(
     }
 
     unsafe {
+        *((elems as usize + (count as usize - 1) * 8) as *mut u64) = 0;
         *((obj as usize + NSMUTABLEARRAY_COUNT_OFF) as *mut u64) = count - 1;
     }
+    release_array_element(removed);
     0
 }
 
@@ -229,9 +384,16 @@ pub extern "C" fn shim_nsmutablearray_remove_last_object(obj: u64, _cmd: u64) ->
     if count == 0 {
         return 0;
     }
+    let elems = unsafe { *((obj as usize + NSMUTABLEARRAY_ELEMS_OFF) as *const u64) };
+    if elems == 0 {
+        return 0;
+    }
+    let removed = unsafe { *((elems as usize + (count as usize - 1) * 8) as *const u64) };
     unsafe {
+        *((elems as usize + (count as usize - 1) * 8) as *mut u64) = 0;
         *((obj as usize + NSMUTABLEARRAY_COUNT_OFF) as *mut u64) = count - 1;
     }
+    release_array_element(removed);
     0
 }
 
@@ -247,6 +409,12 @@ pub extern "C" fn shim_nsmutablearray_replace_object_at_index(
         return 0;
     }
     let count = unsafe { *((obj as usize + NSMUTABLEARRAY_COUNT_OFF) as *const u64) };
+    if count == 0 && index == 0 {
+        // Xcode wrapper binaries have been observed to build an empty mutable
+        // array and then seed argv[0] via replaceObjectAtIndex:withObject:.
+        // Accept that specific pattern as an append for compatibility.
+        return shim_nsmutablearray_add_object(obj, _cmd, new_obj);
+    }
     if index >= count {
         eprintln!(
             "NSMutableArray replaceObjectAtIndex:{} beyond bounds [0..{})",
@@ -258,9 +426,12 @@ pub extern "C" fn shim_nsmutablearray_replace_object_at_index(
     if elems == 0 {
         return 0;
     }
+    let old_obj = unsafe { *((elems as usize + index as usize * 8) as *const u64) };
+    retain_array_element(new_obj);
     unsafe {
         *((elems as usize + index as usize * 8) as *mut u64) = new_obj;
     }
+    release_array_element(old_obj);
     0
 }
 
@@ -269,10 +440,33 @@ pub extern "C" fn shim_nsmutablearray_remove_all_objects(obj: u64, _cmd: u64) ->
     if obj == 0 {
         return 0;
     }
+    let count = unsafe { *((obj as usize + NSMUTABLEARRAY_COUNT_OFF) as *const u64) } as usize;
+    let elems = unsafe { *((obj as usize + NSMUTABLEARRAY_ELEMS_OFF) as *const u64) };
+    release_array_elements(elems, count);
     unsafe {
         *((obj as usize + NSMUTABLEARRAY_COUNT_OFF) as *mut u64) = 0;
     }
     0
+}
+
+/// `-[NSMutableArray setObject:atIndexedSubscript:]` — subscript setter.
+///
+/// If `idx < count`, replaces the element at that index.
+/// If `idx == count`, appends the element.
+pub extern "C" fn shim_nsmutablearray_set_object_at_indexed_subscript(
+    obj: u64,
+    _cmd: u64,
+    new_obj: u64,
+    idx: u64,
+) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
+    let count = unsafe { *((obj as usize + NSMUTABLEARRAY_COUNT_OFF) as *const u64) };
+    if idx == count {
+        return shim_nsmutablearray_add_object(obj, _cmd, new_obj);
+    }
+    shim_nsmutablearray_replace_object_at_index(obj, _cmd, idx, new_obj)
 }
 
 /// `-[NSMutableArray description]` — returns a string representation.

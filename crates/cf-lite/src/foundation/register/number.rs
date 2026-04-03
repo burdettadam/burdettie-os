@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use objc_runtime::ClassInfo;
 
 use super::me;
-use crate::{nsnull, nsnumber, nsnumberformatter, nsobj, nsvalue};
+use crate::{nsdecimalnumber, nsnull, nsnumber, nsnumberformatter, nsobj, nsvalue};
 
 /// Register `NSNumber` with numeric accessors and factory methods.
 pub fn register_nsnumber_class(rt: &mut objc_runtime::ObjcRuntime) {
@@ -249,6 +249,16 @@ pub fn register_nsvalue_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nsvalue::shim_nsvalue_description as u64,
                 "@@:",
             ),
+            me(
+                "initWithBytes:objCType:",
+                nsvalue::shim_nsvalue_init_with_bytes_objctype as u64,
+                "@@:^v*",
+            ),
+            me(
+                "isEqualToValue:",
+                nsvalue::shim_nsvalue_is_equal_to_value as u64,
+                "c@:@",
+            ),
         ],
         class_methods: vec![
             me(
@@ -359,6 +369,26 @@ pub fn register_nsnumberformatter_class(rt: &mut objc_runtime::ObjcRuntime) {
                 "v@:Q",
             ),
             me(
+                "minimumFractionDigits",
+                nsnumberformatter::shim_nsnumberformatter_min_frac as u64,
+                "Q@:",
+            ),
+            me(
+                "maximumFractionDigits",
+                nsnumberformatter::shim_nsnumberformatter_max_frac as u64,
+                "Q@:",
+            ),
+            me(
+                "locale",
+                nsnumberformatter::shim_nsnumberformatter_locale as u64,
+                "@@:",
+            ),
+            me(
+                "setLocale:",
+                nsnumberformatter::shim_nsnumberformatter_set_locale as u64,
+                "v@:@",
+            ),
+            me(
                 "stringFromNumber:",
                 nsnumberformatter::shim_nsnumberformatter_string_from_number as u64,
                 "@@:@",
@@ -387,4 +417,44 @@ pub fn register_nsnumberformatter_class(rt: &mut objc_runtime::ObjcRuntime) {
     };
     rt.register_synthetic_class(info);
     rt.register_metaclass_addr(metaclass_addr, "NSNumberFormatter");
+}
+
+/// Register `NSDecimalNumber` — decimal arithmetic subclass of NSNumber.
+pub fn register_nsdecimalnumber_class(rt: &mut objc_runtime::ObjcRuntime) {
+    let class_addr = nsobj::nsdecimalnumber_class_addr();
+    let metaclass_addr = nsobj::nsdecimalnumber_metaclass_addr();
+    let info = ClassInfo {
+        name: "NSDecimalNumber".to_string(),
+        mapped_addr: class_addr,
+        methods: vec![
+            me("initWithString:", nsdecimalnumber::shim_nsdecimalnumber_init_with_string as u64, "@@:@"),
+            me("initWithMantissa:exponent:isNegative:", nsdecimalnumber::shim_nsdecimalnumber_init_with_mantissa as u64, "@@:Qsc"),
+            me("decimalNumberByAdding:", nsdecimalnumber::shim_nsdecimalnumber_by_adding as u64, "@@:@"),
+            me("decimalNumberBySubtracting:", nsdecimalnumber::shim_nsdecimalnumber_by_subtracting as u64, "@@:@"),
+            me("decimalNumberByMultiplyingBy:", nsdecimalnumber::shim_nsdecimalnumber_by_multiplying as u64, "@@:@"),
+            me("decimalNumberByDividingBy:", nsdecimalnumber::shim_nsdecimalnumber_by_dividing as u64, "@@:@"),
+            me("decimalNumberByRaisingToPower:", nsdecimalnumber::shim_nsdecimalnumber_by_raising_to_power as u64, "@@:Q"),
+            me("compare:", nsdecimalnumber::shim_nsdecimalnumber_compare as u64, "q@:@"),
+            me("doubleValue", nsdecimalnumber::shim_nsdecimalnumber_double_value as u64, "d@:"),
+            me("stringValue", nsdecimalnumber::shim_nsdecimalnumber_string_value as u64, "@@:"),
+            me("descriptionWithLocale:", nsdecimalnumber::shim_nsdecimalnumber_description_with_locale as u64, "@@:@"),
+            me("description", nsdecimalnumber::shim_nsdecimalnumber_description as u64, "@@:"),
+            me("objCType", nsdecimalnumber::shim_nsdecimalnumber_objc_type as u64, "r*@:"),
+            me("isEqual:", nsdecimalnumber::shim_nsdecimalnumber_is_equal as u64, "B@:@"),
+        ],
+        class_methods: vec![
+            me("alloc", nsdecimalnumber::shim_nsdecimalnumber_alloc as u64, "@@:"),
+            me("decimalNumberWithString:", nsdecimalnumber::shim_nsdecimalnumber_with_string as u64, "@@:@"),
+            me("decimalNumberWithMantissa:exponent:isNegative:", nsdecimalnumber::shim_nsdecimalnumber_with_mantissa as u64, "@@:Qsc"),
+            me("zero", nsdecimalnumber::shim_nsdecimalnumber_zero as u64, "@@:"),
+            me("one", nsdecimalnumber::shim_nsdecimalnumber_one as u64, "@@:"),
+            me("notANumber", nsdecimalnumber::shim_nsdecimalnumber_nan as u64, "@@:"),
+        ],
+        ivars: vec![], properties: vec![], protocol_names: Vec::new(),
+        instance_size: 24, is_root: false, is_meta: false,
+        superclass_addr: Some(nsobj::nsnumber_class_addr()),
+        method_index: HashMap::new(), class_method_index: HashMap::new(),
+    };
+    rt.register_synthetic_class(info);
+    rt.register_metaclass_addr(metaclass_addr, "NSDecimalNumber");
 }

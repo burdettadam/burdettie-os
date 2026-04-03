@@ -17,11 +17,43 @@ use platform_core::unwind::UnwindRegistry;
 
 use crate::{ExecError, MappedImage, SymbolResolver};
 
+/// Normalize an install name by collapsing `.` and `..` path segments
+/// in `@rpath/`, `@executable_path/`, or `@loader_path/` prefixed paths.
+///
+/// Example: `@rpath/XcodeDefault/../lib_Foo.dylib` → `@rpath/lib_Foo.dylib`
+pub fn normalize_install_name(name: &str) -> String {
+    let (prefix, rest) = if let Some(r) = name.strip_prefix("@rpath/") {
+        ("@rpath/", r)
+    } else if let Some(r) = name.strip_prefix("@executable_path/") {
+        ("@executable_path/", r)
+    } else if let Some(r) = name.strip_prefix("@loader_path/") {
+        ("@loader_path/", r)
+    } else {
+        return name.to_string();
+    };
+
+    if !rest.contains("..") && !rest.contains("./") {
+        return name.to_string();
+    }
+
+    let mut parts: Vec<&str> = Vec::new();
+    for seg in rest.split('/') {
+        match seg {
+            "." | "" => {}
+            ".." => {
+                parts.pop();
+            }
+            _ => parts.push(seg),
+        }
+    }
+    format!("{prefix}{}", parts.join("/"))
+}
+
 /// A single Mach-O image that has been parsed and mapped into process memory.
 pub struct LoadedImage {
     pub image: MappedImage,
-    pub parsed: ParsedMachO,
-    pub data: Vec<u8>,
+    pub parsed: Arc<ParsedMachO>,
+    pub data: Arc<[u8]>,
     pub install_name: String,
     pub exports: Vec<ExportedSymbol>,
 }
@@ -30,6 +62,7 @@ pub struct LoadedImage {
 pub struct ImageRegistry {
     images: Vec<LoadedImage>,
     name_index: HashMap<String, usize>,
+    generated_unwind_frames: HashMap<usize, Vec<u8>>,
     mapper: Arc<dyn MemoryMapper>,
     unwind: Arc<dyn UnwindRegistry>,
 }
@@ -39,6 +72,7 @@ impl ImageRegistry {
         Self {
             images: Vec::new(),
             name_index: HashMap::new(),
+            generated_unwind_frames: HashMap::new(),
             mapper,
             unwind,
         }
@@ -51,29 +85,43 @@ impl ImageRegistry {
         let parsed = parse(&data).map_err(|e| ExecError::SecurityDenied {
             reason: format!("parse failed: {e}"),
         })?;
+        self.load_preparsed(install_name, Arc::new(parsed), Arc::from(data))
+    }
+
+    /// Map and register a Mach-O binary whose parse results are already available.
+    ///
+    /// `parsed` must correspond to `data`.
+    pub fn load_preparsed(
+        &mut self,
+        install_name: &str,
+        parsed: Arc<ParsedMachO>,
+        data: Arc<[u8]>,
+    ) -> Result<usize, ExecError> {
+        let normalized = normalize_install_name(install_name);
         let plan = MappingPlan::from_parsed(&parsed);
         let image = MappedImage::map(&plan, &data, self.mapper.clone(), self.unwind.clone())?;
-
-        // Register unwind info so @try/@catch works for this image
-        crate::unwind::register_unwind_info(&parsed.segments, image.slide, &*self.unwind);
 
         let exports = extract_exports(&parsed, &data);
 
         let idx = self.images.len();
-        self.name_index.insert(install_name.to_string(), idx);
+        self.name_index.insert(normalized.clone(), idx);
         self.images.push(LoadedImage {
             image,
             parsed,
             data,
-            install_name: install_name.to_string(),
+            install_name: normalized,
             exports,
         });
         Ok(idx)
     }
 
     /// Look up a loaded image by its install name.
+    ///
+    /// The name is normalized (collapsing `..` segments) before lookup,
+    /// so `@rpath/XcodeDefault/../lib_Foo.dylib` matches `@rpath/lib_Foo.dylib`.
     pub fn get(&self, install_name: &str) -> Option<&LoadedImage> {
-        self.name_index.get(install_name).map(|&i| &self.images[i])
+        let normalized = normalize_install_name(install_name);
+        self.name_index.get(&normalized).map(|&i| &self.images[i])
     }
 
     /// All loaded images, in load order.
@@ -84,7 +132,7 @@ impl ImageRegistry {
     /// Apply fixups (chained or classic rebases/binds) to every loaded image,
     /// resolving cross-image symbols via export tries and falling back to
     /// the provided system resolver.
-    pub fn apply_all_fixups(&self, system_resolver: &dyn SymbolResolver) -> Result<(), ExecError> {
+    pub fn apply_all_fixups(&mut self, system_resolver: &dyn SymbolResolver) -> Result<(), ExecError> {
         let composite = RegistryResolver {
             registry: self,
             fallback: system_resolver,
@@ -93,12 +141,16 @@ impl ImageRegistry {
             let fixups = extract_fixups(&loaded.parsed, &loaded.data);
             match &fixups.model {
                 FixupModel::Chained { .. } => {
-                    crate::apply_chained_fixups(
+                    let (rebase_count, bind_count) = crate::apply_chained_fixups(
                         &loaded.image,
                         &loaded.parsed,
                         &loaded.data,
                         &composite,
                     )?;
+                    log::debug!(
+                        "chained fixups for {}: {} rebases, {} binds",
+                        loaded.install_name, rebase_count, bind_count
+                    );
                 }
                 FixupModel::Classic => {
                     // Apply classic rebase opcodes (add slide)
@@ -112,6 +164,46 @@ impl ImageRegistry {
                 }
             }
         }
+
+        self.generated_unwind_frames.clear();
+        for loaded in &self.images {
+            let generated = crate::unwind::synthesize_runtime_eh_frame(
+                &loaded.parsed.segments,
+                loaded.image.slide,
+            );
+
+            let key = loaded
+                .image
+                .segments
+                .iter()
+                .find(|seg| seg.name == "__TEXT")
+                .map(|seg| seg.base as usize)
+                .or_else(|| {
+                    loaded
+                        .image
+                        .segments
+                        .iter()
+                        .find(|seg| seg.name == "__TEXT_EXEC")
+                        .map(|seg| seg.base as usize)
+                });
+
+            let generated_ref = if let (Some(text_start), Some(buf)) = (key, generated) {
+                self.generated_unwind_frames.insert(text_start, buf);
+                self.generated_unwind_frames
+                    .get(&text_start)
+                    .map(Vec::as_slice)
+            } else {
+                None
+            };
+
+            crate::unwind::register_unwind_info(
+                &loaded.parsed.segments,
+                loaded.image.slide,
+                &*self.unwind,
+                generated_ref,
+            );
+        }
+
         Ok(())
     }
 
@@ -150,9 +242,12 @@ impl<'a> SymbolResolver for RegistryResolver<'a> {
                     // If chain resolution failed, fall through to other images
                     continue;
                 }
-                // Export addresses are relative to the image base (vmaddr 0).
-                // Add slide to get the actual in-process address.
-                let addr = (exp.address as i64 + loaded.image.slide) as u64;
+                // Export addresses are offsets from the Mach-O header
+                // (preferred load address). Compute the in-memory address:
+                //   preferred_base + offset + slide
+                let preferred_base = loaded.image.preferred_base();
+                let addr = (preferred_base.wrapping_add(exp.address) as i64
+                    + loaded.image.slide) as u64;
                 return Some(addr);
             }
         }
@@ -186,7 +281,9 @@ impl<'a> RegistryResolver<'a> {
                 }
                 return None;
             }
-            let addr = (exp.address as i64 + target.image.slide) as u64;
+            let preferred_base = target.image.preferred_base();
+            let addr = (preferred_base.wrapping_add(exp.address) as i64
+                + target.image.slide) as u64;
             return Some(addr);
         }
         None
@@ -236,8 +333,115 @@ fn apply_classic_binds_with_resolver(
                 ptr.write_unaligned(0);
             }
             count += 1;
+        } else {
+            // Unresolved strong bind — install trap so calling through
+            // this slot lands in a diagnostic handler instead of crashing
+            // on raw fixup data.
+            log::debug!("classic bind: unresolved '{}', installing trap", bind.symbol_name);
+            unsafe {
+                let ptr = seg.base.add(bind.segment_offset as usize) as *mut u64;
+                ptr.write_unaligned(
+                    crate::fixup::unresolved_bind_trap_addr(),
+                );
+            }
+            count += 1;
         }
     }
 
     Ok(count)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use platform_core::unwind::NoopUnwindRegistry;
+    use platform_core::{PalError, Protection};
+
+    struct StubMapper;
+
+    impl MemoryMapper for StubMapper {
+        fn page_size(&self) -> usize {
+            4096
+        }
+        fn map_anonymous(&self, _size: usize) -> Result<*mut u8, PalError> {
+            Err(PalError::Other("stub".into()))
+        }
+        fn protect(&self, _addr: *mut u8, _size: usize, _prot: Protection) -> Result<(), PalError> {
+            Ok(())
+        }
+        fn unmap(&self, _addr: *mut u8, _size: usize) -> Result<(), PalError> {
+            Ok(())
+        }
+    }
+
+    fn make_registry() -> ImageRegistry {
+        ImageRegistry::new(Arc::new(StubMapper), Arc::new(NoopUnwindRegistry))
+    }
+
+    #[test]
+    fn registry_new_is_empty() {
+        let reg = make_registry();
+        assert!(reg.images().is_empty());
+    }
+
+    #[test]
+    fn registry_get_unknown_returns_none() {
+        let reg = make_registry();
+        assert!(reg.get("nonexistent").is_none());
+    }
+
+    #[test]
+    fn registry_get_multiple_unknowns() {
+        let reg = make_registry();
+        assert!(reg.get("/usr/lib/libSystem.B.dylib").is_none());
+        assert!(reg.get("").is_none());
+    }
+
+    #[test]
+    fn normalize_rpath_with_dotdot() {
+        assert_eq!(
+            normalize_install_name("@rpath/XcodeDefault/../lib_CompilerSwiftSyntax.dylib"),
+            "@rpath/lib_CompilerSwiftSyntax.dylib"
+        );
+    }
+
+    #[test]
+    fn normalize_rpath_no_change() {
+        assert_eq!(
+            normalize_install_name("@rpath/lib_Foo.dylib"),
+            "@rpath/lib_Foo.dylib"
+        );
+    }
+
+    #[test]
+    fn normalize_absolute_path_unchanged() {
+        assert_eq!(
+            normalize_install_name("/usr/lib/libSystem.B.dylib"),
+            "/usr/lib/libSystem.B.dylib"
+        );
+    }
+
+    #[test]
+    fn normalize_executable_path_with_dotdot() {
+        assert_eq!(
+            normalize_install_name("@executable_path/../lib/libFoo.dylib"),
+            "@executable_path/lib/libFoo.dylib"
+        );
+    }
+
+    #[test]
+    fn normalize_multiple_dotdot() {
+        assert_eq!(
+            normalize_install_name("@rpath/a/b/../../lib_Foo.dylib"),
+            "@rpath/lib_Foo.dylib"
+        );
+    }
+
+    #[test]
+    fn normalize_dot_segments() {
+        assert_eq!(
+            normalize_install_name("@rpath/./lib_Foo.dylib"),
+            "@rpath/lib_Foo.dylib"
+        );
+    }
 }

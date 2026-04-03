@@ -155,3 +155,80 @@ pub extern "C" fn shim_nserror_description(obj: u64, _cmd: u64) -> u64 {
     let cstr = std::ffi::CString::new(desc).unwrap_or_default();
     crate::cfstring::alloc_nsstring_from_cstr(cstr.as_ptr())
 }
+
+/// `-[NSError localizedFailureReason]` — returns nil (most errors lack this).
+pub extern "C" fn shim_nserror_localized_failure_reason(_obj: u64, _cmd: u64) -> u64 {
+    0
+}
+
+/// `-[NSError localizedRecoverySuggestion]` — returns nil.
+pub extern "C" fn shim_nserror_localized_recovery_suggestion(_obj: u64, _cmd: u64) -> u64 {
+    0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shim_test_helpers::*;
+
+    #[test]
+    fn create_and_read_fields() {
+        let domain = make_string("TestDomain");
+        let err = shim_nserror_error_with_domain_code_userinfo(0, 0, domain, -42, 0);
+        assert_ne!(err, 0);
+        assert_eq!(shim_nserror_code(err, 0), -42);
+        assert_string_eq(shim_nserror_domain(err, 0), "TestDomain");
+        assert_eq!(shim_nserror_user_info(err, 0), 0);
+        free_obj(err);
+    }
+
+    #[test]
+    fn init_with_domain() {
+        let obj = alloc_obj(32, crate::nsobj::nserror_class_addr());
+        let domain = make_string("NSPOSIXErrorDomain");
+        let result = shim_nserror_init_with_domain_code_userinfo(obj, 0, domain, 13, 0);
+        assert_eq!(result, obj);
+        assert_eq!(shim_nserror_code(obj, 0), 13);
+        assert_string_eq(shim_nserror_domain(obj, 0), "NSPOSIXErrorDomain");
+        free_obj(obj);
+    }
+
+    #[test]
+    fn make_nserror_helper() {
+        let err = make_nserror("NSCocoaErrorDomain", 256);
+        assert_ne!(err, 0);
+        assert_eq!(shim_nserror_code(err, 0), 256);
+        free_obj(err);
+    }
+
+    #[test]
+    fn nil_returns_zero() {
+        assert_eq!(shim_nserror_code(0, 0), 0);
+        assert_eq!(shim_nserror_domain(0, 0), 0);
+        assert_eq!(shim_nserror_user_info(0, 0), 0);
+        assert_eq!(shim_nserror_localized_failure_reason(0, 0), 0);
+        assert_eq!(shim_nserror_localized_recovery_suggestion(0, 0), 0);
+    }
+
+    #[test]
+    fn description_format() {
+        let domain = make_string("TestDomain");
+        let err = shim_nserror_error_with_domain_code_userinfo(0, 0, domain, 99, 0);
+        let desc = shim_nserror_description(err, 0);
+        assert_ne!(desc, 0);
+        assert_string_eq(desc, "Error Domain=TestDomain Code=99");
+        free_obj(err);
+    }
+
+    #[test]
+    fn localized_description_format() {
+        let domain = make_string("TestDomain");
+        let err = shim_nserror_error_with_domain_code_userinfo(0, 0, domain, 5, 0);
+        let desc = shim_nserror_localized_description(err, 0);
+        assert_ne!(desc, 0);
+        let s = read_string(desc);
+        assert!(s.contains("TestDomain"), "should contain domain: {s}");
+        assert!(s.contains("5"), "should contain code: {s}");
+        free_obj(err);
+    }
+}

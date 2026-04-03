@@ -1,0 +1,224 @@
+//! Shared cache integration for the runtime load path.
+//!
+//! When a shared cache file is available (e.g. extracted from macOS), the
+//! runtime can resolve dylib dependencies directly from the cache instead
+//! of requiring individual .dylib files on disk.
+//!
+//! # Usage
+//!
+//! ```no_run
+//! use macho_runtime::shared_cache::SharedCacheLoader;
+//! use std::path::Path;
+//!
+//! let loader = SharedCacheLoader::open(Path::new("/path/to/dyld_shared_cache_arm64e"))
+//!     .expect("failed to open shared cache");
+//!
+//! if let Some(data) = loader.resolve_dylib("/usr/lib/libSystem.B.dylib") {
+//!     println!("Found libSystem: {} bytes", data.len());
+//! }
+//!
+//! println!("Cache contains {} images", loader.image_count());
+//! ```
+
+use std::path::Path;
+
+use macho_shared_cache::SharedCache;
+
+/// Errors from shared cache loading.
+#[derive(Debug, thiserror::Error)]
+pub enum SharedCacheError {
+    /// Failed to open or stat the cache file.
+    #[error("failed to open shared cache: {0}")]
+    Io(#[from] std::io::Error),
+
+    /// The file is empty.
+    #[error("shared cache file is empty")]
+    EmptyFile,
+
+    /// Memory-mapping failed.
+    #[error("mmap failed: {0}")]
+    MmapFailed(std::io::Error),
+
+    /// The cache data could not be parsed.
+    #[error("failed to parse shared cache: {0}")]
+    Parse(#[from] macho_shared_cache::SharedCacheError),
+}
+
+/// A memory-mapped shared cache with dylib resolution.
+pub struct SharedCacheLoader {
+    /// Memory-mapped cache data. Held as a raw mmap to avoid copying.
+    _mmap: Mmap,
+    /// Pre-extracted image metadata (owned strings, no lifetime dependency).
+    images: Vec<CachedImage>,
+    /// Total file size for diagnostics.
+    file_size: usize,
+}
+
+/// Pre-extracted image metadata (owned, no lifetime dependency on cache).
+struct CachedImage {
+    /// Install path (e.g. "/usr/lib/libSystem.B.dylib").
+    path: String,
+    /// File offset of the Mach-O header in the cache.
+    file_offset: usize,
+    /// Size of the Mach-O header + load commands region.
+    header_size: usize,
+}
+
+/// RAII wrapper around a raw mmap.
+struct Mmap {
+    ptr: *mut u8,
+    len: usize,
+}
+
+// Safety: The mmap is read-only and lives for the lifetime of SharedCacheLoader.
+unsafe impl Send for Mmap {}
+unsafe impl Sync for Mmap {}
+
+impl Mmap {
+    fn as_slice(&self) -> &[u8] {
+        // Safety: ptr was obtained from a successful mmap call with length `len`,
+        // mapped as PROT_READ. The slice is valid for the lifetime of `self`.
+        unsafe { std::slice::from_raw_parts(self.ptr, self.len) }
+    }
+}
+
+impl Drop for Mmap {
+    fn drop(&mut self) {
+        // Safety: ptr and len come from a successful mmap call.
+        unsafe {
+            libc::munmap(self.ptr as *mut libc::c_void, self.len);
+        }
+    }
+}
+
+impl SharedCacheLoader {
+    /// Open and memory-map a shared cache file, then parse its image catalog.
+    pub fn open(path: &Path) -> Result<Self, SharedCacheError> {
+        use std::os::unix::io::AsRawFd;
+
+        let file = std::fs::File::open(path)?;
+        let file_size = file.metadata()?.len() as usize;
+        if file_size == 0 {
+            return Err(SharedCacheError::EmptyFile);
+        }
+
+        // Safety: we mmap the file as read-only (PROT_READ, MAP_PRIVATE).
+        // The FD can be closed immediately after mmap returns.
+        let ptr = unsafe {
+            libc::mmap(
+                std::ptr::null_mut(),
+                file_size,
+                libc::PROT_READ,
+                libc::MAP_PRIVATE,
+                file.as_raw_fd(),
+                0,
+            )
+        };
+        if ptr == libc::MAP_FAILED {
+            return Err(SharedCacheError::MmapFailed(std::io::Error::last_os_error()));
+        }
+
+        let mmap = Mmap {
+            ptr: ptr as *mut u8,
+            len: file_size,
+        };
+
+        // Parse the cache structure from the mapped data.
+        let cache = SharedCache::parse(mmap.as_slice())?;
+
+        // Pre-extract image metadata so we don't hold a borrow on the cache.
+        let mut images = Vec::with_capacity(cache.images().len());
+        for img in cache.images() {
+            // Resolve VM address → file offset via the cache mappings.
+            let file_offset = cache
+                .mappings()
+                .iter()
+                .find_map(|m| {
+                    let addr = img.address();
+                    if addr >= m.address && addr < m.address + m.size {
+                        Some((m.file_offset + (addr - m.address)) as usize)
+                    } else {
+                        None
+                    }
+                });
+
+            let file_offset = match file_offset {
+                Some(off) => off,
+                None => continue, // skip unmappable images
+            };
+
+            // Read the Mach-O header to get the header+load commands size.
+            let header_size = if file_offset + 32 <= file_size {
+                let data = mmap.as_slice();
+                let sizeofcmds = u32::from_le_bytes([
+                    data[file_offset + 20],
+                    data[file_offset + 21],
+                    data[file_offset + 22],
+                    data[file_offset + 23],
+                ]) as usize;
+                (32 + sizeofcmds).min(file_size - file_offset)
+            } else {
+                continue; // truncated
+            };
+
+            images.push(CachedImage {
+                path: img.path().to_string(),
+                file_offset,
+                header_size,
+            });
+        }
+
+        log::debug!(
+            "SharedCacheLoader: opened {} ({} images, {:.1} MB)",
+            path.display(),
+            images.len(),
+            file_size as f64 / (1024.0 * 1024.0),
+        );
+
+        Ok(Self {
+            _mmap: mmap,
+            images,
+            file_size,
+        })
+    }
+
+    /// Look up a dylib by install name and return a slice of its Mach-O data.
+    ///
+    /// The returned slice points directly into the memory-mapped cache (zero-copy).
+    pub fn resolve_dylib(&self, install_name: &str) -> Option<&[u8]> {
+        let img = self.images.iter().find(|i| i.path == install_name)?;
+        let data = self._mmap.as_slice();
+        let end = img.file_offset + img.header_size;
+        if end <= data.len() {
+            Some(&data[img.file_offset..end])
+        } else {
+            None
+        }
+    }
+
+    /// The number of images in the cache.
+    pub fn image_count(&self) -> usize {
+        self.images.len()
+    }
+
+    /// Iterate over install paths of all cached images.
+    pub fn image_paths(&self) -> impl Iterator<Item = &str> {
+        self.images.iter().map(|i| i.path.as_str())
+    }
+
+    /// Total size of the memory-mapped cache file in bytes.
+    pub fn file_size(&self) -> usize {
+        self.file_size
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn open_nonexistent_cache_returns_error() {
+        let result = SharedCacheLoader::open(Path::new("/nonexistent/cache"));
+        assert!(result.is_err());
+    }
+}

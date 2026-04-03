@@ -40,3 +40,46 @@ impl UnwindRegistry for NoopUnwindRegistry {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn noop_register_returns_ok() {
+        let reg = NoopUnwindRegistry;
+        assert!(reg.register(0x1000, 0x2000, None, None).is_ok());
+    }
+
+    #[test]
+    fn noop_unregister_returns_ok() {
+        let reg = NoopUnwindRegistry;
+        assert!(reg.unregister(0x1000).is_ok());
+    }
+
+    #[test]
+    fn noop_register_multiple_times() {
+        let reg = NoopUnwindRegistry;
+        for i in 0..5 {
+            assert!(reg.register(i * 0x1000, (i + 1) * 0x1000, None, None).is_ok());
+        }
+    }
+
+    #[test]
+    fn noop_unregister_without_register() {
+        let reg = NoopUnwindRegistry;
+        assert!(reg.unregister(0xDEAD).is_ok());
+    }
+
+    #[test]
+    fn noop_register_with_all_sections() {
+        let reg = NoopUnwindRegistry;
+        let result = reg.register(
+            0x1000,
+            0x5000,
+            Some((0x2000, 0x100)),
+            Some((0x3000, 0x200)),
+        );
+        assert!(result.is_ok());
+    }
+}

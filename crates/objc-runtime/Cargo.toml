@@ -5,6 +5,14 @@ edition.workspace      = true
 license.workspace      = true
 rust-version.workspace = true
 
+[features]
+default = []
+## Use GNUstep libobjc2 as the ObjC runtime backend on Linux.
+## Requires: apt-get install gnustep-libobjc2-dev (or build from source).
+## Status: groundwork only — the trait boundary is defined but the FFI
+## bindings are not yet implemented.
+libobjc2 = []
+
 [dependencies]
 macho-objc          = { path = "../macho-objc" }
 macho-parse         = { path = "../macho-parse" }

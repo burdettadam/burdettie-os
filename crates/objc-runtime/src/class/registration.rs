@@ -1,6 +1,7 @@
 //! Class registration, category merging, and superclass repair.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use macho_objc::ObjcMetadata;
 
@@ -32,9 +33,9 @@ impl ObjcRuntime {
                 .methods
                 .iter()
                 .map(|m| MethodEntry {
-                    selector: m.selector.clone(),
+                    selector: m.selector.clone().into(),
                     imp: (m.imp_vmaddr as i64 + slide) as u64,
-                    type_encoding: m.type_encoding.clone(),
+                    type_encoding: m.type_encoding.clone().into(),
                 })
                 .collect();
 
@@ -42,9 +43,9 @@ impl ObjcRuntime {
                 .class_methods
                 .iter()
                 .map(|m| MethodEntry {
-                    selector: m.selector.clone(),
+                    selector: m.selector.clone().into(),
                     imp: (m.imp_vmaddr as i64 + slide) as u64,
-                    type_encoding: m.type_encoding.clone(),
+                    type_encoding: m.type_encoding.clone().into(),
                 })
                 .collect();
 
@@ -101,12 +102,13 @@ impl ObjcRuntime {
             };
             info.rebuild_indices();
 
-            self.classes_by_addr.insert(mapped_addr, name.clone());
-            self.classes_by_name.insert(name.clone(), info);
+            let name_arc: Arc<str> = Arc::from(name.as_str());
+            self.classes_by_addr.insert(mapped_addr, Arc::clone(&name_arc));
+            self.classes_by_name.insert(Arc::clone(&name_arc), Arc::new(info));
 
             if class_ref.metaclass_addr != 0 {
                 let meta_mapped = (class_ref.metaclass_addr as i64 + slide) as u64;
-                self.classes_by_addr.insert(meta_mapped, name.clone());
+                self.classes_by_addr.insert(meta_mapped, Arc::clone(&name_arc));
                 self.metaclass_addrs.insert(meta_mapped);
                 log::debug!(
                     "ObjcRuntime: registered metaclass for '{}' at {:#x}",
@@ -120,8 +122,8 @@ impl ObjcRuntime {
         for cat in &metadata.categories {
             let cat_class_addr = (cat.class_vmaddr as i64 + slide) as u64;
 
-            let target_name = match self.classes_by_addr.get(&cat_class_addr) {
-                Some(name) => name.clone(),
+            let target_name: Arc<str> = match self.classes_by_addr.get(&cat_class_addr) {
+                Some(name) => Arc::clone(name),
                 None => {
                     log::debug!(
                         "ObjcRuntime: category '{}' targets unknown class at {:#x}",
@@ -139,23 +141,38 @@ impl ObjcRuntime {
             for m in &cat.class_methods {
                 if m.selector == "load" {
                     let imp = (m.imp_vmaddr as i64 + slide) as u64;
-                    self.category_load_imps.push((target_name.clone(), imp));
+                    self.category_load_imps.push((target_name.to_string(), imp));
                 }
             }
 
-            if let Some(class_info) = self.classes_by_name.get_mut(&target_name) {
+            if let Some(class_arc) = self.classes_by_name.get_mut(&*target_name) {
+                let class_info = Arc::make_mut(class_arc);
                 for m in &cat.instance_methods {
+                    if class_info.method_index.contains_key(&*m.selector) {
+                        log::debug!(
+                            "ObjcRuntime: category skip -[{} {}] (shim exists)",
+                            target_name, m.selector,
+                        );
+                        continue;
+                    }
                     class_info.methods.push(MethodEntry {
-                        selector: m.selector.clone(),
+                        selector: m.selector.clone().into(),
                         imp: (m.imp_vmaddr as i64 + slide) as u64,
-                        type_encoding: m.type_encoding.clone(),
+                        type_encoding: m.type_encoding.clone().into(),
                     });
                 }
                 for m in &cat.class_methods {
+                    if class_info.class_method_index.contains_key(&*m.selector) {
+                        log::debug!(
+                            "ObjcRuntime: category skip +[{} {}] (shim exists)",
+                            target_name, m.selector,
+                        );
+                        continue;
+                    }
                     class_info.class_methods.push(MethodEntry {
-                        selector: m.selector.clone(),
+                        selector: m.selector.clone().into(),
                         imp: (m.imp_vmaddr as i64 + slide) as u64,
-                        type_encoding: m.type_encoding.clone(),
+                        type_encoding: m.type_encoding.clone().into(),
                     });
                 }
                 class_info.rebuild_indices();
@@ -182,36 +199,36 @@ impl ObjcRuntime {
                 .instance_methods
                 .iter()
                 .map(|m| MethodEntry {
-                    selector: m.selector.clone(),
+                    selector: m.selector.clone().into(),
                     imp: (m.imp_vmaddr as i64 + slide) as u64,
-                    type_encoding: m.type_encoding.clone(),
+                    type_encoding: m.type_encoding.clone().into(),
                 })
                 .collect();
             let class_methods: Vec<MethodEntry> = proto
                 .class_methods
                 .iter()
                 .map(|m| MethodEntry {
-                    selector: m.selector.clone(),
+                    selector: m.selector.clone().into(),
                     imp: (m.imp_vmaddr as i64 + slide) as u64,
-                    type_encoding: m.type_encoding.clone(),
+                    type_encoding: m.type_encoding.clone().into(),
                 })
                 .collect();
             let optional_instance_methods: Vec<MethodEntry> = proto
                 .optional_instance_methods
                 .iter()
                 .map(|m| MethodEntry {
-                    selector: m.selector.clone(),
+                    selector: m.selector.clone().into(),
                     imp: (m.imp_vmaddr as i64 + slide) as u64,
-                    type_encoding: m.type_encoding.clone(),
+                    type_encoding: m.type_encoding.clone().into(),
                 })
                 .collect();
             let optional_class_methods: Vec<MethodEntry> = proto
                 .optional_class_methods
                 .iter()
                 .map(|m| MethodEntry {
-                    selector: m.selector.clone(),
+                    selector: m.selector.clone().into(),
                     imp: (m.imp_vmaddr as i64 + slide) as u64,
-                    type_encoding: m.type_encoding.clone(),
+                    type_encoding: m.type_encoding.clone().into(),
                 })
                 .collect();
             let properties: Vec<PropertyEntry> = proto
@@ -258,8 +275,8 @@ impl ObjcRuntime {
                 continue;
             }
 
-            let target_name = match self.classes_by_addr.get(&resolved_cls) {
-                Some(name) => name.clone(),
+            let target_name: Arc<str> = match self.classes_by_addr.get(&resolved_cls) {
+                Some(name) => Arc::clone(name),
                 None => {
                     log::debug!(
                         "ObjcRuntime: category '{}' targets unknown class at {:#x} (post-fixup)",
@@ -277,23 +294,38 @@ impl ObjcRuntime {
             for m in &cat.class_methods {
                 if m.selector == "load" {
                     let imp = (m.imp_vmaddr as i64 + slide) as u64;
-                    self.category_load_imps.push((target_name.clone(), imp));
+                    self.category_load_imps.push((target_name.to_string(), imp));
                 }
             }
 
-            if let Some(class_info) = self.classes_by_name.get_mut(&target_name) {
+            if let Some(class_arc) = self.classes_by_name.get_mut(&*target_name) {
+                let class_info = Arc::make_mut(class_arc);
                 for m in &cat.instance_methods {
+                    if class_info.method_index.contains_key(&*m.selector) {
+                        log::debug!(
+                            "ObjcRuntime: category skip -[{} {}] (shim exists)",
+                            target_name, m.selector,
+                        );
+                        continue;
+                    }
                     class_info.methods.push(MethodEntry {
-                        selector: m.selector.clone(),
+                        selector: m.selector.clone().into(),
                         imp: (m.imp_vmaddr as i64 + slide) as u64,
-                        type_encoding: m.type_encoding.clone(),
+                        type_encoding: m.type_encoding.clone().into(),
                     });
                 }
                 for m in &cat.class_methods {
+                    if class_info.class_method_index.contains_key(&*m.selector) {
+                        log::debug!(
+                            "ObjcRuntime: category skip +[{} {}] (shim exists)",
+                            target_name, m.selector,
+                        );
+                        continue;
+                    }
                     class_info.class_methods.push(MethodEntry {
-                        selector: m.selector.clone(),
+                        selector: m.selector.clone().into(),
                         imp: (m.imp_vmaddr as i64 + slide) as u64,
-                        type_encoding: m.type_encoding.clone(),
+                        type_encoding: m.type_encoding.clone().into(),
                     });
                 }
                 class_info.rebuild_indices();
@@ -319,27 +351,31 @@ impl ObjcRuntime {
     pub fn register_synthetic_class(&mut self, mut info: ClassInfo) {
         let addr = info.mapped_addr;
         let name = info.name.clone();
-        for m in &info.methods {
+        info.method_index = HashMap::with_capacity(info.methods.len());
+        for (i, m) in info.methods.iter().enumerate() {
             self.intern_selector(&m.selector);
+            info.method_index.insert(m.selector.clone(), i);
         }
-        for m in &info.class_methods {
+        info.class_method_index = HashMap::with_capacity(info.class_methods.len());
+        for (i, m) in info.class_methods.iter().enumerate() {
             self.intern_selector(&m.selector);
+            info.class_method_index.insert(m.selector.clone(), i);
         }
-        info.rebuild_indices();
         log::debug!(
             "ObjcRuntime: registered synthetic class '{}' at {:#x}, {} methods",
             name,
             addr,
             info.methods.len(),
         );
-        self.classes_by_addr.insert(addr, name.clone());
-        self.classes_by_name.insert(name, info);
+        let name_arc: Arc<str> = Arc::from(name.as_str());
+        self.classes_by_addr.insert(addr, Arc::clone(&name_arc));
+        self.classes_by_name.insert(name_arc, Arc::new(info));
     }
 
     /// Register a metaclass address mapping for a synthetic class.
     pub fn register_metaclass_addr(&mut self, metaclass_addr: u64, class_name: &str) {
         self.classes_by_addr
-            .insert(metaclass_addr, class_name.to_string());
+            .insert(metaclass_addr, Arc::from(class_name));
         self.metaclass_addrs.insert(metaclass_addr);
         log::debug!(
             "ObjcRuntime: registered synthetic metaclass for '{}' at {:#x}",
@@ -357,8 +393,8 @@ impl ObjcRuntime {
     /// The `mapped_addr` for each class must point to a valid, mapped
     /// `objc_class_t` struct.
     pub unsafe fn repair_superclass_addrs(&mut self) {
-        for class in self.classes_by_name.values_mut() {
-            let addr = class.mapped_addr;
+        for class_arc in self.classes_by_name.values_mut() {
+            let addr = class_arc.mapped_addr;
             if addr == 0 {
                 continue;
             }
@@ -368,7 +404,10 @@ impl ObjcRuntime {
             } else {
                 Some(super_ptr)
             };
-            if class.superclass_addr != new_super {
+            // Check before calling Arc::make_mut to avoid COW clones for
+            // Foundation synthetic classes whose superclass never changes.
+            if class_arc.superclass_addr != new_super {
+                let class = Arc::make_mut(class_arc);
                 log::debug!(
                     "ObjcRuntime: repaired superclass for '{}': {:?} → {:?}",
                     class.name,

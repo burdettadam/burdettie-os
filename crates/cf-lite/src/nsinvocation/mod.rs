@@ -243,3 +243,90 @@ pub extern "C" fn shim_dealloc(obj: u64, _cmd: u64) {
         crate::pal_alloc().free(obj as *mut u8);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shim_test_helpers::*;
+
+    fn alloc_inv() -> u64 {
+        let obj = alloc_obj(INSTANCE_SIZE as usize, crate::nsobj::nsinvocation_class_addr());
+        let arg_buf = crate::pal_alloc().calloc(8, 8) as u64;
+        let ret_buf = crate::pal_alloc().calloc(1, 8) as u64;
+        write_field(obj, 32, arg_buf);
+        write_field(obj, 40, ret_buf);
+        obj
+    }
+
+    fn free_inv(obj: u64) {
+        free_buf(read_field(obj, 32));
+        free_buf(read_field(obj, 40));
+        free_obj(obj);
+    }
+
+    #[test]
+    fn nil_getters_return_zero() {
+        assert_eq!(shim_method_signature(0, 0), 0);
+        assert_eq!(shim_target(0, 0), 0);
+        assert_eq!(shim_selector(0, 0), 0);
+    }
+
+    #[test]
+    fn nil_setters_no_panic() {
+        shim_set_target(0, 0, 0xABC);
+        shim_set_selector(0, 0, 0xDEF);
+        shim_set_argument_at_index(0, 0, 0, 0);
+    }
+
+    #[test]
+    fn create_with_signature_stores_sig() {
+        let sig = 0x9999u64;
+        let inv = shim_invocation_with_method_signature(0, 0, sig);
+        assert_ne!(inv, 0);
+        assert_eq!(shim_method_signature(inv, 0), sig);
+        shim_dealloc(inv, 0);
+    }
+
+    #[test]
+    fn target_roundtrip() {
+        let inv = alloc_inv();
+        shim_set_target(inv, 0, 0x1234);
+        assert_eq!(shim_target(inv, 0), 0x1234);
+        free_inv(inv);
+    }
+
+    #[test]
+    fn selector_roundtrip() {
+        let inv = alloc_inv();
+        shim_set_selector(inv, 0, 0x5678);
+        assert_eq!(shim_selector(inv, 0), 0x5678);
+        free_inv(inv);
+    }
+
+    #[test]
+    fn argument_roundtrip() {
+        let inv = alloc_inv();
+        let val: u64 = 0xABCD;
+        shim_set_argument_at_index(inv, 0, &val as *const u64 as u64, 2);
+        let mut out: u64 = 0;
+        shim_get_argument_at_index(inv, 0, &mut out as *mut u64 as u64, 2);
+        assert_eq!(out, 0xABCD);
+        free_inv(inv);
+    }
+
+    #[test]
+    fn return_value_roundtrip() {
+        let inv = alloc_inv();
+        let val: u64 = 0x7777;
+        shim_set_return_value(inv, 0, &val as *const u64 as u64);
+        let mut out: u64 = 0;
+        shim_get_return_value(inv, 0, &mut out as *mut u64 as u64);
+        assert_eq!(out, 0x7777);
+        free_inv(inv);
+    }
+
+    #[test]
+    fn arguments_retained_always_one() {
+        assert_eq!(shim_arguments_retained(0, 0), 1);
+    }
+}

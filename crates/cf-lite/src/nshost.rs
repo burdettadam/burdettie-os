@@ -32,7 +32,7 @@ fn alloc_host(name: u64, addr: u64) -> u64 {
 /// `+[NSHost currentHost]`
 pub extern "C" fn shim_nshost_current_host(_cls: u64, _cmd: u64) -> u64 {
     let mut buf = [0u8; 256];
-    let rc = unsafe { libc::gethostname(buf.as_mut_ptr() as *mut i8, buf.len()) };
+    let rc = unsafe { libc::gethostname(buf.as_mut_ptr() as *mut std::ffi::c_char, buf.len()) };
     let name = if rc == 0 {
         let len = buf.iter().position(|&b| b == 0).unwrap_or(buf.len());
         String::from_utf8_lossy(&buf[..len]).to_string()
@@ -119,4 +119,268 @@ pub extern "C" fn shim_nshost_description(obj: u64, _cmd: u64) -> u64 {
     let name = cfstring::extract_cfstring_cstr(shim_nshost_name(obj, 0))
         .unwrap_or("unknown");
     make_nsstring(&format!("<NSHost: {name}>"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shim_test_helpers::*;
+
+    const SIZE: usize = 24;
+
+    fn host_isa() -> u64 {
+        crate::nsobj::nshost_class_addr()
+    }
+
+    // ── shim_nshost_current_host ───────────────────────────────
+
+    #[test]
+    fn current_host_returns_valid_object() {
+        let h = shim_nshost_current_host(0, 0);
+        assert_ne!(h, 0);
+        // ISA should be set
+        assert_eq!(read_field(h, 0), host_isa());
+        // name field should be a non-null string
+        let name_ptr = read_field(h, NAME_OFF);
+        assert_ne!(name_ptr, 0);
+        let name = read_string(name_ptr);
+        assert!(!name.is_empty(), "hostname should not be empty");
+        free_obj(h);
+    }
+
+    // ── shim_nshost_with_name ──────────────────────────────────
+
+    #[test]
+    fn with_name_stores_name() {
+        let ns = make_string("myhost.local");
+        let h = shim_nshost_with_name(0, 0, ns);
+        assert_ne!(h, 0);
+        assert_eq!(read_field(h, NAME_OFF), ns);
+        assert_eq!(read_field(h, ADDR_OFF), 0);
+        free_obj(h);
+    }
+
+    #[test]
+    fn with_name_nil_name() {
+        let h = shim_nshost_with_name(0, 0, 0);
+        assert_ne!(h, 0);
+        assert_eq!(read_field(h, NAME_OFF), 0);
+        free_obj(h);
+    }
+
+    // ── shim_nshost_with_address ───────────────────────────────
+
+    #[test]
+    fn with_address_stores_address() {
+        let addr = make_string("10.0.0.1");
+        let h = shim_nshost_with_address(0, 0, addr);
+        assert_ne!(h, 0);
+        assert_eq!(read_field(h, NAME_OFF), 0);
+        assert_eq!(read_field(h, ADDR_OFF), addr);
+        free_obj(h);
+    }
+
+    #[test]
+    fn with_address_nil_addr() {
+        let h = shim_nshost_with_address(0, 0, 0);
+        assert_ne!(h, 0);
+        assert_eq!(read_field(h, ADDR_OFF), 0);
+        free_obj(h);
+    }
+
+    // ── shim_nshost_name ───────────────────────────────────────
+
+    #[test]
+    fn name_returns_stored_name() {
+        let ns = make_string("example.com");
+        let h = alloc_obj(SIZE, host_isa());
+        write_field(h, NAME_OFF, ns);
+        assert_eq!(shim_nshost_name(h, 0), ns);
+        free_obj(h);
+    }
+
+    #[test]
+    fn name_nil_returns_zero() {
+        assert_eq!(shim_nshost_name(0, 0), 0);
+    }
+
+    // ── shim_nshost_address ────────────────────────────────────
+
+    #[test]
+    fn address_returns_stored_address() {
+        let addr = make_string("192.168.1.1");
+        let h = alloc_obj(SIZE, host_isa());
+        write_field(h, ADDR_OFF, addr);
+        let result = shim_nshost_address(h, 0);
+        assert_eq!(result, addr);
+        free_obj(h);
+    }
+
+    #[test]
+    fn address_nil_returns_zero() {
+        assert_eq!(shim_nshost_address(0, 0), 0);
+    }
+
+    #[test]
+    fn address_resolves_localhost() {
+        let ns = make_string("localhost");
+        let h = alloc_obj(SIZE, host_isa());
+        write_field(h, NAME_OFF, ns);
+        // addr_ptr is 0, so it should resolve via getaddrinfo
+        let result = shim_nshost_address(h, 0);
+        assert_ne!(result, 0);
+        let addr_str = read_string(result);
+        // localhost typically resolves to 127.0.0.1 or ::1 — shim returns an IP string
+        assert!(!addr_str.is_empty());
+        free_obj(h);
+    }
+
+    #[test]
+    fn address_with_no_name_no_addr_returns_zero() {
+        let h = alloc_obj(SIZE, host_isa());
+        // both name and addr are 0 (from calloc)
+        assert_eq!(shim_nshost_address(h, 0), 0);
+        free_obj(h);
+    }
+
+    // ── shim_nshost_addresses ──────────────────────────────────
+
+    #[test]
+    fn addresses_with_stored_addr() {
+        let addr = make_string("10.0.0.5");
+        let h = alloc_obj(SIZE, host_isa());
+        write_field(h, ADDR_OFF, addr);
+        let arr = shim_nshost_addresses(h, 0);
+        assert_ne!(arr, 0);
+        assert_eq!(crate::nsarray::shim_nsarray_count(arr, 0), 1);
+        free_obj(h);
+    }
+
+    #[test]
+    fn addresses_nil_returns_empty_array() {
+        let arr = shim_nshost_addresses(0, 0);
+        assert_ne!(arr, 0);
+        assert_eq!(crate::nsarray::shim_nsarray_count(arr, 0), 0);
+    }
+
+    // ── shim_nshost_names ──────────────────────────────────────
+
+    #[test]
+    fn names_with_stored_name() {
+        let ns = make_string("host.test");
+        let h = alloc_obj(SIZE, host_isa());
+        write_field(h, NAME_OFF, ns);
+        let arr = shim_nshost_names(h, 0);
+        assert_ne!(arr, 0);
+        assert_eq!(crate::nsarray::shim_nsarray_count(arr, 0), 1);
+        free_obj(h);
+    }
+
+    #[test]
+    fn names_nil_returns_empty_array() {
+        let arr = shim_nshost_names(0, 0);
+        assert_ne!(arr, 0);
+        assert_eq!(crate::nsarray::shim_nsarray_count(arr, 0), 0);
+    }
+
+    #[test]
+    fn names_no_name_returns_empty_array() {
+        let h = alloc_obj(SIZE, host_isa());
+        let arr = shim_nshost_names(h, 0);
+        assert_ne!(arr, 0);
+        assert_eq!(crate::nsarray::shim_nsarray_count(arr, 0), 0);
+        free_obj(h);
+    }
+
+    // ── shim_nshost_localized_name ─────────────────────────────
+
+    #[test]
+    fn localized_name_delegates_to_name() {
+        let ns = make_string("local.host");
+        let h = alloc_obj(SIZE, host_isa());
+        write_field(h, NAME_OFF, ns);
+        assert_eq!(shim_nshost_localized_name(h, 0), ns);
+        free_obj(h);
+    }
+
+    #[test]
+    fn localized_name_nil_returns_zero() {
+        assert_eq!(shim_nshost_localized_name(0, 0), 0);
+    }
+
+    // ── shim_nshost_is_equal ───────────────────────────────────
+
+    #[test]
+    fn is_equal_same_name() {
+        let n1 = make_string("alpha");
+        let n2 = make_string("alpha");
+        let h1 = alloc_obj(SIZE, host_isa());
+        let h2 = alloc_obj(SIZE, host_isa());
+        write_field(h1, NAME_OFF, n1);
+        write_field(h2, NAME_OFF, n2);
+        assert_eq!(shim_nshost_is_equal(h1, 0, h2), 1);
+        free_obj(h1);
+        free_obj(h2);
+    }
+
+    #[test]
+    fn is_equal_different_names() {
+        let n1 = make_string("alpha");
+        let n2 = make_string("beta");
+        let h1 = alloc_obj(SIZE, host_isa());
+        let h2 = alloc_obj(SIZE, host_isa());
+        write_field(h1, NAME_OFF, n1);
+        write_field(h2, NAME_OFF, n2);
+        assert_eq!(shim_nshost_is_equal(h1, 0, h2), 0);
+        free_obj(h1);
+        free_obj(h2);
+    }
+
+    #[test]
+    fn is_equal_nil_obj_returns_zero() {
+        let h = alloc_obj(SIZE, host_isa());
+        write_field(h, NAME_OFF, make_string("x"));
+        assert_eq!(shim_nshost_is_equal(0, 0, h), 0);
+        free_obj(h);
+    }
+
+    #[test]
+    fn is_equal_nil_other_returns_zero() {
+        let h = alloc_obj(SIZE, host_isa());
+        write_field(h, NAME_OFF, make_string("x"));
+        assert_eq!(shim_nshost_is_equal(h, 0, 0), 0);
+        free_obj(h);
+    }
+
+    #[test]
+    fn is_equal_both_nil_returns_zero() {
+        assert_eq!(shim_nshost_is_equal(0, 0, 0), 0);
+    }
+
+    // ── shim_nshost_description ────────────────────────────────
+
+    #[test]
+    fn description_contains_hostname() {
+        let ns = make_string("mybox");
+        let h = alloc_obj(SIZE, host_isa());
+        write_field(h, NAME_OFF, ns);
+        let desc = shim_nshost_description(h, 0);
+        assert_ne!(desc, 0);
+        assert_string_eq(desc, "<NSHost: mybox>");
+        free_obj(h);
+    }
+
+    #[test]
+    fn description_nil_returns_zero() {
+        assert_eq!(shim_nshost_description(0, 0), 0);
+    }
+
+    #[test]
+    fn description_no_name_shows_unknown() {
+        let h = alloc_obj(SIZE, host_isa());
+        let desc = shim_nshost_description(h, 0);
+        assert_ne!(desc, 0);
+        assert_string_eq(desc, "<NSHost: unknown>");
+        free_obj(h);
+    }
 }

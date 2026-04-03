@@ -248,3 +248,439 @@ pub extern "C" fn shim_nsmutablecharset_description(obj: u64, _cmd: u64) -> u64 
     let c_str = std::ffi::CString::new(desc).unwrap_or_default();
     cfstring::shim_cf_string_create_with_cstring(0, c_str.as_ptr(), 0)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shim_test_helpers::*;
+
+    // ── Construction ──────────────────────────────────────────────
+
+    #[test]
+    fn with_characters_in_string_basic() {
+        let s = make_string("abc");
+        let obj = shim_nsmutablecharset_with_characters_in_string(0, 0, s);
+        assert_ne!(obj, 0);
+        assert_eq!(shim_nsmutablecharset_character_is_member(obj, 0, b'a' as u64), 1);
+        assert_eq!(shim_nsmutablecharset_character_is_member(obj, 0, b'b' as u64), 1);
+        assert_eq!(shim_nsmutablecharset_character_is_member(obj, 0, b'c' as u64), 1);
+        assert_eq!(shim_nsmutablecharset_character_is_member(obj, 0, b'z' as u64), 0);
+        free_obj(s);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn with_characters_in_string_deduplicates() {
+        let s = make_string("aabbcc");
+        let obj = shim_nsmutablecharset_with_characters_in_string(0, 0, s);
+        let len = read_field(obj, BITMAP_LEN_OFF);
+        assert_eq!(len, 3);
+        free_obj(s);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn with_characters_in_string_empty() {
+        let s = make_string("");
+        let obj = shim_nsmutablecharset_with_characters_in_string(0, 0, s);
+        assert_ne!(obj, 0);
+        assert_eq!(shim_nsmutablecharset_character_is_member(obj, 0, b'a' as u64), 0);
+        free_obj(s);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn with_characters_in_string_nil_string() {
+        let obj = shim_nsmutablecharset_with_characters_in_string(0, 0, 0);
+        assert_ne!(obj, 0);
+        // Empty set — no codepoints
+        assert_eq!(shim_nsmutablecharset_character_is_member(obj, 0, b'a' as u64), 0);
+        free_obj(obj);
+    }
+
+    // ── Predefined set class methods ─────────────────────────────
+
+    #[test]
+    fn whitespace_set_basic() {
+        let obj = shim_nsmutablecharset_whitespace(0, 0);
+        assert_ne!(obj, 0);
+        assert_eq!(read_field(obj, KIND_OFF), 1);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn alphanumeric_set_basic() {
+        let obj = shim_nsmutablecharset_alphanumeric(0, 0);
+        assert_ne!(obj, 0);
+        assert_eq!(read_field(obj, KIND_OFF), 7);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn decimal_digit_set_basic() {
+        let obj = shim_nsmutablecharset_decimal_digit(0, 0);
+        assert_ne!(obj, 0);
+        assert_eq!(read_field(obj, KIND_OFF), 3);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn letter_set_basic() {
+        let obj = shim_nsmutablecharset_letter(0, 0);
+        assert_ne!(obj, 0);
+        assert_eq!(read_field(obj, KIND_OFF), 4);
+        free_obj(obj);
+    }
+
+    // ── addCharactersInString: ───────────────────────────────────
+
+    #[test]
+    fn add_characters_in_string_basic() {
+        let s_init = make_string("ab");
+        let obj = shim_nsmutablecharset_with_characters_in_string(0, 0, s_init);
+
+        let s_add = make_string("cd");
+        shim_nsmutablecharset_add_characters_in_string(obj, 0, s_add);
+
+        assert_eq!(shim_nsmutablecharset_character_is_member(obj, 0, b'a' as u64), 1);
+        assert_eq!(shim_nsmutablecharset_character_is_member(obj, 0, b'c' as u64), 1);
+        assert_eq!(shim_nsmutablecharset_character_is_member(obj, 0, b'd' as u64), 1);
+        assert_eq!(shim_nsmutablecharset_character_is_member(obj, 0, b'z' as u64), 0);
+
+        free_obj(s_init);
+        free_obj(s_add);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn add_characters_in_string_nil_obj() {
+        let s = make_string("abc");
+        let ret = shim_nsmutablecharset_add_characters_in_string(0, 0, s);
+        assert_eq!(ret, 0); // nil-safe, no crash
+        free_obj(s);
+    }
+
+    #[test]
+    fn add_characters_in_string_nil_string() {
+        let s_init = make_string("ab");
+        let obj = shim_nsmutablecharset_with_characters_in_string(0, 0, s_init);
+        let ret = shim_nsmutablecharset_add_characters_in_string(obj, 0, 0);
+        assert_eq!(ret, 0);
+        // Set unchanged
+        assert_eq!(shim_nsmutablecharset_character_is_member(obj, 0, b'a' as u64), 1);
+        assert_eq!(read_field(obj, BITMAP_LEN_OFF), 2);
+        free_obj(s_init);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn add_characters_deduplicates() {
+        let s_init = make_string("ab");
+        let obj = shim_nsmutablecharset_with_characters_in_string(0, 0, s_init);
+
+        let s_add = make_string("ab");
+        shim_nsmutablecharset_add_characters_in_string(obj, 0, s_add);
+        // Still only 2 unique codepoints
+        assert_eq!(read_field(obj, BITMAP_LEN_OFF), 2);
+
+        free_obj(s_init);
+        free_obj(s_add);
+        free_obj(obj);
+    }
+
+    // ── removeCharactersInString: ────────────────────────────────
+
+    #[test]
+    fn remove_characters_in_string_basic() {
+        let s_init = make_string("abcd");
+        let obj = shim_nsmutablecharset_with_characters_in_string(0, 0, s_init);
+
+        let s_rm = make_string("bc");
+        shim_nsmutablecharset_remove_characters_in_string(obj, 0, s_rm);
+
+        assert_eq!(shim_nsmutablecharset_character_is_member(obj, 0, b'a' as u64), 1);
+        assert_eq!(shim_nsmutablecharset_character_is_member(obj, 0, b'b' as u64), 0);
+        assert_eq!(shim_nsmutablecharset_character_is_member(obj, 0, b'c' as u64), 0);
+        assert_eq!(shim_nsmutablecharset_character_is_member(obj, 0, b'd' as u64), 1);
+
+        free_obj(s_init);
+        free_obj(s_rm);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn remove_characters_in_string_nil_obj() {
+        let s = make_string("abc");
+        let ret = shim_nsmutablecharset_remove_characters_in_string(0, 0, s);
+        assert_eq!(ret, 0);
+        free_obj(s);
+    }
+
+    #[test]
+    fn remove_characters_in_string_nil_string() {
+        let s_init = make_string("ab");
+        let obj = shim_nsmutablecharset_with_characters_in_string(0, 0, s_init);
+        let ret = shim_nsmutablecharset_remove_characters_in_string(obj, 0, 0);
+        assert_eq!(ret, 0);
+        // Set unchanged
+        assert_eq!(read_field(obj, BITMAP_LEN_OFF), 2);
+        free_obj(s_init);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn remove_nonexistent_chars_is_noop() {
+        let s_init = make_string("ab");
+        let obj = shim_nsmutablecharset_with_characters_in_string(0, 0, s_init);
+
+        let s_rm = make_string("xyz");
+        shim_nsmutablecharset_remove_characters_in_string(obj, 0, s_rm);
+        assert_eq!(read_field(obj, BITMAP_LEN_OFF), 2);
+
+        free_obj(s_init);
+        free_obj(s_rm);
+        free_obj(obj);
+    }
+
+    // ── formUnionWithCharacterSet: ───────────────────────────────
+
+    #[test]
+    fn form_union_basic() {
+        let s1 = make_string("ab");
+        let obj = shim_nsmutablecharset_with_characters_in_string(0, 0, s1);
+
+        let s2 = make_string("cd");
+        let other = shim_nsmutablecharset_with_characters_in_string(0, 0, s2);
+
+        shim_nsmutablecharset_form_union(obj, 0, other);
+
+        assert_eq!(shim_nsmutablecharset_character_is_member(obj, 0, b'a' as u64), 1);
+        assert_eq!(shim_nsmutablecharset_character_is_member(obj, 0, b'b' as u64), 1);
+        assert_eq!(shim_nsmutablecharset_character_is_member(obj, 0, b'c' as u64), 1);
+        assert_eq!(shim_nsmutablecharset_character_is_member(obj, 0, b'd' as u64), 1);
+
+        free_obj(s1);
+        free_obj(s2);
+        free_obj(other);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn form_union_nil_obj() {
+        let s = make_string("ab");
+        let other = shim_nsmutablecharset_with_characters_in_string(0, 0, s);
+        let ret = shim_nsmutablecharset_form_union(0, 0, other);
+        assert_eq!(ret, 0);
+        free_obj(s);
+        free_obj(other);
+    }
+
+    #[test]
+    fn form_union_nil_other() {
+        let s = make_string("ab");
+        let obj = shim_nsmutablecharset_with_characters_in_string(0, 0, s);
+        let ret = shim_nsmutablecharset_form_union(obj, 0, 0);
+        assert_eq!(ret, 0);
+        // Set unchanged
+        assert_eq!(read_field(obj, BITMAP_LEN_OFF), 2);
+        free_obj(s);
+        free_obj(obj);
+    }
+
+    // ── formIntersectionWithCharacterSet: ─────────────────────────
+
+    #[test]
+    fn form_intersection_basic() {
+        let s1 = make_string("abcd");
+        let obj = shim_nsmutablecharset_with_characters_in_string(0, 0, s1);
+
+        let s2 = make_string("bc");
+        let other = shim_nsmutablecharset_with_characters_in_string(0, 0, s2);
+
+        shim_nsmutablecharset_form_intersection(obj, 0, other);
+
+        assert_eq!(shim_nsmutablecharset_character_is_member(obj, 0, b'a' as u64), 0);
+        assert_eq!(shim_nsmutablecharset_character_is_member(obj, 0, b'b' as u64), 1);
+        assert_eq!(shim_nsmutablecharset_character_is_member(obj, 0, b'c' as u64), 1);
+        assert_eq!(shim_nsmutablecharset_character_is_member(obj, 0, b'd' as u64), 0);
+
+        free_obj(s1);
+        free_obj(s2);
+        free_obj(other);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn form_intersection_nil_obj() {
+        let s = make_string("ab");
+        let other = shim_nsmutablecharset_with_characters_in_string(0, 0, s);
+        let ret = shim_nsmutablecharset_form_intersection(0, 0, other);
+        assert_eq!(ret, 0);
+        free_obj(s);
+        free_obj(other);
+    }
+
+    #[test]
+    fn form_intersection_nil_other() {
+        let s = make_string("ab");
+        let obj = shim_nsmutablecharset_with_characters_in_string(0, 0, s);
+        let ret = shim_nsmutablecharset_form_intersection(obj, 0, 0);
+        assert_eq!(ret, 0);
+        // Set unchanged
+        assert_eq!(read_field(obj, BITMAP_LEN_OFF), 2);
+        free_obj(s);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn form_intersection_disjoint_gives_empty() {
+        let s1 = make_string("ab");
+        let obj = shim_nsmutablecharset_with_characters_in_string(0, 0, s1);
+
+        let s2 = make_string("xy");
+        let other = shim_nsmutablecharset_with_characters_in_string(0, 0, s2);
+
+        shim_nsmutablecharset_form_intersection(obj, 0, other);
+        assert_eq!(read_field(obj, BITMAP_LEN_OFF), 0);
+
+        free_obj(s1);
+        free_obj(s2);
+        free_obj(other);
+        free_obj(obj);
+    }
+
+    // ── invert ───────────────────────────────────────────────────
+
+    #[test]
+    fn invert_basic() {
+        // Build a set with 'a' (0x61) only, invert in ASCII range
+        let s = make_string("a");
+        let obj = shim_nsmutablecharset_with_characters_in_string(0, 0, s);
+        shim_nsmutablecharset_invert(obj, 0);
+
+        // 'a' should no longer be a member
+        assert_eq!(shim_nsmutablecharset_character_is_member(obj, 0, b'a' as u64), 0);
+        // 'b' (not in original set) should now be a member
+        assert_eq!(shim_nsmutablecharset_character_is_member(obj, 0, b'b' as u64), 1);
+        // NUL (0) should be a member of the inverted set
+        assert_eq!(shim_nsmutablecharset_character_is_member(obj, 0, 0), 1);
+
+        // Inverted set should have 127 codepoints (128 - 1)
+        assert_eq!(read_field(obj, BITMAP_LEN_OFF), 127);
+
+        free_obj(s);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn invert_nil_obj() {
+        let ret = shim_nsmutablecharset_invert(0, 0);
+        assert_eq!(ret, 0);
+    }
+
+    #[test]
+    fn invert_empty_gives_all_ascii() {
+        let s = make_string("");
+        let obj = shim_nsmutablecharset_with_characters_in_string(0, 0, s);
+        shim_nsmutablecharset_invert(obj, 0);
+        assert_eq!(read_field(obj, BITMAP_LEN_OFF), 128);
+        free_obj(s);
+        free_obj(obj);
+    }
+
+    // ── characterIsMember: ───────────────────────────────────────
+
+    #[test]
+    fn character_is_member_nil_obj() {
+        let ret = shim_nsmutablecharset_character_is_member(0, 0, b'a' as u64);
+        assert_eq!(ret, 0);
+    }
+
+    #[test]
+    fn character_is_member_after_mutations() {
+        let s = make_string("abc");
+        let obj = shim_nsmutablecharset_with_characters_in_string(0, 0, s);
+
+        // Add 'x'
+        let s_add = make_string("x");
+        shim_nsmutablecharset_add_characters_in_string(obj, 0, s_add);
+        assert_eq!(shim_nsmutablecharset_character_is_member(obj, 0, b'x' as u64), 1);
+
+        // Remove 'b'
+        let s_rm = make_string("b");
+        shim_nsmutablecharset_remove_characters_in_string(obj, 0, s_rm);
+        assert_eq!(shim_nsmutablecharset_character_is_member(obj, 0, b'b' as u64), 0);
+        assert_eq!(shim_nsmutablecharset_character_is_member(obj, 0, b'a' as u64), 1);
+
+        free_obj(s);
+        free_obj(s_add);
+        free_obj(s_rm);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn character_is_member_invalid_codepoint() {
+        let s = make_string("a");
+        let obj = shim_nsmutablecharset_with_characters_in_string(0, 0, s);
+        // 0xD800 is a surrogate, not a valid char
+        let ret = shim_nsmutablecharset_character_is_member(obj, 0, 0xD800);
+        assert_eq!(ret, 0);
+        free_obj(s);
+        free_obj(obj);
+    }
+
+    // ── description ──────────────────────────────────────────────
+
+    #[test]
+    fn description_custom_set() {
+        let s = make_string("abc");
+        let obj = shim_nsmutablecharset_with_characters_in_string(0, 0, s);
+        let desc = shim_nsmutablecharset_description(obj, 0);
+        assert_ne!(desc, 0);
+        let text = read_string(desc);
+        assert!(text.contains("NSMutableCharacterSet"), "desc: {text}");
+        assert!(text.contains("3 codepoints"), "desc: {text}");
+        free_obj(s);
+        free_obj(desc);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn description_predefined_set() {
+        let obj = shim_nsmutablecharset_whitespace(0, 0);
+        let desc = shim_nsmutablecharset_description(obj, 0);
+        assert_ne!(desc, 0);
+        let text = read_string(desc);
+        assert!(text.contains("predefined kind 1"), "desc: {text}");
+        free_obj(desc);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn description_nil_obj() {
+        let ret = shim_nsmutablecharset_description(0, 0);
+        assert_eq!(ret, 0);
+    }
+
+    // ── Predefined set mutation (ensure_custom flattening) ───────
+
+    #[test]
+    fn predefined_set_flattens_on_mutation() {
+        let obj = shim_nsmutablecharset_decimal_digit(0, 0);
+        assert_eq!(read_field(obj, KIND_OFF), 3); // predefined
+
+        // Add a character — should flatten to custom bitmap
+        let s = make_string("x");
+        shim_nsmutablecharset_add_characters_in_string(obj, 0, s);
+        assert_eq!(read_field(obj, KIND_OFF), 0); // now custom
+
+        // Digits still present
+        assert_eq!(shim_nsmutablecharset_character_is_member(obj, 0, b'0' as u64), 1);
+        assert_eq!(shim_nsmutablecharset_character_is_member(obj, 0, b'9' as u64), 1);
+        // Added char present
+        assert_eq!(shim_nsmutablecharset_character_is_member(obj, 0, b'x' as u64), 1);
+
+        free_obj(s);
+        free_obj(obj);
+    }
+}

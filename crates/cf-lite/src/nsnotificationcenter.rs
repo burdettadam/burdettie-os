@@ -88,6 +88,17 @@ fn observers() -> &'static Mutex<Vec<Observer>> {
     OBSERVERS.get_or_init(|| Mutex::new(Vec::new()))
 }
 
+/// Clear all registered notification observers.
+///
+/// This is used by in-process runners such as `perf-bench`, where multiple
+/// guest executions happen in the same host process and Foundation globals
+/// must not leak from warmup runs into measured iterations.
+pub fn clear_all_observers() {
+    let mut obs = observers().lock().unwrap_or_else(|e| e.into_inner());
+    obs.clear();
+    NEXT_TOKEN.store(1, std::sync::atomic::Ordering::Relaxed);
+}
+
 // ── Notification delivery ──────────────────────────────────────────
 
 fn deliver_to_observers(name_str: &str, notification: u64) {
@@ -268,4 +279,119 @@ pub extern "C" fn shim_nsnotificationcenter_remove_observer_name_object(
             true
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shim_test_helpers::*;
+    use std::sync::Mutex;
+
+    /// Serializes tests that mutate the global notification observer list.
+    static NOTIFICATION_TEST_LOCK: Mutex<()> = Mutex::new(());
+
+    // Observer dispatch is not tested here because it requires ObjC runtime
+    // dispatch (objc_msg_lookup_imp) and involves global mutable state.
+    // The tests below validate notification object construction and the
+    // thread-safe default center singleton.
+
+    #[test]
+    fn default_center_returns_nonzero() {
+        assert_ne!(shim_nsnotificationcenter_default_center(0, 0), 0);
+    }
+
+    #[test]
+    fn default_center_is_stable_singleton() {
+        let a = shim_nsnotificationcenter_default_center(0, 0);
+        let b = shim_nsnotificationcenter_default_center(0, 0);
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn make_notification_stores_fields() {
+        let name = make_string("MyNotification");
+        let sender = make_string("sender-object");
+        let notif = make_nsnotification(name, sender, 0);
+        assert_ne!(notif, 0);
+        assert_eq!(shim_nsnotification_name(notif, 0), name);
+        assert_eq!(shim_nsnotification_object(notif, 0), sender);
+        assert_eq!(shim_nsnotification_userinfo(notif, 0), 0);
+        free_obj(notif);
+    }
+
+    #[test]
+    fn notification_with_name_object_userinfo_shim() {
+        let name = make_string("TestNotifFull");
+        let info = make_string("extra-info");
+        let notif = shim_nsnotification_with_name_object_userinfo(0, 0, name, 0, info);
+        assert_ne!(notif, 0);
+        assert_eq!(shim_nsnotification_name(notif, 0), name);
+        assert_eq!(shim_nsnotification_userinfo(notif, 0), info);
+        free_obj(notif);
+    }
+
+    #[test]
+    fn notification_with_name_object_shim_no_userinfo() {
+        let name = make_string("TestNotifSimple");
+        let notif = shim_nsnotification_with_name_object(0, 0, name, 0);
+        assert_ne!(notif, 0);
+        assert_eq!(shim_nsnotification_name(notif, 0), name);
+        assert_eq!(shim_nsnotification_userinfo(notif, 0), 0);
+        free_obj(notif);
+    }
+
+    #[test]
+    fn notification_accessors_nil_safety() {
+        assert_eq!(shim_nsnotification_name(0, 0), 0);
+        assert_eq!(shim_nsnotification_object(0, 0), 0);
+        assert_eq!(shim_nsnotification_userinfo(0, 0), 0);
+    }
+
+    #[test]
+    fn remove_observer_nil_is_noop() {
+        let center = shim_nsnotificationcenter_default_center(0, 0);
+        // observer=0 → early return, must not crash
+        shim_nsnotificationcenter_remove_observer(center, 0, 0);
+    }
+
+    #[test]
+    fn post_notification_with_nil_name_does_not_crash() {
+        // posts with name_str="", iterates observers that match ""
+        shim_nsnotificationcenter_post_notification_name_object(
+            shim_nsnotificationcenter_default_center(0, 0),
+            0, 0, 0,
+        );
+    }
+
+    #[test]
+    fn clear_all_observers_resets_registry_and_token_counter() {
+        let _lock = NOTIFICATION_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+
+        clear_all_observers();
+        {
+            let mut obs = observers().lock().unwrap_or_else(|e| e.into_inner());
+            obs.push(Observer {
+                token: 41,
+                name: Some("Alpha".to_string()),
+                kind: ObserverKind::Selector {
+                    observer: 0x1000,
+                    sel_ptr: 0x2000,
+                },
+            });
+            obs.push(Observer {
+                token: 42,
+                name: Some("Beta".to_string()),
+                kind: ObserverKind::Block { block: 0x3000 },
+            });
+        }
+        NEXT_TOKEN.store(99, std::sync::atomic::Ordering::Relaxed);
+
+        clear_all_observers();
+
+        let obs = observers().lock().unwrap_or_else(|e| e.into_inner());
+        assert!(obs.is_empty());
+        assert_eq!(NEXT_TOKEN.load(std::sync::atomic::Ordering::Relaxed), 1);
+    }
 }

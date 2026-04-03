@@ -1,0 +1,18 @@
+[package]
+name        = "swift-stub-gen"
+description = "Generate Rust shim stubs from Swift-mangled symbols in Mach-O framework binaries"
+version.workspace    = true
+edition.workspace    = true
+license.workspace    = true
+rust-version.workspace = true
+
+[[bin]]
+name = "swift-stub-gen"
+path = "src/main.rs"
+
+[dependencies]
+macho-parse = { workspace = true }
+macho-types = { workspace = true }
+clap        = { workspace = true }
+log         = { workspace = true }
+env_logger  = { workspace = true }

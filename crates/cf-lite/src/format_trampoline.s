@@ -1,4 +1,4 @@
-// ARM64 stringWithFormat: variadic trampoline for burdetty-os.
+// ARM64 stringWithFormat: variadic trampoline for burdettie-os.
 //
 // When the ObjC runtime dispatches +[NSString stringWithFormat:], the
 // IMP is called with the standard ARM64 ObjC calling convention:
@@ -26,3 +26,15 @@ _shim_nsstring_format_asm:
     // Tail-call the Rust implementation.
     // Returns the new CFString pointer in x0.
     b       _shim_nsstring_string_with_format_inner
+
+// Same trampoline for +[NSMutableString stringWithFormat:] — returns
+// an NSMutableString instead of NSString.
+.global _shim_nsmutablestring_format_asm
+.p2align 4
+
+_shim_nsmutablestring_format_asm:
+    mov     x0, x2              // arg0 = format
+    ldr     x1, [sp, #0]       // arg1 = first variadic arg
+    ldr     x2, [sp, #8]       // arg2 = second variadic arg
+    ldr     x3, [sp, #16]      // arg3 = third variadic arg
+    b       _shim_nsmutablestring_string_with_format_inner

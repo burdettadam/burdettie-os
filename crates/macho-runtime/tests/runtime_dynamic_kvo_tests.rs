@@ -17,7 +17,7 @@ fn runtime_kvo_basics_exit_zero() {
 fn runtime_kvo_basics_nsobject_has_kvo_methods() {
     let Some(_result) = common::run_fixture("kvo_basics/app") else { return };
 
-    let guard = objc_runtime::OBJC_RUNTIME.lock().unwrap();
+    let guard = objc_runtime::OBJC_RUNTIME.read().unwrap();
     if let Some(rt) = guard.as_ref() {
         let nsobject = rt.get_class("NSObject").expect("NSObject should exist");
         let kvo_methods = [
@@ -60,7 +60,7 @@ fn runtime_kvc_nsobject_has_kvc_methods() {
     let Some(_result) = common::run_fixture("kvc_basics/app") else { return };
 
     let guard = objc_runtime::OBJC_RUNTIME
-        .lock()
+        .read()
         .unwrap_or_else(|e| e.into_inner());
     if let Some(rt) = guard.as_ref() {
         let nsobject = rt.get_class("NSObject").expect("NSObject should exist");
@@ -109,7 +109,7 @@ fn runtime_kvc_operators_product_class_registered() {
     let Some(_result) = common::run_fixture("kvc_operators/app") else { return };
 
     let guard = objc_runtime::OBJC_RUNTIME
-        .lock()
+        .read()
         .unwrap_or_else(|e| e.into_inner());
     if let Some(rt) = guard.as_ref() {
         assert!(

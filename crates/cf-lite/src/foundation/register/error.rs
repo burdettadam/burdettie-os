@@ -28,6 +28,16 @@ pub fn register_nserror_class(rt: &mut objc_runtime::ObjcRuntime) {
                 "@@:",
             ),
             me(
+                "localizedFailureReason",
+                nserror::shim_nserror_localized_failure_reason as u64,
+                "@@:",
+            ),
+            me(
+                "localizedRecoverySuggestion",
+                nserror::shim_nserror_localized_recovery_suggestion as u64,
+                "@@:",
+            ),
+            me(
                 "initWithDomain:code:userInfo:",
                 nserror::shim_nserror_init_with_domain_code_userinfo as u64,
                 "@@:@q@",

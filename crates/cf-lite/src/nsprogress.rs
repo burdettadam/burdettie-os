@@ -74,12 +74,11 @@ pub extern "C" fn shim_nsprogress_set_completed_unit_count(obj: u64, _cmd: u64, 
 }
 
 /// `-[NSProgress fractionCompleted]` — returns double (0.0..1.0).
-pub extern "C" fn shim_nsprogress_fraction_completed(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+pub extern "C" fn shim_nsprogress_fraction_completed(obj: u64, _cmd: u64) -> f64 {
+    if obj == 0 { return 0.0; }
     let total = unsafe { *((obj as usize + TOTAL_OFF) as *const i64) };
     let completed = unsafe { *((obj as usize + COMPLETED_OFF) as *const i64) };
-    let frac: f64 = if total > 0 { completed as f64 / total as f64 } else { 0.0 };
-    frac.to_bits()
+    if total > 0 { completed as f64 / total as f64 } else { 0.0 }
 }
 
 pub extern "C" fn shim_nsprogress_is_cancellable(obj: u64, _cmd: u64) -> u8 {
@@ -122,4 +121,75 @@ pub extern "C" fn shim_nsprogress_set_localized_description(obj: u64, _cmd: u64,
 
 pub extern "C" fn shim_nsprogress_description(obj: u64, _cmd: u64) -> u64 {
     shim_nsprogress_localized_description(obj, 0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shim_test_helpers::*;
+
+    #[test]
+    fn nil_safety() {
+        assert_eq!(shim_nsprogress_total_unit_count(0, 0), 0);
+        assert_eq!(shim_nsprogress_completed_unit_count(0, 0), 0);
+        assert_eq!(shim_nsprogress_fraction_completed(0, 0), 0.0);
+        assert_eq!(shim_nsprogress_is_cancellable(0, 0), 0);
+        assert_eq!(shim_nsprogress_is_cancelled(0, 0), 0);
+        assert_eq!(shim_nsprogress_localized_description(0, 0), 0);
+    }
+
+    #[test]
+    fn with_total_sets_total() {
+        let p = shim_nsprogress_with_total(0, 0, 100);
+        assert_ne!(p, 0);
+        assert_eq!(shim_nsprogress_total_unit_count(p, 0), 100);
+        assert_eq!(shim_nsprogress_completed_unit_count(p, 0), 0);
+        free_obj(p);
+    }
+
+    #[test]
+    fn fraction_completed_calculation() {
+        let p = shim_nsprogress_with_total(0, 0, 4);
+        shim_nsprogress_set_completed_unit_count(p, 0, 2);
+        let frac = shim_nsprogress_fraction_completed(p, 0);
+        assert!((frac - 0.5).abs() < 1e-9, "expected 0.5, got {frac}");
+        free_obj(p);
+    }
+
+    #[test]
+    fn fraction_zero_total_returns_zero() {
+        let p = shim_nsprogress_with_total(0, 0, 0);
+        assert_eq!(shim_nsprogress_fraction_completed(p, 0), 0.0);
+        free_obj(p);
+    }
+
+    #[test]
+    fn cancel_sets_cancelled_flag() {
+        let p = shim_nsprogress_with_total(0, 0, 10);
+        assert_eq!(shim_nsprogress_is_cancelled(p, 0), 0);
+        shim_nsprogress_cancel(p, 0);
+        assert_eq!(shim_nsprogress_is_cancelled(p, 0), 1);
+        free_obj(p);
+    }
+
+    #[test]
+    fn localized_description_shows_completed_of_total() {
+        let p = shim_nsprogress_with_total(0, 0, 10);
+        shim_nsprogress_set_completed_unit_count(p, 0, 3);
+        let desc = shim_nsprogress_localized_description(p, 0);
+        assert_ne!(desc, 0);
+        assert_string_eq(desc, "3 of 10");
+        free_obj(p);
+    }
+
+    #[test]
+    fn cancellable_round_trip() {
+        let p = shim_nsprogress_with_total(0, 0, 1);
+        assert_eq!(shim_nsprogress_is_cancellable(p, 0), 1); // default
+        shim_nsprogress_set_cancellable(p, 0, 0);
+        assert_eq!(shim_nsprogress_is_cancellable(p, 0), 0);
+        shim_nsprogress_set_cancellable(p, 0, 1);
+        assert_eq!(shim_nsprogress_is_cancellable(p, 0), 1);
+        free_obj(p);
+    }
 }

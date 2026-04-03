@@ -53,6 +53,8 @@ pub fn parse_code_signature(cs_data: &[u8]) -> Result<CodeSignature, ParseError>
     let mut code_directory = None;
     let mut entitlements_plist = None;
     let mut has_cms_signature = false;
+    let mut cms_data = None;
+    let mut cd_data = None;
 
     for entry in &index {
         let off = entry.offset as usize;
@@ -72,7 +74,10 @@ pub fn parse_code_signature(cs_data: &[u8]) -> Result<CodeSignature, ParseError>
             CSMAGIC_CODEDIRECTORY => {
                 if code_directory.is_none() {
                     match parse_code_directory(blob_data) {
-                        Ok(cd) => code_directory = Some(cd),
+                        Ok(cd) => {
+                            code_directory = Some(cd);
+                            cd_data = Some(blob_data.to_vec());
+                        }
                         Err(e) => log::warn!("CodeDirectory parse failed: {e}"),
                     }
                 }
@@ -88,6 +93,10 @@ pub fn parse_code_signature(cs_data: &[u8]) -> Result<CodeSignature, ParseError>
             }
             CSMAGIC_BLOBWRAPPER => {
                 has_cms_signature = true;
+                // Store raw CMS data (skip 8-byte blob header: magic + length)
+                if blob_data.len() > 8 {
+                    cms_data = Some(blob_data[8..].to_vec());
+                }
             }
             _ => {}
         }
@@ -98,6 +107,8 @@ pub fn parse_code_signature(cs_data: &[u8]) -> Result<CodeSignature, ParseError>
         code_directory,
         entitlements_plist,
         has_cms_signature,
+        cms_data,
+        cd_data,
     })
 }
 
