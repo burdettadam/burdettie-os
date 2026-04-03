@@ -8,7 +8,7 @@ use objc_runtime::ClassInfo;
 use super::me;
 use crate::{
     nsslider, nsprogressindicator, nsimageview, nssegmentedcontrol,
-    nscombobox, nscolorwell, nspasteboard, nsobj,
+    nscombobox, nscolorwell, nspasteboard, nslayoutconstraint, nsobj,
 };
 
 // ── NSSlider ───────────────────────────────────────────────────
@@ -234,4 +234,46 @@ pub fn register_nspasteboard_class(rt: &mut objc_runtime::ObjcRuntime) {
     };
     rt.register_synthetic_class(info);
     rt.register_metaclass_addr(metaclass_addr, "NSPasteboard");
+}
+
+// ── NSLayoutConstraint (Auto Layout) ───────────────────────────
+
+pub fn register_nslayoutconstraint_class(rt: &mut objc_runtime::ObjcRuntime) {
+    let class_addr = nsobj::nslayoutconstraint_class_addr();
+    let metaclass_addr = nsobj::nslayoutconstraint_metaclass_addr();
+    let info = ClassInfo {
+        name: "NSLayoutConstraint".to_string(),
+        mapped_addr: class_addr,
+        methods: vec![
+            me("isActive", nslayoutconstraint::shim_nslayoutconstraint_is_active as u64, "B@:"),
+            me("setActive:", nslayoutconstraint::shim_nslayoutconstraint_set_active as u64, "v@:B"),
+            me("constant", nslayoutconstraint::shim_nslayoutconstraint_constant as u64, "d@:"),
+            me("setConstant:", nslayoutconstraint::shim_nslayoutconstraint_set_constant as u64, "v@:d"),
+            me("multiplier", nslayoutconstraint::shim_nslayoutconstraint_multiplier as u64, "d@:"),
+            me("priority", nslayoutconstraint::shim_nslayoutconstraint_priority as u64, "d@:"),
+            me("setPriority:", nslayoutconstraint::shim_nslayoutconstraint_set_priority as u64, "v@:d"),
+            me("firstItem", nslayoutconstraint::shim_nslayoutconstraint_first_item as u64, "@@:"),
+            me("secondItem", nslayoutconstraint::shim_nslayoutconstraint_second_item as u64, "@@:"),
+            me("firstAttribute", nslayoutconstraint::shim_nslayoutconstraint_first_attribute as u64, "q@:"),
+            me("secondAttribute", nslayoutconstraint::shim_nslayoutconstraint_second_attribute as u64, "q@:"),
+            me("relation", nslayoutconstraint::shim_nslayoutconstraint_relation as u64, "q@:"),
+            me("identifier", nslayoutconstraint::shim_nslayoutconstraint_identifier as u64, "@@:"),
+            me("setIdentifier:", nslayoutconstraint::shim_nslayoutconstraint_set_identifier as u64, "v@:@"),
+            me("shouldBeArchived", nslayoutconstraint::shim_nslayoutconstraint_should_be_archived as u64, "B@:"),
+            me("setShouldBeArchived:", nslayoutconstraint::shim_nslayoutconstraint_set_should_be_archived as u64, "v@:B"),
+        ],
+        class_methods: vec![
+            me("constraintWithItem:attribute:relatedBy:toItem:attribute:multiplier:constant:",
+               nslayoutconstraint::shim_nslayoutconstraint_create as u64,
+               "@@:@q@q@dd"),
+            me("activateConstraints:", nslayoutconstraint::shim_nslayoutconstraint_activate_constraints as u64, "v@:@"),
+            me("deactivateConstraints:", nslayoutconstraint::shim_nslayoutconstraint_deactivate_constraints as u64, "v@:@"),
+        ],
+        ivars: vec![], properties: vec![], protocol_names: Vec::new(),
+        instance_size: nslayoutconstraint::CONSTRAINT_SIZE as u32, is_root: false, is_meta: false,
+        superclass_addr: Some(nsobj::nsobject_class_addr()),
+        method_index: HashMap::new(), class_method_index: HashMap::new(),
+    };
+    rt.register_synthetic_class(info);
+    rt.register_metaclass_addr(metaclass_addr, "NSLayoutConstraint");
 }

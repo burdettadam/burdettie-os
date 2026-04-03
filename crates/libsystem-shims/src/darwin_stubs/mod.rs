@@ -39,6 +39,7 @@ mod xpc_pipe;
 mod xpc_transport;
 mod swift_reflection;
 mod swift_foundation_bridge;
+mod swift_type_metadata;
 
 use crate::table::ShimTable;
 
@@ -79,5 +80,6 @@ pub fn install_darwin_stubs(table: &mut ShimTable) {
     xpc::XpcStubs::install(table);
     swift_reflection::LibswiftRemoteMirrorStubs::install(table);
     swift_foundation_bridge::SwiftFoundationBridgeStubs::install(table);
+    swift_type_metadata::SwiftTypeMetadataStubs::install(table);
     log::debug!("darwin_stubs: registered all macOS-specific stubs");
 }

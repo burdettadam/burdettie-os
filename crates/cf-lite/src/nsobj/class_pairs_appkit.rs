@@ -317,3 +317,12 @@ define_class_pair!(child NSPASTEBOARD_CLASS_DATA, NSPASTEBOARD_METACLASS_DATA, N
     meta_addr: nspasteboard_metaclass_addr,
     parent_class: nsobject_class_addr,
     parent_meta: nsobject_metaclass_addr);
+
+// ── NSLayoutConstraint (Auto Layout) ───────────────────────────
+
+define_class_pair!(child NSLAYOUTCONSTRAINT_CLASS_DATA, NSLAYOUTCONSTRAINT_METACLASS_DATA, NSLAYOUTCONSTRAINT_INIT,
+    ensure: ensure_nslayoutconstraint_init,
+    class_addr: nslayoutconstraint_class_addr,
+    meta_addr: nslayoutconstraint_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);

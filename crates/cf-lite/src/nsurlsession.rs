@@ -97,10 +97,13 @@ pub extern "C" fn shim_nsurlsessionconfig_description(obj: u64, _cmd: u64) -> u6
 // ═══════════════════════════════════════════════════════════════
 
 const SESSION_CONFIG_OFF: usize = 8;
+const SESSION_DELEGATE_OFF: usize = 16;
+const SESSION_QUEUE_OFF: usize = 24;
+const SESSION_SIZE: usize = 32;
 
 /// `+[NSURLSession sharedSession]`
 pub extern "C" fn shim_nsurlsession_shared(_cls: u64, _cmd: u64) -> u64 {
-    let obj = crate::pal_alloc().calloc(1, 16) as u64;
+    let obj = crate::pal_alloc().calloc(1, SESSION_SIZE) as u64;
     if obj == 0 { return 0; }
     unsafe { *(obj as *mut u64) = nsobj::nsurlsession_class_addr(); }
     obj
@@ -108,13 +111,40 @@ pub extern "C" fn shim_nsurlsession_shared(_cls: u64, _cmd: u64) -> u64 {
 
 /// `+[NSURLSession sessionWithConfiguration:]`
 pub extern "C" fn shim_nsurlsession_with_config(_cls: u64, _cmd: u64, config: u64) -> u64 {
-    let obj = crate::pal_alloc().calloc(1, 16) as u64;
+    let obj = crate::pal_alloc().calloc(1, SESSION_SIZE) as u64;
     if obj == 0 { return 0; }
     unsafe {
         *(obj as *mut u64) = nsobj::nsurlsession_class_addr();
         *((obj as usize + SESSION_CONFIG_OFF) as *mut u64) = config;
     }
     obj
+}
+
+/// `+[NSURLSession sessionWithConfiguration:delegate:delegateQueue:]`
+pub extern "C" fn shim_nsurlsession_with_config_delegate(
+    _cls: u64, _cmd: u64, config: u64, delegate: u64, queue: u64,
+) -> u64 {
+    let obj = crate::pal_alloc().calloc(1, SESSION_SIZE) as u64;
+    if obj == 0 { return 0; }
+    unsafe {
+        *(obj as *mut u64) = nsobj::nsurlsession_class_addr();
+        *((obj as usize + SESSION_CONFIG_OFF) as *mut u64) = config;
+        *((obj as usize + SESSION_DELEGATE_OFF) as *mut u64) = delegate;
+        *((obj as usize + SESSION_QUEUE_OFF) as *mut u64) = queue;
+    }
+    obj
+}
+
+/// `-[NSURLSession delegate]`
+pub extern "C" fn shim_nsurlsession_delegate(obj: u64, _cmd: u64) -> u64 {
+    if obj == 0 { return 0; }
+    unsafe { *((obj as usize + SESSION_DELEGATE_OFF) as *const u64) }
+}
+
+/// `-[NSURLSession delegateQueue]`
+pub extern "C" fn shim_nsurlsession_delegate_queue(obj: u64, _cmd: u64) -> u64 {
+    if obj == 0 { return 0; }
+    unsafe { *((obj as usize + SESSION_QUEUE_OFF) as *const u64) }
 }
 
 /// `-[NSURLSession configuration]`
@@ -128,13 +158,13 @@ pub extern "C" fn shim_nsurlsession_data_task_with_url(obj: u64, _cmd: u64, url:
     if obj == 0 { return 0; }
     // Create an NSURLRequest from the URL
     let req = crate::nsurlrequest::shim_nsurlrequest_with_url(0, 0, url);
-    alloc_data_task(req)
+    alloc_data_task_for_session(req, obj)
 }
 
 /// `-[NSURLSession dataTaskWithRequest:]`
 pub extern "C" fn shim_nsurlsession_data_task_with_request(obj: u64, _cmd: u64, request: u64) -> u64 {
     if obj == 0 { return 0; }
-    alloc_data_task(request)
+    alloc_data_task_for_session(request, obj)
 }
 
 /// `-[NSURLSession invalidateAndCancel]`
@@ -200,14 +230,24 @@ pub extern "C" fn shim_nsurlsession_description(obj: u64, _cmd: u64) -> u64 {
 const TASK_REQUEST_OFF: usize = 8;
 const TASK_STATE_OFF: usize = 16;
 const TASK_BLOCK_OFF: usize = 24;
+const TASK_SESSION_OFF: usize = 32;
+const TASK_SIZE: usize = 40;
 
 fn alloc_data_task(request: u64) -> u64 {
-    let obj = crate::pal_alloc().calloc(1, 32) as u64;
+    let obj = crate::pal_alloc().calloc(1, TASK_SIZE) as u64;
     if obj == 0 { return 0; }
     unsafe {
         *(obj as *mut u64) = nsobj::nsurlsessiondatatask_class_addr();
         *((obj as usize + TASK_REQUEST_OFF) as *mut u64) = request;
-        // state = 0 (suspended); block_ptr = 0 (none)
+        // state = 0 (suspended); block_ptr = 0 (none); session = 0
+    }
+    obj
+}
+
+fn alloc_data_task_for_session(request: u64, session: u64) -> u64 {
+    let obj = alloc_data_task(request);
+    if obj != 0 && session != 0 {
+        unsafe { *((obj as usize + TASK_SESSION_OFF) as *mut u64) = session; }
     }
     obj
 }
@@ -222,7 +262,7 @@ pub extern "C" fn shim_nsurlsession_data_task_with_url_completion(
 ) -> u64 {
     if obj == 0 { return 0; }
     let req = crate::nsurlrequest::shim_nsurlrequest_with_url(0, 0, url);
-    let task = alloc_data_task(req);
+    let task = alloc_data_task_for_session(req, obj);
     if task != 0 && block != 0 {
         unsafe { *((task as usize + TASK_BLOCK_OFF) as *mut u64) = block; }
     }
@@ -234,7 +274,7 @@ pub extern "C" fn shim_nsurlsession_data_task_with_request_completion(
     obj: u64, _cmd: u64, request: u64, block: u64,
 ) -> u64 {
     if obj == 0 { return 0; }
-    let task = alloc_data_task(request);
+    let task = alloc_data_task_for_session(request, obj);
     if task != 0 && block != 0 {
         unsafe { *((task as usize + TASK_BLOCK_OFF) as *mut u64) = block; }
     }
@@ -856,5 +896,51 @@ mod tests {
     fn config_set_timeout_resource_noop() {
         // Must not crash
         shim_nsurlsessionconfig_set_timeout_resource(0, 0, 999.0);
+    }
+
+    // ── delegate session ─────────────────────────────────────
+
+    #[test]
+    fn session_with_delegate_stores_fields() {
+        let cfg = shim_nsurlsessionconfig_default(
+            nsobj::nsurlsessionconfiguration_class_addr(), 0,
+        );
+        let fake_delegate: u64 = 0xD000;
+        let fake_queue: u64 = 0xE000;
+        let s = shim_nsurlsession_with_config_delegate(
+            nsobj::nsurlsession_class_addr(), 0, cfg, fake_delegate, fake_queue,
+        );
+        assert_ne!(s, 0);
+        assert_eq!(read_field(s, SESSION_CONFIG_OFF), cfg);
+        assert_eq!(read_field(s, SESSION_DELEGATE_OFF), fake_delegate);
+        assert_eq!(read_field(s, SESSION_QUEUE_OFF), fake_queue);
+        assert_eq!(shim_nsurlsession_delegate(s, 0), fake_delegate);
+        assert_eq!(shim_nsurlsession_delegate_queue(s, 0), fake_queue);
+        free_obj(s);
+        free_obj(cfg);
+    }
+
+    #[test]
+    fn session_delegate_nil() {
+        assert_eq!(shim_nsurlsession_delegate(0, 0), 0);
+        assert_eq!(shim_nsurlsession_delegate_queue(0, 0), 0);
+    }
+
+    #[test]
+    fn shared_session_has_no_delegate() {
+        let s = shim_nsurlsession_shared(nsobj::nsurlsession_class_addr(), 0);
+        assert_eq!(shim_nsurlsession_delegate(s, 0), 0);
+        assert_eq!(shim_nsurlsession_delegate_queue(s, 0), 0);
+        free_obj(s);
+    }
+
+    #[test]
+    fn task_stores_session_reference() {
+        let s = shim_nsurlsession_shared(nsobj::nsurlsession_class_addr(), 0);
+        let task = shim_nsurlsession_data_task_with_url(s, 0, 0);
+        assert_ne!(task, 0);
+        assert_eq!(read_field(task, TASK_SESSION_OFF), s);
+        free_obj(task);
+        free_obj(s);
     }
 }

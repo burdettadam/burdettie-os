@@ -474,6 +474,7 @@ fn populate_foundation_runtime(objc_rt: &mut objc_runtime::ObjcRuntime) {
     cf_lite::FoundationShims::register_nscombobox_class(objc_rt);
     cf_lite::FoundationShims::register_nscolorwell_class(objc_rt);
     cf_lite::FoundationShims::register_nspasteboard_class(objc_rt);
+    cf_lite::FoundationShims::register_nslayoutconstraint_class(objc_rt);
 
     // Gap-analysis classes (Phase C8)
     cf_lite::FoundationShims::register_nsmutabledata_class(objc_rt);

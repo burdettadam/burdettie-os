@@ -157,6 +157,7 @@ pub(crate) mod nsscrollview;
 pub(crate) mod nssegmentedcontrol;
 pub(crate) mod nsslider;
 pub(crate) mod nssplitview;
+pub(crate) mod nslayoutconstraint;
 pub(crate) mod nsstackview;
 pub(crate) mod nstabview;
 pub(crate) mod nstabviewitem;

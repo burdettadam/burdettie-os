@@ -245,13 +245,16 @@ pub fn register_nsurlsession_class(rt: &mut objc_runtime::ObjcRuntime) {
             me("invalidateAndCancel", nsurlsession::shim_nsurlsession_invalidate as u64, "v@:"),
             me("finishTasksAndInvalidate", nsurlsession::shim_nsurlsession_finish_tasks as u64, "v@:"),
             me("description", nsurlsession::shim_nsurlsession_description as u64, "@@:"),
+            me("delegate", nsurlsession::shim_nsurlsession_delegate as u64, "@@:"),
+            me("delegateQueue", nsurlsession::shim_nsurlsession_delegate_queue as u64, "@@:"),
         ],
         class_methods: vec![
             me("sharedSession", nsurlsession::shim_nsurlsession_shared as u64, "@@:"),
             me("sessionWithConfiguration:", nsurlsession::shim_nsurlsession_with_config as u64, "@@:@"),
+            me("sessionWithConfiguration:delegate:delegateQueue:", nsurlsession::shim_nsurlsession_with_config_delegate as u64, "@@:@@@"),
         ],
         ivars: vec![], properties: vec![], protocol_names: Vec::new(),
-        instance_size: 16, is_root: false, is_meta: false,
+        instance_size: 32, is_root: false, is_meta: false,
         superclass_addr: Some(nsobj::nsobject_class_addr()),
         method_index: HashMap::new(), class_method_index: HashMap::new(),
     };
@@ -277,7 +280,7 @@ pub fn register_nsurlsessiondatatask_class(rt: &mut objc_runtime::ObjcRuntime) {
         ],
         class_methods: vec![],
         ivars: vec![], properties: vec![], protocol_names: Vec::new(),
-        instance_size: 32, is_root: false, is_meta: false,
+        instance_size: 40, is_root: false, is_meta: false,
         superclass_addr: Some(nsobj::nsobject_class_addr()),
         method_index: HashMap::new(), class_method_index: HashMap::new(),
     };

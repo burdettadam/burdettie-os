@@ -5,7 +5,7 @@ use objc_runtime::ClassInfo;
 use super::me;
 use crate::{
     nsapplication, nscolor, nsevent, nsfont, nsimage,
-    nsobj, nsresponder, nsrunloop, nsscreen, nsview,
+    nslayoutconstraint, nsobj, nsresponder, nsrunloop, nsscreen, nsview,
     nswindow, nsworkspace,
 };
 
@@ -188,6 +188,13 @@ pub fn register_nsview_class(rt: &mut objc_runtime::ObjcRuntime) {
             me("wantsLayer", nsview::shim_nsview_wants_layer as u64, "B@:"),
             me("setWantsLayer:", nsview::shim_nsview_set_wants_layer as u64, "v@:B"),
             me("layer", nsview::shim_nsview_layer as u64, "@@:"),
+            me("translatesAutoresizingMaskIntoConstraints", nslayoutconstraint::shim_nsview_translates_autoresize as u64, "B@:"),
+            me("setTranslatesAutoresizingMaskIntoConstraints:", nslayoutconstraint::shim_nsview_set_translates_autoresize as u64, "v@:B"),
+            me("addConstraint:", nslayoutconstraint::shim_nsview_add_constraint as u64, "v@:@"),
+            me("addConstraints:", nslayoutconstraint::shim_nsview_add_constraints as u64, "v@:@"),
+            me("removeConstraint:", nslayoutconstraint::shim_nsview_remove_constraint as u64, "v@:@"),
+            me("removeConstraints:", nslayoutconstraint::shim_nsview_remove_constraints as u64, "v@:@"),
+            me("constraints", nslayoutconstraint::shim_nsview_constraints as u64, "@@:"),
         ],
         class_methods: vec![],
         ivars: vec![], properties: vec![], protocol_names: Vec::new(),

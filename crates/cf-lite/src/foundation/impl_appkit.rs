@@ -168,6 +168,10 @@ impl FoundationShims {
         register::register_nspasteboard_class(rt);
     }
 
+    pub fn register_nslayoutconstraint_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nslayoutconstraint_class(rt);
+    }
+
     // ── Gap-analysis classes (Phase C8) ──────────────────────────
 
     pub fn register_nsmutabledata_class(rt: &mut objc_runtime::ObjcRuntime) {
