@@ -20,6 +20,7 @@
 //! println!("Cache contains {} images", loader.image_count());
 //! ```
 
+use std::collections::HashMap;
 use std::path::Path;
 
 use macho_shared_cache::SharedCache;
@@ -50,6 +51,8 @@ pub struct SharedCacheLoader {
     _mmap: Mmap,
     /// Pre-extracted image metadata (owned strings, no lifetime dependency).
     images: Vec<CachedImage>,
+    /// O(1) path → image-index lookup.
+    path_index: HashMap<String, usize>,
     /// Total file size for diagnostics.
     file_size: usize,
 }
@@ -175,9 +178,17 @@ impl SharedCacheLoader {
             file_size as f64 / (1024.0 * 1024.0),
         );
 
+        // Build O(1) path index.
+        let path_index: HashMap<String, usize> = images
+            .iter()
+            .enumerate()
+            .map(|(i, img)| (img.path.clone(), i))
+            .collect();
+
         Ok(Self {
             _mmap: mmap,
             images,
+            path_index,
             file_size,
         })
     }
@@ -185,8 +196,10 @@ impl SharedCacheLoader {
     /// Look up a dylib by install name and return a slice of its Mach-O data.
     ///
     /// The returned slice points directly into the memory-mapped cache (zero-copy).
+    /// Uses O(1) HashMap lookup instead of linear scan.
     pub fn resolve_dylib(&self, install_name: &str) -> Option<&[u8]> {
-        let img = self.images.iter().find(|i| i.path == install_name)?;
+        let &idx = self.path_index.get(install_name)?;
+        let img = &self.images[idx];
         let data = self._mmap.as_slice();
         let end = img.file_offset + img.header_size;
         if end <= data.len() {
@@ -194,6 +207,125 @@ impl SharedCacheLoader {
         } else {
             None
         }
+    }
+
+    /// Access the raw underlying memory-mapped cache data.
+    ///
+    /// Used by export trie parsing which needs to read __LINKEDIT data
+    /// at arbitrary file offsets within the cache.
+    pub fn raw_data(&self) -> &[u8] {
+        self._mmap.as_slice()
+    }
+
+    /// Build a symbol → address map by parsing export tries from the
+    /// specified dylibs. This is the "eager loading" optimization that
+    /// pre-resolves symbols at startup.
+    ///
+    /// Returns a HashMap where keys are symbol names (with leading underscore,
+    /// e.g. `_strlen`) and values are VM addresses from the export trie.
+    pub fn eager_export_map(&self, dylib_paths: &[&str]) -> HashMap<String, u64> {
+        let raw = self._mmap.as_slice();
+        let mut map = HashMap::new();
+
+        for &path in dylib_paths {
+            let Some(&idx) = self.path_index.get(path) else {
+                log::debug!("eager_export_map: image not found: {}", path);
+                continue;
+            };
+            let img = &self.images[idx];
+            let end = img.file_offset + img.header_size;
+            if end > raw.len() {
+                continue;
+            }
+            let header_data = &raw[img.file_offset..end];
+
+            // Parse the Mach-O header+load commands to find the export trie.
+            let Ok(parsed) = macho_parse::parse(header_data) else {
+                log::debug!("eager_export_map: failed to parse {}", path);
+                continue;
+            };
+
+            // Extract export trie — the data_off in the load command is
+            // relative to the image's file offset within the cache.
+            // However, in the shared cache the __LINKEDIT is shared and
+            // the offsets are cache-absolute for LC_DYLD_EXPORTS_TRIE.
+            //
+            // Strategy: try cache-absolute offset first (shared cache),
+            // then image-relative offset (standalone Mach-O).
+            let exports = Self::extract_exports_from_cache(&parsed, raw, img.file_offset);
+            let count = exports.len();
+
+            for sym in exports {
+                if !sym.name.is_empty() && !sym.is_reexport() {
+                    map.insert(sym.name, sym.address);
+                }
+            }
+
+            log::debug!(
+                "eager_export_map: {} → {} exports",
+                path, count
+            );
+        }
+
+        log::info!(
+            "eager_export_map: pre-resolved {} symbols from {} dylibs",
+            map.len(),
+            dylib_paths.len()
+        );
+        map
+    }
+
+    /// Extract exports from a cached image, handling cache-absolute offsets.
+    fn extract_exports_from_cache(
+        parsed: &macho_parse::ParsedMachO,
+        cache_data: &[u8],
+        image_file_offset: usize,
+    ) -> Vec<macho_parse::ExportedSymbol> {
+        use macho_types::load_command::{LoadCommandPayload, LoadCommandType};
+
+        // Try LC_DYLD_EXPORTS_TRIE first (modern)
+        for cmd in &parsed.commands {
+            if cmd.cmd == LoadCommandType::DyldExportsTrie {
+                if let LoadCommandPayload::LinkEdit { data_off, data_size } = &cmd.payload {
+                    let off = *data_off as usize;
+                    let size = *data_size as usize;
+                    if size == 0 {
+                        continue;
+                    }
+                    // Try cache-absolute offset
+                    if off + size <= cache_data.len() {
+                        return macho_parse::parse_export_trie(&cache_data[off..off + size]);
+                    }
+                    // Try image-relative offset
+                    let abs = image_file_offset + off;
+                    if abs + size <= cache_data.len() {
+                        return macho_parse::parse_export_trie(&cache_data[abs..abs + size]);
+                    }
+                }
+            }
+        }
+
+        // Fall back to LC_DYLD_INFO(_ONLY)
+        for cmd in &parsed.commands {
+            if cmd.cmd == LoadCommandType::DyldInfoOnly || cmd.cmd == LoadCommandType::DyldInfo {
+                if let LoadCommandPayload::DyldInfo { export_off, export_size, .. } = &cmd.payload {
+                    let off = *export_off as usize;
+                    let size = *export_size as usize;
+                    if size == 0 {
+                        continue;
+                    }
+                    if off + size <= cache_data.len() {
+                        return macho_parse::parse_export_trie(&cache_data[off..off + size]);
+                    }
+                    let abs = image_file_offset + off;
+                    if abs + size <= cache_data.len() {
+                        return macho_parse::parse_export_trie(&cache_data[abs..abs + size]);
+                    }
+                }
+            }
+        }
+
+        Vec::new()
     }
 
     /// The number of images in the cache.

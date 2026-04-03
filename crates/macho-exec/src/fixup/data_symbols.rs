@@ -40,6 +40,7 @@ impl DataSymbolStore {
         store.register_nstat_keys();
         store.register_swift_runtime_globals();
         store.register_objc_runtime_globals();
+        store.register_objc_ivar_offsets();
         store
     }
 
@@ -507,6 +508,101 @@ impl DataSymbolStore {
         );
     }
 
+    // ── ObjC IVAR offset data symbols ───────────────────────────────
+
+    fn register_objc_ivar_offsets(&mut self) {
+        // Each _OBJC_IVAR_$_ClassName.fieldName symbol is a pointer to a
+        // u64 containing the byte offset of that ivar within the class
+        // instance.  Guest code loads from this address to compute field
+        // pointers:  `ldr x0, [got_ivar]; ldr x1, [obj, x0]`
+        //
+        // The offsets here must match our cf-lite shim object layouts.
+
+        // NSError
+        static NSERROR_CODE:      u64 = 8;
+        static NSERROR_DOMAIN:    u64 = 16;
+        static NSERROR_USERINFO:  u64 = 24;
+
+        self.symbols.insert("_OBJC_IVAR_$_NSError._code",     &NSERROR_CODE     as *const u64 as u64);
+        self.symbols.insert("_OBJC_IVAR_$_NSError._domain",   &NSERROR_DOMAIN   as *const u64 as u64);
+        self.symbols.insert("_OBJC_IVAR_$_NSError._userInfo",  &NSERROR_USERINFO as *const u64 as u64);
+
+        // NSException
+        static NSEXCEPTION_NAME:     u64 = 8;
+        static NSEXCEPTION_REASON:   u64 = 16;
+        static NSEXCEPTION_USERINFO: u64 = 24;
+
+        self.symbols.insert("_OBJC_IVAR_$_NSException._name",     &NSEXCEPTION_NAME     as *const u64 as u64);
+        self.symbols.insert("_OBJC_IVAR_$_NSException._reason",   &NSEXCEPTION_REASON   as *const u64 as u64);
+        self.symbols.insert("_OBJC_IVAR_$_NSException._userInfo", &NSEXCEPTION_USERINFO  as *const u64 as u64);
+
+        // NSURL
+        static NSURL_STRING:      u64 = 8;
+        static NSURL_IS_FILE_URL: u64 = 16;
+
+        self.symbols.insert("_OBJC_IVAR_$_NSURL._urlString",   &NSURL_STRING      as *const u64 as u64);
+        self.symbols.insert("_OBJC_IVAR_$_NSURL._isFileURL",   &NSURL_IS_FILE_URL as *const u64 as u64);
+
+        // NSDate
+        static NSDATE_TI: u64 = 8;
+
+        self.symbols.insert("_OBJC_IVAR_$___NSDate._timeIntervalSinceReferenceDate", &NSDATE_TI as *const u64 as u64);
+        self.symbols.insert("_OBJC_IVAR_$_NSDate._timeIntervalSinceReferenceDate",   &NSDATE_TI as *const u64 as u64);
+
+        // NSNumber
+        static NSNUMBER_TYPE: u64 = 8;
+        static NSNUMBER_VAL:  u64 = 16;
+
+        self.symbols.insert("_OBJC_IVAR_$_NSNumber._type",  &NSNUMBER_TYPE as *const u64 as u64);
+        self.symbols.insert("_OBJC_IVAR_$_NSNumber._value",  &NSNUMBER_VAL as *const u64 as u64);
+
+        // NSData
+        static NSDATA_LENGTH: u64 = 8;
+        static NSDATA_BYTES:  u64 = 16;
+
+        self.symbols.insert("_OBJC_IVAR_$_NSData._length", &NSDATA_LENGTH as *const u64 as u64);
+        self.symbols.insert("_OBJC_IVAR_$_NSData._bytes",  &NSDATA_BYTES  as *const u64 as u64);
+
+        // NSArray
+        static NSARRAY_COUNT:    u64 = 8;
+        static NSARRAY_ELEMENTS: u64 = 16;
+
+        self.symbols.insert("_OBJC_IVAR_$_NSArray._count",       &NSARRAY_COUNT    as *const u64 as u64);
+        self.symbols.insert("_OBJC_IVAR_$_NSArray._elements",    &NSARRAY_ELEMENTS as *const u64 as u64);
+
+        // NSDictionary
+        static NSDICT_COUNT: u64 = 8;
+        static NSDICT_KEYS:  u64 = 16;
+        static NSDICT_VALS:  u64 = 24;
+
+        self.symbols.insert("_OBJC_IVAR_$_NSDictionary._count", &NSDICT_COUNT as *const u64 as u64);
+        self.symbols.insert("_OBJC_IVAR_$_NSDictionary._keys",  &NSDICT_KEYS  as *const u64 as u64);
+        self.symbols.insert("_OBJC_IVAR_$_NSDictionary._values", &NSDICT_VALS as *const u64 as u64);
+
+        // NSThread
+        static NSTHREAD_NAME:   u64 = 8;
+        static NSTHREAD_TARGET: u64 = 16;
+        static NSTHREAD_SEL:    u64 = 24;
+
+        self.symbols.insert("_OBJC_IVAR_$_NSThread._name",     &NSTHREAD_NAME   as *const u64 as u64);
+        self.symbols.insert("_OBJC_IVAR_$_NSThread._target",   &NSTHREAD_TARGET as *const u64 as u64);
+        self.symbols.insert("_OBJC_IVAR_$_NSThread._selector", &NSTHREAD_SEL    as *const u64 as u64);
+
+        // NSNotification
+        static NSNOTIF_NAME:     u64 = 8;
+        static NSNOTIF_OBJECT:   u64 = 16;
+        static NSNOTIF_USERINFO: u64 = 24;
+
+        self.symbols.insert("_OBJC_IVAR_$_NSNotification._name",     &NSNOTIF_NAME     as *const u64 as u64);
+        self.symbols.insert("_OBJC_IVAR_$_NSNotification._object",   &NSNOTIF_OBJECT   as *const u64 as u64);
+        self.symbols.insert("_OBJC_IVAR_$_NSNotification._userInfo", &NSNOTIF_USERINFO  as *const u64 as u64);
+
+        // NSBundle
+        static NSBUNDLE_PATH: u64 = 8;
+
+        self.symbols.insert("_OBJC_IVAR_$_NSBundle._bundlePath", &NSBUNDLE_PATH as *const u64 as u64);
+    }
+
     /// Resolve a symbol via `dlsym(RTLD_DEFAULT, c_name)` and insert it.
     /// No-ops silently if the symbol is not found (binary will fall through
     /// to the StubResolver which may also resolve it, or leave it as NULL).
@@ -678,5 +774,30 @@ mod tests {
         let addr = store.resolve("_kDADiskDescriptionMediaNameKey");
         assert!(addr.is_some(), "_kDADiskDescriptionMediaNameKey should resolve");
         assert_ne!(addr.unwrap(), 0);
+    }
+
+    #[test]
+    fn objc_ivar_offsets_resolve() {
+        let store = DataSymbolStore::new();
+        // Each IVAR symbol resolves to a pointer whose target is the byte offset
+        let cases = [
+            ("_OBJC_IVAR_$_NSError._code", 8u64),
+            ("_OBJC_IVAR_$_NSError._domain", 16),
+            ("_OBJC_IVAR_$_NSError._userInfo", 24),
+            ("_OBJC_IVAR_$_NSData._length", 8),
+            ("_OBJC_IVAR_$_NSData._bytes", 16),
+            ("_OBJC_IVAR_$_NSArray._count", 8),
+            ("_OBJC_IVAR_$_NSDictionary._count", 8),
+            ("_OBJC_IVAR_$_NSURL._urlString", 8),
+            ("_OBJC_IVAR_$_NSDate._timeIntervalSinceReferenceDate", 8),
+            ("_OBJC_IVAR_$_NSBundle._bundlePath", 8),
+        ];
+        for (sym, expected_offset) in &cases {
+            let addr = store.resolve(sym);
+            assert!(addr.is_some(), "{sym} should resolve");
+            let ptr = addr.unwrap() as *const u64;
+            let offset = unsafe { *ptr };
+            assert_eq!(offset, *expected_offset, "{sym}: expected offset {expected_offset}, got {offset}");
+        }
     }
 }

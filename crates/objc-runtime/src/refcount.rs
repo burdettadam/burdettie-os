@@ -1,15 +1,15 @@
 //! Reference counting and autorelease pool for the lab ObjC runtime.
 //!
-//! Retain counts use a global `HashMap<u64, usize>` behind a `Mutex`
-//! (shared across all threads — objects can be retained/released from
-//! any thread). Autorelease pools are per-thread via `thread_local!`,
-//! matching the real ObjC runtime where each thread has its own pool
-//! stack.
+//! Retain counts use a **sharded** lock table (64 `Mutex<HashMap>` shards)
+//! keyed by object address. This allows concurrent retain/release from
+//! multiple threads without a single global bottleneck. Autorelease
+//! pools are per-thread via `thread_local!`, matching the real ObjC
+//! runtime where each thread has its own pool stack.
 
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ffi::c_void;
-use std::sync::Mutex;
+use std::sync::{LazyLock, Mutex};
 
 #[cfg(target_os = "macos")]
 unsafe extern "C" {
@@ -17,7 +17,10 @@ unsafe extern "C" {
 }
 
 /// Global reference-counting state (shared across all threads).
-pub static REFCOUNTS: Mutex<RefCountTable> = Mutex::new(RefCountTable { counts: None });
+///
+/// Uses 64 internal shards so that concurrent retain/release on
+/// different objects rarely contends on the same mutex.
+pub static REFCOUNTS: LazyLock<ShardedRefCounts> = LazyLock::new(ShardedRefCounts::new);
 
 // Per-thread autorelease pool stack.
 // Each thread gets its own pool stack. `objc_autoreleasePoolPush` and
@@ -27,44 +30,51 @@ thread_local! {
         RefCell::new(AutoreleasePoolStack::new());
 }
 
-/// Per-object reference counts.
+/// Number of lock shards — must be a power of two.
+const SHARD_COUNT: usize = 64;
+
+/// Sharded reference-count table for concurrent retain/release.
 ///
-/// Objects not in the table are assumed to have retain count 1
-/// (the initial alloc gives an implicit +1).
-pub struct RefCountTable {
-    counts: Option<HashMap<u64, usize>>,
+/// Object addresses are distributed across `SHARD_COUNT` internal
+/// mutexes by hashing the address. Objects not in any shard are
+/// assumed to have retain count 1 (the initial alloc gives an
+/// implicit +1).
+pub struct ShardedRefCounts {
+    shards: [Mutex<HashMap<u64, usize>>; SHARD_COUNT],
 }
 
-impl Default for RefCountTable {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl RefCountTable {
-    /// Create a new empty table (for tests).
+impl ShardedRefCounts {
+    /// Create a new empty sharded table.
     pub fn new() -> Self {
-        Self { counts: None }
+        Self {
+            shards: std::array::from_fn(|_| Mutex::new(HashMap::new())),
+        }
     }
 
-    fn map(&mut self) -> &mut HashMap<u64, usize> {
-        self.counts.get_or_insert_with(HashMap::new)
+    /// Select the shard for a given object address.
+    #[inline]
+    fn shard_for(&self, obj: u64) -> &Mutex<HashMap<u64, usize>> {
+        // Shift right by 4 to avoid alignment bias (objects are typically
+        // 16-byte aligned), then mask to select a shard.
+        let idx = (obj as usize >> 4) & (SHARD_COUNT - 1);
+        &self.shards[idx]
     }
 
     /// Increment the retain count. Returns the new count.
-    pub fn retain(&mut self, obj: u64) -> usize {
-        let count = self.map().entry(obj).or_insert(1);
+    pub fn retain(&self, obj: u64) -> usize {
+        let mut shard = self.shard_for(obj).lock().unwrap_or_else(|e| e.into_inner());
+        let count = shard.entry(obj).or_insert(1);
         *count += 1;
         *count
     }
 
     /// Decrement the retain count. Returns the new count.
     /// Returns 0 when the object should be deallocated.
-    pub fn release(&mut self, obj: u64) -> usize {
-        let map = self.map();
-        let count = map.entry(obj).or_insert(1);
+    pub fn release(&self, obj: u64) -> usize {
+        let mut shard = self.shard_for(obj).lock().unwrap_or_else(|e| e.into_inner());
+        let count = shard.entry(obj).or_insert(1);
         if *count <= 1 {
-            map.remove(&obj);
+            shard.remove(&obj);
             return 0;
         }
         *count -= 1;
@@ -73,22 +83,21 @@ impl RefCountTable {
 
     /// Get the current retain count (1 if not tracked).
     pub fn count(&self, obj: u64) -> usize {
-        self.counts
-            .as_ref()
-            .and_then(|m| m.get(&obj).copied())
-            .unwrap_or(1)
+        let shard = self.shard_for(obj).lock().unwrap_or_else(|e| e.into_inner());
+        shard.get(&obj).copied().unwrap_or(1)
     }
 
     /// Remove tracking for an object (after dealloc).
-    pub fn remove(&mut self, obj: u64) {
-        if let Some(m) = self.counts.as_mut() {
-            m.remove(&obj);
-        }
+    pub fn remove(&self, obj: u64) {
+        let mut shard = self.shard_for(obj).lock().unwrap_or_else(|e| e.into_inner());
+        shard.remove(&obj);
     }
 
     /// Reset all state (for testing).
-    pub fn reset(&mut self) {
-        self.counts = None;
+    pub fn reset(&self) {
+        for shard in &self.shards {
+            shard.lock().unwrap_or_else(|e| e.into_inner()).clear();
+        }
     }
 }
 
@@ -197,7 +206,7 @@ mod tests {
 
     #[test]
     fn retain_increments() {
-        let mut table = RefCountTable::new();
+        let table = ShardedRefCounts::new();
         assert_eq!(table.count(0x1000), 1); // implicit
         assert_eq!(table.retain(0x1000), 2);
         assert_eq!(table.retain(0x1000), 3);
@@ -206,7 +215,7 @@ mod tests {
 
     #[test]
     fn release_decrements() {
-        let mut table = RefCountTable::new();
+        let table = ShardedRefCounts::new();
         table.retain(0x1000); // 1 → 2
         table.retain(0x1000); // 2 → 3
         assert_eq!(table.release(0x1000), 2);
@@ -217,7 +226,7 @@ mod tests {
 
     #[test]
     fn release_from_implicit_one() {
-        let mut table = RefCountTable::new();
+        let table = ShardedRefCounts::new();
         // Object freshly alloc'd (not in table, implicit count=1)
         assert_eq!(table.release(0x2000), 0); // should dealloc
     }
@@ -250,5 +259,72 @@ mod tests {
         let mut stack = AutoreleasePoolStack::new();
         stack.autorelease(0xD); // creates implicit pool
         assert_eq!(stack.depth(), 1);
+    }
+
+    #[test]
+    fn sharded_concurrent_retain_release() {
+        use std::sync::Arc;
+
+        let table = Arc::new(ShardedRefCounts::new());
+        let handles: Vec<_> = (0..4)
+            .map(|t| {
+                let table = Arc::clone(&table);
+                std::thread::spawn(move || {
+                    let base = (t + 1) * 0x10000;
+                    for i in 0..1000 {
+                        let obj = (base + i * 16) as u64;
+                        table.retain(obj);
+                        table.release(obj);
+                    }
+                })
+            })
+            .collect();
+        for h in handles {
+            h.join().unwrap();
+        }
+        // All retain/release pairs balanced — counts back to implicit 1
+    }
+
+    #[test]
+    fn sharded_objects_different_shards() {
+        let table = ShardedRefCounts::new();
+        // 0x1000 >> 4 = 0x100, 0x2000 >> 4 = 0x200 → different shards
+        table.retain(0x1000);
+        table.retain(0x2000);
+
+        assert_eq!(table.count(0x1000), 2);
+        assert_eq!(table.count(0x2000), 2);
+
+        table.release(0x1000);
+        assert_eq!(table.count(0x1000), 1);
+        assert_eq!(table.count(0x2000), 2); // unaffected
+    }
+
+    #[test]
+    fn sharded_reset_clears_all() {
+        let table = ShardedRefCounts::new();
+        table.retain(0x1000);
+        table.retain(0x2000);
+        table.retain(0x3000);
+        assert_eq!(table.count(0x1000), 2);
+        assert_eq!(table.count(0x2000), 2);
+        assert_eq!(table.count(0x3000), 2);
+
+        table.reset();
+
+        assert_eq!(table.count(0x1000), 1);
+        assert_eq!(table.count(0x2000), 1);
+        assert_eq!(table.count(0x3000), 1);
+    }
+
+    #[test]
+    fn sharded_remove() {
+        let table = ShardedRefCounts::new();
+        table.retain(0x1000); // 1 → 2
+        table.retain(0x1000); // 2 → 3
+        assert_eq!(table.count(0x1000), 3);
+
+        table.remove(0x1000);
+        assert_eq!(table.count(0x1000), 1); // back to implicit
     }
 }

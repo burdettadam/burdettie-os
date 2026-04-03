@@ -37,7 +37,7 @@ pub mod typestate;
 pub use config::{RuntimeConfig, ShimSet};
 pub use context::RuntimeContext;
 pub use error::RuntimeError;
-pub use resolver::CompositeResolver;
+pub use resolver::{CompositeResolver, EagerCacheResolver};
 pub use tracer::{EventKind, RuntimeEvent, RuntimeTracer, TRACER_SCHEMA_VERSION};
 
 use std::path::Path;

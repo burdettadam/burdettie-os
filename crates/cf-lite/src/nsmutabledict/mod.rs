@@ -28,10 +28,7 @@ const INITIAL_CAPACITY: u64 = 4;
 /// Skips nil and objects that aren't heap-allocated.
 fn retain_stored(obj: u64) {
     if obj != 0 {
-        objc_runtime::refcount::REFCOUNTS
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .retain(obj);
+        objc_runtime::refcount::REFCOUNTS.retain(obj);
     }
 }
 

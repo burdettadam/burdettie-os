@@ -9,12 +9,9 @@ pub extern "C" fn shim_objc_autorelease_pool_push() -> u64 {
 pub extern "C" fn shim_objc_autorelease_pool_pop(token: u64) {
     let drained =
         crate::refcount::AUTORELEASE_POOLS.with(|pools| pools.borrow_mut().pop(token as usize));
-    let mut refcounts = crate::refcount::REFCOUNTS
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
     for obj in drained {
         if obj != 0 {
-            let remaining = refcounts.release(obj);
+            let remaining = crate::refcount::REFCOUNTS.release(obj);
             if remaining == 0 {
                 crate::refcount::deallocate_tracked_object(obj, "autorelease pool");
             }
@@ -27,10 +24,7 @@ pub extern "C" fn shim_objc_retain(obj: u64) -> u64 {
     if obj == 0 {
         return 0;
     }
-    crate::refcount::REFCOUNTS
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .retain(obj);
+    crate::refcount::REFCOUNTS.retain(obj);
     obj
 }
 
@@ -39,10 +33,7 @@ pub extern "C" fn shim_objc_release(obj: u64) {
     if obj == 0 {
         return;
     }
-    let remaining = crate::refcount::REFCOUNTS
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .release(obj);
+    let remaining = crate::refcount::REFCOUNTS.release(obj);
     if remaining == 0 {
         crate::refcount::deallocate_tracked_object(obj, "objc_release");
     }
@@ -243,10 +234,7 @@ pub extern "C" fn shim_nsobject_retain_count(obj: u64, _cmd: u64) -> u64 {
     if obj == 0 {
         return 0;
     }
-    crate::refcount::REFCOUNTS
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .count(obj) as u64
+    crate::refcount::REFCOUNTS.count(obj) as u64
 }
 
 /// `-[NSObject dealloc]` — no-op; actual free happens in objc_release.

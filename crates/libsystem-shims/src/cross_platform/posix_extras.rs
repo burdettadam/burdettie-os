@@ -232,13 +232,26 @@ pub extern "C" fn shim_atexit_b(block: u64) -> c_int {
 }
 
 /// bootstrap_look_up: Mach bootstrap server lookup.
-/// Returns BOOTSTRAP_NOT_PRIVILEGED (1100) on Linux.
+///
+/// Resolves a service name to a synthetic Mach port via the internal
+/// bootstrap service registry. Returns `KERN_SUCCESS` (0) on success,
+/// or `BOOTSTRAP_UNKNOWN_SERVICE` (1102) if the name is NULL.
 pub extern "C" fn shim_bootstrap_look_up(
     _bp: u32,
-    _service_name: *const c_char,
-    _sp: *mut u32,
+    service_name: *const c_char,
+    sp: *mut u32,
 ) -> c_int {
-    1100 // BOOTSTRAP_NOT_PRIVILEGED
+    if service_name.is_null() || sp.is_null() {
+        return 1102; // BOOTSTRAP_UNKNOWN_SERVICE
+    }
+    let name = unsafe { std::ffi::CStr::from_ptr(service_name) };
+    let Ok(name_str) = name.to_str() else {
+        return 1102; // BOOTSTRAP_UNKNOWN_SERVICE
+    };
+    let port = crate::darwin_stubs::mach_extras::bootstrap_look_up_service(name_str);
+    unsafe { *sp = port; }
+    log::debug!("bootstrap_look_up(\"{}\") → port {:#x}", name_str, port);
+    0 // KERN_SUCCESS
 }
 
 // ── posix_spawn core ────────────────────────────────────────────────
@@ -506,7 +519,14 @@ mod tests {
 
     #[test]
     fn test_bootstrap_look_up() {
-        assert_eq!(shim_bootstrap_look_up(0, std::ptr::null(), std::ptr::null_mut()), 1100);
+        // NULL service name → BOOTSTRAP_UNKNOWN_SERVICE
+        assert_eq!(shim_bootstrap_look_up(0, std::ptr::null(), std::ptr::null_mut()), 1102);
+        // Valid service name → KERN_SUCCESS (0) + non-zero port
+        let name = b"com.apple.test.service\0";
+        let mut port: u32 = 0;
+        let result = shim_bootstrap_look_up(0, name.as_ptr() as *const c_char, &mut port);
+        assert_eq!(result, 0);
+        assert!(port >= 0x1000);
     }
 
     #[test]

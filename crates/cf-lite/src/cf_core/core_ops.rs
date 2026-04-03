@@ -100,10 +100,7 @@ pub extern "C" fn shim_cf_retain(obj: u64) -> u64 {
     if obj == 0 {
         return 0;
     }
-    objc_runtime::refcount::REFCOUNTS
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .retain(obj);
+    objc_runtime::refcount::REFCOUNTS.retain(obj);
     obj
 }
 

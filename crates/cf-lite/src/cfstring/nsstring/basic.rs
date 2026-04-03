@@ -385,10 +385,7 @@ pub extern "C" fn shim_cf_release(obj: u64) {
     if obj == 0 {
         return;
     }
-    let remaining = objc_runtime::refcount::REFCOUNTS
-        .lock()
-        .unwrap()
-        .release(obj);
+    let remaining = objc_runtime::refcount::REFCOUNTS.release(obj);
     if remaining == 0 {
         objc_runtime::refcount::deallocate_tracked_object(obj, "CFRelease");
     }

@@ -101,10 +101,7 @@ pub extern "C" fn shim_block_copy(block: u64) -> u64 {
 
     // Already on heap (malloc block) — bump refcount
     if flags & BLOCK_NEEDS_FREE != 0 {
-        REFCOUNTS
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .retain(block);
+        REFCOUNTS.retain(block);
         return block;
     }
 
@@ -143,10 +140,7 @@ pub extern "C" fn shim_block_copy(block: u64) -> u64 {
     }
 
     // Initial refcount = 1 (the new heap copy)
-    REFCOUNTS
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .retain(heap);
+    REFCOUNTS.retain(heap);
 
     // Call copy helper if BLOCK_HAS_COPY_DISPOSE
     if flags & BLOCK_HAS_COPY_DISPOSE != 0 && desc != 0 {
@@ -184,10 +178,7 @@ pub extern "C" fn shim_block_release(block: u64) {
         return;
     }
 
-    let remaining = REFCOUNTS
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .release(block);
+    let remaining = REFCOUNTS.release(block);
 
     if remaining == 0 {
         // Call dispose helper if present
@@ -312,10 +303,7 @@ pub extern "C" fn shim_block_object_assign(dest_addr: u64, object: u64, flags: u
     match kind {
         BLOCK_FIELD_IS_OBJECT => {
             // Retain the ObjC object and store pointer
-            crate::refcount::REFCOUNTS
-                .lock()
-                .unwrap_or_else(|e| e.into_inner())
-                .retain(object);
+            crate::refcount::REFCOUNTS.retain(object);
             unsafe { *(dest_addr as *mut u64) = object; }
         }
         BLOCK_FIELD_IS_BLOCK => {
@@ -348,10 +336,7 @@ pub extern "C" fn shim_block_object_dispose(object: u64, flags: u32) {
     let kind = flags & 0xFF;
     match kind {
         BLOCK_FIELD_IS_OBJECT => {
-            let remaining = crate::refcount::REFCOUNTS
-                .lock()
-                .unwrap_or_else(|e| e.into_inner())
-                .release(object);
+            let remaining = crate::refcount::REFCOUNTS.release(object);
             if remaining == 0 {
                 crate::refcount::deallocate_tracked_object(object, "block_object_dispose");
             }
@@ -622,13 +607,10 @@ mod tests {
         shim_block_object_assign(&mut dest as *mut u64 as u64, obj, BLOCK_FIELD_IS_OBJECT);
         assert_eq!(dest, obj);
         // Object was retained — refcount should be > 0
-        let count = crate::refcount::REFCOUNTS
-            .lock()
-            .unwrap()
-            .count(obj);
+        let count = crate::refcount::REFCOUNTS.count(obj);
         assert!(count >= 1);
         // Clean up
-        crate::refcount::REFCOUNTS.lock().unwrap().release(obj);
+        crate::refcount::REFCOUNTS.release(obj);
         crate::pal_alloc().free(obj as *mut u8);
     }
 

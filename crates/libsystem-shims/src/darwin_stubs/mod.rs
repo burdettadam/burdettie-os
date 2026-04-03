@@ -20,7 +20,7 @@ pub(crate) mod dyld_introspection;
 mod iokit;
 mod keymgr;
 mod launch_services;
-mod mach_extras;
+pub(crate) mod mach_extras;
 mod malloc_zone;
 mod misc;
 mod mobile_gestalt;

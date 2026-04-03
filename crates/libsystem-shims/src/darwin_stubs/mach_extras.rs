@@ -72,22 +72,169 @@ pub extern "C" fn shim_mach_continuous_time() -> u64 {
 
 pub extern "C" fn shim_mach_msg_destroy(_msg: u64) {}
 
-/// `mach_msg` / `mach_msg_trap` stub — returns `MACH_SEND_INVALID_DEST`.
+/// `mach_msg` / `mach_msg_trap` — basic MIG routing for known message IDs.
 ///
-/// Signature matches `mach_msg(msg, options, send_size, rcv_size, rcv_name,
-/// timeout, notify)`. There is no real Mach IPC in the lab environment;
-/// any code path that reaches this should treat the error as "port invalid".
+/// Parses the `mach_msg_header_t` to determine the MIG routine:
+/// - msgh_id 403: `bootstrap_look_up` — look up a service name in the
+///   bootstrap namespace and return a synthetic send right.
+/// - All other message IDs return `MACH_SEND_INVALID_DEST`.
+///
+/// This is sufficient for code that uses the raw MIG interface for
+/// bootstrap service lookups (e.g. `xpc_pipe_routine` → launchd).
 pub extern "C" fn shim_mach_msg(
-    _msg: u64,
-    _options: u32,
-    _send_size: u32,
-    _rcv_size: u32,
-    _rcv_name: u32,
+    msg: u64,
+    options: u32,
+    send_size: u32,
+    rcv_size: u32,
+    rcv_name: u32,
     _timeout: u32,
     _notify: u32,
 ) -> u32 {
-    // MACH_SEND_INVALID_DEST = 0x10000003
-    0x10000003u32
+    if msg == 0 || send_size < 24 {
+        return MACH_SEND_INVALID_DEST;
+    }
+
+    // Read mach_msg_header_t at `msg` (24 bytes):
+    //   bits(4) + size(4) + remote_port(4) + local_port(4) + voucher(4) + id(4)
+    let hdr = msg as *const u8;
+    let msgh_id = unsafe {
+        i32::from_le_bytes([
+            *hdr.add(20), *hdr.add(21), *hdr.add(22), *hdr.add(23),
+        ])
+    };
+
+    let is_send_recv = (options & (MACH_SEND_MSG | MACH_RCV_MSG)) == (MACH_SEND_MSG | MACH_RCV_MSG);
+
+    match msgh_id {
+        // MIG bootstrap_look_up request (routine 403)
+        MIG_BOOTSTRAP_LOOK_UP if is_send_recv => {
+            handle_bootstrap_look_up_mig(msg, rcv_size)
+        }
+        _ => {
+            log::debug!("mach_msg: unhandled msgh_id={}, returning MACH_SEND_INVALID_DEST", msgh_id);
+            MACH_SEND_INVALID_DEST
+        }
+    }
+}
+
+// Mach message option flags
+const MACH_SEND_MSG: u32 = 0x00000001;
+const MACH_RCV_MSG: u32 = 0x00000002;
+const MACH_SEND_INVALID_DEST: u32 = 0x10000003;
+
+// MIG routine numbers
+const MIG_BOOTSTRAP_LOOK_UP: i32 = 403;
+
+/// Handle MIG routine 403 (bootstrap_look_up).
+///
+/// Request layout (after 24-byte header):
+///   NDR_record (16 bytes) + service_name (128 bytes inline char[])
+///
+/// Reply layout (after 24-byte header):
+///   NDR_record (16 bytes) + return_code (4 bytes) + service_port descriptor
+fn handle_bootstrap_look_up_mig(msg: u64, rcv_size: u32) -> u32 {
+    // Read the service name from the request (offset 40 = 24 hdr + 16 NDR)
+    let name_ptr = (msg + 40) as *const u8;
+    let name = unsafe {
+        let mut len = 0usize;
+        while len < 128 && *name_ptr.add(len) != 0 {
+            len += 1;
+        }
+        std::str::from_utf8_unchecked(std::slice::from_raw_parts(name_ptr, len))
+    };
+
+    log::debug!("mach_msg MIG 403: bootstrap_look_up(\"{}\")", name);
+
+    // Look up or create a synthetic port for this service.
+    let port = BOOTSTRAP_SERVICES.look_up_or_create(name);
+
+    // Write the reply message.
+    // Minimum reply = 24 (hdr) + 16 (NDR) + 4 (retcode) + 4 (port) = 48 bytes
+    if rcv_size < 48 {
+        return MACH_SEND_INVALID_DEST;
+    }
+
+    let reply = msg as *mut u8;
+    unsafe {
+        // Zero the reply area first
+        std::ptr::write_bytes(reply, 0, rcv_size.min(256) as usize);
+
+        // Reply header
+        let reply_id: i32 = 403 + 100; // MIG reply = request ID + 100
+        std::ptr::copy_nonoverlapping(reply_id.to_le_bytes().as_ptr(), reply.add(20), 4);
+
+        // Reply size
+        let reply_size: u32 = 48;
+        std::ptr::copy_nonoverlapping(reply_size.to_le_bytes().as_ptr(), reply.add(4), 4);
+
+        // NDR record at offset 24 (standard little-endian)
+        *reply.add(27) = 1; // mig_encoding = NDR_PROTOCOL_2_0
+        *reply.add(28) = 1; // int_rep = little-endian
+
+        // Return code = KERN_SUCCESS (0) at offset 40
+        // (already zeroed)
+
+        // Service port at offset 44
+        std::ptr::copy_nonoverlapping(port.to_le_bytes().as_ptr(), reply.add(44), 4);
+    }
+
+    0 // MACH_MSG_SUCCESS
+}
+
+/// Bootstrap service registry — maps service names to synthetic Mach ports.
+///
+/// Thread-safe via `Mutex`. Ports are allocated from a monotonic counter
+/// starting at `0x1000` (above the synthetic host/task port range).
+struct BootstrapServiceRegistry {
+    inner: std::sync::OnceLock<std::sync::Mutex<BootstrapRegistryInner>>,
+}
+
+struct BootstrapRegistryInner {
+    services: std::collections::HashMap<String, u32>,
+    next_port: u32,
+}
+
+impl BootstrapServiceRegistry {
+    const fn new() -> Self {
+        Self {
+            inner: std::sync::OnceLock::new(),
+        }
+    }
+
+    fn get_inner(&self) -> &std::sync::Mutex<BootstrapRegistryInner> {
+        self.inner.get_or_init(|| {
+            std::sync::Mutex::new(BootstrapRegistryInner {
+                services: std::collections::HashMap::new(),
+                next_port: 0x1000,
+            })
+        })
+    }
+
+    /// Look up an existing service or create a new synthetic port.
+    fn look_up_or_create(&self, name: &str) -> u32 {
+        let mut inner = self.get_inner().lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(&port) = inner.services.get(name) {
+            return port;
+        }
+        let port = inner.next_port;
+        inner.next_port += 1;
+        inner.services.insert(name.to_string(), port);
+        log::debug!("bootstrap: registered \"{}\" → port {:#x}", name, port);
+        port
+    }
+
+    /// Look up a service by name.
+    fn look_up(&self, name: &str) -> Option<u32> {
+        let inner = self.get_inner().lock().unwrap_or_else(|e| e.into_inner());
+        inner.services.get(name).copied()
+    }
+}
+
+static BOOTSTRAP_SERVICES: BootstrapServiceRegistry = BootstrapServiceRegistry::new();
+
+/// Public entry point for `bootstrap_look_up` C wrapper (posix_extras.rs).
+pub fn bootstrap_look_up_service(name: &str) -> u32 {
+    BOOTSTRAP_SERVICES.look_up_or_create(name)
 }
 
 /// KERN_INVALID_ARGUMENT = 4
@@ -368,5 +515,99 @@ mod tests {
     #[test]
     fn host_statistics64_stub() {
         assert_eq!(shim_host_statistics64(0, 0, std::ptr::null_mut(), std::ptr::null_mut()), 0);
+    }
+
+    // ── Bootstrap / mach_msg tests ──────────────────────────────
+
+    #[test]
+    fn bootstrap_registry_creates_ports() {
+        let reg = BootstrapServiceRegistry::new();
+        let port = reg.look_up_or_create("com.test.creates_ports");
+        assert!(port >= 0x1000, "port {:#x} should be >= 0x1000", port);
+    }
+
+    #[test]
+    fn bootstrap_registry_same_service_same_port() {
+        let reg = BootstrapServiceRegistry::new();
+        let p1 = reg.look_up_or_create("com.test.same_service");
+        let p2 = reg.look_up_or_create("com.test.same_service");
+        assert_eq!(p1, p2);
+    }
+
+    #[test]
+    fn bootstrap_registry_different_services_different_ports() {
+        let reg = BootstrapServiceRegistry::new();
+        let p1 = reg.look_up_or_create("com.test.service_a");
+        let p2 = reg.look_up_or_create("com.test.service_b");
+        assert_ne!(p1, p2);
+    }
+
+    #[test]
+    fn mach_msg_null_returns_error() {
+        let rc = shim_mach_msg(0, 0, 0, 0, 0, 0, 0);
+        assert_eq!(rc, MACH_SEND_INVALID_DEST);
+    }
+
+    #[test]
+    fn mach_msg_unknown_id_returns_error() {
+        // Allocate a 24-byte header with an unknown msgh_id (999)
+        let mut buf = vec![0u8; 64];
+        let unknown_id: i32 = 999;
+        buf[20..24].copy_from_slice(&unknown_id.to_le_bytes());
+        let rc = shim_mach_msg(
+            buf.as_mut_ptr() as u64,
+            MACH_SEND_MSG | MACH_RCV_MSG,
+            24,  // send_size
+            64,  // rcv_size
+            0, 0, 0,
+        );
+        assert_eq!(rc, MACH_SEND_INVALID_DEST);
+    }
+
+    #[test]
+    fn mach_msg_bootstrap_look_up_succeeds() {
+        // Build a MIG 403 (bootstrap_look_up) request:
+        //   24-byte header + 16-byte NDR + 128-byte service name = 168 bytes
+        // Use 256 bytes for send+rcv buffer.
+        let mut buf = vec![0u8; 256];
+
+        // --- Header (24 bytes) ---
+        // msgh_bits at offset 0 (unused by our shim, leave 0)
+        // msgh_size at offset 4
+        let send_size: u32 = 168;
+        buf[4..8].copy_from_slice(&send_size.to_le_bytes());
+        // msgh_remote_port at offset 8, msgh_local_port at offset 12,
+        // msgh_voucher at offset 16 — leave 0
+        // msgh_id at offset 20 = 403
+        let msg_id: i32 = 403;
+        buf[20..24].copy_from_slice(&msg_id.to_le_bytes());
+
+        // --- NDR record (16 bytes at offset 24) ---
+        // bytes 3 = 1 (mig_encoding), byte 4 = 1 (int_rep)
+        buf[27] = 1;
+        buf[28] = 1;
+
+        // --- Service name (128 bytes at offset 40) ---
+        let svc = b"com.apple.test.shim_msg";
+        buf[40..40 + svc.len()].copy_from_slice(svc);
+        // rest is already zero (null terminated)
+
+        let rcv_size: u32 = 256;
+        let rc = shim_mach_msg(
+            buf.as_mut_ptr() as u64,
+            MACH_SEND_MSG | MACH_RCV_MSG,
+            send_size,
+            rcv_size,
+            0, 0, 0,
+        );
+        assert_eq!(rc, 0, "mach_msg should return MACH_MSG_SUCCESS (0)");
+
+        // Reply header msgh_id should be 403 + 100 = 503
+        let reply_id = i32::from_le_bytes([buf[20], buf[21], buf[22], buf[23]]);
+        assert_eq!(reply_id, 503);
+
+        // Service port at reply offset 44
+        let port = u32::from_le_bytes([buf[44], buf[45], buf[46], buf[47]]);
+        assert!(port >= 0x1000, "reply port {:#x} should be >= 0x1000", port);
     }
 }

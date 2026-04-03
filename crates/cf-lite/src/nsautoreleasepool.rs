@@ -38,12 +38,9 @@ pub extern "C" fn shim_nsautoreleasepool_drain(obj: u64, _cmd: u64) {
     let token = unsafe { *((obj as usize + TOKEN_OFF) as *const u64) };
     let drained = objc_runtime::refcount::AUTORELEASE_POOLS
         .with(|pools| pools.borrow_mut().pop(token as usize));
-    let mut refcounts = objc_runtime::refcount::REFCOUNTS
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
     for o in drained {
         if o != 0 {
-            let remaining = refcounts.release(o);
+            let remaining = objc_runtime::refcount::REFCOUNTS.release(o);
             if remaining == 0 {
                 crate::pal_alloc().free(o as *mut u8);
             }
