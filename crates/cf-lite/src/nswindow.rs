@@ -454,6 +454,19 @@ pub extern "C" fn shim_nswindow_perform_close(obj: u64, _cmd: u64, _sender: u64)
     shim_nswindow_close(obj, 0);
 }
 
+/// `-[NSWindow contentLayoutGuide]` — returns an NSLayoutGuide whose anchors
+/// match the window's content view bounds.
+pub extern "C" fn shim_nswindow_content_layout_guide(obj: u64, _cmd: u64) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
+    let content_view = read_u64(obj, CONTENT_VIEW_OFF);
+    if content_view == 0 {
+        return 0;
+    }
+    crate::nslayoutguide::make_layout_guide(content_view)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1407,5 +1420,30 @@ mod tests {
     #[test]
     fn set_background_color_nil_does_not_crash() {
         shim_nswindow_set_background_color(0, 0, 0xBEEF);
+    }
+
+    // ── contentLayoutGuide ─────────────────────────────────────
+
+    #[test]
+    fn content_layout_guide_returns_guide_for_content_view() {
+        let _lock = WINDOW_TEST_LOCK.lock();
+        let rect = CGRect { origin: CGPoint { x: 0.0, y: 0.0 }, size: CGSize { width: 400.0, height: 300.0 } };
+        let window = alloc_window(rect, 0);
+        let content_view = shim_nswindow_content_view(window, 0);
+        assert_ne!(content_view, 0);
+
+        let guide = shim_nswindow_content_layout_guide(window, 0);
+        assert_ne!(guide, 0);
+
+        // Guide's owning view should be the content view.
+        let owning = crate::nslayoutguide::shim_nslayoutguide_owning_view(guide, 0);
+        assert_eq!(owning, content_view);
+
+        free_obj(guide);
+    }
+
+    #[test]
+    fn content_layout_guide_nil_safety() {
+        assert_eq!(shim_nswindow_content_layout_guide(0, 0), 0);
     }
 }

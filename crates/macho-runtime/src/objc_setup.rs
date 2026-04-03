@@ -558,6 +558,13 @@ fn populate_foundation_runtime(objc_rt: &mut objc_runtime::ObjcRuntime) {
     cf_lite::FoundationShims::register_cbcentralmanager_class(objc_rt);
     cf_lite::FoundationShims::register_cbperipheralmanager_class(objc_rt);
 
+    // Phase C11 — Layout Anchors, Layout Guide, VFL, intrinsic content size
+    cf_lite::FoundationShims::register_nslayoutanchor_class(objc_rt);
+    cf_lite::FoundationShims::register_nslayoutguide_class(objc_rt);
+    cf_lite::FoundationShims::register_nsview_anchor_methods(objc_rt);
+    cf_lite::FoundationShims::register_nswindow_layout_guide_method(objc_rt);
+    cf_lite::FoundationShims::register_nslayoutconstraint_vfl_method(objc_rt);
+
     // Register tagged pointer class table (NSNumber=2, NSString=3, NSDate=6).
     cf_lite::FoundationShims::register_tagged_classes(objc_rt);
 }

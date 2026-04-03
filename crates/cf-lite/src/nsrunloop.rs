@@ -288,6 +288,9 @@ fn run_loop_cycle() {
     notify_observers(CF_RUN_LOOP_BEFORE_SOURCES);
     fire_signaled_sources();
     fire_due_timers();
+    // Flush pending Auto Layout passes before waiting — mirrors Apple's
+    // CATransaction::commit() / layout flush at kCFRunLoopBeforeWaiting.
+    crate::layout_solver::flush_pending_layouts();
     notify_observers(CF_RUN_LOOP_BEFORE_WAITING);
 }
 

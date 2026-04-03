@@ -249,6 +249,8 @@ pub fn register_nsstackview_class(rt: &mut objc_runtime::ObjcRuntime) {
             me("setAlignment:", nsstackview::shim_nsstackview_set_alignment as u64, "v@:Q"),
             me("addArrangedSubview:", nsstackview::shim_nsstackview_add_arranged_subview as u64, "v@:@"),
             me("removeArrangedSubview:", nsstackview::shim_nsstackview_remove_arranged_subview as u64, "v@:@"),
+            me("arrangedSubviews", nsstackview::shim_nsstackview_arranged_subviews as u64, "@@:"),
+            me("insertArrangedSubview:atIndex:", nsstackview::shim_nsstackview_insert_arranged_subview as u64, "v@:@Q"),
         ],
         class_methods: vec![
             me("stackViewWithViews:", nsstackview::shim_nsstackview_stack_view_with_views as u64, "@@:@"),

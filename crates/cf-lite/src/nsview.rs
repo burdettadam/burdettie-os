@@ -359,6 +359,57 @@ pub extern "C" fn shim_nsview_set_needs_update_constraints(obj: u64, _cmd: u64) 
     crate::layout_solver::set_needs_layout(obj, true);
 }
 
+// ── Intrinsic content size ──────────────────────────────────────
+
+/// `NSViewNoIntrinsicMetric` — sentinel meaning "no intrinsic size on this axis".
+pub const NO_INTRINSIC_METRIC: f64 = -1.0;
+
+/// `-[NSView intrinsicContentSize]` — base implementation returns {-1, -1}.
+/// Returns width in x0, height in x1 (two f64s).
+pub extern "C" fn shim_nsview_intrinsic_content_size_w(_obj: u64, _cmd: u64) -> f64 {
+    NO_INTRINSIC_METRIC
+}
+
+/// Second half of intrinsicContentSize (height).
+pub extern "C" fn shim_nsview_intrinsic_content_size_h(_obj: u64, _cmd: u64) -> f64 {
+    NO_INTRINSIC_METRIC
+}
+
+/// `-[NSView invalidateIntrinsicContentSize]` — marks layout as needing update.
+pub extern "C" fn shim_nsview_invalidate_intrinsic_content_size(obj: u64, _cmd: u64) {
+    crate::layout_solver::set_needs_layout(obj, true);
+}
+
+/// `-[NSView contentHuggingPriorityForOrientation:]`
+/// Returns default 250 (NSLayoutPriorityDefaultLow).
+pub extern "C" fn shim_nsview_content_hugging_priority(_obj: u64, _cmd: u64, _orientation: u64) -> f64 {
+    250.0
+}
+
+/// `-[NSView setContentHuggingPriority:forOrientation:]` — no-op (priorities not stored yet).
+pub extern "C" fn shim_nsview_set_content_hugging_priority(_obj: u64, _cmd: u64, _priority: f64, _orientation: u64) {}
+
+/// `-[NSView contentCompressionResistancePriorityForOrientation:]`
+/// Returns default 750 (NSLayoutPriorityDefaultHigh).
+pub extern "C" fn shim_nsview_content_compression_resistance_priority(_obj: u64, _cmd: u64, _orientation: u64) -> f64 {
+    750.0
+}
+
+/// `-[NSView setContentCompressionResistancePriority:forOrientation:]` — no-op.
+pub extern "C" fn shim_nsview_set_content_compression_resistance_priority(_obj: u64, _cmd: u64, _priority: f64, _orientation: u64) {}
+
+/// `-[NSView fittingSize]` — returns intrinsic content size (or 0,0 if no intrinsic).
+pub extern "C" fn shim_nsview_fitting_size_w(obj: u64, _cmd: u64) -> f64 {
+    let w = shim_nsview_intrinsic_content_size_w(obj, 0);
+    if w < 0.0 { 0.0 } else { w }
+}
+
+/// Second half of fittingSize (height).
+pub extern "C" fn shim_nsview_fitting_size_h(obj: u64, _cmd: u64) -> f64 {
+    let h = shim_nsview_intrinsic_content_size_h(obj, 0);
+    if h < 0.0 { 0.0 } else { h }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -778,5 +829,55 @@ mod tests {
         shim_nsview_set_wants_layer(obj, 0, 1);
         assert_eq!(shim_nsview_layer(obj, 0), 0);
         free_obj(obj);
+    }
+
+    // ── intrinsic content size ─────────────────────────────────
+
+    #[test]
+    fn intrinsic_content_size_default_no_metric() {
+        let view = make_view();
+        assert!((shim_nsview_intrinsic_content_size_w(view, 0) - NO_INTRINSIC_METRIC).abs() < f64::EPSILON);
+        assert!((shim_nsview_intrinsic_content_size_h(view, 0) - NO_INTRINSIC_METRIC).abs() < f64::EPSILON);
+        free_obj(view);
+    }
+
+    #[test]
+    fn content_hugging_default_low() {
+        let view = make_view();
+        assert!((shim_nsview_content_hugging_priority(view, 0, 0) - 250.0).abs() < f64::EPSILON);
+        assert!((shim_nsview_content_hugging_priority(view, 0, 1) - 250.0).abs() < f64::EPSILON);
+        free_obj(view);
+    }
+
+    #[test]
+    fn compression_resistance_default_high() {
+        let view = make_view();
+        assert!((shim_nsview_content_compression_resistance_priority(view, 0, 0) - 750.0).abs() < f64::EPSILON);
+        free_obj(view);
+    }
+
+    #[test]
+    fn fitting_size_zero_when_no_intrinsic() {
+        let view = make_view();
+        assert!((shim_nsview_fitting_size_w(view, 0)).abs() < f64::EPSILON);
+        assert!((shim_nsview_fitting_size_h(view, 0)).abs() < f64::EPSILON);
+        free_obj(view);
+    }
+
+    #[test]
+    fn invalidate_intrinsic_marks_needs_layout() {
+        let view = make_view();
+        assert_eq!(shim_nsview_needs_layout(view, 0), 0);
+        shim_nsview_invalidate_intrinsic_content_size(view, 0);
+        assert_eq!(shim_nsview_needs_layout(view, 0), 1);
+        free_obj(view);
+    }
+
+    #[test]
+    fn intrinsic_nil_safety() {
+        assert!((shim_nsview_intrinsic_content_size_w(0, 0) - NO_INTRINSIC_METRIC).abs() < f64::EPSILON);
+        shim_nsview_invalidate_intrinsic_content_size(0, 0);
+        shim_nsview_set_content_hugging_priority(0, 0, 500.0, 0);
+        shim_nsview_set_content_compression_resistance_priority(0, 0, 500.0, 0);
     }
 }

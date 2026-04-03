@@ -456,6 +456,24 @@ pub(crate) fn reset_global_state() {
     *guard = None;
 }
 
+/// Flush pending layouts for all views that have `needs_layout` set.
+///
+/// Called by the run loop before waiting (`kCFRunLoopBeforeWaiting`) to
+/// coalesce layout passes, just as Apple's real implementation does.
+pub(crate) fn flush_pending_layouts() {
+    let views_needing_layout: Vec<u64> = with_state(|state| {
+        state
+            .view_constraints
+            .keys()
+            .copied()
+            .filter(|&v| v != 0 && needs_layout(v))
+            .collect()
+    });
+    for view in views_needing_layout {
+        layout_if_needed(view);
+    }
+}
+
 /// Alias for tests.
 #[cfg(test)]
 pub(crate) fn reset() {
@@ -818,6 +836,29 @@ mod tests {
 
         free_obj(right);
         free_obj(left);
+        free_obj(parent);
+    }
+
+    #[test]
+    fn flush_pending_layouts_clears_needs_layout() {
+        let _lock = TEST_LOCK.lock();
+        reset();
+
+        let parent = make_view(0.0, 0.0, 400.0, 300.0);
+        let child = make_view(0.0, 0.0, 100.0, 50.0);
+        add_subview_raw(parent, child);
+
+        // Add a width constraint and mark needs layout.
+        let c = make_width_constraint(child, 200.0);
+        add_constraint(parent, c);
+        set_needs_layout(parent, true);
+        assert!(needs_layout(parent));
+
+        // Flush should clear the flag.
+        flush_pending_layouts();
+        assert!(!needs_layout(parent), "flush should clear needs_layout");
+
+        free_obj(child);
         free_obj(parent);
     }
 }

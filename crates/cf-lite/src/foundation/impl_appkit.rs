@@ -406,4 +406,26 @@ impl FoundationShims {
     pub fn register_cbperipheralmanager_class(rt: &mut objc_runtime::ObjcRuntime) {
         register::register_cbperipheralmanager_class(rt);
     }
+
+    // ── Phase C11: Layout Anchors, Layout Guide, VFL, intrinsic content size ───
+
+    pub fn register_nslayoutanchor_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nslayoutanchor_class(rt);
+    }
+
+    pub fn register_nslayoutguide_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nslayoutguide_class(rt);
+    }
+
+    pub fn register_nsview_anchor_methods(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsview_anchor_methods(rt);
+    }
+
+    pub fn register_nswindow_layout_guide_method(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nswindow_layout_guide_method(rt);
+    }
+
+    pub fn register_nslayoutconstraint_vfl_method(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nslayoutconstraint_vfl_method(rt);
+    }
 }

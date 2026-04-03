@@ -326,3 +326,21 @@ define_class_pair!(child NSLAYOUTCONSTRAINT_CLASS_DATA, NSLAYOUTCONSTRAINT_METAC
     meta_addr: nslayoutconstraint_metaclass_addr,
     parent_class: nsobject_class_addr,
     parent_meta: nsobject_metaclass_addr);
+
+// ── NSLayoutAnchor (Auto Layout) ──────────────────────────────
+
+define_class_pair!(child NSLAYOUTANCHOR_CLASS_DATA, NSLAYOUTANCHOR_METACLASS_DATA, NSLAYOUTANCHOR_INIT,
+    ensure: ensure_nslayoutanchor_init,
+    class_addr: nslayoutanchor_class_addr,
+    meta_addr: nslayoutanchor_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+// ── NSLayoutGuide (Auto Layout) ──────────────────────────────
+
+define_class_pair!(child NSLAYOUTGUIDE_CLASS_DATA, NSLAYOUTGUIDE_METACLASS_DATA, NSLAYOUTGUIDE_INIT,
+    ensure: ensure_nslayoutguide_init,
+    class_addr: nslayoutguide_class_addr,
+    meta_addr: nslayoutguide_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
