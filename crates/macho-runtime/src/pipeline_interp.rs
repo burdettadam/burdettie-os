@@ -97,8 +97,8 @@ pub(super) fn run_interpreted(
     );
 
     let stub_resolver = StubResolver::new(host_symbols);
-    let data_symbols = DataSymbolStore::new();
-    let composite = CompositeResolver::new(&ctx.shim_table, &data_symbols, Some(&stub_resolver));
+    let data_symbols = DataSymbolStore::global();
+    let composite = CompositeResolver::new(&ctx.shim_table, data_symbols, Some(&stub_resolver));
 
     // 6. Load + map
     #[cfg(target_os = "macos")]

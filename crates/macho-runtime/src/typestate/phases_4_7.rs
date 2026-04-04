@@ -15,11 +15,7 @@ impl Loader<Mapped> {
     pub fn apply_fixups(mut self) -> Result<Loader<FixedUp>, RuntimeError> {
         {
             let ctx = self.inner.ctx.as_ref().expect("ctx set in map_images");
-            let data_symbols = self
-                .inner
-                .data_symbols
-                .as_ref()
-                .unwrap_or_else(|| panic!("data_symbols set in map_images"));
+            let data_symbols = macho_exec::DataSymbolStore::global();
             let composite =
                 CompositeResolver::new(&ctx.shim_table, data_symbols, self.inner.stub_resolver.as_ref());
             let registry = self.inner

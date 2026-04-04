@@ -147,8 +147,8 @@ pub(super) fn run_native(
         "stub_resolver_setup_us",
         stub_resolver_start.elapsed(),
     );
-    let data_symbols = DataSymbolStore::new();
-    let composite = CompositeResolver::new(&ctx.shim_table, &data_symbols, Some(&stub_resolver));
+    let data_symbols = DataSymbolStore::global();
+    let composite = CompositeResolver::new(&ctx.shim_table, data_symbols, Some(&stub_resolver));
 
     // 5.5. Parse DYLD_INSERT_LIBRARIES and check security gate.
     let insert_lib_paths: Vec<std::path::PathBuf> = {

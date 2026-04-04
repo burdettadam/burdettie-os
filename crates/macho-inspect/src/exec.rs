@@ -158,8 +158,8 @@ pub fn print_exec(parsed: &ParsedMachO, data: &[u8], binary_path: &std::path::Pa
     objc_runtime::set_threading(std::sync::Arc::new(platform_linux::LinuxThreading));
 
     let stub = StubResolver::new(host_syms);
-    let data_symbols = DataSymbolStore::new();
-    let composite = macho_runtime::CompositeResolver::new(&ctx.shim_table, &data_symbols, Some(&stub));
+    let data_symbols = DataSymbolStore::global();
+    let composite = macho_runtime::CompositeResolver::new(&ctx.shim_table, data_symbols, Some(&stub));
     if let Err(e) = registry.apply_all_fixups(&composite) {
         eprintln!("  fixup failed: {e}");
         return;

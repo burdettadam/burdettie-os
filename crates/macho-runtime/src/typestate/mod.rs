@@ -97,7 +97,6 @@ struct LoaderInner {
     #[allow(dead_code)]
     host_symbols: Option<Arc<dyn platform_core::symbols::HostSymbolResolver>>,
     stub_resolver: Option<StubResolver>,
-    data_symbols: Option<macho_exec::DataSymbolStore>,
     registry: Option<ImageRegistry>,
     app_idx: usize,
     initializers_run: usize,

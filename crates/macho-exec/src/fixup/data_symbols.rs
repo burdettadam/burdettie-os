@@ -10,6 +10,10 @@
 //! All data here is 'static — allocated once, lives for process lifetime.
 
 use std::collections::HashMap;
+use std::sync::OnceLock;
+
+/// Process-lifetime singleton for the data symbol store.
+static GLOBAL_STORE: OnceLock<DataSymbolStore> = OnceLock::new();
 
 /// Provides stable non-NULL addresses for data symbols.
 ///
@@ -21,6 +25,14 @@ pub struct DataSymbolStore {
 }
 
 impl DataSymbolStore {
+    /// Return the process-wide singleton, initializing on first call.
+    ///
+    /// All data symbols are `'static` addresses (statics or dlsym results)
+    /// so the store is safe to reuse across pipeline runs.
+    pub fn global() -> &'static Self {
+        GLOBAL_STORE.get_or_init(Self::new)
+    }
+
     /// Create a new store with all known data symbol registrations.
     pub fn new() -> Self {
         let mut store = Self {

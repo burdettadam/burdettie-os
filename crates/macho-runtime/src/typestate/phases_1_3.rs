@@ -57,7 +57,6 @@ impl Loader<Parsed> {
                     ctx: None,
                     host_symbols: None,
                     stub_resolver: None,
-                    data_symbols: None,
                     registry: None,
                     app_idx: 0,
                     initializers_run: 0,
@@ -110,7 +109,6 @@ impl Loader<Parsed> {
                 ctx: None,
                 host_symbols: None,
                 stub_resolver: None,
-                data_symbols: None,
                 registry: None,
                 app_idx: 0,
                 initializers_run: 0,
@@ -205,7 +203,8 @@ impl Loader<Checked> {
 
         let stub_resolver_start = Instant::now();
         let stub_resolver = StubResolver::new(host_symbols.clone());
-        let data_symbols = DataSymbolStore::new();
+        // Ensure DataSymbolStore singleton is initialized (one-time cost).
+        let _ = DataSymbolStore::global();
         inner.tracer.record_perf_timing(
             "map_images",
             "stub_resolver_setup_us",
@@ -265,7 +264,6 @@ impl Loader<Checked> {
         inner.ctx = Some(ctx);
         inner.host_symbols = Some(host_symbols);
         inner.stub_resolver = Some(stub_resolver);
-        inner.data_symbols = Some(data_symbols);
         inner.registry = Some(registry);
         inner.app_idx = app_idx;
 
