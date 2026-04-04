@@ -76,7 +76,7 @@ fn conn_id_for_handle(handle: u64) -> Option<u64> {
 /// Returns the XPC object handle (xpc_connection_t) for the guest.
 pub fn create_connection(name_ptr: u64, _queue: u64, _flags: u64) -> u64 {
     let service_name = if name_ptr != 0 {
-        let cstr = unsafe { std::ffi::CStr::from_ptr(name_ptr as *const i8) };
+        let cstr = unsafe { std::ffi::CStr::from_ptr(name_ptr as *const std::ffi::c_char) };
         Some(cstr.to_str().unwrap_or("unknown").to_string())
     } else {
         None
@@ -735,7 +735,7 @@ pub mod socket_transport {
 
             let name_ptr = xpc_objects::dict_get_string(dict2, b"name\0".as_ptr() as u64);
             assert_ne!(name_ptr, 0);
-            let name = unsafe { std::ffi::CStr::from_ptr(name_ptr as *const i8) };
+            let name = unsafe { std::ffi::CStr::from_ptr(name_ptr as *const std::ffi::c_char) };
             assert_eq!(name.to_str().unwrap(), "hello");
         }
 
@@ -777,7 +777,7 @@ pub mod socket_transport {
             assert_eq!(xpc_objects::dict_get_int64(child_handle, b"x\0".as_ptr() as u64), 99);
             let y_ptr = xpc_objects::dict_get_string(child_handle, b"y\0".as_ptr() as u64);
             assert_ne!(y_ptr, 0);
-            let y_str = unsafe { std::ffi::CStr::from_ptr(y_ptr as *const i8) };
+            let y_str = unsafe { std::ffi::CStr::from_ptr(y_ptr as *const std::ffi::c_char) };
             assert_eq!(y_str.to_str().unwrap(), "nested");
         }
 
@@ -843,7 +843,7 @@ pub mod socket_transport {
             let r_leaf = xpc_objects::array_get_value(r_list, 0);
             let msg_ptr = xpc_objects::dict_get_string(r_leaf, b"msg\0".as_ptr() as u64);
             assert_ne!(msg_ptr, 0);
-            let msg = unsafe { std::ffi::CStr::from_ptr(msg_ptr as *const i8) };
+            let msg = unsafe { std::ffi::CStr::from_ptr(msg_ptr as *const std::ffi::c_char) };
             assert_eq!(msg.to_str().unwrap(), "deep");
         }
 

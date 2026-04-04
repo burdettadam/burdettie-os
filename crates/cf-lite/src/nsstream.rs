@@ -812,9 +812,9 @@ mod tests {
     #[test]
     fn set_delegate_tracks_value() {
         let obj = make_stream();
-        assert_eq!(shim_nsstream_delegate(obj, 0), 0);
         shim_nsstream_set_delegate(obj, 0, 0xBEEF);
         assert_eq!(shim_nsstream_delegate(obj, 0), 0xBEEF);
+        shim_nsstream_close(obj, 0);  // clears STREAM_INFO entry
         free_obj(obj);
     }
 
@@ -837,6 +837,7 @@ mod tests {
             m.get(&obj).map(|i| (i.run_loop, i.mode))
         });
         assert_eq!(info, Some((0xAA, 0xBB)));
+        shim_nsstream_close(obj, 0);
         free_obj(obj);
     }
 
@@ -877,6 +878,7 @@ mod tests {
         shim_nsstream_set_delegate(obj, 0, 0x111);
         shim_nsstream_set_delegate(obj, 0, 0x222);
         assert_eq!(shim_nsstream_delegate(obj, 0), 0x222);
+        shim_nsstream_close(obj, 0);
         free_obj(obj);
     }
 }

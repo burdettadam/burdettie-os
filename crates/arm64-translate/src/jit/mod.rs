@@ -134,12 +134,29 @@ impl CodeBuffer {
         }
         #[cfg(not(target_os = "macos"))]
         {
-            // On Linux, use __builtin___clear_cache equivalent
+            // On Linux, use inline assembly for cache maintenance
             unsafe {
-                libc::__clear_cache(
-                    self.ptr.add(start) as *mut _,
-                    self.ptr.add(end) as *mut _,
-                );
+                let start_ptr = self.ptr.add(start) as usize;
+                let end_ptr = self.ptr.add(end) as usize;
+                // Data cache clean + instruction cache invalidate
+                let mut addr = start_ptr;
+                while addr < end_ptr {
+                    std::arch::asm!(
+                        "dc cvau, {addr}",
+                        addr = in(reg) addr,
+                    );
+                    addr += 64; // cache line size
+                }
+                std::arch::asm!("dsb ish");
+                addr = start_ptr;
+                while addr < end_ptr {
+                    std::arch::asm!(
+                        "ic ivau, {addr}",
+                        addr = in(reg) addr,
+                    );
+                    addr += 64;
+                }
+                std::arch::asm!("dsb ish", "isb");
             }
         }
     }

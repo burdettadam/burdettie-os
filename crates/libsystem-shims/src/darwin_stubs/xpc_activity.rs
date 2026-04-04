@@ -95,7 +95,7 @@ const INTERVAL_KEY: &[u8] = b"_interval_secs\0";
 /// periodically at that interval.
 pub fn register(name_ptr: u64, criteria: u64, handler: u64) {
     let name = if name_ptr != 0 {
-        let cstr = unsafe { std::ffi::CStr::from_ptr(name_ptr as *const i8) };
+        let cstr = unsafe { std::ffi::CStr::from_ptr(name_ptr as *const std::ffi::c_char) };
         cstr.to_str().unwrap_or("unknown").to_string()
     } else {
         let id = NEXT_ACTIVITY_ID.fetch_add(1, Ordering::Relaxed);
@@ -215,7 +215,7 @@ pub fn register(name_ptr: u64, criteria: u64, handler: u64) {
 /// Removes the activity and stops its periodic timer (if any).
 pub fn unregister(name_ptr: u64) {
     if name_ptr == 0 { return; }
-    let cstr = unsafe { std::ffi::CStr::from_ptr(name_ptr as *const i8) };
+    let cstr = unsafe { std::ffi::CStr::from_ptr(name_ptr as *const std::ffi::c_char) };
     let name = cstr.to_str().unwrap_or("unknown");
     log::debug!("xpc_activity: unregistering '{}'", name);
     with_activities(|t| {
@@ -236,7 +236,7 @@ pub fn set_criteria(activity: u64, criteria: u64) {
         b"_name\0".as_ptr() as u64,
     );
     if name_ptr != 0 {
-        let cstr = unsafe { std::ffi::CStr::from_ptr(name_ptr as *const i8) };
+        let cstr = unsafe { std::ffi::CStr::from_ptr(name_ptr as *const std::ffi::c_char) };
         let name = cstr.to_str().unwrap_or("unknown");
         with_activities(|t| {
             if let Some(a) = t.get_mut(name) {

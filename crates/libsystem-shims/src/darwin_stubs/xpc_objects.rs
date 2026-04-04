@@ -138,7 +138,7 @@ pub fn create_string_from_ptr(ptr: u64) -> u64 {
     if ptr == 0 {
         return alloc(XpcValue::String(CString::new("").unwrap()));
     }
-    let cstr = unsafe { CStr::from_ptr(ptr as *const i8) };
+    let cstr = unsafe { CStr::from_ptr(ptr as *const std::ffi::c_char) };
     create_string(cstr)
 }
 
@@ -222,7 +222,7 @@ pub fn dict_get(dict: u64, key: &CStr) -> u64 {
 /// Set a string value in a dictionary.
 pub fn dict_set_string(dict: u64, key_ptr: u64, value_ptr: u64) {
     if key_ptr == 0 { return; }
-    let key = unsafe { CStr::from_ptr(key_ptr as *const i8) };
+    let key = unsafe { CStr::from_ptr(key_ptr as *const std::ffi::c_char) };
     let val_handle = create_string_from_ptr(value_ptr);
     dict_set(dict, key, val_handle);
 }
@@ -230,7 +230,7 @@ pub fn dict_set_string(dict: u64, key_ptr: u64, value_ptr: u64) {
 /// Get a string pointer from a dictionary.
 pub fn dict_get_string(dict: u64, key_ptr: u64) -> u64 {
     if key_ptr == 0 { return 0; }
-    let key = unsafe { CStr::from_ptr(key_ptr as *const i8) };
+    let key = unsafe { CStr::from_ptr(key_ptr as *const std::ffi::c_char) };
     let handle = dict_get(dict, key);
     if handle == 0 { return 0; }
     with_table(|t| {
@@ -245,7 +245,7 @@ pub fn dict_get_string(dict: u64, key_ptr: u64) -> u64 {
 /// Set an int64 in a dictionary.
 pub fn dict_set_int64(dict: u64, key_ptr: u64, value: i64) {
     if key_ptr == 0 { return; }
-    let key = unsafe { CStr::from_ptr(key_ptr as *const i8) };
+    let key = unsafe { CStr::from_ptr(key_ptr as *const std::ffi::c_char) };
     let h = create_int64(value);
     dict_set(dict, key, h);
 }
@@ -253,7 +253,7 @@ pub fn dict_set_int64(dict: u64, key_ptr: u64, value: i64) {
 /// Get an int64 from a dictionary.
 pub fn dict_get_int64(dict: u64, key_ptr: u64) -> i64 {
     if key_ptr == 0 { return 0; }
-    let key = unsafe { CStr::from_ptr(key_ptr as *const i8) };
+    let key = unsafe { CStr::from_ptr(key_ptr as *const std::ffi::c_char) };
     let handle = dict_get(dict, key);
     if handle == 0 { return 0; }
     with_table(|t| {
@@ -267,7 +267,7 @@ pub fn dict_get_int64(dict: u64, key_ptr: u64) -> i64 {
 /// Set a uint64 in a dictionary.
 pub fn dict_set_uint64(dict: u64, key_ptr: u64, value: u64) {
     if key_ptr == 0 { return; }
-    let key = unsafe { CStr::from_ptr(key_ptr as *const i8) };
+    let key = unsafe { CStr::from_ptr(key_ptr as *const std::ffi::c_char) };
     let h = create_uint64(value);
     dict_set(dict, key, h);
 }
@@ -275,7 +275,7 @@ pub fn dict_set_uint64(dict: u64, key_ptr: u64, value: u64) {
 /// Get a uint64 from a dictionary.
 pub fn dict_get_uint64(dict: u64, key_ptr: u64) -> u64 {
     if key_ptr == 0 { return 0; }
-    let key = unsafe { CStr::from_ptr(key_ptr as *const i8) };
+    let key = unsafe { CStr::from_ptr(key_ptr as *const std::ffi::c_char) };
     let handle = dict_get(dict, key);
     if handle == 0 { return 0; }
     with_table(|t| {
@@ -289,7 +289,7 @@ pub fn dict_get_uint64(dict: u64, key_ptr: u64) -> u64 {
 /// Set a bool in a dictionary.
 pub fn dict_set_bool(dict: u64, key_ptr: u64, value: bool) {
     if key_ptr == 0 { return; }
-    let key = unsafe { CStr::from_ptr(key_ptr as *const i8) };
+    let key = unsafe { CStr::from_ptr(key_ptr as *const std::ffi::c_char) };
     let h = create_bool(value);
     dict_set(dict, key, h);
 }
@@ -297,7 +297,7 @@ pub fn dict_set_bool(dict: u64, key_ptr: u64, value: bool) {
 /// Get a bool from a dictionary.
 pub fn dict_get_bool(dict: u64, key_ptr: u64) -> bool {
     if key_ptr == 0 { return false; }
-    let key = unsafe { CStr::from_ptr(key_ptr as *const i8) };
+    let key = unsafe { CStr::from_ptr(key_ptr as *const std::ffi::c_char) };
     let handle = dict_get(dict, key);
     if handle == 0 { return false; }
     with_table(|t| {
@@ -311,7 +311,7 @@ pub fn dict_get_bool(dict: u64, key_ptr: u64) -> bool {
 /// Set data in a dictionary.
 pub fn dict_set_data(dict: u64, key_ptr: u64, data_ptr: u64, len: u64) {
     if key_ptr == 0 { return; }
-    let key = unsafe { CStr::from_ptr(key_ptr as *const i8) };
+    let key = unsafe { CStr::from_ptr(key_ptr as *const std::ffi::c_char) };
     let h = create_data_from_ptr(data_ptr, len);
     dict_set(dict, key, h);
 }
@@ -319,7 +319,7 @@ pub fn dict_set_data(dict: u64, key_ptr: u64, data_ptr: u64, len: u64) {
 /// Get data pointer from a dictionary (returns pointer to bytes, sets length).
 pub fn dict_get_data(dict: u64, key_ptr: u64) -> u64 {
     if key_ptr == 0 { return 0; }
-    let key = unsafe { CStr::from_ptr(key_ptr as *const i8) };
+    let key = unsafe { CStr::from_ptr(key_ptr as *const std::ffi::c_char) };
     let handle = dict_get(dict, key);
     if handle == 0 { return 0; }
     with_table(|t| {
@@ -333,7 +333,7 @@ pub fn dict_get_data(dict: u64, key_ptr: u64) -> u64 {
 /// Set an fd in a dictionary.
 pub fn dict_set_fd(dict: u64, key_ptr: u64, fd: i32) {
     if key_ptr == 0 { return; }
-    let key = unsafe { CStr::from_ptr(key_ptr as *const i8) };
+    let key = unsafe { CStr::from_ptr(key_ptr as *const std::ffi::c_char) };
     let h = create_fd(fd);
     dict_set(dict, key, h);
 }
@@ -605,7 +605,7 @@ mod tests {
         let h = create_string(&cstr);
         let ptr = get_string_ptr(h);
         assert_ne!(ptr, 0);
-        let read = unsafe { CStr::from_ptr(ptr as *const i8) };
+        let read = unsafe { CStr::from_ptr(ptr as *const std::ffi::c_char) };
         assert_eq!(read.to_str().unwrap(), "hello");
         assert_eq!(get_string_length(h), 5);
     }
@@ -652,7 +652,7 @@ mod tests {
         dict_set_string(dict, b"key\0".as_ptr() as u64, b"value\0".as_ptr() as u64);
         let ptr = dict_get_string(dict, b"key\0".as_ptr() as u64);
         assert_ne!(ptr, 0);
-        let read = unsafe { CStr::from_ptr(ptr as *const i8) };
+        let read = unsafe { CStr::from_ptr(ptr as *const std::ffi::c_char) };
         assert_eq!(read.to_str().unwrap(), "value");
     }
 

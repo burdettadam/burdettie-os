@@ -78,7 +78,7 @@ pub fn routine(pipe: u64, request: u64, reply_out: u64) -> i32 {
         return EPIPE;
     }
 
-    let name = unsafe { std::ffi::CStr::from_ptr(name_ptr as *const i8) };
+    let name = unsafe { std::ffi::CStr::from_ptr(name_ptr as *const std::ffi::c_char) };
     let name_str = name.to_str().unwrap_or("");
 
     // Look up handler

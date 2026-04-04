@@ -323,7 +323,7 @@ pub extern "C" fn shim_mig_get_special_reply_port() -> u32 { 0 }
 
 pub extern "C" fn shim_mig_strncpy(dest: *mut u8, src: *const u8, len: u64) {
     if dest.is_null() || src.is_null() { return; }
-    unsafe { libc::strncpy(dest as *mut i8, src as *const i8, len as usize); }
+    unsafe { libc::strncpy(dest as *mut std::ffi::c_char, src as *const std::ffi::c_char, len as usize); }
 }
 
 // ── Host / VM / Task ───────────────────────────────────────────

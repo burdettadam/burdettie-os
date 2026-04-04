@@ -592,7 +592,7 @@ pub fn register_guest_images_with_host_runtime(registry: &macho_exec::ImageRegis
     use std::ffi::c_void;
 
     extern "C" {
-        fn dlsym(handle: *mut c_void, symbol: *const i8) -> *mut c_void;
+        fn dlsym(handle: *mut c_void, symbol: *const std::ffi::c_char) -> *mut c_void;
     }
     const RTLD_DEFAULT: *mut c_void = -2isize as *mut c_void;
 

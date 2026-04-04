@@ -204,7 +204,7 @@ mod tests {
     #[test]
     fn uloc_get_default_returns_en_us() {
         let ptr = shim_uloc_get_default() as *const u8;
-        let s = unsafe { std::ffi::CStr::from_ptr(ptr as *const i8) };
+        let s = unsafe { std::ffi::CStr::from_ptr(ptr as *const std::ffi::c_char) };
         assert_eq!(s.to_str().unwrap(), "en_US");
     }
 

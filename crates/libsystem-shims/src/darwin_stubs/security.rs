@@ -533,7 +533,7 @@ pub extern "C" fn shim_sec_random_copy_bytes(_rng: u64, count: usize, bytes: *mu
         }
         #[cfg(not(target_os = "macos"))]
         {
-            let fd = libc::open(b"/dev/urandom\0".as_ptr() as *const i8, libc::O_RDONLY);
+            let fd = libc::open(b"/dev/urandom\0".as_ptr() as *const std::ffi::c_char, libc::O_RDONLY);
             if fd >= 0 {
                 libc::read(fd, slice.as_mut_ptr() as *mut libc::c_void, count);
                 libc::close(fd);
@@ -655,10 +655,10 @@ mod tests {
     }
 
     fn clear_keychain() {
-        let mut guard = keychain_store();
-        if let Some(store) = guard.as_mut() {
-            store.clear();
-        }
+        // Reset the SQLite keychain DB for test isolation.
+        let mut guard = keychain_db();
+        let db = ensure_keychain(&mut guard);
+        let _ = db.execute("DELETE FROM keychain", []);
     }
 
     #[test]

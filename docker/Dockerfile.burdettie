@@ -40,8 +40,10 @@ RUN cargo build --release --workspace \
 
 # Show errors if build failed
 RUN if [ ! -f target/release/macho-inspect ]; then \
-      echo "BUILD FAILED:"; \
-      grep -B5 -A5 'error\[E' /tmp/build.log | head -100 || true; \
+      echo "BUILD FAILED — full error log:"; \
+      grep -B2 -A5 'error\[E' /tmp/build.log | head -200 || true; \
+      echo "---"; \
+      tail -30 /tmp/build.log; \
       exit 1; \
     fi
 

@@ -97,15 +97,35 @@ fn decode_logical_reg(raw: u32) -> Instruction {
 }
 
 fn decode_dp_1source(raw: u32) -> Instruction {
-    // DP 1-source: sf 1 S 11010110 opcode2(6) Rn Rd
-    // opcode2 bits[15:10]:
-    //   000000=RBIT, 000001=REV16, 000010=REV(32)/REV32(64), 000011=REV(64)
-    //   000100=CLZ, 000101=CLS
+    // DP 1-source: sf 1 S 11010110 opcode2(5) opcode(6) Rn(5) Rd(5)
+    // opcode2 at bits[20:16]:
+    //   00000 → standard 1-source (RBIT, REV16, REV, CLZ, CLS)
+    //   00001 → PAC instructions (PACIA, PACIB, AUTIA, AUTIB, XPACI, etc.)
     let sf = (raw >> 31) & 1 == 1;
-    let opcode2 = (raw >> 10) & 0x3F;
+    let opcode2_field = (raw >> 16) & 0x1F; // bits[20:16]
+    let opcode = (raw >> 10) & 0x3F;        // bits[15:10]
     let rn = ((raw >> 5) & 0x1F) as u8;
     let rd = (raw & 0x1F) as u8;
-    match opcode2 {
+
+    if opcode2_field == 0b00001 {
+        // PAC (ARMv8.3 arm64e) instructions
+        return match opcode {
+            0b000000 => Instruction::PacIA { rd, rn },  // PACIA / PACIZA
+            0b000010 => Instruction::PacIB { rd, rn },  // PACIB / PACIZB
+            0b000100 => Instruction::PacDA { rd, rn },  // PACDA / PACDZA
+            0b000110 => Instruction::PacDB { rd, rn },  // PACDB / PACDZB
+            0b001000 => Instruction::AutIA { rd, rn },  // AUTIA / AUTIZA
+            0b001010 => Instruction::AutIB { rd, rn },  // AUTIB / AUTIZB
+            0b001100 => Instruction::AutDA { rd, rn },  // AUTDA / AUTDZA
+            0b001110 => Instruction::AutDB { rd, rn },  // AUTDB / AUTDZB
+            0b100000 => Instruction::Xpaci { rd },      // XPACI
+            0b100010 => Instruction::Xpacd { rd },      // XPACD
+            _ => Instruction::Nop, // unrecognized PAC variant → NOP
+        };
+    }
+
+    // Standard 1-source: opcode2=00000 — RBIT, REV16, REV, CLZ, CLS
+    match opcode {
         0b000000 => Instruction::Rbit { sf, rd, rn },
         0b000001 => Instruction::Rev16 { sf, rd, rn },
         0b000010 if sf => Instruction::Rev32 { rd, rn },

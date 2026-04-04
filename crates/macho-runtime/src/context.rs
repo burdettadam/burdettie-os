@@ -93,7 +93,6 @@ impl RuntimeContext {
             libsystem_shims::RandomShims::install(&mut table);
         }
         if shim_set.darwin_stubs {
-            #[cfg(target_os = "macos")]
             libsystem_shims::install_darwin_stubs(&mut table);
         }
 

@@ -674,11 +674,28 @@ mod tests {
     }
 
     #[test]
-    fn block_object_assign_byref_stores_pointer() {
-        let obj = 0xCAFE_1234u64;
+    fn block_object_assign_byref_copies_to_heap() {
+        // Build a minimal byref struct:
+        // [isa:8][forwarding:8][flags:4][size:4][captured:8]
+        let mut byref = [0u8; BYREF_MIN_SIZE];
+        let byref_ptr = byref.as_mut_ptr() as u64;
+        unsafe {
+            // forwarding → self (stack copy)
+            *((byref.as_mut_ptr().add(BYREF_FORWARDING_OFF)) as *mut u64) = byref_ptr;
+            // size = BYREF_MIN_SIZE
+            *((byref.as_mut_ptr().add(BYREF_SIZE_OFF)) as *mut u32) = BYREF_MIN_SIZE as u32;
+        }
         let mut dest: u64 = 0;
-        shim_block_object_assign(&mut dest as *mut u64 as u64, obj, BLOCK_FIELD_IS_BYREF);
-        assert_eq!(dest, obj);
+        shim_block_object_assign(&mut dest as *mut u64 as u64, byref_ptr, BLOCK_FIELD_IS_BYREF);
+        assert_ne!(dest, 0);
+        assert_ne!(dest, byref_ptr, "byref should be copied to heap");
+        // Stack forwarding → heap
+        let stack_fwd = unsafe { *((byref.as_ptr().add(BYREF_FORWARDING_OFF)) as *const u64) };
+        assert_eq!(stack_fwd, dest);
+        // Heap forwarding → itself
+        let heap_fwd = unsafe { *((dest as usize + BYREF_FORWARDING_OFF) as *const u64) };
+        assert_eq!(heap_fwd, dest);
+        unsafe { libc::free(dest as *mut libc::c_void); }
     }
 
     #[test]

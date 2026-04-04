@@ -77,7 +77,7 @@ impl SystemConfigurationStubs {
 /// `SCNetworkReachabilityCreateWithName(alloc, name) -> SCNetworkReachabilityRef`
 pub extern "C" fn shim_sc_reachability_create_with_name(_alloc: u64, name: u64) -> u64 {
     let hostname = if name != 0 {
-        unsafe { std::ffi::CStr::from_ptr(name as *const i8) }
+        unsafe { std::ffi::CStr::from_ptr(name as *const std::ffi::c_char) }
             .to_str()
             .unwrap_or("<invalid>")
     } else {

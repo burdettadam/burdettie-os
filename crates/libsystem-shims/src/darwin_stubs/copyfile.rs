@@ -42,7 +42,7 @@ unsafe fn cstr_from_guest(ptr: u64) -> Option<String> {
     if ptr == 0 {
         return None;
     }
-    let c = unsafe { std::ffi::CStr::from_ptr(ptr as *const i8) };
+    let c = unsafe { std::ffi::CStr::from_ptr(ptr as *const std::ffi::c_char) };
     c.to_str().ok().map(|s| s.to_owned())
 }
 

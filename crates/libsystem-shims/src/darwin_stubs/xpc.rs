@@ -232,7 +232,7 @@ pub extern "C" fn shim_xpc_dictionary_create(
                 let key_ptr = *((keys + i * 8) as *const u64);
                 let val_handle = *((values + i * 8) as *const u64);
                 if key_ptr != 0 {
-                    let key = std::ffi::CStr::from_ptr(key_ptr as *const i8);
+                    let key = std::ffi::CStr::from_ptr(key_ptr as *const std::ffi::c_char);
                     obj::dict_set(dict, key, val_handle);
                 }
             }
@@ -247,13 +247,13 @@ pub extern "C" fn shim_xpc_dictionary_create_empty() -> u64 {
 
 pub extern "C" fn shim_xpc_dictionary_set_value(dict: u64, key: u64, val: u64) {
     if key == 0 { return; }
-    let k = unsafe { std::ffi::CStr::from_ptr(key as *const i8) };
+    let k = unsafe { std::ffi::CStr::from_ptr(key as *const std::ffi::c_char) };
     obj::dict_set(dict, k, val);
 }
 
 pub extern "C" fn shim_xpc_dictionary_get_value(dict: u64, key: u64) -> u64 {
     if key == 0 { return 0; }
-    let k = unsafe { std::ffi::CStr::from_ptr(key as *const i8) };
+    let k = unsafe { std::ffi::CStr::from_ptr(key as *const std::ffi::c_char) };
     obj::dict_get(dict, k)
 }
 
@@ -476,7 +476,7 @@ mod tests {
         shim_xpc_dictionary_set_string(dict, b"name\0".as_ptr() as u64, b"hello\0".as_ptr() as u64);
         let ptr = shim_xpc_dictionary_get_string(dict, b"name\0".as_ptr() as u64);
         assert_ne!(ptr, 0);
-        let s = unsafe { std::ffi::CStr::from_ptr(ptr as *const i8) };
+        let s = unsafe { std::ffi::CStr::from_ptr(ptr as *const std::ffi::c_char) };
         assert_eq!(s.to_str().unwrap(), "hello");
 
         // Int64 round-trip
@@ -509,7 +509,7 @@ mod tests {
         let h = shim_xpc_string_create(b"test\0".as_ptr() as u64);
         assert_ne!(h, 0);
         let ptr = shim_xpc_string_get_string_ptr(h);
-        let s = unsafe { std::ffi::CStr::from_ptr(ptr as *const i8) };
+        let s = unsafe { std::ffi::CStr::from_ptr(ptr as *const std::ffi::c_char) };
         assert_eq!(s.to_str().unwrap(), "test");
         assert_eq!(shim_xpc_string_get_length(h), 4);
     }
@@ -562,7 +562,7 @@ mod tests {
         let h = shim_xpc_int64_create(42);
         let ptr = shim_xpc_copy_description(h);
         assert_ne!(ptr, 0);
-        let cstr = unsafe { std::ffi::CStr::from_ptr(ptr as *const i8) };
+        let cstr = unsafe { std::ffi::CStr::from_ptr(ptr as *const std::ffi::c_char) };
         assert_eq!(cstr.to_str().unwrap(), "42");
     }
 

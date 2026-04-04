@@ -326,11 +326,38 @@ mod tests {
     }
 
     #[test]
-    fn test_block_object_assign_byref_stores_pointer() {
+    fn test_block_object_assign_byref_copies_to_heap() {
+        // Build a minimal byref struct:
+        // [isa:8][forwarding:8][flags:4][size:4][captured:8]
+        let mut byref = [0u8; 32];
+        let byref_ptr = byref.as_mut_ptr() as u64;
+        unsafe {
+            // isa = 0
+            // forwarding → self (stack copy)
+            std::ptr::write_unaligned(byref.as_mut_ptr().add(8) as *mut u64, byref_ptr);
+            // flags = 0
+            // size = 32
+            std::ptr::write_unaligned(byref.as_mut_ptr().add(20) as *mut u32, 32);
+            // captured value at offset 24
+            std::ptr::write_unaligned(byref.as_mut_ptr().add(24) as *mut u64, 0xDEAD_BEEF);
+        }
         let mut dest: u64 = 0;
-        let obj: u64 = 0xCAFE_BABE;
-        shim_block_object_assign(&mut dest as *mut u64 as u64, obj, BLOCK_FIELD_IS_BYREF);
-        assert_eq!(dest, obj, "IS_BYREF should store pointer");
+        shim_block_object_assign(&mut dest as *mut u64 as u64, byref_ptr, BLOCK_FIELD_IS_BYREF);
+        // dest should point to a heap copy, not the original stack byref
+        assert_ne!(dest, 0);
+        assert_ne!(dest, byref_ptr, "byref should be copied to heap");
+        // Stack copy's forwarding should now point to heap copy
+        let stack_fwd = unsafe {
+            std::ptr::read_unaligned(byref.as_ptr().add(8) as *const u64)
+        };
+        assert_eq!(stack_fwd, dest, "stack forwarding should point to heap");
+        // Heap copy's forwarding should point to itself
+        let heap_fwd = unsafe {
+            std::ptr::read_unaligned((dest as *const u8).add(8) as *const u64)
+        };
+        assert_eq!(heap_fwd, dest, "heap forwarding should point to itself");
+        // Clean up
+        unsafe { libc::free(dest as *mut libc::c_void); }
     }
 
     #[test]
