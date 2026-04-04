@@ -384,3 +384,12 @@ define_class_pair!(child NSDECIMALNUMBER_CLASS_DATA, NSDECIMALNUMBER_METACLASS_D
     parent_class: nsnumber_class_addr,
     parent_meta: nsnumber_metaclass_addr);
 
+// ── NSUndoManager ──────────────────────────────────────────────
+
+define_class_pair!(child NSUNDOMANAGER_CLASS_DATA, NSUNDOMANAGER_METACLASS_DATA, NSUNDOMANAGER_INIT,
+    ensure: ensure_nsundomanager_init,
+    class_addr: nsundomanager_class_addr,
+    meta_addr: nsundomanager_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+

@@ -565,6 +565,13 @@ fn populate_foundation_runtime(objc_rt: &mut objc_runtime::ObjcRuntime) {
     cf_lite::FoundationShims::register_nswindow_layout_guide_method(objc_rt);
     cf_lite::FoundationShims::register_nslayoutconstraint_vfl_method(objc_rt);
 
+    // Phase C12 — Safe area, NSTraitCollection, NSAnimationContext, NSTableView, NSUndoManager
+    cf_lite::FoundationShims::register_nstraitcollection_class(objc_rt);
+    cf_lite::FoundationShims::register_nsanimationcontext_class(objc_rt);
+    cf_lite::FoundationShims::register_nstableview_class(objc_rt);
+    cf_lite::FoundationShims::register_nsundomanager_class(objc_rt);
+    cf_lite::FoundationShims::register_nsview_safe_area_methods(objc_rt);
+
     // Register tagged pointer class table (NSNumber=2, NSString=3, NSDate=6).
     cf_lite::FoundationShims::register_tagged_classes(objc_rt);
 }

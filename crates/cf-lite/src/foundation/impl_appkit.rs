@@ -428,4 +428,26 @@ impl FoundationShims {
     pub fn register_nslayoutconstraint_vfl_method(rt: &mut objc_runtime::ObjcRuntime) {
         register::register_nslayoutconstraint_vfl_method(rt);
     }
+
+    // ── Phase C12: Safe area, NSTraitCollection, NSAnimationContext, NSTableView, NSUndoManager ──
+
+    pub fn register_nstraitcollection_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nstraitcollection_class(rt);
+    }
+
+    pub fn register_nsanimationcontext_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsanimationcontext_class(rt);
+    }
+
+    pub fn register_nstableview_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nstableview_class(rt);
+    }
+
+    pub fn register_nsundomanager_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsundomanager_class(rt);
+    }
+
+    pub fn register_nsview_safe_area_methods(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsview_safe_area_methods(rt);
+    }
 }

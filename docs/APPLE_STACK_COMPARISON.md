@@ -405,11 +405,11 @@ How burdettieOS's architecture maps to Apple's real system and where it diverges
 
 | Opportunity | Apple Behaviour | Current State | Estimated Effort |
 |------------|----------------|---------------|-----------------|
-| **Safe area / layout margins** | `safeAreaLayoutGuide`, `layoutMarginsGuide` — inset rects for content placement | Not implemented | Medium — new guide objects + inset computation |
-| **Size classes / trait collections** | `NSTraitCollection`, `horizontalSizeClass`, `verticalSizeClass` — adaptive layout | Not implemented | Medium — new ObjC class + propagation through view hierarchy |
-| **NSAnimationContext / implicit animations** | `NSAnimationContext.runAnimationGroup`, `animator()` proxy, `CAAnimation` | Not implemented | High — requires animation timer integration with run loop |
-| **NSTableView / NSOutlineView data source** | `numberOfRows(in:)`, `tableView(_:objectValueFor:row:)` delegate protocol | NSTableView exists as property-storage stub | Medium — wire data source callbacks to actual row count / cell content |
-| **NSUndoManager** | Undo/redo stack with target-action invocations | Not implemented | Medium — new class with invocation recording |
+| **Safe area / layout margins** | `safeAreaLayoutGuide`, `layoutMarginsGuide` — inset rects for content placement | ✅ Implemented — safeAreaLayoutGuide, layoutMarginsGuide, safeAreaInsets, layoutMargins, addLayoutGuide:/removeLayoutGuide: on NSView (Phase C12) | Medium — new guide objects + inset computation |
+| **Size classes / trait collections** | `NSTraitCollection`, `horizontalSizeClass`, `verticalSizeClass` — adaptive layout | ✅ Implemented — NSTraitCollection with size classes, userInterfaceIdiom, displayScale; factory methods; NSView traitCollection accessor (Phase C12) | Medium — new ObjC class + propagation through view hierarchy |
+| **NSAnimationContext / implicit animations** | `NSAnimationContext.runAnimationGroup`, `animator()` proxy, `CAAnimation` | ✅ Implemented — beginGrouping/endGrouping, currentContext, runAnimationGroup:completionHandler:, duration, allowsImplicitAnimation, thread-local context stack (Phase C12) | High — requires animation timer integration with run loop |
+| **NSTableView / NSOutlineView data source** | `numberOfRows(in:)`, `tableView(_:objectValueFor:row:)` delegate protocol | ✅ Implemented — ObjC shim with dataSource/delegate, addTableColumn:/removeTableColumn:, numberOfRows/numberOfColumns, reloadData, selectedRow, selectRowIndexes:byExtendingSelection: (Phase C12) | Medium — wire data source callbacks to actual row count / cell content |
+| **NSUndoManager** | Undo/redo stack with target-action invocations | ✅ Implemented — registerUndoWithTarget:selector:object:, undo/redo, canUndo/canRedo, groupsByEvent, beginUndoGrouping/endUndoGrouping, removeAllActions, actionName (Phase C12) | Medium — new class with invocation recording |
 
 ### Tier 3 — Completeness (polish and edge cases)
 

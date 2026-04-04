@@ -344,3 +344,30 @@ define_class_pair!(child NSLAYOUTGUIDE_CLASS_DATA, NSLAYOUTGUIDE_METACLASS_DATA,
     meta_addr: nslayoutguide_metaclass_addr,
     parent_class: nsobject_class_addr,
     parent_meta: nsobject_metaclass_addr);
+
+// ── NSTraitCollection (size classes / trait environment) ───────
+
+define_class_pair!(child NSTRAITCOLLECTION_CLASS_DATA, NSTRAITCOLLECTION_METACLASS_DATA, NSTRAITCOLLECTION_INIT,
+    ensure: ensure_nstraitcollection_init,
+    class_addr: nstraitcollection_class_addr,
+    meta_addr: nstraitcollection_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+// ── NSAnimationContext (implicit animations) ──────────────────
+
+define_class_pair!(child NSANIMATIONCONTEXT_CLASS_DATA, NSANIMATIONCONTEXT_METACLASS_DATA, NSANIMATIONCONTEXT_INIT,
+    ensure: ensure_nsanimationcontext_init,
+    class_addr: nsanimationcontext_class_addr,
+    meta_addr: nsanimationcontext_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+// ── NSTableView (data source driven table) ────────────────────
+
+define_class_pair!(child NSTABLEVIEW_CLASS_DATA, NSTABLEVIEW_METACLASS_DATA, NSTABLEVIEW_INIT,
+    ensure: ensure_nstableview_init,
+    class_addr: nstableview_class_addr,
+    meta_addr: nstableview_metaclass_addr,
+    parent_class: nsview_class_addr,
+    parent_meta: nsview_metaclass_addr);

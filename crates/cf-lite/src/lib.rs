@@ -171,6 +171,11 @@ pub(crate) mod nstoolbaritem;
 pub(crate) mod nsusernotificationcenter;
 pub(crate) mod nsviewcontroller;
 pub(crate) mod nswindowcontroller;
+// Tier 2 Feature Parity: safe area, size classes, animation, table view, undo
+pub(crate) mod nstraitcollection;
+pub(crate) mod nsanimationcontext;
+pub(crate) mod nstableview;
+pub(crate) mod nsundomanager;
 
 // Framework stubs (CoreData, AVFoundation, CoreLocation, CoreBluetooth)
 pub(crate) mod coredata_stubs;

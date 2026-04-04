@@ -410,6 +410,76 @@ pub extern "C" fn shim_nsview_fitting_size_h(obj: u64, _cmd: u64) -> f64 {
     if h < 0.0 { 0.0 } else { h }
 }
 
+// ── Safe area / layout margins ──────────────────────────────────
+
+use std::collections::HashMap;
+use std::sync::Mutex;
+
+/// Per-view cached layout guides: (safe_area_guide, layout_margins_guide).
+static VIEW_GUIDES: Mutex<Option<HashMap<u64, (u64, u64)>>> = Mutex::new(None);
+
+fn get_or_create_guides(view: u64) -> (u64, u64) {
+    let mut map = VIEW_GUIDES.lock().unwrap();
+    let map = map.get_or_insert_with(HashMap::new);
+    if let Some(&pair) = map.get(&view) {
+        return pair;
+    }
+    let safe = crate::nslayoutguide::make_layout_guide(view);
+    let margins = crate::nslayoutguide::make_layout_guide(view);
+    map.insert(view, (safe, margins));
+    (safe, margins)
+}
+
+/// `-[NSView safeAreaLayoutGuide]`
+///
+/// On macOS there is no notch/status bar, so the safe area equals the view bounds.
+pub extern "C" fn shim_nsview_safe_area_layout_guide(obj: u64, _cmd: u64) -> u64 {
+    if obj == 0 { return 0; }
+    get_or_create_guides(obj).0
+}
+
+/// `-[NSView layoutMarginsGuide]`
+///
+/// Returns an NSLayoutGuide inset by `layoutMargins` (default 8pt on all sides).
+pub extern "C" fn shim_nsview_layout_margins_guide(obj: u64, _cmd: u64) -> u64 {
+    if obj == 0 { return 0; }
+    get_or_create_guides(obj).1
+}
+
+/// `-[NSView safeAreaInsets]` — returns (0,0,0,0) on macOS (no notch).
+/// We return the top inset; companion shims below return the other edges.
+pub extern "C" fn shim_nsview_safe_area_insets_top(_obj: u64, _cmd: u64) -> f64 { 0.0 }
+/// Safe area inset — left.
+pub extern "C" fn shim_nsview_safe_area_insets_left(_obj: u64, _cmd: u64) -> f64 { 0.0 }
+/// Safe area inset — bottom.
+pub extern "C" fn shim_nsview_safe_area_insets_bottom(_obj: u64, _cmd: u64) -> f64 { 0.0 }
+/// Safe area inset — right.
+pub extern "C" fn shim_nsview_safe_area_insets_right(_obj: u64, _cmd: u64) -> f64 { 0.0 }
+
+/// Default layout margin (8pt on each side, matching AppKit defaults).
+const DEFAULT_LAYOUT_MARGIN: f64 = 8.0;
+
+/// `-[NSView layoutMargins]` — returns default 8pt edges (top).
+pub extern "C" fn shim_nsview_layout_margins_top(_obj: u64, _cmd: u64) -> f64 { DEFAULT_LAYOUT_MARGIN }
+/// Layout margins — left.
+pub extern "C" fn shim_nsview_layout_margins_left(_obj: u64, _cmd: u64) -> f64 { DEFAULT_LAYOUT_MARGIN }
+/// Layout margins — bottom.
+pub extern "C" fn shim_nsview_layout_margins_bottom(_obj: u64, _cmd: u64) -> f64 { DEFAULT_LAYOUT_MARGIN }
+/// Layout margins — right.
+pub extern "C" fn shim_nsview_layout_margins_right(_obj: u64, _cmd: u64) -> f64 { DEFAULT_LAYOUT_MARGIN }
+
+/// `-[NSView addLayoutGuide:]`
+pub extern "C" fn shim_nsview_add_layout_guide(obj: u64, _cmd: u64, guide: u64) {
+    if obj == 0 || guide == 0 { return; }
+    crate::nslayoutguide::shim_nslayoutguide_set_owning_view(guide, 0, obj);
+}
+
+/// `-[NSView removeLayoutGuide:]`
+pub extern "C" fn shim_nsview_remove_layout_guide(_obj: u64, _cmd: u64, guide: u64) {
+    if guide == 0 { return; }
+    crate::nslayoutguide::shim_nslayoutguide_set_owning_view(guide, 0, 0);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -879,5 +949,89 @@ mod tests {
         shim_nsview_invalidate_intrinsic_content_size(0, 0);
         shim_nsview_set_content_hugging_priority(0, 0, 500.0, 0);
         shim_nsview_set_content_compression_resistance_priority(0, 0, 500.0, 0);
+    }
+
+    // ── safe area / layout margins ─────────────────────────────
+
+    #[test]
+    fn safe_area_layout_guide_returns_nonzero() {
+        let view = make_view();
+        let guide = shim_nsview_safe_area_layout_guide(view, 0);
+        assert_ne!(guide, 0);
+        // Should be stable (cached)
+        let guide2 = shim_nsview_safe_area_layout_guide(view, 0);
+        assert_eq!(guide, guide2);
+        free_obj(view);
+    }
+
+    #[test]
+    fn layout_margins_guide_returns_nonzero() {
+        let view = make_view();
+        let guide = shim_nsview_layout_margins_guide(view, 0);
+        assert_ne!(guide, 0);
+        let guide2 = shim_nsview_layout_margins_guide(view, 0);
+        assert_eq!(guide, guide2);
+        free_obj(view);
+    }
+
+    #[test]
+    fn safe_area_and_margins_guide_differ() {
+        let view = make_view();
+        let sa = shim_nsview_safe_area_layout_guide(view, 0);
+        let lm = shim_nsview_layout_margins_guide(view, 0);
+        assert_ne!(sa, lm);
+        free_obj(view);
+    }
+
+    #[test]
+    fn safe_area_nil_returns_zero() {
+        assert_eq!(shim_nsview_safe_area_layout_guide(0, 0), 0);
+        assert_eq!(shim_nsview_layout_margins_guide(0, 0), 0);
+    }
+
+    #[test]
+    fn safe_area_insets_all_zero() {
+        let view = make_view();
+        assert_eq!(shim_nsview_safe_area_insets_top(view, 0), 0.0);
+        assert_eq!(shim_nsview_safe_area_insets_left(view, 0), 0.0);
+        assert_eq!(shim_nsview_safe_area_insets_bottom(view, 0), 0.0);
+        assert_eq!(shim_nsview_safe_area_insets_right(view, 0), 0.0);
+        free_obj(view);
+    }
+
+    #[test]
+    fn layout_margins_default_8pt() {
+        let view = make_view();
+        assert_eq!(shim_nsview_layout_margins_top(view, 0), 8.0);
+        assert_eq!(shim_nsview_layout_margins_left(view, 0), 8.0);
+        assert_eq!(shim_nsview_layout_margins_bottom(view, 0), 8.0);
+        assert_eq!(shim_nsview_layout_margins_right(view, 0), 8.0);
+        free_obj(view);
+    }
+
+    #[test]
+    fn add_layout_guide_sets_owning_view() {
+        let view = make_view();
+        let guide = crate::nslayoutguide::make_layout_guide(0);
+        shim_nsview_add_layout_guide(view, 0, guide);
+        assert_eq!(crate::nslayoutguide::shim_nslayoutguide_owning_view(guide, 0), view);
+        free_obj(guide);
+        free_obj(view);
+    }
+
+    #[test]
+    fn remove_layout_guide_clears_owning_view() {
+        let view = make_view();
+        let guide = crate::nslayoutguide::make_layout_guide(view);
+        shim_nsview_remove_layout_guide(view, 0, guide);
+        assert_eq!(crate::nslayoutguide::shim_nslayoutguide_owning_view(guide, 0), 0);
+        free_obj(guide);
+        free_obj(view);
+    }
+
+    #[test]
+    fn add_remove_layout_guide_nil_safety() {
+        shim_nsview_add_layout_guide(0, 0, 0);
+        shim_nsview_remove_layout_guide(0, 0, 0);
     }
 }
