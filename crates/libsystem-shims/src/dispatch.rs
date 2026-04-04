@@ -43,22 +43,22 @@ impl DispatchShims {
     pub fn install(table: &mut ShimTable) {
         table.register(
             "_dispatch_once",
-            shim_dispatch_once as u64,
+            shim_dispatch_once as *const () as u64,
             "dispatch_once (thread-safe)",
         );
         table.register(
             "_dispatch_once_f",
-            shim_dispatch_once_f as u64,
+            shim_dispatch_once_f as *const () as u64,
             "dispatch_once_f (thread-safe)",
         );
         table.register(
             "_dispatch_async",
-            shim_dispatch_async as u64,
+            shim_dispatch_async as *const () as u64,
             "dispatch_async (threaded)",
         );
         table.register(
             "_dispatch_sync",
-            shim_dispatch_sync as u64,
+            shim_dispatch_sync as *const () as u64,
             "dispatch_sync (inline)",
         );
         table.register(
@@ -68,7 +68,7 @@ impl DispatchShims {
         );
         table.register(
             "_dispatch_get_global_queue",
-            shim_dispatch_get_global_queue as u64,
+            shim_dispatch_get_global_queue as *const () as u64,
             "dispatch_get_global_queue (inline)",
         );
 

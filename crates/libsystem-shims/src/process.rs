@@ -142,26 +142,26 @@ impl ProcessShims {
 
         table.register(
             "_getprogname",
-            shim_getprogname as u64,
+            shim_getprogname as *const () as u64,
             "getprogname → process name",
         );
         table.register(
             "__NSGetExecutablePath",
-            shim_nsgetexecutablepath as u64,
+            shim_nsgetexecutablepath as *const () as u64,
             "_NSGetExecutablePath → executable path",
         );
-        table.register("__NSGetArgc", shim_nsgetargc as u64, "_NSGetArgc → &argc");
-        table.register("__NSGetArgv", shim_nsgetargv as u64, "_NSGetArgv → &argv");
+        table.register("__NSGetArgc", shim_nsgetargc as *const () as u64, "_NSGetArgc → &argc");
+        table.register("__NSGetArgv", shim_nsgetargv as *const () as u64, "_NSGetArgv → &argv");
         table.register(
             "_getenv",
-            shim_getenv as u64,
+            shim_getenv as *const () as u64,
             "getenv → environment variable",
         );
-        table.register("_setenv", shim_setenv as u64, "setenv → set env var");
-        table.register("_putenv", shim_putenv as u64, "putenv → KEY=VALUE env");
-        table.register("_unsetenv", shim_unsetenv as u64, "unsetenv → remove env var");
-        table.register("_execv", shim_execv as u64, "execv → preserve guest argv");
-        table.register("_dladdr", shim_dladdr as u64, "dladdr → guest-aware address lookup");
+        table.register("_setenv", shim_setenv as *const () as u64, "setenv → set env var");
+        table.register("_putenv", shim_putenv as *const () as u64, "putenv → KEY=VALUE env");
+        table.register("_unsetenv", shim_unsetenv as *const () as u64, "unsetenv → remove env var");
+        table.register("_execv", shim_execv as *const () as u64, "execv → preserve guest argv");
+        table.register("_dladdr", shim_dladdr as *const () as u64, "dladdr → guest-aware address lookup");
 
         log::debug!("ProcessShims: registered 10 process identity shims");
     }

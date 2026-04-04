@@ -7,7 +7,7 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use graphics_core::{BezierPath, Color, Point, Rect, Surface, SoftwareRenderer, Renderer};
+use graphics_core::{BezierPath, Color, Rect, Surface, SoftwareRenderer, Renderer};
 
 /// A heap-allocated CGContext backed by a `Surface` + `SoftwareRenderer`.
 pub struct CgContext {

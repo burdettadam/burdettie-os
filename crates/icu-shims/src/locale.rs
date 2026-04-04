@@ -11,11 +11,11 @@ static US_COUNTRY: &[u8] = b"US\0";
 
 pub fn install(table: &mut ShimTable) {
     register_shims!(table,
-        ("_uloc_getDefault", shim_uloc_get_default as u64, "uloc_getDefault (icu4x → en_US)"),
-        ("_uloc_getName", shim_uloc_get_name as u64, "uloc_getName (icu4x)"),
-        ("_uloc_getLanguage", shim_uloc_get_language as u64, "uloc_getLanguage (icu4x)"),
-        ("_uloc_getCountry", shim_uloc_get_country as u64, "uloc_getCountry (icu4x)"),
-        ("_uloc_canonicalize", shim_uloc_canonicalize as u64, "uloc_canonicalize (icu4x)")
+        ("_uloc_getDefault", shim_uloc_get_default as *const () as u64, "uloc_getDefault (icu4x → en_US)"),
+        ("_uloc_getName", shim_uloc_get_name as *const () as u64, "uloc_getName (icu4x)"),
+        ("_uloc_getLanguage", shim_uloc_get_language as *const () as u64, "uloc_getLanguage (icu4x)"),
+        ("_uloc_getCountry", shim_uloc_get_country as *const () as u64, "uloc_getCountry (icu4x)"),
+        ("_uloc_canonicalize", shim_uloc_canonicalize as *const () as u64, "uloc_canonicalize (icu4x)")
     );
 }
 

@@ -306,15 +306,15 @@ impl DispatchConcurrencyStubs {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
         register_shims!(table,
-            ("_dispatch_group_create", shim_dispatch_group_create as u64, "dispatch_group_create (real)"),
-            ("_dispatch_group_enter", shim_dispatch_group_enter as u64, "dispatch_group_enter (real)"),
-            ("_dispatch_group_leave", shim_dispatch_group_leave as u64, "dispatch_group_leave (real)"),
-            ("_dispatch_group_wait", shim_dispatch_group_wait as u64, "dispatch_group_wait (real)"),
-            ("_dispatch_group_notify", shim_dispatch_group_notify as u64, "dispatch_group_notify (real)"),
-            ("_dispatch_group_async", shim_dispatch_group_async as u64, "dispatch_group_async (real)"),
-            ("_dispatch_semaphore_create", shim_dispatch_semaphore_create as u64, "dispatch_semaphore_create (real)"),
-            ("_dispatch_semaphore_wait", shim_dispatch_semaphore_wait as u64, "dispatch_semaphore_wait (real)"),
-            ("_dispatch_semaphore_signal", shim_dispatch_semaphore_signal as u64, "dispatch_semaphore_signal (real)"),
+            ("_dispatch_group_create", shim_dispatch_group_create as *const () as u64, "dispatch_group_create (real)"),
+            ("_dispatch_group_enter", shim_dispatch_group_enter as *const () as u64, "dispatch_group_enter (real)"),
+            ("_dispatch_group_leave", shim_dispatch_group_leave as *const () as u64, "dispatch_group_leave (real)"),
+            ("_dispatch_group_wait", shim_dispatch_group_wait as *const () as u64, "dispatch_group_wait (real)"),
+            ("_dispatch_group_notify", shim_dispatch_group_notify as *const () as u64, "dispatch_group_notify (real)"),
+            ("_dispatch_group_async", shim_dispatch_group_async as *const () as u64, "dispatch_group_async (real)"),
+            ("_dispatch_semaphore_create", shim_dispatch_semaphore_create as *const () as u64, "dispatch_semaphore_create (real)"),
+            ("_dispatch_semaphore_wait", shim_dispatch_semaphore_wait as *const () as u64, "dispatch_semaphore_wait (real)"),
+            ("_dispatch_semaphore_signal", shim_dispatch_semaphore_signal as *const () as u64, "dispatch_semaphore_signal (real)"),
         );
         log::debug!("DispatchConcurrencyStubs: registered 9 stubs");
     }

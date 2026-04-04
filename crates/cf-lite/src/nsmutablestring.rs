@@ -27,7 +27,7 @@ extern "C" {
 pub fn string_with_format_trampoline_addr() -> u64 {
     #[cfg(all(target_arch = "aarch64", target_os = "macos"))]
     {
-        shim_nsmutablestring_format_asm as u64
+        shim_nsmutablestring_format_asm as *const () as u64
     }
     #[cfg(not(all(target_arch = "aarch64", target_os = "macos")))]
     {
@@ -212,14 +212,12 @@ pub extern "C" fn shim_nsmutablestring_init_with_format(
     _a2: u64,
     _a3: u64,
 ) -> u64 {
-    unsafe {
-        std::arch::naked_asm!(
-            "ldp x3, x4, [sp]",
-            "ldr x5, [sp, #16]",
-            "b {inner}",
-            inner = sym shim_nsmutablestring_init_with_format_inner,
-        )
-    }
+    std::arch::naked_asm!(
+        "ldp x3, x4, [sp]",
+        "ldr x5, [sp, #16]",
+        "b {inner}",
+        inner = sym shim_nsmutablestring_init_with_format_inner,
+    )
 }
 
 #[cfg(not(target_arch = "aarch64"))]
@@ -273,14 +271,12 @@ pub extern "C" fn shim_nsmutablestring_append_format(
 ) -> u64 {
     // x0=self, x1=_cmd, x2=format are already in registers.
     // Read variadic args from the stack (caller placed them at [sp]).
-    unsafe {
-        std::arch::naked_asm!(
-            "ldp x3, x4, [sp]",    // x3 = va_arg[0], x4 = va_arg[1]
-            "ldr x5, [sp, #16]",   // x5 = va_arg[2]
-            "b {inner}",
-            inner = sym shim_nsmutablestring_append_format_inner,
-        )
-    }
+    std::arch::naked_asm!(
+        "ldp x3, x4, [sp]",    // x3 = va_arg[0], x4 = va_arg[1]
+        "ldr x5, [sp, #16]",   // x5 = va_arg[2]
+        "b {inner}",
+        inner = sym shim_nsmutablestring_append_format_inner,
+    )
 }
 
 #[cfg(not(target_arch = "aarch64"))]

@@ -31,14 +31,14 @@ impl OsLogStubs {
 
         // ── Core os_log ─────────────────────────────────────────
         register_shims!(table,
-            ("_os_log_create", shim_os_log_create as u64, "os_log_create (stub → sentinel handle)"),
-            ("_os_log_type_enabled", shim_os_log_type_enabled as u64, "os_log_type_enabled (stub → true)"),
-            ("__os_log_impl", shim_os_log_impl as u64, "_os_log_impl (stub → log::debug)"),
-            ("__os_log_debug_impl", shim_os_log_impl as u64, "_os_log_debug_impl (stub → log::debug)"),
-            ("__os_log_error_impl", shim_os_log_error_impl as u64, "_os_log_error_impl (stub → log::error)"),
-            ("__os_log_fault_impl", shim_os_log_error_impl as u64, "_os_log_fault_impl (stub → log::error)"),
-            ("__os_log_pack_send", shim_os_log_void_stub as u64, "_os_log_pack_send (stub → void)"),
-            ("__os_log_is_debug_enabled", shim_os_log_true_stub as u64, "_os_log_is_debug_enabled (stub → 1)")
+            ("_os_log_create", shim_os_log_create as *const () as u64, "os_log_create (stub → sentinel handle)"),
+            ("_os_log_type_enabled", shim_os_log_type_enabled as *const () as u64, "os_log_type_enabled (stub → true)"),
+            ("__os_log_impl", shim_os_log_impl as *const () as u64, "_os_log_impl (stub → log::debug)"),
+            ("__os_log_debug_impl", shim_os_log_impl as *const () as u64, "_os_log_debug_impl (stub → log::debug)"),
+            ("__os_log_error_impl", shim_os_log_error_impl as *const () as u64, "_os_log_error_impl (stub → log::error)"),
+            ("__os_log_fault_impl", shim_os_log_error_impl as *const () as u64, "_os_log_fault_impl (stub → log::error)"),
+            ("__os_log_pack_send", shim_os_log_void_stub as *const () as u64, "_os_log_pack_send (stub → void)"),
+            ("__os_log_is_debug_enabled", shim_os_log_true_stub as *const () as u64, "_os_log_is_debug_enabled (stub → 1)")
         );
 
         // ── os_log data symbols ─────────────────────────────────
@@ -49,25 +49,25 @@ impl OsLogStubs {
 
         // ── os_signpost ─────────────────────────────────────────
         register_shims!(table,
-            ("_os_signpost_interval_begin", shim_os_log_void_stub as u64, "os_signpost_interval_begin (stub → void)"),
-            ("_os_signpost_interval_end", shim_os_log_void_stub as u64, "os_signpost_interval_end (stub → void)"),
-            ("_os_signpost_event_emit", shim_os_log_void_stub as u64, "os_signpost_event_emit (stub → void)"),
-            ("_os_signpost_id_generate", shim_os_signpost_id_generate as u64, "os_signpost_id_generate (stub → counter)"),
-            ("_os_signpost_id_make_with_pointer", shim_os_signpost_id_make_with_pointer as u64, "os_signpost_id_make_with_pointer (stub → ptr)")
+            ("_os_signpost_interval_begin", shim_os_log_void_stub as *const () as u64, "os_signpost_interval_begin (stub → void)"),
+            ("_os_signpost_interval_end", shim_os_log_void_stub as *const () as u64, "os_signpost_interval_end (stub → void)"),
+            ("_os_signpost_event_emit", shim_os_log_void_stub as *const () as u64, "os_signpost_event_emit (stub → void)"),
+            ("_os_signpost_id_generate", shim_os_signpost_id_generate as *const () as u64, "os_signpost_id_generate (stub → counter)"),
+            ("_os_signpost_id_make_with_pointer", shim_os_signpost_id_make_with_pointer as *const () as u64, "os_signpost_id_make_with_pointer (stub → ptr)")
         );
 
         // ── os_activity ─────────────────────────────────────────
         register_shims!(table,
-            ("_os_activity_initiate", shim_os_activity_initiate as u64, "os_activity_initiate (stub → inline block)"),
-            ("_os_activity_scope_enter", shim_os_log_void2_stub as u64, "os_activity_scope_enter (stub → void)"),
-            ("_os_activity_scope_leave", shim_os_log_void1_stub as u64, "os_activity_scope_leave (stub → void)"),
-            ("__os_activity_create", shim_os_activity_create as u64, "_os_activity_create (stub → sentinel)"),
-            ("__os_activity_current", shim_os_activity_current as u64, "_os_activity_current (stub → sentinel)")
+            ("_os_activity_initiate", shim_os_activity_initiate as *const () as u64, "os_activity_initiate (stub → inline block)"),
+            ("_os_activity_scope_enter", shim_os_log_void2_stub as *const () as u64, "os_activity_scope_enter (stub → void)"),
+            ("_os_activity_scope_leave", shim_os_log_void1_stub as *const () as u64, "os_activity_scope_leave (stub → void)"),
+            ("__os_activity_create", shim_os_activity_create as *const () as u64, "_os_activity_create (stub → sentinel)"),
+            ("__os_activity_current", shim_os_activity_current as *const () as u64, "_os_activity_current (stub → sentinel)")
         );
 
         // ── Private utility used by Xcode tools ─────────────────
         register_shims!(table,
-            ("_os_log_set_default_behavior", shim_os_log_void1_stub as u64, "os_log_set_default_behavior (stub → void)")
+            ("_os_log_set_default_behavior", shim_os_log_void1_stub as *const () as u64, "os_log_set_default_behavior (stub → void)")
         );
 
         log::debug!("OsLogStubs: registered 22 os_log/signpost/activity stubs");

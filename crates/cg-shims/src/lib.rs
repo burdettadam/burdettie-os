@@ -11,7 +11,7 @@
 //! Us:     cg-shims              → register_cg_shims(table) installs ~80 stubs
 //! ```
 // Function pointers are cast to u64 addresses for the emulated Mach-O address space.
-#![allow(clippy::fn_to_numeric_cast)]
+#![allow(dead_code, clippy::fn_to_numeric_cast)]
 
 mod context;
 mod colorspace;

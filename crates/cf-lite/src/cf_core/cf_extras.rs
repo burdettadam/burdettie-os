@@ -250,7 +250,7 @@ pub extern "C" fn shim_cf_convert_float32_host_to_swapped(val: f32) -> u32 {
 
 /// `CFPropertyListRef CFPropertyListCreateWithData(alloc, data, options, format, error)`
 pub extern "C" fn shim_cf_property_list_create_with_data(
-    alloc: u64, data: u64, options: u64, format: *mut i32, error: *mut u64,
+    _alloc: u64, data: u64, options: u64, format: *mut i32, error: *mut u64,
 ) -> u64 {
     if data == 0 { return 0; }
     // Delegate to +[NSPropertyListSerialization propertyListWithData:options:format:error:]
@@ -262,7 +262,7 @@ pub extern "C" fn shim_cf_property_list_create_with_data(
 
 /// `CFDataRef CFPropertyListCreateData(alloc, propertyList, format, options, error)`
 pub extern "C" fn shim_cf_property_list_create_data(
-    alloc: u64, plist: u64, format: i64, options: u64, error: *mut u64,
+    _alloc: u64, plist: u64, format: i64, options: u64, error: *mut u64,
 ) -> u64 {
     if plist == 0 { return 0; }
     // Delegate to +[NSPropertyListSerialization dataWithPropertyList:format:options:error:]

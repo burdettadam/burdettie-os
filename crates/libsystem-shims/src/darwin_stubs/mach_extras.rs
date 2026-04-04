@@ -15,48 +15,48 @@ impl MachExtrasStubs {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
         register_shims!(table,
-            ("_mach_continuous_time", shim_mach_continuous_time as u64, "mach_continuous_time (stub → mach_absolute_time)"),
+            ("_mach_continuous_time", shim_mach_continuous_time as *const () as u64, "mach_continuous_time (stub → mach_absolute_time)"),
             ("_mach_msg_destroy", shim_mach_msg_destroy as *const () as u64, "mach_msg_destroy (stub → void)"),
             ("_mach_msg", shim_mach_msg as *const () as u64, "mach_msg (stub → MACH_SEND_INVALID_DEST)"),
             ("_mach_msg_trap", shim_mach_msg as *const () as u64, "mach_msg_trap (stub → MACH_SEND_INVALID_DEST)"),
-            ("_mach_port_type", shim_mach_port_type as u64, "mach_port_type (stub → KERN_INVALID_ARGUMENT)"),
-            ("_mig_dealloc_special_reply_port", shim_mig_void_stub as u64, "mig_dealloc_special_reply_port (stub → void)"),
-            ("_mig_get_special_reply_port", shim_mig_get_special_reply_port as u64, "mig_get_special_reply_port (stub → 0)"),
-            ("_mig_strncpy", shim_mig_strncpy as u64, "mig_strncpy (stub → strncpy)"),
-            ("_mig_strncpy_zerofill", shim_mig_strncpy as u64, "mig_strncpy_zerofill (stub → strncpy)")
+            ("_mach_port_type", shim_mach_port_type as *const () as u64, "mach_port_type (stub → KERN_INVALID_ARGUMENT)"),
+            ("_mig_dealloc_special_reply_port", shim_mig_void_stub as *const () as u64, "mig_dealloc_special_reply_port (stub → void)"),
+            ("_mig_get_special_reply_port", shim_mig_get_special_reply_port as *const () as u64, "mig_get_special_reply_port (stub → 0)"),
+            ("_mig_strncpy", shim_mig_strncpy as *const () as u64, "mig_strncpy (stub → strncpy)"),
+            ("_mig_strncpy_zerofill", shim_mig_strncpy as *const () as u64, "mig_strncpy_zerofill (stub → strncpy)")
         );
 
         // ── Host / VM / Task ────────────────────────────────────
         register_shims!(table,
-            ("_mach_host_self", shim_mach_host_self as u64, "mach_host_self (→ synthetic port)"),
-            ("_host_page_size", shim_host_page_size as u64, "host_page_size (→ real page size)"),
-            ("_host_info", shim_host_info as u64, "host_info (→ real CPU/mem info)"),
-            ("_host_statistics", shim_host_statistics as u64, "host_statistics (stub → KERN_SUCCESS)"),
-            ("_host_statistics64", shim_host_statistics64 as u64, "host_statistics64 (stub → KERN_SUCCESS)"),
-            ("_vm_allocate", shim_vm_allocate as u64, "vm_allocate (→ real mmap)"),
-            ("_vm_deallocate", shim_vm_deallocate as u64, "vm_deallocate (→ real munmap)"),
-            ("_vm_protect", shim_vm_protect as u64, "vm_protect (→ real mprotect)"),
+            ("_mach_host_self", shim_mach_host_self as *const () as u64, "mach_host_self (→ synthetic port)"),
+            ("_host_page_size", shim_host_page_size as *const () as u64, "host_page_size (→ real page size)"),
+            ("_host_info", shim_host_info as *const () as u64, "host_info (→ real CPU/mem info)"),
+            ("_host_statistics", shim_host_statistics as *const () as u64, "host_statistics (stub → KERN_SUCCESS)"),
+            ("_host_statistics64", shim_host_statistics64 as *const () as u64, "host_statistics64 (stub → KERN_SUCCESS)"),
+            ("_vm_allocate", shim_vm_allocate as *const () as u64, "vm_allocate (→ real mmap)"),
+            ("_vm_deallocate", shim_vm_deallocate as *const () as u64, "vm_deallocate (→ real munmap)"),
+            ("_vm_protect", shim_vm_protect as *const () as u64, "vm_protect (→ real mprotect)"),
             ("_vm_page_size", &VM_PAGE_SIZE_DATA as *const u64 as u64, "vm_page_size data symbol"),
-            ("_mach_port_allocate", shim_mach_port_allocate as u64, "mach_port_allocate (stub → KERN_SUCCESS)"),
-            ("_mach_port_deallocate", shim_mach_port_deallocate as u64, "mach_port_deallocate (stub → KERN_SUCCESS)"),
-            ("_mach_port_mod_refs", shim_mach_port_mod_refs as u64, "mach_port_mod_refs (stub → KERN_SUCCESS)"),
-            ("_task_info", shim_task_info as u64, "task_info (→ real memory stats)")
+            ("_mach_port_allocate", shim_mach_port_allocate as *const () as u64, "mach_port_allocate (stub → KERN_SUCCESS)"),
+            ("_mach_port_deallocate", shim_mach_port_deallocate as *const () as u64, "mach_port_deallocate (stub → KERN_SUCCESS)"),
+            ("_mach_port_mod_refs", shim_mach_port_mod_refs as *const () as u64, "mach_port_mod_refs (stub → KERN_SUCCESS)"),
+            ("_task_info", shim_task_info as *const () as u64, "task_info (→ real memory stats)")
         );
 
         // ── Thread state & task control ─────────────────────────
         register_shims!(table,
-            ("_thread_get_state", shim_thread_get_state as u64, "thread_get_state (stub → KERN_FAILURE)"),
-            ("_thread_set_state", shim_thread_set_state as u64, "thread_set_state (stub → KERN_FAILURE)"),
-            ("_thread_create", shim_thread_create as u64, "thread_create (stub → KERN_FAILURE)"),
-            ("_thread_terminate", shim_thread_terminate as u64, "thread_terminate (stub → KERN_SUCCESS)"),
-            ("_task_threads", shim_task_threads as u64, "task_threads (stub → 0 threads)"),
-            ("_thread_info", shim_thread_info as u64, "thread_info (stub → KERN_SUCCESS)"),
-            ("_thread_suspend", shim_thread_suspend as u64, "thread_suspend (stub → KERN_SUCCESS)"),
-            ("_thread_resume", shim_thread_resume as u64, "thread_resume (stub → KERN_SUCCESS)"),
-            ("_thread_abort", shim_thread_abort as u64, "thread_abort (stub → KERN_SUCCESS)"),
-            ("_thread_abort_safely", shim_thread_abort_safely as u64, "thread_abort_safely (stub → KERN_SUCCESS)"),
-            ("_task_policy_set", shim_task_policy_set as u64, "task_policy_set (stub → KERN_SUCCESS)"),
-            ("_task_policy_get", shim_task_policy_get as u64, "task_policy_get (stub → KERN_SUCCESS)")
+            ("_thread_get_state", shim_thread_get_state as *const () as u64, "thread_get_state (stub → KERN_FAILURE)"),
+            ("_thread_set_state", shim_thread_set_state as *const () as u64, "thread_set_state (stub → KERN_FAILURE)"),
+            ("_thread_create", shim_thread_create as *const () as u64, "thread_create (stub → KERN_FAILURE)"),
+            ("_thread_terminate", shim_thread_terminate as *const () as u64, "thread_terminate (stub → KERN_SUCCESS)"),
+            ("_task_threads", shim_task_threads as *const () as u64, "task_threads (stub → 0 threads)"),
+            ("_thread_info", shim_thread_info as *const () as u64, "thread_info (stub → KERN_SUCCESS)"),
+            ("_thread_suspend", shim_thread_suspend as *const () as u64, "thread_suspend (stub → KERN_SUCCESS)"),
+            ("_thread_resume", shim_thread_resume as *const () as u64, "thread_resume (stub → KERN_SUCCESS)"),
+            ("_thread_abort", shim_thread_abort as *const () as u64, "thread_abort (stub → KERN_SUCCESS)"),
+            ("_thread_abort_safely", shim_thread_abort_safely as *const () as u64, "thread_abort_safely (stub → KERN_SUCCESS)"),
+            ("_task_policy_set", shim_task_policy_set as *const () as u64, "task_policy_set (stub → KERN_SUCCESS)"),
+            ("_task_policy_get", shim_task_policy_get as *const () as u64, "task_policy_get (stub → KERN_SUCCESS)")
         );
 
         log::debug!("MachExtrasStubs: registered 32 Mach stubs");
@@ -86,7 +86,7 @@ pub extern "C" fn shim_mach_msg(
     options: u32,
     send_size: u32,
     rcv_size: u32,
-    rcv_name: u32,
+    _rcv_name: u32,
     _timeout: u32,
     _notify: u32,
 ) -> u32 {
@@ -110,6 +110,14 @@ pub extern "C" fn shim_mach_msg(
         MIG_BOOTSTRAP_LOOK_UP if is_send_recv => {
             handle_bootstrap_look_up_mig(msg, rcv_size)
         }
+        // MIG task_get_special_port (routine 3400)
+        MIG_TASK_GET_SPECIAL_PORT if is_send_recv => {
+            handle_task_get_special_port(msg, rcv_size)
+        }
+        // MIG host_info (routine 200)
+        MIG_HOST_INFO if is_send_recv => {
+            handle_host_info_mig(msg, rcv_size)
+        }
         _ => {
             log::debug!("mach_msg: unhandled msgh_id={}, returning MACH_SEND_INVALID_DEST", msgh_id);
             MACH_SEND_INVALID_DEST
@@ -124,6 +132,8 @@ const MACH_SEND_INVALID_DEST: u32 = 0x10000003;
 
 // MIG routine numbers
 const MIG_BOOTSTRAP_LOOK_UP: i32 = 403;
+const MIG_HOST_INFO: i32 = 200;
+const MIG_TASK_GET_SPECIAL_PORT: i32 = 3400;
 
 /// Handle MIG routine 403 (bootstrap_look_up).
 ///
@@ -179,6 +189,73 @@ fn handle_bootstrap_look_up_mig(msg: u64, rcv_size: u32) -> u32 {
     }
 
     0 // MACH_MSG_SUCCESS
+}
+
+/// Handle MIG routine 3400 (task_get_special_port).
+///
+/// Request: hdr(24) + NDR(16) + which_port(4)
+/// Reply:   hdr(24) + NDR(16) + return_code(4) + port(4)
+fn handle_task_get_special_port(msg: u64, rcv_size: u32) -> u32 {
+    if rcv_size < 48 {
+        return MACH_SEND_INVALID_DEST;
+    }
+    // Read which_port from offset 40 (24 hdr + 16 NDR)
+    let which = unsafe {
+        i32::from_le_bytes([
+            *((msg + 40) as *const u8),
+            *((msg + 41) as *const u8),
+            *((msg + 42) as *const u8),
+            *((msg + 43) as *const u8),
+        ])
+    };
+    // Return the bootstrap port (MACH_HOST_PORT) for any request
+    let port: u32 = match which {
+        1 => MACH_HOST_PORT,   // TASK_KERNEL_PORT
+        4 => 0x105,            // TASK_BOOTSTRAP_PORT — synthetic bootstrap
+        _ => MACH_HOST_PORT,
+    };
+    log::debug!("mach_msg MIG 3400: task_get_special_port(which={}) → {:#x}", which, port);
+
+    let reply = msg as *mut u8;
+    unsafe {
+        std::ptr::write_bytes(reply, 0, rcv_size.min(256) as usize);
+        let reply_id: i32 = 3400 + 100;
+        std::ptr::copy_nonoverlapping(reply_id.to_le_bytes().as_ptr(), reply.add(20), 4);
+        let reply_size: u32 = 48;
+        std::ptr::copy_nonoverlapping(reply_size.to_le_bytes().as_ptr(), reply.add(4), 4);
+        *reply.add(27) = 1;
+        *reply.add(28) = 1;
+        std::ptr::copy_nonoverlapping(port.to_le_bytes().as_ptr(), reply.add(44), 4);
+    }
+    0
+}
+
+/// Handle MIG routine 200 (host_info).
+///
+/// Returns minimal host_basic_info: max_cpus, avail_cpus, memory_size.
+fn handle_host_info_mig(msg: u64, rcv_size: u32) -> u32 {
+    if rcv_size < 72 {
+        return MACH_SEND_INVALID_DEST;
+    }
+    log::debug!("mach_msg MIG 200: host_info");
+
+    let reply = msg as *mut u8;
+    unsafe {
+        std::ptr::write_bytes(reply, 0, rcv_size.min(256) as usize);
+        let reply_id: i32 = 200 + 100;
+        std::ptr::copy_nonoverlapping(reply_id.to_le_bytes().as_ptr(), reply.add(20), 4);
+        let reply_size: u32 = 72;
+        std::ptr::copy_nonoverlapping(reply_size.to_le_bytes().as_ptr(), reply.add(4), 4);
+        *reply.add(27) = 1;
+        *reply.add(28) = 1;
+        // host_info_out starts at offset 44 (after hdr+NDR+retcode)
+        // host_basic_info: max_cpus(4), avail_cpus(4), memory_size(4)
+        let ncpu = libc::sysconf(libc::_SC_NPROCESSORS_ONLN).max(1) as u32;
+        std::ptr::copy_nonoverlapping(ncpu.to_le_bytes().as_ptr(), reply.add(44), 4);
+        std::ptr::copy_nonoverlapping(ncpu.to_le_bytes().as_ptr(), reply.add(48), 4);
+        // memory_size at offset 52 (simplified: report as 0 and let callers use sysctl)
+    }
+    0
 }
 
 /// Bootstrap service registry — maps service names to synthetic Mach ports.

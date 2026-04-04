@@ -5,7 +5,6 @@ use crate::font::{TextRun};
 use crate::font_manager::{FontFace, FontManager};
 use crate::unicode::{is_combining_mark, is_zero_width, normalize_nfc};
 
-use super::helpers::measure_str;
 use super::types::LayoutGlyph;
 
 // ── Attributed text layout ─────────────────────────────────────────

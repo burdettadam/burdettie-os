@@ -20,10 +20,10 @@ fn default_collator() -> CollatorBorrowed<'static> {
 
 pub fn install(table: &mut ShimTable) {
     register_shims!(table,
-        ("_ucol_open", shim_ucol_open as u64, "ucol_open (icu4x → real collator)"),
-        ("_ucol_close", shim_ucol_close as u64, "ucol_close (icu4x)"),
-        ("_ucol_strcoll", shim_ucol_strcoll as u64, "ucol_strcoll (icu4x → real comparison)"),
-        ("_ucol_getSortKey", shim_ucol_get_sort_key as u64, "ucol_getSortKey (icu4x → stub)")
+        ("_ucol_open", shim_ucol_open as *const () as u64, "ucol_open (icu4x → real collator)"),
+        ("_ucol_close", shim_ucol_close as *const () as u64, "ucol_close (icu4x)"),
+        ("_ucol_strcoll", shim_ucol_strcoll as *const () as u64, "ucol_strcoll (icu4x → real comparison)"),
+        ("_ucol_getSortKey", shim_ucol_get_sort_key as *const () as u64, "ucol_getSortKey (icu4x → stub)")
     );
 }
 

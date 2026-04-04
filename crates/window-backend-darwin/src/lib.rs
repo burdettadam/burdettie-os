@@ -125,6 +125,7 @@ struct AppState {
     cursor_pos: (f64, f64),
     last_scroll_delta: Option<(f64, f64)>,
     focused: bool,
+    #[allow(dead_code)]
     window_mode: WindowMode,
     theme: Theme,
 }

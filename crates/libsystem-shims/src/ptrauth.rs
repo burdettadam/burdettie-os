@@ -15,12 +15,12 @@ impl PtrauthShims {
     pub fn install(table: &mut ShimTable) {
         table.register(
             "_ptrauth_strip",
-            shim_ptrauth_strip as u64,
+            shim_ptrauth_strip as *const () as u64,
             "ptrauth_strip → identity (no PAC in lab)",
         );
         table.register(
             "_ptrauth_sign_unauthenticated",
-            shim_ptrauth_sign_unauthenticated as u64,
+            shim_ptrauth_sign_unauthenticated as *const () as u64,
             "ptrauth_sign_unauthenticated → identity (no PAC in lab)",
         );
 

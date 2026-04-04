@@ -75,39 +75,39 @@ impl CoreTextStubs {
         use crate::register_shims;
         register_shims!(table,
             // -- CTFontManager (existing, still NULL stubs) --
-            ("_CTFontManagerCopyAvailableFontFamilyNames", shim_ct_null_stub as u64, "CTFontManagerCopyAvailableFontFamilyNames (stub → NULL)"),
-            ("_CTFontManagerCopyAvailablePostScriptNames", shim_ct_null_stub as u64, "CTFontManagerCopyAvailablePostScriptNames (stub → NULL)"),
+            ("_CTFontManagerCopyAvailableFontFamilyNames", shim_ct_null_stub as *const () as u64, "CTFontManagerCopyAvailableFontFamilyNames (stub → NULL)"),
+            ("_CTFontManagerCopyAvailablePostScriptNames", shim_ct_null_stub as *const () as u64, "CTFontManagerCopyAvailablePostScriptNames (stub → NULL)"),
 
             // -- CTFont creation --
-            ("_CTFontCreateWithName", shim_ct_font_create_with_name as u64, "CTFontCreateWithName (handle-based)"),
-            ("_CTFontCopyFullName", shim_ct_font_copy_full_name as u64, "CTFontCopyFullName (stub → NULL)"),
-            ("_CTFontGetGlyphCount", shim_ct_zero_stub as u64, "CTFontGetGlyphCount (stub → 0)"),
+            ("_CTFontCreateWithName", shim_ct_font_create_with_name as *const () as u64, "CTFontCreateWithName (handle-based)"),
+            ("_CTFontCopyFullName", shim_ct_font_copy_full_name as *const () as u64, "CTFontCopyFullName (stub → NULL)"),
+            ("_CTFontGetGlyphCount", shim_ct_zero_stub as *const () as u64, "CTFontGetGlyphCount (stub → 0)"),
 
             // -- CTFont metrics --
-            ("_CTFontGetAscent", shim_ct_font_get_ascent as u64, "CTFontGetAscent"),
-            ("_CTFontGetDescent", shim_ct_font_get_descent as u64, "CTFontGetDescent"),
-            ("_CTFontGetLeading", shim_ct_font_get_leading as u64, "CTFontGetLeading"),
-            ("_CTFontGetXHeight", shim_ct_font_get_x_height as u64, "CTFontGetXHeight"),
-            ("_CTFontGetCapHeight", shim_ct_font_get_cap_height as u64, "CTFontGetCapHeight"),
-            ("_CTFontGetUnitsPerEm", shim_ct_font_get_units_per_em as u64, "CTFontGetUnitsPerEm"),
-            ("_CTFontGetSize", shim_ct_font_get_size as u64, "CTFontGetSize"),
-            ("_CTFontGetBoundingBox", shim_ct_font_get_bounding_box as u64, "CTFontGetBoundingBox"),
+            ("_CTFontGetAscent", shim_ct_font_get_ascent as *const () as u64, "CTFontGetAscent"),
+            ("_CTFontGetDescent", shim_ct_font_get_descent as *const () as u64, "CTFontGetDescent"),
+            ("_CTFontGetLeading", shim_ct_font_get_leading as *const () as u64, "CTFontGetLeading"),
+            ("_CTFontGetXHeight", shim_ct_font_get_x_height as *const () as u64, "CTFontGetXHeight"),
+            ("_CTFontGetCapHeight", shim_ct_font_get_cap_height as *const () as u64, "CTFontGetCapHeight"),
+            ("_CTFontGetUnitsPerEm", shim_ct_font_get_units_per_em as *const () as u64, "CTFontGetUnitsPerEm"),
+            ("_CTFontGetSize", shim_ct_font_get_size as *const () as u64, "CTFontGetSize"),
+            ("_CTFontGetBoundingBox", shim_ct_font_get_bounding_box as *const () as u64, "CTFontGetBoundingBox"),
 
             // -- CTFontDescriptor --
-            ("_CTFontDescriptorCreateWithAttributes", shim_ct_descriptor_create as u64, "CTFontDescriptorCreateWithAttributes"),
-            ("_CTFontDescriptorCreateMatchingFontDescriptor", shim_ct_descriptor_match as u64, "CTFontDescriptorCreateMatchingFontDescriptor"),
-            ("_CTFontDescriptorCopyAttribute", shim_ct_descriptor_copy_attr as u64, "CTFontDescriptorCopyAttribute"),
+            ("_CTFontDescriptorCreateWithAttributes", shim_ct_descriptor_create as *const () as u64, "CTFontDescriptorCreateWithAttributes"),
+            ("_CTFontDescriptorCreateMatchingFontDescriptor", shim_ct_descriptor_match as *const () as u64, "CTFontDescriptorCreateMatchingFontDescriptor"),
+            ("_CTFontDescriptorCopyAttribute", shim_ct_descriptor_copy_attr as *const () as u64, "CTFontDescriptorCopyAttribute"),
 
             // -- CTParagraphStyle --
-            ("_CTParagraphStyleCreate", shim_ct_paragraph_style_create as u64, "CTParagraphStyleCreate"),
-            ("_CTParagraphStyleGetValueForSpecifier", shim_ct_paragraph_style_get_value as u64, "CTParagraphStyleGetValueForSpecifier"),
+            ("_CTParagraphStyleCreate", shim_ct_paragraph_style_create as *const () as u64, "CTParagraphStyleCreate"),
+            ("_CTParagraphStyleGetValueForSpecifier", shim_ct_paragraph_style_get_value as *const () as u64, "CTParagraphStyleGetValueForSpecifier"),
 
             // -- CTLine --
-            ("_CTLineCreateWithAttributedString", shim_ct_line_create as u64, "CTLineCreateWithAttributedString (handle-based)"),
+            ("_CTLineCreateWithAttributedString", shim_ct_line_create as *const () as u64, "CTLineCreateWithAttributedString (handle-based)"),
 
             // -- CTRun --
-            ("_CTRunGetGlyphCount", shim_ct_run_get_glyph_count as u64, "CTRunGetGlyphCount (stub → 0)"),
-            ("_CTRunGetPositions", shim_ct_run_get_positions as u64, "CTRunGetPositions (no-op)"),
+            ("_CTRunGetGlyphCount", shim_ct_run_get_glyph_count as *const () as u64, "CTRunGetGlyphCount (stub → 0)"),
+            ("_CTRunGetPositions", shim_ct_run_get_positions as *const () as u64, "CTRunGetPositions (no-op)"),
         );
         log::debug!("CoreTextStubs: registered 21 shims");
     }

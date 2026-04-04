@@ -374,11 +374,11 @@ mod tests {
             mapped_addr: EVENT_PROBE_CLASS_ADDR,
             methods: vec![objc_runtime::MethodEntry {
                 selector: "keyDown:".into(),
-                imp: event_probe_key_down as u64,
+                imp: event_probe_key_down as *const () as u64,
                 type_encoding: "v@:@".into(),
             }, objc_runtime::MethodEntry {
                 selector: "performAction:".into(),
-                imp: action_probe_imp as u64,
+                imp: action_probe_imp as *const () as u64,
                 type_encoding: "v@:@".into(),
             }],
             class_methods: vec![],

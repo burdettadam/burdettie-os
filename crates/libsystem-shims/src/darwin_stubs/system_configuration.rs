@@ -29,38 +29,38 @@ impl SystemConfigurationStubs {
 
         // ── SCNetworkReachability ───────────────────────────────
         register_shims!(table,
-            ("_SCNetworkReachabilityCreateWithName", shim_sc_reachability_create_with_name as u64, "SCNetworkReachabilityCreateWithName (stub → handle)"),
-            ("_SCNetworkReachabilityCreateWithAddress", shim_sc_reachability_create_with_address as u64, "SCNetworkReachabilityCreateWithAddress (stub → handle)"),
-            ("_SCNetworkReachabilityGetFlags", shim_sc_reachability_get_flags as u64, "SCNetworkReachabilityGetFlags (stub → reachable)"),
-            ("_SCNetworkReachabilitySetCallback", shim_sc_reachability_set_callback as u64, "SCNetworkReachabilitySetCallback (stub → TRUE)"),
-            ("_SCNetworkReachabilityScheduleWithRunLoop", shim_sc_reachability_schedule_with_run_loop as u64, "SCNetworkReachabilityScheduleWithRunLoop (stub → TRUE)"),
-            ("_SCNetworkReachabilityUnscheduleFromRunLoop", shim_sc_reachability_unschedule_from_run_loop as u64, "SCNetworkReachabilityUnscheduleFromRunLoop (stub → TRUE)"),
-            ("_SCNetworkReachabilitySetDispatchQueue", shim_sc_reachability_set_dispatch_queue as u64, "SCNetworkReachabilitySetDispatchQueue (stub → TRUE)")
+            ("_SCNetworkReachabilityCreateWithName", shim_sc_reachability_create_with_name as *const () as u64, "SCNetworkReachabilityCreateWithName (stub → handle)"),
+            ("_SCNetworkReachabilityCreateWithAddress", shim_sc_reachability_create_with_address as *const () as u64, "SCNetworkReachabilityCreateWithAddress (stub → handle)"),
+            ("_SCNetworkReachabilityGetFlags", shim_sc_reachability_get_flags as *const () as u64, "SCNetworkReachabilityGetFlags (stub → reachable)"),
+            ("_SCNetworkReachabilitySetCallback", shim_sc_reachability_set_callback as *const () as u64, "SCNetworkReachabilitySetCallback (stub → TRUE)"),
+            ("_SCNetworkReachabilityScheduleWithRunLoop", shim_sc_reachability_schedule_with_run_loop as *const () as u64, "SCNetworkReachabilityScheduleWithRunLoop (stub → TRUE)"),
+            ("_SCNetworkReachabilityUnscheduleFromRunLoop", shim_sc_reachability_unschedule_from_run_loop as *const () as u64, "SCNetworkReachabilityUnscheduleFromRunLoop (stub → TRUE)"),
+            ("_SCNetworkReachabilitySetDispatchQueue", shim_sc_reachability_set_dispatch_queue as *const () as u64, "SCNetworkReachabilitySetDispatchQueue (stub → TRUE)")
         );
 
         // ── SCDynamicStore ──────────────────────────────────────
         register_shims!(table,
-            ("_SCDynamicStoreCreate", shim_sc_dynamic_store_create as u64, "SCDynamicStoreCreate (stub → handle)"),
-            ("_SCDynamicStoreCopyValue", shim_sc_dynamic_store_copy_value as u64, "SCDynamicStoreCopyValue (stub → NULL)"),
-            ("_SCDynamicStoreCopyMultiple", shim_sc_dynamic_store_copy_multiple as u64, "SCDynamicStoreCopyMultiple (stub → NULL)"),
-            ("_SCDynamicStoreSetValue", shim_sc_dynamic_store_set_value as u64, "SCDynamicStoreSetValue (stub → TRUE)"),
-            ("_SCDynamicStoreSetNotificationKeys", shim_sc_dynamic_store_set_notification_keys as u64, "SCDynamicStoreSetNotificationKeys (stub → TRUE)"),
-            ("_SCDynamicStoreSetDispatchQueue", shim_sc_dynamic_store_set_dispatch_queue as u64, "SCDynamicStoreSetDispatchQueue (stub → TRUE)")
+            ("_SCDynamicStoreCreate", shim_sc_dynamic_store_create as *const () as u64, "SCDynamicStoreCreate (stub → handle)"),
+            ("_SCDynamicStoreCopyValue", shim_sc_dynamic_store_copy_value as *const () as u64, "SCDynamicStoreCopyValue (stub → NULL)"),
+            ("_SCDynamicStoreCopyMultiple", shim_sc_dynamic_store_copy_multiple as *const () as u64, "SCDynamicStoreCopyMultiple (stub → NULL)"),
+            ("_SCDynamicStoreSetValue", shim_sc_dynamic_store_set_value as *const () as u64, "SCDynamicStoreSetValue (stub → TRUE)"),
+            ("_SCDynamicStoreSetNotificationKeys", shim_sc_dynamic_store_set_notification_keys as *const () as u64, "SCDynamicStoreSetNotificationKeys (stub → TRUE)"),
+            ("_SCDynamicStoreSetDispatchQueue", shim_sc_dynamic_store_set_dispatch_queue as *const () as u64, "SCDynamicStoreSetDispatchQueue (stub → TRUE)")
         );
 
         // ── SCPreferences ───────────────────────────────────────
         register_shims!(table,
-            ("_SCPreferencesCreate", shim_sc_preferences_create as u64, "SCPreferencesCreate (stub → handle)"),
-            ("_SCPreferencesGetValue", shim_sc_preferences_get_value as u64, "SCPreferencesGetValue (stub → NULL)"),
-            ("_SCPreferencesSetValue", shim_sc_preferences_set_value as u64, "SCPreferencesSetValue (stub → TRUE)"),
-            ("_SCPreferencesCommitChanges", shim_sc_preferences_commit_changes as u64, "SCPreferencesCommitChanges (stub → TRUE)"),
-            ("_SCPreferencesApplyChanges", shim_sc_preferences_apply_changes as u64, "SCPreferencesApplyChanges (stub → TRUE)")
+            ("_SCPreferencesCreate", shim_sc_preferences_create as *const () as u64, "SCPreferencesCreate (stub → handle)"),
+            ("_SCPreferencesGetValue", shim_sc_preferences_get_value as *const () as u64, "SCPreferencesGetValue (stub → NULL)"),
+            ("_SCPreferencesSetValue", shim_sc_preferences_set_value as *const () as u64, "SCPreferencesSetValue (stub → TRUE)"),
+            ("_SCPreferencesCommitChanges", shim_sc_preferences_commit_changes as *const () as u64, "SCPreferencesCommitChanges (stub → TRUE)"),
+            ("_SCPreferencesApplyChanges", shim_sc_preferences_apply_changes as *const () as u64, "SCPreferencesApplyChanges (stub → TRUE)")
         );
 
         // ── SCNetworkConfiguration ──────────────────────────────
         register_shims!(table,
-            ("_SCNetworkInterfaceCopyAll", shim_sc_network_interface_copy_all as u64, "SCNetworkInterfaceCopyAll (stub → NULL)"),
-            ("_SCNetworkServiceCopyAll", shim_sc_network_service_copy_all as u64, "SCNetworkServiceCopyAll (stub → NULL)")
+            ("_SCNetworkInterfaceCopyAll", shim_sc_network_interface_copy_all as *const () as u64, "SCNetworkInterfaceCopyAll (stub → NULL)"),
+            ("_SCNetworkServiceCopyAll", shim_sc_network_service_copy_all as *const () as u64, "SCNetworkServiceCopyAll (stub → NULL)")
         );
 
         // ── Data symbols ────────────────────────────────────────

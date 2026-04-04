@@ -515,7 +515,7 @@ mod tests {
 
         let block = crate::pal_alloc().calloc(1, 24) as *mut u64;
         unsafe {
-            *block.add(2) = test_block_invoke as u64;
+            *block.add(2) = test_block_invoke as *const () as u64;
             COLLECTED.clear();
         }
         shim_nsindexset_enumerate_indexes_using_block(set, 0, block as u64);
@@ -541,7 +541,7 @@ mod tests {
 
         let block = crate::pal_alloc().calloc(1, 24) as *mut u64;
         unsafe {
-            *block.add(2) = even_block as u64;
+            *block.add(2) = even_block as *const () as u64;
         }
 
         let result = shim_nsindexset_indexes_passing_test(set, 0, block as u64);

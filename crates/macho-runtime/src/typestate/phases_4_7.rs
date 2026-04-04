@@ -1,5 +1,5 @@
 use std::marker::PhantomData;
-use macho_exec::{call_constructors, DataSymbolStore};
+use macho_exec::call_constructors;
 use macho_objc::extract_initializers;
 
 use crate::error::RuntimeError;

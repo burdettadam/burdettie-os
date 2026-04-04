@@ -12,7 +12,6 @@ use crate::{ExecError, MappedImage};
 pub use chained::apply_chained_fixups;
 pub use chained::unresolved_bind_trap_addr;
 pub use resolver::{StubResolver, SymbolResolver};
-pub use data_symbols::DataSymbolStore;
 
 /// Apply rebase fixups: add slide to each rebase location.
 pub fn apply_rebases(image: &MappedImage, fixups: &Fixups) -> Result<usize, ExecError> {

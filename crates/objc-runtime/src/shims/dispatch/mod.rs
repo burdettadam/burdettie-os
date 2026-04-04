@@ -36,7 +36,7 @@ extern "C" {
 
 pub fn objc_msg_send_addr() -> u64 {
     #[cfg(all(target_arch = "aarch64", any(target_os = "macos", target_os = "linux")))]
-    { shim_objc_msg_send_asm as u64 }
+    { shim_objc_msg_send_asm as *const () as u64 }
     #[cfg(all(target_arch = "x86_64", target_os = "macos"))]
     { shim_objc_msg_send_x86_64_asm as u64 }
     #[cfg(not(any(
@@ -48,7 +48,7 @@ pub fn objc_msg_send_addr() -> u64 {
 
 pub fn objc_msg_send_stret_addr() -> u64 {
     #[cfg(all(target_arch = "aarch64", any(target_os = "macos", target_os = "linux")))]
-    { shim_objc_msg_send_stret_asm as u64 }
+    { shim_objc_msg_send_stret_asm as *const () as u64 }
     #[cfg(all(target_arch = "x86_64", target_os = "macos"))]
     { shim_objc_msg_send_stret_x86_64_asm as u64 }
     #[cfg(not(any(
@@ -60,7 +60,7 @@ pub fn objc_msg_send_stret_addr() -> u64 {
 
 pub fn objc_msg_send_fp2ret_addr() -> u64 {
     #[cfg(all(target_arch = "aarch64", any(target_os = "macos", target_os = "linux")))]
-    { shim_objc_msg_send_fp2ret_asm as u64 }
+    { shim_objc_msg_send_fp2ret_asm as *const () as u64 }
     #[cfg(all(target_arch = "x86_64", target_os = "macos"))]
     { shim_objc_msg_send_fp2ret_x86_64_asm as u64 }
     #[cfg(not(any(
@@ -72,7 +72,7 @@ pub fn objc_msg_send_fp2ret_addr() -> u64 {
 
 pub fn objc_msg_send_super_addr() -> u64 {
     #[cfg(all(target_arch = "aarch64", any(target_os = "macos", target_os = "linux")))]
-    { shim_objc_msg_send_super_asm as u64 }
+    { shim_objc_msg_send_super_asm as *const () as u64 }
     #[cfg(all(target_arch = "x86_64", target_os = "macos"))]
     { shim_objc_msg_send_super_x86_64_asm as u64 }
     #[cfg(not(any(
@@ -84,7 +84,7 @@ pub fn objc_msg_send_super_addr() -> u64 {
 
 pub fn objc_msg_send_super_stret_addr() -> u64 {
     #[cfg(all(target_arch = "aarch64", any(target_os = "macos", target_os = "linux")))]
-    { shim_objc_msg_send_super_stret_asm as u64 }
+    { shim_objc_msg_send_super_stret_asm as *const () as u64 }
     #[cfg(all(target_arch = "x86_64", target_os = "macos"))]
     { shim_objc_msg_send_super_stret_x86_64_asm as u64 }
     #[cfg(not(any(
@@ -96,7 +96,7 @@ pub fn objc_msg_send_super_stret_addr() -> u64 {
 
 pub fn objc_msg_send_super2_addr() -> u64 {
     #[cfg(all(target_arch = "aarch64", any(target_os = "macos", target_os = "linux")))]
-    { shim_objc_msg_send_super2_asm as u64 }
+    { shim_objc_msg_send_super2_asm as *const () as u64 }
     #[cfg(all(target_arch = "x86_64", target_os = "macos"))]
     { shim_objc_msg_send_super2_x86_64_asm as u64 }
     #[cfg(not(any(
@@ -108,7 +108,7 @@ pub fn objc_msg_send_super2_addr() -> u64 {
 
 pub fn objc_msg_send_super2_stret_addr() -> u64 {
     #[cfg(all(target_arch = "aarch64", any(target_os = "macos", target_os = "linux")))]
-    { shim_objc_msg_send_super2_stret_asm as u64 }
+    { shim_objc_msg_send_super2_stret_asm as *const () as u64 }
     #[cfg(all(target_arch = "x86_64", target_os = "macos"))]
     { shim_objc_msg_send_super2_stret_x86_64_asm as u64 }
     #[cfg(not(any(

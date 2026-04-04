@@ -234,43 +234,43 @@ impl SwiftFoundationBridgeStubs {
             // Dictionary<K,V>  ← NSDictionary
             (
                 "_$sSD10FoundationE36_unconditionallyBridgeFromObjectiveCySDyxq_GSo12NSDictionaryCSgFZ",
-                shim_bridge_dictionary_from_nsdictionary as u64,
+                shim_bridge_dictionary_from_nsdictionary as *const () as u64,
                 "Dictionary._unconditionallyBridgeFromObjectiveC: returns empty dict (safe bridge stub)"
             ),
             // Array<T>  ← NSArray
             (
                 "_$sSa10FoundationE36_unconditionallyBridgeFromObjectiveCySayxGSo7NSArrayCSgFZ",
-                shim_bridge_array_from_nsarray as u64,
+                shim_bridge_array_from_nsarray as *const () as u64,
                 "Array._unconditionallyBridgeFromObjectiveC: returns empty array (safe bridge stub)"
             ),
             // String  ← NSString
             (
                 "_$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ",
-                shim_bridge_string_from_nsstring as u64,
+                shim_bridge_string_from_nsstring as *const () as u64,
                 "String._unconditionallyBridgeFromObjectiveC: returns empty string (safe bridge stub)"
             ),
             // Substring  ← NSString
             (
                 "_$sSs10FoundationE36_unconditionallyBridgeFromObjectiveCySsSo8NSStringCSgFZ",
-                shim_bridge_substring_from_nsstring as u64,
+                shim_bridge_substring_from_nsstring as *const () as u64,
                 "Substring._unconditionallyBridgeFromObjectiveC: returns empty (safe bridge stub)"
             ),
             // Set<T>  ← NSSet
             (
                 "_$sSh10FoundationE36_unconditionallyBridgeFromObjectiveCyShyxGSo5NSSetCSgFZ",
-                shim_bridge_set_from_nsset as u64,
+                shim_bridge_set_from_nsset as *const () as u64,
                 "Set._unconditionallyBridgeFromObjectiveC: returns empty set (safe bridge stub)"
             ),
             // Data  ← NSData
             (
                 "_$s10Foundation4DataV36_unconditionallyBridgeFromObjectiveCyACSo6NSDataCSgFZ",
-                shim_bridge_data_from_nsdata as u64,
+                shim_bridge_data_from_nsdata as *const () as u64,
                 "Data._unconditionallyBridgeFromObjectiveC: returns empty data (safe bridge stub)"
             ),
             // IndexSet  ← NSIndexSet
             (
                 "_$s10Foundation8IndexSetV36_unconditionallyBridgeFromObjectiveCyACSo07NSIndexC0CSgFZ",
-                shim_bridge_indexset_from_nsindexset as u64,
+                shim_bridge_indexset_from_nsindexset as *const () as u64,
                 "IndexSet._unconditionallyBridgeFromObjectiveC: returns empty (safe bridge stub)"
             ),
 
@@ -279,32 +279,32 @@ impl SwiftFoundationBridgeStubs {
             // but the force-bridge take two arguments (inout result pointer in x1).
             (
                 "_$sSD10FoundationE26_forceBridgeFromObjectiveC_6resultySo12NSDictionaryC_SDyxq_GSgztFZ",
-                shim_force_bridge_dictionary as u64,
+                shim_force_bridge_dictionary as *const () as u64,
                 "Dictionary._forceBridgeFromObjectiveC: writes nil result (safe bridge stub)"
             ),
             (
                 "_$sSa10FoundationE26_forceBridgeFromObjectiveC_6resultySo7NSArrayC_SayxGSgztFZ",
-                shim_force_bridge_array as u64,
+                shim_force_bridge_array as *const () as u64,
                 "Array._forceBridgeFromObjectiveC: writes nil result (safe bridge stub)"
             ),
             (
                 "_$sSS10FoundationE26_forceBridgeFromObjectiveC_6resultySo8NSStringC_SSSgztFZ",
-                shim_force_bridge_string as u64,
+                shim_force_bridge_string as *const () as u64,
                 "String._forceBridgeFromObjectiveC: writes nil result (safe bridge stub)"
             ),
             (
                 "_$sSs10FoundationE26_forceBridgeFromObjectiveC_6resultySo8NSStringC_SsSgztFZ",
-                shim_force_bridge_substring as u64,
+                shim_force_bridge_substring as *const () as u64,
                 "Substring._forceBridgeFromObjectiveC: writes nil result (safe bridge stub)"
             ),
             (
                 "_$sSh10FoundationE26_forceBridgeFromObjectiveC_6resultySo5NSSetC_ShyxGSgztFZ",
-                shim_force_bridge_set as u64,
+                shim_force_bridge_set as *const () as u64,
                 "Set._forceBridgeFromObjectiveC: writes nil result (safe bridge stub)"
             ),
             (
                 "_$s10Foundation4DataV26_forceBridgeFromObjectiveC_6resultySo6NSDataC_ACSgztFZ",
-                shim_force_bridge_data as u64,
+                shim_force_bridge_data as *const () as u64,
                 "Data._forceBridgeFromObjectiveC: writes nil result (safe bridge stub)"
             ),
         );

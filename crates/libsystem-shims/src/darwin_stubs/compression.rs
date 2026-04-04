@@ -50,13 +50,13 @@ impl CompressionStubs {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
         register_shims!(table,
-            ("_compression_encode_buffer", shim_compression_encode_buffer as u64, "compression_encode_buffer"),
-            ("_compression_decode_buffer", shim_compression_decode_buffer as u64, "compression_decode_buffer"),
-            ("_compression_stream_init", shim_compression_stream_init as u64, "compression_stream_init"),
-            ("_compression_stream_process", shim_compression_stream_process as u64, "compression_stream_process"),
-            ("_compression_stream_destroy", shim_compression_stream_destroy as u64, "compression_stream_destroy"),
-            ("_compression_encode_scratch_buffer_size", shim_compression_encode_scratch_buffer_size as u64, "compression_encode_scratch_buffer_size"),
-            ("_compression_decode_scratch_buffer_size", shim_compression_decode_scratch_buffer_size as u64, "compression_decode_scratch_buffer_size"),
+            ("_compression_encode_buffer", shim_compression_encode_buffer as *const () as u64, "compression_encode_buffer"),
+            ("_compression_decode_buffer", shim_compression_decode_buffer as *const () as u64, "compression_decode_buffer"),
+            ("_compression_stream_init", shim_compression_stream_init as *const () as u64, "compression_stream_init"),
+            ("_compression_stream_process", shim_compression_stream_process as *const () as u64, "compression_stream_process"),
+            ("_compression_stream_destroy", shim_compression_stream_destroy as *const () as u64, "compression_stream_destroy"),
+            ("_compression_encode_scratch_buffer_size", shim_compression_encode_scratch_buffer_size as *const () as u64, "compression_encode_scratch_buffer_size"),
+            ("_compression_decode_scratch_buffer_size", shim_compression_decode_scratch_buffer_size as *const () as u64, "compression_decode_scratch_buffer_size"),
         );
         log::debug!("CompressionStubs: registered 7 stubs");
     }

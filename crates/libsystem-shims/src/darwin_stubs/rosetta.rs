@@ -10,9 +10,9 @@ impl RosettaStubs {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
         register_shims!(table,
-            ("_rosetta_is_translation_available", shim_rosetta_false as u64, "rosetta_is_translation_available (stub → false)"),
-            ("_rosetta_has_been_previously_installed", shim_rosetta_false as u64, "rosetta_has_been_previously_installed (stub → false)"),
-            ("_rosetta_translate_binaries", shim_rosetta_err as u64, "rosetta_translate_binaries (stub → -1)"),
+            ("_rosetta_is_translation_available", shim_rosetta_false as *const () as u64, "rosetta_is_translation_available (stub → false)"),
+            ("_rosetta_has_been_previously_installed", shim_rosetta_false as *const () as u64, "rosetta_has_been_previously_installed (stub → false)"),
+            ("_rosetta_translate_binaries", shim_rosetta_err as *const () as u64, "rosetta_translate_binaries (stub → -1)"),
         );
         log::debug!("RosettaStubs: registered 3 stubs");
     }

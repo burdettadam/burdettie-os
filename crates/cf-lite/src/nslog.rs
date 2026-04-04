@@ -35,7 +35,7 @@ extern "C" {
 pub fn nslog_trampoline_addr() -> u64 {
     #[cfg(all(target_arch = "aarch64", target_os = "macos"))]
     {
-        shim_nslog_asm as u64
+        shim_nslog_asm as *const () as u64
     }
     #[cfg(all(target_arch = "x86_64", target_os = "macos"))]
     {

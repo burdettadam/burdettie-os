@@ -15,7 +15,7 @@ pub struct LibswiftRemoteMirrorStubs;
 impl LibswiftRemoteMirrorStubs {
     pub fn install(table: &mut ShimTable) {
         // Function stubs — all route through swift_null_stub (returns 0).
-        let fn_addr = swift_null_stub as u64;
+        let fn_addr = swift_null_stub as *const () as u64;
         table.register("_swift_reflection_typeRefForMetadata", fn_addr, "runtime-helper: _swift_reflection_typeRefForMetadata");
         table.register("_swift_reflection_typeRefForMangledTypeName", fn_addr, "runtime-helper: _swift_reflection_typeRefForMangledTypeName");
         table.register("_swift_reflection_typeRefForInstance", fn_addr, "runtime-helper: _swift_reflection_typeRefForInstance");

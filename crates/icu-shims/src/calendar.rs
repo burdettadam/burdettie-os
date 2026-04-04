@@ -129,14 +129,14 @@ fn week_of_year(year: i32, month0: i32, day: i32) -> i32 {
 
 pub fn install(table: &mut ShimTable) {
     register_shims!(table,
-        ("_ucal_open", shim_ucal_open as u64, "ucal_open (Gregorian calendar)"),
-        ("_ucal_close", shim_ucal_close as u64, "ucal_close"),
-        ("_ucal_get", shim_ucal_get as u64, "ucal_get (field extraction)"),
-        ("_ucal_set", shim_ucal_set as u64, "ucal_set (field modification)"),
-        ("_ucal_getMillis", shim_ucal_get_millis as u64, "ucal_getMillis"),
-        ("_ucal_setMillis", shim_ucal_set_millis as u64, "ucal_setMillis"),
-        ("_ucal_add", shim_ucal_add as u64, "ucal_add (date arithmetic)"),
-        ("_ucal_getTimeZoneDisplayName", shim_ucal_get_tz_display_name as u64, "ucal_getTimeZoneDisplayName (stub → UTC)")
+        ("_ucal_open", shim_ucal_open as *const () as u64, "ucal_open (Gregorian calendar)"),
+        ("_ucal_close", shim_ucal_close as *const () as u64, "ucal_close"),
+        ("_ucal_get", shim_ucal_get as *const () as u64, "ucal_get (field extraction)"),
+        ("_ucal_set", shim_ucal_set as *const () as u64, "ucal_set (field modification)"),
+        ("_ucal_getMillis", shim_ucal_get_millis as *const () as u64, "ucal_getMillis"),
+        ("_ucal_setMillis", shim_ucal_set_millis as *const () as u64, "ucal_setMillis"),
+        ("_ucal_add", shim_ucal_add as *const () as u64, "ucal_add (date arithmetic)"),
+        ("_ucal_getTimeZoneDisplayName", shim_ucal_get_tz_display_name as *const () as u64, "ucal_getTimeZoneDisplayName (stub → UTC)")
     );
 }
 
@@ -222,7 +222,7 @@ pub extern "C" fn shim_ucal_add(cal: u64, field: i32, amount: i32, status: *mut 
     if !status.is_null() { unsafe { *status = U_ZERO_ERROR; } }
     with_table(|t| {
         let Some(state) = t.get_mut(&cal) else { return; };
-        let (mut y, mut m, mut d, mut h, mut mi, mut s, mut ms) = decompose(state.millis);
+        let (mut y, mut m, d, h, mi, s, ms) = decompose(state.millis);
         match field {
             UCAL_YEAR => y += amount,
             UCAL_MONTH => {

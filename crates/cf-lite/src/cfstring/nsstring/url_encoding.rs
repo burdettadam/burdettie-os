@@ -1,6 +1,6 @@
 //! NSString URL percent-encoding and byte-length shims.
 
-use std::ffi::{CStr, CString, c_char};
+use std::ffi::CString;
 
 use crate::cfstring::{
     cfstring_parts, extract_cfstring_cstr, shim_cf_string_create_with_cstring,
@@ -149,7 +149,7 @@ pub extern "C" fn shim_nsstring_length_of_bytes_using_encoding(
     if obj == 0 {
         return 0;
     }
-    let Some((bytes, len)) = cfstring_parts(obj) else {
+    let Some((_bytes, len)) = cfstring_parts(obj) else {
         return 0;
     };
     len as u64

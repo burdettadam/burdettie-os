@@ -34,7 +34,7 @@ pub extern "C" fn objc_msg_lookup_imp(obj: u64, sel: u64) -> u64 {
             Err(e) => e.into_inner(),
         };
         let Some(rt) = guard.as_ref() else {
-            return unrecognized_selector_stub as u64;
+            return unrecognized_selector_stub as *const () as u64;
         };
         if let Some(isa) = rt.tagged_class_for_pointer(obj) {
             if let Some(imp) = rt.msg_lookup(isa, sel_str) {
@@ -52,7 +52,7 @@ pub extern "C" fn objc_msg_lookup_imp(obj: u64, sel: u64) -> u64 {
             selector: sel_str.into(),
             receiver: obj,
         });
-        return unrecognized_selector_stub as u64;
+        return unrecognized_selector_stub as *const () as u64;
     }
 
     if obj % 8 != 0 {
@@ -62,7 +62,7 @@ pub extern "C" fn objc_msg_lookup_imp(obj: u64, sel: u64) -> u64 {
         log::warn!(
             "objc_msgSend: unaligned pointer {obj:#x} for '{sel_str}'"
         );
-        return unrecognized_selector_stub as u64;
+        return unrecognized_selector_stub as *const () as u64;
     }
 
     let sel_str = unsafe { CStr::from_ptr(sel as *const c_char) }
@@ -154,7 +154,7 @@ pub extern "C" fn objc_msg_lookup_imp(obj: u64, sel: u64) -> u64 {
                         receiver: obj,
                         isa,
                     });
-                    return forwarding_trampoline as u64;
+                    return forwarding_trampoline as *const () as u64;
                 }
 
                 drop(guard);
@@ -166,7 +166,7 @@ pub extern "C" fn objc_msg_lookup_imp(obj: u64, sel: u64) -> u64 {
                     receiver: obj,
                     isa,
                 });
-                return forwarding_trampoline as u64;
+                return forwarding_trampoline as *const () as u64;
             }
 
             drop(guard);
@@ -183,7 +183,7 @@ pub extern "C" fn objc_msg_lookup_imp(obj: u64, sel: u64) -> u64 {
                 selector: sel_str.into(),
                 receiver: obj,
             });
-            unrecognized_selector_stub as u64
+            unrecognized_selector_stub as *const () as u64
         }
     }
 }
@@ -246,7 +246,7 @@ pub extern "C" fn objc_msg_super_lookup_imp(receiver: u64, super_class: u64, sel
                 "objc_msgSendSuper: unrecognized selector '{}' on {:#x} (super={:#x}) → returning nil",
                 sel_str, receiver, super_class
             );
-            unrecognized_selector_stub as u64
+            unrecognized_selector_stub as *const () as u64
         }
     }
 }
@@ -278,7 +278,7 @@ pub extern "C" fn objc_msg_super2_lookup_imp(receiver: u64, current_class: u64, 
                     "objc_msgSendSuper2: class '{}' at {:#x} has no superclass → returning nil",
                     info.name, current_class
                 );
-                return unrecognized_selector_stub as u64;
+                return unrecognized_selector_stub as *const () as u64;
             }
         },
         None => {
@@ -286,7 +286,7 @@ pub extern "C" fn objc_msg_super2_lookup_imp(receiver: u64, current_class: u64, 
                 current_class,
             });
             log::warn!("objc_msgSendSuper2: unknown class at {:#x} → returning nil", current_class);
-            return unrecognized_selector_stub as u64;
+            return unrecognized_selector_stub as *const () as u64;
         }
     };
 
@@ -305,7 +305,7 @@ pub extern "C" fn objc_msg_super2_lookup_imp(receiver: u64, current_class: u64, 
                 "objc_msgSendSuper2: unrecognized selector '{}' on {:#x} (super={:#x}) → returning nil",
                 sel_str, receiver, super_class
             );
-            unrecognized_selector_stub as u64
+            unrecognized_selector_stub as *const () as u64
         }
     }
 }

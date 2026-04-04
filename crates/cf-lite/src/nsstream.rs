@@ -17,6 +17,9 @@
 use crate::cfstring;
 use crate::nsobj;
 
+use std::collections::HashMap;
+use std::sync::Mutex;
+
 const STATUS_OFF: usize = 8;
 const ERROR_OFF: usize = 16;
 const DATA_OFF: usize = 24;
@@ -28,6 +31,55 @@ const NS_STREAM_STATUS_NOT_OPEN: u64 = 0;
 const NS_STREAM_STATUS_OPEN: u64 = 2;
 const NS_STREAM_STATUS_AT_END: u64 = 5;
 const NS_STREAM_STATUS_CLOSED: u64 = 6;
+
+// NSStreamEvent bitmask values
+const NS_STREAM_EVENT_OPEN_COMPLETED: u64 = 1 << 0;
+const NS_STREAM_EVENT_HAS_BYTES_AVAILABLE: u64 = 1 << 1;
+const NS_STREAM_EVENT_HAS_SPACE_AVAILABLE: u64 = 1 << 2;
+const NS_STREAM_EVENT_END_ENCOUNTERED: u64 = 1 << 4;
+
+/// Per-stream scheduling metadata (delegate + run loop association).
+struct StreamScheduleInfo {
+    delegate: u64,
+    run_loop: u64,
+    mode: u64,
+}
+
+static STREAM_INFO: Mutex<Option<HashMap<u64, StreamScheduleInfo>>> = Mutex::new(None);
+
+fn with_stream_info<R>(f: impl FnOnce(&mut HashMap<u64, StreamScheduleInfo>) -> R) -> R {
+    let mut guard = STREAM_INFO.lock().unwrap_or_else(|e| e.into_inner());
+    let map = guard.get_or_insert_with(HashMap::new);
+    f(map)
+}
+
+/// Fire `stream:handleEvent:` on the delegate via the ObjC runtime.
+fn fire_stream_event(stream: u64, delegate: u64, event: u64) {
+    if delegate == 0 || stream == 0 { return; }
+    // Dispatch stream:handleEvent: — 2-arg selector
+    let isa = unsafe { *(delegate as *const u64) };
+    let selector = "stream:handleEvent:";
+    let guard = match objc_runtime::OBJC_RUNTIME.read() {
+        Ok(g) => g,
+        Err(e) => e.into_inner(),
+    };
+    let Some(rt) = guard.as_ref() else { return; };
+    let Some(imp) = rt.msg_lookup(isa, selector) else { return; };
+    let sel_ptr = rt.selector_ptr(selector).unwrap_or(0) as u64;
+    drop(guard);
+    let func: extern "C" fn(u64, u64, u64, u64) = unsafe { std::mem::transmute(imp) };
+    func(delegate, sel_ptr, stream, event);
+}
+
+/// Fire EndEncountered on the delegate if the stream is scheduled.
+fn fire_end_event_if_scheduled(obj: u64) {
+    let delegate = with_stream_info(|m| {
+        m.get(&obj).filter(|i| i.run_loop != 0).map_or(0, |i| i.delegate)
+    });
+    if delegate != 0 {
+        fire_stream_event(obj, delegate, NS_STREAM_EVENT_END_ENCOUNTERED);
+    }
+}
 
 fn make_nsstring(s: &str) -> u64 {
     let c = std::ffi::CString::new(s).unwrap_or_default();
@@ -41,11 +93,32 @@ fn make_nsstring(s: &str) -> u64 {
 pub extern "C" fn shim_nsstream_open(obj: u64, _cmd: u64) {
     if obj == 0 { return; }
     unsafe { *((obj as usize + STATUS_OFF) as *mut u64) = NS_STREAM_STATUS_OPEN; }
+    // Fire delegate events if scheduled in a run loop.
+    let (delegate, is_scheduled) = with_stream_info(|m| {
+        m.get(&obj).map_or((0u64, false), |i| (i.delegate, i.run_loop != 0))
+    });
+    if is_scheduled && delegate != 0 {
+        fire_stream_event(obj, delegate, NS_STREAM_EVENT_OPEN_COMPLETED);
+        // For input streams: fire HasBytesAvailable if data is ready.
+        let isa = unsafe { *(obj as *const u64) };
+        if isa == nsobj::nsinputstream_class_addr() {
+            let data_ptr = unsafe { *((obj as usize + DATA_OFF) as *const u64) };
+            if data_ptr != 0 {
+                fire_stream_event(obj, delegate, NS_STREAM_EVENT_HAS_BYTES_AVAILABLE);
+            }
+        }
+        // For output streams: fire HasSpaceAvailable.
+        if isa == nsobj::nsoutputstream_class_addr() {
+            fire_stream_event(obj, delegate, NS_STREAM_EVENT_HAS_SPACE_AVAILABLE);
+        }
+    }
 }
 
 pub extern "C" fn shim_nsstream_close(obj: u64, _cmd: u64) {
     if obj == 0 { return; }
     unsafe { *((obj as usize + STATUS_OFF) as *mut u64) = NS_STREAM_STATUS_CLOSED; }
+    // Clean up scheduling info.
+    with_stream_info(|m| { m.remove(&obj); });
 }
 
 pub extern "C" fn shim_nsstream_stream_status(obj: u64, _cmd: u64) -> u64 {
@@ -58,19 +131,32 @@ pub extern "C" fn shim_nsstream_stream_error(obj: u64, _cmd: u64) -> u64 {
     unsafe { *((obj as usize + ERROR_OFF) as *const u64) }
 }
 
-pub extern "C" fn shim_nsstream_delegate(_obj: u64, _cmd: u64) -> u64 {
-    0 // stub — delegate not tracked
+pub extern "C" fn shim_nsstream_delegate(obj: u64, _cmd: u64) -> u64 {
+    if obj == 0 { return 0; }
+    with_stream_info(|m| m.get(&obj).map_or(0, |i| i.delegate))
 }
 
-pub extern "C" fn shim_nsstream_set_delegate(_obj: u64, _cmd: u64, _delegate: u64) {
-    // stub — delegate not tracked
+pub extern "C" fn shim_nsstream_set_delegate(obj: u64, _cmd: u64, delegate: u64) {
+    if obj == 0 { return; }
+    with_stream_info(|m| {
+        m.entry(obj)
+            .and_modify(|i| i.delegate = delegate)
+            .or_insert(StreamScheduleInfo { delegate, run_loop: 0, mode: 0 });
+    });
 }
 
-pub extern "C" fn shim_nsstream_schedule_in_run_loop(_obj: u64, _cmd: u64, _rl: u64, _mode: u64) {
-    // stub — no real run loop integration
+pub extern "C" fn shim_nsstream_schedule_in_run_loop(obj: u64, _cmd: u64, rl: u64, mode: u64) {
+    if obj == 0 { return; }
+    with_stream_info(|m| {
+        m.entry(obj)
+            .and_modify(|i| { i.run_loop = rl; i.mode = mode; })
+            .or_insert(StreamScheduleInfo { delegate: 0, run_loop: rl, mode });
+    });
 }
 
-pub extern "C" fn shim_nsstream_remove_from_run_loop(_obj: u64, _cmd: u64, _rl: u64, _mode: u64) {
+pub extern "C" fn shim_nsstream_remove_from_run_loop(obj: u64, _cmd: u64, _rl: u64, _mode: u64) {
+    if obj == 0 { return; }
+    with_stream_info(|m| { m.remove(&obj); });
 }
 
 pub extern "C" fn shim_nsstream_description(obj: u64, _cmd: u64) -> u64 {
@@ -121,6 +207,7 @@ pub extern "C" fn shim_nsinputstream_read(obj: u64, _cmd: u64, buffer: u64, max_
     let data_ptr = unsafe { *((obj as usize + DATA_OFF) as *const u64) };
     if data_ptr == 0 {
         unsafe { *((obj as usize + STATUS_OFF) as *mut u64) = NS_STREAM_STATUS_AT_END; }
+        fire_end_event_if_scheduled(obj);
         return 0;
     }
 
@@ -129,6 +216,7 @@ pub extern "C" fn shim_nsinputstream_read(obj: u64, _cmd: u64, buffer: u64, max_
 
     if read_pos >= total_len {
         unsafe { *((obj as usize + STATUS_OFF) as *mut u64) = NS_STREAM_STATUS_AT_END; }
+        fire_end_event_if_scheduled(obj);
         return 0;
     }
 
@@ -144,6 +232,7 @@ pub extern "C" fn shim_nsinputstream_read(obj: u64, _cmd: u64, buffer: u64, max_
         *((obj as usize + READ_POS_OFF) as *mut u64) = read_pos + to_copy;
         if read_pos + to_copy >= total_len {
             *((obj as usize + STATUS_OFF) as *mut u64) = NS_STREAM_STATUS_AT_END;
+            fire_end_event_if_scheduled(obj);
         }
     }
     to_copy as i64
@@ -716,5 +805,78 @@ mod tests {
 
         free_obj(inp);
         free_obj(out);
+    }
+
+    // ── Delegate / Run Loop Scheduling ─────────────────────────
+
+    #[test]
+    fn set_delegate_tracks_value() {
+        let obj = make_stream();
+        assert_eq!(shim_nsstream_delegate(obj, 0), 0);
+        shim_nsstream_set_delegate(obj, 0, 0xBEEF);
+        assert_eq!(shim_nsstream_delegate(obj, 0), 0xBEEF);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn set_delegate_nil_obj() {
+        shim_nsstream_set_delegate(0, 0, 0xBEEF); // must not crash
+    }
+
+    #[test]
+    fn delegate_nil_obj() {
+        assert_eq!(shim_nsstream_delegate(0, 0), 0);
+    }
+
+    #[test]
+    fn schedule_tracks_run_loop() {
+        let obj = make_stream();
+        shim_nsstream_schedule_in_run_loop(obj, 0, 0xAA, 0xBB);
+        // Verify through internal map
+        let info = with_stream_info(|m| {
+            m.get(&obj).map(|i| (i.run_loop, i.mode))
+        });
+        assert_eq!(info, Some((0xAA, 0xBB)));
+        free_obj(obj);
+    }
+
+    #[test]
+    fn remove_from_run_loop_clears_info() {
+        let obj = make_stream();
+        shim_nsstream_schedule_in_run_loop(obj, 0, 0xAA, 0xBB);
+        shim_nsstream_remove_from_run_loop(obj, 0, 0xAA, 0xBB);
+        let info = with_stream_info(|m| m.get(&obj).map(|i| i.run_loop));
+        assert_eq!(info, None);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn close_clears_schedule_info() {
+        let obj = make_stream();
+        shim_nsstream_schedule_in_run_loop(obj, 0, 0xAA, 0xBB);
+        shim_nsstream_set_delegate(obj, 0, 0xCC);
+        shim_nsstream_close(obj, 0);
+        let info = with_stream_info(|m| m.get(&obj).map(|i| i.delegate));
+        assert_eq!(info, None);
+        free_obj(obj);
+    }
+
+    #[test]
+    fn schedule_nil_obj() {
+        shim_nsstream_schedule_in_run_loop(0, 0, 0xAA, 0xBB); // must not crash
+    }
+
+    #[test]
+    fn remove_nil_obj() {
+        shim_nsstream_remove_from_run_loop(0, 0, 0xAA, 0xBB); // must not crash
+    }
+
+    #[test]
+    fn set_delegate_overwrites_previous() {
+        let obj = make_stream();
+        shim_nsstream_set_delegate(obj, 0, 0x111);
+        shim_nsstream_set_delegate(obj, 0, 0x222);
+        assert_eq!(shim_nsstream_delegate(obj, 0), 0x222);
+        free_obj(obj);
     }
 }

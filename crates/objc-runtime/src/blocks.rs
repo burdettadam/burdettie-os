@@ -289,12 +289,70 @@ const BLOCK_FIELD_IS_BLOCK: u32 = 7; // captured __block block
 const BLOCK_FIELD_IS_BYREF: u32 = 8; // captured __block variable
 const BLOCK_BYREF_CALLER: u32 = 128; // called from byref copy/dispose helper
 
+// Byref struct layout offsets.
+const BYREF_FORWARDING_OFF: usize = 8;
+const BYREF_FLAGS_OFF: usize = 16;
+const BYREF_SIZE_OFF: usize = 20;
+const BYREF_HAS_COPY_DISPOSE: u32 = 1 << 25;
+const BYREF_NEEDS_FREE: u32 = 1 << 24;
+const BYREF_MIN_SIZE: usize = 32;
+
+/// Copy a `__block` byref struct from stack to heap, updating both
+/// forwarding pointers.  Returns the heap address.
+fn copy_byref_to_heap(byref: u64) -> u64 {
+    // Read the existing forwarding pointer — if it already points to heap, bump refcount
+    let forwarding = unsafe { *((byref as usize + BYREF_FORWARDING_OFF) as *const u64) };
+    if forwarding != byref && forwarding != 0 {
+        // Already copied to heap — return existing heap copy
+        REFCOUNTS.retain(forwarding);
+        return forwarding;
+    }
+
+    // Read size from the byref struct
+    let size = unsafe { *((byref as usize + BYREF_SIZE_OFF) as *const u32) } as usize;
+    let alloc_size = if size >= BYREF_MIN_SIZE { size } else { BYREF_MIN_SIZE };
+
+    let heap = crate::pal_alloc().malloc(alloc_size) as u64;
+    if heap == 0 { return byref; }
+
+    // Bitwise copy
+    unsafe { std::ptr::copy_nonoverlapping(byref as *const u8, heap as *mut u8, alloc_size); }
+
+    // Set heap copy's forwarding to itself
+    unsafe { *((heap as usize + BYREF_FORWARDING_OFF) as *mut u64) = heap; }
+
+    // Update stack copy's forwarding to point to heap
+    unsafe { *((byref as usize + BYREF_FORWARDING_OFF) as *mut u64) = heap; }
+
+    // Set BYREF_NEEDS_FREE on heap copy
+    unsafe {
+        let f = (heap as usize + BYREF_FLAGS_OFF) as *mut u32;
+        *f |= BYREF_NEEDS_FREE;
+    }
+
+    // Initial refcount = 1
+    REFCOUNTS.retain(heap);
+
+    // Call byref copy helper if HAS_COPY_DISPOSE
+    let flags = unsafe { *((byref as usize + BYREF_FLAGS_OFF) as *const u32) };
+    if flags & BYREF_HAS_COPY_DISPOSE != 0 {
+        let copy_fn = unsafe { *((byref as usize + 24) as *const u64) };
+        if copy_fn != 0 {
+            let copy: extern "C" fn(u64, u64) = unsafe { std::mem::transmute(copy_fn) };
+            copy(heap, byref);
+        }
+    }
+
+    log::debug!("_Block_object_assign: copied byref {:#x} → heap {:#x} ({} bytes)", byref, heap, alloc_size);
+    heap
+}
+
 /// `void _Block_object_assign(void *destAddr, const void *object, const int flags)`
 ///
 /// Called inside block copy helpers to retain/copy captured objects.
 /// - BLOCK_FIELD_IS_OBJECT → retain the object
 /// - BLOCK_FIELD_IS_BLOCK  → Block_copy the nested block
-/// - BLOCK_FIELD_IS_BYREF  → copy the __block byref struct (simplified: memcpy pointer)
+/// - BLOCK_FIELD_IS_BYREF  → copy the __block byref struct to heap, update forwarding
 pub extern "C" fn shim_block_object_assign(dest_addr: u64, object: u64, flags: u32) {
     if dest_addr == 0 || object == 0 {
         return;
@@ -312,8 +370,9 @@ pub extern "C" fn shim_block_object_assign(dest_addr: u64, object: u64, flags: u
             unsafe { *(dest_addr as *mut u64) = copied; }
         }
         _ if kind == BLOCK_FIELD_IS_BYREF || kind == (BLOCK_FIELD_IS_BYREF | BLOCK_BYREF_CALLER) => {
-            // __block byref: just store the pointer (simplified)
-            unsafe { *(dest_addr as *mut u64) = object; }
+            // __block byref: copy to heap and update forwarding pointers
+            let heap = copy_byref_to_heap(object);
+            unsafe { *(dest_addr as *mut u64) = heap; }
         }
         _ => {
             // Unknown flag combination — store pointer as-is

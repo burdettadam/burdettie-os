@@ -21,6 +21,7 @@
 // Function pointers are cast to u64 addresses for the emulated Mach-O address space.
 // Public shim functions take raw pointers from emulated code — inherently unsafe at the FFI boundary.
 #![allow(
+    dead_code,                         // FFI shims referenced by pointer, not by Rust call
     clippy::fn_to_numeric_cast,
     clippy::not_unsafe_ptr_arg_deref,
     clippy::unwrap_used,            // shim FFI code uses unwrap where panic = irrecoverable

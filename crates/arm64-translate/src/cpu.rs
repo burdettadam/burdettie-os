@@ -32,6 +32,17 @@ pub struct CpuState {
     /// Set by Load-Exclusive; checked and cleared by Store-Exclusive.
     /// `Some((addr, size))` if an exclusive monitor is active.
     pub exclusive_monitor: Option<(u64, u8)>,
+    /// Pointer Authentication keys (ARMv8.3 arm64e).
+    /// APIAKey (instruction A key, used by PACIA/AUTIA).
+    pub pac_ia_key: u128,
+    /// APIBKey (instruction B key).
+    pub pac_ib_key: u128,
+    /// APDAKey (data A key).
+    pub pac_da_key: u128,
+    /// APDBKey (data B key).
+    pub pac_db_key: u128,
+    /// Generic authentication key (APGAKey).
+    pub pac_ga_key: u128,
 }
 
 /// NZCV condition flags.
@@ -139,6 +150,9 @@ impl Condition {
 impl CpuState {
     /// Create a new CPU state with all registers zeroed.
     pub fn new() -> Self {
+        // Initialize PAC keys with pseudo-random values seeded from a constant.
+        // In a real implementation these would come from the kernel.
+        let seed: u128 = 0xB0AD_E771_E050_BAC0_DEAD_BEEF_CAFE_1234;
         Self {
             x: [0u64; 31],
             sp: 0,
@@ -149,6 +163,11 @@ impl CpuState {
             fpcr: 0,
             fpsr: 0,
             exclusive_monitor: None,
+            pac_ia_key: seed,
+            pac_ib_key: seed.wrapping_add(1),
+            pac_da_key: seed.wrapping_add(2),
+            pac_db_key: seed.wrapping_add(3),
+            pac_ga_key: seed.wrapping_add(4),
         }
     }
 

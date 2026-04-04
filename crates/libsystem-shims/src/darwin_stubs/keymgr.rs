@@ -30,11 +30,11 @@ impl KeymgrStubs {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
         register_shims!(table,
-            ("__keymgr_get_and_lock_processwide_ptr", shim_keymgr_get_and_lock_processwide_ptr as u64, "keymgr get_and_lock_processwide_ptr"),
-            ("__keymgr_set_and_unlock_processwide_ptr", shim_keymgr_set_and_unlock_processwide_ptr as u64, "keymgr set_and_unlock_processwide_ptr"),
-            ("__keymgr_get_processwide_ptr", shim_keymgr_get_processwide_ptr as u64, "keymgr get_processwide_ptr"),
-            ("__keymgr_get_per_thread_data", shim_keymgr_get_per_thread_data as u64, "keymgr get_per_thread_data"),
-            ("__keymgr_set_per_thread_data", shim_keymgr_set_per_thread_data as u64, "keymgr set_per_thread_data"),
+            ("__keymgr_get_and_lock_processwide_ptr", shim_keymgr_get_and_lock_processwide_ptr as *const () as u64, "keymgr get_and_lock_processwide_ptr"),
+            ("__keymgr_set_and_unlock_processwide_ptr", shim_keymgr_set_and_unlock_processwide_ptr as *const () as u64, "keymgr set_and_unlock_processwide_ptr"),
+            ("__keymgr_get_processwide_ptr", shim_keymgr_get_processwide_ptr as *const () as u64, "keymgr get_processwide_ptr"),
+            ("__keymgr_get_per_thread_data", shim_keymgr_get_per_thread_data as *const () as u64, "keymgr get_per_thread_data"),
+            ("__keymgr_set_per_thread_data", shim_keymgr_set_per_thread_data as *const () as u64, "keymgr set_per_thread_data"),
             ("__keymgr_global", KEYMGR_GLOBAL.as_ptr() as u64, "keymgr_global data symbol"),
         );
         log::debug!("KeymgrStubs: registered 6 stubs");

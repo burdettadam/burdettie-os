@@ -14,58 +14,58 @@ impl PosixExtrasShims {
         use crate::register_shims;
         register_shims!(table,
             // ── bit scanning ────────────────────────────────────
-            ("_flsl", shim_flsl as u64, "flsl (find last set bit, long)"),
-            ("_fls", shim_fls as u64, "fls (find last set bit, int)"),
+            ("_flsl", shim_flsl as *const () as u64, "flsl (find last set bit, long)"),
+            ("_fls", shim_fls as *const () as u64, "fls (find last set bit, int)"),
 
             // ── file/pty ────────────────────────────────────────
-            ("_mkostemp", shim_mkostemp as u64, "mkostemp (mkstemp + flags)"),
-            ("_openpty", shim_openpty as u64, "openpty (allocate pty)"),
+            ("_mkostemp", shim_mkostemp as *const () as u64, "mkostemp (mkstemp + flags)"),
+            ("_openpty", shim_openpty as *const () as u64, "openpty (allocate pty)"),
 
             // ── process ─────────────────────────────────────────
-            ("_waitid", shim_waitid as u64, "waitid (wait for process state change)"),
+            ("_waitid", shim_waitid as *const () as u64, "waitid (wait for process state change)"),
 
             // ── time ────────────────────────────────────────────
-            ("_timespec_get", shim_timespec_get as u64, "timespec_get (C11)"),
+            ("_timespec_get", shim_timespec_get as *const () as u64, "timespec_get (C11)"),
 
             // ── backtrace ───────────────────────────────────────
-            ("_backtrace", shim_backtrace as u64, "backtrace (stack trace)"),
-            ("_backtrace_symbols", shim_backtrace_symbols as u64, "backtrace_symbols (symbolicate)"),
-            ("_backtrace_symbols_fd", shim_backtrace_symbols_fd as u64, "backtrace_symbols_fd (symbolicate to fd)"),
+            ("_backtrace", shim_backtrace as *const () as u64, "backtrace (stack trace)"),
+            ("_backtrace_symbols", shim_backtrace_symbols as *const () as u64, "backtrace_symbols (symbolicate)"),
+            ("_backtrace_symbols_fd", shim_backtrace_symbols_fd as *const () as u64, "backtrace_symbols_fd (symbolicate to fd)"),
 
             // ── Apple-specific with safe defaults ───────────────
-            ("__availability_version_check", shim_availability_version_check as u64, "_availability_version_check (stub → 1, available)"),
-            ("_atexit_b", shim_atexit_b as u64, "atexit_b (block-based atexit)"),
-            ("_bootstrap_look_up", shim_bootstrap_look_up as u64, "bootstrap_look_up (stub → not privileged)"),
+            ("__availability_version_check", shim_availability_version_check as *const () as u64, "_availability_version_check (stub → 1, available)"),
+            ("_atexit_b", shim_atexit_b as *const () as u64, "atexit_b (block-based atexit)"),
+            ("_bootstrap_look_up", shim_bootstrap_look_up as *const () as u64, "bootstrap_look_up (stub → not privileged)"),
 
             // ── posix_spawn core ────────────────────────────────
-            ("_posix_spawn", shim_posix_spawn as u64, "posix_spawn (thin wrapper → libc)"),
-            ("_posix_spawnp", shim_posix_spawnp as u64, "posix_spawnp (thin wrapper → libc)"),
+            ("_posix_spawn", shim_posix_spawn as *const () as u64, "posix_spawn (thin wrapper → libc)"),
+            ("_posix_spawnp", shim_posix_spawnp as *const () as u64, "posix_spawnp (thin wrapper → libc)"),
 
             // ── posix_spawn_file_actions ─────────────────────────
-            ("_posix_spawn_file_actions_init", shim_posix_spawn_file_actions_init as u64, "posix_spawn_file_actions_init"),
-            ("_posix_spawn_file_actions_destroy", shim_posix_spawn_file_actions_destroy as u64, "posix_spawn_file_actions_destroy"),
-            ("_posix_spawn_file_actions_addclose", shim_posix_spawn_file_actions_addclose as u64, "posix_spawn_file_actions_addclose"),
-            ("_posix_spawn_file_actions_adddup2", shim_posix_spawn_file_actions_adddup2 as u64, "posix_spawn_file_actions_adddup2"),
-            ("_posix_spawn_file_actions_addopen", shim_posix_spawn_file_actions_addopen as u64, "posix_spawn_file_actions_addopen"),
-            ("_posix_spawn_file_actions_addchdir_np", shim_posix_spawn_file_actions_addchdir_np as u64, "posix_spawn_file_actions_addchdir_np (stub → ENOSYS)"),
-            ("_posix_spawn_file_actions_addfchdir_np", shim_posix_spawn_file_actions_addfchdir_np as u64, "posix_spawn_file_actions_addfchdir_np (stub → ENOSYS)"),
+            ("_posix_spawn_file_actions_init", shim_posix_spawn_file_actions_init as *const () as u64, "posix_spawn_file_actions_init"),
+            ("_posix_spawn_file_actions_destroy", shim_posix_spawn_file_actions_destroy as *const () as u64, "posix_spawn_file_actions_destroy"),
+            ("_posix_spawn_file_actions_addclose", shim_posix_spawn_file_actions_addclose as *const () as u64, "posix_spawn_file_actions_addclose"),
+            ("_posix_spawn_file_actions_adddup2", shim_posix_spawn_file_actions_adddup2 as *const () as u64, "posix_spawn_file_actions_adddup2"),
+            ("_posix_spawn_file_actions_addopen", shim_posix_spawn_file_actions_addopen as *const () as u64, "posix_spawn_file_actions_addopen"),
+            ("_posix_spawn_file_actions_addchdir_np", shim_posix_spawn_file_actions_addchdir_np as *const () as u64, "posix_spawn_file_actions_addchdir_np (stub → ENOSYS)"),
+            ("_posix_spawn_file_actions_addfchdir_np", shim_posix_spawn_file_actions_addfchdir_np as *const () as u64, "posix_spawn_file_actions_addfchdir_np (stub → ENOSYS)"),
 
             // ── posix_spawnattr extras ──────────────────────────
-            ("_posix_spawnattr_getflags", shim_posix_spawnattr_getflags as u64, "posix_spawnattr_getflags"),
-            ("_posix_spawnattr_setflags", shim_posix_spawnattr_setflags as u64, "posix_spawnattr_setflags"),
-            ("_posix_spawnattr_init", shim_posix_spawnattr_init as u64, "posix_spawnattr_init"),
-            ("_posix_spawnattr_destroy", shim_posix_spawnattr_destroy as u64, "posix_spawnattr_destroy"),
-            ("_posix_spawnattr_getsigmask", shim_posix_spawnattr_getsigmask as u64, "posix_spawnattr_getsigmask"),
-            ("_posix_spawnattr_setsigmask", shim_posix_spawnattr_setsigmask as u64, "posix_spawnattr_setsigmask"),
-            ("_posix_spawnattr_getsigdefault", shim_posix_spawnattr_getsigdefault as u64, "posix_spawnattr_getsigdefault"),
-            ("_posix_spawnattr_setsigdefault", shim_posix_spawnattr_setsigdefault as u64, "posix_spawnattr_setsigdefault"),
-            ("_posix_spawnattr_getpgroup", shim_posix_spawnattr_getpgroup as u64, "posix_spawnattr_getpgroup"),
-            ("_posix_spawnattr_setpgroup", shim_posix_spawnattr_setpgroup as u64, "posix_spawnattr_setpgroup"),
-            ("_posix_spawnattr_setbinpref_np", shim_posix_spawnattr_setbinpref_np as u64, "posix_spawnattr_setbinpref_np (stub → 0)"),
-            ("_posix_spawnattr_set_persona_np", shim_posix_spawnattr_set_persona_np as u64, "posix_spawnattr_set_persona_np (stub → 0)"),
+            ("_posix_spawnattr_getflags", shim_posix_spawnattr_getflags as *const () as u64, "posix_spawnattr_getflags"),
+            ("_posix_spawnattr_setflags", shim_posix_spawnattr_setflags as *const () as u64, "posix_spawnattr_setflags"),
+            ("_posix_spawnattr_init", shim_posix_spawnattr_init as *const () as u64, "posix_spawnattr_init"),
+            ("_posix_spawnattr_destroy", shim_posix_spawnattr_destroy as *const () as u64, "posix_spawnattr_destroy"),
+            ("_posix_spawnattr_getsigmask", shim_posix_spawnattr_getsigmask as *const () as u64, "posix_spawnattr_getsigmask"),
+            ("_posix_spawnattr_setsigmask", shim_posix_spawnattr_setsigmask as *const () as u64, "posix_spawnattr_setsigmask"),
+            ("_posix_spawnattr_getsigdefault", shim_posix_spawnattr_getsigdefault as *const () as u64, "posix_spawnattr_getsigdefault"),
+            ("_posix_spawnattr_setsigdefault", shim_posix_spawnattr_setsigdefault as *const () as u64, "posix_spawnattr_setsigdefault"),
+            ("_posix_spawnattr_getpgroup", shim_posix_spawnattr_getpgroup as *const () as u64, "posix_spawnattr_getpgroup"),
+            ("_posix_spawnattr_setpgroup", shim_posix_spawnattr_setpgroup as *const () as u64, "posix_spawnattr_setpgroup"),
+            ("_posix_spawnattr_setbinpref_np", shim_posix_spawnattr_setbinpref_np as *const () as u64, "posix_spawnattr_setbinpref_np (stub → 0)"),
+            ("_posix_spawnattr_set_persona_np", shim_posix_spawnattr_set_persona_np as *const () as u64, "posix_spawnattr_set_persona_np (stub → 0)"),
 
             // ── BSD extras ──────────────────────────────────────
-            ("_funopen", shim_funopen as u64, "funopen (stub → NULL)"),
+            ("_funopen", shim_funopen as *const () as u64, "funopen (stub → NULL)"),
         );
         log::debug!("PosixExtrasShims: registered 35 POSIX/libc extra shims");
     }

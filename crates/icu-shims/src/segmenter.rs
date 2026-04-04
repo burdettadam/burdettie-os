@@ -13,11 +13,11 @@ fn word_segmenter() -> WordSegmenterBorrowed<'static> {
 
 pub fn install(table: &mut ShimTable) {
     register_shims!(table,
-        ("_ubrk_open", shim_ubrk_open as u64, "ubrk_open (icu4x → real segmenter)"),
-        ("_ubrk_close", shim_ubrk_close as u64, "ubrk_close (icu4x)"),
-        ("_ubrk_setText", shim_ubrk_set_text as u64, "ubrk_setText (icu4x)"),
-        ("_ubrk_first", shim_ubrk_first as u64, "ubrk_first (icu4x → 0)"),
-        ("_ubrk_next", shim_ubrk_next as u64, "ubrk_next (icu4x → real breaks)")
+        ("_ubrk_open", shim_ubrk_open as *const () as u64, "ubrk_open (icu4x → real segmenter)"),
+        ("_ubrk_close", shim_ubrk_close as *const () as u64, "ubrk_close (icu4x)"),
+        ("_ubrk_setText", shim_ubrk_set_text as *const () as u64, "ubrk_setText (icu4x)"),
+        ("_ubrk_first", shim_ubrk_first as *const () as u64, "ubrk_first (icu4x → 0)"),
+        ("_ubrk_next", shim_ubrk_next as *const () as u64, "ubrk_next (icu4x → real breaks)")
     );
 }
 

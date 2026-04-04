@@ -334,7 +334,10 @@ impl Interpreter {
             // ── Branch / Call / Return ────────────────────────────
             B { .. } | Bl { .. } | Br { .. } | Blr { .. } | Ret { .. }
             | Bcond { .. } | Cbz { .. } | Cbnz { .. } | Tbz { .. } | Tbnz { .. }
-            | Mrs { .. } | Msr { .. } | Brk { .. } => {
+            | Mrs { .. } | Msr { .. } | Brk { .. }
+            | PacIA { .. } | PacIB { .. } | PacDA { .. } | PacDB { .. }
+            | AutIA { .. } | AutIB { .. } | AutDA { .. } | AutDB { .. }
+            | Xpaci { .. } | Xpacd { .. } => {
                 self.exec_branch(insn, pc)
             }
 

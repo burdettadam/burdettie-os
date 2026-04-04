@@ -185,16 +185,6 @@ pub extern "C" fn shim_nsmeasurement_description(obj: u64, _cmd: u64) -> u64 {
 
 use std::sync::OnceLock;
 
-/// Identity-coefficient singleton (coefficient=1.0, constant=0.0).
-macro_rules! unit_singleton {
-    ($static:ident, $fn_name:ident, $isa_fn:ident, $symbol:expr) => {
-        static $static: OnceLock<u64> = OnceLock::new();
-        pub fn $fn_name() -> u64 {
-            *$static.get_or_init(|| alloc_unit(crate::nsobj::$isa_fn(), $symbol))
-        }
-    };
-}
-
 /// Linear-converter singleton (base = value × coeff + const).
 macro_rules! unit_singleton_linear {
     ($static:ident, $fn_name:ident, $isa_fn:ident, $symbol:expr, $coeff:expr, $const:expr) => {

@@ -36,10 +36,10 @@ impl BlocksRuntimeStubs {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
         register_shims!(table,
-            ("__Block_copy", shim_block_copy as u64, "Block_copy — copy a block to the heap"),
-            ("__Block_release", shim_block_release as u64, "Block_release — release a heap block"),
-            ("__Block_object_assign", shim_block_object_assign as u64, "Block_object_assign — captured object assign/copy"),
-            ("__Block_object_dispose", shim_block_object_dispose as u64, "Block_object_dispose — captured object dispose/release"),
+            ("__Block_copy", shim_block_copy as *const () as u64, "Block_copy — copy a block to the heap"),
+            ("__Block_release", shim_block_release as *const () as u64, "Block_release — release a heap block"),
+            ("__Block_object_assign", shim_block_object_assign as *const () as u64, "Block_object_assign — captured object assign/copy"),
+            ("__Block_object_dispose", shim_block_object_dispose as *const () as u64, "Block_object_dispose — captured object dispose/release"),
             ("__NSConcreteStackBlock", NSCONCRETESTACK_SENTINEL.as_ptr() as u64, "NSConcreteStackBlock data symbol"),
             ("__NSConcreteGlobalBlock", NSCONCRETEGLOBAL_SENTINEL.as_ptr() as u64, "NSConcreteGlobalBlock data symbol"),
         );
@@ -163,7 +163,7 @@ pub extern "C" fn shim_block_release(block: u64) {
 /// Called by compiler-generated copy helpers to retain/copy captured values.
 /// - `BLOCK_FIELD_IS_OBJECT` → store the pointer (no ObjC retain without runtime).
 /// - `BLOCK_FIELD_IS_BLOCK`  → `Block_copy` the nested block, store result.
-/// - `BLOCK_FIELD_IS_BYREF`  → store the pointer.
+/// - `BLOCK_FIELD_IS_BYREF`  → copy byref struct to heap, update forwarding pointers.
 pub extern "C" fn shim_block_object_assign(dest_addr: u64, object: u64, flags: i32) {
     if dest_addr == 0 || object == 0 {
         return;
@@ -174,7 +174,38 @@ pub extern "C" fn shim_block_object_assign(dest_addr: u64, object: u64, flags: i
             let copied = shim_block_copy(object);
             unsafe { *(dest_addr as *mut u64) = copied; }
         }
-        // IS_OBJECT, IS_BYREF, or unknown — store pointer as-is.
+        BLOCK_FIELD_IS_BYREF => {
+            // Copy byref struct to heap and update forwarding pointers.
+            // Byref layout: [isa:8][forwarding:8][flags:4][size:4][...].
+            let forwarding = unsafe {
+                std::ptr::read_unaligned((object as *const u8).add(8) as *const u64)
+            };
+            // If forwarding already points elsewhere, it's already on the heap
+            if forwarding != object && forwarding != 0 {
+                unsafe { *(dest_addr as *mut u64) = forwarding; }
+                return;
+            }
+            // Read size from offset 20
+            let size = unsafe {
+                std::ptr::read_unaligned((object as *const u8).add(20) as *const u32)
+            } as usize;
+            let alloc_size = if size >= BLOCK_SIZE { size } else { BLOCK_SIZE };
+            let heap = unsafe { libc::malloc(alloc_size) };
+            if heap.is_null() {
+                unsafe { *(dest_addr as *mut u64) = object; }
+                return;
+            }
+            unsafe {
+                std::ptr::copy_nonoverlapping(object as *const u8, heap as *mut u8, alloc_size);
+                // Heap copy forwarding → itself
+                std::ptr::write_unaligned((heap as *mut u8).add(8) as *mut u64, heap as u64);
+                // Stack copy forwarding → heap
+                std::ptr::write_unaligned((object as *mut u8).add(8) as *mut u64, heap as u64);
+                // Store heap pointer at destination
+                *(dest_addr as *mut u64) = heap as u64;
+            }
+        }
+        // IS_OBJECT or unknown — store pointer as-is.
         _ => {
             unsafe { *(dest_addr as *mut u64) = object; }
         }

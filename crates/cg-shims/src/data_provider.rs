@@ -7,12 +7,12 @@ static CG_DATA_PROVIDER_SENTINEL: u64 = 0x4347_4450_0001;
 pub fn install(table: &mut ShimTable) {
     use libsystem_shims::register_shims;
     register_shims!(table,
-        ("_CGDataProviderCreateWithData", shim_cg_dp_create as u64, "CGDataProviderCreateWithData (stub → sentinel)"),
-        ("_CGDataProviderCreateWithCFData", shim_cg_dp_create_cf as u64, "CGDataProviderCreateWithCFData (stub → sentinel)"),
-        ("_CGDataProviderCreateWithURL", shim_cg_dp_create_cf as u64, "CGDataProviderCreateWithURL (stub → sentinel)"),
-        ("_CGDataProviderCopyData", shim_cg_dp_null as u64, "CGDataProviderCopyData (stub → NULL)"),
-        ("_CGDataProviderRetain", shim_cg_dp_retain as u64, "CGDataProviderRetain (stub → same)"),
-        ("_CGDataProviderRelease", shim_cg_dp_release as u64, "CGDataProviderRelease (stub → void)")
+        ("_CGDataProviderCreateWithData", shim_cg_dp_create as *const () as u64, "CGDataProviderCreateWithData (stub → sentinel)"),
+        ("_CGDataProviderCreateWithCFData", shim_cg_dp_create_cf as *const () as u64, "CGDataProviderCreateWithCFData (stub → sentinel)"),
+        ("_CGDataProviderCreateWithURL", shim_cg_dp_create_cf as *const () as u64, "CGDataProviderCreateWithURL (stub → sentinel)"),
+        ("_CGDataProviderCopyData", shim_cg_dp_null as *const () as u64, "CGDataProviderCopyData (stub → NULL)"),
+        ("_CGDataProviderRetain", shim_cg_dp_retain as *const () as u64, "CGDataProviderRetain (stub → same)"),
+        ("_CGDataProviderRelease", shim_cg_dp_release as *const () as u64, "CGDataProviderRelease (stub → void)")
     );
 }
 

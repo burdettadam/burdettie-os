@@ -14,12 +14,12 @@ impl NotifyStubs {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
         register_shims!(table,
-            ("_notify_register_dispatch", shim_notify_register_dispatch as u64, "notify_register_dispatch (stub → OK)"),
-            ("_notify_register_check", shim_notify_register_check as u64, "notify_register_check (stub → OK)"),
-            ("_notify_get_state", shim_notify_get_state as u64, "notify_get_state (stub → OK, state=0)"),
-            ("_notify_set_state", shim_notify_set_state as u64, "notify_set_state (stub → OK)"),
-            ("_notify_post", shim_notify_post as u64, "notify_post (stub → OK)"),
-            ("_notify_cancel", shim_notify_cancel as u64, "notify_cancel (stub → OK)"),
+            ("_notify_register_dispatch", shim_notify_register_dispatch as *const () as u64, "notify_register_dispatch (stub → OK)"),
+            ("_notify_register_check", shim_notify_register_check as *const () as u64, "notify_register_check (stub → OK)"),
+            ("_notify_get_state", shim_notify_get_state as *const () as u64, "notify_get_state (stub → OK, state=0)"),
+            ("_notify_set_state", shim_notify_set_state as *const () as u64, "notify_set_state (stub → OK)"),
+            ("_notify_post", shim_notify_post as *const () as u64, "notify_post (stub → OK)"),
+            ("_notify_cancel", shim_notify_cancel as *const () as u64, "notify_cancel (stub → OK)"),
         );
         log::debug!("NotifyStubs: registered 6 stubs");
     }

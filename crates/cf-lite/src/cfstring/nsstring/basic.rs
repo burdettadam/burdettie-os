@@ -407,7 +407,7 @@ extern "C" {
 pub fn string_with_format_trampoline_addr() -> u64 {
     #[cfg(all(target_arch = "aarch64", target_os = "macos"))]
     {
-        shim_nsstring_format_asm as u64
+        shim_nsstring_format_asm as *const () as u64
     }
     #[cfg(all(target_arch = "x86_64", target_os = "macos"))]
     {

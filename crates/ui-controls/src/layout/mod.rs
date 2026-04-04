@@ -3,11 +3,7 @@
 //! Provides `StackView` (horizontal/vertical stacking with spacing)
 //! and helper functions for common layout patterns.
 
-use graphics_core::{Rect, Renderer};
-use ui_view::layout::{
-    self as constraint, LayoutAttribute, LayoutEngine, ViewId,
-    SUPERVIEW,
-};
+use graphics_core::Rect;
 use ui_view::View;
 
 /// Axis along which a stack view arranges its children.

@@ -9,20 +9,20 @@ use libsystem_shims::table::ShimTable;
 pub fn install(table: &mut ShimTable) {
     use libsystem_shims::register_shims;
     register_shims!(table,
-        ("_CGPathCreateMutable", shim_cg_path_create as u64, "CGPathCreateMutable (bridge → real)"),
-        ("_CGPathCreateCopy", shim_cg_path_copy as u64, "CGPathCreateCopy (bridge → clone)"),
-        ("_CGPathCreateMutableCopy", shim_cg_path_copy as u64, "CGPathCreateMutableCopy (bridge → clone)"),
-        ("_CGPathRetain", shim_cg_path_retain as u64, "CGPathRetain (bridge → same)"),
-        ("_CGPathRelease", shim_cg_path_release as u64, "CGPathRelease (bridge → real)"),
-        ("_CGPathMoveToPoint", shim_cg_path_move_to as u64, "CGPathMoveToPoint (bridge → real)"),
-        ("_CGPathAddLineToPoint", shim_cg_path_line_to as u64, "CGPathAddLineToPoint (bridge → real)"),
-        ("_CGPathAddCurveToPoint", shim_cg_path_curve_to as u64, "CGPathAddCurveToPoint (bridge → real)"),
-        ("_CGPathAddRect", shim_cg_path_add_rect as u64, "CGPathAddRect (bridge → real)"),
-        ("_CGPathAddEllipseInRect", shim_cg_path_add_ellipse as u64, "CGPathAddEllipseInRect (bridge → real)"),
-        ("_CGPathCloseSubpath", shim_cg_path_close as u64, "CGPathCloseSubpath (bridge → real)"),
-        ("_CGPathIsEmpty", shim_cg_path_is_empty as u64, "CGPathIsEmpty (bridge → real)"),
-        ("_CGPathGetBoundingBox", shim_cg_path_void1 as u64, "CGPathGetBoundingBox (stub → zeroed)"),
-        ("_CGPathContainsPoint", shim_cg_path_false as u64, "CGPathContainsPoint (stub → false)")
+        ("_CGPathCreateMutable", shim_cg_path_create as *const () as u64, "CGPathCreateMutable (bridge → real)"),
+        ("_CGPathCreateCopy", shim_cg_path_copy as *const () as u64, "CGPathCreateCopy (bridge → clone)"),
+        ("_CGPathCreateMutableCopy", shim_cg_path_copy as *const () as u64, "CGPathCreateMutableCopy (bridge → clone)"),
+        ("_CGPathRetain", shim_cg_path_retain as *const () as u64, "CGPathRetain (bridge → same)"),
+        ("_CGPathRelease", shim_cg_path_release as *const () as u64, "CGPathRelease (bridge → real)"),
+        ("_CGPathMoveToPoint", shim_cg_path_move_to as *const () as u64, "CGPathMoveToPoint (bridge → real)"),
+        ("_CGPathAddLineToPoint", shim_cg_path_line_to as *const () as u64, "CGPathAddLineToPoint (bridge → real)"),
+        ("_CGPathAddCurveToPoint", shim_cg_path_curve_to as *const () as u64, "CGPathAddCurveToPoint (bridge → real)"),
+        ("_CGPathAddRect", shim_cg_path_add_rect as *const () as u64, "CGPathAddRect (bridge → real)"),
+        ("_CGPathAddEllipseInRect", shim_cg_path_add_ellipse as *const () as u64, "CGPathAddEllipseInRect (bridge → real)"),
+        ("_CGPathCloseSubpath", shim_cg_path_close as *const () as u64, "CGPathCloseSubpath (bridge → real)"),
+        ("_CGPathIsEmpty", shim_cg_path_is_empty as *const () as u64, "CGPathIsEmpty (bridge → real)"),
+        ("_CGPathGetBoundingBox", shim_cg_path_void1 as *const () as u64, "CGPathGetBoundingBox (stub → zeroed)"),
+        ("_CGPathContainsPoint", shim_cg_path_false as *const () as u64, "CGPathContainsPoint (stub → false)")
     );
 }
 

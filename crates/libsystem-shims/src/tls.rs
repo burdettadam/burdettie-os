@@ -65,10 +65,10 @@ impl TlsShims {
 
         table.register(
             "__tlv_bootstrap",
-            shim_tlv_bootstrap as u64,
+            shim_tlv_bootstrap as *const () as u64,
             "TLV bootstrap thunk",
         );
-        table.register("__tlv_atexit", shim_tlv_atexit as u64, "TLV atexit (no-op)");
+        table.register("__tlv_atexit", shim_tlv_atexit as *const () as u64, "TLV atexit (no-op)");
 
         log::debug!("TlsShims: registered 2 TLS shims");
     }

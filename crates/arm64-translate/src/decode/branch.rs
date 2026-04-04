@@ -125,12 +125,41 @@ pub(super) fn decode_branch(raw: u32, pc: u64) -> Instruction {
         return Instruction::Nop;
     }
     // PAC instructions (ARMv8.3): PACIA, PACIB, PACDA, PACDB, AUTIA, AUTIB, AUTDA, AUTDB,
-    // XPACI, XPACD, RETAA, RETAB — all treated as NOP in software interpreter.
-    // Pattern: bits[31:22] = 1101011 / 1101010 depending on variant, but the common
-    // "data key" PAC instructions share bits[31:25] = 1101010 with bits[24:20] identifying PAC.
-    // Simplest check: instructions starting with 0xDAC... or 0xD73... family.
-    if (raw & 0xFEFFF800) == 0xDAC10000 || (raw & 0xFFFFFC00) == 0xD71F0800 {
-        return Instruction::Nop;
+    // XPACI, XPACD, RETAA, RETAB.
+    //
+    // Encoding: 0xDAC1_xxxx family (data-processing 1-source PAC group).
+    //   bits[20:16] = opcode2, bits[15:10] = opcode, bits[9:5] = Rn, bits[4:0] = Rd
+    //   PACIA:  opcode2=0b00001, opcode=0b000000 → 0xDAC10000 | Rn<<5 | Rd
+    //   PACIB:  opcode2=0b00001, opcode=0b000010 → 0xDAC10800 | Rn<<5 | Rd
+    //   PACDA:  opcode2=0b00001, opcode=0b000100 → 0xDAC11000
+    //   PACDB:  opcode2=0b00001, opcode=0b000110 → 0xDAC11800
+    //   AUTIA:  opcode2=0b00001, opcode=0b001000 → 0xDAC12000
+    //   AUTIB:  opcode2=0b00001, opcode=0b001010 → 0xDAC12800
+    //   AUTDA:  opcode2=0b00001, opcode=0b001100 → 0xDAC13000
+    //   AUTDB:  opcode2=0b00001, opcode=0b001110 → 0xDAC13800
+    //   XPACI:  0xDAC143E0 | Rd  (Rn=0b11111=ZR, opcode=0b100000)
+    //   XPACD:  0xDAC147E0 | Rd  (Rn=0b11111=ZR, opcode=0b100010)
+    if (raw & 0xFFE0FC00) == 0xDAC10000 {
+        let rd = (raw & 0x1F) as u8;
+        let rn = ((raw >> 5) & 0x1F) as u8;
+        let opcode = (raw >> 10) & 0x3F;
+        return match opcode {
+            0b000000 => Instruction::PacIA { rd, rn },  // PACIA / PACIZA
+            0b000010 => Instruction::PacIB { rd, rn },  // PACIB / PACIZB
+            0b000100 => Instruction::PacDA { rd, rn },  // PACDA / PACDZA
+            0b000110 => Instruction::PacDB { rd, rn },  // PACDB / PACDZB
+            0b001000 => Instruction::AutIA { rd, rn },  // AUTIA / AUTIZA
+            0b001010 => Instruction::AutIB { rd, rn },  // AUTIB / AUTIZB
+            0b001100 => Instruction::AutDA { rd, rn },  // AUTDA / AUTDZA
+            0b001110 => Instruction::AutDB { rd, rn },  // AUTDB / AUTDZB
+            0b100000 => Instruction::Xpaci { rd },      // XPACI
+            0b100010 => Instruction::Xpacd { rd },      // XPACD
+            _ => Instruction::Nop, // other PAC variants → NOP
+        };
+    }
+    // RETAA / RETAB — authenticated returns, treat as RET
+    if (raw & 0xFFFFFC00) == 0xD71F0800 {
+        return Instruction::Ret { rn: 30 }; // RETAA/RETAB return via LR
     }
 
     Instruction::Unknown { raw }
@@ -432,5 +461,95 @@ mod tests {
     fn test_decode_svc() {
         let insn = decode(enc_svc(0x42), 0x1000);
         assert!(matches!(insn, Instruction::Svc { imm: 0x42 }));
+    }
+
+    // ── PAC instructions (ARMv8.3) ───────────────────────────
+
+    /// Encode a PAC data-processing-1-source instruction.
+    /// opcode occupies bits[15:10], rn at bits[9:5], rd at bits[4:0].
+    fn enc_pac(opcode: u32, rd: u32, rn: u32) -> u32 {
+        0xDAC10000 | (opcode << 10) | (rn << 5) | rd
+    }
+
+    #[test]
+    fn test_decode_pacia() {
+        let insn = decode(enc_pac(0b000000, 3, 5), 0x1000);
+        assert!(matches!(insn, Instruction::PacIA { rd: 3, rn: 5 }));
+    }
+
+    #[test]
+    fn test_decode_pacib() {
+        let insn = decode(enc_pac(0b000010, 0, 1), 0x1000);
+        assert!(matches!(insn, Instruction::PacIB { rd: 0, rn: 1 }));
+    }
+
+    #[test]
+    fn test_decode_pacda() {
+        let insn = decode(enc_pac(0b000100, 2, 3), 0x1000);
+        assert!(matches!(insn, Instruction::PacDA { rd: 2, rn: 3 }));
+    }
+
+    #[test]
+    fn test_decode_pacdb() {
+        let insn = decode(enc_pac(0b000110, 4, 5), 0x1000);
+        assert!(matches!(insn, Instruction::PacDB { rd: 4, rn: 5 }));
+    }
+
+    #[test]
+    fn test_decode_autia() {
+        let insn = decode(enc_pac(0b001000, 7, 8), 0x1000);
+        assert!(matches!(insn, Instruction::AutIA { rd: 7, rn: 8 }));
+    }
+
+    #[test]
+    fn test_decode_autib() {
+        let insn = decode(enc_pac(0b001010, 1, 2), 0x1000);
+        assert!(matches!(insn, Instruction::AutIB { rd: 1, rn: 2 }));
+    }
+
+    #[test]
+    fn test_decode_autda() {
+        let insn = decode(enc_pac(0b001100, 9, 10), 0x1000);
+        assert!(matches!(insn, Instruction::AutDA { rd: 9, rn: 10 }));
+    }
+
+    #[test]
+    fn test_decode_autdb() {
+        let insn = decode(enc_pac(0b001110, 11, 12), 0x1000);
+        assert!(matches!(insn, Instruction::AutDB { rd: 11, rn: 12 }));
+    }
+
+    #[test]
+    fn test_decode_xpaci() {
+        // XPACI: opcode=0b100000, Rn=0b11111 (ZR/SP)
+        let insn = decode(enc_pac(0b100000, 6, 31), 0x1000);
+        assert!(matches!(insn, Instruction::Xpaci { rd: 6 }));
+    }
+
+    #[test]
+    fn test_decode_xpacd() {
+        let insn = decode(enc_pac(0b100010, 15, 31), 0x1000);
+        assert!(matches!(insn, Instruction::Xpacd { rd: 15 }));
+    }
+
+    #[test]
+    fn test_decode_paciza() {
+        // PACIZA Xd = PACIA Xd, XZR — rn=31 means zero context
+        let insn = decode(enc_pac(0b000000, 2, 31), 0x1000);
+        assert!(matches!(insn, Instruction::PacIA { rd: 2, rn: 31 }));
+    }
+
+    #[test]
+    fn test_decode_retaa() {
+        // RETAA = 0xD71F0BFF (authenticated return via LR)
+        let insn = decode(0xD71F0BFF, 0x1000);
+        assert!(matches!(insn, Instruction::Ret { rn: 30 }));
+    }
+
+    #[test]
+    fn test_decode_retab() {
+        // RETAB = 0xD71F0FFF
+        let insn = decode(0xD71F0FFF, 0x1000);
+        assert!(matches!(insn, Instruction::Ret { rn: 30 }));
     }
 }

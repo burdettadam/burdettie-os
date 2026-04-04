@@ -40,13 +40,13 @@ fn with_table<R>(f: impl FnOnce(&mut HashMap<u64, FormatterConfig>) -> R) -> R {
 
 pub fn install(table: &mut ShimTable) {
     register_shims!(table,
-        ("_unum_open", shim_unum_open as u64, "unum_open (icu4x → real formatter)"),
-        ("_unum_close", shim_unum_close as u64, "unum_close (icu4x)"),
-        ("_unum_formatInt64", shim_unum_format_int64 as u64, "unum_formatInt64 (icu4x → real)"),
-        ("_unum_formatDouble", shim_unum_format_double as u64, "unum_formatDouble (icu4x → real)"),
-        ("_unum_parseToNumber", shim_unum_parse_to_number as u64, "unum_parseToNumber (real parser)"),
-        ("_unum_parse", shim_unum_parse as u64, "unum_parse → int32_t"),
-        ("_unum_parseDouble", shim_unum_parse_double as u64, "unum_parseDouble → double")
+        ("_unum_open", shim_unum_open as *const () as u64, "unum_open (icu4x → real formatter)"),
+        ("_unum_close", shim_unum_close as *const () as u64, "unum_close (icu4x)"),
+        ("_unum_formatInt64", shim_unum_format_int64 as *const () as u64, "unum_formatInt64 (icu4x → real)"),
+        ("_unum_formatDouble", shim_unum_format_double as *const () as u64, "unum_formatDouble (icu4x → real)"),
+        ("_unum_parseToNumber", shim_unum_parse_to_number as *const () as u64, "unum_parseToNumber (real parser)"),
+        ("_unum_parse", shim_unum_parse as *const () as u64, "unum_parse → int32_t"),
+        ("_unum_parseDouble", shim_unum_parse_double as *const () as u64, "unum_parseDouble → double")
     );
 }
 
@@ -82,7 +82,7 @@ pub extern "C" fn shim_unum_close(handle: u64) {
 
 /// `unum_formatInt64(fmt, number, result, resultLength, pos, status) → int32_t`
 pub extern "C" fn shim_unum_format_int64(
-    handle: u64,
+    _handle: u64,
     number: i64,
     result: *mut u16,
     result_len: i32,

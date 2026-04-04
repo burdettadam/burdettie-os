@@ -257,18 +257,18 @@ impl SocketShims {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
         register_shims!(table,
-            ("_socket",     shim_socket as u64,     "socket — localhost/unix passthrough"),
-            ("_connect",    shim_connect as u64,    "connect — localhost/unix passthrough"),
-            ("_bind",       shim_bind as u64,       "bind — localhost/unix passthrough"),
-            ("_listen",     shim_listen as u64,     "listen — passthrough"),
-            ("_accept",     shim_accept as u64,     "accept — passthrough"),
-            ("_send",       shim_send as u64,       "send — passthrough"),
-            ("_recv",       shim_recv as u64,       "recv — passthrough"),
-            ("_sendto",     shim_sendto as u64,     "sendto — localhost/unix passthrough"),
-            ("_recvfrom",   shim_recvfrom as u64,   "recvfrom — passthrough"),
-            ("_getsockopt", shim_getsockopt as u64, "getsockopt — passthrough"),
-            ("_setsockopt", shim_setsockopt as u64, "setsockopt — passthrough"),
-            ("_shutdown",   shim_shutdown as u64,   "shutdown — passthrough"),
+            ("_socket",     shim_socket as *const () as u64,     "socket — localhost/unix passthrough"),
+            ("_connect",    shim_connect as *const () as u64,    "connect — localhost/unix passthrough"),
+            ("_bind",       shim_bind as *const () as u64,       "bind — localhost/unix passthrough"),
+            ("_listen",     shim_listen as *const () as u64,     "listen — passthrough"),
+            ("_accept",     shim_accept as *const () as u64,     "accept — passthrough"),
+            ("_send",       shim_send as *const () as u64,       "send — passthrough"),
+            ("_recv",       shim_recv as *const () as u64,       "recv — passthrough"),
+            ("_sendto",     shim_sendto as *const () as u64,     "sendto — localhost/unix passthrough"),
+            ("_recvfrom",   shim_recvfrom as *const () as u64,   "recvfrom — passthrough"),
+            ("_getsockopt", shim_getsockopt as *const () as u64, "getsockopt — passthrough"),
+            ("_setsockopt", shim_setsockopt as *const () as u64, "setsockopt — passthrough"),
+            ("_shutdown",   shim_shutdown as *const () as u64,   "shutdown — passthrough"),
         );
     }
 }

@@ -9,12 +9,7 @@
 //! - Zero-width character filtering (ZWJ, ZWNJ, BOM, etc.)
 //! - Missing glyph detection for emoji placeholder rendering
 
-use ab_glyph::{Font as AbFont, ScaleFont};
-
 use crate::color::Color;
-use crate::font::TextRun;
-use crate::font_manager::{FontFace, FontManager};
-use crate::unicode::{is_combining_mark, is_zero_width, normalize_nfc};
 
 /// A positioned glyph ready for rasterization.
 #[derive(Debug, Clone)]

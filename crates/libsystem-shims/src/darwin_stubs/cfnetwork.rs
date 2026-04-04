@@ -33,67 +33,67 @@ impl CfNetworkStubs {
 
         // ── CFHost (DNS resolution) ─────────────────────────────
         register_shims!(table,
-            ("_CFHostCreateWithName", shim_cfnetwork_sentinel2 as u64, "CFHostCreateWithName (stub → sentinel)"),
-            ("_CFHostStartInfoResolution", shim_cfnetwork_true3 as u64, "CFHostStartInfoResolution (stub → true)"),
-            ("_CFHostGetAddressing", shim_cfnetwork_null2 as u64, "CFHostGetAddressing (stub → NULL)"),
-            ("_CFHostGetNames", shim_cfnetwork_null2 as u64, "CFHostGetNames (stub → NULL)"),
-            ("_CFHostSetClient", shim_cfnetwork_void3 as u64, "CFHostSetClient (stub → no-op)"),
-            ("_CFHostScheduleWithRunLoop", shim_cfnetwork_void3 as u64, "CFHostScheduleWithRunLoop (stub → no-op)"),
-            ("_CFHostUnscheduleFromRunLoop", shim_cfnetwork_void3 as u64, "CFHostUnscheduleFromRunLoop (stub → no-op)")
+            ("_CFHostCreateWithName", shim_cfnetwork_sentinel2 as *const () as u64, "CFHostCreateWithName (stub → sentinel)"),
+            ("_CFHostStartInfoResolution", shim_cfnetwork_true3 as *const () as u64, "CFHostStartInfoResolution (stub → true)"),
+            ("_CFHostGetAddressing", shim_cfnetwork_null2 as *const () as u64, "CFHostGetAddressing (stub → NULL)"),
+            ("_CFHostGetNames", shim_cfnetwork_null2 as *const () as u64, "CFHostGetNames (stub → NULL)"),
+            ("_CFHostSetClient", shim_cfnetwork_void3 as *const () as u64, "CFHostSetClient (stub → no-op)"),
+            ("_CFHostScheduleWithRunLoop", shim_cfnetwork_void3 as *const () as u64, "CFHostScheduleWithRunLoop (stub → no-op)"),
+            ("_CFHostUnscheduleFromRunLoop", shim_cfnetwork_void3 as *const () as u64, "CFHostUnscheduleFromRunLoop (stub → no-op)")
         );
 
         // ── CFHTTPMessage ───────────────────────────────────────
         register_shims!(table,
-            ("_CFHTTPMessageCreateRequest", shim_cfnetwork_sentinel4 as u64, "CFHTTPMessageCreateRequest (stub → sentinel)"),
-            ("_CFHTTPMessageCreateResponse", shim_cfnetwork_sentinel4 as u64, "CFHTTPMessageCreateResponse (stub → sentinel)"),
-            ("_CFHTTPMessageCreateEmpty", shim_cfnetwork_sentinel2 as u64, "CFHTTPMessageCreateEmpty (stub → sentinel)"),
-            ("_CFHTTPMessageAppendBytes", shim_cfnetwork_true3 as u64, "CFHTTPMessageAppendBytes (stub → true)"),
-            ("_CFHTTPMessageCopyBody", shim_cfnetwork_null1 as u64, "CFHTTPMessageCopyBody (stub → NULL)"),
-            ("_CFHTTPMessageCopyHeaderFieldValue", shim_cfnetwork_null2 as u64, "CFHTTPMessageCopyHeaderFieldValue (stub → NULL)"),
-            ("_CFHTTPMessageCopyAllHeaderFields", shim_cfnetwork_null1 as u64, "CFHTTPMessageCopyAllHeaderFields (stub → NULL)"),
-            ("_CFHTTPMessageCopyRequestURL", shim_cfnetwork_null1 as u64, "CFHTTPMessageCopyRequestURL (stub → NULL)"),
-            ("_CFHTTPMessageCopyRequestMethod", shim_cfnetwork_null1 as u64, "CFHTTPMessageCopyRequestMethod (stub → NULL)"),
-            ("_CFHTTPMessageGetResponseStatusCode", shim_cf_http_message_get_response_status_code as u64, "CFHTTPMessageGetResponseStatusCode (stub → 200)"),
-            ("_CFHTTPMessageSetBody", shim_cfnetwork_void2 as u64, "CFHTTPMessageSetBody (stub → no-op)"),
-            ("_CFHTTPMessageSetHeaderFieldValue", shim_cfnetwork_void3 as u64, "CFHTTPMessageSetHeaderFieldValue (stub → no-op)"),
-            ("_CFHTTPMessageIsHeaderComplete", shim_cfnetwork_true1 as u64, "CFHTTPMessageIsHeaderComplete (stub → true)")
+            ("_CFHTTPMessageCreateRequest", shim_cfnetwork_sentinel4 as *const () as u64, "CFHTTPMessageCreateRequest (stub → sentinel)"),
+            ("_CFHTTPMessageCreateResponse", shim_cfnetwork_sentinel4 as *const () as u64, "CFHTTPMessageCreateResponse (stub → sentinel)"),
+            ("_CFHTTPMessageCreateEmpty", shim_cfnetwork_sentinel2 as *const () as u64, "CFHTTPMessageCreateEmpty (stub → sentinel)"),
+            ("_CFHTTPMessageAppendBytes", shim_cfnetwork_true3 as *const () as u64, "CFHTTPMessageAppendBytes (stub → true)"),
+            ("_CFHTTPMessageCopyBody", shim_cfnetwork_null1 as *const () as u64, "CFHTTPMessageCopyBody (stub → NULL)"),
+            ("_CFHTTPMessageCopyHeaderFieldValue", shim_cfnetwork_null2 as *const () as u64, "CFHTTPMessageCopyHeaderFieldValue (stub → NULL)"),
+            ("_CFHTTPMessageCopyAllHeaderFields", shim_cfnetwork_null1 as *const () as u64, "CFHTTPMessageCopyAllHeaderFields (stub → NULL)"),
+            ("_CFHTTPMessageCopyRequestURL", shim_cfnetwork_null1 as *const () as u64, "CFHTTPMessageCopyRequestURL (stub → NULL)"),
+            ("_CFHTTPMessageCopyRequestMethod", shim_cfnetwork_null1 as *const () as u64, "CFHTTPMessageCopyRequestMethod (stub → NULL)"),
+            ("_CFHTTPMessageGetResponseStatusCode", shim_cf_http_message_get_response_status_code as *const () as u64, "CFHTTPMessageGetResponseStatusCode (stub → 200)"),
+            ("_CFHTTPMessageSetBody", shim_cfnetwork_void2 as *const () as u64, "CFHTTPMessageSetBody (stub → no-op)"),
+            ("_CFHTTPMessageSetHeaderFieldValue", shim_cfnetwork_void3 as *const () as u64, "CFHTTPMessageSetHeaderFieldValue (stub → no-op)"),
+            ("_CFHTTPMessageIsHeaderComplete", shim_cfnetwork_true1 as *const () as u64, "CFHTTPMessageIsHeaderComplete (stub → true)")
         );
 
         // ── CFHTTPStream ────────────────────────────────────────
         register_shims!(table,
-            ("_CFReadStreamCreateForHTTPRequest", shim_cfnetwork_sentinel2 as u64, "CFReadStreamCreateForHTTPRequest (stub → sentinel)"),
-            ("_CFHTTPReadStreamSetRedirectsAutomatically", shim_cfnetwork_void2 as u64, "CFHTTPReadStreamSetRedirectsAutomatically (stub → no-op)")
+            ("_CFReadStreamCreateForHTTPRequest", shim_cfnetwork_sentinel2 as *const () as u64, "CFReadStreamCreateForHTTPRequest (stub → sentinel)"),
+            ("_CFHTTPReadStreamSetRedirectsAutomatically", shim_cfnetwork_void2 as *const () as u64, "CFHTTPReadStreamSetRedirectsAutomatically (stub → no-op)")
         );
 
         // ── CFNetDiagnostics ────────────────────────────────────
         register_shims!(table,
-            ("_CFNetDiagnosticCreateWithStreams", shim_cfnetwork_sentinel3 as u64, "CFNetDiagnosticCreateWithStreams (stub → sentinel)"),
-            ("_CFNetDiagnosticSetName", shim_cfnetwork_void2 as u64, "CFNetDiagnosticSetName (stub → no-op)"),
-            ("_CFNetDiagnosticCopyNetworkStatusPassively", shim_cf_net_diagnostic_copy_status as u64, "CFNetDiagnosticCopyNetworkStatusPassively (stub → connected)")
+            ("_CFNetDiagnosticCreateWithStreams", shim_cfnetwork_sentinel3 as *const () as u64, "CFNetDiagnosticCreateWithStreams (stub → sentinel)"),
+            ("_CFNetDiagnosticSetName", shim_cfnetwork_void2 as *const () as u64, "CFNetDiagnosticSetName (stub → no-op)"),
+            ("_CFNetDiagnosticCopyNetworkStatusPassively", shim_cf_net_diagnostic_copy_status as *const () as u64, "CFNetDiagnosticCopyNetworkStatusPassively (stub → connected)")
         );
 
         // ── CFNetService (Bonjour) ──────────────────────────────
         register_shims!(table,
-            ("_CFNetServiceCreate", shim_cfnetwork_sentinel4 as u64, "CFNetServiceCreate (stub → sentinel)"),
-            ("_CFNetServiceBrowserCreate", shim_cfnetwork_sentinel2 as u64, "CFNetServiceBrowserCreate (stub → sentinel)"),
-            ("_CFNetServiceRegisterWithOptions", shim_cfnetwork_true3 as u64, "CFNetServiceRegisterWithOptions (stub → true)"),
-            ("_CFNetServiceBrowserSearchForServices", shim_cfnetwork_true4 as u64, "CFNetServiceBrowserSearchForServices (stub → true)"),
-            ("_CFNetServiceCancel", shim_cfnetwork_void1 as u64, "CFNetServiceCancel (stub → no-op)"),
-            ("_CFNetServiceBrowserStopSearch", shim_cfnetwork_void2 as u64, "CFNetServiceBrowserStopSearch (stub → no-op)"),
-            ("_CFNetServiceGetName", shim_cfnetwork_null1 as u64, "CFNetServiceGetName (stub → NULL)")
+            ("_CFNetServiceCreate", shim_cfnetwork_sentinel4 as *const () as u64, "CFNetServiceCreate (stub → sentinel)"),
+            ("_CFNetServiceBrowserCreate", shim_cfnetwork_sentinel2 as *const () as u64, "CFNetServiceBrowserCreate (stub → sentinel)"),
+            ("_CFNetServiceRegisterWithOptions", shim_cfnetwork_true3 as *const () as u64, "CFNetServiceRegisterWithOptions (stub → true)"),
+            ("_CFNetServiceBrowserSearchForServices", shim_cfnetwork_true4 as *const () as u64, "CFNetServiceBrowserSearchForServices (stub → true)"),
+            ("_CFNetServiceCancel", shim_cfnetwork_void1 as *const () as u64, "CFNetServiceCancel (stub → no-op)"),
+            ("_CFNetServiceBrowserStopSearch", shim_cfnetwork_void2 as *const () as u64, "CFNetServiceBrowserStopSearch (stub → no-op)"),
+            ("_CFNetServiceGetName", shim_cfnetwork_null1 as *const () as u64, "CFNetServiceGetName (stub → NULL)")
         );
 
         // ── CFProxy (PAC / WPAD) ────────────────────────────────
         register_shims!(table,
-            ("_CFNetworkCopyProxiesForURL", shim_cfnetwork_null2 as u64, "CFNetworkCopyProxiesForURL (stub → NULL)"),
-            ("_CFNetworkCopyProxiesForAutoConfigurationScript", shim_cfnetwork_null3 as u64, "CFNetworkCopyProxiesForAutoConfigurationScript (stub → NULL)"),
-            ("_CFNetworkCopySystemProxySettings", shim_cfnetwork_null0 as u64, "CFNetworkCopySystemProxySettings (stub → NULL)")
+            ("_CFNetworkCopyProxiesForURL", shim_cfnetwork_null2 as *const () as u64, "CFNetworkCopyProxiesForURL (stub → NULL)"),
+            ("_CFNetworkCopyProxiesForAutoConfigurationScript", shim_cfnetwork_null3 as *const () as u64, "CFNetworkCopyProxiesForAutoConfigurationScript (stub → NULL)"),
+            ("_CFNetworkCopySystemProxySettings", shim_cfnetwork_null0 as *const () as u64, "CFNetworkCopySystemProxySettings (stub → NULL)")
         );
 
         // ── CFSocketStream ──────────────────────────────────────
         register_shims!(table,
-            ("_CFStreamCreatePairWithSocketToHost", shim_cf_stream_create_pair_with_host as u64, "CFStreamCreatePairWithSocketToHost (stub → no-op, NULLs)"),
-            ("_CFStreamCreatePairWithSocket", shim_cf_stream_create_pair_with_socket as u64, "CFStreamCreatePairWithSocket (stub → no-op)")
+            ("_CFStreamCreatePairWithSocketToHost", shim_cf_stream_create_pair_with_host as *const () as u64, "CFStreamCreatePairWithSocketToHost (stub → no-op, NULLs)"),
+            ("_CFStreamCreatePairWithSocket", shim_cf_stream_create_pair_with_socket as *const () as u64, "CFStreamCreatePairWithSocket (stub → no-op)")
         );
 
         // ── Data symbols (string constants) ─────────────────────

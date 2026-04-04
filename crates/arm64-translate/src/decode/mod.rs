@@ -450,6 +450,29 @@ pub enum Instruction {
     /// CRC32B/CRC32H/CRC32W/CRC32X / CRC32CB/CRC32CH/CRC32CW/CRC32CX
     Crc32 { sf: bool, rd: u8, rn: u8, rm: u8, sz: u8, c: bool },
 
+    // ── Pointer Authentication (ARMv8.3 arm64e) ──────────────────
+
+    /// PACIA Xd, Xn / PACIZA Xd — sign pointer with IA key.
+    PacIA { rd: u8, rn: u8 },
+    /// PACIB Xd, Xn / PACIZB Xd — sign pointer with IB key.
+    PacIB { rd: u8, rn: u8 },
+    /// PACDA Xd, Xn / PACDZA Xd — sign data pointer with DA key.
+    PacDA { rd: u8, rn: u8 },
+    /// PACDB Xd, Xn / PACDZB Xd — sign data pointer with DB key.
+    PacDB { rd: u8, rn: u8 },
+    /// AUTIA Xd, Xn / AUTIZA Xd — authenticate pointer with IA key.
+    AutIA { rd: u8, rn: u8 },
+    /// AUTIB Xd, Xn / AUTIZB Xd — authenticate pointer with IB key.
+    AutIB { rd: u8, rn: u8 },
+    /// AUTDA Xd, Xn / AUTDZA Xd — authenticate data pointer with DA key.
+    AutDA { rd: u8, rn: u8 },
+    /// AUTDB Xd, Xn / AUTDZB Xd — authenticate data pointer with DB key.
+    AutDB { rd: u8, rn: u8 },
+    /// XPACI Xd — strip PAC bits from instruction pointer.
+    Xpaci { rd: u8 },
+    /// XPACD Xd — strip PAC bits from data pointer.
+    Xpacd { rd: u8 },
+
     // ── Fallback ──────────────────────────────────────────────────
 
     /// Unknown/unimplemented instruction.

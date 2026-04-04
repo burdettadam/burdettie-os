@@ -22,79 +22,79 @@ impl IcuShims {
 
         // ── uregex (regex) ──────────────────────────────────────
         register_shims!(table,
-            ("_uregex_open", shim_uregex_open as u64, "uregex_open (stub → NULL)"),
-            ("_uregex_openC", shim_uregex_open_c as u64, "uregex_openC (stub → NULL)"),
-            ("_uregex_close", shim_icu_void1 as u64, "uregex_close (stub → void)"),
-            ("_uregex_setText", shim_icu_void4 as u64, "uregex_setText (stub → void)"),
-            ("_uregex_find", shim_icu_false2 as u64, "uregex_find (stub → false)"),
-            ("_uregex_findNext", shim_icu_false1 as u64, "uregex_findNext (stub → false)"),
-            ("_uregex_group", shim_icu_null3 as u64, "uregex_group (stub → NULL)"),
-            ("_uregex_groupCount", shim_icu_zero1 as u64, "uregex_groupCount (stub → 0)"),
-            ("_uregex_start", shim_icu_zero2 as u64, "uregex_start (stub → 0)"),
-            ("_uregex_end", shim_icu_zero2 as u64, "uregex_end (stub → 0)"),
-            ("_uregex_reset", shim_icu_void2 as u64, "uregex_reset (stub → void)"),
-            ("_uregex_matches", shim_icu_false2 as u64, "uregex_matches (stub → false)"),
-            ("_uregex_replaceAll", shim_icu_zero4 as u64, "uregex_replaceAll (stub → 0)"),
-            ("_uregex_replaceFirst", shim_icu_zero4 as u64, "uregex_replaceFirst (stub → 0)"),
-            ("_uregex_pattern", shim_icu_null2 as u64, "uregex_pattern (stub → NULL)")
+            ("_uregex_open", shim_uregex_open as *const () as u64, "uregex_open (stub → NULL)"),
+            ("_uregex_openC", shim_uregex_open_c as *const () as u64, "uregex_openC (stub → NULL)"),
+            ("_uregex_close", shim_icu_void1 as *const () as u64, "uregex_close (stub → void)"),
+            ("_uregex_setText", shim_icu_void4 as *const () as u64, "uregex_setText (stub → void)"),
+            ("_uregex_find", shim_icu_false2 as *const () as u64, "uregex_find (stub → false)"),
+            ("_uregex_findNext", shim_icu_false1 as *const () as u64, "uregex_findNext (stub → false)"),
+            ("_uregex_group", shim_icu_null3 as *const () as u64, "uregex_group (stub → NULL)"),
+            ("_uregex_groupCount", shim_icu_zero1 as *const () as u64, "uregex_groupCount (stub → 0)"),
+            ("_uregex_start", shim_icu_zero2 as *const () as u64, "uregex_start (stub → 0)"),
+            ("_uregex_end", shim_icu_zero2 as *const () as u64, "uregex_end (stub → 0)"),
+            ("_uregex_reset", shim_icu_void2 as *const () as u64, "uregex_reset (stub → void)"),
+            ("_uregex_matches", shim_icu_false2 as *const () as u64, "uregex_matches (stub → false)"),
+            ("_uregex_replaceAll", shim_icu_zero4 as *const () as u64, "uregex_replaceAll (stub → 0)"),
+            ("_uregex_replaceFirst", shim_icu_zero4 as *const () as u64, "uregex_replaceFirst (stub → 0)"),
+            ("_uregex_pattern", shim_icu_null2 as *const () as u64, "uregex_pattern (stub → NULL)")
         );
 
         // ── uregion ─────────────────────────────────────────────
         register_shims!(table,
-            ("_uregion_getRegionFromCode", shim_icu_null1 as u64, "uregion_getRegionFromCode (stub → NULL)"),
-            ("_uregion_getContainedRegions", shim_icu_null2 as u64, "uregion_getContainedRegions (stub → NULL)"),
-            ("_uregion_getNumericCode", shim_icu_zero1 as u64, "uregion_getNumericCode (stub → 0)")
+            ("_uregion_getRegionFromCode", shim_icu_null1 as *const () as u64, "uregion_getRegionFromCode (stub → NULL)"),
+            ("_uregion_getContainedRegions", shim_icu_null2 as *const () as u64, "uregion_getContainedRegions (stub → NULL)"),
+            ("_uregion_getNumericCode", shim_icu_zero1 as *const () as u64, "uregion_getNumericCode (stub → 0)")
         );
 
         // ── ucol (collation) ────────────────────────────────────
         register_shims!(table,
-            ("_ucol_open", shim_ucol_open as u64, "ucol_open (stub → NULL)"),
-            ("_ucol_close", shim_icu_void1 as u64, "ucol_close (stub → void)"),
-            ("_ucol_strcoll", shim_ucol_strcoll as u64, "ucol_strcoll (stub → 0/equal)"),
-            ("_ucol_getSortKey", shim_icu_zero4 as u64, "ucol_getSortKey (stub → 0)")
+            ("_ucol_open", shim_ucol_open as *const () as u64, "ucol_open (stub → NULL)"),
+            ("_ucol_close", shim_icu_void1 as *const () as u64, "ucol_close (stub → void)"),
+            ("_ucol_strcoll", shim_ucol_strcoll as *const () as u64, "ucol_strcoll (stub → 0/equal)"),
+            ("_ucol_getSortKey", shim_icu_zero4 as *const () as u64, "ucol_getSortKey (stub → 0)")
         );
 
         // ── uenum (enumeration) ─────────────────────────────────
         register_shims!(table,
-            ("_uenum_close", shim_icu_void1 as u64, "uenum_close (stub → void)"),
-            ("_uenum_count", shim_uenum_count as u64, "uenum_count (stub → 0)"),
-            ("_uenum_next", shim_uenum_next as u64, "uenum_next (stub → NULL)"),
-            ("_uenum_reset", shim_icu_void2 as u64, "uenum_reset (stub → void)")
+            ("_uenum_close", shim_icu_void1 as *const () as u64, "uenum_close (stub → void)"),
+            ("_uenum_count", shim_uenum_count as *const () as u64, "uenum_count (stub → 0)"),
+            ("_uenum_next", shim_uenum_next as *const () as u64, "uenum_next (stub → NULL)"),
+            ("_uenum_reset", shim_icu_void2 as *const () as u64, "uenum_reset (stub → void)")
         );
 
         // ── udat (date formatting) ──────────────────────────────
         register_shims!(table,
-            ("_udat_open", shim_icu_null6 as u64, "udat_open (stub → NULL)"),
-            ("_udat_close", shim_icu_void1 as u64, "udat_close (stub → void)"),
-            ("_udat_format", shim_icu_zero4 as u64, "udat_format (stub → 0)"),
-            ("_udat_parse", shim_icu_zero4 as u64, "udat_parse (stub → 0)")
+            ("_udat_open", shim_icu_null6 as *const () as u64, "udat_open (stub → NULL)"),
+            ("_udat_close", shim_icu_void1 as *const () as u64, "udat_close (stub → void)"),
+            ("_udat_format", shim_icu_zero4 as *const () as u64, "udat_format (stub → 0)"),
+            ("_udat_parse", shim_icu_zero4 as *const () as u64, "udat_parse (stub → 0)")
         );
 
         // ── unum (number formatting) ────────────────────────────
         register_shims!(table,
-            ("_unum_open", shim_icu_null5 as u64, "unum_open (stub → NULL)"),
-            ("_unum_close", shim_icu_void1 as u64, "unum_close (stub → void)"),
-            ("_unum_formatInt64", shim_icu_zero4 as u64, "unum_formatInt64 (stub → 0)"),
-            ("_unum_formatDouble", shim_icu_zero4 as u64, "unum_formatDouble (stub → 0)"),
-            ("_unum_parseToNumber", shim_icu_void4 as u64, "unum_parseToNumber (stub → void)")
+            ("_unum_open", shim_icu_null5 as *const () as u64, "unum_open (stub → NULL)"),
+            ("_unum_close", shim_icu_void1 as *const () as u64, "unum_close (stub → void)"),
+            ("_unum_formatInt64", shim_icu_zero4 as *const () as u64, "unum_formatInt64 (stub → 0)"),
+            ("_unum_formatDouble", shim_icu_zero4 as *const () as u64, "unum_formatDouble (stub → 0)"),
+            ("_unum_parseToNumber", shim_icu_void4 as *const () as u64, "unum_parseToNumber (stub → void)")
         );
 
         // ── uloc (locale) ───────────────────────────────────────
         register_shims!(table,
-            ("_uloc_getDefault", shim_uloc_get_default as u64, "uloc_getDefault (stub → en_US)"),
-            ("_uloc_getName", shim_icu_zero4 as u64, "uloc_getName (stub → 0)"),
-            ("_uloc_getLanguage", shim_icu_zero4 as u64, "uloc_getLanguage (stub → 0)"),
-            ("_uloc_getCountry", shim_icu_zero4 as u64, "uloc_getCountry (stub → 0)"),
-            ("_uloc_canonicalize", shim_icu_zero4 as u64, "uloc_canonicalize (stub → 0)")
+            ("_uloc_getDefault", shim_uloc_get_default as *const () as u64, "uloc_getDefault (stub → en_US)"),
+            ("_uloc_getName", shim_icu_zero4 as *const () as u64, "uloc_getName (stub → 0)"),
+            ("_uloc_getLanguage", shim_icu_zero4 as *const () as u64, "uloc_getLanguage (stub → 0)"),
+            ("_uloc_getCountry", shim_icu_zero4 as *const () as u64, "uloc_getCountry (stub → 0)"),
+            ("_uloc_canonicalize", shim_icu_zero4 as *const () as u64, "uloc_canonicalize (stub → 0)")
         );
 
         // ── ubrk (break iterator) ──────────────────────────────
         register_shims!(table,
-            ("_ubrk_open", shim_icu_null4 as u64, "ubrk_open (stub → NULL)"),
-            ("_ubrk_close", shim_icu_void1 as u64, "ubrk_close (stub → void)"),
-            ("_ubrk_setText", shim_icu_void3 as u64, "ubrk_setText (stub → void)"),
-            ("_ubrk_first", shim_icu_zero1 as u64, "ubrk_first (stub → 0)"),
-            ("_ubrk_next", shim_ubrk_next as u64, "ubrk_next (stub → UBRK_DONE)")
+            ("_ubrk_open", shim_icu_null4 as *const () as u64, "ubrk_open (stub → NULL)"),
+            ("_ubrk_close", shim_icu_void1 as *const () as u64, "ubrk_close (stub → void)"),
+            ("_ubrk_setText", shim_icu_void3 as *const () as u64, "ubrk_setText (stub → void)"),
+            ("_ubrk_first", shim_icu_zero1 as *const () as u64, "ubrk_first (stub → 0)"),
+            ("_ubrk_next", shim_ubrk_next as *const () as u64, "ubrk_next (stub → UBRK_DONE)")
         );
 
         log::debug!("IcuShims: registered 44 ICU stub shims");

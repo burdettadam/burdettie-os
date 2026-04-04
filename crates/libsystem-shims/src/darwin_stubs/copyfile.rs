@@ -216,15 +216,15 @@ impl CopyfileStubs {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
         register_shims!(table,
-            ("_copyfile", shim_copyfile as u64, "copyfile — copy files with flags"),
-            ("_fcopyfile", shim_fcopyfile as u64, "fcopyfile — copy between fds"),
-            ("_copyfile_state_alloc", shim_copyfile_state_alloc as u64, "copyfile_state_alloc"),
-            ("_copyfile_state_free", shim_copyfile_state_free as u64, "copyfile_state_free"),
-            ("_copyfile_state_get", shim_copyfile_state_get as u64, "copyfile_state_get"),
-            ("_copyfile_state_set", shim_copyfile_state_set as u64, "copyfile_state_set"),
-            ("_removefile", shim_removefile as u64, "removefile — remove files/dirs"),
-            ("_removefile_state_alloc", shim_removefile_state_alloc as u64, "removefile_state_alloc"),
-            ("_removefile_state_free", shim_removefile_state_free as u64, "removefile_state_free"),
+            ("_copyfile", shim_copyfile as *const () as u64, "copyfile — copy files with flags"),
+            ("_fcopyfile", shim_fcopyfile as *const () as u64, "fcopyfile — copy between fds"),
+            ("_copyfile_state_alloc", shim_copyfile_state_alloc as *const () as u64, "copyfile_state_alloc"),
+            ("_copyfile_state_free", shim_copyfile_state_free as *const () as u64, "copyfile_state_free"),
+            ("_copyfile_state_get", shim_copyfile_state_get as *const () as u64, "copyfile_state_get"),
+            ("_copyfile_state_set", shim_copyfile_state_set as *const () as u64, "copyfile_state_set"),
+            ("_removefile", shim_removefile as *const () as u64, "removefile — remove files/dirs"),
+            ("_removefile_state_alloc", shim_removefile_state_alloc as *const () as u64, "removefile_state_alloc"),
+            ("_removefile_state_free", shim_removefile_state_free as *const () as u64, "removefile_state_free"),
         );
         log::debug!("CopyfileStubs: registered 9 stubs");
     }

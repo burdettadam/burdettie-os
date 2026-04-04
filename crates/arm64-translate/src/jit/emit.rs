@@ -35,9 +35,11 @@ const fn gpr_offset(n: u8) -> u32 {
 }
 
 /// Offset of `sp` in CpuState (after x[31]).
+#[allow(dead_code)]
 const SP_OFFSET: u32 = 31 * 8;
 
 /// Offset of `pc` in CpuState.
+#[allow(dead_code)]
 const PC_OFFSET: u32 = 32 * 8;
 
 /// Offset of `nzcv.n` in CpuState.

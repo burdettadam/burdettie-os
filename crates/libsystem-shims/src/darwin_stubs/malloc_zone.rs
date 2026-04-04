@@ -21,21 +21,21 @@ impl MallocZoneStubs {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
         register_shims!(table,
-            ("_malloc_default_zone", shim_malloc_default_zone as u64, "malloc_default_zone → default zone pointer"),
-            ("_malloc_create_zone", shim_malloc_create_zone as u64, "malloc_create_zone → default zone pointer"),
-            ("_malloc_destroy_zone", shim_malloc_destroy_zone as u64, "malloc_destroy_zone (no-op)"),
-            ("_malloc_zone_malloc", shim_malloc_zone_malloc as u64, "malloc_zone_malloc → libc::malloc"),
-            ("_malloc_zone_calloc", shim_malloc_zone_calloc as u64, "malloc_zone_calloc → libc::calloc"),
-            ("_malloc_zone_realloc", shim_malloc_zone_realloc as u64, "malloc_zone_realloc → libc::realloc"),
-            ("_malloc_zone_free", shim_malloc_zone_free as u64, "malloc_zone_free → libc::free"),
-            ("_malloc_zone_memalign", shim_malloc_zone_memalign as u64, "malloc_zone_memalign → libc::posix_memalign"),
-            ("_malloc_size", shim_malloc_size as u64, "malloc_size → 0 (portable fallback)"),
-            ("_malloc_good_size", shim_malloc_good_size as u64, "malloc_good_size → next 16-byte alignment"),
-            ("_malloc_zone_statistics", shim_malloc_zone_statistics as u64, "malloc_zone_statistics → zeroed stats"),
-            ("_malloc_zone_batch_malloc", shim_malloc_zone_batch_malloc as u64, "malloc_zone_batch_malloc → individual mallocs"),
-            ("_malloc_zone_batch_free", shim_malloc_zone_batch_free as u64, "malloc_zone_batch_free → individual frees"),
-            ("_malloc_set_zone_name", shim_malloc_set_zone_name as u64, "malloc_set_zone_name (no-op)"),
-            ("_malloc_zone_from_ptr", shim_malloc_zone_from_ptr as u64, "malloc_zone_from_ptr → default zone")
+            ("_malloc_default_zone", shim_malloc_default_zone as *const () as u64, "malloc_default_zone → default zone pointer"),
+            ("_malloc_create_zone", shim_malloc_create_zone as *const () as u64, "malloc_create_zone → default zone pointer"),
+            ("_malloc_destroy_zone", shim_malloc_destroy_zone as *const () as u64, "malloc_destroy_zone (no-op)"),
+            ("_malloc_zone_malloc", shim_malloc_zone_malloc as *const () as u64, "malloc_zone_malloc → libc::malloc"),
+            ("_malloc_zone_calloc", shim_malloc_zone_calloc as *const () as u64, "malloc_zone_calloc → libc::calloc"),
+            ("_malloc_zone_realloc", shim_malloc_zone_realloc as *const () as u64, "malloc_zone_realloc → libc::realloc"),
+            ("_malloc_zone_free", shim_malloc_zone_free as *const () as u64, "malloc_zone_free → libc::free"),
+            ("_malloc_zone_memalign", shim_malloc_zone_memalign as *const () as u64, "malloc_zone_memalign → libc::posix_memalign"),
+            ("_malloc_size", shim_malloc_size as *const () as u64, "malloc_size → 0 (portable fallback)"),
+            ("_malloc_good_size", shim_malloc_good_size as *const () as u64, "malloc_good_size → next 16-byte alignment"),
+            ("_malloc_zone_statistics", shim_malloc_zone_statistics as *const () as u64, "malloc_zone_statistics → zeroed stats"),
+            ("_malloc_zone_batch_malloc", shim_malloc_zone_batch_malloc as *const () as u64, "malloc_zone_batch_malloc → individual mallocs"),
+            ("_malloc_zone_batch_free", shim_malloc_zone_batch_free as *const () as u64, "malloc_zone_batch_free → individual frees"),
+            ("_malloc_set_zone_name", shim_malloc_set_zone_name as *const () as u64, "malloc_set_zone_name (no-op)"),
+            ("_malloc_zone_from_ptr", shim_malloc_zone_from_ptr as *const () as u64, "malloc_zone_from_ptr → default zone")
         );
         log::debug!("MallocZoneStubs: registered 15 stubs");
     }

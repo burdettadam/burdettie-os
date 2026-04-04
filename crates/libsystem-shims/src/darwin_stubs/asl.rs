@@ -15,12 +15,12 @@ impl AslStubs {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
         register_shims!(table,
-            ("_asl_open", shim_asl_open as u64, "asl_open (stub → synthetic handle)"),
-            ("_asl_new", shim_asl_new as u64, "asl_new (stub → synthetic msg)"),
-            ("_asl_set", shim_asl_set as u64, "asl_set (stub → 0)"),
-            ("_asl_send", shim_asl_send as u64, "asl_send (stub → 0, logs debug)"),
-            ("_asl_free", shim_asl_free as u64, "asl_free (stub → void)"),
-            ("_asl_format", shim_asl_format as u64, "asl_format (stub → NULL)"),
+            ("_asl_open", shim_asl_open as *const () as u64, "asl_open (stub → synthetic handle)"),
+            ("_asl_new", shim_asl_new as *const () as u64, "asl_new (stub → synthetic msg)"),
+            ("_asl_set", shim_asl_set as *const () as u64, "asl_set (stub → 0)"),
+            ("_asl_send", shim_asl_send as *const () as u64, "asl_send (stub → 0, logs debug)"),
+            ("_asl_free", shim_asl_free as *const () as u64, "asl_free (stub → void)"),
+            ("_asl_format", shim_asl_format as *const () as u64, "asl_format (stub → NULL)"),
         );
         log::debug!("AslStubs: registered 6 stubs");
     }

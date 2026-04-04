@@ -58,10 +58,10 @@ fn make_formatter() -> Option<DateTimeFormatter<fieldsets::YMDT>> {
 
 pub fn install(table: &mut ShimTable) {
     register_shims!(table,
-        ("_udat_open", shim_udat_open as u64, "udat_open (icu4x → real date formatter)"),
-        ("_udat_close", shim_udat_close as u64, "udat_close (icu4x)"),
-        ("_udat_format", shim_udat_format as u64, "udat_format (icu4x → real formatting)"),
-        ("_udat_parse", shim_udat_parse as u64, "udat_parse (ISO 8601 + ICU medium format parser)")
+        ("_udat_open", shim_udat_open as *const () as u64, "udat_open (icu4x → real date formatter)"),
+        ("_udat_close", shim_udat_close as *const () as u64, "udat_close (icu4x)"),
+        ("_udat_format", shim_udat_format as *const () as u64, "udat_format (icu4x → real formatting)"),
+        ("_udat_parse", shim_udat_parse as *const () as u64, "udat_parse (ISO 8601 + ICU medium format parser)")
     );
 }
 

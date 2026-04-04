@@ -548,27 +548,27 @@ mod tests {
             methods: vec![
                 objc_runtime::MethodEntry {
                     selector: "keyDown:".into(),
-                    imp: probe_key_down_imp as u64,
+                    imp: probe_key_down_imp as *const () as u64,
                     type_encoding: "v@:@".into(),
                 },
                 objc_runtime::MethodEntry {
                     selector: "mouseDown:".into(),
-                    imp: probe_key_down_imp as u64,
+                    imp: probe_key_down_imp as *const () as u64,
                     type_encoding: "v@:@".into(),
                 },
                 objc_runtime::MethodEntry {
                     selector: "resignFirstResponder".into(),
-                    imp: probe_resign_first_responder as u64,
+                    imp: probe_resign_first_responder as *const () as u64,
                     type_encoding: "B@:".into(),
                 },
                 objc_runtime::MethodEntry {
                     selector: "becomeFirstResponder".into(),
-                    imp: probe_become_first_responder as u64,
+                    imp: probe_become_first_responder as *const () as u64,
                     type_encoding: "B@:".into(),
                 },
                 objc_runtime::MethodEntry {
                     selector: "performKeyEquivalent:".into(),
-                    imp: probe_perform_key_equivalent as u64,
+                    imp: probe_perform_key_equivalent as *const () as u64,
                     type_encoding: "B@:@".into(),
                 },
             ],
@@ -594,7 +594,7 @@ mod tests {
             methods: vec![
                 objc_runtime::MethodEntry {
                     selector: "windowShouldClose:".into(),
-                    imp: probe_window_should_close as u64,
+                    imp: probe_window_should_close as *const () as u64,
                     type_encoding: "B@:@".into(),
                 },
             ],

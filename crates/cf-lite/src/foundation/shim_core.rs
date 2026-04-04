@@ -12,7 +12,7 @@ pub(super) fn install_core_shims(table: &mut ShimTable) {
     // NSLog + CFConstantString
     register_shims!(table,
         ("_NSLog", nslog::nslog_trampoline_addr(), "NSLog → fprintf(stderr, ...)"),
-        ("__NSIsNSString", cf_core::shim_ns_is_nsstring as u64, "__NSIsNSString → string/CFString predicate"),
+        ("__NSIsNSString", cf_core::shim_ns_is_nsstring as *const () as u64, "__NSIsNSString → string/CFString predicate"),
         ("___CFConstantStringClassReference", cfconstant_string_class_addr(), "CFConstantString class reference (data symbol)"),
     );
 
@@ -24,11 +24,11 @@ pub(super) fn install_core_shims(table: &mut ShimTable) {
 
     // CFString functions
     register_shims!(table,
-        ("_CFStringCreateWithCString", cfstring::shim_cf_string_create_with_cstring as u64, "CFStringCreateWithCString shim"),
-        ("_CFStringGetLength", cfstring::shim_cf_string_get_length as u64, "CFStringGetLength shim"),
-        ("_CFStringGetCStringPtr", cfstring::shim_cf_string_get_cstring_ptr as u64, "CFStringGetCStringPtr shim"),
+        ("_CFStringCreateWithCString", cfstring::shim_cf_string_create_with_cstring as *const () as u64, "CFStringCreateWithCString shim"),
+        ("_CFStringGetLength", cfstring::shim_cf_string_get_length as *const () as u64, "CFStringGetLength shim"),
+        ("_CFStringGetCStringPtr", cfstring::shim_cf_string_get_cstring_ptr as *const () as u64, "CFStringGetCStringPtr shim"),
         ("_kCFStringEncodingUTF8", cfstring::kcf_string_encoding_utf8_addr(), "kCFStringEncodingUTF8 data symbol"),
-        ("_CFRelease", cfstring::shim_cf_release as u64, "CFRelease shim"),
+        ("_CFRelease", cfstring::shim_cf_release as *const () as u64, "CFRelease shim"),
         ("_kCFAllocatorDefault", cfstring::kcf_allocator_default_addr(), "kCFAllocatorDefault data symbol"),
     );
 
@@ -230,67 +230,67 @@ pub(super) fn install_core_shims(table: &mut ShimTable) {
 
     // NSStringFrom* geometry formatting functions
     register_shims!(table,
-        ("_NSStringFromPoint", nsvalue::shim_nsstringfrompoint as u64, "NSStringFromPoint → format CGPoint as NSString"),
-        ("_NSStringFromSize", nsvalue::shim_nsstringfromsize as u64, "NSStringFromSize → format CGSize as NSString"),
-        ("_NSStringFromRect", nsvalue::shim_nsstringfromrect as u64, "NSStringFromRect → format CGRect as NSString"),
-        ("_NSStringFromRange", nsvalue::shim_nsstringfromrange as u64, "NSStringFromRange → format NSRange as NSString"),
+        ("_NSStringFromPoint", nsvalue::shim_nsstringfrompoint as *const () as u64, "NSStringFromPoint → format CGPoint as NSString"),
+        ("_NSStringFromSize", nsvalue::shim_nsstringfromsize as *const () as u64, "NSStringFromSize → format CGSize as NSString"),
+        ("_NSStringFromRect", nsvalue::shim_nsstringfromrect as *const () as u64, "NSStringFromRect → format CGRect as NSString"),
+        ("_NSStringFromRange", nsvalue::shim_nsstringfromrange as *const () as u64, "NSStringFromRange → format NSRange as NSString"),
     );
 
     // CoreFoundation core functions
     register_shims!(table,
-        ("_CFRetain", cf_core::shim_cf_retain as u64, "CFRetain shim"),
-        ("_CFGetTypeID", cf_core::shim_cf_get_type_id as u64, "CFGetTypeID shim"),
-        ("_CFEqual", cf_core::shim_cf_equal as u64, "CFEqual shim"),
-        ("_CFHash", cf_core::shim_cf_hash as u64, "CFHash shim"),
-        ("_CFCopyDescription", cf_core::shim_cf_copy_description as u64, "CFCopyDescription shim"),
-        ("_CFPreferencesCopyValue", cf_core::shim_cf_preferences_copy_value as u64, "CFPreferencesCopyValue shim"),
+        ("_CFRetain", cf_core::shim_cf_retain as *const () as u64, "CFRetain shim"),
+        ("_CFGetTypeID", cf_core::shim_cf_get_type_id as *const () as u64, "CFGetTypeID shim"),
+        ("_CFEqual", cf_core::shim_cf_equal as *const () as u64, "CFEqual shim"),
+        ("_CFHash", cf_core::shim_cf_hash as *const () as u64, "CFHash shim"),
+        ("_CFCopyDescription", cf_core::shim_cf_copy_description as *const () as u64, "CFCopyDescription shim"),
+        ("_CFPreferencesCopyValue", cf_core::shim_cf_preferences_copy_value as *const () as u64, "CFPreferencesCopyValue shim"),
     );
 
     // CF type ID getters
     register_shims!(table,
-        ("_CFStringGetTypeID", cf_core::shim_cf_string_get_type_id as u64, "CFStringGetTypeID shim"),
-        ("_CFArrayGetTypeID", cf_core::shim_cf_array_get_type_id as u64, "CFArrayGetTypeID shim"),
-        ("_CFDictionaryGetTypeID", cf_core::shim_cf_dictionary_get_type_id as u64, "CFDictionaryGetTypeID shim"),
-        ("_CFDataGetTypeID", cf_core::shim_cf_data_get_type_id as u64, "CFDataGetTypeID shim"),
-        ("_CFURLGetTypeID", cf_core::shim_cf_url_get_type_id as u64, "CFURLGetTypeID shim"),
-        ("_CFBooleanGetTypeID", cf_core::shim_cf_boolean_get_type_id as u64, "CFBooleanGetTypeID shim"),
-        ("_CFNumberGetTypeID", cf_core::shim_cf_number_get_type_id as u64, "CFNumberGetTypeID shim"),
-        ("_CFNullGetTypeID", cf_core::shim_cf_null_get_type_id as u64, "CFNullGetTypeID shim"),
+        ("_CFStringGetTypeID", cf_core::shim_cf_string_get_type_id as *const () as u64, "CFStringGetTypeID shim"),
+        ("_CFArrayGetTypeID", cf_core::shim_cf_array_get_type_id as *const () as u64, "CFArrayGetTypeID shim"),
+        ("_CFDictionaryGetTypeID", cf_core::shim_cf_dictionary_get_type_id as *const () as u64, "CFDictionaryGetTypeID shim"),
+        ("_CFDataGetTypeID", cf_core::shim_cf_data_get_type_id as *const () as u64, "CFDataGetTypeID shim"),
+        ("_CFURLGetTypeID", cf_core::shim_cf_url_get_type_id as *const () as u64, "CFURLGetTypeID shim"),
+        ("_CFBooleanGetTypeID", cf_core::shim_cf_boolean_get_type_id as *const () as u64, "CFBooleanGetTypeID shim"),
+        ("_CFNumberGetTypeID", cf_core::shim_cf_number_get_type_id as *const () as u64, "CFNumberGetTypeID shim"),
+        ("_CFNullGetTypeID", cf_core::shim_cf_null_get_type_id as *const () as u64, "CFNullGetTypeID shim"),
     );
 
     // CFArray C functions
     register_shims!(table,
-        ("_CFArrayCreate", cf_core::shim_cf_array_create as u64, "CFArrayCreate shim"),
-        ("_CFArrayGetCount", cf_core::shim_cf_array_get_count as u64, "CFArrayGetCount shim"),
-        ("_CFArrayGetValueAtIndex", cf_core::shim_cf_array_get_value_at_index as u64, "CFArrayGetValueAtIndex shim"),
+        ("_CFArrayCreate", cf_core::shim_cf_array_create as *const () as u64, "CFArrayCreate shim"),
+        ("_CFArrayGetCount", cf_core::shim_cf_array_get_count as *const () as u64, "CFArrayGetCount shim"),
+        ("_CFArrayGetValueAtIndex", cf_core::shim_cf_array_get_value_at_index as *const () as u64, "CFArrayGetValueAtIndex shim"),
     );
 
     // CFDictionary C functions
     register_shims!(table,
-        ("_CFDictionaryCreate", cf_core::shim_cf_dictionary_create as u64, "CFDictionaryCreate shim"),
-        ("_CFDictionaryGetCount", cf_core::shim_cf_dictionary_get_count as u64, "CFDictionaryGetCount shim"),
-        ("_CFDictionaryGetValue", cf_core::shim_cf_dictionary_get_value as u64, "CFDictionaryGetValue shim"),
+        ("_CFDictionaryCreate", cf_core::shim_cf_dictionary_create as *const () as u64, "CFDictionaryCreate shim"),
+        ("_CFDictionaryGetCount", cf_core::shim_cf_dictionary_get_count as *const () as u64, "CFDictionaryGetCount shim"),
+        ("_CFDictionaryGetValue", cf_core::shim_cf_dictionary_get_value as *const () as u64, "CFDictionaryGetValue shim"),
     );
 
     // CFData C functions
     register_shims!(table,
-        ("_CFDataCreate", cf_core::shim_cf_data_create as u64, "CFDataCreate shim"),
-        ("_CFDataGetBytePtr", cf_core::shim_cf_data_get_byte_ptr as u64, "CFDataGetBytePtr shim"),
-        ("_CFDataGetLength", cf_core::shim_cf_data_get_length as u64, "CFDataGetLength shim"),
+        ("_CFDataCreate", cf_core::shim_cf_data_create as *const () as u64, "CFDataCreate shim"),
+        ("_CFDataGetBytePtr", cf_core::shim_cf_data_get_byte_ptr as *const () as u64, "CFDataGetBytePtr shim"),
+        ("_CFDataGetLength", cf_core::shim_cf_data_get_length as *const () as u64, "CFDataGetLength shim"),
     );
 
     // CFURL C functions
     register_shims!(table,
-        ("_CFURLCreateWithString", cf_core::shim_cf_url_create_with_string as u64, "CFURLCreateWithString shim"),
-        ("_CFURLGetString", cf_core::shim_cf_url_get_string as u64, "CFURLGetString shim"),
-        ("_CFURLCreateWithFileSystemPath", cf_core::shim_cf_url_create_with_file_system_path as u64, "CFURLCreateWithFileSystemPath shim"),
+        ("_CFURLCreateWithString", cf_core::shim_cf_url_create_with_string as *const () as u64, "CFURLCreateWithString shim"),
+        ("_CFURLGetString", cf_core::shim_cf_url_get_string as *const () as u64, "CFURLGetString shim"),
+        ("_CFURLCreateWithFileSystemPath", cf_core::shim_cf_url_create_with_file_system_path as *const () as u64, "CFURLCreateWithFileSystemPath shim"),
     );
 
     // CFBundle C functions
     register_shims!(table,
-        ("_CFBundleGetMainBundle", cf_core::shim_cf_bundle_get_main_bundle as u64, "CFBundleGetMainBundle shim"),
-        ("_CFBundleCopyBundleURL", cf_core::shim_cf_bundle_copy_bundle_url as u64, "CFBundleCopyBundleURL shim"),
-        ("_CFBundleCopyInfoDictionaryForURL", cf_core::shim_cf_bundle_copy_info_dictionary_for_url as u64, "CFBundleCopyInfoDictionaryForURL shim"),
+        ("_CFBundleGetMainBundle", cf_core::shim_cf_bundle_get_main_bundle as *const () as u64, "CFBundleGetMainBundle shim"),
+        ("_CFBundleCopyBundleURL", cf_core::shim_cf_bundle_copy_bundle_url as *const () as u64, "CFBundleCopyBundleURL shim"),
+        ("_CFBundleCopyInfoDictionaryForURL", cf_core::shim_cf_bundle_copy_info_dictionary_for_url as *const () as u64, "CFBundleCopyInfoDictionaryForURL shim"),
     );
 
     // CF boolean/null data symbols
@@ -310,8 +310,8 @@ pub(super) fn install_core_shims(table: &mut ShimTable) {
 
     // CFString encoding conversion functions
     register_shims!(table,
-        ("_CFStringConvertEncodingToNSStringEncoding", cf_core::shim_cf_string_convert_encoding_to_nsstring_encoding as u64, "CFStringConvertEncodingToNSStringEncoding shim"),
-        ("_CFStringConvertIANACharSetNameToEncoding", cf_core::shim_cf_string_convert_iana_charset_name_to_encoding as u64, "CFStringConvertIANACharSetNameToEncoding shim"),
+        ("_CFStringConvertEncodingToNSStringEncoding", cf_core::shim_cf_string_convert_encoding_to_nsstring_encoding as *const () as u64, "CFStringConvertEncodingToNSStringEncoding shim"),
+        ("_CFStringConvertIANACharSetNameToEncoding", cf_core::shim_cf_string_convert_iana_charset_name_to_encoding as *const () as u64, "CFStringConvertIANACharSetNameToEncoding shim"),
     );
 
     // ___NSArray0__struct — empty immutable array singleton
@@ -394,119 +394,119 @@ pub(super) fn install_core_shims(table: &mut ShimTable) {
 
     // CFNumber C functions
     register_shims!(table,
-        ("_CFNumberCreate", cf_core::shim_cf_number_create as u64, "CFNumberCreate → create number from type+ptr"),
-        ("_CFNumberGetValue", cf_core::shim_cf_number_get_value as u64, "CFNumberGetValue → extract value by type"),
-        ("_CFNumberGetType", cf_core::shim_cf_number_get_type as u64, "CFNumberGetType → CFNumberType enum"),
-        ("_CFNumberCompare", cf_core::shim_cf_number_compare as u64, "CFNumberCompare → numeric ordering"),
-        ("_CFNumberIsFloatType", cf_core::shim_cf_number_is_float_type as u64, "CFNumberIsFloatType → Boolean"),
+        ("_CFNumberCreate", cf_core::shim_cf_number_create as *const () as u64, "CFNumberCreate → create number from type+ptr"),
+        ("_CFNumberGetValue", cf_core::shim_cf_number_get_value as *const () as u64, "CFNumberGetValue → extract value by type"),
+        ("_CFNumberGetType", cf_core::shim_cf_number_get_type as *const () as u64, "CFNumberGetType → CFNumberType enum"),
+        ("_CFNumberCompare", cf_core::shim_cf_number_compare as *const () as u64, "CFNumberCompare → numeric ordering"),
+        ("_CFNumberIsFloatType", cf_core::shim_cf_number_is_float_type as *const () as u64, "CFNumberIsFloatType → Boolean"),
     );
 
     // CFString expanded C functions
     register_shims!(table,
-        ("_CFStringGetCString", cf_core::shim_cf_string_get_cstring as u64, "CFStringGetCString → copy to C buffer"),
-        ("_CFStringCreateCopy", cf_core::shim_cf_string_create_copy as u64, "CFStringCreateCopy → immutable copy"),
-        ("_CFStringCompare", cf_core::shim_cf_string_compare as u64, "CFStringCompare → lexical ordering"),
-        ("_CFStringCreateWithCharacters", cf_core::shim_cf_string_create_with_characters as u64, "CFStringCreateWithCharacters → from UTF-16"),
-        ("_CFStringGetCharacterAtIndex", cf_core::shim_cf_string_get_character_at_index as u64, "CFStringGetCharacterAtIndex → UniChar"),
-        ("_CFStringFind", cf_core::shim_cf_string_find as u64, "CFStringFind → substring search"),
+        ("_CFStringGetCString", cf_core::shim_cf_string_get_cstring as *const () as u64, "CFStringGetCString → copy to C buffer"),
+        ("_CFStringCreateCopy", cf_core::shim_cf_string_create_copy as *const () as u64, "CFStringCreateCopy → immutable copy"),
+        ("_CFStringCompare", cf_core::shim_cf_string_compare as *const () as u64, "CFStringCompare → lexical ordering"),
+        ("_CFStringCreateWithCharacters", cf_core::shim_cf_string_create_with_characters as *const () as u64, "CFStringCreateWithCharacters → from UTF-16"),
+        ("_CFStringGetCharacterAtIndex", cf_core::shim_cf_string_get_character_at_index as *const () as u64, "CFStringGetCharacterAtIndex → UniChar"),
+        ("_CFStringFind", cf_core::shim_cf_string_find as *const () as u64, "CFStringFind → substring search"),
     );
 
     // CFRunLoop C functions
     register_shims!(table,
-        ("_CFRunLoopGetCurrent", cf_core::shim_cf_run_loop_get_current as u64, "CFRunLoopGetCurrent → current thread run loop"),
-        ("_CFRunLoopGetMain", cf_core::shim_cf_run_loop_get_main as u64, "CFRunLoopGetMain → main thread run loop"),
-        ("_CFRunLoopRun", cf_core::shim_cf_run_loop_run as u64, "CFRunLoopRun → run default mode"),
-        ("_CFRunLoopRunInMode", cf_core::shim_cf_run_loop_run_in_mode as u64, "CFRunLoopRunInMode → timed mode run"),
-        ("_CFRunLoopStop", cf_core::shim_cf_run_loop_stop as u64, "CFRunLoopStop → exit run loop"),
-        ("_CFRunLoopAddTimer", cf_core::shim_cf_run_loop_add_timer as u64, "CFRunLoopAddTimer → schedule timer"),
-        ("_CFRunLoopAddSource", cf_core::shim_cf_run_loop_add_source as u64, "CFRunLoopAddSource → add input source"),
-        ("_CFRunLoopRemoveSource", cf_core::shim_cf_run_loop_remove_source as u64, "CFRunLoopRemoveSource → remove input source"),
-        ("_CFRunLoopSourceCreate", cf_core::shim_cf_run_loop_source_create as u64, "CFRunLoopSourceCreate → allocate source"),
-        ("_CFRunLoopSourceSignal", cf_core::shim_cf_run_loop_source_signal as u64, "CFRunLoopSourceSignal → signal source"),
-        ("_CFRunLoopSourceInvalidate", cf_core::shim_cf_run_loop_source_invalidate as u64, "CFRunLoopSourceInvalidate → invalidate source"),
-        ("_CFRunLoopSourceIsValid", cf_core::shim_cf_run_loop_source_is_valid as u64, "CFRunLoopSourceIsValid → check source validity"),
-        ("_CFRunLoopObserverCreate", cf_core::shim_cf_run_loop_observer_create as u64, "CFRunLoopObserverCreate → allocate observer"),
-        ("_CFRunLoopAddObserver", cf_core::shim_cf_run_loop_add_observer as u64, "CFRunLoopAddObserver → register observer"),
-        ("_CFRunLoopRemoveObserver", cf_core::shim_cf_run_loop_remove_observer as u64, "CFRunLoopRemoveObserver → unregister observer"),
-        ("_CFRunLoopObserverInvalidate", cf_core::shim_cf_run_loop_observer_invalidate as u64, "CFRunLoopObserverInvalidate → invalidate observer"),
+        ("_CFRunLoopGetCurrent", cf_core::shim_cf_run_loop_get_current as *const () as u64, "CFRunLoopGetCurrent → current thread run loop"),
+        ("_CFRunLoopGetMain", cf_core::shim_cf_run_loop_get_main as *const () as u64, "CFRunLoopGetMain → main thread run loop"),
+        ("_CFRunLoopRun", cf_core::shim_cf_run_loop_run as *const () as u64, "CFRunLoopRun → run default mode"),
+        ("_CFRunLoopRunInMode", cf_core::shim_cf_run_loop_run_in_mode as *const () as u64, "CFRunLoopRunInMode → timed mode run"),
+        ("_CFRunLoopStop", cf_core::shim_cf_run_loop_stop as *const () as u64, "CFRunLoopStop → exit run loop"),
+        ("_CFRunLoopAddTimer", cf_core::shim_cf_run_loop_add_timer as *const () as u64, "CFRunLoopAddTimer → schedule timer"),
+        ("_CFRunLoopAddSource", cf_core::shim_cf_run_loop_add_source as *const () as u64, "CFRunLoopAddSource → add input source"),
+        ("_CFRunLoopRemoveSource", cf_core::shim_cf_run_loop_remove_source as *const () as u64, "CFRunLoopRemoveSource → remove input source"),
+        ("_CFRunLoopSourceCreate", cf_core::shim_cf_run_loop_source_create as *const () as u64, "CFRunLoopSourceCreate → allocate source"),
+        ("_CFRunLoopSourceSignal", cf_core::shim_cf_run_loop_source_signal as *const () as u64, "CFRunLoopSourceSignal → signal source"),
+        ("_CFRunLoopSourceInvalidate", cf_core::shim_cf_run_loop_source_invalidate as *const () as u64, "CFRunLoopSourceInvalidate → invalidate source"),
+        ("_CFRunLoopSourceIsValid", cf_core::shim_cf_run_loop_source_is_valid as *const () as u64, "CFRunLoopSourceIsValid → check source validity"),
+        ("_CFRunLoopObserverCreate", cf_core::shim_cf_run_loop_observer_create as *const () as u64, "CFRunLoopObserverCreate → allocate observer"),
+        ("_CFRunLoopAddObserver", cf_core::shim_cf_run_loop_add_observer as *const () as u64, "CFRunLoopAddObserver → register observer"),
+        ("_CFRunLoopRemoveObserver", cf_core::shim_cf_run_loop_remove_observer as *const () as u64, "CFRunLoopRemoveObserver → unregister observer"),
+        ("_CFRunLoopObserverInvalidate", cf_core::shim_cf_run_loop_observer_invalidate as *const () as u64, "CFRunLoopObserverInvalidate → invalidate observer"),
         ("_kCFRunLoopDefaultMode", cf_core::kcf_run_loop_default_mode_addr(), "kCFRunLoopDefaultMode constant string"),
         ("_kCFRunLoopCommonModes", cf_core::kcf_run_loop_common_modes_addr(), "kCFRunLoopCommonModes constant string"),
     );
 
     // CFAllocator C functions
     register_shims!(table,
-        ("_CFAllocatorGetDefault", cf_core::shim_cf_allocator_get_default as u64, "CFAllocatorGetDefault → default allocator"),
-        ("_CFAllocatorAllocate", cf_core::shim_cf_allocator_allocate as u64, "CFAllocatorAllocate → calloc wrapper"),
-        ("_CFAllocatorDeallocate", cf_core::shim_cf_allocator_deallocate as u64, "CFAllocatorDeallocate → free wrapper"),
+        ("_CFAllocatorGetDefault", cf_core::shim_cf_allocator_get_default as *const () as u64, "CFAllocatorGetDefault → default allocator"),
+        ("_CFAllocatorAllocate", cf_core::shim_cf_allocator_allocate as *const () as u64, "CFAllocatorAllocate → calloc wrapper"),
+        ("_CFAllocatorDeallocate", cf_core::shim_cf_allocator_deallocate as *const () as u64, "CFAllocatorDeallocate → free wrapper"),
     );
 
     // CFMutableArray C functions
     register_shims!(table,
-        ("_CFArrayCreateMutable", cf_core::shim_cf_array_create_mutable as u64, "CFArrayCreateMutable → NSMutableArray"),
-        ("_CFArrayAppendValue", cf_core::shim_cf_array_append_value as u64, "CFArrayAppendValue → addObject:"),
-        ("_CFArrayInsertValueAtIndex", cf_core::shim_cf_array_insert_value_at_index as u64, "CFArrayInsertValueAtIndex → insertObject:atIndex:"),
-        ("_CFArrayRemoveValueAtIndex", cf_core::shim_cf_array_remove_value_at_index as u64, "CFArrayRemoveValueAtIndex → removeObjectAtIndex:"),
-        ("_CFArraySetValueAtIndex", cf_core::shim_cf_array_set_value_at_index as u64, "CFArraySetValueAtIndex → replaceObjectAtIndex:withObject:"),
-        ("_CFArrayRemoveAllValues", cf_core::shim_cf_array_remove_all_values as u64, "CFArrayRemoveAllValues → removeAllObjects"),
-        ("_CFArraySortValues", cf_core::shim_cf_array_sort_values as u64, "CFArraySortValues → stub no-op"),
+        ("_CFArrayCreateMutable", cf_core::shim_cf_array_create_mutable as *const () as u64, "CFArrayCreateMutable → NSMutableArray"),
+        ("_CFArrayAppendValue", cf_core::shim_cf_array_append_value as *const () as u64, "CFArrayAppendValue → addObject:"),
+        ("_CFArrayInsertValueAtIndex", cf_core::shim_cf_array_insert_value_at_index as *const () as u64, "CFArrayInsertValueAtIndex → insertObject:atIndex:"),
+        ("_CFArrayRemoveValueAtIndex", cf_core::shim_cf_array_remove_value_at_index as *const () as u64, "CFArrayRemoveValueAtIndex → removeObjectAtIndex:"),
+        ("_CFArraySetValueAtIndex", cf_core::shim_cf_array_set_value_at_index as *const () as u64, "CFArraySetValueAtIndex → replaceObjectAtIndex:withObject:"),
+        ("_CFArrayRemoveAllValues", cf_core::shim_cf_array_remove_all_values as *const () as u64, "CFArrayRemoveAllValues → removeAllObjects"),
+        ("_CFArraySortValues", cf_core::shim_cf_array_sort_values as *const () as u64, "CFArraySortValues → stub no-op"),
     );
 
     // CFMutableDictionary C functions
     register_shims!(table,
-        ("_CFDictionaryCreateMutable", cf_core::shim_cf_dictionary_create_mutable as u64, "CFDictionaryCreateMutable → NSMutableDictionary"),
-        ("_CFDictionarySetValue", cf_core::shim_cf_dictionary_set_value as u64, "CFDictionarySetValue → setObject:forKey:"),
-        ("_CFDictionaryAddValue", cf_core::shim_cf_dictionary_add_value as u64, "CFDictionaryAddValue → setObject:forKey:"),
-        ("_CFDictionaryReplaceValue", cf_core::shim_cf_dictionary_replace_value as u64, "CFDictionaryReplaceValue → replace if exists"),
-        ("_CFDictionaryRemoveValue", cf_core::shim_cf_dictionary_remove_value as u64, "CFDictionaryRemoveValue → removeObjectForKey:"),
-        ("_CFDictionaryRemoveAllValues", cf_core::shim_cf_dictionary_remove_all_values as u64, "CFDictionaryRemoveAllValues → removeAllObjects"),
+        ("_CFDictionaryCreateMutable", cf_core::shim_cf_dictionary_create_mutable as *const () as u64, "CFDictionaryCreateMutable → NSMutableDictionary"),
+        ("_CFDictionarySetValue", cf_core::shim_cf_dictionary_set_value as *const () as u64, "CFDictionarySetValue → setObject:forKey:"),
+        ("_CFDictionaryAddValue", cf_core::shim_cf_dictionary_add_value as *const () as u64, "CFDictionaryAddValue → setObject:forKey:"),
+        ("_CFDictionaryReplaceValue", cf_core::shim_cf_dictionary_replace_value as *const () as u64, "CFDictionaryReplaceValue → replace if exists"),
+        ("_CFDictionaryRemoveValue", cf_core::shim_cf_dictionary_remove_value as *const () as u64, "CFDictionaryRemoveValue → removeObjectForKey:"),
+        ("_CFDictionaryRemoveAllValues", cf_core::shim_cf_dictionary_remove_all_values as *const () as u64, "CFDictionaryRemoveAllValues → removeAllObjects"),
     );
 
     // CFSet / CFMutableSet C functions
     register_shims!(table,
-        ("_CFSetCreate", cf_core::shim_cf_set_create as u64, "CFSetCreate → NSSet"),
-        ("_CFSetGetTypeID", cf_core::shim_cf_set_get_type_id as u64, "CFSetGetTypeID"),
-        ("_CFSetGetCount", cf_core::shim_cf_set_get_count as u64, "CFSetGetCount → count"),
-        ("_CFSetContainsValue", cf_core::shim_cf_set_contains_value as u64, "CFSetContainsValue → containsObject:"),
-        ("_CFSetGetValues", cf_core::shim_cf_set_get_values as u64, "CFSetGetValues → copy pointers"),
-        ("_CFSetCreateMutable", cf_core::shim_cf_set_create_mutable as u64, "CFSetCreateMutable → NSMutableSet"),
-        ("_CFSetAddValue", cf_core::shim_cf_set_add_value as u64, "CFSetAddValue → addObject:"),
-        ("_CFSetRemoveValue", cf_core::shim_cf_set_remove_value as u64, "CFSetRemoveValue → removeObject:"),
-        ("_CFSetRemoveAllValues", cf_core::shim_cf_set_remove_all_values as u64, "CFSetRemoveAllValues → removeAllObjects"),
+        ("_CFSetCreate", cf_core::shim_cf_set_create as *const () as u64, "CFSetCreate → NSSet"),
+        ("_CFSetGetTypeID", cf_core::shim_cf_set_get_type_id as *const () as u64, "CFSetGetTypeID"),
+        ("_CFSetGetCount", cf_core::shim_cf_set_get_count as *const () as u64, "CFSetGetCount → count"),
+        ("_CFSetContainsValue", cf_core::shim_cf_set_contains_value as *const () as u64, "CFSetContainsValue → containsObject:"),
+        ("_CFSetGetValues", cf_core::shim_cf_set_get_values as *const () as u64, "CFSetGetValues → copy pointers"),
+        ("_CFSetCreateMutable", cf_core::shim_cf_set_create_mutable as *const () as u64, "CFSetCreateMutable → NSMutableSet"),
+        ("_CFSetAddValue", cf_core::shim_cf_set_add_value as *const () as u64, "CFSetAddValue → addObject:"),
+        ("_CFSetRemoveValue", cf_core::shim_cf_set_remove_value as *const () as u64, "CFSetRemoveValue → removeObject:"),
+        ("_CFSetRemoveAllValues", cf_core::shim_cf_set_remove_all_values as *const () as u64, "CFSetRemoveAllValues → removeAllObjects"),
     );
 
     // CFUUID C functions
     register_shims!(table,
-        ("_CFUUIDCreate", cf_core::shim_cf_uuid_create as u64, "CFUUIDCreate → new random UUID"),
-        ("_CFUUIDCreateString", cf_core::shim_cf_uuid_create_string as u64, "CFUUIDCreateString → UUID string"),
-        ("_CFUUIDCreateFromString", cf_core::shim_cf_uuid_create_from_string as u64, "CFUUIDCreateFromString → parse string"),
-        ("_CFUUIDGetUUIDBytes", cf_core::shim_cf_uuid_get_uuid_bytes as u64, "CFUUIDGetUUIDBytes → stub 0"),
-        ("_CFUUIDCreateFromUUIDBytes", cf_core::shim_cf_uuid_create_from_uuid_bytes as u64, "CFUUIDCreateFromUUIDBytes → new UUID"),
+        ("_CFUUIDCreate", cf_core::shim_cf_uuid_create as *const () as u64, "CFUUIDCreate → new random UUID"),
+        ("_CFUUIDCreateString", cf_core::shim_cf_uuid_create_string as *const () as u64, "CFUUIDCreateString → UUID string"),
+        ("_CFUUIDCreateFromString", cf_core::shim_cf_uuid_create_from_string as *const () as u64, "CFUUIDCreateFromString → parse string"),
+        ("_CFUUIDGetUUIDBytes", cf_core::shim_cf_uuid_get_uuid_bytes as *const () as u64, "CFUUIDGetUUIDBytes → stub 0"),
+        ("_CFUUIDCreateFromUUIDBytes", cf_core::shim_cf_uuid_create_from_uuid_bytes as *const () as u64, "CFUUIDCreateFromUUIDBytes → new UUID"),
     );
 
     // CFByteOrder C functions
     register_shims!(table,
-        ("_CFByteOrderGetCurrent", cf_core::shim_cf_byte_order_get_current as u64, "CFByteOrderGetCurrent → 1 (little-endian)"),
-        ("_CFSwapInt16BigToHost", cf_core::shim_cf_swap_int16_big_to_host as u64, "CFSwapInt16BigToHost"),
-        ("_CFSwapInt32BigToHost", cf_core::shim_cf_swap_int32_big_to_host as u64, "CFSwapInt32BigToHost"),
-        ("_CFSwapInt64BigToHost", cf_core::shim_cf_swap_int64_big_to_host as u64, "CFSwapInt64BigToHost"),
-        ("_CFSwapInt16HostToBig", cf_core::shim_cf_swap_int16_host_to_big as u64, "CFSwapInt16HostToBig"),
-        ("_CFSwapInt32HostToBig", cf_core::shim_cf_swap_int32_host_to_big as u64, "CFSwapInt32HostToBig"),
-        ("_CFSwapInt64HostToBig", cf_core::shim_cf_swap_int64_host_to_big as u64, "CFSwapInt64HostToBig"),
-        ("_CFSwapInt16LittleToHost", cf_core::shim_cf_swap_int16_little_to_host as u64, "CFSwapInt16LittleToHost"),
-        ("_CFSwapInt32LittleToHost", cf_core::shim_cf_swap_int32_little_to_host as u64, "CFSwapInt32LittleToHost"),
-        ("_CFSwapInt64LittleToHost", cf_core::shim_cf_swap_int64_little_to_host as u64, "CFSwapInt64LittleToHost"),
-        ("_CFSwapInt16HostToLittle", cf_core::shim_cf_swap_int16_host_to_little as u64, "CFSwapInt16HostToLittle"),
-        ("_CFSwapInt32HostToLittle", cf_core::shim_cf_swap_int32_host_to_little as u64, "CFSwapInt32HostToLittle"),
-        ("_CFSwapInt64HostToLittle", cf_core::shim_cf_swap_int64_host_to_little as u64, "CFSwapInt64HostToLittle"),
-        ("_CFConvertFloat64SwappedToHost", cf_core::shim_cf_convert_float64_swapped_to_host as u64, "CFConvertFloat64SwappedToHost"),
-        ("_CFConvertFloat32HostToSwapped", cf_core::shim_cf_convert_float32_host_to_swapped as u64, "CFConvertFloat32HostToSwapped"),
+        ("_CFByteOrderGetCurrent", cf_core::shim_cf_byte_order_get_current as *const () as u64, "CFByteOrderGetCurrent → 1 (little-endian)"),
+        ("_CFSwapInt16BigToHost", cf_core::shim_cf_swap_int16_big_to_host as *const () as u64, "CFSwapInt16BigToHost"),
+        ("_CFSwapInt32BigToHost", cf_core::shim_cf_swap_int32_big_to_host as *const () as u64, "CFSwapInt32BigToHost"),
+        ("_CFSwapInt64BigToHost", cf_core::shim_cf_swap_int64_big_to_host as *const () as u64, "CFSwapInt64BigToHost"),
+        ("_CFSwapInt16HostToBig", cf_core::shim_cf_swap_int16_host_to_big as *const () as u64, "CFSwapInt16HostToBig"),
+        ("_CFSwapInt32HostToBig", cf_core::shim_cf_swap_int32_host_to_big as *const () as u64, "CFSwapInt32HostToBig"),
+        ("_CFSwapInt64HostToBig", cf_core::shim_cf_swap_int64_host_to_big as *const () as u64, "CFSwapInt64HostToBig"),
+        ("_CFSwapInt16LittleToHost", cf_core::shim_cf_swap_int16_little_to_host as *const () as u64, "CFSwapInt16LittleToHost"),
+        ("_CFSwapInt32LittleToHost", cf_core::shim_cf_swap_int32_little_to_host as *const () as u64, "CFSwapInt32LittleToHost"),
+        ("_CFSwapInt64LittleToHost", cf_core::shim_cf_swap_int64_little_to_host as *const () as u64, "CFSwapInt64LittleToHost"),
+        ("_CFSwapInt16HostToLittle", cf_core::shim_cf_swap_int16_host_to_little as *const () as u64, "CFSwapInt16HostToLittle"),
+        ("_CFSwapInt32HostToLittle", cf_core::shim_cf_swap_int32_host_to_little as *const () as u64, "CFSwapInt32HostToLittle"),
+        ("_CFSwapInt64HostToLittle", cf_core::shim_cf_swap_int64_host_to_little as *const () as u64, "CFSwapInt64HostToLittle"),
+        ("_CFConvertFloat64SwappedToHost", cf_core::shim_cf_convert_float64_swapped_to_host as *const () as u64, "CFConvertFloat64SwappedToHost"),
+        ("_CFConvertFloat32HostToSwapped", cf_core::shim_cf_convert_float32_host_to_swapped as *const () as u64, "CFConvertFloat32HostToSwapped"),
     );
 
     // CFPropertyList C functions
     register_shims!(table,
-        ("_CFPropertyListCreateWithData", cf_core::shim_cf_property_list_create_with_data as u64, "CFPropertyListCreateWithData → parse plist"),
-        ("_CFPropertyListCreateData", cf_core::shim_cf_property_list_create_data as u64, "CFPropertyListCreateData → serialize plist"),
-        ("_CFPropertyListIsValid", cf_core::shim_cf_property_list_is_valid as u64, "CFPropertyListIsValid → validate"),
+        ("_CFPropertyListCreateWithData", cf_core::shim_cf_property_list_create_with_data as *const () as u64, "CFPropertyListCreateWithData → parse plist"),
+        ("_CFPropertyListCreateData", cf_core::shim_cf_property_list_create_data as *const () as u64, "CFPropertyListCreateData → serialize plist"),
+        ("_CFPropertyListIsValid", cf_core::shim_cf_property_list_is_valid as *const () as u64, "CFPropertyListIsValid → validate"),
     );
 
     // NSPasteboard C-level function stubs (for programs that call +[NSPasteboard generalPasteboard] directly)

@@ -219,7 +219,7 @@ mod tests {
         // invoke at offset 16 returns 1 for any input.
         extern "C" fn always_true(_blk: u64, _obj: u64, _bindings: u64) -> u8 { 1 }
         let mut block = [0u64; 5];
-        block[2] = always_true as u64; // offset 16 = invoke
+        block[2] = always_true as *const () as u64; // offset 16 = invoke
         let pred = shim_predicate_with_block(0, 0, block.as_ptr() as u64);
         assert_ne!(pred, 0);
         assert_eq!(shim_predicate_evaluate(pred, 0, 0), 1);
@@ -230,7 +230,7 @@ mod tests {
     fn predicate_with_block_always_false() {
         extern "C" fn always_false(_blk: u64, _obj: u64, _bindings: u64) -> u8 { 0 }
         let mut block = [0u64; 5];
-        block[2] = always_false as u64; // offset 16 = invoke
+        block[2] = always_false as *const () as u64; // offset 16 = invoke
         let pred = shim_predicate_with_block(0, 0, block.as_ptr() as u64);
         assert_ne!(pred, 0);
         assert_eq!(shim_predicate_evaluate(pred, 0, 0), 0);

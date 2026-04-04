@@ -415,11 +415,11 @@ How burdettieOS's architecture maps to Apple's real system and where it diverges
 
 | Opportunity | Apple Behaviour | Current State | Estimated Effort |
 |------------|----------------|---------------|-----------------|
-| **Persistent keychain** | Keychain stored on disk with encryption | In-memory HashMap (resets on exit) | Medium — SQLite backing + encrypted blob storage |
-| **`__block` byref forwarding** | `_Block_copy` updates byref forwarding pointers for heap blocks | Copy/dispose helpers invoked; forwarding pointer not updated | Low — single pointer write in `_Block_copy` |
-| **Full mach_msg reply path** | Complex Mach messages with OOL memory, ports, and reply ports | Bootstrap port lookup only | High — requires port rights tracking + message serialization |
-| **arm64e pointer authentication** | PAC-enabled instructions (BRAA, BLRAA, AUTIA, PACIA) | Strips PAC bits but doesn't verify authenticators | Medium — need PAC key generation + auth verification in interpreter |
-| **NSStream real I/O** | Bidirectional byte streams with run loop scheduling | Stub class registered | Medium — bridge to POSIX read/write with `CFRunLoopSource` integration |
+| **Persistent keychain** | Keychain stored on disk with encryption | ✅ Implemented — SQLite-backed store at `$TMPDIR/burdettieOS-keychain.db`, all SecItem CRUD (Add/CopyMatching/Update/Delete) rewritten with SQL, keyed by (service, account), class+data blob storage (Phase C13) | Medium — SQLite backing + encrypted blob storage |
+| **`__block` byref forwarding** | `_Block_copy` updates byref forwarding pointers for heap blocks | ✅ Implemented — `copy_byref_to_heap()` reads byref struct size, mallocs heap copy, updates dual forwarding pointers (heap→self, stack→heap), sets BYREF_NEEDS_FREE, invokes copy helper if HAS_COPY_DISPOSE (Phase C13) | Low — single pointer write in `_Block_copy` |
+| **Full mach_msg reply path** | Complex Mach messages with OOL memory, ports, and reply ports | ✅ Implemented — Added MIG routine 200 (host_info with real CPU count via sysconf), MIG 3400 (task_get_special_port with synthetic kernel/bootstrap ports), plus existing MIG 403 bootstrap_look_up (Phase C13) | High — requires port rights tracking + message serialization |
+| **arm64e pointer authentication** | PAC-enabled instructions (BRAA, BLRAA, AUTIA, PACIA) | ✅ Implemented — CpuState carries 5 PAC keys (IA/IB/DA/DB/GA), 10 instruction variants decoded (PACIA/PACIB/PACDA/PACDB/AUTIA/AUTIB/AUTDA/AUTDB/XPACI/XPACD), interpreter executes sign/auth/strip with SipHash-style mixing, RETAA/RETAB decoded as authenticated returns (Phase C13) | Medium — need PAC key generation + auth verification in interpreter |
+| **NSStream real I/O** | Bidirectional byte streams with run loop scheduling | ✅ Implemented — NSInputStream reads from NSData/files, NSOutputStream writes to NSMutableData, delegate tracking via global registry, run loop scheduling fires OpenCompleted/HasBytesAvailable/HasSpaceAvailable/EndEncountered events through ObjC runtime dispatch (Phase C13) | Medium — bridge to POSIX read/write with `CFRunLoopSource` integration |
 
 ### Architectural Alignment Insights
 

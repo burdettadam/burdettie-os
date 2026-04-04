@@ -1,6 +1,5 @@
 use ab_glyph::{Font as AbFont, ScaleFont};
 
-use crate::font_manager::FontFace;
 use crate::unicode::{is_combining_mark, is_zero_width};
 
 use super::types::LayoutGlyph;

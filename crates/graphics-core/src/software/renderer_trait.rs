@@ -1,6 +1,6 @@
 //! `impl Renderer for SoftwareRenderer` - all Renderer trait methods.
 
-use ab_glyph::{Font as AbFont, ScaleFont};
+use ab_glyph::Font as AbFont;
 
 use crate::color::Color;
 use crate::font::Font;
@@ -12,7 +12,6 @@ use crate::path::BezierPath;
 use crate::renderer::{LineCap, LineJoin, Renderer};
 use crate::shadow::Shadow;
 use crate::text_layout::AttributedLayout;
-use crate::unicode::{is_combining_mark, is_zero_width, normalize_nfc};
 
 use super::renderer::{GraphicsState, SoftwareRenderer};
 

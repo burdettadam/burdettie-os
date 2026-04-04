@@ -513,6 +513,7 @@ impl Interpreter {
 
 /// Apply a 64-bit LSE atomic operation.
 /// op: 0=LDADD, 1=LDCLR, 2=LDEOR, 3=LDSET, 4=LDSMAX, 5=LDSMIN, 6=LDUMAX, 7=LDUMIN
+#[allow(dead_code)]
 fn lse_op64(op: u8, orig: u64, src: u64) -> u64 {
     match op {
         0 => orig.wrapping_add(src),                                   // LDADD

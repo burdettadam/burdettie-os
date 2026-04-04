@@ -38,6 +38,7 @@ pub struct CodegenOptions {
     /// Whether to call `swift-demangle` for human-readable comments.
     pub demangle: bool,
     /// Emit stubs for re-exported symbols too (default: false).
+    #[allow(dead_code)]
     pub include_reexports: bool,
     /// Emit stubs for data symbols (type metadata, witness tables).
     pub include_data_stubs: bool,

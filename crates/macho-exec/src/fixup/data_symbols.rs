@@ -266,19 +266,19 @@ impl DataSymbolStore {
         // Non-NULL opaque addresses are sufficient for mode dispatch.
         static CFRL_DEFAULT:  u64 = 0x4346_4D01;
         static CFRL_COMMON:   u64 = 0x4346_4D02;
-        static NSDefaultMode: u64 = 0x4E53_4D01;
-        static NSCommonModes: u64 = 0x4E53_4D02;
-        static NSEventTrack:  u64 = 0x4E53_4D03;
-        static NSModalPanel:  u64 = 0x4E53_4D04;
-        static NSConnReply:   u64 = 0x4E53_4D05;
+        static NSDEFAULT_MODE: u64 = 0x4E53_4D01;
+        static NSCOMMON_MODES: u64 = 0x4E53_4D02;
+        static NSEVENT_TRACK:  u64 = 0x4E53_4D03;
+        static NSMODAL_PANEL:  u64 = 0x4E53_4D04;
+        static NSCONN_REPLY:   u64 = 0x4E53_4D05;
 
         self.symbols.insert("_kCFRunLoopDefaultMode",     &CFRL_DEFAULT  as *const u64 as u64);
         self.symbols.insert("_kCFRunLoopCommonModes",     &CFRL_COMMON   as *const u64 as u64);
-        self.symbols.insert("_NSDefaultRunLoopMode",      &NSDefaultMode as *const u64 as u64);
-        self.symbols.insert("_NSRunLoopCommonModes",      &NSCommonModes as *const u64 as u64);
-        self.symbols.insert("_NSEventTrackingRunLoopMode",&NSEventTrack  as *const u64 as u64);
-        self.symbols.insert("_NSModalPanelRunLoopMode",   &NSModalPanel  as *const u64 as u64);
-        self.symbols.insert("_NSConnectionReplyMode",     &NSConnReply   as *const u64 as u64);
+        self.symbols.insert("_NSDefaultRunLoopMode",      &NSDEFAULT_MODE as *const u64 as u64);
+        self.symbols.insert("_NSRunLoopCommonModes",      &NSCOMMON_MODES as *const u64 as u64);
+        self.symbols.insert("_NSEventTrackingRunLoopMode",&NSEVENT_TRACK  as *const u64 as u64);
+        self.symbols.insert("_NSModalPanelRunLoopMode",   &NSMODAL_PANEL  as *const u64 as u64);
+        self.symbols.insert("_NSConnectionReplyMode",     &NSCONN_REPLY   as *const u64 as u64);
     }
 
     // ── Blocks runtime globals ────────────────────────────────────
@@ -392,6 +392,7 @@ impl DataSymbolStore {
         static NS_DEBUGDESC:   u64 = 0x4E53_4509;
         // Notification names
         static NS_PROC_INFO:   u64 = 0x4E53_4510;
+        #[allow(dead_code)]
         static NS_LOW_DISK:    u64 = 0x4E53_4511;
         // NSBundle/NSApplication keys
         static NS_BUNDLE_DID_LOAD: u64 = 0x4E53_4512;

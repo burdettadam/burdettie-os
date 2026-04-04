@@ -70,13 +70,13 @@ impl DyldIntrospectionStubs {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
         register_shims!(table,
-            ("__dyld_image_count", shim_dyld_image_count as u64, "_dyld_image_count (registry)"),
-            ("__dyld_get_image_header", shim_dyld_get_image_header as u64, "_dyld_get_image_header (registry)"),
-            ("__dyld_get_image_name", shim_dyld_get_image_name as u64, "_dyld_get_image_name (registry)"),
-            ("__dyld_get_image_vmaddr_slide", shim_dyld_get_image_vmaddr_slide as u64, "_dyld_get_image_vmaddr_slide (registry)"),
-            ("__dyld_register_func_for_add_image", shim_dyld_register_func_for_add_image as u64, "_dyld_register_func_for_add_image"),
-            ("_dyld_image_path_containing_address", shim_dyld_image_path_containing_address as u64, "dyld_image_path_containing_address"),
-            ("__NSGetExecutablePath", shim_nsgetexecutablepath as u64, "_NSGetExecutablePath"),
+            ("__dyld_image_count", shim_dyld_image_count as *const () as u64, "_dyld_image_count (registry)"),
+            ("__dyld_get_image_header", shim_dyld_get_image_header as *const () as u64, "_dyld_get_image_header (registry)"),
+            ("__dyld_get_image_name", shim_dyld_get_image_name as *const () as u64, "_dyld_get_image_name (registry)"),
+            ("__dyld_get_image_vmaddr_slide", shim_dyld_get_image_vmaddr_slide as *const () as u64, "_dyld_get_image_vmaddr_slide (registry)"),
+            ("__dyld_register_func_for_add_image", shim_dyld_register_func_for_add_image as *const () as u64, "_dyld_register_func_for_add_image"),
+            ("_dyld_image_path_containing_address", shim_dyld_image_path_containing_address as *const () as u64, "dyld_image_path_containing_address"),
+            ("__NSGetExecutablePath", shim_nsgetexecutablepath as *const () as u64, "_NSGetExecutablePath"),
         );
         log::debug!("DyldIntrospectionStubs: registered 7 stubs");
     }

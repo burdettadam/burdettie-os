@@ -5,7 +5,6 @@
 //! The keychain stores generic password items keyed by (service, account).
 
 use crate::table::ShimTable;
-use std::collections::HashMap;
 use std::sync::Mutex;
 
 pub struct SecurityStubs;
@@ -34,81 +33,81 @@ impl SecurityStubs {
 
         // ── Keychain / SecItem ──────────────────────────────────
         register_shims!(table,
-            ("_SecItemAdd", shim_sec_item_add as u64, "SecItemAdd (stub → errSecUnimplemented)"),
-            ("_SecItemCopyMatching", shim_sec_item_copy_matching as u64, "SecItemCopyMatching (stub → errSecItemNotFound)"),
-            ("_SecItemUpdate", shim_sec_item_update as u64, "SecItemUpdate (stub → errSecUnimplemented)"),
-            ("_SecItemDelete", shim_sec_item_delete as u64, "SecItemDelete (stub → errSecUnimplemented)")
+            ("_SecItemAdd", shim_sec_item_add as *const () as u64, "SecItemAdd (stub → errSecUnimplemented)"),
+            ("_SecItemCopyMatching", shim_sec_item_copy_matching as *const () as u64, "SecItemCopyMatching (stub → errSecItemNotFound)"),
+            ("_SecItemUpdate", shim_sec_item_update as *const () as u64, "SecItemUpdate (stub → errSecUnimplemented)"),
+            ("_SecItemDelete", shim_sec_item_delete as *const () as u64, "SecItemDelete (stub → errSecUnimplemented)")
         );
 
         // ── SecCertificate ──────────────────────────────────────
         register_shims!(table,
-            ("_SecCertificateCreateWithData", shim_sec_cert_create as u64, "SecCertificateCreateWithData (stub → NULL)"),
-            ("_SecCertificateCopyData", shim_sec_return_null as u64, "SecCertificateCopyData (stub → NULL)"),
-            ("_SecCertificateCopySubjectSummary", shim_sec_return_null as u64, "SecCertificateCopySubjectSummary (stub → NULL)"),
-            ("_SecCertificateCopyCommonName", shim_sec_copy_common_name as u64, "SecCertificateCopyCommonName (stub → errSecUnimplemented)"),
-            ("_SecCertificateGetTypeID", shim_sec_get_type_id as u64, "SecCertificateGetTypeID (stub → 100)")
+            ("_SecCertificateCreateWithData", shim_sec_cert_create as *const () as u64, "SecCertificateCreateWithData (stub → NULL)"),
+            ("_SecCertificateCopyData", shim_sec_return_null as *const () as u64, "SecCertificateCopyData (stub → NULL)"),
+            ("_SecCertificateCopySubjectSummary", shim_sec_return_null as *const () as u64, "SecCertificateCopySubjectSummary (stub → NULL)"),
+            ("_SecCertificateCopyCommonName", shim_sec_copy_common_name as *const () as u64, "SecCertificateCopyCommonName (stub → errSecUnimplemented)"),
+            ("_SecCertificateGetTypeID", shim_sec_get_type_id as *const () as u64, "SecCertificateGetTypeID (stub → 100)")
         );
 
         // ── SecKey ──────────────────────────────────────────────
         register_shims!(table,
-            ("_SecKeyCreateRandomKey", shim_sec_key_create_random as u64, "SecKeyCreateRandomKey (stub → NULL)"),
-            ("_SecKeyCopyPublicKey", shim_sec_return_null as u64, "SecKeyCopyPublicKey (stub → NULL)"),
-            ("_SecKeyCopyExternalRepresentation", shim_sec_return_null as u64, "SecKeyCopyExternalRepresentation (stub → NULL)"),
-            ("_SecKeyCreateSignature", shim_sec_return_null as u64, "SecKeyCreateSignature (stub → NULL)"),
-            ("_SecKeyCreateEncryptedData", shim_sec_return_null as u64, "SecKeyCreateEncryptedData (stub → NULL)"),
-            ("_SecKeyCreateDecryptedData", shim_sec_return_null as u64, "SecKeyCreateDecryptedData (stub → NULL)"),
-            ("_SecKeyGetTypeID", shim_sec_get_type_id as u64, "SecKeyGetTypeID (stub → 100)"),
-            ("_SecKeyIsAlgorithmSupported", shim_sec_return_false as u64, "SecKeyIsAlgorithmSupported (stub → false)"),
-            ("_SecKeyGetBlockSize", shim_sec_return_zero as u64, "SecKeyGetBlockSize (stub → 0)")
+            ("_SecKeyCreateRandomKey", shim_sec_key_create_random as *const () as u64, "SecKeyCreateRandomKey (stub → NULL)"),
+            ("_SecKeyCopyPublicKey", shim_sec_return_null as *const () as u64, "SecKeyCopyPublicKey (stub → NULL)"),
+            ("_SecKeyCopyExternalRepresentation", shim_sec_return_null as *const () as u64, "SecKeyCopyExternalRepresentation (stub → NULL)"),
+            ("_SecKeyCreateSignature", shim_sec_return_null as *const () as u64, "SecKeyCreateSignature (stub → NULL)"),
+            ("_SecKeyCreateEncryptedData", shim_sec_return_null as *const () as u64, "SecKeyCreateEncryptedData (stub → NULL)"),
+            ("_SecKeyCreateDecryptedData", shim_sec_return_null as *const () as u64, "SecKeyCreateDecryptedData (stub → NULL)"),
+            ("_SecKeyGetTypeID", shim_sec_get_type_id as *const () as u64, "SecKeyGetTypeID (stub → 100)"),
+            ("_SecKeyIsAlgorithmSupported", shim_sec_return_false as *const () as u64, "SecKeyIsAlgorithmSupported (stub → false)"),
+            ("_SecKeyGetBlockSize", shim_sec_return_zero as *const () as u64, "SecKeyGetBlockSize (stub → 0)")
         );
 
         // ── SecTrust ────────────────────────────────────────────
         register_shims!(table,
-            ("_SecTrustCreateWithCertificates", shim_sec_trust_create as u64, "SecTrustCreateWithCertificates (stub → errSecUnimplemented)"),
-            ("_SecTrustEvaluateWithError", shim_sec_trust_evaluate_with_error as u64, "SecTrustEvaluateWithError (stub → false/fail)"),
-            ("_SecTrustEvaluateAsyncWithError", shim_sec_void3 as u64, "SecTrustEvaluateAsyncWithError (stub → void)"),
-            ("_SecTrustGetCertificateCount", shim_sec_return_zero as u64, "SecTrustGetCertificateCount (stub → 0)"),
-            ("_SecTrustCopyResult", shim_sec_return_null as u64, "SecTrustCopyResult (stub → NULL)"),
-            ("_SecTrustSetPolicies", shim_sec_return_unimplemented as u64, "SecTrustSetPolicies (stub → errSecUnimplemented)"),
-            ("_SecTrustSetAnchorCertificates", shim_sec_return_unimplemented as u64, "SecTrustSetAnchorCertificates (stub → errSecUnimplemented)"),
-            ("_SecTrustGetTypeID", shim_sec_get_type_id as u64, "SecTrustGetTypeID (stub → 100)")
+            ("_SecTrustCreateWithCertificates", shim_sec_trust_create as *const () as u64, "SecTrustCreateWithCertificates (stub → errSecUnimplemented)"),
+            ("_SecTrustEvaluateWithError", shim_sec_trust_evaluate_with_error as *const () as u64, "SecTrustEvaluateWithError (stub → false/fail)"),
+            ("_SecTrustEvaluateAsyncWithError", shim_sec_void3 as *const () as u64, "SecTrustEvaluateAsyncWithError (stub → void)"),
+            ("_SecTrustGetCertificateCount", shim_sec_return_zero as *const () as u64, "SecTrustGetCertificateCount (stub → 0)"),
+            ("_SecTrustCopyResult", shim_sec_return_null as *const () as u64, "SecTrustCopyResult (stub → NULL)"),
+            ("_SecTrustSetPolicies", shim_sec_return_unimplemented as *const () as u64, "SecTrustSetPolicies (stub → errSecUnimplemented)"),
+            ("_SecTrustSetAnchorCertificates", shim_sec_return_unimplemented as *const () as u64, "SecTrustSetAnchorCertificates (stub → errSecUnimplemented)"),
+            ("_SecTrustGetTypeID", shim_sec_get_type_id as *const () as u64, "SecTrustGetTypeID (stub → 100)")
         );
 
         // ── SecPolicy ───────────────────────────────────────────
         register_shims!(table,
-            ("_SecPolicyCreateSSL", shim_sec_policy_create as u64, "SecPolicyCreateSSL (stub → sentinel)"),
-            ("_SecPolicyCreateBasicX509", shim_sec_policy_create_no_args as u64, "SecPolicyCreateBasicX509 (stub → sentinel)"),
-            ("_SecPolicyGetTypeID", shim_sec_get_type_id as u64, "SecPolicyGetTypeID (stub → 100)")
+            ("_SecPolicyCreateSSL", shim_sec_policy_create as *const () as u64, "SecPolicyCreateSSL (stub → sentinel)"),
+            ("_SecPolicyCreateBasicX509", shim_sec_policy_create_no_args as *const () as u64, "SecPolicyCreateBasicX509 (stub → sentinel)"),
+            ("_SecPolicyGetTypeID", shim_sec_get_type_id as *const () as u64, "SecPolicyGetTypeID (stub → 100)")
         );
 
         // ── SecIdentity ─────────────────────────────────────────
         register_shims!(table,
-            ("_SecIdentityGetTypeID", shim_sec_get_type_id as u64, "SecIdentityGetTypeID (stub → 100)"),
-            ("_SecIdentityCopyCertificate", shim_sec_identity_copy_cert as u64, "SecIdentityCopyCertificate (stub → errSecUnimplemented)"),
-            ("_SecIdentityCopyPrivateKey", shim_sec_identity_copy_key as u64, "SecIdentityCopyPrivateKey (stub → errSecUnimplemented)")
+            ("_SecIdentityGetTypeID", shim_sec_get_type_id as *const () as u64, "SecIdentityGetTypeID (stub → 100)"),
+            ("_SecIdentityCopyCertificate", shim_sec_identity_copy_cert as *const () as u64, "SecIdentityCopyCertificate (stub → errSecUnimplemented)"),
+            ("_SecIdentityCopyPrivateKey", shim_sec_identity_copy_key as *const () as u64, "SecIdentityCopyPrivateKey (stub → errSecUnimplemented)")
         );
 
         // ── SecAccessControl ────────────────────────────────────
         register_shims!(table,
-            ("_SecAccessControlCreateWithFlags", shim_sec_return_null3 as u64, "SecAccessControlCreateWithFlags (stub → NULL)")
+            ("_SecAccessControlCreateWithFlags", shim_sec_return_null3 as *const () as u64, "SecAccessControlCreateWithFlags (stub → NULL)")
         );
 
         // ── Randomness ──────────────────────────────────────────
         register_shims!(table,
-            ("_SecRandomCopyBytes", shim_sec_random_copy_bytes as u64, "SecRandomCopyBytes (stub → fills with random)")
+            ("_SecRandomCopyBytes", shim_sec_random_copy_bytes as *const () as u64, "SecRandomCopyBytes (stub → fills with random)")
         );
 
         // ── PKCS12 / import-export ──────────────────────────────
         register_shims!(table,
-            ("_SecPKCS12Import", shim_sec_return_unimplemented as u64, "SecPKCS12Import (stub → errSecUnimplemented)")
+            ("_SecPKCS12Import", shim_sec_return_unimplemented as *const () as u64, "SecPKCS12Import (stub → errSecUnimplemented)")
         );
 
         // ── Keychain refs (legacy) ──────────────────────────────
         register_shims!(table,
-            ("_SecKeychainItemCopyContent", shim_sec_return_unimplemented as u64, "SecKeychainItemCopyContent (stub → errSecUnimplemented)"),
-            ("_SecKeychainFindGenericPassword", shim_sec_return_item_not_found as u64, "SecKeychainFindGenericPassword (stub → errSecItemNotFound)"),
-            ("_SecKeychainFindInternetPassword", shim_sec_return_item_not_found as u64, "SecKeychainFindInternetPassword (stub → errSecItemNotFound)"),
-            ("_SecKeychainAddGenericPassword", shim_sec_return_unimplemented as u64, "SecKeychainAddGenericPassword (stub → errSecUnimplemented)")
+            ("_SecKeychainItemCopyContent", shim_sec_return_unimplemented as *const () as u64, "SecKeychainItemCopyContent (stub → errSecUnimplemented)"),
+            ("_SecKeychainFindGenericPassword", shim_sec_return_item_not_found as *const () as u64, "SecKeychainFindGenericPassword (stub → errSecItemNotFound)"),
+            ("_SecKeychainFindInternetPassword", shim_sec_return_item_not_found as *const () as u64, "SecKeychainFindInternetPassword (stub → errSecItemNotFound)"),
+            ("_SecKeychainAddGenericPassword", shim_sec_return_unimplemented as *const () as u64, "SecKeychainAddGenericPassword (stub → errSecUnimplemented)")
         );
 
         // ── kSec* string constant data symbols ──────────────────
@@ -131,75 +130,75 @@ impl SecurityStubs {
         // errAuthorizationDenied (-60005) is the safe default: the guest
         // binary cannot perform privileged operations inside our interpreter.
         register_shims!(table,
-            ("_AuthorizationCreate",                   shim_auth_denied as u64,        "AuthorizationCreate (stub → errAuthorizationDenied)"),
-            ("_AuthorizationFree",                     shim_auth_free as u64,           "AuthorizationFree (stub → void)"),
-            ("_AuthorizationCopyRights",               shim_auth_denied as u64,        "AuthorizationCopyRights (stub → errAuthorizationDenied)"),
-            ("_AuthorizationCopyRightsAsync",          shim_auth_copy_rights_async as u64, "AuthorizationCopyRightsAsync (stub → void/denied)"),
-            ("_AuthorizationMakeExternalForm",         shim_auth_denied as u64,        "AuthorizationMakeExternalForm (stub → errAuthorizationDenied)"),
-            ("_AuthorizationCreateFromExternalForm",   shim_auth_denied as u64,        "AuthorizationCreateFromExternalForm (stub → errAuthorizationDenied)"),
-            ("_AuthorizationCopyInfo",                 shim_auth_denied as u64,        "AuthorizationCopyInfo (stub → errAuthorizationDenied)"),
-            ("_AuthorizationExecuteWithPrivileges",    shim_auth_denied as u64,        "AuthorizationExecuteWithPrivileges (stub → errAuthorizationDenied)"),
-            ("_AuthorizationCancelRight",              shim_auth_cancelled as u64,     "AuthorizationCancelRight (stub → errAuthorizationCanceled)"),
-            ("_AuthorizationFreeItemSet",              shim_auth_free_item_set as u64, "AuthorizationFreeItemSet (stub → void)"),
-            ("_AuthorizationRightSet",                 shim_auth_denied as u64,        "AuthorizationRightSet (stub → errAuthorizationDenied)"),
-            ("_AuthorizationRightGet",                 shim_auth_denied as u64,        "AuthorizationRightGet (stub → errAuthorizationDenied)"),
-            ("_AuthorizationRightRemove",              shim_auth_denied as u64,        "AuthorizationRightRemove (stub → errAuthorizationDenied)"),
-            ("_AuthorizationPluginCreate",             shim_auth_denied as u64,        "AuthorizationPluginCreate (stub → errAuthorizationDenied)"),
+            ("_AuthorizationCreate",                   shim_auth_denied as *const () as u64,        "AuthorizationCreate (stub → errAuthorizationDenied)"),
+            ("_AuthorizationFree",                     shim_auth_free as *const () as u64,           "AuthorizationFree (stub → void)"),
+            ("_AuthorizationCopyRights",               shim_auth_denied as *const () as u64,        "AuthorizationCopyRights (stub → errAuthorizationDenied)"),
+            ("_AuthorizationCopyRightsAsync",          shim_auth_copy_rights_async as *const () as u64, "AuthorizationCopyRightsAsync (stub → void/denied)"),
+            ("_AuthorizationMakeExternalForm",         shim_auth_denied as *const () as u64,        "AuthorizationMakeExternalForm (stub → errAuthorizationDenied)"),
+            ("_AuthorizationCreateFromExternalForm",   shim_auth_denied as *const () as u64,        "AuthorizationCreateFromExternalForm (stub → errAuthorizationDenied)"),
+            ("_AuthorizationCopyInfo",                 shim_auth_denied as *const () as u64,        "AuthorizationCopyInfo (stub → errAuthorizationDenied)"),
+            ("_AuthorizationExecuteWithPrivileges",    shim_auth_denied as *const () as u64,        "AuthorizationExecuteWithPrivileges (stub → errAuthorizationDenied)"),
+            ("_AuthorizationCancelRight",              shim_auth_cancelled as *const () as u64,     "AuthorizationCancelRight (stub → errAuthorizationCanceled)"),
+            ("_AuthorizationFreeItemSet",              shim_auth_free_item_set as *const () as u64, "AuthorizationFreeItemSet (stub → void)"),
+            ("_AuthorizationRightSet",                 shim_auth_denied as *const () as u64,        "AuthorizationRightSet (stub → errAuthorizationDenied)"),
+            ("_AuthorizationRightGet",                 shim_auth_denied as *const () as u64,        "AuthorizationRightGet (stub → errAuthorizationDenied)"),
+            ("_AuthorizationRightRemove",              shim_auth_denied as *const () as u64,        "AuthorizationRightRemove (stub → errAuthorizationDenied)"),
+            ("_AuthorizationPluginCreate",             shim_auth_denied as *const () as u64,        "AuthorizationPluginCreate (stub → errAuthorizationDenied)"),
             // Private Authorization SPI used by /usr/bin/security
-            ("_AuthorizationCopyPreloginUserDatabase", shim_auth_denied as u64,        "AuthorizationCopyPreloginUserDatabase (stub → errAuthorizationDenied)"),
-            ("_AuthorizationHandlePreloginOverride",   shim_auth_denied as u64,        "AuthorizationHandlePreloginOverride (stub → errAuthorizationDenied)"),
+            ("_AuthorizationCopyPreloginUserDatabase", shim_auth_denied as *const () as u64,        "AuthorizationCopyPreloginUserDatabase (stub → errAuthorizationDenied)"),
+            ("_AuthorizationHandlePreloginOverride",   shim_auth_denied as *const () as u64,        "AuthorizationHandlePreloginOverride (stub → errAuthorizationDenied)"),
         );
 
         // ── Network.framework (nw_* symbols) ───────────────────
         // Network.framework is not available in our stub environment.
         // Return NULL / no-op for all nw_* calls.
         register_shims!(table,
-            ("_nw_connection_create",              shim_sec_return_null as u64, "nw_connection_create (stub → NULL)"),
-            ("_nw_connection_start",               shim_void1_stub as u64,      "nw_connection_start (stub → void)"),
-            ("_nw_connection_send",                shim_void4_stub as u64,      "nw_connection_send (stub → void)"),
-            ("_nw_connection_receive",             shim_void4_stub as u64,      "nw_connection_receive (stub → void)"),
-            ("_nw_connection_cancel",              shim_void1_stub as u64,      "nw_connection_cancel (stub → void)"),
-            ("_nw_connection_set_state_changed_handler", shim_void2_stub as u64, "nw_connection_set_state_changed_handler (stub → void)"),
-            ("_nw_connection_set_queue",           shim_void2_stub as u64,      "nw_connection_set_queue (stub → void)"),
-            ("_nw_endpoint_create_host",           shim_sec_return_null as u64, "nw_endpoint_create_host (stub → NULL)"),
-            ("_nw_parameters_create_secure_tcp",   shim_sec_return_null as u64, "nw_parameters_create_secure_tcp (stub → NULL)"),
-            ("_nw_parameters_create_secure_udp",   shim_sec_return_null as u64, "nw_parameters_create_secure_udp (stub → NULL)"),
-            ("_nw_parameters_create",              shim_sec_return_null as u64, "nw_parameters_create (stub → NULL)"),
-            ("_nw_listener_create",                shim_sec_return_null as u64, "nw_listener_create (stub → NULL)"),
-            ("_nw_listener_start",                 shim_void1_stub as u64,      "nw_listener_start (stub → void)"),
-            ("_nw_listener_cancel",                shim_void1_stub as u64,      "nw_listener_cancel (stub → void)"),
-            ("_nw_listener_set_state_changed_handler", shim_void2_stub as u64, "nw_listener_set_state_changed_handler (stub → void)"),
-            ("_nw_listener_set_new_connection_handler", shim_void2_stub as u64, "nw_listener_set_new_connection_handler (stub → void)"),
-            ("_nw_listener_set_queue",             shim_void2_stub as u64,      "nw_listener_set_queue (stub → void)"),
-            ("_nw_path_monitor_create",            shim_sec_return_null as u64, "nw_path_monitor_create (stub → NULL)"),
-            ("_nw_path_monitor_start",             shim_void1_stub as u64,      "nw_path_monitor_start (stub → void)"),
-            ("_nw_path_monitor_set_queue",         shim_void2_stub as u64,      "nw_path_monitor_set_queue (stub → void)"),
-            ("_nw_path_monitor_set_update_handler",shim_void2_stub as u64,      "nw_path_monitor_set_update_handler (stub → void)"),
-            ("_nw_path_monitor_cancel",            shim_void1_stub as u64,      "nw_path_monitor_cancel (stub → void)"),
+            ("_nw_connection_create",              shim_sec_return_null as *const () as u64, "nw_connection_create (stub → NULL)"),
+            ("_nw_connection_start",               shim_void1_stub as *const () as u64,      "nw_connection_start (stub → void)"),
+            ("_nw_connection_send",                shim_void4_stub as *const () as u64,      "nw_connection_send (stub → void)"),
+            ("_nw_connection_receive",             shim_void4_stub as *const () as u64,      "nw_connection_receive (stub → void)"),
+            ("_nw_connection_cancel",              shim_void1_stub as *const () as u64,      "nw_connection_cancel (stub → void)"),
+            ("_nw_connection_set_state_changed_handler", shim_void2_stub as *const () as u64, "nw_connection_set_state_changed_handler (stub → void)"),
+            ("_nw_connection_set_queue",           shim_void2_stub as *const () as u64,      "nw_connection_set_queue (stub → void)"),
+            ("_nw_endpoint_create_host",           shim_sec_return_null as *const () as u64, "nw_endpoint_create_host (stub → NULL)"),
+            ("_nw_parameters_create_secure_tcp",   shim_sec_return_null as *const () as u64, "nw_parameters_create_secure_tcp (stub → NULL)"),
+            ("_nw_parameters_create_secure_udp",   shim_sec_return_null as *const () as u64, "nw_parameters_create_secure_udp (stub → NULL)"),
+            ("_nw_parameters_create",              shim_sec_return_null as *const () as u64, "nw_parameters_create (stub → NULL)"),
+            ("_nw_listener_create",                shim_sec_return_null as *const () as u64, "nw_listener_create (stub → NULL)"),
+            ("_nw_listener_start",                 shim_void1_stub as *const () as u64,      "nw_listener_start (stub → void)"),
+            ("_nw_listener_cancel",                shim_void1_stub as *const () as u64,      "nw_listener_cancel (stub → void)"),
+            ("_nw_listener_set_state_changed_handler", shim_void2_stub as *const () as u64, "nw_listener_set_state_changed_handler (stub → void)"),
+            ("_nw_listener_set_new_connection_handler", shim_void2_stub as *const () as u64, "nw_listener_set_new_connection_handler (stub → void)"),
+            ("_nw_listener_set_queue",             shim_void2_stub as *const () as u64,      "nw_listener_set_queue (stub → void)"),
+            ("_nw_path_monitor_create",            shim_sec_return_null as *const () as u64, "nw_path_monitor_create (stub → NULL)"),
+            ("_nw_path_monitor_start",             shim_void1_stub as *const () as u64,      "nw_path_monitor_start (stub → void)"),
+            ("_nw_path_monitor_set_queue",         shim_void2_stub as *const () as u64,      "nw_path_monitor_set_queue (stub → void)"),
+            ("_nw_path_monitor_set_update_handler",shim_void2_stub as *const () as u64,      "nw_path_monitor_set_update_handler (stub → void)"),
+            ("_nw_path_monitor_cancel",            shim_void1_stub as *const () as u64,      "nw_path_monitor_cancel (stub → void)"),
             // Additional nw_* symbols imported by /usr/bin/security
-            ("__nw_parameters_configure_protocol_default_configuration", shim_void1_stub as u64, "nw_parameters_configure_protocol_default_configuration (stub → void)"),
-            ("_nw_connection_copy_endpoint",       shim_sec_return_null as u64, "nw_connection_copy_endpoint (stub → NULL)"),
-            ("_nw_endpoint_get_hostname",          shim_sec_return_null as u64, "nw_endpoint_get_hostname (stub → NULL)"),
-            ("_nw_endpoint_get_port",              shim_sec_return_null as u64, "nw_endpoint_get_port (stub → NULL)"),
-            ("_nw_error_get_error_code",           shim_sec_return_null as u64, "nw_error_get_error_code (stub → 0)"),
-            ("_nw_parameters_set_indefinite",      shim_void2_stub as u64,      "nw_parameters_set_indefinite (stub → void)"),
-            ("_nw_tls_copy_sec_protocol_options",  shim_sec_return_null as u64, "nw_tls_copy_sec_protocol_options (stub → NULL)"),
+            ("__nw_parameters_configure_protocol_default_configuration", shim_void1_stub as *const () as u64, "nw_parameters_configure_protocol_default_configuration (stub → void)"),
+            ("_nw_connection_copy_endpoint",       shim_sec_return_null as *const () as u64, "nw_connection_copy_endpoint (stub → NULL)"),
+            ("_nw_endpoint_get_hostname",          shim_sec_return_null as *const () as u64, "nw_endpoint_get_hostname (stub → NULL)"),
+            ("_nw_endpoint_get_port",              shim_sec_return_null as *const () as u64, "nw_endpoint_get_port (stub → NULL)"),
+            ("_nw_error_get_error_code",           shim_sec_return_null as *const () as u64, "nw_error_get_error_code (stub → 0)"),
+            ("_nw_parameters_set_indefinite",      shim_void2_stub as *const () as u64,      "nw_parameters_set_indefinite (stub → void)"),
+            ("_nw_tls_copy_sec_protocol_options",  shim_sec_return_null as *const () as u64, "nw_tls_copy_sec_protocol_options (stub → NULL)"),
         );
 
         // ── CSSM (deprecated, legacy CDSA crypto) ───────────────
         register_shims!(table,
-            ("_CSSM_Init",        shim_auth_denied as u64, "CSSM_Init (stub → error)"),
-            ("_CSSM_ModuleLoad",  shim_auth_denied as u64, "CSSM_ModuleLoad (stub → error)"),
-            ("_CSSM_ModuleUnload",shim_auth_denied as u64, "CSSM_ModuleUnload (stub → error)"),
-            ("_CSSM_Terminate",   shim_auth_denied as u64, "CSSM_Terminate (stub → error)"),
+            ("_CSSM_Init",        shim_auth_denied as *const () as u64, "CSSM_Init (stub → error)"),
+            ("_CSSM_ModuleLoad",  shim_auth_denied as *const () as u64, "CSSM_ModuleLoad (stub → error)"),
+            ("_CSSM_ModuleUnload",shim_auth_denied as *const () as u64, "CSSM_ModuleUnload (stub → error)"),
+            ("_CSSM_Terminate",   shim_auth_denied as *const () as u64, "CSSM_Terminate (stub → error)"),
             // CSSM string helpers (lowercase prefix, need explicit stubs)
-            ("_cssmErrorString",   shim_sec_return_null as u64, "cssmErrorString (stub → NULL)"),
-            ("_cssmPerror",        shim_void1_stub as u64,      "cssmPerror (stub → void)"),
+            ("_cssmErrorString",   shim_sec_return_null as *const () as u64, "cssmErrorString (stub → NULL)"),
+            ("_cssmPerror",        shim_void1_stub as *const () as u64,      "cssmPerror (stub → void)"),
         );
 
         // ── SecLogObj / diagnostics ──────────────────────────────
         register_shims!(table,
-            ("_secLogObjForScope", shim_sec_return_null as u64, "secLogObjForScope (stub → NULL)"),
+            ("_secLogObjForScope", shim_sec_return_null as *const () as u64, "secLogObjForScope (stub → NULL)"),
         );
 
         log::debug!("SecurityStubs: registered Security.framework stubs");
@@ -219,25 +218,42 @@ static KSEC_CLASS_CERT: u64 = 0x4B53_4543_0012;
 static KSEC_CLASS_KEY: u64 = 0x4B53_4543_0013;
 static KSEC_CLASS_IDENTITY: u64 = 0x4B53_4543_0014;
 
-// ── In-memory keychain store ────────────────────────────────────
+// ── SQLite-backed persistent keychain store ─────────────────────
 
-/// A keychain item stored in memory.
-#[derive(Clone)]
-struct KeychainItem {
-    class: u64,      // sentinel value (KSEC_CLASS_GENERIC_PW etc.)
-    service: String,  // kSecAttrService value (extracted string)
-    account: String,  // kSecAttrAccount value (extracted string)
-    data: Vec<u8>,    // kSecValueData payload
+/// The keychain is backed by a SQLite database at `$TMPDIR/burdettieOS-keychain.db`.
+/// If the file cannot be created, falls back to an in-memory database.
+/// Items are stored as (service TEXT, account TEXT, class INTEGER, data BLOB).
+
+static KEYCHAIN_DB: Mutex<Option<rusqlite::Connection>> = Mutex::new(None);
+
+fn keychain_db() -> std::sync::MutexGuard<'static, Option<rusqlite::Connection>> {
+    KEYCHAIN_DB.lock().unwrap_or_else(|e| e.into_inner())
 }
 
-static KEYCHAIN: Mutex<Option<HashMap<(String, String), KeychainItem>>> = Mutex::new(None);
-
-fn keychain_store() -> std::sync::MutexGuard<'static, Option<HashMap<(String, String), KeychainItem>>> {
-    KEYCHAIN.lock().unwrap_or_else(|e| e.into_inner())
-}
-
-fn ensure_store(guard: &mut Option<HashMap<(String, String), KeychainItem>>) -> &mut HashMap<(String, String), KeychainItem> {
-    guard.get_or_insert_with(HashMap::new)
+fn ensure_keychain(guard: &mut Option<rusqlite::Connection>) -> &mut rusqlite::Connection {
+    guard.get_or_insert_with(|| {
+        let path = std::env::var("TMPDIR")
+            .unwrap_or_else(|_| "/tmp".to_string());
+        let db_path = format!("{}/burdettieOS-keychain.db", path.trim_end_matches('/'));
+        let conn = rusqlite::Connection::open(&db_path)
+            .unwrap_or_else(|_| {
+                log::debug!("keychain: file-backed DB failed, using in-memory");
+                rusqlite::Connection::open_in_memory()
+                    .expect("keychain: in-memory DB failed")
+            });
+        let _ = conn.execute(
+            "CREATE TABLE IF NOT EXISTS keychain (
+                service TEXT NOT NULL,
+                account TEXT NOT NULL,
+                class   INTEGER NOT NULL DEFAULT 0,
+                data    BLOB NOT NULL DEFAULT x'',
+                PRIMARY KEY (service, account)
+            )",
+            [],
+        );
+        log::debug!("keychain: opened SQLite store at {}", db_path);
+        conn
+    })
 }
 
 /// Read a u64 from `obj + offset`, returning 0 if obj is null.
@@ -306,21 +322,27 @@ pub extern "C" fn shim_sec_item_add(attrs: u64, result: *mut u64) -> i32 {
     if class == 0 {
         return ERR_SEC_UNIMPLEMENTED;
     }
-    let item = KeychainItem {
-        class,
-        service: service.clone(),
-        account: account.clone(),
-        data: data.unwrap_or_default(),
-    };
-    let key = (service, account);
-    let mut guard = keychain_store();
-    let store = ensure_store(&mut guard);
-    if store.contains_key(&key) {
+    let data_bytes = data.unwrap_or_default();
+    let mut guard = keychain_db();
+    let conn = ensure_keychain(&mut guard);
+    // Check for duplicate
+    let exists: bool = conn.query_row(
+        "SELECT COUNT(*) FROM keychain WHERE service = ?1 AND account = ?2",
+        rusqlite::params![&service, &account],
+        |row| row.get::<_, i64>(0),
+    ).unwrap_or(0) > 0;
+    if exists {
         return ERR_SEC_DUPLICATE_ITEM;
     }
-    store.insert(key, item);
+    let rc = conn.execute(
+        "INSERT INTO keychain (service, account, class, data) VALUES (?1, ?2, ?3, ?4)",
+        rusqlite::params![&service, &account, class as i64, &data_bytes],
+    );
+    if rc.is_err() {
+        return ERR_SEC_UNIMPLEMENTED;
+    }
     if !result.is_null() {
-        unsafe { *result = 0; } // no result object returned on add
+        unsafe { *result = 0; }
     }
     ERR_SEC_SUCCESS
 }
@@ -328,22 +350,25 @@ pub extern "C" fn shim_sec_item_add(attrs: u64, result: *mut u64) -> i32 {
 /// SecItemCopyMatching(query, result) → OSStatus
 pub extern "C" fn shim_sec_item_copy_matching(query: u64, result: *mut u64) -> i32 {
     let (_class, service, account, _data) = parse_query(query);
-    let key = (service, account);
-    let guard = keychain_store();
-    if let Some(store) = guard.as_ref() {
-        if let Some(item) = store.get(&key) {
+    let mut guard = keychain_db();
+    let conn = ensure_keychain(&mut guard);
+    let row_data: Result<Vec<u8>, _> = conn.query_row(
+        "SELECT data FROM keychain WHERE service = ?1 AND account = ?2",
+        rusqlite::params![&service, &account],
+        |row| row.get(0),
+    );
+    match row_data {
+        Ok(data) => {
             let return_data = dict_value_for_sentinel(query, KSEC_RETURN_DATA);
             if return_data != 0 && !result.is_null() {
-                // Return an NSData object containing the stored data.
-                // We allocate a minimal NSData-like object: [isa:8][bytes_ptr:8][length:8]
                 let data_obj = unsafe { libc::calloc(1, 24) as u64 };
-                if data_obj != 0 && !item.data.is_empty() {
-                    let buf = unsafe { libc::malloc(item.data.len()) as *mut u8 };
+                if data_obj != 0 && !data.is_empty() {
+                    let buf = unsafe { libc::malloc(data.len()) as *mut u8 };
                     if !buf.is_null() {
                         unsafe {
-                            std::ptr::copy_nonoverlapping(item.data.as_ptr(), buf, item.data.len());
+                            std::ptr::copy_nonoverlapping(data.as_ptr(), buf, data.len());
                             *((data_obj as usize + 8) as *mut u64) = buf as u64;
-                            *((data_obj as usize + 16) as *mut u64) = item.data.len() as u64;
+                            *((data_obj as usize + 16) as *mut u64) = data.len() as u64;
                         }
                     }
                 }
@@ -353,27 +378,31 @@ pub extern "C" fn shim_sec_item_copy_matching(query: u64, result: *mut u64) -> i
             if !result.is_null() {
                 unsafe { *result = 0; }
             }
-            return ERR_SEC_SUCCESS;
+            ERR_SEC_SUCCESS
+        }
+        Err(_) => {
+            if !result.is_null() {
+                unsafe { *result = 0; }
+            }
+            ERR_SEC_ITEM_NOT_FOUND
         }
     }
-    if !result.is_null() {
-        unsafe { *result = 0; }
-    }
-    ERR_SEC_ITEM_NOT_FOUND
 }
 
 /// SecItemUpdate(query, attrs) → OSStatus
 pub extern "C" fn shim_sec_item_update(query: u64, attrs: u64) -> i32 {
     let (_class, service, account, _data) = parse_query(query);
-    let key = (service, account);
     let (_class2, _service2, _account2, new_data) = parse_query(attrs);
-    let mut guard = keychain_store();
-    let store = ensure_store(&mut guard);
-    if let Some(item) = store.get_mut(&key) {
-        if let Some(d) = new_data {
-            item.data = d;
+    let mut guard = keychain_db();
+    let conn = ensure_keychain(&mut guard);
+    if let Some(d) = new_data {
+        let rows = conn.execute(
+            "UPDATE keychain SET data = ?1 WHERE service = ?2 AND account = ?3",
+            rusqlite::params![&d, &service, &account],
+        ).unwrap_or(0);
+        if rows > 0 {
+            return ERR_SEC_SUCCESS;
         }
-        return ERR_SEC_SUCCESS;
     }
     ERR_SEC_ITEM_NOT_FOUND
 }
@@ -381,10 +410,13 @@ pub extern "C" fn shim_sec_item_update(query: u64, attrs: u64) -> i32 {
 /// SecItemDelete(query) → OSStatus
 pub extern "C" fn shim_sec_item_delete(query: u64) -> i32 {
     let (_class, service, account, _data) = parse_query(query);
-    let key = (service, account);
-    let mut guard = keychain_store();
-    let store = ensure_store(&mut guard);
-    if store.remove(&key).is_some() {
+    let mut guard = keychain_db();
+    let conn = ensure_keychain(&mut guard);
+    let rows = conn.execute(
+        "DELETE FROM keychain WHERE service = ?1 AND account = ?2",
+        rusqlite::params![&service, &account],
+    ).unwrap_or(0);
+    if rows > 0 {
         return ERR_SEC_SUCCESS;
     }
     ERR_SEC_ITEM_NOT_FOUND

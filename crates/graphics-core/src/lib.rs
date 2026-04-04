@@ -54,7 +54,7 @@ pub enum RendererBackend {
 pub fn create_renderer(backend: RendererBackend, width: u32, height: u32) -> Box<dyn Renderer> {
     match backend {
         RendererBackend::Software => {
-            let surface = Surface::new(width, height);
+            let _surface = Surface::new(width, height);
             // We need an owned renderer — wrap in a GpuStubRenderer-style
             // owned surface. For the Software path we reuse GpuStubRenderer
             // (which delegates to SoftwareRenderer) since SoftwareRenderer

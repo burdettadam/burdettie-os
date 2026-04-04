@@ -48,48 +48,48 @@ impl MachShims {
 
         table.register(
             "_mach_absolute_time",
-            shim_mach_absolute_time as u64,
+            shim_mach_absolute_time as *const () as u64,
             "mach_absolute_time (portable)",
         );
         table.register(
             "_mach_timebase_info",
-            shim_mach_timebase_info as u64,
+            shim_mach_timebase_info as *const () as u64,
             "mach_timebase_info (portable)",
         );
 
         table.register(
             "_clock",
-            shim_clock as u64,
+            shim_clock as *const () as u64,
             "clock (delegate to host)",
         );
         table.register(
             "_sys_icache_invalidate",
-            shim_sys_icache_invalidate as u64,
+            shim_sys_icache_invalidate as *const () as u64,
             "sys_icache_invalidate (no-op in lab)",
         );
         table.register(
             "__dyld_register_func_for_add_image",
-            shim_dyld_register_func_for_add_image as u64,
+            shim_dyld_register_func_for_add_image as *const () as u64,
             "_dyld_register_func_for_add_image (no-op, prevents host callback confusion)",
         );
         table.register(
             "__dyld_image_count",
-            shim_dyld_image_count as u64,
+            shim_dyld_image_count as *const () as u64,
             "_dyld_image_count (returns 0 for guest)",
         );
         table.register(
             "__dyld_get_image_header",
-            shim_dyld_get_image_header as u64,
+            shim_dyld_get_image_header as *const () as u64,
             "_dyld_get_image_header (returns null for guest)",
         );
         table.register(
             "__dyld_get_image_name",
-            shim_dyld_get_image_name as u64,
+            shim_dyld_get_image_name as *const () as u64,
             "_dyld_get_image_name (returns empty for guest)",
         );
         table.register(
             "__dyld_get_image_vmaddr_slide",
-            shim_dyld_get_image_vmaddr_slide as u64,
+            shim_dyld_get_image_vmaddr_slide as *const () as u64,
             "_dyld_get_image_vmaddr_slide (returns 0 for guest)",
         );
 

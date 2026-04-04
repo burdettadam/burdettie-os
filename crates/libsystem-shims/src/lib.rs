@@ -5,6 +5,7 @@
 //! resolver chain. Shims fall into three strategies:
 // Function pointers are cast to u64 addresses for the emulated Mach-O address space.
 #![allow(
+    dead_code,                      // FFI shims referenced by pointer, not by Rust call
     clippy::fn_to_numeric_cast,
     clippy::unwrap_used,
     clippy::expect_used,

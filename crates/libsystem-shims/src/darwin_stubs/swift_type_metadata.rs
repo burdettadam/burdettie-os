@@ -194,52 +194,52 @@ impl SwiftTypeMetadataStubs {
 
         table.register(
             "_swift_getTypeByMangledNameInContext",
-            shim_swift_get_type_by_mangled_name as u64,
+            shim_swift_get_type_by_mangled_name as *const () as u64,
             "swift-runtime: getTypeByMangledNameInContext → static struct metadata",
         );
         table.register(
             "_swift_getTypeByMangledNameInContext2",
-            shim_swift_get_type_by_mangled_name as u64,
+            shim_swift_get_type_by_mangled_name as *const () as u64,
             "swift-runtime: getTypeByMangledNameInContext2 → static struct metadata",
         );
         table.register(
             "_swift_getTypeByMangledNameInEnvironment",
-            shim_swift_get_type_by_mangled_name_env as u64,
+            shim_swift_get_type_by_mangled_name_env as *const () as u64,
             "swift-runtime: getTypeByMangledNameInEnvironment → static struct metadata",
         );
         table.register(
             "_swift_conformsToProtocol",
-            shim_swift_conforms_to_protocol as u64,
+            shim_swift_conforms_to_protocol as *const () as u64,
             "swift-runtime: conformsToProtocol → NULL (no conformance)",
         );
         table.register(
             "_swift_conformsToProtocolCommon",
-            shim_swift_conforms_to_protocol as u64,
+            shim_swift_conforms_to_protocol as *const () as u64,
             "swift-runtime: conformsToProtocolCommon → NULL (no conformance)",
         );
         table.register(
             "_swift_getExistentialTypeMetadata",
-            shim_swift_get_existential_type_metadata as u64,
+            shim_swift_get_existential_type_metadata as *const () as u64,
             "swift-runtime: getExistentialTypeMetadata → static metadata",
         );
         table.register(
             "_swift_getTupleTypeMetadata",
-            shim_swift_get_tuple_type_metadata as u64,
+            shim_swift_get_tuple_type_metadata as *const () as u64,
             "swift-runtime: getTupleTypeMetadata → static metadata",
         );
         table.register(
             "_swift_getOpaqueTypeMetadata",
-            shim_swift_get_opaque_type_metadata as u64,
+            shim_swift_get_opaque_type_metadata as *const () as u64,
             "swift-runtime: getOpaqueTypeMetadata → static metadata",
         );
         table.register(
             "_swift_checkMetadataState",
-            shim_swift_check_metadata_state as u64,
+            shim_swift_check_metadata_state as *const () as u64,
             "swift-runtime: checkMetadataState → complete",
         );
         table.register(
             "_swift_getTypeContextDescriptor",
-            shim_swift_get_type_context_descriptor as u64,
+            shim_swift_get_type_context_descriptor as *const () as u64,
             "swift-runtime: getTypeContextDescriptor → dummy descriptor",
         );
     }

@@ -235,21 +235,21 @@ impl FoundationShims {
             rt,
             "DVTSystemPrerequisitesPaths",
             "licenseHostAppInfoPlistPath",
-            shim_dvt_system_prerequisites_paths_license_host_app_info_plist_path as u64,
+            shim_dvt_system_prerequisites_paths_license_host_app_info_plist_path as *const () as u64,
             "@@:",
         );
         install_guest_class_method(
             rt,
             "DVTSystemPrerequisitesPaths",
             "hostAppVersionPlistPath",
-            shim_dvt_system_prerequisites_paths_host_app_version_plist_path as u64,
+            shim_dvt_system_prerequisites_paths_host_app_version_plist_path as *const () as u64,
             "@@:",
         );
         install_guest_class_method(
             rt,
             "DVTSystemPrerequisitesPaths",
             "hostAppProductBuildVersion",
-            shim_dvt_system_prerequisites_paths_host_app_product_build_version as u64,
+            shim_dvt_system_prerequisites_paths_host_app_product_build_version as *const () as u64,
             "@@:",
         );
     }
@@ -263,7 +263,7 @@ mod impl_appkit;
 mod tests {
     use super::*;
     use std::collections::HashMap;
-    use std::sync::Arc;
+    
 
     #[derive(Default)]
     struct TestSymbolResolver {

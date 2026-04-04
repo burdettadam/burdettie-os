@@ -10,58 +10,58 @@ pub fn install(table: &mut ShimTable) {
     use libsystem_shims::register_shims;
     register_shims!(table,
         // ── Context creation ────────────────────────────────────
-        ("_CGBitmapContextCreate", shim_cg_bitmap_context_create as u64, "CGBitmapContextCreate (bridge → Surface)"),
-        ("_CGBitmapContextCreateImage", shim_cg_bitmap_create_image as u64, "CGBitmapContextCreateImage (bridge → handle)"),
-        ("_CGBitmapContextGetData", shim_cg_bitmap_get_data as u64, "CGBitmapContextGetData (bridge → pixel ptr)"),
-        ("_CGBitmapContextGetWidth", shim_cg_bitmap_get_width as u64, "CGBitmapContextGetWidth (bridge → real)"),
-        ("_CGBitmapContextGetHeight", shim_cg_bitmap_get_height as u64, "CGBitmapContextGetHeight (bridge → real)"),
+        ("_CGBitmapContextCreate", shim_cg_bitmap_context_create as *const () as u64, "CGBitmapContextCreate (bridge → Surface)"),
+        ("_CGBitmapContextCreateImage", shim_cg_bitmap_create_image as *const () as u64, "CGBitmapContextCreateImage (bridge → handle)"),
+        ("_CGBitmapContextGetData", shim_cg_bitmap_get_data as *const () as u64, "CGBitmapContextGetData (bridge → pixel ptr)"),
+        ("_CGBitmapContextGetWidth", shim_cg_bitmap_get_width as *const () as u64, "CGBitmapContextGetWidth (bridge → real)"),
+        ("_CGBitmapContextGetHeight", shim_cg_bitmap_get_height as *const () as u64, "CGBitmapContextGetHeight (bridge → real)"),
 
         // ── State ───────────────────────────────────────────────
-        ("_CGContextSaveGState", shim_cg_save_gstate as u64, "CGContextSaveGState (bridge → real)"),
-        ("_CGContextRestoreGState", shim_cg_restore_gstate as u64, "CGContextRestoreGState (bridge → real)"),
+        ("_CGContextSaveGState", shim_cg_save_gstate as *const () as u64, "CGContextSaveGState (bridge → real)"),
+        ("_CGContextRestoreGState", shim_cg_restore_gstate as *const () as u64, "CGContextRestoreGState (bridge → real)"),
 
         // ── Transform ───────────────────────────────────────────
-        ("_CGContextTranslateCTM", shim_cg_void3 as u64, "CGContextTranslateCTM (stub → void)"),
-        ("_CGContextScaleCTM", shim_cg_void3 as u64, "CGContextScaleCTM (stub → void)"),
-        ("_CGContextRotateCTM", shim_cg_void2 as u64, "CGContextRotateCTM (stub → void)"),
-        ("_CGContextConcatCTM", shim_cg_void2 as u64, "CGContextConcatCTM (stub → void)"),
+        ("_CGContextTranslateCTM", shim_cg_void3 as *const () as u64, "CGContextTranslateCTM (stub → void)"),
+        ("_CGContextScaleCTM", shim_cg_void3 as *const () as u64, "CGContextScaleCTM (stub → void)"),
+        ("_CGContextRotateCTM", shim_cg_void2 as *const () as u64, "CGContextRotateCTM (stub → void)"),
+        ("_CGContextConcatCTM", shim_cg_void2 as *const () as u64, "CGContextConcatCTM (stub → void)"),
 
         // ── Color ───────────────────────────────────────────────
-        ("_CGContextSetFillColorWithColor", shim_cg_set_fill_color as u64, "CGContextSetFillColorWithColor (bridge → real)"),
-        ("_CGContextSetStrokeColorWithColor", shim_cg_set_stroke_color as u64, "CGContextSetStrokeColorWithColor (bridge → real)"),
-        ("_CGContextSetRGBFillColor", shim_cg_set_rgb_fill as u64, "CGContextSetRGBFillColor (bridge → real)"),
-        ("_CGContextSetRGBStrokeColor", shim_cg_set_rgb_stroke as u64, "CGContextSetRGBStrokeColor (bridge → real)"),
-        ("_CGContextSetAlpha", shim_cg_set_alpha as u64, "CGContextSetAlpha (bridge → real)"),
+        ("_CGContextSetFillColorWithColor", shim_cg_set_fill_color as *const () as u64, "CGContextSetFillColorWithColor (bridge → real)"),
+        ("_CGContextSetStrokeColorWithColor", shim_cg_set_stroke_color as *const () as u64, "CGContextSetStrokeColorWithColor (bridge → real)"),
+        ("_CGContextSetRGBFillColor", shim_cg_set_rgb_fill as *const () as u64, "CGContextSetRGBFillColor (bridge → real)"),
+        ("_CGContextSetRGBStrokeColor", shim_cg_set_rgb_stroke as *const () as u64, "CGContextSetRGBStrokeColor (bridge → real)"),
+        ("_CGContextSetAlpha", shim_cg_set_alpha as *const () as u64, "CGContextSetAlpha (bridge → real)"),
 
         // ── Drawing ─────────────────────────────────────────────
-        ("_CGContextFillRect", shim_cg_fill_rect as u64, "CGContextFillRect (bridge → real)"),
-        ("_CGContextStrokeRect", shim_cg_stroke_rect as u64, "CGContextStrokeRect (bridge → real)"),
-        ("_CGContextFillEllipseInRect", shim_cg_fill_ellipse as u64, "CGContextFillEllipseInRect (bridge → real)"),
-        ("_CGContextStrokePath", shim_cg_stroke_path as u64, "CGContextStrokePath (bridge → real)"),
-        ("_CGContextFillPath", shim_cg_fill_path as u64, "CGContextFillPath (bridge → real)"),
-        ("_CGContextDrawImage", shim_cg_void6 as u64, "CGContextDrawImage (stub → void)"),
-        ("_CGContextClipToRect", shim_cg_void5 as u64, "CGContextClipToRect (stub → void)"),
-        ("_CGContextSetLineWidth", shim_cg_set_line_width as u64, "CGContextSetLineWidth (bridge → real)"),
-        ("_CGContextSetLineCap", shim_cg_void2 as u64, "CGContextSetLineCap (stub → void)"),
-        ("_CGContextSetLineJoin", shim_cg_void2 as u64, "CGContextSetLineJoin (stub → void)"),
+        ("_CGContextFillRect", shim_cg_fill_rect as *const () as u64, "CGContextFillRect (bridge → real)"),
+        ("_CGContextStrokeRect", shim_cg_stroke_rect as *const () as u64, "CGContextStrokeRect (bridge → real)"),
+        ("_CGContextFillEllipseInRect", shim_cg_fill_ellipse as *const () as u64, "CGContextFillEllipseInRect (bridge → real)"),
+        ("_CGContextStrokePath", shim_cg_stroke_path as *const () as u64, "CGContextStrokePath (bridge → real)"),
+        ("_CGContextFillPath", shim_cg_fill_path as *const () as u64, "CGContextFillPath (bridge → real)"),
+        ("_CGContextDrawImage", shim_cg_void6 as *const () as u64, "CGContextDrawImage (stub → void)"),
+        ("_CGContextClipToRect", shim_cg_void5 as *const () as u64, "CGContextClipToRect (stub → void)"),
+        ("_CGContextSetLineWidth", shim_cg_set_line_width as *const () as u64, "CGContextSetLineWidth (bridge → real)"),
+        ("_CGContextSetLineCap", shim_cg_void2 as *const () as u64, "CGContextSetLineCap (stub → void)"),
+        ("_CGContextSetLineJoin", shim_cg_void2 as *const () as u64, "CGContextSetLineJoin (stub → void)"),
 
         // ── Path in context ─────────────────────────────────────
-        ("_CGContextBeginPath", shim_cg_begin_path as u64, "CGContextBeginPath (bridge → real)"),
-        ("_CGContextMoveToPoint", shim_cg_move_to as u64, "CGContextMoveToPoint (bridge → real)"),
-        ("_CGContextAddLineToPoint", shim_cg_line_to as u64, "CGContextAddLineToPoint (bridge → real)"),
-        ("_CGContextAddCurveToPoint", shim_cg_curve_to as u64, "CGContextAddCurveToPoint (bridge → real)"),
-        ("_CGContextAddRect", shim_cg_add_rect as u64, "CGContextAddRect (bridge → real)"),
-        ("_CGContextClosePath", shim_cg_close_path as u64, "CGContextClosePath (bridge → real)"),
+        ("_CGContextBeginPath", shim_cg_begin_path as *const () as u64, "CGContextBeginPath (bridge → real)"),
+        ("_CGContextMoveToPoint", shim_cg_move_to as *const () as u64, "CGContextMoveToPoint (bridge → real)"),
+        ("_CGContextAddLineToPoint", shim_cg_line_to as *const () as u64, "CGContextAddLineToPoint (bridge → real)"),
+        ("_CGContextAddCurveToPoint", shim_cg_curve_to as *const () as u64, "CGContextAddCurveToPoint (bridge → real)"),
+        ("_CGContextAddRect", shim_cg_add_rect as *const () as u64, "CGContextAddRect (bridge → real)"),
+        ("_CGContextClosePath", shim_cg_close_path as *const () as u64, "CGContextClosePath (bridge → real)"),
 
         // ── Text ────────────────────────────────────────────────
-        ("_CGContextSetFont", shim_cg_void2 as u64, "CGContextSetFont (stub → void)"),
-        ("_CGContextSetFontSize", shim_cg_void2 as u64, "CGContextSetFontSize (stub → void)"),
-        ("_CGContextShowTextAtPoint", shim_cg_void5 as u64, "CGContextShowTextAtPoint (stub → void)"),
+        ("_CGContextSetFont", shim_cg_void2 as *const () as u64, "CGContextSetFont (stub → void)"),
+        ("_CGContextSetFontSize", shim_cg_void2 as *const () as u64, "CGContextSetFontSize (stub → void)"),
+        ("_CGContextShowTextAtPoint", shim_cg_void5 as *const () as u64, "CGContextShowTextAtPoint (stub → void)"),
 
         // ── Lifecycle ───────────────────────────────────────────
-        ("_CGContextRetain", shim_cg_retain as u64, "CGContextRetain (bridge → same ptr)"),
-        ("_CGContextRelease", shim_cg_context_release as u64, "CGContextRelease (bridge → real)"),
-        ("_CGContextFlush", shim_cg_void1 as u64, "CGContextFlush (stub → void)")
+        ("_CGContextRetain", shim_cg_retain as *const () as u64, "CGContextRetain (bridge → same ptr)"),
+        ("_CGContextRelease", shim_cg_context_release as *const () as u64, "CGContextRelease (bridge → real)"),
+        ("_CGContextFlush", shim_cg_void1 as *const () as u64, "CGContextFlush (stub → void)")
     );
 }
 

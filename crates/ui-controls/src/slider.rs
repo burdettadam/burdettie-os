@@ -1,6 +1,6 @@
 //! Slider control — continuous value selection within a range.
 
-use graphics_core::{Color, Point, Rect, Renderer};
+use graphics_core::{Color, Rect, Renderer};
 use ui_view::layout::IntrinsicSize;
 use ui_view::View;
 

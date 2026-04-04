@@ -58,6 +58,7 @@ impl ExtractedSymbol {
 ///
 /// Only returns **regular** (non-re-export) symbols; re-exports are filtered
 /// out by default because they have no code/data in the current binary.
+#[allow(dead_code)]
 pub fn extract_symbols(path: &Path, include_reexports: bool) -> Result<Vec<ExtractedSymbol>, String> {
     let raw = std::fs::read(path)
         .map_err(|e| format!("cannot read {}: {e}", path.display()))?;

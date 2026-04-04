@@ -24,99 +24,99 @@ impl XpcStubs {
 
         // ── XPC Object lifecycle ────────────────────────────────
         register_shims!(table,
-            ("_xpc_retain", shim_xpc_retain as u64, "xpc_retain → identity (refcount not tracked)"),
-            ("_xpc_release", shim_xpc_release as u64, "xpc_release → removes from object store"),
-            ("_xpc_copy", shim_xpc_copy as u64, "xpc_copy → identity (shallow)"),
-            ("_xpc_equal", shim_xpc_equal as u64, "xpc_equal → value comparison"),
-            ("_xpc_hash", shim_xpc_hash as u64, "xpc_hash → value hash"),
-            ("_xpc_get_type", shim_xpc_get_type as u64, "xpc_get_type → type tag pointer"),
-            ("_xpc_copy_description", shim_xpc_copy_description as u64, "xpc_copy_description → malloc'd string")
+            ("_xpc_retain", shim_xpc_retain as *const () as u64, "xpc_retain → identity (refcount not tracked)"),
+            ("_xpc_release", shim_xpc_release as *const () as u64, "xpc_release → removes from object store"),
+            ("_xpc_copy", shim_xpc_copy as *const () as u64, "xpc_copy → identity (shallow)"),
+            ("_xpc_equal", shim_xpc_equal as *const () as u64, "xpc_equal → value comparison"),
+            ("_xpc_hash", shim_xpc_hash as *const () as u64, "xpc_hash → value hash"),
+            ("_xpc_get_type", shim_xpc_get_type as *const () as u64, "xpc_get_type → type tag pointer"),
+            ("_xpc_copy_description", shim_xpc_copy_description as *const () as u64, "xpc_copy_description → malloc'd string")
         );
 
         // ── XPC Connection ──────────────────────────────────────
         register_shims!(table,
-            ("_xpc_connection_create", shim_xpc_connection_create as u64, "xpc_connection_create → tracked connection"),
-            ("_xpc_connection_create_mach_service", shim_xpc_connection_create_mach_service as u64, "xpc_connection_create_mach_service → tracked connection"),
-            ("_xpc_connection_set_event_handler", shim_xpc_connection_set_event_handler as u64, "xpc_connection_set_event_handler → stores block"),
-            ("_xpc_connection_resume", shim_xpc_connection_resume as u64, "xpc_connection_resume → delivers pending msgs"),
-            ("_xpc_connection_suspend", shim_xpc_connection_suspend as u64, "xpc_connection_suspend → pauses delivery"),
-            ("_xpc_connection_cancel", shim_xpc_connection_cancel as u64, "xpc_connection_cancel → sends INVALID error"),
-            ("_xpc_connection_send_message", shim_xpc_connection_send_message as u64, "xpc_connection_send_message → loopback delivery"),
-            ("_xpc_connection_send_message_with_reply", shim_xpc_connection_send_message_with_reply as u64, "xpc_connection_send_message_with_reply → calls handler"),
-            ("_xpc_connection_send_message_with_reply_sync", shim_xpc_connection_send_message_with_reply_sync as u64, "xpc_connection_send_message_with_reply_sync → error reply"),
-            ("_xpc_connection_send_barrier", shim_xpc_connection_send_barrier as u64, "xpc_connection_send_barrier → inline block"),
-            ("_xpc_connection_set_target_queue", shim_xpc_connection_set_target_queue as u64, "xpc_connection_set_target_queue → stores queue"),
-            ("_xpc_connection_get_pid", shim_xpc_connection_get_pid as u64, "xpc_connection_get_pid → getpid()")
+            ("_xpc_connection_create", shim_xpc_connection_create as *const () as u64, "xpc_connection_create → tracked connection"),
+            ("_xpc_connection_create_mach_service", shim_xpc_connection_create_mach_service as *const () as u64, "xpc_connection_create_mach_service → tracked connection"),
+            ("_xpc_connection_set_event_handler", shim_xpc_connection_set_event_handler as *const () as u64, "xpc_connection_set_event_handler → stores block"),
+            ("_xpc_connection_resume", shim_xpc_connection_resume as *const () as u64, "xpc_connection_resume → delivers pending msgs"),
+            ("_xpc_connection_suspend", shim_xpc_connection_suspend as *const () as u64, "xpc_connection_suspend → pauses delivery"),
+            ("_xpc_connection_cancel", shim_xpc_connection_cancel as *const () as u64, "xpc_connection_cancel → sends INVALID error"),
+            ("_xpc_connection_send_message", shim_xpc_connection_send_message as *const () as u64, "xpc_connection_send_message → loopback delivery"),
+            ("_xpc_connection_send_message_with_reply", shim_xpc_connection_send_message_with_reply as *const () as u64, "xpc_connection_send_message_with_reply → calls handler"),
+            ("_xpc_connection_send_message_with_reply_sync", shim_xpc_connection_send_message_with_reply_sync as *const () as u64, "xpc_connection_send_message_with_reply_sync → error reply"),
+            ("_xpc_connection_send_barrier", shim_xpc_connection_send_barrier as *const () as u64, "xpc_connection_send_barrier → inline block"),
+            ("_xpc_connection_set_target_queue", shim_xpc_connection_set_target_queue as *const () as u64, "xpc_connection_set_target_queue → stores queue"),
+            ("_xpc_connection_get_pid", shim_xpc_connection_get_pid as *const () as u64, "xpc_connection_get_pid → getpid()")
         );
 
         // ── XPC Dictionary ──────────────────────────────────────
         register_shims!(table,
-            ("_xpc_dictionary_create", shim_xpc_dictionary_create as u64, "xpc_dictionary_create → real dict object"),
-            ("_xpc_dictionary_create_empty", shim_xpc_dictionary_create_empty as u64, "xpc_dictionary_create_empty → real dict object"),
-            ("_xpc_dictionary_set_value", shim_xpc_dictionary_set_value as u64, "xpc_dictionary_set_value → stores pair"),
-            ("_xpc_dictionary_get_value", shim_xpc_dictionary_get_value as u64, "xpc_dictionary_get_value → retrieves pair"),
-            ("_xpc_dictionary_set_string", shim_xpc_dictionary_set_string as u64, "xpc_dictionary_set_string → stores string"),
-            ("_xpc_dictionary_get_string", shim_xpc_dictionary_get_string as u64, "xpc_dictionary_get_string → returns C string ptr"),
-            ("_xpc_dictionary_set_int64", shim_xpc_dictionary_set_int64 as u64, "xpc_dictionary_set_int64 → stores int64"),
-            ("_xpc_dictionary_get_int64", shim_xpc_dictionary_get_int64 as u64, "xpc_dictionary_get_int64 → retrieves int64"),
-            ("_xpc_dictionary_set_uint64", shim_xpc_dictionary_set_uint64 as u64, "xpc_dictionary_set_uint64 → stores uint64"),
-            ("_xpc_dictionary_get_uint64", shim_xpc_dictionary_get_uint64 as u64, "xpc_dictionary_get_uint64 → retrieves uint64"),
-            ("_xpc_dictionary_set_bool", shim_xpc_dictionary_set_bool as u64, "xpc_dictionary_set_bool → stores bool"),
-            ("_xpc_dictionary_get_bool", shim_xpc_dictionary_get_bool as u64, "xpc_dictionary_get_bool → retrieves bool"),
-            ("_xpc_dictionary_set_data", shim_xpc_dictionary_set_data as u64, "xpc_dictionary_set_data → stores data"),
-            ("_xpc_dictionary_get_data", shim_xpc_dictionary_get_data as u64, "xpc_dictionary_get_data → retrieves data ptr"),
-            ("_xpc_dictionary_set_fd", shim_xpc_dictionary_set_fd as u64, "xpc_dictionary_set_fd → stores fd"),
-            ("_xpc_dictionary_get_count", shim_xpc_dictionary_get_count as u64, "xpc_dictionary_get_count → real count"),
-            ("_xpc_dictionary_apply", shim_xpc_dictionary_apply as u64, "xpc_dictionary_apply → iterates pairs"),
-            ("_xpc_dictionary_get_remote_connection", shim_xpc_dictionary_get_remote_connection as u64, "xpc_dictionary_get_remote_connection → NULL (loopback)")
+            ("_xpc_dictionary_create", shim_xpc_dictionary_create as *const () as u64, "xpc_dictionary_create → real dict object"),
+            ("_xpc_dictionary_create_empty", shim_xpc_dictionary_create_empty as *const () as u64, "xpc_dictionary_create_empty → real dict object"),
+            ("_xpc_dictionary_set_value", shim_xpc_dictionary_set_value as *const () as u64, "xpc_dictionary_set_value → stores pair"),
+            ("_xpc_dictionary_get_value", shim_xpc_dictionary_get_value as *const () as u64, "xpc_dictionary_get_value → retrieves pair"),
+            ("_xpc_dictionary_set_string", shim_xpc_dictionary_set_string as *const () as u64, "xpc_dictionary_set_string → stores string"),
+            ("_xpc_dictionary_get_string", shim_xpc_dictionary_get_string as *const () as u64, "xpc_dictionary_get_string → returns C string ptr"),
+            ("_xpc_dictionary_set_int64", shim_xpc_dictionary_set_int64 as *const () as u64, "xpc_dictionary_set_int64 → stores int64"),
+            ("_xpc_dictionary_get_int64", shim_xpc_dictionary_get_int64 as *const () as u64, "xpc_dictionary_get_int64 → retrieves int64"),
+            ("_xpc_dictionary_set_uint64", shim_xpc_dictionary_set_uint64 as *const () as u64, "xpc_dictionary_set_uint64 → stores uint64"),
+            ("_xpc_dictionary_get_uint64", shim_xpc_dictionary_get_uint64 as *const () as u64, "xpc_dictionary_get_uint64 → retrieves uint64"),
+            ("_xpc_dictionary_set_bool", shim_xpc_dictionary_set_bool as *const () as u64, "xpc_dictionary_set_bool → stores bool"),
+            ("_xpc_dictionary_get_bool", shim_xpc_dictionary_get_bool as *const () as u64, "xpc_dictionary_get_bool → retrieves bool"),
+            ("_xpc_dictionary_set_data", shim_xpc_dictionary_set_data as *const () as u64, "xpc_dictionary_set_data → stores data"),
+            ("_xpc_dictionary_get_data", shim_xpc_dictionary_get_data as *const () as u64, "xpc_dictionary_get_data → retrieves data ptr"),
+            ("_xpc_dictionary_set_fd", shim_xpc_dictionary_set_fd as *const () as u64, "xpc_dictionary_set_fd → stores fd"),
+            ("_xpc_dictionary_get_count", shim_xpc_dictionary_get_count as *const () as u64, "xpc_dictionary_get_count → real count"),
+            ("_xpc_dictionary_apply", shim_xpc_dictionary_apply as *const () as u64, "xpc_dictionary_apply → iterates pairs"),
+            ("_xpc_dictionary_get_remote_connection", shim_xpc_dictionary_get_remote_connection as *const () as u64, "xpc_dictionary_get_remote_connection → NULL (loopback)")
         );
 
         // ── XPC Array ───────────────────────────────────────────
         register_shims!(table,
-            ("_xpc_array_create", shim_xpc_array_create as u64, "xpc_array_create → real array object"),
-            ("_xpc_array_get_count", shim_xpc_array_get_count as u64, "xpc_array_get_count → real count"),
-            ("_xpc_array_get_value", shim_xpc_array_get_value as u64, "xpc_array_get_value → retrieves element"),
-            ("_xpc_array_append_value", shim_xpc_array_append_value as u64, "xpc_array_append_value → appends element"),
-            ("_xpc_array_apply", shim_xpc_array_apply as u64, "xpc_array_apply → iterates elements")
+            ("_xpc_array_create", shim_xpc_array_create as *const () as u64, "xpc_array_create → real array object"),
+            ("_xpc_array_get_count", shim_xpc_array_get_count as *const () as u64, "xpc_array_get_count → real count"),
+            ("_xpc_array_get_value", shim_xpc_array_get_value as *const () as u64, "xpc_array_get_value → retrieves element"),
+            ("_xpc_array_append_value", shim_xpc_array_append_value as *const () as u64, "xpc_array_append_value → appends element"),
+            ("_xpc_array_apply", shim_xpc_array_apply as *const () as u64, "xpc_array_apply → iterates elements")
         );
 
         // ── XPC Primitive constructors ──────────────────────────
         register_shims!(table,
-            ("_xpc_string_create", shim_xpc_string_create as u64, "xpc_string_create → real string object"),
-            ("_xpc_string_get_string_ptr", shim_xpc_string_get_string_ptr as u64, "xpc_string_get_string_ptr → C string pointer"),
-            ("_xpc_string_get_length", shim_xpc_string_get_length as u64, "xpc_string_get_length → byte count"),
-            ("_xpc_int64_create", shim_xpc_int64_create as u64, "xpc_int64_create → real int64 object"),
-            ("_xpc_int64_get_value", shim_xpc_int64_get_value as u64, "xpc_int64_get_value → stored value"),
-            ("_xpc_uint64_create", shim_xpc_uint64_create as u64, "xpc_uint64_create → real uint64 object"),
-            ("_xpc_uint64_get_value", shim_xpc_uint64_get_value as u64, "xpc_uint64_get_value → stored value"),
-            ("_xpc_bool_create", shim_xpc_bool_create as u64, "xpc_bool_create → real bool object"),
-            ("_xpc_bool_get_value", shim_xpc_bool_get_value as u64, "xpc_bool_get_value → stored value"),
-            ("_xpc_data_create", shim_xpc_data_create as u64, "xpc_data_create → real data object"),
-            ("_xpc_data_get_bytes_ptr", shim_xpc_data_get_bytes_ptr as u64, "xpc_data_get_bytes_ptr → byte pointer"),
-            ("_xpc_data_get_length", shim_xpc_data_get_length as u64, "xpc_data_get_length → byte count"),
-            ("_xpc_null_create", shim_xpc_null_create as u64, "xpc_null_create → real null object"),
-            ("_xpc_date_create", shim_xpc_date_create as u64, "xpc_date_create → real date object"),
-            ("_xpc_date_get_value", shim_xpc_date_get_value as u64, "xpc_date_get_value → stored nanos"),
-            ("_xpc_uuid_create", shim_xpc_uuid_create as u64, "xpc_uuid_create → real uuid object"),
-            ("_xpc_fd_create", shim_xpc_fd_create as u64, "xpc_fd_create → real fd object"),
-            ("_xpc_double_create", shim_xpc_double_create as u64, "xpc_double_create → real double object"),
-            ("_xpc_double_get_value", shim_xpc_double_get_value as u64, "xpc_double_get_value → stored value")
+            ("_xpc_string_create", shim_xpc_string_create as *const () as u64, "xpc_string_create → real string object"),
+            ("_xpc_string_get_string_ptr", shim_xpc_string_get_string_ptr as *const () as u64, "xpc_string_get_string_ptr → C string pointer"),
+            ("_xpc_string_get_length", shim_xpc_string_get_length as *const () as u64, "xpc_string_get_length → byte count"),
+            ("_xpc_int64_create", shim_xpc_int64_create as *const () as u64, "xpc_int64_create → real int64 object"),
+            ("_xpc_int64_get_value", shim_xpc_int64_get_value as *const () as u64, "xpc_int64_get_value → stored value"),
+            ("_xpc_uint64_create", shim_xpc_uint64_create as *const () as u64, "xpc_uint64_create → real uint64 object"),
+            ("_xpc_uint64_get_value", shim_xpc_uint64_get_value as *const () as u64, "xpc_uint64_get_value → stored value"),
+            ("_xpc_bool_create", shim_xpc_bool_create as *const () as u64, "xpc_bool_create → real bool object"),
+            ("_xpc_bool_get_value", shim_xpc_bool_get_value as *const () as u64, "xpc_bool_get_value → stored value"),
+            ("_xpc_data_create", shim_xpc_data_create as *const () as u64, "xpc_data_create → real data object"),
+            ("_xpc_data_get_bytes_ptr", shim_xpc_data_get_bytes_ptr as *const () as u64, "xpc_data_get_bytes_ptr → byte pointer"),
+            ("_xpc_data_get_length", shim_xpc_data_get_length as *const () as u64, "xpc_data_get_length → byte count"),
+            ("_xpc_null_create", shim_xpc_null_create as *const () as u64, "xpc_null_create → real null object"),
+            ("_xpc_date_create", shim_xpc_date_create as *const () as u64, "xpc_date_create → real date object"),
+            ("_xpc_date_get_value", shim_xpc_date_get_value as *const () as u64, "xpc_date_get_value → stored nanos"),
+            ("_xpc_uuid_create", shim_xpc_uuid_create as *const () as u64, "xpc_uuid_create → real uuid object"),
+            ("_xpc_fd_create", shim_xpc_fd_create as *const () as u64, "xpc_fd_create → real fd object"),
+            ("_xpc_double_create", shim_xpc_double_create as *const () as u64, "xpc_double_create → real double object"),
+            ("_xpc_double_get_value", shim_xpc_double_get_value as *const () as u64, "xpc_double_get_value → stored value")
         );
 
         // ── XPC Activity (timer-based scheduler) ─────────────────
         register_shims!(table,
-            ("_xpc_activity_register", shim_xpc_activity_register as u64, "xpc_activity_register → registers + fires check-in"),
-            ("_xpc_activity_unregister", shim_xpc_activity_unregister as u64, "xpc_activity_unregister → removes activity"),
-            ("_xpc_activity_set_criteria", shim_xpc_activity_set_criteria as u64, "xpc_activity_set_criteria → updates criteria dict"),
-            ("_xpc_activity_get_state", shim_xpc_activity_get_state as u64, "xpc_activity_get_state → real state machine"),
-            ("_xpc_activity_should_defer", shim_xpc_activity_should_defer as u64, "xpc_activity_should_defer → false (always run)")
+            ("_xpc_activity_register", shim_xpc_activity_register as *const () as u64, "xpc_activity_register → registers + fires check-in"),
+            ("_xpc_activity_unregister", shim_xpc_activity_unregister as *const () as u64, "xpc_activity_unregister → removes activity"),
+            ("_xpc_activity_set_criteria", shim_xpc_activity_set_criteria as *const () as u64, "xpc_activity_set_criteria → updates criteria dict"),
+            ("_xpc_activity_get_state", shim_xpc_activity_get_state as *const () as u64, "xpc_activity_get_state → real state machine"),
+            ("_xpc_activity_should_defer", shim_xpc_activity_should_defer as *const () as u64, "xpc_activity_should_defer → false (always run)")
         );
 
         // ── XPC Endpoint / Pipe ─────────────────────────────────
         register_shims!(table,
-            ("_xpc_endpoint_create", shim_xpc_endpoint_create as u64, "xpc_endpoint_create → real endpoint object"),
-            ("_xpc_pipe_create", shim_xpc_pipe_create as u64, "xpc_pipe_create → named pipe with handler registry"),
-            ("_xpc_pipe_routine", shim_xpc_pipe_routine as u64, "xpc_pipe_routine → routes to handler or EPIPE")
+            ("_xpc_endpoint_create", shim_xpc_endpoint_create as *const () as u64, "xpc_endpoint_create → real endpoint object"),
+            ("_xpc_pipe_create", shim_xpc_pipe_create as *const () as u64, "xpc_pipe_create → named pipe with handler registry"),
+            ("_xpc_pipe_routine", shim_xpc_pipe_routine as *const () as u64, "xpc_pipe_routine → routes to handler or EPIPE")
         );
 
         // Install default pipe handlers for well-known services

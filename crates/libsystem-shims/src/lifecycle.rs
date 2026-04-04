@@ -27,53 +27,53 @@ impl LifecycleShims {
     pub fn install(table: &mut ShimTable) {
         table.register(
             "_atexit",
-            shim_atexit as u64,
+            shim_atexit as *const () as u64,
             "atexit (registered but not called)",
         );
         table.register(
             "___cxa_atexit",
-            shim_cxa_atexit as u64,
+            shim_cxa_atexit as *const () as u64,
             "__cxa_atexit (registered)",
         );
         table.register(
             "__os_feature_enabled_impl",
-            shim_os_feature_enabled_impl as u64,
+            shim_os_feature_enabled_impl as *const () as u64,
             "__os_feature_enabled_impl → conservative feature flag false",
         );
-        table.register("_exit", shim_exit as u64, "exit (clean shutdown)");
+        table.register("_exit", shim_exit as *const () as u64, "exit (clean shutdown)");
         table.register(
             "_sigaction",
-            shim_sigaction as u64,
+            shim_sigaction as *const () as u64,
             "sigaction (guest handlers intercepted)",
         );
         table.register(
             "_signal",
-            shim_signal as u64,
+            shim_signal as *const () as u64,
             "signal (guest handlers intercepted)",
         );
         table.register(
             "_sigaltstack",
-            shim_sigaltstack as u64,
+            shim_sigaltstack as *const () as u64,
             "sigaltstack (intercepted, no guest alt stack)",
         );
         table.register(
             "___register_frame",
-            shim_register_frame as u64,
+            shim_register_frame as *const () as u64,
             "__register_frame (delegate to host for DWARF unwind)",
         );
         table.register(
             "___deregister_frame",
-            shim_deregister_frame as u64,
+            shim_deregister_frame as *const () as u64,
             "__deregister_frame (delegate to host for DWARF unwind)",
         );
         table.register(
             "_abort",
-            shim_abort as u64,
+            shim_abort as *const () as u64,
             "abort (diagnostic wrapper)",
         );
         table.register(
             "_strlen",
-            shim_strlen_diagnostic as u64,
+            shim_strlen_diagnostic as *const () as u64,
             "strlen (diagnostic wrapper)",
         );
 

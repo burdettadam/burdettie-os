@@ -116,6 +116,7 @@ pub fn demangle(sym: &str) -> Option<String> {
 ///   - leading `_$s` / `_$S` / `__T` stripped
 ///   - `$` replaced with `D`  (dollar-sign encodes context in Swift ABI)
 ///   - non-alphanumeric → `_`
+#[allow(dead_code)]
 pub fn to_rust_ident_suffix(sym: &str) -> String {
     let stripped = if let Some(s) = sym.strip_prefix("_$s") {
         s

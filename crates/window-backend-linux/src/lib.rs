@@ -17,7 +17,7 @@ use std::sync::{Arc, Mutex};
 
 use graphics_core::Surface;
 use window_backend::{
-    CursorIcon, WindowConfig, WindowEvent, WindowId, WindowMode, Theme, WindowBackend,
+    WindowConfig, WindowEvent, WindowId, WindowBackend,
 };
 
 /// Winit-based window backend.

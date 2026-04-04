@@ -14,17 +14,17 @@ impl RandomShims {
     pub fn install(table: &mut ShimTable) {
         table.register(
             "_arc4random",
-            shim_arc4random as u64,
+            shim_arc4random as *const () as u64,
             "arc4random (portable)",
         );
         table.register(
             "_arc4random_buf",
-            shim_arc4random_buf as u64,
+            shim_arc4random_buf as *const () as u64,
             "arc4random_buf (portable)",
         );
         table.register(
             "_arc4random_uniform",
-            shim_arc4random_uniform as u64,
+            shim_arc4random_uniform as *const () as u64,
             "arc4random_uniform (portable)",
         );
 

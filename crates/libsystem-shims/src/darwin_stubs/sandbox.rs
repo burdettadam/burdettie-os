@@ -13,17 +13,17 @@ impl SandboxStubs {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
         register_shims!(table,
-            ("_sandbox_check", shim_sandbox_check as u64, "sandbox_check (stub → 0, not sandboxed)"),
-            ("_sandbox_extension_consume", shim_sandbox_extension_consume as u64, "sandbox_extension_consume (stub → 0)"),
-            ("_sandbox_init", shim_sandbox_init as u64, "sandbox_init (stub → 0, accepted but not enforced)"),
-            ("_sandbox_init_with_parameters", shim_sandbox_init_with_parameters as u64, "sandbox_init_with_parameters (stub → 0)"),
-            ("_sandbox_free_error", shim_sandbox_free_error as u64, "sandbox_free_error (no-op)"),
-            ("_sandbox_extension_issue_file", shim_sandbox_extension_issue_file as u64, "sandbox_extension_issue_file (stub → mock token)"),
-            ("_sandbox_extension_issue_mach", shim_sandbox_extension_issue_mach as u64, "sandbox_extension_issue_mach (stub → mock token)"),
-            ("_sandbox_extension_issue_generic", shim_sandbox_extension_issue_generic as u64, "sandbox_extension_issue_generic (stub → mock token)"),
-            ("_sandbox_extension_release", shim_sandbox_extension_release as u64, "sandbox_extension_release (stub → 0)"),
-            ("_sandbox_check_by_audit_token", shim_sandbox_check_by_audit_token as u64, "sandbox_check_by_audit_token (stub → 0, allowed)"),
-            ("_sandbox_apply", shim_sandbox_apply as u64, "sandbox_apply (stub → 0, not enforced)"),
+            ("_sandbox_check", shim_sandbox_check as *const () as u64, "sandbox_check (stub → 0, not sandboxed)"),
+            ("_sandbox_extension_consume", shim_sandbox_extension_consume as *const () as u64, "sandbox_extension_consume (stub → 0)"),
+            ("_sandbox_init", shim_sandbox_init as *const () as u64, "sandbox_init (stub → 0, accepted but not enforced)"),
+            ("_sandbox_init_with_parameters", shim_sandbox_init_with_parameters as *const () as u64, "sandbox_init_with_parameters (stub → 0)"),
+            ("_sandbox_free_error", shim_sandbox_free_error as *const () as u64, "sandbox_free_error (no-op)"),
+            ("_sandbox_extension_issue_file", shim_sandbox_extension_issue_file as *const () as u64, "sandbox_extension_issue_file (stub → mock token)"),
+            ("_sandbox_extension_issue_mach", shim_sandbox_extension_issue_mach as *const () as u64, "sandbox_extension_issue_mach (stub → mock token)"),
+            ("_sandbox_extension_issue_generic", shim_sandbox_extension_issue_generic as *const () as u64, "sandbox_extension_issue_generic (stub → mock token)"),
+            ("_sandbox_extension_release", shim_sandbox_extension_release as *const () as u64, "sandbox_extension_release (stub → 0)"),
+            ("_sandbox_check_by_audit_token", shim_sandbox_check_by_audit_token as *const () as u64, "sandbox_check_by_audit_token (stub → 0, allowed)"),
+            ("_sandbox_apply", shim_sandbox_apply as *const () as u64, "sandbox_apply (stub → 0, not enforced)"),
         );
         log::debug!("SandboxStubs: registered 11 stubs");
     }
