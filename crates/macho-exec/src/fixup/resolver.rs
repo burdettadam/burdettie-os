@@ -116,6 +116,8 @@ impl StubResolver {
     pub fn new(host: Arc<dyn HostSymbolResolver>) -> Self {
         // Preload host libraries once per process so RTLD_DEFAULT can see them
         // without paying repeated dlopen/dyld setup cost on every loader run.
+        // On Linux, these macOS framework paths don't exist — skip preloading.
+        #[cfg(target_os = "macos")]
         PRELOAD_STATE.preload(host.as_ref(), Self::PRELOAD_LIBRARIES);
         let handle = host.default_handle();
         Self { host, handle }

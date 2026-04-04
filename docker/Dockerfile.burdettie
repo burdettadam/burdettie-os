@@ -36,14 +36,16 @@ RUN cargo build --release --workspace \
     --exclude foundation-explorer \
     --exclude window-backend-darwin \
     --exclude platform-darwin-host \
-    2>&1 | tee /tmp/build.log | tail -10
+    2>&1 | tee /tmp/build.log ; \
+    echo "BUILD_EXIT=$?" >> /tmp/build.log
 
 # Show errors if build failed
 RUN if [ ! -f target/release/macho-inspect ]; then \
-      echo "BUILD FAILED — full error log:"; \
-      grep -B2 -A5 'error\[E' /tmp/build.log | head -200 || true; \
+      echo "BUILD FAILED — error lines:"; \
+      grep -i 'error\|could not compile\|cannot\|undefined\|linking failed\|ld:' /tmp/build.log | head -50 || true; \
       echo "---"; \
-      tail -30 /tmp/build.log; \
+      echo "Last 50 lines of build.log:"; \
+      tail -50 /tmp/build.log; \
       exit 1; \
     fi
 

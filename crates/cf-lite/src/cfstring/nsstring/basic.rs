@@ -393,7 +393,7 @@ pub extern "C" fn shim_cf_release(obj: u64) {
 
 // ── +[NSString stringWithFormat:] ──────────────────────────────────
 
-#[cfg(all(target_arch = "aarch64", target_os = "macos"))]
+#[cfg(all(target_arch = "aarch64", any(target_os = "macos", target_os = "linux")))]
 extern "C" {
     fn shim_nsstring_format_asm();
 }
@@ -405,7 +405,7 @@ extern "C" {
 
 /// Returns the address of the stringWithFormat: trampoline.
 pub fn string_with_format_trampoline_addr() -> u64 {
-    #[cfg(all(target_arch = "aarch64", target_os = "macos"))]
+    #[cfg(all(target_arch = "aarch64", any(target_os = "macos", target_os = "linux")))]
     {
         shim_nsstring_format_asm as *const () as u64
     }
@@ -413,7 +413,10 @@ pub fn string_with_format_trampoline_addr() -> u64 {
     {
         shim_nsstring_format_x86_64_asm as u64
     }
-    #[cfg(not(all(any(target_arch = "aarch64", target_arch = "x86_64"), target_os = "macos")))]
+    #[cfg(not(any(
+        all(target_arch = "aarch64", any(target_os = "macos", target_os = "linux")),
+        all(target_arch = "x86_64", target_os = "macos"),
+    )))]
     {
         shim_nsstring_string_with_format_inner as u64
     }

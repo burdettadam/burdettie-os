@@ -164,7 +164,10 @@ pub extern "C" fn shim_gethostname(name: u64, len: usize) -> i32 {
 }
 
 pub extern "C" fn shim_sethostname(_name: u64, _len: usize) -> i32 {
+    #[cfg(target_os = "macos")]
     unsafe { *libc::__error() = libc::EPERM };
+    #[cfg(not(target_os = "macos"))]
+    unsafe { *libc::__errno_location() = libc::EPERM };
     -1
 }
 

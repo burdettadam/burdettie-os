@@ -18,18 +18,18 @@ use crate::nsobj;
 
 const NSMUTABLESTRING_SIZE: usize = 32;
 
-#[cfg(all(target_arch = "aarch64", target_os = "macos"))]
+#[cfg(all(target_arch = "aarch64", any(target_os = "macos", target_os = "linux")))]
 extern "C" {
     fn shim_nsmutablestring_format_asm();
 }
 
 /// Returns the address of the +[NSMutableString stringWithFormat:] trampoline.
 pub fn string_with_format_trampoline_addr() -> u64 {
-    #[cfg(all(target_arch = "aarch64", target_os = "macos"))]
+    #[cfg(all(target_arch = "aarch64", any(target_os = "macos", target_os = "linux")))]
     {
         shim_nsmutablestring_format_asm as *const () as u64
     }
-    #[cfg(not(all(target_arch = "aarch64", target_os = "macos")))]
+    #[cfg(not(all(target_arch = "aarch64", any(target_os = "macos", target_os = "linux"))))]
     {
         shim_nsmutablestring_string_with_format_inner as u64
     }

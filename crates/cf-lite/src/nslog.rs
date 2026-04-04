@@ -13,7 +13,7 @@ use std::sync::Mutex;
 
 // ── ARM64 assembly trampoline linkage ──────────────────────────────
 
-#[cfg(all(target_arch = "aarch64", target_os = "macos"))]
+#[cfg(all(target_arch = "aarch64", any(target_os = "macos", target_os = "linux")))]
 extern "C" {
     fn shim_nslog_asm();
 }
@@ -33,7 +33,7 @@ extern "C" {
 /// the trampoline is a simple tail-call.
 /// On other platforms, returns the Rust function directly.
 pub fn nslog_trampoline_addr() -> u64 {
-    #[cfg(all(target_arch = "aarch64", target_os = "macos"))]
+    #[cfg(all(target_arch = "aarch64", any(target_os = "macos", target_os = "linux")))]
     {
         shim_nslog_asm as *const () as u64
     }
@@ -41,7 +41,10 @@ pub fn nslog_trampoline_addr() -> u64 {
     {
         shim_nslog_x86_64_asm as u64
     }
-    #[cfg(not(all(any(target_arch = "aarch64", target_arch = "x86_64"), target_os = "macos")))]
+    #[cfg(not(any(
+        all(target_arch = "aarch64", any(target_os = "macos", target_os = "linux")),
+        all(target_arch = "x86_64", target_os = "macos"),
+    )))]
     {
         shim_nslog_inner as u64
     }
