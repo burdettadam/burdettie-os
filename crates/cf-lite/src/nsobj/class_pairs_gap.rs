@@ -494,3 +494,63 @@ define_class_pair!(child CBPERIPHERALMANAGER_CLASS_DATA, CBPERIPHERALMANAGER_MET
     meta_addr: cbperipheralmanager_metaclass_addr,
     parent_class: nsobject_class_addr,
     parent_meta: nsobject_metaclass_addr);
+
+// ── DVT framework classes (Xcode helper) ────────────────────────
+
+define_class_pair!(child DVTSYSTEMPREREQUISITESPATHS_CLASS_DATA, DVTSYSTEMPREREQUISITESPATHS_METACLASS_DATA, DVTSYSTEMPREREQUISITESPATHS_INIT,
+    ensure: ensure_dvtsystemprerequisitespaths_init,
+    class_addr: dvtsystemprerequisitespaths_class_addr,
+    meta_addr: dvtsystemprerequisitespaths_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child DVTLICENSEAGREEMENTCLI_CLASS_DATA, DVTLICENSEAGREEMENTCLI_METACLASS_DATA, DVTLICENSEAGREEMENTCLI_INIT,
+    ensure: ensure_dvtlicenseagreementcli_init,
+    class_addr: dvtlicenseagreementcli_class_addr,
+    meta_addr: dvtlicenseagreementcli_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child DVTFIRSTLAUNCHPACKAGEINSTALLER_CLASS_DATA, DVTFIRSTLAUNCHPACKAGEINSTALLER_METACLASS_DATA, DVTFIRSTLAUNCHPACKAGEINSTALLER_INIT,
+    ensure: ensure_dvtfirstlaunchpackageinstaller_init,
+    class_addr: dvtfirstlaunchpackageinstaller_class_addr,
+    meta_addr: dvtfirstlaunchpackageinstaller_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child DVTFIRSTLAUNCHPACKAGEINSTALLERCLI_CLASS_DATA, DVTFIRSTLAUNCHPACKAGEINSTALLERCLI_METACLASS_DATA, DVTFIRSTLAUNCHPACKAGEINSTALLERCLI_INIT,
+    ensure: ensure_dvtfirstlaunchpackageinstallercli_init,
+    class_addr: dvtfirstlaunchpackageinstallercli_class_addr,
+    meta_addr: dvtfirstlaunchpackageinstallercli_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child DVTCOREDEVICEDDIINSTALLER_CLASS_DATA, DVTCOREDEVICEDDIINSTALLER_METACLASS_DATA, DVTCOREDEVICEDDIINSTALLER_INIT,
+    ensure: ensure_dvtcoredeviceddiinstaller_init,
+    class_addr: dvtcoredeviceddiinstaller_class_addr,
+    meta_addr: dvtcoredeviceddiinstaller_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child DVTSIMULATORDEVICEREMOVER_CLASS_DATA, DVTSIMULATORDEVICEREMOVER_METACLASS_DATA, DVTSIMULATORDEVICEREMOVER_INIT,
+    ensure: ensure_dvtsimulatordeviceremover_init,
+    class_addr: dvtsimulatordeviceremover_class_addr,
+    meta_addr: dvtsimulatordeviceremover_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child DVTCACHECLEANER_CLASS_DATA, DVTCACHECLEANER_METACLASS_DATA, DVTCACHECLEANER_INIT,
+    ensure: ensure_dvtcachecleaner_init,
+    class_addr: dvtcachecleaner_class_addr,
+    meta_addr: dvtcachecleaner_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+// ── NSAssertionHandler (Foundation) ─────────────────────────────
+
+define_class_pair!(child NSASSERTIONHANDLER_CLASS_DATA, NSASSERTIONHANDLER_METACLASS_DATA, NSASSERTIONHANDLER_INIT,
+    ensure: ensure_nsassertionhandler_init,
+    class_addr: nsassertionhandler_class_addr,
+    meta_addr: nsassertionhandler_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);

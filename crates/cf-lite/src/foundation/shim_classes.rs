@@ -83,6 +83,18 @@ pub(super) fn install_class_symbols(table: &mut ShimTable) {
     register_class!(table, "CADisplayLink", nsobj::cadisplaylink_class_addr(), nsobj::cadisplaylink_metaclass_addr());
     register_class!(table, "CAMediaTimingFunction", nsobj::camediatimingfunction_class_addr(), nsobj::camediatimingfunction_metaclass_addr());
 
+    // ── DVT framework classes (Xcode helper) ────────────────────────
+    register_class!(table, "DVTSystemPrerequisitesPaths", nsobj::dvtsystemprerequisitespaths_class_addr(), nsobj::dvtsystemprerequisitespaths_metaclass_addr());
+    register_class!(table, "DVTLicenseAgreementCLI", nsobj::dvtlicenseagreementcli_class_addr(), nsobj::dvtlicenseagreementcli_metaclass_addr());
+    register_class!(table, "DVTFirstLaunchPackageInstaller", nsobj::dvtfirstlaunchpackageinstaller_class_addr(), nsobj::dvtfirstlaunchpackageinstaller_metaclass_addr());
+    register_class!(table, "DVTFirstLaunchPackageInstallerCLI", nsobj::dvtfirstlaunchpackageinstallercli_class_addr(), nsobj::dvtfirstlaunchpackageinstallercli_metaclass_addr());
+    register_class!(table, "DVTCoreDeviceDDIInstaller", nsobj::dvtcoredeviceddiinstaller_class_addr(), nsobj::dvtcoredeviceddiinstaller_metaclass_addr());
+    register_class!(table, "DVTSimulatorDeviceRemover", nsobj::dvtsimulatordeviceremover_class_addr(), nsobj::dvtsimulatordeviceremover_metaclass_addr());
+    register_class!(table, "DVTCacheCleaner", nsobj::dvtcachecleaner_class_addr(), nsobj::dvtcachecleaner_metaclass_addr());
+
+    // ── NSAssertionHandler ──────────────────────────────────────────
+    register_class!(table, "NSAssertionHandler", nsobj::nsassertionhandler_class_addr(), nsobj::nsassertionhandler_metaclass_addr());
+
     // ── _OBJC_EHTYPE_$_NSException ───────────────────────────────────
     // Our guest-side personality function (shim_objc_personality_v0) reads the
     // type table's EHTYPE via LSDA and passes it directly to shim_objc_exception_match

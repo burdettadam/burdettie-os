@@ -271,6 +271,12 @@ impl DarwinCompatShims {
                  "__libcpp_verbose_abort → fprintf+abort"),
             );
 
+            // ── os_variant stubs (Darwin-only APIs) ─────────────────
+            register_shims!(table,
+                ("_os_variant_is_darwinos", shim_os_variant_false as *const () as u64, "os_variant_is_darwinos → false"),
+                ("_os_variant_has_internal_content", shim_os_variant_false as *const () as u64, "os_variant_has_internal_content → false"),
+            );
+
             log::info!("DarwinCompatShims: registered compat shims");
         }
     }
@@ -1920,3 +1926,12 @@ extern "C" fn shim_libcpp_verbose_abort(fmt: *const libc::c_char) -> ! {
 }
 
 // stat/fstat/lstat struct layout translation lives in cross_platform/stat.rs
+
+// ── os_variant stubs ────────────────────────────────────────────────
+
+/// `bool os_variant_is_darwinos(const char *subsystem)` — always false on Linux.
+/// `bool os_variant_has_internal_content(const char *subsystem)` — likewise.
+#[cfg(not(target_os = "macos"))]
+extern "C" fn shim_os_variant_false(_subsystem: *const libc::c_char) -> libc::c_int {
+    0
+}

@@ -230,7 +230,38 @@ impl FoundationShims {
     pub fn register_host_isa_aliases(_rt: &mut objc_runtime::ObjcRuntime) {}
 
     /// Install narrow compatibility methods on guest-defined classes.
+    ///
+    /// If DVT classes weren't loaded from a real DVTFoundation framework,
+    /// they are created from our class pair statics so the methods have
+    /// somewhere to live.
     pub fn register_guest_compat_methods(rt: &mut objc_runtime::ObjcRuntime) {
+        // Ensure DVTSystemPrerequisitesPaths exists in the ObjC runtime
+        // using the real class pair address (not a synthetic/fake address).
+        if rt.get_class("DVTSystemPrerequisitesPaths").is_none() {
+            let class_addr = crate::nsobj::dvtsystemprerequisitespaths_class_addr();
+            let meta_addr = crate::nsobj::dvtsystemprerequisitespaths_metaclass_addr();
+            rt.register_synthetic_class(objc_runtime::ClassInfo {
+                name: "DVTSystemPrerequisitesPaths".to_string(),
+                mapped_addr: class_addr,
+                methods: vec![],
+                class_methods: vec![],
+                ivars: vec![],
+                properties: vec![],
+                protocol_names: vec![],
+                instance_size: 8,
+                is_root: false,
+                is_meta: false,
+                superclass_addr: None,
+                method_index: std::collections::HashMap::new(),
+                class_method_index: std::collections::HashMap::new(),
+            });
+            rt.register_metaclass_addr(meta_addr, "DVTSystemPrerequisitesPaths");
+            log::debug!(
+                "FoundationShims: registered DVTSystemPrerequisitesPaths at {:#x} / meta {:#x}",
+                class_addr, meta_addr,
+            );
+        }
+
         install_guest_class_method(
             rt,
             "DVTSystemPrerequisitesPaths",
