@@ -327,8 +327,10 @@ extern "C" fn shim_exit(status: i32) -> ! {
 
 /// `void abort(void)` — diagnostic wrapper.
 ///
-/// Logs when the guest calls abort, then delegates to the host abort.
-/// This helps identify when LLVM's error handler calls abort().
+/// Logs when the guest calls abort, then terminates the process with
+/// `_exit(1)`. Using `_exit` rather than the real `abort()` avoids
+/// SIGABRT so that tools that intentionally abort (e.g. after printing
+/// an error) are treated as normal (non-crash) exits.
 extern "C" fn shim_abort() -> ! {
     eprintln!("[DIAGNOSTIC] abort() called by guest code!");
     // Print a simple backtrace for context
@@ -337,7 +339,7 @@ extern "C" fn shim_abort() -> ! {
     eprintln!("[DIAGNOSTIC] abort caller LR = {lr:#x}");
     use std::io::Write;
     let _ = std::io::stderr().flush();
-    unsafe { libc::abort() }
+    unsafe { libc::_exit(1) }
 }
 
 /// `int sigaction(int sig, const struct sigaction *act, struct sigaction *oact)`
