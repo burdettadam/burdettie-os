@@ -77,8 +77,13 @@ impl DyldIntrospectionStubs {
             ("__dyld_register_func_for_add_image", shim_dyld_register_func_for_add_image as *const () as u64, "_dyld_register_func_for_add_image"),
             ("_dyld_image_path_containing_address", shim_dyld_image_path_containing_address as *const () as u64, "dyld_image_path_containing_address"),
             ("__NSGetExecutablePath", shim_nsgetexecutablepath as *const () as u64, "_NSGetExecutablePath"),
+            // Shared cache introspection — Linux has no shared cache
+            ("__dyld_get_shared_cache_range", shim_dyld_get_shared_cache_range as *const () as u64, "_dyld_get_shared_cache_range (→ false)"),
+            ("_dyld_for_each_installed_shared_cache", shim_dyld_for_each_installed_shared_cache as *const () as u64, "dyld_for_each_installed_shared_cache (nop)"),
+            ("_dyld_shared_cache_for_each_file", shim_dyld_shared_cache_for_each_file as *const () as u64, "dyld_shared_cache_for_each_file (nop)"),
+            ("_dyld_shared_cache_file_path", shim_dyld_shared_cache_file_path as *const () as u64, "dyld_shared_cache_file_path (→ NULL)"),
         );
-        log::debug!("DyldIntrospectionStubs: registered 7 stubs");
+        log::debug!("DyldIntrospectionStubs: registered 11 stubs");
     }
 }
 
@@ -190,6 +195,30 @@ extern "C" fn shim_nsgetexecutablepath(buf: u64, bufsize: u64) -> i32 {
     unsafe {
         std::ptr::copy_nonoverlapping(path.as_ptr(), buf as *mut u8, path.len());
     }
+    0
+}
+
+// ---------------------------------------------------------------------------
+// Shared cache introspection stubs
+// ---------------------------------------------------------------------------
+
+/// `bool _dyld_get_shared_cache_range(size_t *length)` — returns false
+/// and sets *length = 0. Linux has no dyld shared cache.
+extern "C" fn shim_dyld_get_shared_cache_range(length: *mut u64) -> i32 {
+    if !length.is_null() {
+        unsafe { *length = 0 };
+    }
+    0 // false
+}
+
+/// `void dyld_for_each_installed_shared_cache(void (^block)(...))` — nop.
+extern "C" fn shim_dyld_for_each_installed_shared_cache(_block: u64) {}
+
+/// `void dyld_shared_cache_for_each_file(void (^block)(...))` — nop.
+extern "C" fn shim_dyld_shared_cache_for_each_file(_block: u64) {}
+
+/// `const char *dyld_shared_cache_file_path(void)` — returns NULL.
+extern "C" fn shim_dyld_shared_cache_file_path() -> u64 {
     0
 }
 

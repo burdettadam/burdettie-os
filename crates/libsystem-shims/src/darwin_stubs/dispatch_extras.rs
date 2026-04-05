@@ -33,8 +33,14 @@ impl DispatchExtrasStubs {
             ("_dispatch_source_get_data", shim_dispatch_zero1 as *const () as u64, "dispatch_source_get_data (stub → 0)"),
             ("_dispatch_source_get_handle", shim_dispatch_zero1 as *const () as u64, "dispatch_source_get_handle (stub → 0)"),
             ("_dispatch_source_merge_data", shim_dispatch_void2 as *const () as u64, "dispatch_source_merge_data (stub → void)"),
+            // dispatch_apply — serial loop implementation
+            ("_dispatch_apply", shim_dispatch_apply as *const () as u64, "dispatch_apply (serial loop)"),
+            ("_dispatch_apply_f", shim_dispatch_apply_f as *const () as u64, "dispatch_apply_f (serial loop)"),
+            // dispatch_queue_create — returns a sentinel queue pointer
+            ("_dispatch_queue_create", shim_dispatch_queue_create as *const () as u64, "dispatch_queue_create (→ sentinel)"),
+            ("__dispatch_queue_attr_concurrent", &DISPATCH_QUEUE_ATTR_CONCURRENT as *const _ as u64, "_dispatch_queue_attr_concurrent (data sentinel)"),
         );
-        log::debug!("DispatchExtrasStubs: registered 22 stubs");
+        log::debug!("DispatchExtrasStubs: registered 26 stubs");
     }
 }
 
@@ -49,3 +55,49 @@ pub extern "C" fn shim_dispatch_null3(_a: u64, _b: u64, _c: u64) -> u64 { 0 }
 pub extern "C" fn shim_dispatch_block_create(_flags: u64, _block: u64) -> u64 { _block }
 pub extern "C" fn shim_dispatch_block_create_qos(_flags: u64, _qos: u64, _rel: i32, _block: u64) -> u64 { _block }
 pub extern "C" fn shim_dispatch_first_arg(a: u64, _b: u64) -> u64 { a }
+
+/// Sentinel for `_dispatch_queue_attr_concurrent` data symbol.
+static DISPATCH_QUEUE_ATTR_CONCURRENT: [u8; 8] = [0; 8];
+
+/// `void dispatch_apply(size_t iterations, dispatch_queue_t queue,
+///                       void (^block)(size_t))`
+///
+/// Executes the block `iterations` times with indices 0..iterations-1.
+/// On macOS this runs concurrently; we run serially (sufficient for ld).
+pub extern "C" fn shim_dispatch_apply(iterations: usize, _queue: u64, block: *const u8) {
+    if block.is_null() || iterations == 0 {
+        return;
+    }
+    // Block layout: isa(8) + flags(4) + reserved(4) + invoke(8)
+    let invoke: extern "C" fn(*const u8, usize) = unsafe {
+        *(block.add(16) as *const extern "C" fn(*const u8, usize))
+    };
+    for i in 0..iterations {
+        invoke(block, i);
+    }
+}
+
+/// `void dispatch_apply_f(size_t iterations, dispatch_queue_t queue,
+///                         void *context, void (*work)(void *, size_t))`
+pub extern "C" fn shim_dispatch_apply_f(
+    iterations: usize,
+    _queue: u64,
+    context: u64,
+    work: Option<extern "C" fn(u64, usize)>,
+) {
+    if let Some(f) = work {
+        for i in 0..iterations {
+            f(context, i);
+        }
+    }
+}
+
+/// `dispatch_queue_t dispatch_queue_create(const char *label, dispatch_queue_attr_t attr)`
+///
+/// Returns a sentinel queue pointer. All our dispatch shims execute
+/// inline regardless of queue identity.
+static DISPATCH_CREATED_Q: [u8; 8] = [0; 8];
+
+pub extern "C" fn shim_dispatch_queue_create(_label: u64, _attr: u64) -> u64 {
+    DISPATCH_CREATED_Q.as_ptr() as u64
+}
