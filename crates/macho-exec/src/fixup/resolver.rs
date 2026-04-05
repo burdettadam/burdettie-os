@@ -128,6 +128,7 @@ impl StubResolver {
         "libarchive.so.13",
         "libssl.so.3",
         "libcrypto.so.3",
+        "/usr/local/lib/libressl_compat.so",
         "libacl.so.1",
         "libc++.so.1",
         "libc++abi.so.1",
@@ -449,6 +450,71 @@ impl StubResolver {
         }
         // BZ2 / bzip2
         if name.starts_with("BZ2_") {
+            return true;
+        }
+        // OpenSSL / LibreSSL — macOS ships LibreSSL whose symbols are mostly
+        // ABI-compatible with OpenSSL 3.  Prefixes cover both the public API
+        // and internal helpers used by the macOS `openssl` CLI.
+        if name.starts_with("SSL_") || name.starts_with("TLS_")
+            || name.starts_with("TLSv") || name.starts_with("DTLS_")
+            || name.starts_with("EVP_") || name.starts_with("PEM_")
+            || name.starts_with("BIO_") || name.starts_with("BN_")
+            || name.starts_with("RSA_") || name.starts_with("DSA_")
+            || name.starts_with("DH_") || name.starts_with("EC_")
+            || name.starts_with("ECDSA_") || name.starts_with("ECDH_")
+            || name.starts_with("X509") || name.starts_with("ASN1_")
+            || name.starts_with("OBJ_") || name.starts_with("OCSP_")
+            || name.starts_with("PKCS") || name.starts_with("CMS_")
+            || name.starts_with("HMAC") || name.starts_with("RAND_")
+            || name.starts_with("CRYPTO_") || name.starts_with("ERR_")
+            || name.starts_with("OPENSSL_") || name.starts_with("CONF_")
+            || name.starts_with("NCONF_") || name.starts_with("ENGINE_")
+            // Cipher primitives
+            || name.starts_with("AES_") || name.starts_with("BF_")
+            || name.starts_with("CAST_") || name.starts_with("Camellia_")
+            || name.starts_with("DES_") || name.starts_with("RC2_")
+            || name.starts_with("RC4") // RC4, RC4_options, RC4_set_key
+            // Hash primitives
+            || name.starts_with("SHA1") || name.starts_with("SHA256")
+            || name.starts_with("SHA512") || name.starts_with("WHIRLPOOL")
+            // Buffer / UI / TXT_DB / SMIME
+            || name.starts_with("BUF_MEM_") || name.starts_with("BUF_strlcpy")
+            || name.starts_with("UI_") || name.starts_with("TXT_DB_")
+            || name.starts_with("SMIME_")
+            // Param print/dup helpers
+            || name.starts_with("DHparams_") || name.starts_with("DSAparams_")
+            || name.starts_with("ECPKParameters_") || name.starts_with("PBEPARAM_")
+            // X509 type structs
+            || name.starts_with("GENERAL_NAME")
+            || name.starts_with("AUTHORITY_INFO")
+            || name.starts_with("ACCESS_DESCRIPTION")
+            || name.starts_with("BASIC_CONSTRAINTS")
+            || name.starts_with("DIST_POINT")
+            || name.starts_with("ISSUING_DIST_POINT")
+            || name.starts_with("POLICYINFO")
+            || name.starts_with("POLICY_MAPPING")
+            || name.starts_with("NAME_CONSTRAINTS")
+            || name.starts_with("NETSCAPE_")
+            // Encoding helpers
+            || name.starts_with("i2d_") || name.starts_with("d2i_")
+            || name.starts_with("i2a_") || name.starts_with("a2i_")
+            || name.starts_with("i2t_") || name.starts_with("i2v_")
+            || name.starts_with("i2b_") || name.starts_with("b2i_")
+            || name.starts_with("s2i_")
+            || name.starts_with("sk_") || name.starts_with("lh_")
+            || name.starts_with("CTLOG_")
+            || name.starts_with("CT_") || name.starts_with("SCT_")
+            || name.starts_with("TS_")
+        {
+            return true;
+        }
+        // Standalone OpenSSL symbols (not prefix-matched above)
+        if matches!(name,
+            "SSLeay" | "SSLeay_version" | "OpenSSLDie"
+            | "string_to_hex" | "hex_to_string"
+            | "explicit_bzero" | "freezero" | "recallocarray" | "reallocarray"
+            | "strtonum"
+        ) {
             return true;
         }
         // DNS resolver (libresolv)

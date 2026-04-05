@@ -34,9 +34,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libc++1 \
     libc++abi1 \
     locales \
+    gcc \
+    libc6-dev \
     && rm -rf /var/lib/apt/lists/* \
     && echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen \
     && locale-gen
+
+# Build LibreSSL-to-OpenSSL 3 compatibility shim.
+# macOS ships LibreSSL whose API predates OpenSSL 3's renames/removals.
+# This .so provides the deprecated symbol names, delegating to OpenSSL 3.
+COPY docker/libressl_compat.c /tmp/libressl_compat.c
+RUN gcc -shared -fPIC -O2 -o /usr/local/lib/libressl_compat.so \
+        /tmp/libressl_compat.c \
+        -ldl -Wl,--no-as-needed \
+    && rm /tmp/libressl_compat.c \
+    && apt-get purge -y --auto-remove gcc libc6-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 # System identity
 RUN echo "burdettie-os 1.0" > /etc/burdettie-release

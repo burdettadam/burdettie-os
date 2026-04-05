@@ -157,27 +157,16 @@ pub fn blend_discriminator(addr: u64, diversity: u16) -> u64 {
 /// The caller must ensure `value` is a valid pointer for the target context.
 pub unsafe fn pac_sign_pointer(
     value: u64,
-    key: PacKey,
-    slot_addr: u64,
-    diversity: u16,
-    addr_div: bool,
+    _key: PacKey,
+    _slot_addr: u64,
+    _diversity: u16,
+    _addr_div: bool,
 ) -> u64 {
-    if value == 0 {
-        return 0;
-    }
-    let modifier = if addr_div {
-        if diversity == 0 {
-            // Auth-GOT stubs do `BRAA x16, x17` where x17 = raw slot address.
-            // When diversity is 0, the modifier IS the raw address — no blending.
-            // (Apple's dyld uses the same convention.)
-            slot_addr
-        } else {
-            blend_discriminator(slot_addr, diversity)
-        }
-    } else {
-        diversity as u64
-    };
-    pac_sign_raw(value, key, modifier)
+    // Our loader strips all PAC branches and signing instructions from the
+    // guest binary (arm64e → arm64 downgrade).  Host code (glibc, libssl,
+    // etc.) uses plain BLR and cannot handle PAC-signed pointers, so we
+    // must never actually sign.
+    value
 }
 
 // ── Runtime PAC detection ───────────────────────────────────────────
@@ -346,9 +335,9 @@ fn depac_branch(insn: u32) -> u32 {
 /// Must be called AFTER fixups are applied and BEFORE `protect()` makes
 /// text segments read-only.
 pub fn strip_pac_branches(image: &crate::MappedImage) {
-    if has_hardware_pac() {
-        return;
-    }
+    // Always strip PAC even on PAC hardware: the guest binary's signed
+    // pointers cannot cross into host code (glibc qsort, libssl, etc.)
+    // which uses plain BLR branches.
     let mut patched = 0u32;
     for seg in &image.segments {
         // Only patch executable segments (__TEXT and friends)
@@ -363,12 +352,49 @@ pub fn strip_pac_branches(image: &crate::MappedImage) {
                 let fixed = depac_branch(insn);
                 unsafe { base.add(i).write_unaligned(fixed); }
                 patched += 1;
+            } else if is_pac_data_insn(insn) {
+                // NOP out PACIA/PACIB/PACDA/PACDB/AUTIA/AUTIB/AUTDA/AUTDB
+                // and HINT-space variants (PACIASP, AUTIASP, etc.) so the
+                // binary never signs or authenticates pointers.
+                unsafe { base.add(i).write_unaligned(NOP); }
+                patched += 1;
             }
         }
     }
     if patched > 0 {
-        log::info!("strip_pac_branches: patched {patched} authenticated branch instructions");
+        log::info!("strip_pac_branches: patched {patched} PAC instructions (branches + data)");
     }
+}
+
+/// ARM64 NOP instruction.
+const NOP: u32 = 0xD503_201F;
+
+/// Test whether a 32-bit instruction is a PAC/AUT data-processing instruction.
+///
+/// Matches PACIA/PACIB/PACDA/PACDB/AUTIA/AUTIB/AUTDA/AUTDB and their Z
+/// variants (Data-processing 1 source, opcodes 001_000..001_111), plus
+/// HINT-space PAC instructions (PACIA1716, PACIASP, AUTIASP, etc.).
+#[inline]
+fn is_pac_data_insn(insn: u32) -> bool {
+    // Data-processing (1 source) PAC/AUT family:
+    //   bits[31:21] = 11011010110, bits[20:16] = 00001, bits[15:13] = 001
+    //   Matches: PACIA..AUTDB and Z variants (opcode bits[12:10] = 000..111)
+    if (insn & 0xFFFF_E000) == 0xDAC1_2000 {
+        return true;
+    }
+    // HINT-space PAC instructions (function prologue/epilogue):
+    //   PACIA1716  = HINT #8   = 0xD503_211F
+    //   PACIB1716  = HINT #10  = 0xD503_215F
+    //   AUTIA1716  = HINT #12  = 0xD503_219F
+    //   AUTIB1716  = HINT #14  = 0xD503_21DF
+    //   PACIASP    = HINT #25  = 0xD503_233F
+    //   PACIBSP    = HINT #27  = 0xD503_237F
+    //   AUTIASP    = HINT #29  = 0xD503_23BF
+    //   AUTIBSP    = HINT #31  = 0xD503_23FF
+    matches!(insn,
+        0xD503_211F | 0xD503_215F | 0xD503_219F | 0xD503_21DF
+        | 0xD503_233F | 0xD503_237F | 0xD503_23BF | 0xD503_23FF
+    )
 }
 
 #[cfg(test)]

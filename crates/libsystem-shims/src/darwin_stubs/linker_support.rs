@@ -47,11 +47,12 @@ impl LinkerSupportStubs {
             ("__simple_sresize", shim_simple_sresize as *const () as u64, "_simple_sresize (→ realloc)"),
         );
 
-        // ── BSD extensions (3 symbols) ──────────────────────────────
+        // ── BSD extensions (4 symbols) ──────────────────────────────
         register_shims!(table,
             ("_mkpath_np", shim_mkpath_np as *const () as u64, "mkpath_np (recursive mkdir)"),
             ("_dirname_r", shim_dirname_r as *const () as u64, "dirname_r (thread-safe dirname)"),
             ("_qsort_b", shim_qsort_b as *const () as u64, "qsort_b (qsort with block)"),
+            ("_qsort_r", shim_qsort_r as *const () as u64, "qsort_r (BSD→glibc arg swap)"),
         );
 
         // ── UUID (3 symbols) ────────────────────────────────────────
@@ -357,6 +358,57 @@ extern "C" fn shim_qsort_b(
             let a_ptr = slice[j * width..].as_ptr();
             let b_ptr = slice[(j - 1) * width..].as_ptr();
             let cmp = invoke(block, b_ptr, a_ptr);
+            if cmp <= 0 {
+                break;
+            }
+            // Swap elements
+            tmp.copy_from_slice(&slice[j * width..(j + 1) * width]);
+            slice.copy_within((j - 1) * width..j * width, j * width);
+            slice[(j - 1) * width..j * width].copy_from_slice(&tmp);
+            j -= 1;
+        }
+    }
+}
+
+// ── qsort_r (BSD → glibc argument translation) ─────────────────────
+//
+// macOS/BSD: void qsort_r(void *base, size_t nel, size_t width,
+//                          void *thunk,
+//                          int (*compar)(void *thunk, const void *a, const void *b))
+//
+// glibc:     void qsort_r(void *base, size_t nmemb, size_t size,
+//                          int (*compar)(const void *a, const void *b, void *arg),
+//                          void *arg)
+//
+// Both the qsort_r parameter order AND the comparison callback signature
+// differ. We translate by wrapping the BSD comparator in a glibc-style
+// callback that swaps the thunk argument position.
+
+/// BSD `qsort_r` — translates BSD calling convention to inline sort.
+/// macOS passes (base, nel, width, thunk, compar) where compar is
+/// `int (*)(void *thunk, const void *a, const void *b)`.
+/// We sort in-place using the BSD comparator directly.
+extern "C" fn shim_qsort_r(
+    base: *mut u8,
+    nel: usize,
+    width: usize,
+    thunk: *mut u8,
+    bsd_compar: extern "C" fn(*mut u8, *const u8, *const u8) -> i32,
+) {
+    if base.is_null() || nel <= 1 || width == 0 {
+        return;
+    }
+
+    let slice = unsafe { std::slice::from_raw_parts_mut(base, nel * width) };
+    let mut tmp = vec![0u8; width];
+
+    // Insertion sort — correct for any dataset, simple, no ABI issues.
+    for i in 1..nel {
+        let mut j = i;
+        while j > 0 {
+            let a_ptr = slice[j * width..].as_ptr();
+            let b_ptr = slice[(j - 1) * width..].as_ptr();
+            let cmp = bsd_compar(thunk, b_ptr, a_ptr);
             if cmp <= 0 {
                 break;
             }
