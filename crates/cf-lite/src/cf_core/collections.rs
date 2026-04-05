@@ -81,6 +81,18 @@ pub extern "C" fn shim_cf_dictionary_get_value(dict: u64, key: u64) -> u64 {
     crate::nsdictionary::shim_nsdictionary_object_for_key(dict, 0, key)
 }
 
+/// `Boolean CFDictionaryGetValueIfPresent(CFDictionaryRef theDict, const void *key, const void **value)`
+pub extern "C" fn shim_cf_dictionary_get_value_if_present(dict: u64, key: u64, value_out: u64) -> u8 {
+    let val = shim_cf_dictionary_get_value(dict, key);
+    if val == 0 {
+        return 0; // false
+    }
+    if value_out != 0 {
+        unsafe { *(value_out as *mut u64) = val; }
+    }
+    1 // true
+}
+
 // ── CFData C functions ─────────────────────────────────────────────
 
 /// `CFDataRef CFDataCreate(CFAllocatorRef, const UInt8 *bytes, CFIndex length)`
@@ -674,6 +686,208 @@ pub extern "C" fn shim_cf_allocator_deallocate(_alloc: u64, ptr: u64) {
     if ptr != 0 {
         unsafe { libc::free(ptr as *mut libc::c_void); }
     }
+}
+
+// ── CFStringGetBytes ───────────────────────────────────────────────
+
+/// `CFIndex CFStringGetBytes(CFStringRef, CFRange range, CFStringEncoding, UInt8 lossByte,
+///     Boolean isExternalRepresentation, UInt8 *buffer, CFIndex maxBufLen, CFIndex *usedBufLen)`
+///
+/// Converts characters from a CFString into a byte buffer.
+/// We only support UTF-8 encoding.
+pub extern "C" fn shim_cf_string_get_bytes(
+    string: u64,
+    range_loc: i64,
+    range_len: i64,
+    _encoding: u32,
+    _loss_byte: u8,
+    _is_external: u8,
+    buffer: u64,
+    max_buf_len: i64,
+    used_buf_len: u64,
+) -> i64 {
+    if string == 0 || range_len <= 0 {
+        if used_buf_len != 0 {
+            unsafe { *(used_buf_len as *mut i64) = 0; }
+        }
+        return 0;
+    }
+    let parts = crate::cfstring::cfstring_parts(string);
+    let (bytes, total_len) = match parts {
+        Some((b, len)) => (b, len),
+        None => {
+            if used_buf_len != 0 {
+                unsafe { *(used_buf_len as *mut i64) = 0; }
+            }
+            return 0;
+        }
+    };
+
+    let start = range_loc as usize;
+    let end = (range_loc + range_len) as usize;
+    let end = end.min(total_len);
+    if start >= end {
+        if used_buf_len != 0 {
+            unsafe { *(used_buf_len as *mut i64) = 0; }
+        }
+        return 0;
+    }
+    let slice = &bytes[start..end];
+    let copy_len = if buffer != 0 {
+        let n = slice.len().min(max_buf_len as usize);
+        unsafe { std::ptr::copy_nonoverlapping(slice.as_ptr(), buffer as *mut u8, n); }
+        n
+    } else {
+        slice.len()
+    };
+    if used_buf_len != 0 {
+        unsafe { *(used_buf_len as *mut i64) = copy_len as i64; }
+    }
+    copy_len as i64
+}
+
+/// `Boolean CFStringGetFileSystemRepresentation(CFStringRef, char *buffer, CFIndex maxBufLen)`
+pub extern "C" fn shim_cf_string_get_file_system_representation(
+    string: u64,
+    buffer: u64,
+    max_buf_len: i64,
+) -> u8 {
+    if string == 0 || buffer == 0 || max_buf_len <= 0 {
+        return 0;
+    }
+    let cstr = crate::cfstring::extract_cfstring_cstr(string);
+    match cstr {
+        Some(s) => {
+            let bytes = s.as_bytes();
+            let n = bytes.len().min((max_buf_len - 1) as usize);
+            unsafe {
+                std::ptr::copy_nonoverlapping(bytes.as_ptr(), buffer as *mut u8, n);
+                *((buffer as *mut u8).add(n)) = 0; // NUL-terminate
+            }
+            1
+        }
+        None => 0,
+    }
+}
+
+// ── CFDataCreateWithBytesNoCopy ────────────────────────────────────
+
+/// `CFDataRef CFDataCreateWithBytesNoCopy(CFAllocatorRef, const UInt8 *bytes, CFIndex length, CFAllocatorRef bytesDeallocator)`
+///
+/// We copy the bytes anyway since we can't rely on the caller's lifetime guarantees.
+pub extern "C" fn shim_cf_data_create_with_bytes_no_copy(
+    alloc: u64,
+    bytes: *const u8,
+    length: i64,
+    _deallocator: u64,
+) -> u64 {
+    shim_cf_data_create(alloc, bytes, length)
+}
+
+// ── CFErrorCopyDescription ─────────────────────────────────────────
+
+/// `CFStringRef CFErrorCopyDescription(CFErrorRef err)`
+///
+/// We don't model CFError deeply — return a generic error string.
+pub extern "C" fn shim_cf_error_copy_description(err: u64) -> u64 {
+    if err == 0 {
+        let cstr = std::ffi::CString::new("(null error)").unwrap();
+        return crate::cfstring::shim_cf_string_create_with_cstring(0, cstr.as_ptr(), 0);
+    }
+    let cstr = std::ffi::CString::new("CFError (no details available)").unwrap();
+    crate::cfstring::shim_cf_string_create_with_cstring(0, cstr.as_ptr(), 0)
+}
+
+// ── CFURLCreateDataAndPropertiesFromResource ───────────────────────
+
+/// `Boolean CFURLCreateDataAndPropertiesFromResource(CFAllocatorRef, CFURLRef url,
+///     CFDataRef *resourceData, CFDictionaryRef *properties, CFArrayRef desiredProperties,
+///     SInt32 *errorCode)`
+///
+/// Deprecated API used by sw_vers to read plist files from disk.
+pub extern "C" fn shim_cf_url_create_data_and_properties_from_resource(
+    _alloc: u64,
+    url: u64,
+    resource_data_out: u64,
+    _properties_out: u64,
+    _desired: u64,
+    error_code_out: u64,
+) -> u8 {
+    if url == 0 || resource_data_out == 0 {
+        if error_code_out != 0 {
+            unsafe { *(error_code_out as *mut i32) = -1; }
+        }
+        return 0;
+    }
+    // Extract file path from CFURL
+    let url_str = crate::cfstring::extract_cfstring_cstr(unsafe {
+        *((url as usize + 16) as *const u64) // NSURL stores the string at offset 16
+    });
+    let path = match url_str {
+        Some(s) => {
+            // Strip file:// prefix if present
+            if let Some(p) = s.strip_prefix("file://") { p } else { s }
+        }
+        None => {
+            if error_code_out != 0 {
+                unsafe { *(error_code_out as *mut i32) = -1; }
+            }
+            return 0;
+        }
+    };
+    match std::fs::read(path) {
+        Ok(data) => {
+            let cf_data = crate::nsdata::make_nsdata(&data);
+            unsafe { *(resource_data_out as *mut u64) = cf_data; }
+            if error_code_out != 0 {
+                unsafe { *(error_code_out as *mut i32) = 0; }
+            }
+            1
+        }
+        Err(_) => {
+            if error_code_out != 0 {
+                unsafe { *(error_code_out as *mut i32) = -1; }
+            }
+            0
+        }
+    }
+}
+
+// ── _CFCopySupplementalVersionDictionary ───────────────────────────
+
+/// Private Apple function that returns the SystemVersion.plist as a CFDictionary.
+/// sw_vers uses this to get macOS version info.
+///
+/// Reads `/System/Library/CoreServices/SystemVersion.plist` and returns
+/// the parsed dictionary.  Returns NULL if the file is missing or unparseable.
+pub extern "C" fn shim_cf_copy_supplemental_version_dictionary() -> u64 {
+    const PLIST_PATH: &str = "/System/Library/CoreServices/SystemVersion.plist";
+
+    let data = match std::fs::read(PLIST_PATH) {
+        Ok(d) => d,
+        Err(e) => {
+            log::debug!("_CFCopySupplementalVersionDictionary: cannot read {PLIST_PATH}: {e}");
+            return 0;
+        }
+    };
+
+    // Parse the plist (XML or binary) via NSPropertyListSerialization
+    let cf_data = crate::nsdata::make_nsdata(&data);
+    let dict = crate::nspropertylistserialization::shim_plist_with_data(
+        crate::nsobj::nspropertylistserialization_class_addr(),
+        0,     // _cmd
+        cf_data,
+        0,     // options
+        0,     // format out
+        0,     // error out
+    );
+
+    if dict != 0 {
+        log::debug!("_CFCopySupplementalVersionDictionary: loaded from {PLIST_PATH}");
+    } else {
+        log::debug!("_CFCopySupplementalVersionDictionary: plist parse failed");
+    }
+    dict
 }
 
 #[cfg(test)]

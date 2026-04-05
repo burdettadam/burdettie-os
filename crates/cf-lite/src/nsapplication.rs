@@ -334,7 +334,51 @@ pub extern "C" fn shim_nsapplication_run(obj: u64, _cmd: u64) {
         send_delegate_message(delegate, "applicationDidFinishLaunching:", note);
     }
 
-    log::debug!("NSApplication run: run loop iteration complete");
+    // If a GUI bridge is available, enter the real event loop.
+    // The bridge blocks here until the application terminates.
+    if let Some(bridge) = crate::gui_bridge::gui_bridge() {
+        log::info!("NSApplication run: entering GUI event loop");
+
+        // Show any already-visible guest windows
+        for &window in &snapshot_windows() {
+            if crate::nswindow::is_window_visible(window) {
+                let desc = crate::nswindow::window_desc(window);
+                bridge.show_window(&desc);
+            }
+        }
+
+        bridge.run_event_loop(Box::new(|guest_window, event| {
+            match event {
+                crate::gui_bridge::GuiEvent::WindowCloseRequested => {
+                    if guest_window != 0 {
+                        crate::nswindow::shim_nswindow_perform_close(guest_window, 0, 0);
+                    }
+                }
+                crate::gui_bridge::GuiEvent::AppTerminate => {
+                    shim_nsapplication_terminate(
+                        get_or_create_shared_app(), 0, 0,
+                    );
+                }
+                crate::gui_bridge::GuiEvent::WindowResized { width, height } => {
+                    if guest_window != 0 {
+                        crate::nswindow::shim_nswindow_set_frame_display(
+                            guest_window, 0, 0.0, 0.0, width, height, 1,
+                        );
+                    }
+                }
+                other => {
+                    crate::gui_bridge::dispatch_gui_event(guest_window, &other);
+                }
+            }
+        }));
+
+        unsafe { *((obj as usize + IS_RUNNING_OFF) as *mut u64) = 0; }
+        log::info!("NSApplication run: GUI event loop exited");
+        return;
+    }
+
+    // No bridge — run one cycle and return (headless/CLI behavior).
+    log::debug!("NSApplication run: no GUI bridge, single-pass complete");
 }
 
 /// `-[NSApplication terminate:]`
@@ -349,6 +393,12 @@ pub extern "C" fn shim_nsapplication_terminate(obj: u64, _cmd: u64, _sender: u64
     }
 
     unsafe { *((obj as usize + IS_RUNNING_OFF) as *mut u64) = 0; }
+
+    // Ask GUI bridge to stop if active
+    if let Some(bridge) = crate::gui_bridge::gui_bridge() {
+        bridge.request_stop();
+    }
+
     log::debug!("NSApplication terminate: stopped");
 }
 

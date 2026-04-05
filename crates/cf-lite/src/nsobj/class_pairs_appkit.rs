@@ -371,3 +371,49 @@ define_class_pair!(child NSTABLEVIEW_CLASS_DATA, NSTABLEVIEW_METACLASS_DATA, NST
     meta_addr: nstableview_metaclass_addr,
     parent_class: nsview_class_addr,
     parent_meta: nsview_metaclass_addr);
+
+// ── CoreAnimation classes (CALayer, CATransaction, CADisplayLink) ──
+
+define_class_pair!(child CALAYER_CLASS_DATA, CALAYER_METACLASS_DATA, CALAYER_INIT,
+    ensure: ensure_calayer_init,
+    class_addr: calayer_class_addr,
+    meta_addr: calayer_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child CATRANSACTION_CLASS_DATA, CATRANSACTION_METACLASS_DATA, CATRANSACTION_INIT,
+    ensure: ensure_catransaction_init,
+    class_addr: catransaction_class_addr,
+    meta_addr: catransaction_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child CADISPLAYLINK_CLASS_DATA, CADISPLAYLINK_METACLASS_DATA, CADISPLAYLINK_INIT,
+    ensure: ensure_cadisplaylink_init,
+    class_addr: cadisplaylink_class_addr,
+    meta_addr: cadisplaylink_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child CAMEDIATIMINGFUNCTION_CLASS_DATA, CAMEDIATIMINGFUNCTION_METACLASS_DATA, CAMEDIATIMINGFUNCTION_INIT,
+    ensure: ensure_camediatimingfunction_init,
+    class_addr: camediatimingfunction_class_addr,
+    meta_addr: camediatimingfunction_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+// ── Phase C14: NSGraphicsContext, NSBezierPath ─────────────────────
+
+define_class_pair!(child NSGRAPHICSCONTEXT_CLASS_DATA, NSGRAPHICSCONTEXT_METACLASS_DATA, NSGRAPHICSCONTEXT_INIT,
+    ensure: ensure_nsgraphicscontext_init,
+    class_addr: nsgraphicscontext_class_addr,
+    meta_addr: nsgraphicscontext_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSBEZIERPATH_CLASS_DATA, NSBEZIERPATH_METACLASS_DATA, NSBEZIERPATH_INIT,
+    ensure: ensure_nsbezierpath_init,
+    class_addr: nsbezierpath_class_addr,
+    meta_addr: nsbezierpath_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);

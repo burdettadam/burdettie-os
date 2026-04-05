@@ -140,12 +140,14 @@ pub(crate) mod nsalert;
 pub(crate) mod nsapplication;
 pub(crate) mod nsappearance;
 pub(crate) mod nsbutton;
+pub(crate) mod calayer;
 pub(crate) mod nscolor;
 pub(crate) mod nscolorwell;
 pub(crate) mod nscombobox;
 pub(crate) mod nscontrol;
 pub(crate) mod nsevent;
 pub(crate) mod nsfont;
+pub(crate) mod nsgraphicscontext;
 pub(crate) mod nsimage;
 pub(crate) mod nsimageview;
 pub(crate) mod nsmenu_shim;
@@ -175,8 +177,12 @@ pub(crate) mod nswindowcontroller;
 // Tier 2 Feature Parity: safe area, size classes, animation, table view, undo
 pub(crate) mod nstraitcollection;
 pub(crate) mod nsanimationcontext;
+pub(crate) mod nsbezierpath;
 pub(crate) mod nstableview;
 pub(crate) mod nsundomanager;
+
+// GUI bridge: connects AppKit shims to a real windowing backend
+pub mod gui_bridge;
 
 // Framework stubs (CoreData, AVFoundation, CoreLocation, CoreBluetooth)
 pub(crate) mod coredata_stubs;

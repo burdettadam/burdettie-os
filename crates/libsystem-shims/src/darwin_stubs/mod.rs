@@ -21,6 +21,7 @@ mod iokit;
 mod keymgr;
 mod launch_services;
 pub(crate) mod mach_extras;
+mod macho_arch;
 mod malloc_zone;
 mod misc;
 mod mobile_gestalt;
@@ -77,6 +78,7 @@ pub fn install_darwin_stubs(table: &mut ShimTable) {
     sysinfo::SysInfoStubs::install(table);
     dyld_introspection::DyldIntrospectionStubs::install(table);
     keymgr::KeymgrStubs::install(table);
+    macho_arch::MachoArchStubs::install(table);
     xpc::XpcStubs::install(table);
     swift_reflection::LibswiftRemoteMirrorStubs::install(table);
     swift_foundation_bridge::SwiftFoundationBridgeStubs::install(table);

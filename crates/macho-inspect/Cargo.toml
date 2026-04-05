@@ -30,12 +30,19 @@ serde_json     = { workspace = true }
 serde          = { workspace = true }
 env_logger     = { workspace = true }
 log            = { workspace = true }
+winit          = { version = "0.30", optional = true }
+softbuffer     = { version = "0.4", optional = true }
+
+[features]
+default = []
+gui = ["dep:winit", "dep:softbuffer"]
 
 [target.'cfg(target_os = "macos")'.dependencies]
 platform-darwin-host = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 platform-linux       = { workspace = true }
+libc                 = { workspace = true }
 
 [lints]
 workspace = true

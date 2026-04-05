@@ -152,6 +152,7 @@ impl ProcessShims {
         );
         table.register("__NSGetArgc", shim_nsgetargc as *const () as u64, "_NSGetArgc → &argc");
         table.register("__NSGetArgv", shim_nsgetargv as *const () as u64, "_NSGetArgv → &argv");
+        table.register("__NSGetEnviron", shim_nsgetenviron as *const () as u64, "_NSGetEnviron → &environ");
         table.register(
             "_getenv",
             shim_getenv as *const () as u64,
@@ -211,6 +212,17 @@ extern "C" fn shim_nsgetargc() -> *const i32 {
 extern "C" fn shim_nsgetargv() -> *const *const *const std::ffi::c_char {
     let state = PROCESS_STATE.get().expect("process state not initialised");
     &state.argv_head as *const usize as *const *const *const std::ffi::c_char
+}
+
+/// `char ***_NSGetEnviron(void)` — returns pointer to `environ`.
+///
+/// On macOS this is in `crt_externs.h`. On Linux, we return a pointer to
+/// the libc `environ` global variable, which is the same semantics.
+extern "C" fn shim_nsgetenviron() -> *const *const *const std::ffi::c_char {
+    extern "C" {
+        static mut environ: *const *const std::ffi::c_char;
+    }
+    unsafe { std::ptr::addr_of!(environ) as *const *const *const std::ffi::c_char }
 }
 
 /// `char *getenv(const char *name)`

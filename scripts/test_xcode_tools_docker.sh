@@ -168,12 +168,13 @@ test_dir() {
             notarytool|altool)
                            args="--help" ;;
             xcstringstool)  args="" ;;
-            grep|sed|sort|uniq|wc|cut|tar|gzip|diff|bzip2)
-                           args="--version" ;;
+            grep|sed|sort|uniq|wc|cut|gzip|diff|bzip2)
+                           args="" ;;
+            tar)           args="-tf /dev/null" ;;
             awk)           args="--version" ;;
-            find)          args="--version" ;;
-            file)          args="/opt/xcode-tools/xcode-tc/lipo" ;;
-            stat)          args="/opt/xcode-tools/xcode-tc/lipo" ;;
+            find)          args="/tmp -maxdepth 0 -print" ;;
+            file)          args="/etc/hostname" ;;
+            stat)          args="/" ;;
             uname)         args="-a" ;;
             sw_vers|arch|hostinfo|uptime|id|whoami|hostname|vm_stat)
                            args="" ;;

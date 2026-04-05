@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
-const FOUNDATION_SYNTHETIC_CLASS_COUNT: usize = 93;
+const FOUNDATION_SYNTHETIC_CLASS_COUNT: usize = 95;
 const FOUNDATION_SELECTOR_RESERVE: usize = 512;
 const FOUNDATION_PROTOCOL_RESERVE: usize = 16;
 const FOUNDATION_CATEGORY_LOAD_RESERVE: usize = 16;
@@ -571,6 +571,16 @@ fn populate_foundation_runtime(objc_rt: &mut objc_runtime::ObjcRuntime) {
     cf_lite::FoundationShims::register_nstableview_class(objc_rt);
     cf_lite::FoundationShims::register_nsundomanager_class(objc_rt);
     cf_lite::FoundationShims::register_nsview_safe_area_methods(objc_rt);
+
+    // Phase C13 — CoreAnimation (CALayer, CATransaction, CADisplayLink, CAMediaTimingFunction)
+    cf_lite::FoundationShims::register_calayer_class(objc_rt);
+    cf_lite::FoundationShims::register_catransaction_class(objc_rt);
+    cf_lite::FoundationShims::register_cadisplaylink_class(objc_rt);
+    cf_lite::FoundationShims::register_camediatimingfunction_class(objc_rt);
+
+    // Phase C14 — Drawing (NSGraphicsContext, NSBezierPath)
+    cf_lite::FoundationShims::register_nsgraphicscontext_class(objc_rt);
+    cf_lite::FoundationShims::register_nsbezierpath_class(objc_rt);
 
     // Register tagged pointer class table (NSNumber=2, NSString=3, NSDate=6).
     cf_lite::FoundationShims::register_tagged_classes(objc_rt);

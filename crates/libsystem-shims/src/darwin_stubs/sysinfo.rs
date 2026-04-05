@@ -30,8 +30,11 @@ impl SysInfoStubs {
             ("_endgrent", shim_endgrent as *const () as u64, "endgrent close group enumeration"),
             ("_gethostname", shim_gethostname as *const () as u64, "gethostname get system hostname"),
             ("_sethostname", shim_sethostname as *const () as u64, "sethostname stub (returns EPERM)"),
+            ("_getgroups", shim_getgroups as *const () as u64, "getgroups get supplementary group IDs"),
+            ("_getgrouplist_2", shim_getgrouplist_2 as *const () as u64, "getgrouplist_2 macOS extended group list"),
+            ("_getaudit_addr", shim_getaudit_addr as *const () as u64, "getaudit_addr stub (returns ENOSYS)"),
         );
-        log::debug!("SysInfoStubs: registered 16 stubs");
+        log::debug!("SysInfoStubs: registered 19 stubs");
     }
 }
 
@@ -168,6 +171,92 @@ pub extern "C" fn shim_sethostname(_name: u64, _len: usize) -> i32 {
     unsafe { *libc::__error() = libc::EPERM };
     #[cfg(not(target_os = "macos"))]
     unsafe { *libc::__errno_location() = libc::EPERM };
+    -1
+}
+
+// ---------------------------------------------------------------------------
+// Supplementary groups
+// ---------------------------------------------------------------------------
+
+/// `int getgroups(int gidsetsize, gid_t grouplist[])`
+pub extern "C" fn shim_getgroups(gidsetsize: i32, grouplist: u64) -> i32 {
+    unsafe { libc::getgroups(gidsetsize, grouplist as *mut libc::gid_t) }
+}
+
+/// `int getgrouplist_2(const char *name, gid_t basegid, gid_t **groups)`
+///
+/// macOS-specific: allocates and returns all groups for user.
+/// We implement using Linux `getgrouplist` + malloc.
+pub extern "C" fn shim_getgrouplist_2(name: u64, basegid: u32, groups_out: u64) -> i32 {
+    if name == 0 || groups_out == 0 {
+        return -1;
+    }
+    // On macOS, getgrouplist uses c_int for groups; on Linux it uses gid_t.
+    // We handle this with cfg to satisfy both platforms.
+    #[cfg(target_os = "macos")]
+    {
+        let mut ngroups: libc::c_int = 64;
+        let mut buf: Vec<libc::c_int> = vec![0; ngroups as usize];
+        let rc = unsafe {
+            libc::getgrouplist(name as *const c_char, basegid as libc::c_int, buf.as_mut_ptr(), &mut ngroups)
+        };
+        if rc < 0 {
+            buf.resize(ngroups as usize, 0);
+            let rc2 = unsafe {
+                libc::getgrouplist(name as *const c_char, basegid as libc::c_int, buf.as_mut_ptr(), &mut ngroups)
+            };
+            if rc2 < 0 { return -1; }
+        }
+        let alloc_size = (ngroups as usize) * std::mem::size_of::<u32>();
+        let ptr = unsafe { libc::malloc(alloc_size) };
+        if ptr.is_null() { return -1; }
+        // Copy as u32 (gid_t) for the macOS ABI caller
+        let out = ptr as *mut u32;
+        for i in 0..ngroups as usize {
+            unsafe { *out.add(i) = buf[i] as u32; }
+        }
+        unsafe { *(groups_out as *mut u64) = ptr as u64; }
+        ngroups
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let mut ngroups: libc::c_int = 64;
+        let mut buf: Vec<libc::gid_t> = vec![0; ngroups as usize];
+        let rc = unsafe {
+            libc::getgrouplist(name as *const c_char, basegid as libc::gid_t, buf.as_mut_ptr(), &mut ngroups)
+        };
+        if rc < 0 {
+            buf.resize(ngroups as usize, 0);
+            let rc2 = unsafe {
+                libc::getgrouplist(name as *const c_char, basegid as libc::gid_t, buf.as_mut_ptr(), &mut ngroups)
+            };
+            if rc2 < 0 { return -1; }
+        }
+        let alloc_size = (ngroups as usize) * std::mem::size_of::<libc::gid_t>();
+        let ptr = unsafe { libc::malloc(alloc_size) };
+        if ptr.is_null() { return -1; }
+        unsafe {
+            std::ptr::copy_nonoverlapping(buf.as_ptr() as *const u8, ptr as *mut u8, alloc_size);
+            *(groups_out as *mut u64) = ptr as u64;
+        }
+        ngroups
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BSM Audit (stub)
+// ---------------------------------------------------------------------------
+
+/// `int getaudit_addr(auditinfo_addr_t *info, int length)`
+///
+/// BSM audit not available on Linux — return ENOSYS.
+pub extern "C" fn shim_getaudit_addr(_info: u64, _length: i32) -> i32 {
+    unsafe {
+        #[cfg(target_os = "macos")]
+        { *libc::__error() = libc::ENOSYS; }
+        #[cfg(not(target_os = "macos"))]
+        { *libc::__errno_location() = libc::ENOSYS; }
+    }
     -1
 }
 

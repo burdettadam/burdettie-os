@@ -299,9 +299,27 @@ pub extern "C" fn shim_nsview_set_wants_layer(obj: u64, _cmd: u64, flag: u8) {
     write_u64(obj, FLAGS_OFF, flags);
 }
 
-/// `-[NSView layer]` — returns nil (no real CALayer).
-pub extern "C" fn shim_nsview_layer(_obj: u64, _cmd: u64) -> u64 {
-    0
+/// `-[NSView layer]` — returns a lazily-created CALayer when wantsLayer is YES.
+pub extern "C" fn shim_nsview_layer(obj: u64, _cmd: u64) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
+    // Only return a layer if wantsLayer is set.
+    if read_u64(obj, FLAGS_OFF) & FLAG_WANTS_LAYER == 0 {
+        return 0;
+    }
+    view_layer_or_create(obj)
+}
+
+/// Lazily create and cache a CALayer for a view.
+fn view_layer_or_create(obj: u64) -> u64 {
+    use std::collections::HashMap;
+    use std::sync::Mutex;
+    static VIEW_LAYERS: std::sync::OnceLock<Mutex<HashMap<u64, u64>>> =
+        std::sync::OnceLock::new();
+    let map = VIEW_LAYERS.get_or_init(|| Mutex::new(HashMap::new()));
+    let mut guard = map.lock().unwrap_or_else(|e| e.into_inner());
+    *guard.entry(obj).or_insert_with(crate::calayer::alloc_layer)
 }
 
 /// `-[NSView superview]`
@@ -309,14 +327,21 @@ pub extern "C" fn shim_nsview_superview(obj: u64, _cmd: u64) -> u64 {
     read_u64(obj, SUPERVIEW_OFF)
 }
 
-/// `-[NSView frame]` — returns first f64 of frame (x) as simplified stub.
-pub extern "C" fn shim_nsview_frame(obj: u64, _cmd: u64) -> f64 {
-    read_f64(obj, FRAME_X_OFF)
+/// `-[NSView frame]` — returns CGRect (32 bytes, x8 indirect return on ARM64).
+pub extern "C" fn shim_nsview_frame(obj: u64, _cmd: u64) -> CGRect {
+    if obj == 0 { return CGRect::ZERO; }
+    CGRect::new(
+        read_f64(obj, FRAME_X_OFF),
+        read_f64(obj, FRAME_Y_OFF),
+        read_f64(obj, FRAME_W_OFF),
+        read_f64(obj, FRAME_H_OFF),
+    )
 }
 
-/// `-[NSView bounds]` — same as frame for this stub.
-pub extern "C" fn shim_nsview_bounds(obj: u64, _cmd: u64) -> f64 {
-    shim_nsview_frame(obj, _cmd)
+/// `-[NSView bounds]` — origin at (0,0), same size as frame.
+pub extern "C" fn shim_nsview_bounds(obj: u64, _cmd: u64) -> CGRect {
+    let f = shim_nsview_frame(obj, _cmd);
+    CGRect::new(0.0, 0.0, f.size.width, f.size.height)
 }
 
 /// `-[NSView window]`
@@ -720,13 +745,13 @@ mod tests {
 
     #[test]
     fn frame_nil() {
-        assert_eq!(shim_nsview_frame(0, 0), 0.0);
+        assert_eq!(shim_nsview_frame(0, 0), CGRect::ZERO);
     }
 
     #[test]
     fn frame_returns_x() {
         let obj = shim_nsview_init_with_frame(0, 0, 42.5, 0.0, 0.0, 0.0);
-        assert_eq!(shim_nsview_frame(obj, 0), 42.5);
+        assert_eq!(shim_nsview_frame(obj, 0).origin.x, 42.5);
         free_obj(obj);
     }
 
@@ -734,7 +759,7 @@ mod tests {
     fn frame_manual_layout() {
         let obj = make_view();
         write_f64(obj, FRAME_X_OFF, 99.0);
-        assert_eq!(shim_nsview_frame(obj, 0), 99.0);
+        assert_eq!(shim_nsview_frame(obj, 0).origin.x, 99.0);
         free_obj(obj);
     }
 
@@ -742,13 +767,18 @@ mod tests {
 
     #[test]
     fn bounds_nil() {
-        assert_eq!(shim_nsview_bounds(0, 0), 0.0);
+        assert_eq!(shim_nsview_bounds(0, 0), CGRect::ZERO);
     }
 
     #[test]
-    fn bounds_matches_frame() {
-        let obj = shim_nsview_init_with_frame(0, 0, 7.5, 0.0, 0.0, 0.0);
-        assert_eq!(shim_nsview_bounds(obj, 0), shim_nsview_frame(obj, 0));
+    fn bounds_matches_frame_size() {
+        let obj = shim_nsview_init_with_frame(0, 0, 7.5, 3.0, 100.0, 200.0);
+        let bounds = shim_nsview_bounds(obj, 0);
+        let frame = shim_nsview_frame(obj, 0);
+        assert_eq!(bounds.origin.x, 0.0);
+        assert_eq!(bounds.origin.y, 0.0);
+        assert_eq!(bounds.size.width, frame.size.width);
+        assert_eq!(bounds.size.height, frame.size.height);
         free_obj(obj);
     }
 
@@ -893,11 +923,16 @@ mod tests {
     }
 
     #[test]
-    fn layer_always_returns_zero() {
+    fn layer_returns_calayer_when_wants_layer() {
         let obj = make_view();
+        // Without wantsLayer, layer returns nil
         assert_eq!(shim_nsview_layer(obj, 0), 0);
+        // With wantsLayer, layer returns a valid CALayer
         shim_nsview_set_wants_layer(obj, 0, 1);
-        assert_eq!(shim_nsview_layer(obj, 0), 0);
+        let layer = shim_nsview_layer(obj, 0);
+        assert_ne!(layer, 0);
+        // Calling again returns the same layer (cached)
+        assert_eq!(shim_nsview_layer(obj, 0), layer);
         free_obj(obj);
     }
 

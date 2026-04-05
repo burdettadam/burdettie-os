@@ -1,0 +1,20 @@
+[package]
+name = "file-explorer"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "file-explorer"
+path = "src/main.rs"
+
+[dependencies]
+app-kit-lite          = { workspace = true }
+graphics-core         = { workspace = true }
+window-backend        = { workspace = true }
+window-backend-darwin = { workspace = true }
+ui-controls           = { workspace = true }
+
+[lints]
+workspace = true

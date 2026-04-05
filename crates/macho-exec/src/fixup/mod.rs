@@ -1,6 +1,7 @@
 //! Fixup application: rebases, symbol binds, and chained fixup walking.
 
 mod chained;
+pub mod ctor_thunk;
 mod resolver;
 pub mod data_symbols;
 

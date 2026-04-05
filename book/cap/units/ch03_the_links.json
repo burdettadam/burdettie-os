@@ -1,0 +1,374 @@
+[
+  {
+    "unit_id": "ch03_s01",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 12,
+    "observables": {
+      "participants": ["the_reader", "the_builder", "concept_dynamic_linking"],
+      "context": { "setting": "setting_debugger", "chapter": 3, "part": 2, "title": "Why Dynamic Linking", "estimated_words": 1500, "source_files": ["crates/macho-exec/src/fixup/"] },
+      "event_type": "discovery"
+    },
+    "structure": {
+      "position": 0.149,
+      "causal_role": "setup",
+      "grouping": { "part": "II — The Linker", "chapter": "Ch 3 — The Links", "beat": "break_into_two" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "demonstrate", "target": "GOT entries are all zero — first function call → SIGSEGV at address 0x0", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_builder", "action": "explain", "target": "static vs dynamic linking — shared code, version independence, memory savings", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_builder", "action": "explain", "target": "install names and @rpath — how macOS names its libraries", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_builder", "action": "frame", "target": "'Do we need to build an entire dynamic linker?' Yes.", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "binary_is_mapped_but_cannot_call_functions" },
+        "after": { "state_type": "knowledge", "value": "dynamic_linking_is_required_to_resolve_symbols" },
+        "trigger": "SIGSEGV at address 0x0 reveals all function pointers are unresolved",
+        "description": "The reader commits to building a full dynamic linker. There is no shortcut."
+      }
+    },
+    "interpretations": {
+      "subtext": "The scope of the project becomes clear. Understanding requires building the whole stack.",
+      "motifs": ["SIGSEGV", "scope_revelation"],
+      "reader_emotion": "hesitation_then_commitment",
+      "thematic_function": "Break into Two — the reader enters the 'special world' of dynamic linking. From reader to builder."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "has_mapped_image_in_memory" },
+        "post_state": { "capability": "understands_need_for_dynamic_linker" },
+        "objective": { "action": "resolve", "target": "why mapped binary crashes on first function call" },
+        "information_state": {
+          "knows": [
+            { "subject": "vm", "predicate": "knows", "about": "binary is mapped with correct permissions" }
+          ],
+          "gaps": [
+            { "subject": "linking", "predicate": "knows", "about": "bind opcode format" },
+            { "subject": "linking", "predicate": "knows", "about": "chained fixup format" }
+          ],
+          "gained": [
+            { "subject": "linking", "predicate": "knows", "about": "GOT must be filled with real function addresses" },
+            { "subject": "linking", "predicate": "knows", "about": "shared libraries enable code reuse without duplication" },
+            { "subject": "linking", "predicate": "knows", "about": "install names and @rpath library naming" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch03_s02",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 13,
+    "observables": {
+      "participants": ["the_reader", "crate_macho_exec"],
+      "context": { "setting": "setting_hex_editor", "chapter": 3, "part": 2, "title": "Import Binds", "estimated_words": 2000, "source_files": ["crates/macho-exec/src/fixup/resolver.rs"] },
+      "event_type": "discovery"
+    },
+    "structure": {
+      "position": 0.162,
+      "causal_role": "trigger",
+      "grouping": { "part": "II — The Linker", "chapter": "Ch 3 — The Links", "beat": "break_into_two" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_reader", "action": "locate", "target": "LC_DYLD_INFO_ONLY load command pointing to bind opcode stream", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "decode", "target": "bind opcode stream byte by byte — a mini virtual machine", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_builder", "action": "explain", "target": "BIND_OPCODE_SET_SYMBOL_TRAILING_FLAGS, BIND_OPCODE_DO_BIND", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_reader", "action": "trace", "target": "opcode VM executing bind instructions to fill GOT entries", "significance": "essential" },
+        { "sequence_number": 5, "agent": "the_builder", "action": "contrast", "target": "lazy binding — deferred resolution via stub helpers", "significance": "supplementary" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "symbols_need_resolving_somehow" },
+        "after": { "state_type": "knowledge", "value": "bind_opcodes_are_a_mini_vm_language" },
+        "trigger": "Walking the opcode stream byte by byte reveals a virtual machine embedded in the binary",
+        "description": "The binary contains its own loading program. Apple's undocumented territory begins."
+      }
+    },
+    "interpretations": {
+      "subtext": "The binary contains its own loading program — a VM within a file within a VM.",
+      "motifs": ["self_describing_binary", "platform_opacity"],
+      "reader_emotion": "archaeologist_code_breaking",
+      "thematic_function": "Entering Apple's undocumented territory — the bind opcode format is a code-breaking exercise. Sets up the contrast with modern chained fixups."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "understands_need_for_dynamic_linker" },
+        "post_state": { "capability": "can_decode_classic_bind_opcodes" },
+        "objective": { "action": "decode", "target": "bind opcode protocol" },
+        "information_state": {
+          "gained": [
+            { "subject": "linking", "predicate": "knows", "about": "LC_DYLD_INFO_ONLY points to bind/lazy/rebase opcodes" },
+            { "subject": "linking", "predicate": "knows", "about": "bind opcodes form a mini VM language" },
+            { "subject": "linking", "predicate": "knows", "about": "lazy binding defers resolution until first call" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch03_s03",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 14,
+    "observables": {
+      "participants": ["the_reader", "the_platform", "crate_macho_exec", "concept_chained_fixups"],
+      "context": { "setting": "setting_hex_editor", "chapter": 3, "part": 2, "title": "Chained Fixups", "estimated_words": 2500, "source_files": ["crates/macho-exec/src/fixup/chained/walk.rs"] },
+      "event_type": "discovery"
+    },
+    "structure": {
+      "position": 0.176,
+      "causal_role": "complication",
+      "grouping": { "part": "II — The Linker", "chapter": "Ch 3 — The Links", "beat": "break_into_two" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "introduce", "target": "LC_DYLD_CHAINED_FIXUPS — the modern format replacing bind opcodes", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "decode", "target": "pointer chains linking data pages — follow the chain from page start", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_reader", "action": "decode", "target": "rebase vs bind encoded in the same 64-bit word (bit 62 discriminator)", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_platform", "action": "deceive", "target": "Apple's header says bit fields are at certain positions, but actual encoding differs", "significance": "essential" },
+        { "sequence_number": 5, "agent": "the_reader", "action": "verify", "target": "binary tells the truth even when documentation lies — empirical validation", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "trusts_apple_documentation" },
+        "after": { "state_type": "knowledge", "value": "binary_is_ground_truth_documentation_lies" },
+        "trigger": "Apple's own header file mis-documents the chained fixup bit fields",
+        "description": "THE moment the documentation lies. The reader learns to trust the binary over the headers."
+      }
+    },
+    "interpretations": {
+      "subtext": "The platform's opacity is not accidental — even official documentation is unreliable. The binary itself is the only truth.",
+      "motifs": ["documentation_lies", "binary_truth"],
+      "reader_emotion": "revelation_and_vindication",
+      "thematic_function": "Key thematic moment — establishes empiricism as the book's epistemology. Referenced again in App B (Binary Format Secrets) where all such cases are catalogued."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "can_decode_classic_bind_opcodes" },
+        "post_state": { "capability": "can_decode_chained_fixups" },
+        "objective": { "action": "master", "target": "modern chained fixup format" },
+        "information_state": {
+          "gained": [
+            { "subject": "fixups", "predicate": "knows", "about": "chained pointer format: follow next-offset chain per data page" },
+            { "subject": "fixups", "predicate": "knows", "about": "rebase vs bind encoded in same word (bit 62)" },
+            { "subject": "epistemology", "predicate": "knows", "about": "Apple headers can lie; binary is ground truth" }
+          ],
+          "gaps": [
+            { "subject": "fixups", "predicate": "knows", "about": "authenticated fixups with PAC (next scene)" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch03_s04",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 15,
+    "observables": {
+      "participants": ["the_reader", "the_platform", "concept_pac"],
+      "context": { "setting": "setting_debugger", "chapter": 3, "part": 2, "title": "Auth Fixups and PAC", "estimated_words": 2000 },
+      "event_type": "discovery"
+    },
+    "structure": {
+      "position": 0.189,
+      "causal_role": "complication",
+      "grouping": { "part": "II — The Linker", "chapter": "Ch 3 — The Links", "beat": "fun_and_games" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "introduce", "target": "arm64e authenticated binds — PAC keys (IA/IB/DA/DB)", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_builder", "action": "explain", "target": "blend discriminators — context-specific pointer signing", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_reader", "action": "decode", "target": "DYLD_CHAINED_PTR_ARM64E format bit layout", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_builder", "action": "demonstrate", "target": "real PAC crash: 0x40000000000000 trap address on auth failure", "significance": "essential" },
+        { "sequence_number": 5, "agent": "the_reader", "action": "decode", "target": "how to read and diagnose a PAC crash from register dump", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "fixups_are_address_resolution" },
+        "after": { "state_type": "knowledge", "value": "pointers_carry_cryptographic_authentication" },
+        "trigger": "PAC crash reveals security at the pointer level",
+        "description": "Pointer authentication adds a cryptographic layer to every function call. Deep territory."
+      }
+    },
+    "interpretations": {
+      "subtext": "The platform doesn't just link code — it cryptographically verifies every pointer. Security is woven into the ISA.",
+      "motifs": ["platform_opacity", "SIGSEGV"],
+      "reader_emotion": "entering_deep_territory",
+      "thematic_function": "PAC recurs in Ch 6 (cross-platform complications) and Ch 7 (interpreter must handle PAC metadata)."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "can_decode_chained_fixups" },
+        "post_state": { "capability": "understands_pac_and_auth_fixups" },
+        "objective": { "action": "learn", "target": "pointer authentication codes and arm64e" },
+        "information_state": {
+          "gained": [
+            { "subject": "pac", "predicate": "knows", "about": "PAC keys: IA/IB/DA/DB" },
+            { "subject": "pac", "predicate": "knows", "about": "blend discriminators for context-specific signing" },
+            { "subject": "pac", "predicate": "knows", "about": "0x40000000000000 trap address on auth failure" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch03_s05",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 16,
+    "observables": {
+      "participants": ["the_reader", "crate_macho_resolve"],
+      "context": { "setting": "setting_ide", "chapter": 3, "part": 2, "title": "The Stub Resolver", "estimated_words": 1500, "source_files": ["crates/macho-resolve/src/"] },
+      "event_type": "implementation"
+    },
+    "structure": {
+      "position": 0.203,
+      "causal_role": "resolution",
+      "grouping": { "part": "II — The Linker", "chapter": "Ch 3 — The Links", "beat": "fun_and_games" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "explain", "target": "symbol name → host dlsym() resolution strategy", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "study", "target": "safe list: which symbols we resolve directly via dlsym()", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_reader", "action": "study", "target": "shim list: which symbols we redirect to our own implementations", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_reader", "action": "study", "target": "prefix matching rules for _objc_, _CF_, _NS* disambiguation", "significance": "supplementary" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "capability", "value": "can_decode_fixup_formats" },
+        "after": { "state_type": "capability", "value": "can_resolve_symbols_via_dlsym" },
+        "trigger": "StubResolver maps symbol names to real function pointers via policy",
+        "description": "Resolution is a policy decision: resolve, shim, or reject. What you expose defines what's possible."
+      }
+    },
+    "interpretations": {
+      "subtext": "Resolution is a policy decision, not just a technical one. What you expose defines what's possible.",
+      "motifs": ["engineering_decision"],
+      "reader_emotion": "engineering_decision_making",
+      "thematic_function": "Introduces the 3-tier resolution policy that becomes critical in Ch 5 (Foundation methods → shim) and Ch 6 (safe-list expansion for Linux)."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "understands_pac_and_auth_fixups" },
+        "post_state": { "capability": "can_resolve_symbols_via_policy" },
+        "objective": { "action": "build", "target": "StubResolver with safe list policy" },
+        "information_state": {
+          "gained": [
+            { "subject": "resolution", "predicate": "knows", "about": "3-tier policy: resolve / shim / reject" },
+            { "subject": "resolution", "predicate": "knows", "about": "prefix matching for ObjC/CF/NS symbols" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch03_s06",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 17,
+    "observables": {
+      "participants": ["the_reader", "crate_macho_exec"],
+      "context": { "setting": "setting_terminal", "chapter": 3, "part": 2, "title": "Dependency Loading", "estimated_words": 1500 },
+      "event_type": "implementation"
+    },
+    "structure": {
+      "position": 0.216,
+      "causal_role": "complication",
+      "grouping": { "part": "II — The Linker", "chapter": "Ch 3 — The Links", "beat": "fun_and_games" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_reader", "action": "implement", "target": "BFS walk of LC_LOAD_DYLIB commands from main binary", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "build", "target": "ImageRegistry with deduplication and cycle detection", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_reader", "action": "visualize", "target": "dependency graph for a real Xcode tool — many libraries deep", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_builder", "action": "demonstrate", "target": "a single CLI tool pulls in 20+ dylibs transitively", "significance": "supplementary" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "one_binary_needs_resolution" },
+        "after": { "state_type": "knowledge", "value": "binaries_form_deep_dependency_graphs" },
+        "trigger": "Dependency graph visualization shows the scale of library loading",
+        "description": "One binary requires dozens of libraries, each requiring more. Loading is inherently recursive."
+      }
+    },
+    "interpretations": {
+      "subtext": "A single binary is a node in a vast graph. Loading is inherently recursive.",
+      "motifs": ["scope_revelation"],
+      "reader_emotion": "awe_at_scale",
+      "thematic_function": "Fun and Games — the complexity is exciting, not daunting. The dependency graph connects to Ch 6 (RTLD_GLOBAL loading order matters on Linux)."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "can_resolve_symbols_via_policy" },
+        "post_state": { "capability": "can_load_dependency_graphs" },
+        "objective": { "action": "build", "target": "recursive library loading with cycle detection" },
+        "information_state": {
+          "gained": [
+            { "subject": "linking", "predicate": "knows", "about": "BFS walk of LC_LOAD_DYLIB for transitive deps" },
+            { "subject": "linking", "predicate": "knows", "about": "ImageRegistry deduplicates across the graph" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch03_s07",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 18,
+    "observables": {
+      "participants": ["the_reader", "the_platform", "crate_macho_shared_cache"],
+      "context": { "setting": "setting_hex_editor", "chapter": 3, "part": 2, "title": "The Shared Cache", "estimated_words": 2500, "source_files": ["crates/macho-shared-cache/src/"] },
+      "event_type": "discovery"
+    },
+    "structure": {
+      "position": 0.230,
+      "causal_role": "complication",
+      "grouping": { "part": "II — The Linker", "chapter": "Ch 3 — The Links", "beat": "fun_and_games" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "reveal", "target": "dyld_shared_cache_arm64e: 2GB of prelinked libraries in one file", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "explore", "target": "image lookup by install name → offset within cache", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_reader", "action": "explore", "target": "slide info — the cache has its own ASLR", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_reader", "action": "explore", "target": "local symbol extraction — symbols stripped from disk dylibs live here", "significance": "essential" },
+        { "sequence_number": 5, "agent": "the_builder", "action": "explain", "target": "why most .dylib files don't exist on disk anymore (since macOS 11)", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "libraries_are_individual_files" },
+        "after": { "state_type": "knowledge", "value": "apple_prelinks_all_libraries_into_one_giant_cache" },
+        "trigger": "Apple merged all system libraries into a single 2GB cache file",
+        "description": "Apple's most aggressive optimization. Individual libraries vanish from disk. Our job gets harder."
+      }
+    },
+    "interpretations": {
+      "subtext": "The platform optimizes aggressively for its own loader. Building an alternative means reimplementing these optimizations.",
+      "motifs": ["platform_opacity", "scope_revelation"],
+      "reader_emotion": "awe_plus_difficulty_awareness",
+      "thematic_function": "Chapter closing revelation — simple C-only tools (strings, nm) now work. But ObjC is about to break everything. Bridge to Ch 4: 'C functions work. But [NSObject init] crashes.'"
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "can_load_dependency_graphs" },
+        "post_state": { "capability": "can_extract_from_shared_cache" },
+        "objective": { "action": "understand", "target": "dyld shared cache format and extraction" },
+        "information_state": {
+          "gained": [
+            { "subject": "cache", "predicate": "knows", "about": "shared cache format: 2GB prelinked library archive" },
+            { "subject": "cache", "predicate": "knows", "about": "image lookup by install name" },
+            { "subject": "cache", "predicate": "knows", "about": "cache-specific slide info and local symbol extraction" }
+          ],
+          "gaps": [
+            { "subject": "runtime", "predicate": "knows", "about": "ObjC message dispatch — next chapter" }
+          ]
+        }
+      }
+    ]
+  }
+]

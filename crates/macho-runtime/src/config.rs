@@ -43,7 +43,8 @@ pub struct ShimSet {
     pub random: bool,
     /// Install macOS-specific platform stubs (Security, Authorization, Network, Carbon,
     /// sysmon, DataDetectors, container, NStatManager, ServiceManagement, AudioToolbox, etc.)
-    /// Only meaningful on macOS; on Linux this is always false.
+    /// These are needed on all platforms — on Linux they provide the only implementation
+    /// of macOS-specific APIs that guest Mach-O binaries expect.
     pub darwin_stubs: bool,
 }
 
@@ -60,10 +61,7 @@ impl Default for ShimSet {
             objc: true,
             foundation: true,
             random: true,
-            #[cfg(target_os = "macos")]
             darwin_stubs: true,
-            #[cfg(not(target_os = "macos"))]
-            darwin_stubs: false,
         }
     }
 }

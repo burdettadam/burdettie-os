@@ -10,12 +10,19 @@
 
 mod icu;
 mod posix_extras;
+mod stat;
+mod dirent;
+pub mod variadic_shims;
 
 use crate::table::ShimTable;
 
 /// Install all cross-platform shims into the table.
 pub fn install_cross_platform_shims(table: &mut ShimTable) {
+    log::info!("cross_platform: starting installation");
     posix_extras::PosixExtrasShims::install(table);
     icu::IcuShims::install(table);
-    log::debug!("cross_platform: registered all cross-platform shims");
+    stat::StatShims::install(table);
+    dirent::DirentShims::install(table);
+    variadic_shims::VariadicShims::install(table);
+    log::info!("cross_platform: registered all cross-platform shims");
 }

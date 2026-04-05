@@ -235,6 +235,7 @@ fn resolve_and_write_bind(
     imports: &[ChainedImport],
     resolver: &dyn SymbolResolver,
 ) -> bool {
+    let import_name = imports.get(ordinal).map(|i| i.name.as_str()).unwrap_or("?");
     let addr = match resolve_bind_addr(ordinal, addend, imports, resolver) {
         Some(a) => a,
         None => {
@@ -243,6 +244,9 @@ fn resolve_and_write_bind(
             trap_addr()
         }
     };
+    log::trace!(
+        "  write_bind: seg+{offset:#x} = {addr:#x} (ordinal={ordinal}, '{import_name}')"
+    );
     unsafe {
         let ptr = seg.base.add(offset) as *mut u64;
         ptr.write_unaligned(addr);
@@ -253,6 +257,10 @@ fn resolve_and_write_bind(
 /// Resolve a chained bind import, returning the address or None.
 ///
 /// Used by walk.rs for both plain and auth binds (auth binds PAC-sign afterward).
+///
+/// For C++ constructor/destructor symbols, the resolved address is wrapped
+/// in a thunk that preserves `x0` (`this`) across the call, compensating
+/// for the Apple ARM64 vs AAPCS64 ABI difference.
 fn resolve_bind_addr(
     ordinal: usize,
     addend: u64,
@@ -262,7 +270,16 @@ fn resolve_bind_addr(
     let import = imports.get(ordinal)?;
 
     if let Some(addr) = resolver.resolve(&import.name) {
-        Some(addr + addend)
+        let final_addr = addr + addend;
+        // On Linux, wrap C++ constructors/destructors so macOS callers
+        // that expect `this` returned in x0 don't crash.
+        #[cfg(all(target_arch = "aarch64", not(target_os = "macos")))]
+        if super::ctor_thunk::is_ctor_or_dtor(&import.name) {
+            if let Some(thunk) = super::ctor_thunk::wrap_ctor(final_addr) {
+                return Some(thunk);
+            }
+        }
+        Some(final_addr)
     } else if import.weak {
         Some(0)
     } else {

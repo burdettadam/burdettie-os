@@ -1,0 +1,421 @@
+[
+  {
+    "unit_id": "ch01_s01",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 1,
+    "observables": {
+      "participants": ["the_reader", "the_platform", "concept_mach_o"],
+      "context": {
+        "setting": "setting_hex_editor",
+        "chapter": 1,
+        "part": 1,
+        "title": "The Black Box",
+        "estimated_words": 1800,
+        "source_files": ["crates/macho-types/src/header.rs"]
+      },
+      "event_type": "discovery"
+    },
+    "structure": {
+      "position": 0.0,
+      "causal_role": "setup",
+      "grouping": {
+        "part": "I — The Artifact",
+        "chapter": "Ch 1 — The Binary",
+        "beat": "opening_image"
+      },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_reader", "action": "open", "target": "/usr/bin/true in hex editor", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "observe", "target": "magic bytes CF FA ED FE at offset 0", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_builder", "action": "explain", "target": "0xFEEDFACF little-endian Mach-O 64-bit magic", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_builder", "action": "contextualize", "target": "NeXT heritage, 1997 acquisition, every macOS binary uses this format", "significance": "supplementary" },
+        { "sequence_number": 5, "agent": "the_builder", "action": "contrast", "target": "fat/universal binaries vs thin Mach-O, byte order variations", "significance": "supplementary" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "binary_is_opaque_black_box" },
+        "after": { "state_type": "knowledge", "value": "binary_has_readable_structure" },
+        "trigger": "Hex editor reveals magic number and recognizable patterns",
+        "description": "The reader shifts from seeing a binary as opaque data to recognizing it has structure and meaning."
+      }
+    },
+    "interpretations": {
+      "subtext": "The platform hides meaning in plain sight — visible to anyone who learns to look.",
+      "motifs": ["0xFEEDFACF", "black_box_opening"],
+      "reader_emotion": "curiosity_with_intimidation",
+      "thematic_function": "Opening Image — the 'before' snapshot. The reader cannot yet read a binary. Mirrors ch10_s05 (Final Image) where the same hex dump is now fully transparent.",
+      "foreshadowing": ["The magic number 0xFEEDFACF recurs as a motif of growing familiarity, culminating in the Final Image."]
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "none", "binary_comprehension": "zero" },
+        "post_state": { "capability": "recognize_magic_number", "binary_comprehension": "superficial" },
+        "objective": { "action": "understand", "target": "what is inside a macOS binary" },
+        "information_state": {
+          "knows": [],
+          "gaps": [
+            { "subject": "mach-o", "predicate": "knows", "about": "header structure" },
+            { "subject": "mach-o", "predicate": "knows", "about": "load commands" },
+            { "subject": "mach-o", "predicate": "knows", "about": "how binary gets executed" }
+          ],
+          "gained": [
+            { "subject": "mach-o", "predicate": "knows", "about": "magic number 0xFEEDFACF" },
+            { "subject": "mach-o", "predicate": "knows", "about": "file begins with structured header" },
+            { "subject": "history", "predicate": "knows", "about": "NeXT origins of the format" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch01_s02",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 2,
+    "observables": {
+      "participants": ["the_reader", "the_platform", "crate_macho_types", "concept_mach_o"],
+      "context": {
+        "setting": "setting_source",
+        "chapter": 1,
+        "part": 1,
+        "title": "The Header",
+        "estimated_words": 2000,
+        "source_files": ["crates/macho-types/src/header.rs"]
+      },
+      "event_type": "discovery"
+    },
+    "structure": {
+      "position": 0.014,
+      "causal_role": "setup",
+      "grouping": {
+        "part": "I — The Artifact",
+        "chapter": "Ch 1 — The Binary",
+        "beat": "theme_stated"
+      },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "present", "target": "mach_header_64 struct: cpu_type, cpu_subtype, filetype, ncmds, sizeofcmds, flags", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "parse", "target": "header fields from hex bytes, mapping to Rust struct", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_builder", "action": "explain", "target": "MH_PIE flag — position-independent executable", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_builder", "action": "demonstrate", "target": "first SIGSEGV running binary on Linux", "significance": "essential" },
+        { "sequence_number": 5, "agent": "the_builder", "action": "reframe", "target": "crash is information, not failure — the book's philosophy stated", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "recognizes_magic_number_only" },
+        "after": { "state_type": "knowledge", "value": "can_read_header_fields" },
+        "trigger": "mach_header_64 struct mapped to Rust representation; first crash reframes failure as information",
+        "description": "Reader gains ability to decode the header and encounters the first crash that frames the book's philosophy."
+      }
+    },
+    "interpretations": {
+      "subtext": "The crash is the platform's way of telling you what it expects. Failure is pedagogy.",
+      "motifs": ["SIGSEGV", "crash_as_teacher"],
+      "reader_emotion": "challenge_issued",
+      "thematic_function": "Theme Stated — states the book's philosophy: crashes are information, understanding comes from persistence. Tested most severely in Ch 6 (variadic crisis), validated in Ch 9 (crash autopsy)."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "recognize_magic_number", "binary_comprehension": "superficial" },
+        "post_state": { "capability": "read_header_fields", "binary_comprehension": "header_level" },
+        "objective": { "action": "decode", "target": "header fields and their meanings" },
+        "information_state": {
+          "knows": [
+            { "subject": "mach-o", "predicate": "knows", "about": "magic number" }
+          ],
+          "gaps": [
+            { "subject": "mach-o", "predicate": "knows", "about": "load command structure" },
+            { "subject": "execution", "predicate": "knows", "about": "why binary crashes on Linux" }
+          ],
+          "gained": [
+            { "subject": "mach-o", "predicate": "knows", "about": "header fields: cpu_type, filetype, ncmds, flags" },
+            { "subject": "mach-o", "predicate": "knows", "about": "MH_PIE means position-independent" },
+            { "subject": "philosophy", "predicate": "knows", "about": "crashes are diagnostic information" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch01_s03",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 3,
+    "observables": {
+      "participants": ["the_reader", "crate_macho_types", "concept_load_command"],
+      "context": {
+        "setting": "setting_source",
+        "chapter": 1,
+        "part": 1,
+        "title": "The Load Commands",
+        "estimated_words": 2200,
+        "source_files": ["crates/macho-types/src/load_command.rs"]
+      },
+      "event_type": "discovery"
+    },
+    "structure": {
+      "position": 0.027,
+      "causal_role": "setup",
+      "grouping": {
+        "part": "I — The Artifact",
+        "chapter": "Ch 1 — The Binary",
+        "beat": "set_up"
+      },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "explain", "target": "load command array following header, iterated by cmd/cmdsize pairs", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "walk", "target": "LC_SEGMENT_64 — maps code/data to memory", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_reader", "action": "walk", "target": "LC_LOAD_DYLIB — declares library dependencies", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_reader", "action": "walk", "target": "LC_MAIN — identifies entry point offset", "significance": "essential" },
+        { "sequence_number": 5, "agent": "the_builder", "action": "reveal", "target": "binary is self-describing — tells the loader what to do", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "header_is_table_of_contents" },
+        "after": { "state_type": "knowledge", "value": "load_commands_are_instructions_to_loader" },
+        "trigger": "Walking the load command array shows the binary's self-describing protocol",
+        "description": "The binary contains instructions for its own loading — a protocol, not just data."
+      }
+    },
+    "interpretations": {
+      "subtext": "The binary doesn't just contain code — it contains a conversation between itself and whatever loads it.",
+      "motifs": ["self_describing_binary"],
+      "reader_emotion": "growing_confidence",
+      "thematic_function": "Set-Up — LC_LOAD_DYLIB foreshadows Ch 3 (linking), LC_SEGMENT_64 foreshadows Ch 2 (mapping)."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "read_header_fields" },
+        "post_state": { "capability": "navigate_load_commands" },
+        "objective": { "action": "understand", "target": "load command taxonomy and segment-section hierarchy" },
+        "information_state": {
+          "knows": [
+            { "subject": "mach-o", "predicate": "knows", "about": "header fields" }
+          ],
+          "gaps": [
+            { "subject": "mach-o", "predicate": "knows", "about": "section-level contents" },
+            { "subject": "linking", "predicate": "knows", "about": "how LC_LOAD_DYLIB deps get resolved" }
+          ],
+          "gained": [
+            { "subject": "mach-o", "predicate": "knows", "about": "LC_SEGMENT_64 maps code/data to memory" },
+            { "subject": "mach-o", "predicate": "knows", "about": "LC_LOAD_DYLIB declares dependencies" },
+            { "subject": "mach-o", "predicate": "knows", "about": "LC_MAIN identifies entry point" },
+            { "subject": "architecture", "predicate": "knows", "about": "binary is self-describing protocol" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch01_s04",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 4,
+    "observables": {
+      "participants": ["the_reader", "concept_mach_o"],
+      "context": {
+        "setting": "setting_hex_editor",
+        "chapter": 1,
+        "part": 1,
+        "title": "The Sections",
+        "estimated_words": 2000
+      },
+      "event_type": "discovery"
+    },
+    "structure": {
+      "position": 0.041,
+      "causal_role": "setup",
+      "grouping": {
+        "part": "I — The Artifact",
+        "chapter": "Ch 1 — The Binary",
+        "beat": "set_up"
+      },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_reader", "action": "examine", "target": "__TEXT/__text — executable machine code", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "examine", "target": "__DATA/__objc_classlist — ObjC class metadata pointers", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_reader", "action": "examine", "target": "__LINKEDIT — fixup info, code signature, symbol data", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_builder", "action": "demonstrate", "target": "hex side-by-side showing real section contents", "significance": "essential" },
+        { "sequence_number": 5, "agent": "the_builder", "action": "explain", "target": "section alignment and size constraints (16K page alignment)", "significance": "supplementary" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "segments_contain_something" },
+        "after": { "state_type": "knowledge", "value": "sections_have_specific_roles_and_content_types" },
+        "trigger": "Hex side-by-side reveals section contents and their purposes",
+        "description": "Code, metadata, and linking data each have distinct homes. Complexity is partitioned."
+      }
+    },
+    "interpretations": {
+      "subtext": "Complexity is manageable when you see the partitioning. Every byte has a designated place.",
+      "motifs": ["structured_partitioning"],
+      "reader_emotion": "deepening_understanding",
+      "thematic_function": "Seeds for future chapters: __DATA/__objc_classlist → Ch 4, __LINKEDIT → Ch 3."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "navigate_load_commands" },
+        "post_state": { "capability": "identify_section_contents" },
+        "objective": { "action": "map", "target": "section roles and content types" },
+        "information_state": {
+          "knows": [
+            { "subject": "mach-o", "predicate": "knows", "about": "load command taxonomy" }
+          ],
+          "gaps": [
+            { "subject": "mach-o", "predicate": "knows", "about": "symbol table structure" },
+            { "subject": "objc", "predicate": "knows", "about": "what __objc_classlist metadata means (Ch 4)" }
+          ],
+          "gained": [
+            { "subject": "mach-o", "predicate": "knows", "about": "__TEXT/__text = executable code" },
+            { "subject": "mach-o", "predicate": "knows", "about": "__DATA/__objc_classlist = ObjC metadata" },
+            { "subject": "mach-o", "predicate": "knows", "about": "__LINKEDIT = fixup and signing data" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch01_s05",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 5,
+    "observables": {
+      "participants": ["the_reader", "crate_macho_types", "concept_dynamic_linking"],
+      "context": {
+        "setting": "setting_source",
+        "chapter": 1,
+        "part": 1,
+        "title": "The Symbol Table",
+        "estimated_words": 2000
+      },
+      "event_type": "discovery"
+    },
+    "structure": {
+      "position": 0.054,
+      "causal_role": "setup",
+      "grouping": {
+        "part": "I — The Artifact",
+        "chapter": "Ch 1 — The Binary",
+        "beat": "set_up"
+      },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "explain", "target": "nlist_64 entries: n_strx, n_type, n_sect, n_desc, n_value", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "examine", "target": "string table — raw C strings indexed by byte offset", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_reader", "action": "classify", "target": "external (N_EXT), local, undefined (N_UNDF) symbols", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_reader", "action": "examine", "target": "indirect symbol table mapping GOT/stub entries", "significance": "essential" },
+        { "sequence_number": 5, "agent": "the_builder", "action": "foreshadow", "target": "undefined symbols are the 'links' Chapter 3 will connect", "significance": "supplementary" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "binary_contains_code_and_metadata" },
+        "after": { "state_type": "knowledge", "value": "binary_declares_external_dependencies_via_symbols" },
+        "trigger": "Undefined symbols reveal the binary's need for external functions",
+        "description": "Reader discovers the binary's dependency interface — unresolved symbols waiting to be connected."
+      }
+    },
+    "interpretations": {
+      "subtext": "A binary is incomplete by design. It declares what it needs from the world.",
+      "motifs": ["undefined_symbols_as_open_questions", "self_describing_binary"],
+      "reader_emotion": "anticipation",
+      "thematic_function": "Foreshadows Ch 3 (symbol resolution) and Ch 4 (__objc_selrefs use indirect symbols)."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "identify_section_contents" },
+        "post_state": { "capability": "read_symbol_table" },
+        "objective": { "action": "understand", "target": "how binaries declare external dependencies" },
+        "information_state": {
+          "knows": [
+            { "subject": "mach-o", "predicate": "knows", "about": "section types and roles" }
+          ],
+          "gaps": [
+            { "subject": "linking", "predicate": "knows", "about": "how symbols actually get resolved at load time" },
+            { "subject": "linking", "predicate": "knows", "about": "chained fixup format (Ch 3)" }
+          ],
+          "gained": [
+            { "subject": "linking", "predicate": "knows", "about": "N_UNDF symbols need resolution" },
+            { "subject": "linking", "predicate": "knows", "about": "indirect symbol table maps GOT/stubs" },
+            { "subject": "linking", "predicate": "knows", "about": "nlist_64 encodes type, section, value" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch01_s06",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 6,
+    "observables": {
+      "participants": ["the_reader", "crate_macho_parse", "crate_macho_types", "tool_nm"],
+      "context": {
+        "setting": "setting_ide",
+        "chapter": 1,
+        "part": 1,
+        "title": "Building the Parser",
+        "estimated_words": 2000,
+        "source_files": ["crates/macho-parse/src/lib.rs"]
+      },
+      "event_type": "implementation"
+    },
+    "structure": {
+      "position": 0.068,
+      "causal_role": "resolution",
+      "grouping": {
+        "part": "I — The Artifact",
+        "chapter": "Ch 1 — The Binary",
+        "beat": "set_up"
+      },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "introduce", "target": "macho-parse crate architecture and zero-copy design", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "study", "target": "zero-copy parsing: &[u8] → typed views without allocation", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_reader", "action": "study", "target": "ParsedMachO struct: header + load commands + segments + symbols", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_reader", "action": "study", "target": "MachOError enum — validation at system boundaries", "significance": "supplementary" },
+        { "sequence_number": 5, "agent": "the_reader", "action": "run", "target": "macho-inspect --info on /usr/bin/true → clean parsed output", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "capability", "value": "can_read_binary_manually" },
+        "after": { "state_type": "capability", "value": "has_first_tool_to_parse_any_mach_o" },
+        "trigger": "macho-inspect produces clean parsed output from any binary",
+        "description": "Opaque file → structured understanding. The reader has their first tool. But parsing isn't running."
+      }
+    },
+    "interpretations": {
+      "subtext": "Understanding is made concrete through tooling. Theory becomes power when you can run it.",
+      "motifs": ["first_tool"],
+      "reader_emotion": "accomplishment",
+      "thematic_function": "Chapter resolution — Set-Up complete. Bridge to Ch 2: 'We can read the binary. Now we need to give it somewhere to live.'"
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "read_symbol_table", "binary_comprehension": "manual" },
+        "post_state": { "capability": "parse_any_macho_binary", "binary_comprehension": "tooled" },
+        "objective": { "action": "build", "target": "first working binary parser" },
+        "information_state": {
+          "knows": [
+            { "subject": "mach-o", "predicate": "knows", "about": "complete binary format structure" }
+          ],
+          "gaps": [
+            { "subject": "execution", "predicate": "knows", "about": "how to load binary into memory (Ch 2)" },
+            { "subject": "execution", "predicate": "knows", "about": "how to resolve symbols (Ch 3)" }
+          ],
+          "gained": [
+            { "subject": "rust", "predicate": "knows", "about": "zero-copy parsing via &[u8] → typed views" },
+            { "subject": "tooling", "predicate": "knows", "about": "ParsedMachO struct and MachOError" },
+            { "subject": "tooling", "predicate": "knows", "about": "macho-inspect --info for binary inspection" }
+          ]
+        }
+      }
+    ]
+  }
+]

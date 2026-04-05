@@ -66,8 +66,11 @@ impl PosixExtrasShims {
 
             // ── BSD extras ──────────────────────────────────────
             ("_funopen", shim_funopen as *const () as u64, "funopen (stub → NULL)"),
+
+            // ── sandbox/security stubs ──────────────────────────
+            ("_chroot", shim_chroot as *const () as u64, "chroot (stub → EPERM)"),
         );
-        log::debug!("PosixExtrasShims: registered 35 POSIX/libc extra shims");
+        log::debug!("PosixExtrasShims: registered 36 POSIX/libc extra shims");
     }
 }
 
@@ -490,6 +493,23 @@ pub extern "C" fn shim_funopen(
     _closefn: u64,
 ) -> u64 {
     0 // NULL
+}
+
+// ── chroot stub ─────────────────────────────────────────────────────
+
+/// `int chroot(const char *dirname)` — always fails with EPERM.
+///
+/// In the loader context, chroot is a security-sensitive operation that
+/// we never want to actually perform.  Returning EPERM allows tools like
+/// tar that optionally call chroot to fall through to their non-chroot path.
+pub extern "C" fn shim_chroot(_dirname: *const c_char) -> c_int {
+    unsafe {
+        #[cfg(target_os = "macos")]
+        { *libc::__error() = libc::EPERM; }
+        #[cfg(not(target_os = "macos"))]
+        { *libc::__errno_location() = libc::EPERM; }
+    }
+    -1
 }
 
 #[cfg(test)]

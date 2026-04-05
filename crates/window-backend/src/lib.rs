@@ -6,7 +6,9 @@
 //! to work identically on any platform.
 
 mod types;
+pub mod keyboard_layout;
 
+pub use keyboard_layout::KeyboardLayout;
 pub use types::*;
 
 use graphics_core::Surface;

@@ -655,10 +655,10 @@ mod tests {
     }
 
     fn clear_keychain() {
-        // Reset the SQLite keychain DB for test isolation.
         let mut guard = keychain_db();
-        let db = ensure_keychain(&mut guard);
-        let _ = db.execute("DELETE FROM keychain", []);
+        if let Some(conn) = guard.as_mut() {
+            let _ = conn.execute("DELETE FROM keychain", []);
+        }
     }
 
     #[test]

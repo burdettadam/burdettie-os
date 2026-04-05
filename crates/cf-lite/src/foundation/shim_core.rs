@@ -270,6 +270,7 @@ pub(super) fn install_core_shims(table: &mut ShimTable) {
         ("_CFDictionaryCreate", cf_core::shim_cf_dictionary_create as *const () as u64, "CFDictionaryCreate shim"),
         ("_CFDictionaryGetCount", cf_core::shim_cf_dictionary_get_count as *const () as u64, "CFDictionaryGetCount shim"),
         ("_CFDictionaryGetValue", cf_core::shim_cf_dictionary_get_value as *const () as u64, "CFDictionaryGetValue shim"),
+        ("_CFDictionaryGetValueIfPresent", cf_core::shim_cf_dictionary_get_value_if_present as *const () as u64, "CFDictionaryGetValueIfPresent shim"),
     );
 
     // CFData C functions
@@ -277,6 +278,7 @@ pub(super) fn install_core_shims(table: &mut ShimTable) {
         ("_CFDataCreate", cf_core::shim_cf_data_create as *const () as u64, "CFDataCreate shim"),
         ("_CFDataGetBytePtr", cf_core::shim_cf_data_get_byte_ptr as *const () as u64, "CFDataGetBytePtr shim"),
         ("_CFDataGetLength", cf_core::shim_cf_data_get_length as *const () as u64, "CFDataGetLength shim"),
+        ("_CFDataCreateWithBytesNoCopy", cf_core::shim_cf_data_create_with_bytes_no_copy as *const () as u64, "CFDataCreateWithBytesNoCopy shim"),
     );
 
     // CFURL C functions
@@ -409,6 +411,8 @@ pub(super) fn install_core_shims(table: &mut ShimTable) {
         ("_CFStringCreateWithCharacters", cf_core::shim_cf_string_create_with_characters as *const () as u64, "CFStringCreateWithCharacters → from UTF-16"),
         ("_CFStringGetCharacterAtIndex", cf_core::shim_cf_string_get_character_at_index as *const () as u64, "CFStringGetCharacterAtIndex → UniChar"),
         ("_CFStringFind", cf_core::shim_cf_string_find as *const () as u64, "CFStringFind → substring search"),
+        ("_CFStringGetBytes", cf_core::shim_cf_string_get_bytes as *const () as u64, "CFStringGetBytes → convert to byte buffer"),
+        ("_CFStringGetFileSystemRepresentation", cf_core::shim_cf_string_get_file_system_representation as *const () as u64, "CFStringGetFileSystemRepresentation → path bytes"),
     );
 
     // CFRunLoop C functions
@@ -523,4 +527,78 @@ pub(super) fn install_core_shims(table: &mut ShimTable) {
         ("_NSRTFPboardType", nspasteboard::ns_rtf_pasteboard_type_addr(), "NSRTFPboardType (legacy)"),
         ("_NSFilenamesPboardType", nspasteboard::ns_file_names_pasteboard_type_addr(), "NSFilenamesPboardType (legacy)"),
     );
+
+    // NSAttributedString attribute key constants (GUI text rendering)
+    register_shims!(table,
+        ("_NSFontAttributeName", foundation_constants::nsfont_attribute_name_addr(), "NSFontAttributeName constant"),
+        ("_NSForegroundColorAttributeName", foundation_constants::nsforeground_color_attribute_name_addr(), "NSForegroundColorAttributeName constant"),
+        ("_NSBackgroundColorAttributeName", foundation_constants::nsbackground_color_attribute_name_addr(), "NSBackgroundColorAttributeName constant"),
+        ("_NSParagraphStyleAttributeName", foundation_constants::nsparagraph_style_attribute_name_addr(), "NSParagraphStyleAttributeName constant"),
+        ("_NSKernAttributeName", foundation_constants::nskern_attribute_name_addr(), "NSKernAttributeName constant"),
+        ("_NSStrikethroughStyleAttributeName", foundation_constants::nsstrikethrough_style_attribute_name_addr(), "NSStrikethroughStyleAttributeName constant"),
+        ("_NSUnderlineStyleAttributeName", foundation_constants::nsunderline_style_attribute_name_addr(), "NSUnderlineStyleAttributeName constant"),
+        ("_NSShadowAttributeName", foundation_constants::nsshadow_attribute_name_addr(), "NSShadowAttributeName constant"),
+        ("_NSLinkAttributeName", foundation_constants::nslink_attribute_name_addr(), "NSLinkAttributeName constant"),
+        ("_NSBaselineOffsetAttributeName", foundation_constants::nsbaseline_offset_attribute_name_addr(), "NSBaselineOffsetAttributeName constant"),
+        ("_NSAttachmentAttributeName", foundation_constants::nsattachment_attribute_name_addr(), "NSAttachmentAttributeName constant"),
+        ("_NSSuperscriptAttributeName", foundation_constants::nssuperscript_attribute_name_addr(), "NSSuperscriptAttributeName constant"),
+        ("_NSStrikethroughColorAttributeName", foundation_constants::nsstrikethrough_color_attribute_name_addr(), "NSStrikethroughColorAttributeName constant"),
+        ("_NSUnderlineColorAttributeName", foundation_constants::nsunderline_color_attribute_name_addr(), "NSUnderlineColorAttributeName constant"),
+    );
+
+    // NSAccessibility constants
+    register_shims!(table,
+        ("_NSAccessibilityRoleAttribute", foundation_constants::nsaccessibility_role_attribute_addr(), "NSAccessibilityRoleAttribute constant"),
+        ("_NSAccessibilityRoleDescriptionAttribute", foundation_constants::nsaccessibility_role_description_attribute_addr(), "NSAccessibilityRoleDescriptionAttribute constant"),
+        ("_NSAccessibilityTitleAttribute", foundation_constants::nsaccessibility_title_attribute_addr(), "NSAccessibilityTitleAttribute constant"),
+        ("_NSAccessibilityValueAttribute", foundation_constants::nsaccessibility_value_attribute_addr(), "NSAccessibilityValueAttribute constant"),
+    );
+
+    // NSAppKitVersionNumber data symbol
+    register_shims!(table,
+        ("_NSAppKitVersionNumber", foundation_constants::nsappkit_version_number_addr(), "NSAppKitVersionNumber version double"),
+    );
+
+    // CFError / CFURL resource / SystemVersion shims (sw_vers support)
+    register_shims!(table,
+        ("_CFErrorCopyDescription", cf_core::shim_cf_error_copy_description as *const () as u64, "CFErrorCopyDescription → generic string"),
+        ("_CFURLCreateDataAndPropertiesFromResource", cf_core::shim_cf_url_create_data_and_properties_from_resource as *const () as u64, "CFURLCreateDataAndPropertiesFromResource → read file URL"),
+        ("__CFCopySupplementalVersionDictionary", cf_core::shim_cf_copy_supplemental_version_dictionary as *const () as u64, "_CFCopySupplementalVersionDictionary → synthetic macOS version"),
+    );
+
+    // SystemVersion key constants (sw_vers)
+    register_shims!(table,
+        ("__kCFSystemVersionProductNameKey", foundation_constants::kcf_system_version_product_name_key_addr(), "_kCFSystemVersionProductNameKey → ProductName"),
+        ("__kCFSystemVersionProductVersionKey", foundation_constants::kcf_system_version_product_version_key_addr(), "_kCFSystemVersionProductVersionKey → ProductVersion"),
+        ("__kCFSystemVersionBuildVersionKey", foundation_constants::kcf_system_version_build_version_key_addr(), "_kCFSystemVersionBuildVersionKey → ProductBuildVersion"),
+        ("__kCFSystemVersionProductVersionExtraKey", foundation_constants::kcf_system_version_product_version_extra_key_addr(), "_kCFSystemVersionProductVersionExtraKey → ProductVersionExtra"),
+    );
+
+    // NSEvent tracking run loop mode
+    register_shims!(table,
+        ("_NSEventTrackingRunLoopMode", nsrunloop::nsevent_tracking_run_loop_mode_addr(), "NSEventTrackingRunLoopMode constant"),
+        ("_NSModalPanelRunLoopMode", nsrunloop::nsmodal_panel_run_loop_mode_addr(), "NSModalPanelRunLoopMode constant"),
+    );
+
+    // CGContextGetCurrentContext — returns thread-local current CGContext handle.
+    // Registered here (not in cg-shims) because the thread-local state
+    // lives in cf-lite's NSGraphicsContext.
+    register_shims!(table,
+        ("_CGContextGetCurrentContext", shim_cg_context_get_current_context as *const () as u64, "CGContextGetCurrentContext (thread-local via NSGraphicsContext)"),
+        ("_UIGraphicsGetCurrentContext", shim_cg_context_get_current_context as *const () as u64, "UIGraphicsGetCurrentContext (alias for CGContextGetCurrentContext)"),
+    );
+
+    // NSGraphicsContext / NSBezierPath class data symbols
+    register_shims!(table,
+        ("_OBJC_CLASS_$_NSGraphicsContext", nsobj::nsgraphicscontext_class_addr(), "NSGraphicsContext class data symbol"),
+        ("_OBJC_METACLASS_$_NSGraphicsContext", nsobj::nsgraphicscontext_metaclass_addr(), "NSGraphicsContext metaclass data symbol"),
+        ("_OBJC_CLASS_$_NSBezierPath", nsobj::nsbezierpath_class_addr(), "NSBezierPath class data symbol"),
+        ("_OBJC_METACLASS_$_NSBezierPath", nsobj::nsbezierpath_metaclass_addr(), "NSBezierPath metaclass data symbol"),
+    );
+}
+
+use crate::nsgraphicscontext;
+
+extern "C" fn shim_cg_context_get_current_context() -> u64 {
+    nsgraphicscontext::current_cg_context_handle()
 }

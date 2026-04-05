@@ -1,5 +1,30 @@
 //! Thin pthread shim functions that delegate to the host OS.
 
+/// macOS `_PTHREAD_MUTEX_SIG_init` — the 4-byte signature Darwin writes
+/// at the start of every `pthread_mutex_t` to mark it as initialised.
+/// Linux interprets those same bytes as lock-state / owner, causing
+/// deadlocks when we hand a macOS-format mutex to `pthread_mutex_lock`.
+const DARWIN_PTHREAD_MUTEX_SIG_INIT: u32 = 0x32AA_ABA7;
+
+/// If `mutex` starts with the macOS signature, zero it and call
+/// `pthread_mutex_init` so Linux gets a valid mutex.
+#[cfg(not(target_os = "macos"))]
+unsafe fn maybe_reinit_darwin_mutex(mutex: *mut libc::pthread_mutex_t) {
+    let sig = (mutex as *const u32).read_unaligned();
+    if sig == DARWIN_PTHREAD_MUTEX_SIG_INIT {
+        log::debug!(
+            "pthread_mutex: detected macOS sig {sig:#x}, reinitializing for Linux"
+        );
+        std::ptr::write_bytes(mutex as *mut u8, 0, std::mem::size_of::<libc::pthread_mutex_t>());
+        libc::pthread_mutex_init(mutex, std::ptr::null());
+    }
+}
+
+#[cfg(target_os = "macos")]
+unsafe fn maybe_reinit_darwin_mutex(_mutex: *mut libc::pthread_mutex_t) {
+    // On macOS the signature is expected — nothing to do.
+}
+
 // ── Thread lifecycle ────────────────────────────────────────────────
 
 /// `int pthread_create(pthread_t *, const pthread_attr_t *, start_routine, void *arg)`
@@ -106,14 +131,20 @@ pub(super) extern "C" fn shim_pthread_mutex_init(
     mutex: *mut libc::pthread_mutex_t,
     attr: *const libc::pthread_mutexattr_t,
 ) -> libc::c_int {
-    unsafe { libc::pthread_mutex_init(mutex, attr) }
+    // Zero out first to clear any macOS signature bytes.
+    unsafe {
+        std::ptr::write_bytes(mutex as *mut u8, 0, std::mem::size_of::<libc::pthread_mutex_t>());
+        libc::pthread_mutex_init(mutex, attr)
+    }
 }
 
 pub(super) extern "C" fn shim_pthread_mutex_lock(mutex: *mut libc::pthread_mutex_t) -> libc::c_int {
+    unsafe { maybe_reinit_darwin_mutex(mutex) };
     unsafe { libc::pthread_mutex_lock(mutex) }
 }
 
 pub(super) extern "C" fn shim_pthread_mutex_trylock(mutex: *mut libc::pthread_mutex_t) -> libc::c_int {
+    unsafe { maybe_reinit_darwin_mutex(mutex) };
     unsafe { libc::pthread_mutex_trylock(mutex) }
 }
 
@@ -279,4 +310,38 @@ pub(super) extern "C" fn shim_pthread_main_np() -> libc::c_int {
             if tid == pid { 1 } else { 0 }
         }
     }
+}
+
+// ── C++ std::mutex shims (macOS ABI → Linux pthread) ────────────────
+//
+// Guest binaries compiled for macOS inline-initialise `pthread_mutex_t`
+// with the Darwin signature `0x32AAABA7` instead of calling
+// `pthread_mutex_init`.  The host's `std::mutex::lock()` (from the
+// system libc++) doesn't know about this, so we shim the mangled C++
+// symbols to intercept the call at the guest import level.
+
+/// `std::__1::mutex::lock()` — _ZNSt3__15mutex4lockEv
+///
+/// `this` points to the `std::mutex` object whose first member is
+/// a `pthread_mutex_t`.
+pub(super) extern "C" fn shim_std_mutex_lock(this: *mut libc::pthread_mutex_t) {
+    unsafe { maybe_reinit_darwin_mutex(this) };
+    let ret = unsafe { libc::pthread_mutex_lock(this) };
+    if ret != 0 {
+        log::warn!("std::mutex::lock failed with {ret}");
+    }
+}
+
+/// `std::__1::mutex::unlock()` — _ZNSt3__15mutex6unlockEv
+pub(super) extern "C" fn shim_std_mutex_unlock(this: *mut libc::pthread_mutex_t) {
+    let ret = unsafe { libc::pthread_mutex_unlock(this) };
+    if ret != 0 {
+        log::warn!("std::mutex::unlock failed with {ret}");
+    }
+}
+
+/// `std::__1::mutex::try_lock()` — _ZNSt3__15mutex8try_lockEv
+pub(super) extern "C" fn shim_std_mutex_try_lock(this: *mut libc::pthread_mutex_t) -> bool {
+    unsafe { maybe_reinit_darwin_mutex(this) };
+    unsafe { libc::pthread_mutex_trylock(this) == 0 }
 }

@@ -1,0 +1,369 @@
+[
+  {
+    "unit_id": "app_a_s01",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 68,
+    "observables": {
+      "participants": ["the_reader", "the_builder"],
+      "context": { "setting": "setting_reference", "appendix": "A", "title": "Full Stack Diagram", "estimated_words": 2000 },
+      "event_type": "reference"
+    },
+    "structure": {
+      "position": 0.905,
+      "causal_role": "reference",
+      "grouping": { "appendix": "A — The Stack Map", "beat": "reference" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "present", "target": "full architecture diagram: guest binary → loader → shim layers → host OS", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_builder", "action": "annotate", "target": "each layer with chapter reference, crate name, and key data flow", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_builder", "action": "explain", "target": "how data flows from Mach-O bytes through each transformation to running process", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "individual_layers_understood" },
+        "after": { "state_type": "knowledge", "value": "complete_stack_diagram_as_reference" },
+        "trigger": "Full architectural diagram assembles all layers into coherent picture",
+        "description": "The complete stack map — every layer the book built, assembled into one diagram."
+      }
+    },
+    "interpretations": {
+      "subtext": "The map of the territory. Every chapter built one layer; the appendix shows them all together.",
+      "motifs": ["convergence"]
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "reference_user",
+        "pre_state": { "capability": "complete_loader_understanding" },
+        "post_state": { "capability": "has_complete_reference_diagram" },
+        "objective": { "action": "reference", "target": "full stack architecture diagram" },
+        "information_state": {
+          "gained": [{ "subject": "architecture", "predicate": "knows", "about": "complete data flow from Mach-O bytes to running process" }]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "app_a_s02",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 69,
+    "observables": {
+      "participants": ["the_reader", "the_builder", "concept_parity_map"],
+      "context": { "setting": "setting_reference", "appendix": "A", "title": "Parity Scoreboard", "estimated_words": 2000 },
+      "event_type": "reference"
+    },
+    "structure": {
+      "position": 0.919,
+      "causal_role": "reference",
+      "grouping": { "appendix": "A — The Stack Map", "beat": "reference" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "present", "target": "parity scoreboard: ~92% libSystem coverage, ~43% Foundation coverage", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_builder", "action": "annotate", "target": "per-framework function counts: shimmed vs total vs needed", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_builder", "action": "explain", "target": "coverage methodology: what counts as 'shimmed' (functional, not just stub)", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "approximate_coverage_sense" },
+        "after": { "state_type": "knowledge", "value": "exact_parity_percentages" },
+        "trigger": "Parity scoreboard provides exact coverage metrics per framework",
+        "description": "The scoreboard makes coverage concrete — not 'most' but '92%' of libSystem."
+      }
+    },
+    "interpretations": {
+      "subtext": "Numbers replace intuition. The scoreboard turns 'it mostly works' into '92% libSystem, 43% Foundation.'",
+      "motifs": ["validation_by_numbers"]
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "reference_user",
+        "pre_state": { "capability": "has_complete_reference_diagram" },
+        "post_state": { "capability": "has_exact_parity_metrics" },
+        "objective": { "action": "reference", "target": "per-framework parity coverage metrics" },
+        "information_state": {
+          "gained": [
+            { "subject": "parity", "predicate": "knows", "about": "~92% libSystem, ~43% Foundation shimmed" },
+            { "subject": "methodology", "predicate": "knows", "about": "coverage methodology: functional shim vs stub vs not-shimmed" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "app_a_s03",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 70,
+    "observables": {
+      "participants": ["the_reader", "the_builder"],
+      "context": { "setting": "setting_reference", "appendix": "A", "title": "Where We Align", "estimated_words": 1500 },
+      "event_type": "reference"
+    },
+    "structure": {
+      "position": 0.932,
+      "causal_role": "reference",
+      "grouping": { "appendix": "A — The Stack Map", "beat": "reference" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "catalog", "target": "areas of strong alignment: Mach-O parsing, ObjC runtime, Foundation data types, file I/O", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_builder", "action": "explain", "target": "alignment factors: well-documented APIs, stable ABIs, simple data flow", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "parity_numbers_known" },
+        "after": { "state_type": "knowledge", "value": "understands_what_aligns_and_why" },
+        "trigger": "Alignment catalog shows which areas are reliable and why",
+        "description": "What aligns: areas where Apple's interfaces are stable and well-documented."
+      }
+    },
+    "interpretations": {
+      "subtext": "Alignment correlates with API stability and documentation quality. The better Apple documents it, the easier to shim."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "reference_user",
+        "pre_state": { "capability": "has_exact_parity_metrics" },
+        "post_state": { "capability": "understands_alignment_patterns" },
+        "objective": { "action": "reference", "target": "areas of strong alignment between shims and Apple" },
+        "information_state": {
+          "gained": [{ "subject": "parity", "predicate": "knows", "about": "strong alignment: Mach-O parsing, ObjC runtime, Foundation data types, file I/O" }]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "app_a_s04",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 71,
+    "observables": {
+      "participants": ["the_reader", "the_builder"],
+      "context": { "setting": "setting_reference", "appendix": "A", "title": "Where We Diverge", "estimated_words": 1500 },
+      "event_type": "reference"
+    },
+    "structure": {
+      "position": 0.946,
+      "causal_role": "reference",
+      "grouping": { "appendix": "A — The Stack Map", "beat": "reference" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "catalog", "target": "areas of divergence: Security.framework, Swift runtime, Metal, private frameworks", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_builder", "action": "explain", "target": "divergence factors: undocumented APIs, hardware dependencies, enormous surface area", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_builder", "action": "assess", "target": "which divergences matter for the target use case (CLI tools) and which don't (Metal)", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "alignment_patterns_known" },
+        "after": { "state_type": "knowledge", "value": "understands_divergence_patterns_and_their_causes" },
+        "trigger": "Divergence catalog shows where shimming is incomplete and why",
+        "description": "What diverges: areas where Apple's interfaces are undocumented, hardware-dependent, or too large."
+      }
+    },
+    "interpretations": {
+      "subtext": "Divergence isn't failure — it's the boundary. Understanding the boundary is as valuable as extending it."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "reference_user",
+        "pre_state": { "capability": "understands_alignment_patterns" },
+        "post_state": { "capability": "understands_divergence_boundary" },
+        "objective": { "action": "reference", "target": "areas of divergence and their root causes" },
+        "information_state": {
+          "gained": [
+            { "subject": "parity", "predicate": "knows", "about": "divergence: Security.framework, Swift runtime, Metal, private frameworks" },
+            { "subject": "parity", "predicate": "knows", "about": "divergence causes: undocumented APIs, hardware deps, surface area" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "app_b_s01",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 72,
+    "observables": {
+      "participants": ["the_reader", "the_builder", "concept_undocumented"],
+      "context": { "setting": "setting_reference", "appendix": "B", "title": "ABI Secrets", "estimated_words": 2000 },
+      "event_type": "war_story"
+    },
+    "structure": {
+      "position": 0.959,
+      "causal_role": "reference",
+      "grouping": { "appendix": "B — The War Stories", "beat": "war_stories" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "reveal", "target": "Apple ARM64 variadic ABI divergence from AAPCS — all variadics on stack", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_builder", "action": "reveal", "target": "struct return ABI: small structs in registers, large structs via implicit pointer", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_builder", "action": "explain", "target": "how these were discovered: disassembly comparison, not documentation", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "abi_facts_from_chapters" },
+        "after": { "state_type": "knowledge", "value": "complete_abi_secret_catalog" },
+        "trigger": "Collected ABI secrets from the entire project into one reference",
+        "description": "Every ABI secret discovered during the project, cataloged. Callbacks to Ch6 (variadic crisis)."
+      }
+    },
+    "interpretations": {
+      "subtext": "The secrets Apple never documented. Found by reading binary output, not API documentation.",
+      "motifs": ["documentation_lies", "binary_truth"]
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "reference_user",
+        "pre_state": { "capability": "understands_divergence_boundary" },
+        "post_state": { "capability": "has_abi_secret_reference" },
+        "objective": { "action": "reference", "target": "catalog of undocumented ABI behaviors" },
+        "information_state": {
+          "gained": [
+            { "subject": "abi", "predicate": "knows", "about": "complete variadic, struct return, and calling convention secrets" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "app_b_s02",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 73,
+    "observables": {
+      "participants": ["the_reader", "the_builder", "concept_undocumented"],
+      "context": { "setting": "setting_reference", "appendix": "B", "title": "Binary Format Secrets", "estimated_words": 2000 },
+      "event_type": "war_story"
+    },
+    "structure": {
+      "position": 0.973,
+      "causal_role": "reference",
+      "grouping": { "appendix": "B — The War Stories", "beat": "war_stories" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "reveal", "target": "binary plist format — undocumented trailer structure, offset table encoding", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_builder", "action": "reveal", "target": "chained fixups format — documentation says one thing, dyld does another", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_builder", "action": "reveal", "target": "shared dylib cache format — undocumented slide info and local symbol extraction", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "binary_format_from_chapters" },
+        "after": { "state_type": "knowledge", "value": "complete_binary_format_secret_catalog" },
+        "trigger": "Binary format secrets from the entire project cataloged",
+        "description": "The binary format secrets Apple never fully documented. Callbacks to Ch3 (chained fixups)."
+      }
+    },
+    "interpretations": {
+      "subtext": "The specification is the implementation. When docs disagree with code, code wins.",
+      "motifs": ["documentation_lies", "binary_truth"]
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "reference_user",
+        "pre_state": { "capability": "has_abi_secret_reference" },
+        "post_state": { "capability": "has_binary_format_secret_reference" },
+        "objective": { "action": "reference", "target": "catalog of undocumented binary format behaviors" },
+        "information_state": {
+          "gained": [
+            { "subject": "macho", "predicate": "knows", "about": "binary plist trailer, chained fixups edge cases, shared cache slide info" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "app_b_s03",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 74,
+    "observables": {
+      "participants": ["the_reader", "the_builder", "concept_undocumented"],
+      "context": { "setting": "setting_reference", "appendix": "B", "title": "Runtime Secrets", "estimated_words": 2000 },
+      "event_type": "war_story"
+    },
+    "structure": {
+      "position": 0.986,
+      "causal_role": "reference",
+      "grouping": { "appendix": "B — The War Stories", "beat": "war_stories" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "reveal", "target": "tagged pointer encoding — top bits encode class, bottom 60 bits encode value inline", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_builder", "action": "reveal", "target": "non-pointer ISA — modern ObjC uses ISA masks, not raw pointers, for class lookup", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_builder", "action": "reveal", "target": "shared cache +load order — Apple's specific ordering for class and category loading", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "runtime_from_chapters" },
+        "after": { "state_type": "knowledge", "value": "complete_runtime_secret_catalog" },
+        "trigger": "Runtime secrets from ObjC/Foundation implementation cataloged",
+        "description": "The runtime secrets: tagged pointers, non-pointer ISA, shared cache load order. Callbacks to Ch4."
+      }
+    },
+    "interpretations": {
+      "subtext": "The runtime's performance tricks are its deepest secrets. Speed comes from ISA bit-packing and tagged pointers.",
+      "motifs": ["engineering_elegance", "binary_truth"]
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "reference_user",
+        "pre_state": { "capability": "has_binary_format_secret_reference" },
+        "post_state": { "capability": "has_runtime_secret_reference" },
+        "objective": { "action": "reference", "target": "catalog of runtime secrets and performance tricks" },
+        "information_state": {
+          "gained": [
+            { "subject": "objc", "predicate": "knows", "about": "tagged pointer encoding: class in top bits, value in bottom 60" },
+            { "subject": "objc", "predicate": "knows", "about": "non-pointer ISA with mask-based class lookup" },
+            { "subject": "runtime", "predicate": "knows", "about": "shared cache +load order specifics" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "app_b_s04",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 75,
+    "observables": {
+      "participants": ["the_reader", "the_builder", "concept_undocumented"],
+      "context": { "setting": "setting_reference", "appendix": "B", "title": "Framework Secrets", "estimated_words": 2000 },
+      "event_type": "war_story"
+    },
+    "structure": {
+      "position": 1.000,
+      "causal_role": "reference",
+      "grouping": { "appendix": "B — The War Stories", "beat": "war_stories" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "reveal", "target": "libxo — structured output library hidden inside macOS CLI tools", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_builder", "action": "reveal", "target": "shared cache +load order for frameworks — Foundation loads after CoreFoundation loads after libSystem", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_builder", "action": "reveal", "target": "private framework dependencies — DVTFoundation, IDEFoundation, and the Xcode stack", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "framework_from_chapters" },
+        "after": { "state_type": "knowledge", "value": "complete_framework_secret_catalog" },
+        "trigger": "Framework-level secrets and hidden dependencies cataloged",
+        "description": "The final appendix entry. Every undocumented framework behavior discovered during the project."
+      }
+    },
+    "interpretations": {
+      "subtext": "The last secrets. Apple's stack is deep, layered, and full of surprises. Now the reader knows where to look.",
+      "motifs": ["documentation_lies", "platform_opacity"]
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "reference_user",
+        "pre_state": { "capability": "has_runtime_secret_reference" },
+        "post_state": { "capability": "has_complete_secret_reference" },
+        "objective": { "action": "reference", "target": "catalog of framework-level undocumented behaviors" },
+        "information_state": {
+          "gained": [
+            { "subject": "frameworks", "predicate": "knows", "about": "libxo hidden output library in CLI tools" },
+            { "subject": "frameworks", "predicate": "knows", "about": "shared cache load order: libSystem → CoreFoundation → Foundation" },
+            { "subject": "frameworks", "predicate": "knows", "about": "private frameworks: DVTFoundation, IDEFoundation for Xcode toolchain" }
+          ]
+        }
+      }
+    ]
+  }
+]

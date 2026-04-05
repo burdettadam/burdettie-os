@@ -1,0 +1,301 @@
+[
+  {
+    "unit_id": "ch08_s01",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 51,
+    "observables": {
+      "participants": ["the_reader", "the_builder", "crate_libsystem_shims", "crate_macho_runtime"],
+      "context": { "setting": "setting_source", "chapter": 8, "part": 4, "title": "The libSystem Shim Layer", "estimated_words": 1500, "source_files": ["crates/libsystem-shims/src/", "crates/macho-runtime/src/"] },
+      "event_type": "theory"
+    },
+    "structure": {
+      "position": 0.676,
+      "causal_role": "setup",
+      "grouping": { "part": "IV — The System", "chapter": "Ch 8 — The System", "beat": "finale_system" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "frame", "target": "libSystem is the root of everything — malloc, pthread, mach, dyld_stub_binder all live here", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_builder", "action": "explain", "target": "shim layer architecture: thin wrappers that translate macOS syscall conventions to host equivalents", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_builder", "action": "demonstrate", "target": "~92% of libSystem functions shimmed — the remaining 8% are the hard edge cases", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "libsystem_is_just_libc" },
+        "after": { "state_type": "knowledge", "value": "libsystem_is_the_platform_root_with_custom_shim_architecture" },
+        "trigger": "libSystem isn't libc — it's the entire platform substrate including mach, dispatch, and dyld",
+        "description": "The system layer is deeper than Foundation. Every program depends on it, but few understand it."
+      }
+    },
+    "interpretations": {
+      "subtext": "The lowest layer is always the hardest to see and the most important to get right.",
+      "motifs": ["platform_opacity"],
+      "reader_emotion": "respect_for_depth",
+      "thematic_function": "Finale system setup — completing the bottom of the stack."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "interpreter_validated_27_objc_tests" },
+        "post_state": { "capability": "understands_libsystem_shim_architecture" },
+        "objective": { "action": "survey", "target": "libSystem shim layer scope and architecture" },
+        "information_state": {
+          "gained": [
+            { "subject": "system", "predicate": "knows", "about": "libSystem covers malloc, pthread, mach, dyld_stub_binder" },
+            { "subject": "system", "predicate": "knows", "about": "~92% shim coverage with thin wrapper translation pattern" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch08_s02",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 52,
+    "observables": {
+      "participants": ["the_reader", "crate_macho_runtime"],
+      "context": { "setting": "setting_source", "chapter": 8, "part": 4, "title": "Thread-Local Variables", "estimated_words": 1500, "source_files": ["crates/macho-exec/src/tlv.rs"] },
+      "event_type": "implementation"
+    },
+    "structure": {
+      "position": 0.689,
+      "causal_role": "complication",
+      "grouping": { "part": "IV — The System", "chapter": "Ch 8 — The System", "beat": "finale_system" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "explain", "target": "Mach-O TLV thunks: __thread variables use tlv_get_addr trampolines, not ELF-style __tls_get_addr", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "implement", "target": "TLV descriptor parsing from __DATA,__thread_vars section", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_reader", "action": "implement", "target": "per-thread storage allocation and tlv_get_addr shim implementation", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_builder", "action": "explain", "target": "TLV initializers: __DATA,__thread_init must run before first access on each thread", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "thread_locals_just_work" },
+        "after": { "state_type": "knowledge", "value": "macho_tlv_requires_custom_thunk_implementation" },
+        "trigger": "TLV thunks are Mach-O specific — a completely different mechanism from ELF/Linux TLS",
+        "description": "Thread-local variables are invisible until they crash. Mach-O TLV is entirely different from ELF TLS."
+      }
+    },
+    "interpretations": {
+      "subtext": "The invisible infrastructure. Thread-locals work perfectly until you try to implement them yourself.",
+      "motifs": ["platform_opacity", "invisible_infrastructure"],
+      "reader_emotion": "hidden_complexity_revealed"
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "understands_libsystem_shim_architecture" },
+        "post_state": { "capability": "can_handle_thread_local_variables" },
+        "objective": { "action": "implement", "target": "Mach-O TLV thunk handling and per-thread storage" },
+        "information_state": {
+          "gained": [
+            { "subject": "macho", "predicate": "knows", "about": "TLV descriptors in __DATA,__thread_vars with tlv_get_addr trampolines" },
+            { "subject": "macho", "predicate": "knows", "about": "per-thread storage allocation and __thread_init section" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch08_s03",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 53,
+    "observables": {
+      "participants": ["the_reader", "crate_macho_runtime", "concept_compact_unwind"],
+      "context": { "setting": "setting_source", "chapter": 8, "part": 4, "title": "Exception Handling", "estimated_words": 1500, "source_files": ["crates/macho-runtime/src/"] },
+      "event_type": "implementation"
+    },
+    "structure": {
+      "position": 0.703,
+      "causal_role": "complication",
+      "grouping": { "part": "IV — The System", "chapter": "Ch 8 — The System", "beat": "finale_system" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "explain", "target": "compact unwind info: 32-bit entries encode frame pointer state and register saves", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "implement", "target": "__unwind_info section parsing — page tables, second-level entries, LSDA references", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_reader", "action": "implement", "target": "personality function routing — __gxx_personality_v0 for C++ exceptions, __objc_personality_v0 for ObjC", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_builder", "action": "explain", "target": "@try/@catch compiles to setjmp/longjmp handlers via personality functions", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "exceptions_are_language_features" },
+        "after": { "state_type": "knowledge", "value": "exceptions_are_binary_format_features_encoded_in_unwind_info" },
+        "trigger": "Compact unwind info makes exceptions a binary format concern, not just a language concern",
+        "description": "Exceptions aren't magic — they're encoded in the binary as compact unwind info and personality routines."
+      }
+    },
+    "interpretations": {
+      "subtext": "Exception handling is the most complex binary format feature. It bridges compiler, linker, and runtime.",
+      "motifs": ["invisible_infrastructure", "engineering_elegance"],
+      "reader_emotion": "awe_at_complexity",
+      "thematic_function": "Foreshadows App B (Binary Format Secrets) — compact unwind is one of the deepest Apple-specific features."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "can_handle_thread_local_variables" },
+        "post_state": { "capability": "can_handle_exceptions" },
+        "objective": { "action": "implement", "target": "compact unwind info parsing and personality function routing" },
+        "information_state": {
+          "gained": [
+            { "subject": "macho", "predicate": "knows", "about": "compact unwind: 32-bit entries with page tables, LSDA, personality refs" },
+            { "subject": "runtime", "predicate": "knows", "about": "personality functions route exceptions to C++/ObjC handlers" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch08_s04",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 54,
+    "observables": {
+      "participants": ["the_reader", "crate_macho_runtime"],
+      "context": { "setting": "setting_source", "chapter": 8, "part": 4, "title": "Signal Handling", "estimated_words": 1200 },
+      "event_type": "implementation"
+    },
+    "structure": {
+      "position": 0.716,
+      "causal_role": "complication",
+      "grouping": { "part": "IV — The System", "chapter": "Ch 8 — The System", "beat": "finale_system" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "explain", "target": "SIGSEGV/SIGBUS handlers need to distinguish guest faults from host faults", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "implement", "target": "signal handler registration with sigaction() and SA_SIGINFO for context", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_reader", "action": "implement", "target": "fault address analysis: is it in guest memory or host memory?", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "signals_crash_the_process" },
+        "after": { "state_type": "knowledge", "value": "signals_can_be_caught_and_diagnosed" },
+        "trigger": "Signal handler catches SIGSEGV and determines if it's a guest fault or host bug",
+        "description": "Signal handling is the safety net. Crashes become diagnostic information instead of silent death."
+      }
+    },
+    "interpretations": {
+      "subtext": "A crash is just a signal you didn't handle. The difference between debugging and death is a signal handler.",
+      "motifs": ["crash_as_teacher", "SIGSEGV"],
+      "reader_emotion": "empowerment",
+      "thematic_function": "Callback to Ch1's SIGSEGV motif — the crash that started the book is now caught and diagnosed."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "can_handle_exceptions" },
+        "post_state": { "capability": "can_handle_signals" },
+        "objective": { "action": "implement", "target": "signal handling with guest/host fault discrimination" },
+        "information_state": {
+          "gained": [
+            { "subject": "system", "predicate": "knows", "about": "sigaction with SA_SIGINFO for fault address context" },
+            { "subject": "system", "predicate": "knows", "about": "guest vs host fault discrimination via memory map" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch08_s05",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 55,
+    "observables": {
+      "participants": ["the_reader", "crate_macho_runtime", "concept_typestate"],
+      "context": { "setting": "setting_source", "chapter": 8, "part": 4, "title": "The Typestate Loader", "estimated_words": 1500, "source_files": ["crates/macho-runtime/src/typestate/"] },
+      "event_type": "implementation"
+    },
+    "structure": {
+      "position": 0.730,
+      "causal_role": "resolution",
+      "grouping": { "part": "IV — The System", "chapter": "Ch 8 — The System", "beat": "finale_system" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "explain", "target": "typestate pattern: Parsed → Mapped → Linked → Relocated → Initialized — each state is a type", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "implement", "target": "phantom type parameters enforce state transitions at compile time", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_builder", "action": "explain", "target": "you can't call initialize() on a Parsed binary — the type system prevents it", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_reader", "action": "implement", "target": "state transition methods: parse() → map() → link() → relocate() → initialize()", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "loader_phases_are_runtime_checked" },
+        "after": { "state_type": "knowledge", "value": "typestate_makes_loader_phases_compile_time_safe" },
+        "trigger": "Typestate pattern eliminates an entire class of loader bugs at compile time",
+        "description": "Rust's type system enforces what the loader's architecture requires. Invalid state transitions don't compile."
+      }
+    },
+    "interpretations": {
+      "subtext": "The typestate loader is the design thesis. Rust's type system enforces the loader's architecture.",
+      "motifs": ["engineering_elegance", "rust_strengths"],
+      "reader_emotion": "design_satisfaction",
+      "thematic_function": "The system-level design statement — Rust typestates make illegal loader states unrepresentable."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "can_handle_signals" },
+        "post_state": { "capability": "understands_typestate_loader_design" },
+        "objective": { "action": "understand", "target": "typestate pattern for compile-time loader phase enforcement" },
+        "information_state": {
+          "gained": [
+            { "subject": "design", "predicate": "knows", "about": "typestate: Parsed→Mapped→Linked→Relocated→Initialized" },
+            { "subject": "rust", "predicate": "knows", "about": "phantom type parameters enforce valid state transitions at compile time" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch08_s06",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 56,
+    "observables": {
+      "participants": ["the_reader", "the_builder", "crate_macho_runtime"],
+      "context": { "setting": "setting_terminal", "chapter": 8, "part": 4, "title": "Performance", "estimated_words": 1200 },
+      "event_type": "resolution"
+    },
+    "structure": {
+      "position": 0.743,
+      "causal_role": "resolution",
+      "grouping": { "part": "IV — The System", "chapter": "Ch 8 — The System", "beat": "finale_system" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "measure", "target": "initial loader startup: 300µs — unacceptable for repeated tool invocations", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "optimize", "target": "OnceLock for shim singletons, DataSymbolStore caching, lazy initialization", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_builder", "action": "measure", "target": "optimized startup: 100µs — 3x improvement from targeted caching", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "metric", "value": "300_microsecond_startup" },
+        "after": { "state_type": "metric", "value": "100_microsecond_startup" },
+        "trigger": "OnceLock + DataSymbolStore caching reduces startup by 3x",
+        "description": "300µs → 100µs. Targeted optimization, not premature optimization — measure first, then fix."
+      }
+    },
+    "interpretations": {
+      "subtext": "Measure, don't guess. The 3x improvement came from three targeted fixes, not a rewrite.",
+      "motifs": ["validation_by_numbers", "pragmatic_engineering"],
+      "reader_emotion": "satisfying_improvement",
+      "thematic_function": "Chapter resolution — the system layer is complete and fast. Bridge to Ch 9: 'Now test everything.'"
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "understands_typestate_loader_design" },
+        "post_state": { "capability": "system_layer_optimized_100us" },
+        "objective": { "action": "optimize", "target": "loader startup performance" },
+        "information_state": {
+          "gained": [
+            { "subject": "performance", "predicate": "knows", "about": "OnceLock singletons + DataSymbolStore caching = 3x startup improvement" },
+            { "subject": "methodology", "predicate": "knows", "about": "measure first, optimize targeted bottlenecks" }
+          ],
+          "gaps": [
+            { "subject": "validation", "predicate": "knows", "about": "comprehensive tool compatibility testing still needed (Ch 9)" }
+          ]
+        }
+      }
+    ]
+  }
+]

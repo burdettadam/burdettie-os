@@ -48,7 +48,10 @@ impl HostSymbolResolver for LinuxSymbolResolver {
 
     fn open_library(&self, path: &str) -> Option<*mut ()> {
         let c_str = std::ffi::CString::new(path).ok()?;
-        let handle = unsafe { libc::dlopen(c_str.as_ptr(), libc::RTLD_LAZY) };
+        // RTLD_GLOBAL makes the library's symbols visible via RTLD_DEFAULT,
+        // allowing later dlsym(RTLD_DEFAULT, ...) calls to find symbols
+        // from compression libraries, libarchive, etc.
+        let handle = unsafe { libc::dlopen(c_str.as_ptr(), libc::RTLD_LAZY | libc::RTLD_GLOBAL) };
         if handle.is_null() {
             None
         } else {

@@ -11,6 +11,8 @@ core-foundation-lite = { workspace = true }
 libsystem-shims      = { workspace = true }
 objc-runtime         = { workspace = true }
 platform-core        = { workspace = true }
+cg-shims             = { workspace = true }
+graphics-core        = { workspace = true }
 log                  = { workspace = true }
 libc                 = { workspace = true }
 regex                = { workspace = true }

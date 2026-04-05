@@ -6,7 +6,7 @@ use graphics_core::{
     Color, Font, FontManager, Point, Rect, Renderer as _, SoftwareRenderer, Surface,
 };
 use ui_view::layout::{LayoutConstraint, LayoutEngine};
-use window_backend::KeyCode;
+use window_backend::{KeyCode, KeyboardLayout};
 
 use crate::{
     Button, Checkbox, ComboBox, ImageView, Label, ProgressBar, RadioButton, ScrollView, Slider,
@@ -30,11 +30,13 @@ impl AppScene {
             imageviews: Vec::new(),
             scrollviews: Vec::new(),
             on_button_click: None,
+            on_layout_change: None,
             main_menu: None,
             focused_textfield: None,
             modifier_flags: ModifierFlags::default(),
             font_manager: FontManager::new(),
             constraints: Vec::new(),
+            keyboard_layout: KeyboardLayout::default(),
         }
     }
 
@@ -97,6 +99,24 @@ impl AppScene {
 
     pub fn set_main_menu(&mut self, menu: NSMenu) {
         self.main_menu = Some(menu);
+    }
+
+    /// Set the active keyboard layout.
+    pub fn set_keyboard_layout(&mut self, layout: KeyboardLayout) {
+        self.keyboard_layout = layout;
+    }
+
+    /// Get the current keyboard layout.
+    pub fn keyboard_layout(&self) -> KeyboardLayout {
+        self.keyboard_layout
+    }
+
+    /// Register a handler called when the keyboard layout changes (Ctrl+Space).
+    pub fn on_layout_change(
+        &mut self,
+        handler: impl FnMut(KeyboardLayout) + 'static,
+    ) {
+        self.on_layout_change = Some(Box::new(handler));
     }
 
     /// Add a layout constraint.
@@ -276,11 +296,20 @@ impl AppScene {
         self.modifier_flags = flags;
     }
 
-    /// Handle a key press. Checks menu shortcuts first, then dispatches
-    /// keyboard navigation (Tab cycles textfield focus, Space/Return activates
-    /// focused button, Left/Right adjusts focused slider).
+    /// Handle a key press. Checks Ctrl+Space for layout cycling, menu shortcuts,
+    /// then dispatches keyboard navigation (Tab cycles textfield focus,
+    /// Space/Return activates focused button, Left/Right adjusts focused slider).
     /// Returns `true` if anything was consumed.
     pub fn handle_key_down(&mut self, key: KeyCode) -> bool {
+        // Ctrl+Space → cycle keyboard layout (matches macOS Input Sources shortcut)
+        if key == KeyCode::Space && self.modifier_flags.control && !self.modifier_flags.command {
+            self.keyboard_layout = self.keyboard_layout.next();
+            if let Some(ref mut handler) = self.on_layout_change {
+                handler(self.keyboard_layout);
+            }
+            return true;
+        }
+
         if self.handle_textfield_shortcut(key) {
             return true;
         }
@@ -332,8 +361,9 @@ impl AppScene {
         }
     }
 
-    /// Handle character input (typed text). Inserts into the focused
-    /// text field. Returns `true` if consumed.
+    /// Handle character input (typed text). Remaps through the active
+    /// keyboard layout, then inserts into the focused text field.
+    /// Returns `true` if consumed.
     pub fn handle_character_input(&mut self, text: &str) -> bool {
         let Some(idx) = self.focused_textfield else {
             return false;
@@ -341,7 +371,8 @@ impl AppScene {
         if idx >= self.textfields.len() {
             return false;
         }
-        for ch in text.chars() {
+        let remapped = self.keyboard_layout.remap_str(text);
+        for ch in remapped.chars() {
             self.textfields[idx].insert_char(ch);
         }
         true

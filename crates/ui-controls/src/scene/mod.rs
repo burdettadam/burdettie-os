@@ -10,6 +10,7 @@ use graphics_core::{
     Color, FontManager,
 };
 use ui_view::layout::LayoutConstraint;
+use window_backend::KeyboardLayout;
 
 use crate::{
     Button, Checkbox, ComboBox, ImageView, Label, ProgressBar, RadioButton, ScrollView, Slider,
@@ -18,6 +19,9 @@ use crate::{
 
 /// Button click handler: receives button index and mutable access to labels/textfields.
 pub type ButtonClickHandler = Box<dyn FnMut(usize, &mut Vec<Label>, &mut Vec<TextField>)>;
+
+/// Keyboard layout change handler.
+pub type LayoutChangeHandler = Box<dyn FnMut(KeyboardLayout)>;
 
 /// Backend-agnostic scene containing all GUI controls and interaction logic.
 ///
@@ -37,11 +41,13 @@ pub struct AppScene {
     pub(crate) imageviews: Vec<ImageView>,
     pub(crate) scrollviews: Vec<ScrollView>,
     pub(crate) on_button_click: Option<ButtonClickHandler>,
+    pub(crate) on_layout_change: Option<LayoutChangeHandler>,
     pub(crate) main_menu: Option<NSMenu>,
     pub(crate) focused_textfield: Option<usize>,
     pub(crate) modifier_flags: ModifierFlags,
     pub(crate) font_manager: FontManager,
     pub(crate) constraints: Vec<LayoutConstraint>,
+    pub(crate) keyboard_layout: KeyboardLayout,
 }
 
 

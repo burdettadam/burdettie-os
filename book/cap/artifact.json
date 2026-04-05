@@ -1,0 +1,435 @@
+{
+  "$schema": "cap/schemas/artifact.schema.json",
+  "protocol": "canonical-artifact-protocol",
+  "protocol_version": "1.0.0",
+  "profile": "narrative",
+  "profile_version": "1.0.0",
+  "artifact_id": "loading_darwin",
+  "metadata": {
+    "title": "Loading Darwin: Building a macOS Binary Loader from Scratch",
+    "author": "Adam Burdett",
+    "estimated_words": 103000,
+    "chapters": 10,
+    "appendices": 2,
+    "total_scenes": 75,
+    "parts": [
+      { "number": 1, "title": "The Artifact", "chapters": [1, 2] },
+      { "number": 2, "title": "The Linker", "chapters": [3, 4] },
+      { "number": 3, "title": "The Platform", "chapters": [5, 6, 7] },
+      { "number": 4, "title": "The System", "chapters": [8, 9, 10] }
+    ]
+  },
+  "entities": [
+    {
+      "entity_id": "the_reader",
+      "entity_type": "character",
+      "display_name": "The Reader",
+      "observable_descriptors": { "slot": "protagonist" },
+      "structural_properties": { "role": "protagonist", "pov": true },
+      "interpretations": {
+        "archetype": "explorer",
+        "arc_type": "positive_change",
+        "wound": "systems_opacity",
+        "desire": "understand_platform_internals"
+      }
+    },
+    {
+      "entity_id": "the_builder",
+      "entity_type": "character",
+      "display_name": "The Builder (Author Voice)",
+      "observable_descriptors": { "slot": "mentor" },
+      "structural_properties": { "role": "mentor", "pov": false },
+      "interpretations": {
+        "archetype": "guide",
+        "arc_type": "flat",
+        "function": "translates_crashes_into_understanding"
+      }
+    },
+    {
+      "entity_id": "the_platform",
+      "entity_type": "character",
+      "display_name": "The Platform (macOS / Apple)",
+      "observable_descriptors": { "slot": "antagonist" },
+      "structural_properties": { "role": "antagonist" },
+      "interpretations": {
+        "archetype": "threshold_guardian",
+        "arc_type": "flat",
+        "function": "resists_understanding_through_opacity"
+      }
+    },
+    {
+      "entity_id": "crate_macho_parse",
+      "entity_type": "object",
+      "display_name": "macho-parse",
+      "observable_descriptors": { "kind": "crate", "source": "crates/macho-parse/src/lib.rs" },
+      "structural_properties": { "introduced": "ch01", "role": "Mach-O binary parser" }
+    },
+    {
+      "entity_id": "crate_macho_types",
+      "entity_type": "object",
+      "display_name": "macho-types",
+      "observable_descriptors": { "kind": "crate", "source": "crates/macho-types/src/header.rs" },
+      "structural_properties": { "introduced": "ch01", "role": "shared type definitions" }
+    },
+    {
+      "entity_id": "crate_macho_exec",
+      "entity_type": "object",
+      "display_name": "macho-exec",
+      "observable_descriptors": { "kind": "crate", "source": "crates/macho-exec/src/mapped.rs" },
+      "structural_properties": { "introduced": "ch02", "role": "memory mapping and fixups" }
+    },
+    {
+      "entity_id": "crate_macho_resolve",
+      "entity_type": "object",
+      "display_name": "macho-resolve",
+      "observable_descriptors": { "kind": "crate" },
+      "structural_properties": { "introduced": "ch03", "role": "symbol resolution" }
+    },
+    {
+      "entity_id": "crate_macho_shared_cache",
+      "entity_type": "object",
+      "display_name": "macho-shared-cache",
+      "observable_descriptors": { "kind": "crate" },
+      "structural_properties": { "introduced": "ch03", "role": "dyld shared cache reader" }
+    },
+    {
+      "entity_id": "crate_macho_objc",
+      "entity_type": "object",
+      "display_name": "macho-objc",
+      "observable_descriptors": { "kind": "crate" },
+      "structural_properties": { "introduced": "ch04", "role": "ObjC metadata parser" }
+    },
+    {
+      "entity_id": "crate_objc_runtime",
+      "entity_type": "object",
+      "display_name": "objc-runtime",
+      "observable_descriptors": { "kind": "crate", "source": "crates/objc-runtime/src/class/" },
+      "structural_properties": { "introduced": "ch04", "role": "synthetic Objective-C runtime" }
+    },
+    {
+      "entity_id": "crate_cf_lite",
+      "entity_type": "object",
+      "display_name": "cf-lite",
+      "observable_descriptors": { "kind": "crate", "source": "crates/cf-lite/src/", "test_count": 2682 },
+      "structural_properties": { "introduced": "ch05", "role": "Foundation framework shims" }
+    },
+    {
+      "entity_id": "crate_core_foundation_lite",
+      "entity_type": "object",
+      "display_name": "core-foundation-lite",
+      "observable_descriptors": { "kind": "crate" },
+      "structural_properties": { "introduced": "ch05", "role": "CoreFoundation shims" }
+    },
+    {
+      "entity_id": "crate_libsystem_shims",
+      "entity_type": "object",
+      "display_name": "libsystem-shims",
+      "observable_descriptors": { "kind": "crate", "source": "crates/libsystem-shims/src/darwin_compat.rs" },
+      "structural_properties": { "introduced": "ch06", "role": "system library compatibility" }
+    },
+    {
+      "entity_id": "crate_platform_linux",
+      "entity_type": "object",
+      "display_name": "platform-linux",
+      "observable_descriptors": { "kind": "crate" },
+      "structural_properties": { "introduced": "ch06", "role": "Linux PAL implementation" }
+    },
+    {
+      "entity_id": "crate_arm64_translate",
+      "entity_type": "object",
+      "display_name": "arm64-translate",
+      "observable_descriptors": { "kind": "crate", "source": "crates/arm64-translate/src/" },
+      "structural_properties": { "introduced": "ch07", "role": "ARM64 interpreter" }
+    },
+    {
+      "entity_id": "crate_macho_runtime",
+      "entity_type": "object",
+      "display_name": "macho-runtime",
+      "observable_descriptors": { "kind": "crate", "source": "crates/macho-runtime/src/typestate/" },
+      "structural_properties": { "introduced": "ch08", "role": "typestate loader pipeline" }
+    },
+    {
+      "entity_id": "crate_macho_inspect",
+      "entity_type": "object",
+      "display_name": "macho-inspect",
+      "observable_descriptors": { "kind": "crate", "source": "crates/macho-inspect/src/exec.rs" },
+      "structural_properties": { "introduced": "ch09", "role": "the executable: loads and runs binaries" }
+    },
+    {
+      "entity_id": "crate_app_kit_lite",
+      "entity_type": "object",
+      "display_name": "app-kit-lite",
+      "observable_descriptors": { "kind": "crate" },
+      "structural_properties": { "introduced": "ch10", "role": "AppKit shims" }
+    },
+    {
+      "entity_id": "crate_test_harness",
+      "entity_type": "object",
+      "display_name": "test-harness",
+      "observable_descriptors": { "kind": "crate" },
+      "structural_properties": { "introduced": "ch09", "role": "corpus test framework" }
+    },
+    {
+      "entity_id": "concept_mach_o",
+      "entity_type": "object",
+      "display_name": "Mach-O format",
+      "observable_descriptors": { "kind": "concept" },
+      "structural_properties": { "introduced": "ch01", "recurs_in": ["ch02", "ch03", "ch09"] }
+    },
+    {
+      "entity_id": "concept_virtual_memory",
+      "entity_type": "object",
+      "display_name": "Virtual memory",
+      "observable_descriptors": { "kind": "concept" },
+      "structural_properties": { "introduced": "ch02", "recurs_in": ["ch03", "ch07", "ch08"] }
+    },
+    {
+      "entity_id": "concept_dynamic_linking",
+      "entity_type": "object",
+      "display_name": "Dynamic linking",
+      "observable_descriptors": { "kind": "concept" },
+      "structural_properties": { "introduced": "ch03", "recurs_in": ["ch06", "ch09"] }
+    },
+    {
+      "entity_id": "concept_chained_fixups",
+      "entity_type": "object",
+      "display_name": "Chained fixup format",
+      "observable_descriptors": { "kind": "concept" },
+      "structural_properties": { "introduced": "ch03", "recurs_in": ["ch06"] }
+    },
+    {
+      "entity_id": "concept_pac",
+      "entity_type": "object",
+      "display_name": "Pointer Authentication",
+      "observable_descriptors": { "kind": "concept" },
+      "structural_properties": { "introduced": "ch03", "recurs_in": ["ch06", "ch07"] }
+    },
+    {
+      "entity_id": "concept_objc_msgsend",
+      "entity_type": "object",
+      "display_name": "objc_msgSend dispatch",
+      "observable_descriptors": { "kind": "concept" },
+      "structural_properties": { "introduced": "ch04", "recurs_in": ["ch05", "ch09"] }
+    },
+    {
+      "entity_id": "concept_tagged_pointer",
+      "entity_type": "object",
+      "display_name": "Tagged pointers",
+      "observable_descriptors": { "kind": "concept" },
+      "structural_properties": { "introduced": "ch04", "recurs_in": ["ch05"] }
+    },
+    {
+      "entity_id": "concept_toll_free_bridge",
+      "entity_type": "object",
+      "display_name": "Toll-free bridging",
+      "observable_descriptors": { "kind": "concept" },
+      "structural_properties": { "introduced": "ch05", "recurs_in": ["ch09"] }
+    },
+    {
+      "entity_id": "concept_variadic_abi",
+      "entity_type": "object",
+      "display_name": "Variadic ABI mismatch",
+      "observable_descriptors": { "kind": "concept" },
+      "structural_properties": { "introduced": "ch06", "recurs_in": ["ch09"] }
+    },
+    {
+      "entity_id": "concept_arm64_isa",
+      "entity_type": "object",
+      "display_name": "ARM64 instruction set",
+      "observable_descriptors": { "kind": "concept" },
+      "structural_properties": { "introduced": "ch07" }
+    },
+    {
+      "entity_id": "concept_typestate",
+      "entity_type": "object",
+      "display_name": "Typestate pattern",
+      "observable_descriptors": { "kind": "concept" },
+      "structural_properties": { "introduced": "ch08" }
+    },
+    {
+      "entity_id": "concept_load_command",
+      "entity_type": "object",
+      "display_name": "Load commands",
+      "observable_descriptors": { "kind": "concept" },
+      "structural_properties": { "introduced": "ch01", "recurs_in": ["ch02", "ch03"] }
+    },
+    {
+      "entity_id": "concept_aslr",
+      "entity_type": "object",
+      "display_name": "ASLR / slide",
+      "observable_descriptors": { "kind": "concept" },
+      "structural_properties": { "introduced": "ch02", "recurs_in": ["ch03", "ch06"] }
+    },
+    {
+      "entity_id": "concept_isa_pointer",
+      "entity_type": "object",
+      "display_name": "ISA pointer",
+      "observable_descriptors": { "kind": "concept" },
+      "structural_properties": { "introduced": "ch04", "recurs_in": ["ch05", "ch06"] }
+    },
+    {
+      "entity_id": "concept_compact_unwind",
+      "entity_type": "object",
+      "display_name": "Compact unwind info",
+      "observable_descriptors": { "kind": "concept" },
+      "structural_properties": { "introduced": "ch08" }
+    },
+    {
+      "entity_id": "concept_responder_chain",
+      "entity_type": "object",
+      "display_name": "Responder chain",
+      "observable_descriptors": { "kind": "concept" },
+      "structural_properties": { "introduced": "ch10" }
+    },
+    {
+      "entity_id": "concept_parity_map",
+      "entity_type": "object",
+      "display_name": "Stack parity map",
+      "observable_descriptors": { "kind": "concept" },
+      "structural_properties": { "introduced": "appA", "recurs_in": ["appB"] }
+    },
+    {
+      "entity_id": "concept_undocumented",
+      "entity_type": "object",
+      "display_name": "Undocumented behaviors",
+      "observable_descriptors": { "kind": "concept" },
+      "structural_properties": { "introduced": "appB", "recurs_in": ["ch06", "ch09"] }
+    },
+    {
+      "entity_id": "concept_ffi_boundary",
+      "entity_type": "object",
+      "display_name": "FFI boundary",
+      "observable_descriptors": { "kind": "concept" },
+      "structural_properties": { "introduced": "ch07", "recurs_in": ["ch08"] }
+    },
+    {
+      "entity_id": "tool_lipo",
+      "entity_type": "object",
+      "display_name": "lipo",
+      "observable_descriptors": { "kind": "tool", "category": "xcode_toolchain" },
+      "structural_properties": { "introduced": "ch09", "class": "easy_win" }
+    },
+    {
+      "entity_id": "tool_nm",
+      "entity_type": "object",
+      "display_name": "nm",
+      "observable_descriptors": { "kind": "tool", "category": "xcode_toolchain" },
+      "structural_properties": { "introduced": "ch01", "recurs_in": ["ch09"] }
+    },
+    {
+      "entity_id": "tool_strings",
+      "entity_type": "object",
+      "display_name": "strings",
+      "observable_descriptors": { "kind": "tool", "category": "xcode_toolchain" },
+      "structural_properties": { "introduced": "ch09", "class": "easy_win" }
+    },
+    {
+      "entity_id": "tool_xcodebuild",
+      "entity_type": "object",
+      "display_name": "xcodebuild",
+      "observable_descriptors": { "kind": "tool", "category": "xcode_dev" },
+      "structural_properties": { "introduced": "ch09", "class": "hard_case" }
+    },
+    {
+      "entity_id": "tool_swift_demangle",
+      "entity_type": "object",
+      "display_name": "swift-demangle",
+      "observable_descriptors": { "kind": "tool", "category": "xcode_toolchain" },
+      "structural_properties": { "introduced": "ch09", "class": "hard_case" }
+    },
+    {
+      "entity_id": "tool_notarytool",
+      "entity_type": "object",
+      "display_name": "notarytool",
+      "observable_descriptors": { "kind": "tool", "category": "xcode_dev" },
+      "structural_properties": { "introduced": "ch09", "class": "unsolved" }
+    },
+    {
+      "entity_id": "tool_cut",
+      "entity_type": "object",
+      "display_name": "cut",
+      "observable_descriptors": { "kind": "tool", "category": "system" },
+      "structural_properties": { "introduced": "ch06", "recurs_in": ["ch09"] }
+    },
+    {
+      "entity_id": "tool_sort",
+      "entity_type": "object",
+      "display_name": "sort",
+      "observable_descriptors": { "kind": "tool", "category": "system" },
+      "structural_properties": { "introduced": "ch06", "recurs_in": ["ch09"] }
+    },
+    {
+      "entity_id": "setting_hex_editor",
+      "entity_type": "location",
+      "display_name": "Hex editor view",
+      "observable_descriptors": { "atmosphere": "raw_data_immersion" },
+      "structural_properties": { "type": "virtual_environment" }
+    },
+    {
+      "entity_id": "setting_terminal",
+      "entity_type": "location",
+      "display_name": "Terminal / shell",
+      "observable_descriptors": { "atmosphere": "command_line_interaction" },
+      "structural_properties": { "type": "virtual_environment" }
+    },
+    {
+      "entity_id": "setting_debugger",
+      "entity_type": "location",
+      "display_name": "Crash / register dump view",
+      "observable_descriptors": { "atmosphere": "forensic_analysis" },
+      "structural_properties": { "type": "virtual_environment" }
+    },
+    {
+      "entity_id": "setting_ide",
+      "entity_type": "location",
+      "display_name": "Source code editor",
+      "observable_descriptors": { "atmosphere": "construction" },
+      "structural_properties": { "type": "virtual_environment" }
+    },
+    {
+      "entity_id": "setting_docker",
+      "entity_type": "location",
+      "display_name": "Docker container (linux/arm64)",
+      "observable_descriptors": { "atmosphere": "alien_territory" },
+      "structural_properties": { "type": "virtual_environment" }
+    },
+    {
+      "entity_id": "setting_source",
+      "entity_type": "location",
+      "display_name": "Source code listing",
+      "observable_descriptors": { "atmosphere": "annotated_walkthrough" },
+      "structural_properties": { "type": "virtual_environment" }
+    }
+  ],
+  "relationships": [
+    { "source": "the_reader", "target": "the_builder", "relationship_type": "mentor", "evidence": "Author guides reader through each chapter's crash-to-comprehension arc" },
+    { "source": "the_reader", "target": "the_platform", "relationship_type": "rival", "evidence": "Platform opacity is the central obstacle the reader overcomes" },
+    { "source": "crate_macho_parse", "target": "crate_macho_types", "relationship_type": "dependency", "evidence": "macho-parse uses macho-types for shared struct definitions" },
+    { "source": "crate_macho_exec", "target": "crate_macho_parse", "relationship_type": "dependency", "evidence": "Mapping requires parsed binary input" },
+    { "source": "crate_objc_runtime", "target": "crate_macho_objc", "relationship_type": "dependency", "evidence": "Runtime registration consumes ObjC metadata from binary" },
+    { "source": "crate_cf_lite", "target": "crate_objc_runtime", "relationship_type": "dependency", "evidence": "Foundation shims register classes through ObjC runtime" },
+    { "source": "crate_macho_runtime", "target": "crate_macho_exec", "relationship_type": "dependency", "evidence": "Typestate pipeline orchestrates mapping, fixup, and initialization" },
+    { "source": "crate_macho_inspect", "target": "crate_macho_runtime", "relationship_type": "dependency", "evidence": "Executable uses the full runtime pipeline" }
+  ],
+  "views": [
+    {
+      "view_id": "fichtean_curve",
+      "view_type": "tension_arc",
+      "description": "Fichtean Curve tension mapping: escalating crises with partial resolutions",
+      "ordering": "chronological"
+    },
+    {
+      "view_id": "heros_journey",
+      "view_type": "transformation_arc",
+      "description": "Hero's Journey mapping: Departure (Ch 1-2), Initiation (Ch 3-8), Return (Ch 9-10)",
+      "ordering": "chronological"
+    },
+    {
+      "view_id": "reader_knowledge",
+      "view_type": "entity_trajectory",
+      "description": "Reader's cumulative knowledge trajectory across all scenes",
+      "scope": ["the_reader"],
+      "ordering": "chronological"
+    }
+  ]
+}

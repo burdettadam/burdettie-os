@@ -194,6 +194,46 @@ fn rgb_to_hsb(r: f64, g: f64, b: f64) -> (f64, f64, f64) {
     (hue, saturation, brightness)
 }
 
+// ── Drawing context integration ────────────────────────────────
+
+fn color_components(obj: u64) -> (f64, f64, f64, f64) {
+    if obj == 0 { return (0.0, 0.0, 0.0, 1.0); }
+    unsafe {
+        (
+            *((obj as usize + 8) as *const f64),
+            *((obj as usize + 16) as *const f64),
+            *((obj as usize + 24) as *const f64),
+            *((obj as usize + 32) as *const f64),
+        )
+    }
+}
+
+/// `-[NSColor set]` — set both fill and stroke to this color in the current context.
+pub extern "C" fn shim_nscolor_set(obj: u64, _cmd: u64) {
+    shim_nscolor_set_fill(obj, _cmd);
+    shim_nscolor_set_stroke(obj, _cmd);
+}
+
+/// `-[NSColor setFill]` — set fill color in the current CGContext.
+pub extern "C" fn shim_nscolor_set_fill(obj: u64, _cmd: u64) {
+    let cg_ctx = crate::nsgraphicscontext::current_cg_context_handle();
+    if cg_ctx == 0 || obj == 0 { return; }
+    let (r, g, b, a) = color_components(obj);
+    cg_shims::bridge::with_context(cg_ctx, |c| {
+        c.fill_color = graphics_core::Color::new(r, g, b, a);
+    });
+}
+
+/// `-[NSColor setStroke]` — set stroke color in the current CGContext.
+pub extern "C" fn shim_nscolor_set_stroke(obj: u64, _cmd: u64) {
+    let cg_ctx = crate::nsgraphicscontext::current_cg_context_handle();
+    if cg_ctx == 0 || obj == 0 { return; }
+    let (r, g, b, a) = color_components(obj);
+    cg_shims::bridge::with_context(cg_ctx, |c| {
+        c.stroke_color = graphics_core::Color::new(r, g, b, a);
+    });
+}
+
 fn hsb_to_rgb(h: f64, s: f64, b: f64) -> (f64, f64, f64) {
     if s < 1e-10 {
         return (b, b, b);

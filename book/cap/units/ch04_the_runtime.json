@@ -1,0 +1,409 @@
+[
+  {
+    "unit_id": "ch04_s01",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 19,
+    "observables": {
+      "participants": ["the_reader", "the_platform", "crate_macho_objc", "concept_isa_pointer"],
+      "context": { "setting": "setting_hex_editor", "chapter": 4, "part": 2, "title": "The ObjC Object Model", "estimated_words": 1800, "source_files": ["crates/macho-objc/src/"] },
+      "event_type": "discovery"
+    },
+    "structure": {
+      "position": 0.243,
+      "causal_role": "setup",
+      "grouping": { "part": "II — The Linker", "chapter": "Ch 4 — The Runtime", "beat": "b_story_fun_and_games" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "demonstrate", "target": "objc_msgSend(receiver, @selector(init)) crashes — no ObjC runtime on Linux", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "examine", "target": "ISA pointers — every object's first 8 bytes point to its class", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_reader", "action": "examine", "target": "class_t struct: ISA, superclass, cache, vtable, class_ro_t pointer", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_reader", "action": "examine", "target": "class_ro_t: name, method list, ivar layout, base protocols", "significance": "essential" },
+        { "sequence_number": 5, "agent": "the_builder", "action": "reveal", "target": "ObjC objects are memory layouts, not API abstractions — paradigm shift", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "objc_is_api_abstraction" },
+        "after": { "state_type": "knowledge", "value": "objc_objects_are_binary_memory_layouts" },
+        "trigger": "Seeing class_t and class_ro_t as raw hex reveals ObjC's binary representation",
+        "description": "Paradigm shift — ObjC objects seen for the first time as memory layouts, not API abstractions."
+      }
+    },
+    "interpretations": {
+      "subtext": "Every abstraction has a concrete representation. The binary level reveals what the API hides.",
+      "motifs": ["SIGSEGV", "paradigm_shift"],
+      "reader_emotion": "paradigm_shift",
+      "thematic_function": "B Story begins — ObjC runtime is the 'B story' (an entirely different layer hiding inside the binary). ISA pointer concept recurs in Ch 5 (toll-free bridging) and Ch 4.8 (tagged pointers)."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "can_resolve_c_symbols" },
+        "post_state": { "capability": "understands_objc_binary_layout" },
+        "objective": { "action": "understand", "target": "how ObjC classes are represented in the binary" },
+        "information_state": {
+          "gained": [
+            { "subject": "objc", "predicate": "knows", "about": "ISA pointer: first 8 bytes of every object → class" },
+            { "subject": "objc", "predicate": "knows", "about": "class_t layout: ISA, superclass, cache, vtable, ro data" },
+            { "subject": "objc", "predicate": "knows", "about": "class_ro_t: name, methods, ivars, protocols" }
+          ],
+          "gaps": [
+            { "subject": "objc", "predicate": "knows", "about": "how selectors are interned" },
+            { "subject": "objc", "predicate": "knows", "about": "message dispatch algorithm" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch04_s02",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 20,
+    "observables": {
+      "participants": ["the_reader", "crate_objc_runtime"],
+      "context": { "setting": "setting_source", "chapter": 4, "part": 2, "title": "Selector Interning", "estimated_words": 1200, "source_files": ["crates/objc-runtime/src/class/"] },
+      "event_type": "discovery"
+    },
+    "structure": {
+      "position": 0.257,
+      "causal_role": "setup",
+      "grouping": { "part": "II — The Linker", "chapter": "Ch 4 — The Runtime", "beat": "b_story_fun_and_games" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "explain", "target": "__objc_selrefs section: list of selector string pointers", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_builder", "action": "explain", "target": "SEL is a C string pointer — but uniqued so pointer comparison works", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_reader", "action": "understand", "target": "every 'init' string across all images must resolve to same pointer value", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "selectors_are_method_names" },
+        "after": { "state_type": "knowledge", "value": "selectors_are_unique_interned_pointers" },
+        "trigger": "Selector uniquing requirement makes string comparison a pointer comparison — O(1)",
+        "description": "Technical elegance — interning turns string matching into pointer equality."
+      }
+    },
+    "interpretations": {
+      "subtext": "Elegance emerges from constraints. Interning turns O(n) comparisons into O(1).",
+      "motifs": ["engineering_elegance"],
+      "reader_emotion": "technical_elegance"
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "understands_objc_binary_layout" },
+        "post_state": { "capability": "understands_selector_interning" },
+        "objective": { "action": "learn", "target": "selector uniquing protocol" },
+        "information_state": {
+          "gained": [
+            { "subject": "objc", "predicate": "knows", "about": "SEL = interned C string, pointer-equality comparable" },
+            { "subject": "objc", "predicate": "knows", "about": "__objc_selrefs binds selectors from binary to runtime" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch04_s03",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 21,
+    "observables": {
+      "participants": ["the_reader", "the_builder", "concept_objc_msgsend"],
+      "context": { "setting": "setting_source", "chapter": 4, "part": 2, "title": "Message Dispatch", "estimated_words": 2000 },
+      "event_type": "theory"
+    },
+    "structure": {
+      "position": 0.270,
+      "causal_role": "trigger",
+      "grouping": { "part": "II — The Linker", "chapter": "Ch 4 — The Runtime", "beat": "b_story_fun_and_games" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "present", "target": "hot path: receiver → ISA → cache lookup (hash table) → method list scan → superclass chain", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_builder", "action": "compare", "target": "ObjC late-binding vs C++ vtable dispatch: flexibility vs speed", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_builder", "action": "explain", "target": "method resolution is deferred until the message is sent — truly late-bound", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_reader", "action": "understand", "target": "the dispatch algorithm makes dynamic class creation and categories possible", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "objc_calls_are_function_calls" },
+        "after": { "state_type": "knowledge", "value": "objc_is_truly_late_bound_message_dispatch" },
+        "trigger": "Understanding the ISA → cache → method list → superclass chain algorithm",
+        "description": "ObjC is more elegant than expected — true late binding means infinite runtime flexibility."
+      }
+    },
+    "interpretations": {
+      "subtext": "ObjC's message dispatch is not an overhead — it's a design philosophy. Late binding enables the entire platform.",
+      "motifs": ["engineering_elegance"],
+      "reader_emotion": "more_elegant_than_expected",
+      "thematic_function": "Fun and Games moment — the dispatch algorithm is intellectually delightful. This concept recurs every time ObjC method calls happen (Ch 5, Ch 9)."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "understands_selector_interning" },
+        "post_state": { "capability": "understands_message_dispatch_algorithm" },
+        "objective": { "action": "learn", "target": "objc_msgSend dispatch algorithm" },
+        "information_state": {
+          "gained": [
+            { "subject": "objc", "predicate": "knows", "about": "dispatch: ISA → cache → method list → superclass" },
+            { "subject": "objc", "predicate": "knows", "about": "late binding vs C++ vtable: flexibility vs speed tradeoff" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch04_s04",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 22,
+    "observables": {
+      "participants": ["the_reader", "crate_objc_runtime", "concept_objc_msgsend"],
+      "context": { "setting": "setting_ide", "chapter": 4, "part": 2, "title": "Building objc_msgSend", "estimated_words": 2000, "source_files": ["crates/objc-runtime/src/class/", "crates/objc-runtime/trampoline.s"] },
+      "event_type": "implementation"
+    },
+    "structure": {
+      "position": 0.284,
+      "causal_role": "complication",
+      "grouping": { "part": "II — The Linker", "chapter": "Ch 4 — The Runtime", "beat": "b_story_fun_and_games" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_reader", "action": "study", "target": "ARM64 assembly trampoline: trampoline.s — the most critical assembly file", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_builder", "action": "explain", "target": "register save/restore area — x0-x7 args must be preserved across lookup", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_builder", "action": "explain", "target": "TLS access via mrs x16, TPIDR_EL0 for thread-safe dispatch", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_reader", "action": "build", "target": "LookupResult struct: found IMP pointer + selector info", "significance": "essential" },
+        { "sequence_number": 5, "agent": "the_reader", "action": "verify", "target": "dispatch to resolved IMP — assembly branch to function pointer", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "capability", "value": "understands_dispatch_algorithm" },
+        "after": { "state_type": "capability", "value": "has_working_objc_msgsend_trampoline" },
+        "trigger": "Writing the ARM64 assembly trampoline — the single most critical piece of assembly",
+        "description": "High-wire act — assembly is precise or it's wrong. The heart of ObjC dispatch built from scratch."
+      }
+    },
+    "interpretations": {
+      "subtext": "Some things can only be built at the lowest level. The trampoline is where all abstraction falls away.",
+      "motifs": ["assembly_precision"],
+      "reader_emotion": "high_wire_act",
+      "thematic_function": "Fun and Games peak moment — building objc_msgSend from scratch in assembly. One of the book's most memorable scenes."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "understands_message_dispatch_algorithm" },
+        "post_state": { "capability": "has_working_assembly_trampoline" },
+        "objective": { "action": "build", "target": "objc_msgSend in ARM64 assembly" },
+        "information_state": {
+          "gained": [
+            { "subject": "asm", "predicate": "knows", "about": "ARM64 register save/restore for trampoline" },
+            { "subject": "asm", "predicate": "knows", "about": "TPIDR_EL0 for TLS access in assembly" },
+            { "subject": "asm", "predicate": "knows", "about": "LookupResult struct bridges asm → Rust" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch04_s05",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 23,
+    "observables": {
+      "participants": ["the_reader", "crate_objc_runtime", "crate_macho_objc"],
+      "context": { "setting": "setting_ide", "chapter": 4, "part": 2, "title": "Class Registration", "estimated_words": 1500, "source_files": ["crates/objc-runtime/src/class/"] },
+      "event_type": "implementation"
+    },
+    "structure": {
+      "position": 0.297,
+      "causal_role": "resolution",
+      "grouping": { "part": "II — The Linker", "chapter": "Ch 4 — The Runtime", "beat": "b_story_fun_and_games" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_reader", "action": "parse", "target": "__objc_classlist section entries — pointers to class_t structs", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "build", "target": "classes_by_name HashMap and classes_by_addr HashMap", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_reader", "action": "handle", "target": "metaclasses — each class has a companion metaclass for class methods", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_reader", "action": "implement", "target": "multi-image registration — classes from all loaded images", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "capability", "value": "has_dispatch_mechanism" },
+        "after": { "state_type": "capability", "value": "has_populated_class_table" },
+        "trigger": "ObjcRuntime struct filled with classes from all loaded images",
+        "description": "Systematic construction — every class from every binary registered and addressable."
+      }
+    },
+    "interpretations": {
+      "subtext": "A runtime is a registry. Building it is an act of comprehensive accounting.",
+      "motifs": ["systematic_construction"],
+      "reader_emotion": "systematic_construction"
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "has_working_assembly_trampoline" },
+        "post_state": { "capability": "has_class_table_from_all_images" },
+        "objective": { "action": "register", "target": "all classes from all loaded images" },
+        "information_state": {
+          "gained": [
+            { "subject": "objc", "predicate": "knows", "about": "classes_by_name and classes_by_addr lookups" },
+            { "subject": "objc", "predicate": "knows", "about": "metaclass mirroring for class methods" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch04_s06",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 24,
+    "observables": {
+      "participants": ["the_reader", "crate_objc_runtime"],
+      "context": { "setting": "setting_source", "chapter": 4, "part": 2, "title": "Protocols and Categories", "estimated_words": 1500 },
+      "event_type": "implementation"
+    },
+    "structure": {
+      "position": 0.311,
+      "causal_role": "complication",
+      "grouping": { "part": "II — The Linker", "chapter": "Ch 4 — The Runtime", "beat": "b_story_fun_and_games" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_reader", "action": "parse", "target": "__objc_protolist section entries — protocol descriptor pointers", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "parse", "target": "__objc_catlist section entries — category descriptors", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_reader", "action": "implement", "target": "category method injection — adding methods to existing classes post-registration", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_reader", "action": "build", "target": "protocol conformance tables linking classes to protocol requirements", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "classes_have_methods" },
+        "after": { "state_type": "knowledge", "value": "classes_can_be_extended_at_runtime_via_categories" },
+        "trigger": "Category loading injects methods into classes after registration",
+        "description": "ObjC classes aren't fixed at compile time — they're assembled at load time."
+      }
+    },
+    "interpretations": {
+      "subtext": "The runtime is dynamic by design — types are living entities that change after creation.",
+      "motifs": ["runtime_dynamism"],
+      "reader_emotion": "completing_the_picture"
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "has_class_table_from_all_images" },
+        "post_state": { "capability": "has_protocols_and_categories_loaded" },
+        "objective": { "action": "complete", "target": "protocol and category registration" },
+        "information_state": {
+          "gained": [
+            { "subject": "objc", "predicate": "knows", "about": "categories inject methods post-registration" },
+            { "subject": "objc", "predicate": "knows", "about": "protocol conformance tables" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch04_s07",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 25,
+    "observables": {
+      "participants": ["the_reader", "crate_objc_runtime"],
+      "context": { "setting": "setting_source", "chapter": 4, "part": 2, "title": "Dynamic Class Creation", "estimated_words": 1200 },
+      "event_type": "discovery"
+    },
+    "structure": {
+      "position": 0.324,
+      "causal_role": "complication",
+      "grouping": { "part": "II — The Linker", "chapter": "Ch 4 — The Runtime", "beat": "b_story_fun_and_games" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "demonstrate", "target": "objc_allocateClassPair — creating a new class at runtime", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_builder", "action": "demonstrate", "target": "class_addMethod — adding methods to the new class", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_builder", "action": "reveal", "target": "KVO ISA swizzling — runtime creates invisible subclasses on the fly", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_builder", "action": "explain", "target": "synthetic address allocator for runtime-created class metadata", "significance": "supplementary" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "classes_come_from_binaries" },
+        "after": { "state_type": "knowledge", "value": "classes_can_be_created_and_modified_at_runtime" },
+        "trigger": "KVO ISA swizzling reveals the runtime creates invisible subclasses on the fly",
+        "description": "The runtime isn't just static registration — it's a live system that rewrites itself."
+      }
+    },
+    "interpretations": {
+      "subtext": "Runtime dynamism is beautiful AND dangerous. The flexibility that enables KVO also enables chaos.",
+      "motifs": ["runtime_dynamism"],
+      "reader_emotion": "beautiful_and_dangerous",
+      "thematic_function": "Fun and Games peak — 'that's how KVO works?!' One of the book's delightful revelation moments."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "has_protocols_and_categories_loaded" },
+        "post_state": { "capability": "can_create_classes_dynamically" },
+        "objective": { "action": "understand", "target": "runtime class creation and ISA swizzling" },
+        "information_state": {
+          "gained": [
+            { "subject": "objc", "predicate": "knows", "about": "objc_allocateClassPair creates classes at runtime" },
+            { "subject": "objc", "predicate": "knows", "about": "KVO ISA swizzling creates invisible subclasses" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch04_s08",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 26,
+    "observables": {
+      "participants": ["the_reader", "the_platform", "concept_tagged_pointer"],
+      "context": { "setting": "setting_debugger", "chapter": 4, "part": 2, "title": "Tagged Pointers", "estimated_words": 1000 },
+      "event_type": "discovery"
+    },
+    "structure": {
+      "position": 0.338,
+      "causal_role": "resolution",
+      "grouping": { "part": "II — The Linker", "chapter": "Ch 4 — The Runtime", "beat": "b_story_fun_and_games" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "reveal", "target": "bit 63 set means 'this isn't a real pointer' — it's an inline value", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "decode", "target": "NSNumber/NSDate/NSString small values encoded in the pointer bits", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_builder", "action": "explain", "target": "tag class dispatch table — bits 60-62 select the class", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_builder", "action": "demonstrate", "target": "'the number isn't a pointer, it IS the pointer' — the book's best one-liner", "significance": "supplementary" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "all_objc_objects_are_heap_allocations" },
+        "after": { "state_type": "knowledge", "value": "small_values_are_encoded_directly_in_pointers" },
+        "trigger": "Tagged pointer decode reveals the number IS the pointer",
+        "description": "Apple engineers are clever — tagged pointers eliminate heap allocation for small values."
+      }
+    },
+    "interpretations": {
+      "subtext": "The platform's optimizations are invisible at the API level but essential at the binary level.",
+      "motifs": ["engineering_elegance", "platform_opacity"],
+      "reader_emotion": "clever_engineering_appreciation",
+      "thematic_function": "Chapter resolution — the ObjC runtime is alive: dispatch, registration, dynamic creation, tagged pointers all work. Bridge to Ch 5: 'The runtime works. But [NSString stringWithFormat:] returns garbage.'"
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "can_create_classes_dynamically" },
+        "post_state": { "capability": "has_complete_objc_runtime" },
+        "objective": { "action": "decode", "target": "tagged pointer scheme and tag dispatch" },
+        "information_state": {
+          "gained": [
+            { "subject": "runtime", "predicate": "knows", "about": "tagged pointers: bit 63 = not a real pointer" },
+            { "subject": "runtime", "predicate": "knows", "about": "tag class dispatch via bits 60-62" }
+          ],
+          "gaps": [
+            { "subject": "foundation", "predicate": "knows", "about": "NSString/NSArray implementations — next chapter" }
+          ]
+        }
+      }
+    ]
+  }
+]

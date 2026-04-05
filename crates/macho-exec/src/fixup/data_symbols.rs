@@ -240,19 +240,19 @@ impl DataSymbolStore {
     // ── CF system version keys ──────────────────────────────────
 
     fn register_cf_version_keys(&mut self) {
-        // These are CFStringRef constants. On macOS they're exported from
-        // CoreFoundation. For our purposes we just need stable non-NULL
-        // addresses. The actual string value isn't critical since these
-        // are used as dictionary keys — what matters is pointer identity.
+        // These are CFStringRef constants — fallback for when the cf-lite
+        // ShimTable entries aren't present.  The ShimTable provides proper
+        // CFString-backed addresses; these sentinels just prevent NULL deref.
+        // The symbol names must include the "Key" suffix to match real imports.
         static PRODUCT_NAME: u64 = 0x4346_5601;
         static PRODUCT_VERSION: u64 = 0x4346_5602;
         static BUILD_VERSION: u64 = 0x4346_5603;
         static PRODUCT_VERSION_EXTRA: u64 = 0x4346_5604;
 
-        self.symbols.insert("__kCFSystemVersionProductName", &PRODUCT_NAME as *const u64 as u64);
-        self.symbols.insert("__kCFSystemVersionProductVersion", &PRODUCT_VERSION as *const u64 as u64);
-        self.symbols.insert("__kCFSystemVersionBuildVersion", &BUILD_VERSION as *const u64 as u64);
-        self.symbols.insert("__kCFSystemVersionProductVersionExtra", &PRODUCT_VERSION_EXTRA as *const u64 as u64);
+        self.symbols.insert("__kCFSystemVersionProductNameKey", &PRODUCT_NAME as *const u64 as u64);
+        self.symbols.insert("__kCFSystemVersionProductVersionKey", &PRODUCT_VERSION as *const u64 as u64);
+        self.symbols.insert("__kCFSystemVersionBuildVersionKey", &BUILD_VERSION as *const u64 as u64);
+        self.symbols.insert("__kCFSystemVersionProductVersionExtraKey", &PRODUCT_VERSION_EXTRA as *const u64 as u64);
     }
 
     // ── Foundation / CF constants ────────────────────────────────
@@ -498,6 +498,36 @@ impl DataSymbolStore {
         self.try_dlsym_insert("__swiftEmptyDictionarySingleton", "_swiftEmptyDictionarySingleton");
         self.try_dlsym_insert("__swiftImmortalRefCount",         "_swiftImmortalRefCount");
         self.try_dlsym_insert("__swiftEmptySetSingleton",        "_swiftEmptySetSingleton");
+
+        // On Linux, no host Foundation/Swift runtime → provide static
+        // fallback singletons.  These are opaque data blobs whose exact
+        // layout doesn't matter as long as callers get a valid non-NULL
+        // address to compare against.
+        #[cfg(not(target_os = "macos"))]
+        {
+            // Swift heap-object layout: 8-byte metadata pointer + 8-byte refcount
+            // We fake these with zeroed buffers — callers check `== emptyArray`
+            // rather than reading contents.
+            static EMPTY_ARRAY: [u8; 64] = [0u8; 64];
+            static EMPTY_DICT: [u8; 64] = [0u8; 64];
+            static SWIFT_EMPTY_ARRAY: [u8; 64] = [0u8; 64];
+            static SWIFT_EMPTY_DICT: [u8; 64] = [0u8; 64];
+            static SWIFT_IMMORTAL_RC: u64 = 0;
+            static SWIFT_EMPTY_SET: [u8; 64] = [0u8; 64];
+
+            self.symbols.entry("__NSArray0__struct")
+                .or_insert(EMPTY_ARRAY.as_ptr() as u64);
+            self.symbols.entry("__NSDictionary0__struct")
+                .or_insert(EMPTY_DICT.as_ptr() as u64);
+            self.symbols.entry("_swiftEmptyArrayStorage")
+                .or_insert(SWIFT_EMPTY_ARRAY.as_ptr() as u64);
+            self.symbols.entry("_swiftEmptyDictionarySingleton")
+                .or_insert(SWIFT_EMPTY_DICT.as_ptr() as u64);
+            self.symbols.entry("_swiftImmortalRefCount")
+                .or_insert(&SWIFT_IMMORTAL_RC as *const u64 as u64);
+            self.symbols.entry("_swiftEmptySetSingleton")
+                .or_insert(SWIFT_EMPTY_SET.as_ptr() as u64);
+        }
     }
 
     // ── ObjC runtime globals ─────────────────────────────────────
@@ -519,6 +549,28 @@ impl DataSymbolStore {
             "__objc_debug_taggedpointer_ext_classes",
             "_objc_debug_taggedpointer_ext_classes",
         );
+
+        // On Linux, no host ObjC runtime exists so dlsym returns NULL above.
+        // Provide static fallback buffers for required data symbols.
+        #[cfg(not(target_os = "macos"))]
+        {
+            // 128 bytes of zeros — enough for the cache/vtable sentinels.
+            // The runtime only compares the address, not the contents.
+            static EMPTY_CACHE: [u8; 128] = [0u8; 128];
+            static EMPTY_VTABLE: [u8; 64] = [0u8; 64];
+            // Tagged-pointer class tables: array of 8 Class pointers (all NULL)
+            static TAGGED_CLASSES: [u64; 8] = [0u64; 8];
+            static TAGGED_EXT_CLASSES: [u64; 256] = [0u64; 256];
+
+            self.symbols.entry("_objc_empty_cache")
+                .or_insert(EMPTY_CACHE.as_ptr() as u64);
+            self.symbols.entry("_objc_empty_vtable")
+                .or_insert(EMPTY_VTABLE.as_ptr() as u64);
+            self.symbols.entry("_objc_debug_taggedpointer_classes")
+                .or_insert(TAGGED_CLASSES.as_ptr() as u64);
+            self.symbols.entry("_objc_debug_taggedpointer_ext_classes")
+                .or_insert(TAGGED_EXT_CLASSES.as_ptr() as u64);
+        }
     }
 
     // ── ObjC IVAR offset data symbols ───────────────────────────────
@@ -718,9 +770,9 @@ mod tests {
     fn data_symbol_store_resolves_cf_version_keys() {
         let store = DataSymbolStore::new();
         for name in &[
-            "__kCFSystemVersionProductName",
-            "__kCFSystemVersionProductVersion",
-            "__kCFSystemVersionBuildVersion",
+            "__kCFSystemVersionProductNameKey",
+            "__kCFSystemVersionProductVersionKey",
+            "__kCFSystemVersionBuildVersionKey",
         ] {
             assert!(store.resolve(name).is_some(), "{name} should resolve");
         }

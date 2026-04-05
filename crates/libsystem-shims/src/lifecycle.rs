@@ -76,8 +76,61 @@ impl LifecycleShims {
             shim_strlen_diagnostic as *const () as u64,
             "strlen (diagnostic wrapper)",
         );
+        // C++ guard variable shims — single-threaded, non-blocking.
+        // The Linux __cxa_guard_acquire uses futex and can hang if the
+        // guard variable contains stale data from the Mach-O binary.
+        table.register(
+            "___cxa_guard_acquire",
+            shim_cxa_guard_acquire as *const () as u64,
+            "__cxa_guard_acquire (single-threaded)",
+        );
+        table.register(
+            "___cxa_guard_release",
+            shim_cxa_guard_release as *const () as u64,
+            "__cxa_guard_release (single-threaded)",
+        );
+        table.register(
+            "___cxa_guard_abort",
+            shim_cxa_guard_abort as *const () as u64,
+            "__cxa_guard_abort (single-threaded)",
+        );
+        // std::mutex shims — delegate to pthread directly.
+        // Guest code's std::mutex has Apple-ABI layout; system libc++'s
+        // std::mutex::lock() expects different internal offsets.
+        // We bypass libc++ and call pthread directly.
+        table.register(
+            "__ZNSt3__15mutex4lockEv",
+            shim_std_mutex_lock as *const () as u64,
+            "std::mutex::lock (pthread delegate)",
+        );
+        table.register(
+            "__ZNSt3__15mutex6unlockEv",
+            shim_std_mutex_unlock as *const () as u64,
+            "std::mutex::unlock (pthread delegate)",
+        );
+        table.register(
+            "__ZNSt3__15mutex8try_lockEv",
+            shim_std_mutex_try_lock as *const () as u64,
+            "std::mutex::try_lock (pthread delegate)",
+        );
+        // pthread_mutex shims — reinitialize macOS-layout mutexes for Linux.
+        table.register(
+            "_pthread_mutex_lock",
+            shim_pthread_mutex_lock as *const () as u64,
+            "pthread_mutex_lock (macOS→Linux reinit)",
+        );
+        table.register(
+            "_pthread_mutex_unlock",
+            shim_pthread_mutex_unlock as *const () as u64,
+            "pthread_mutex_unlock",
+        );
+        table.register(
+            "_pthread_mutex_trylock",
+            shim_pthread_mutex_trylock as *const () as u64,
+            "pthread_mutex_trylock (macOS→Linux reinit)",
+        );
 
-        log::debug!("LifecycleShims: registered 11 lifecycle shims");
+        log::debug!("LifecycleShims: registered 20 lifecycle shims");
     }
 
     /// Run all registered atexit handlers in LIFO order.
@@ -132,6 +185,92 @@ extern "C" fn shim_cxa_atexit(
     }
 }
 
+
+/// Single-threaded __cxa_guard_acquire.
+extern "C" fn shim_cxa_guard_acquire(guard: *mut u64) -> i32 {
+    let byte0 = guard as *mut u8;
+    let val = unsafe { byte0.read_volatile() };
+    if val != 0 { return 0; }
+    unsafe { byte0.write_volatile(0x10) };
+    1
+}
+///
+/// Mark the static variable as fully initialized. Sets byte 0 to 1.
+extern "C" fn shim_cxa_guard_release(guard: *mut u64) {
+    let byte0 = guard as *mut u8;
+    unsafe { byte0.write_volatile(1) };
+}
+
+/// `void __cxa_guard_abort(uint64_t *guard)`
+///
+/// Initialization failed — reset guard to "not initialized". Sets byte 0 to 0.
+extern "C" fn shim_cxa_guard_abort(guard: *mut u64) {
+    let byte0 = guard as *mut u8;
+    unsafe { byte0.write_volatile(0) };
+}
+
+/// `std::mutex::lock()` — handle macOS↔Linux pthread_mutex_t layout mismatch.
+///
+/// macOS `pthread_mutex_t` is 64 bytes with __sig=0x32AAAB3B for initialized
+/// mutexes. Linux aarch64 `pthread_mutex_t` is 48 bytes with a completely
+/// different internal layout. We detect uninitialized/macOS mutexes and
+/// reinitialize them as Linux mutexes before locking.
+extern "C" fn shim_std_mutex_lock(this: *mut libc::c_void) {
+    reinit_mutex_if_needed(this);
+    unsafe { libc::pthread_mutex_lock(this as *mut libc::pthread_mutex_t) };
+}
+
+/// `std::mutex::unlock()` — delegate directly to pthread_mutex_unlock.
+extern "C" fn shim_std_mutex_unlock(this: *mut libc::c_void) {
+    unsafe { libc::pthread_mutex_unlock(this as *mut libc::pthread_mutex_t) };
+}
+
+/// `std::mutex::try_lock()` — delegate directly to pthread_mutex_trylock.
+extern "C" fn shim_std_mutex_try_lock(this: *mut libc::c_void) -> bool {
+    reinit_mutex_if_needed(this);
+    unsafe { libc::pthread_mutex_trylock(this as *mut libc::pthread_mutex_t) == 0 }
+}
+
+/// Reinitialize a macOS-layout pthread_mutex_t as a Linux mutex.
+///
+/// On macOS, an initialized mutex has __sig = 0x32AAAB3B at offset 0.
+/// We detect this signature (or any non-zero non-Linux pattern) and
+/// zero + reinitialize the mutex for Linux.
+fn reinit_mutex_if_needed(ptr: *mut libc::c_void) {
+    use std::collections::HashSet;
+    use std::sync::Mutex;
+    static INITIALIZED: std::sync::OnceLock<Mutex<HashSet<usize>>> = std::sync::OnceLock::new();
+    let set = INITIALIZED.get_or_init(|| Mutex::new(HashSet::new()));
+    let addr = ptr as usize;
+    let mut guard = set.lock().unwrap();
+    if guard.insert(addr) {
+        // First time seeing this mutex — zero-init as Linux pthread_mutex_t
+        let mtx = ptr as *mut libc::pthread_mutex_t;
+        unsafe {
+            std::ptr::write_bytes(mtx as *mut u8, 0, std::mem::size_of::<libc::pthread_mutex_t>());
+            libc::pthread_mutex_init(mtx, std::ptr::null());
+        }
+        log::trace!("Reinitialized mutex at {ptr:?} for Linux");
+    }
+}
+
+/// `int pthread_mutex_lock(pthread_mutex_t *mutex)` — with macOS→Linux reinit.
+extern "C" fn shim_pthread_mutex_lock(mutex: *mut libc::pthread_mutex_t) -> libc::c_int {
+    reinit_mutex_if_needed(mutex as *mut libc::c_void);
+    unsafe { libc::pthread_mutex_lock(mutex) }
+}
+
+/// `int pthread_mutex_unlock(pthread_mutex_t *mutex)`
+extern "C" fn shim_pthread_mutex_unlock(mutex: *mut libc::pthread_mutex_t) -> libc::c_int {
+    unsafe { libc::pthread_mutex_unlock(mutex) }
+}
+
+/// `int pthread_mutex_trylock(pthread_mutex_t *mutex)` — with macOS→Linux reinit.
+extern "C" fn shim_pthread_mutex_trylock(mutex: *mut libc::pthread_mutex_t) -> libc::c_int {
+    reinit_mutex_if_needed(mutex as *mut libc::c_void);
+    unsafe { libc::pthread_mutex_trylock(mutex) }
+}
+
 /// `bool __os_feature_enabled_impl(const char *domain, const char *feature)`
 ///
 /// We conservatively report features as disabled, except for the Foundation
@@ -177,7 +316,9 @@ extern "C" fn shim_os_feature_enabled_impl(
 /// to terminate immediately without running cleanup callbacks.
 extern "C" fn shim_exit(status: i32) -> ! {
     log::trace!("exit({status}): bypassing atexit handlers, calling _exit");
-    // Flush stdout/stderr so guest output is not lost
+    // Flush C stdio so guest printf output is not lost
+    unsafe { libc::fflush(std::ptr::null_mut()); }
+    // Flush Rust stdio
     use std::io::Write;
     let _ = std::io::stdout().flush();
     let _ = std::io::stderr().flush();
@@ -207,29 +348,55 @@ extern "C" fn shim_abort() -> ! {
 /// jump to unmapped/invalid addresses, causing a host SIGSEGV.
 ///
 /// We accept the call (return 0) but do NOT pass it to the real `sigaction`.
+/// macOS ARM64 `struct sigaction` — only 16 bytes!
+/// Linux's `struct sigaction` is 152 bytes.  The guest binary allocates
+/// macOS-sized structs on the stack, so we must NEVER read/write using
+/// the Linux layout or we'll corrupt the stack.
+#[repr(C)]
+struct DarwinSigaction {
+    sa_sigaction: u64, // union { void(*)(int); void(*)(int,siginfo_t*,void*); }
+    sa_mask: u32,      // sigset_t = uint32_t on macOS
+    sa_flags: i32,     // int
+}
+
 /// If `oact` is non-null we zero it to indicate "no previous handler".
 extern "C" fn shim_sigaction(
     sig: i32,
-    act: *const libc::sigaction,
-    oact: *mut libc::sigaction,
+    act: *const DarwinSigaction,
+    oact: *mut DarwinSigaction,
 ) -> i32 {
     if !act.is_null() {
-        let handler = unsafe { (*act).sa_sigaction } as u64;
+        let handler = unsafe { (*act).sa_sigaction };
         let flags = unsafe { (*act).sa_flags };
         log::debug!("sigaction: intercepted sig={sig} handler={handler:#x} flags={flags:#x}");
         // Allow LLVM's crash recovery handlers for SIGBUS/SIGSEGV/SIGABRT
         // through to the host so crash diagnostics work properly.
         if sig == 10 || sig == 11 || sig == 6 {
             log::debug!("sigaction: ALLOWING sig={sig} through to host");
+            // Build a Linux-sized sigaction from the macOS one
+            let mut linux_act: libc::sigaction = unsafe { std::mem::zeroed() };
+            linux_act.sa_sigaction = handler as usize;
+            linux_act.sa_flags = flags as libc::c_int;
             extern "C" { fn sigaction(sig: i32, act: *const libc::sigaction, oact: *mut libc::sigaction) -> i32; }
-            return unsafe { sigaction(sig, act, oact) };
+            let mut linux_oact: libc::sigaction = unsafe { std::mem::zeroed() };
+            let oact_ptr = if oact.is_null() { std::ptr::null_mut() } else { &mut linux_oact };
+            let ret = unsafe { sigaction(sig, &linux_act, oact_ptr) };
+            if !oact.is_null() {
+                // Convert Linux oact back to macOS layout
+                unsafe {
+                    (*oact).sa_sigaction = linux_oact.sa_sigaction as u64;
+                    (*oact).sa_mask = 0;
+                    (*oact).sa_flags = linux_oact.sa_flags as i32;
+                }
+            }
+            return ret;
         }
     } else {
         log::trace!("sigaction: query-only for signal {sig}");
     }
     if !oact.is_null() {
-        // Zero out the old action struct so the caller sees SIG_DFL
-        unsafe { std::ptr::write_bytes(oact, 0, 1) };
+        // Zero out only the macOS-sized struct (16 bytes, not Linux's 152!)
+        unsafe { std::ptr::write_bytes(oact as *mut u8, 0, std::mem::size_of::<DarwinSigaction>()) };
     }
     0 // success
 }

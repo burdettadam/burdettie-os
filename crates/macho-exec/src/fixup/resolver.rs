@@ -15,6 +15,10 @@ pub trait SymbolResolver {
 pub struct StubResolver {
     host: Arc<dyn HostSymbolResolver>,
     handle: *mut (),
+    /// Separate handle for Apple-ABI libc++ (loaded with RTLD_LOCAL).
+    /// C++ symbols are resolved from this first to match macOS ABI.
+    #[cfg(target_os = "linux")]
+    cxx_handle: Option<*mut ()>,
 }
 
 // StubResolver's handle is an opaque RTLD_DEFAULT / dlopen handle.
@@ -113,24 +117,105 @@ impl StubResolver {
         "/usr/lib/swift/libswift_StringProcessing.dylib",
     ];
 
+    /// Linux shared libraries to preload so their symbols are available via
+    /// RTLD_DEFAULT.  These are the Linux equivalents of the macOS framework
+    /// libraries listed in PRELOAD_LIBRARIES.
+    #[cfg(target_os = "linux")]
+    const LINUX_PRELOAD_LIBRARIES: &[&str] = &[
+        "libbz2.so.1.0",
+        "liblzma.so.5",
+        "libz.so.1",
+        "libarchive.so.13",
+        "libssl.so.3",
+        "libcrypto.so.3",
+        "libacl.so.1",
+        "libc++.so.1",
+        "libc++abi.so.1",
+    ];
+
+    /// Path to a custom libc++ built with Apple's `_LIBCPP_ABI_ALTERNATE_STRING_LAYOUT`.
+    /// This library is dlopen'd with RTLD_LOCAL so it doesn't interfere with
+    /// the host process's libc++. C++ symbols are resolved from this library
+    /// first to ensure ABI compatibility with macOS Mach-O binaries.
+    #[cfg(target_os = "linux")]
+    const APPLE_ABI_LIBCXX_PATH: &str = "/opt/apple-libcxx/libc++.so.1.0";
+
     pub fn new(host: Arc<dyn HostSymbolResolver>) -> Self {
         // Preload host libraries once per process so RTLD_DEFAULT can see them
         // without paying repeated dlopen/dyld setup cost on every loader run.
-        // On Linux, these macOS framework paths don't exist — skip preloading.
         #[cfg(target_os = "macos")]
         PRELOAD_STATE.preload(host.as_ref(), Self::PRELOAD_LIBRARIES);
+        #[cfg(target_os = "linux")]
+        PRELOAD_STATE.preload(host.as_ref(), Self::LINUX_PRELOAD_LIBRARIES);
         let handle = host.default_handle();
-        Self { host, handle }
+
+        // On Linux, try to open the Apple-ABI libc++ for C++ symbol resolution.
+        // Must use RTLD_LOCAL to avoid replacing the system libc++ symbols
+        // that the host process depends on.
+        #[cfg(target_os = "linux")]
+        let cxx_handle = {
+            let path = std::ffi::CString::new(Self::APPLE_ABI_LIBCXX_PATH).ok();
+            let h = path.and_then(|p| {
+                let h = unsafe { libc::dlopen(p.as_ptr(), libc::RTLD_LAZY | libc::RTLD_LOCAL) };
+                if h.is_null() { None } else { Some(h as *mut ()) }
+            });
+            if h.is_some() {
+                log::info!("StubResolver: loaded Apple-ABI libc++ from {} (RTLD_LOCAL)", Self::APPLE_ABI_LIBCXX_PATH);
+            } else {
+                log::debug!("StubResolver: Apple-ABI libc++ not found at {}, using system libc++", Self::APPLE_ABI_LIBCXX_PATH);
+            }
+            h
+        };
+
+        Self {
+            host,
+            handle,
+            #[cfg(target_os = "linux")]
+            cxx_handle,
+        }
+    }
+
+    /// Check if a symbol is a std::basic_string method that needs the Apple
+    /// alternate string layout. Only these symbols are redirected to the
+    /// Apple-ABI libc++ to avoid RTTI conflicts.
+    #[cfg(target_os = "linux")]
+    fn is_apple_cxx_symbol(name: &str) -> bool {
+        // std::__1::basic_string<char, ...> member functions and related
+        // Mangled prefix: _ZNSt3__112basic_stringIc  or _ZNKSt3__112basic_stringIc
+        if name.contains("12basic_stringIc") {
+            return true;
+        }
+        // std::__1::operator+(const char*, const basic_string<char>&)
+        // Mangled: _ZNSt3__1plIc
+        if name.contains("St3__1plIc") {
+            return true;
+        }
+        false
     }
 
     pub fn resolve(&self, name: &str) -> Option<u64> {
         let c_name = name.strip_prefix('_').unwrap_or(name);
+        // Strip Darwin variant suffixes ($DARWIN_EXTSN, $UNIX2003, etc.)
+        // On Linux, all functions are POSIX-conformant by default.
+        let c_name = c_name.split('$').next().unwrap_or(c_name);
         if !Self::is_safe_symbol(c_name) {
             log::debug!("StubResolver: skipping unsafe symbol: {name}");
             runtime_diagnostics::emit(runtime_diagnostics::DiagEvent::SymbolBlocked {
                 name: name.into(),
             });
             return None;
+        }
+
+        // On Linux, try the Apple-ABI libc++ first for std::string symbols.
+        // Only redirect basic_string-related symbols to avoid RTTI/type_info
+        // conflicts that cause std::bad_cast when two libc++ instances coexist.
+        #[cfg(target_os = "linux")]
+        if let Some(cxx_h) = self.cxx_handle {
+            if Self::is_apple_cxx_symbol(c_name) {
+                if let Some(ptr) = self.host.resolve_in(cxx_h, c_name) {
+                    return Some(ptr as u64);
+                }
+            }
         }
 
         let addr = self.host.resolve_in(self.handle, c_name);
@@ -468,7 +553,7 @@ impl StubResolver {
             | "tolower" | "toupper" | "__tolower" | "__toupper"
             | "isalpha" | "isdigit" | "isspace" | "isalnum"
             | "isupper" | "islower" | "isprint" | "isxdigit" | "iscntrl" | "ispunct"
-            | "isascii" | "toascii"
+            | "isascii" | "toascii" | "isblank"
             // File I/O (write is already listed in stdio above)
             | "open" | "close" | "read" | "lseek" | "pread" | "pwrite" | "creat"
             | "fstat" | "stat" | "lstat" | "access" | "unlink" | "rename" | "remove"
@@ -513,7 +598,7 @@ impl StubResolver {
             // Argument parsing
             | "getopt" | "optarg" | "optind" | "optopt" | "optreset"
             | "getuid" | "geteuid" | "getgid" | "getegid"
-            | "fork" | "execv" | "execve" | "execvp"
+            | "fork" | "execv" | "execve" | "execvp" | "execl" | "execlp" | "execle"
             | "posix_spawn" | "posix_spawn_file_actions_init"
             | "posix_spawn_file_actions_destroy"
             | "posix_spawn_file_actions_adddup2"
@@ -814,14 +899,14 @@ impl StubResolver {
             | "wcstod" | "wcstol" | "wcstoul" | "wcstoull" | "wcstoll"
             | "wcswidth" | "wcwidth"
             | "btowc" | "wctob" | "wctomb"
-            | "mbtowc" | "mbrtowc" | "mbstowcs" | "wcstombs"
+            | "mbtowc" | "mbrtowc" | "mbstowcs" | "mbsrtowcs" | "wcstombs"
             | "mbrlen" | "mblen" | "mbsinit"
             | "__mb_cur_max"
             | "___mb_cur_max"
             | "__collate_lookup_l"
             | "wcsdup" | "wcsnlen" | "wcsnrtombs" | "wcsrtombs" | "wcslcpy" | "wcslcat"
             | "fgetwc" | "fgetwln" | "fputwc" | "fputws" | "fwprintf" | "fwide"
-            | "getwc" | "putwc" | "ungetwc" | "swprintf" | "vswprintf" | "vfwprintf"
+            | "getwc" | "putwc" | "putwchar" | "ungetwc" | "swprintf" | "vswprintf" | "vfwprintf"
             | "iswblank" | "iswspace" | "iswprint" | "iswupper" | "iswlower"
             | "iswdigit" | "iswalpha" | "iswalnum" | "iswctype" | "iswpunct"
             | "towupper" | "towlower" | "wctype"
@@ -926,11 +1011,12 @@ impl StubResolver {
             | "strmode" | "getmode" | "setmode"
             | "user_from_uid" | "group_from_gid"
             | "lchflags" | "chflags" | "fchflags"
+            | "lchown" | "lchmod"
             | "strtofflags" | "fflagstostr"
             | "rpmatch"
-            | "strtoq" | "strtouq"
+            | "strtoq" | "strtouq" | "strtonum"
             | "errc" | "warnc" | "verrc" | "vwarnc"
-            | "expand_number"
+            | "expand_number" | "devname"
             | "compat_mode"
             | "fsctl" | "gethostuuid"
             | "kdebug_trace" | "kdebug_trace_string"

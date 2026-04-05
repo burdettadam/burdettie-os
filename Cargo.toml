@@ -45,6 +45,8 @@ members = [
     "apps/hello-darwin",
     "apps/control-gallery",
     "apps/foundation-explorer",
+    "apps/launchpad",
+    "apps/file-explorer",
 ]
 
 [workspace.package]

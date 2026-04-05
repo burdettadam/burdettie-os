@@ -73,6 +73,16 @@ pub(super) fn install_class_symbols(table: &mut ShimTable) {
     register_class!(table, "NSMenuItem", nsobj::nsmenuitem_class_addr(), nsobj::nsmenuitem_metaclass_addr());
     register_class!(table, "NSNib", nsobj::nsnib_class_addr(), nsobj::nsnib_metaclass_addr());
 
+    // ── Phase C14 Drawing class data symbols ─────────────────────────
+    register_class!(table, "NSGraphicsContext", nsobj::nsgraphicscontext_class_addr(), nsobj::nsgraphicscontext_metaclass_addr());
+    register_class!(table, "NSBezierPath", nsobj::nsbezierpath_class_addr(), nsobj::nsbezierpath_metaclass_addr());
+
+    // ── CoreAnimation class data symbols ────────────────────────────
+    register_class!(table, "CALayer", nsobj::calayer_class_addr(), nsobj::calayer_metaclass_addr());
+    register_class!(table, "CATransaction", nsobj::catransaction_class_addr(), nsobj::catransaction_metaclass_addr());
+    register_class!(table, "CADisplayLink", nsobj::cadisplaylink_class_addr(), nsobj::cadisplaylink_metaclass_addr());
+    register_class!(table, "CAMediaTimingFunction", nsobj::camediatimingfunction_class_addr(), nsobj::camediatimingfunction_metaclass_addr());
+
     // ── _OBJC_EHTYPE_$_NSException ───────────────────────────────────
     // Our guest-side personality function (shim_objc_personality_v0) reads the
     // type table's EHTYPE via LSDA and passes it directly to shim_objc_exception_match

@@ -93,18 +93,20 @@ pub extern "C" fn shim_nsscreen_screens(_cls: u64, _cmd: u64) -> u64 {
     crate::nsarray::make_nsarray(&[main])
 }
 
-/// `-[NSScreen frame]` — returns CGRect via indirect struct return.
-/// ARM64 ABI passes x8 as the indirect result pointer for large structs.
-/// For simplicity, return the width (first component callers typically use).
-pub extern "C" fn shim_nsscreen_frame(obj: u64, _cmd: u64) -> f64 {
-    if obj == 0 { return 0.0; }
-    unsafe { *((obj as usize + WIDTH_OFF) as *const f64) }
+/// `-[NSScreen frame]` — returns CGRect (32 bytes, x8 indirect return on ARM64).
+pub extern "C" fn shim_nsscreen_frame(obj: u64, _cmd: u64) -> crate::cg_types::CGRect {
+    if obj == 0 { return crate::cg_types::CGRect::ZERO; }
+    let w = unsafe { *((obj as usize + WIDTH_OFF) as *const f64) };
+    let h = unsafe { *((obj as usize + HEIGHT_OFF) as *const f64) };
+    crate::cg_types::CGRect::new(0.0, 0.0, w, h)
 }
 
-/// `-[NSScreen visibleFrame]` — same as frame minus menu bar height (25pt).
-pub extern "C" fn shim_nsscreen_visible_frame(obj: u64, _cmd: u64) -> f64 {
-    if obj == 0 { return 0.0; }
-    unsafe { *((obj as usize + WIDTH_OFF) as *const f64) }
+/// `-[NSScreen visibleFrame]` — frame minus menu bar height (25pt).
+pub extern "C" fn shim_nsscreen_visible_frame(obj: u64, _cmd: u64) -> crate::cg_types::CGRect {
+    if obj == 0 { return crate::cg_types::CGRect::ZERO; }
+    let w = unsafe { *((obj as usize + WIDTH_OFF) as *const f64) };
+    let h = unsafe { *((obj as usize + HEIGHT_OFF) as *const f64) };
+    crate::cg_types::CGRect::new(0.0, 25.0, w, h - 25.0)
 }
 
 /// `-[NSScreen backingScaleFactor]` — returns 2.0 (Retina) on macOS, 1.0 elsewhere.
@@ -186,14 +188,17 @@ mod tests {
     #[test]
     fn frame_returns_positive_width() {
         let screen = shim_nsscreen_main_screen(0, 0);
-        let val = shim_nsscreen_frame(screen, 0);
-        assert!(val > 0.0, "frame width should be positive, got {val}");
+        let rect = shim_nsscreen_frame(screen, 0);
+        assert!(rect.size.width > 0.0, "frame width should be positive, got {}", rect.size.width);
+        assert!(rect.size.height > 0.0, "frame height should be positive, got {}", rect.size.height);
+        assert_eq!(rect.origin.x, 0.0);
+        assert_eq!(rect.origin.y, 0.0);
     }
 
     #[test]
     fn frame_nil_safety() {
         let val = shim_nsscreen_frame(0, 0);
-        assert_eq!(val, 0.0);
+        assert_eq!(val, crate::cg_types::CGRect::ZERO);
     }
 
     // --- shim_nsscreen_visible_frame ---
@@ -201,14 +206,17 @@ mod tests {
     #[test]
     fn visible_frame_returns_positive_width() {
         let screen = shim_nsscreen_main_screen(0, 0);
-        let val = shim_nsscreen_visible_frame(screen, 0);
-        assert!(val > 0.0, "visible frame width should be positive, got {val}");
+        let rect = shim_nsscreen_visible_frame(screen, 0);
+        assert!(rect.size.width > 0.0, "visible frame width should be positive, got {}", rect.size.width);
+        assert!(rect.size.height > 0.0);
+        // visibleFrame origin.y should be 25 (menu bar)
+        assert_eq!(rect.origin.y, 25.0);
     }
 
     #[test]
     fn visible_frame_nil_safety() {
         let val = shim_nsscreen_visible_frame(0, 0);
-        assert_eq!(val, 0.0);
+        assert_eq!(val, crate::cg_types::CGRect::ZERO);
     }
 
     // --- nsscreen_width / nsscreen_height ---

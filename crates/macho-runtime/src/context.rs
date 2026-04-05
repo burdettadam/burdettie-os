@@ -95,6 +95,14 @@ impl RuntimeContext {
         if shim_set.darwin_stubs {
             libsystem_shims::install_darwin_stubs(&mut table);
         }
+        // DarwinCompatShims provides Linux equivalents for macOS-specific
+        // C library symbols (__stderrp, __stdoutp, __error, etc.).
+        // Always installed — on macOS this is a no-op internally.
+        libsystem_shims::DarwinCompatShims::install(&mut table);
+
+        // Cross-platform shims: variadic ABI translation, stat struct
+        // conversion, POSIX extras, ICU.  Always installed.
+        libsystem_shims::cross_platform::install_cross_platform_shims(&mut table);
 
         log::info!("RuntimeContext: installed {} shims", table.len());
 

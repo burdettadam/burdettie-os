@@ -228,6 +228,12 @@ pub fn print_exec(parsed: &ParsedMachO, data: &[u8], binary_path: &std::path::Pa
         println!("  Patched {total_tlv} TLV descriptors");
     }
 
+    // Strip PAC-authenticated branches when hardware PAC is unavailable
+    // (e.g. Linux without PAC support).  No-op when PAC is present.
+    for loaded in registry.images() {
+        macho_exec::ptrauth::strip_pac_branches(&loaded.image);
+    }
+
     // Diagnostic: check critical symbol resolutions
     for sym in &["_objc_msgSend", "_OBJC_CLASS_$_NSObject"] {
         let addr = composite.resolve(sym);
@@ -294,9 +300,137 @@ pub fn print_exec(parsed: &ParsedMachO, data: &[u8], binary_path: &std::path::Pa
     }
     println!("  Calling entry...");
 
+    // Install a SIGSEGV handler on Linux to get the faulting PC/address
+    // before the process dies.  Useful for diagnosing guest crashes.
+    #[cfg(target_os = "linux")]
+    unsafe {
+        unsafe extern "C" fn crash_handler(sig: libc::c_int, info: *mut libc::siginfo_t, ctx: *mut libc::c_void) {
+            unsafe {
+                let info = &*info;
+                let fault_addr = info.si_addr() as u64;
+                let uctx = &*(ctx as *const libc::ucontext_t);
+                let pc = uctx.uc_mcontext.pc;
+                let regs = &uctx.uc_mcontext.regs;
+                // Strip PAC bits from PC to get the raw address
+                let pc_stripped = pc & 0x0000_FFFF_FFFF_FFFF;
+                let fp = regs[29];
+                let sp = uctx.uc_mcontext.sp;
+                eprintln!("\n  *** SIGSEGV at PC={pc:#x} (stripped={pc_stripped:#x}), fault_addr={fault_addr:#x}, signal={sig} ***");
+                eprintln!("  x0={:#x} x1={:#x} x2={:#x} x16={:#x} x17={:#x} x30(lr)={:#x}",
+                    regs[0], regs[1], regs[2], regs[16], regs[17], regs[30]);
+                eprintln!("  x29(fp)={fp:#x} sp={sp:#x}");
+
+                // Walk frame pointer chain for backtrace
+                eprintln!("  --- backtrace (fp chain) ---");
+                let mut frame = fp;
+                for i in 0..20 {
+                    if frame == 0 || frame & 0x7 != 0 { break; }
+                    // Each frame: [fp] = prev_fp, [fp+8] = return_addr
+                    let prev_fp = *(frame as *const u64);
+                    let ret_addr = *((frame + 8) as *const u64);
+                    let ret_stripped = ret_addr & 0x0000_FFFF_FFFF_FFFF;
+                    let mut dl_bt = std::mem::zeroed::<DlInfo>();
+                    let sym = if ret_stripped != 0 && dladdr(ret_stripped as *const libc::c_void, &mut dl_bt) != 0 {
+                        if dl_bt.dli_sname.is_null() { "(unknown)".to_string() }
+                        else {
+                            let s = std::ffi::CStr::from_ptr(dl_bt.dli_sname).to_str().unwrap_or("?");
+                            let off = ret_stripped.wrapping_sub(dl_bt.dli_saddr as u64);
+                            format!("{s}+{off:#x}")
+                        }
+                    } else { "(?)".to_string() };
+                    eprintln!("  #{i}: ret={ret_stripped:#x} fp={frame:#x} {sym}");
+                    if prev_fp == 0 || prev_fp <= frame { break; }
+                    frame = prev_fp;
+                }
+                // Dump stack near SP for analysis when FP is 0
+                eprintln!("  --- stack dump (32 words from SP) ---");
+                let sp_ptr = sp as *const u64;
+                for i in 0..32i64 {
+                    let addr = sp.wrapping_add((i as u64) * 8);
+                    let val = *sp_ptr.offset(i as isize);
+                    if val > 0xffff00000000 || (val > 0x100000000 && val < 0x200000000) {
+                        // Looks like an address — try dladdr
+                        let v_stripped = val & 0x0000_FFFF_FFFF_FFFF;
+                        let mut dl_s = std::mem::zeroed::<DlInfo>();
+                        let sym = if dladdr(v_stripped as *const libc::c_void, &mut dl_s) != 0 && !dl_s.dli_sname.is_null() {
+                            let s = std::ffi::CStr::from_ptr(dl_s.dli_sname).to_str().unwrap_or("?");
+                            format!(" → {s}")
+                        } else { String::new() };
+                        eprintln!("  sp+{:#04x}: {val:#018x}{sym}", i * 8);
+                    }
+                }
+
+                // Use dladdr to identify functions at PC and LR
+                #[repr(C)]
+                struct DlInfo {
+                    dli_fname: *const libc::c_char,
+                    dli_fbase: *mut libc::c_void,
+                    dli_sname: *const libc::c_char,
+                    dli_saddr: *mut libc::c_void,
+                }
+                extern "C" {
+                    fn dladdr(addr: *const libc::c_void, info: *mut DlInfo) -> libc::c_int;
+                }
+                let mut dl = std::mem::zeroed::<DlInfo>();
+                if dladdr(pc_stripped as *const libc::c_void, &mut dl) != 0 {
+                    let fname = if dl.dli_fname.is_null() { "?" } else {
+                        std::ffi::CStr::from_ptr(dl.dli_fname).to_str().unwrap_or("?")
+                    };
+                    let sname = if dl.dli_sname.is_null() { "(unknown)" } else {
+                        std::ffi::CStr::from_ptr(dl.dli_sname).to_str().unwrap_or("?")
+                    };
+                    let offset = pc_stripped.wrapping_sub(dl.dli_saddr as u64);
+                    eprintln!("  PC in: {fname} :: {sname}+{offset:#x}");
+                }
+                let lr = regs[30] & 0x0000_FFFF_FFFF_FFFF;
+                let mut dl2 = std::mem::zeroed::<DlInfo>();
+                if dladdr(lr as *const libc::c_void, &mut dl2) != 0 {
+                    let fname = if dl2.dli_fname.is_null() { "?" } else {
+                        std::ffi::CStr::from_ptr(dl2.dli_fname).to_str().unwrap_or("?")
+                    };
+                    let sname = if dl2.dli_sname.is_null() { "(unknown)" } else {
+                        std::ffi::CStr::from_ptr(dl2.dli_sname).to_str().unwrap_or("?")
+                    };
+                    let offset = lr.wrapping_sub(dl2.dli_saddr as u64);
+                    eprintln!("  LR in: {fname} :: {sname}+{offset:#x}");
+                }
+
+                // Print memory mapping at crash PC for diagnosis
+                if let Ok(maps) = std::fs::read_to_string("/proc/self/maps") {
+                    for line in maps.lines() {
+                        let parts: Vec<&str> = line.split('-').collect();
+                        if let Some(start_str) = parts.first() {
+                            if let Ok(start) = u64::from_str_radix(start_str.trim(), 16) {
+                                let rest = &line[start_str.len()+1..];
+                                if let Some(end_str) = rest.split_whitespace().next() {
+                                    if let Ok(end) = u64::from_str_radix(end_str, 16) {
+                                        if pc_stripped >= start && pc_stripped < end {
+                                            eprintln!("  PC is in: {line}");
+                                        }
+                                        if fault_addr >= start && fault_addr < end {
+                                            eprintln!("  fault_addr is in: {line}");
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                std::process::exit(139);
+            }
+        }
+        let mut sa: libc::sigaction = std::mem::zeroed();
+        sa.sa_sigaction = crash_handler as usize;
+        sa.sa_flags = libc::SA_SIGINFO | libc::SA_RESETHAND;
+        libc::sigaction(libc::SIGSEGV, &sa, std::ptr::null_mut());
+        libc::sigaction(libc::SIGBUS, &sa, std::ptr::null_mut());
+    }
+
     println!("  ── output ──");
     match call_entry_with_args(&app.image, entry, Some(&entry_args)) {
         Ok(result) => {
+            // Flush C stdio so any printf output from the guest binary appears
+            unsafe { libc::fflush(std::ptr::null_mut()); }
             println!("  ── end ──");
             println!("  Exit code: {}", result.exit_code);
         }

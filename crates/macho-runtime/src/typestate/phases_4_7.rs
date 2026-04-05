@@ -27,6 +27,10 @@ impl Loader<Mapped> {
             for loaded in registry.images() {
                 macho_exec::patch_tlv_thunks(&loaded.image, &loaded.parsed, &loaded.data);
             }
+            // Strip PAC-authenticated branches when hardware PAC is unavailable
+            for loaded in registry.images() {
+                macho_exec::ptrauth::strip_pac_branches(&loaded.image);
+            }
         }
         self.inner
             .tracer

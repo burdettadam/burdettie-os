@@ -35,7 +35,7 @@ pub(crate) mod random;
 pub(crate) mod socket;
 pub mod table;
 pub(crate) mod tls;
-pub(crate) mod cross_platform;
+pub mod cross_platform;
 pub(crate) mod darwin_stubs;
 
 pub use darwin_compat::DarwinCompatShims;

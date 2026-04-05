@@ -1,0 +1,401 @@
+[
+  {
+    "unit_id": "ch07_s01",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 43,
+    "observables": {
+      "participants": ["the_reader", "the_builder", "crate_arm64_translate"],
+      "context": { "setting": "setting_source", "chapter": 7, "part": 4, "title": "Why Interpret", "estimated_words": 1500, "source_files": ["crates/arm64-translate/src/"] },
+      "event_type": "theory"
+    },
+    "structure": {
+      "position": 0.568,
+      "causal_role": "setup",
+      "grouping": { "part": "III — The Platform", "chapter": "Ch 7 — The Interpreter", "beat": "break_into_three" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "frame", "target": "x86_64 binaries exist — Intel Macs shipped for 15 years. We need to run ARM64 code on any host.", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_builder", "action": "explain", "target": "interpretation vs JIT vs AOT — why a pure Rust interpreter is the right first step", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_builder", "action": "explain", "target": "ARM64 is fixed-width 32-bit — every instruction is exactly 4 bytes, unlike x86 variable-length", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_builder", "action": "frame", "target": "the interpreter is Chapter 7 because it requires everything before it — loader, runtime, Foundation, bridge", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "loader_runs_native_code_only" },
+        "after": { "state_type": "knowledge", "value": "interpretation_enables_cross_architecture_execution" },
+        "trigger": "The A-story (loader) and B-story (runtime) converge on a new capability",
+        "description": "Break Into Three — synthesis of everything learned. The interpreter is a new kind of loader."
+      }
+    },
+    "interpretations": {
+      "subtext": "The interpreter isn't a diversion — it's the synthesis. Everything built so far converges.",
+      "motifs": ["convergence", "paradigm_shift"],
+      "reader_emotion": "excited_synthesis",
+      "thematic_function": "Beat 12 (Break Into Three) — A-story and B-story merge into a new capability."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "cross_platform_51_tools_pass" },
+        "post_state": { "capability": "understands_interpretation_strategy" },
+        "objective": { "action": "understand", "target": "why ARM64 interpretation is the right approach" },
+        "information_state": {
+          "gained": [
+            { "subject": "architecture", "predicate": "knows", "about": "ARM64 fixed-width 32-bit encoding makes decoding tractable" },
+            { "subject": "strategy", "predicate": "knows", "about": "interpreter vs JIT vs AOT tradeoffs" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch07_s02",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 44,
+    "observables": {
+      "participants": ["the_reader", "crate_arm64_translate", "concept_arm64_isa"],
+      "context": { "setting": "setting_source", "chapter": 7, "part": 4, "title": "The Decode Ring", "estimated_words": 1500, "source_files": ["crates/arm64-translate/src/decode.rs"] },
+      "event_type": "implementation"
+    },
+    "structure": {
+      "position": 0.581,
+      "causal_role": "trigger",
+      "grouping": { "part": "III — The Platform", "chapter": "Ch 7 — The Interpreter", "beat": "finale_gather" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "explain", "target": "ARM64 instruction encoding: top bits select instruction class (data processing, branch, load/store, etc.)", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "implement", "target": "decode() function: u32 → Instruction enum with extracted operands", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_builder", "action": "explain", "target": "bit extraction patterns: (insn >> shift) & mask for register fields, immediates, opcodes", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_reader", "action": "verify", "target": "decode known instruction bytes and compare to objdump disassembly", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "capability", "value": "understands_interpretation_strategy" },
+        "after": { "state_type": "capability", "value": "can_decode_arm64_instructions" },
+        "trigger": "First instruction decoded from bytes to structured enum",
+        "description": "The decode ring: 32 bits → structured Instruction. Each bit field has meaning."
+      }
+    },
+    "interpretations": {
+      "subtext": "An instruction set is a language. Decoding is parsing. The CPU's grammar is in the bit fields.",
+      "motifs": ["binary_truth", "language_metaphor"],
+      "reader_emotion": "precision_satisfaction",
+      "thematic_function": "Finale gathering (Beat 13) — assembling the tools for the final push."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "understands_interpretation_strategy" },
+        "post_state": { "capability": "can_decode_arm64_instructions" },
+        "objective": { "action": "build", "target": "ARM64 instruction decoder" },
+        "information_state": {
+          "gained": [
+            { "subject": "arm64", "predicate": "knows", "about": "instruction encoding: top bits select class, bit fields encode operands" },
+            { "subject": "arm64", "predicate": "knows", "about": "decode function: u32 → Instruction enum" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch07_s03",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 45,
+    "observables": {
+      "participants": ["the_reader", "crate_arm64_translate"],
+      "context": { "setting": "setting_ide", "chapter": 7, "part": 4, "title": "Integer Instructions", "estimated_words": 1200, "source_files": ["crates/arm64-translate/src/execute.rs"] },
+      "event_type": "implementation"
+    },
+    "structure": {
+      "position": 0.595,
+      "causal_role": "complication",
+      "grouping": { "part": "III — The Platform", "chapter": "Ch 7 — The Interpreter", "beat": "finale_gather" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_reader", "action": "implement", "target": "ADD, SUB, AND, ORR, EOR — arithmetic and logical with 32/64-bit variants", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "implement", "target": "MOVZ, MOVK, MOVN — immediate loading with shift positions", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_reader", "action": "implement", "target": "CMP, TST — flag-setting variants that update NZCV condition flags", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_reader", "action": "verify", "target": "computed register values match expected results for known instruction sequences", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "capability", "value": "can_decode_arm64_instructions" },
+        "after": { "state_type": "capability", "value": "can_execute_integer_instructions" },
+        "trigger": "First computed result matches expected output — the CPU simulation works",
+        "description": "The interpreter does real work. ADD produces sums. CMP sets flags. The virtual CPU computes."
+      }
+    },
+    "interpretations": {
+      "subtext": "A CPU is just arithmetic with side effects. Each instruction is a function: registers in, registers out.",
+      "motifs": ["assembly_precision"],
+      "reader_emotion": "building_momentum"
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "can_decode_arm64_instructions" },
+        "post_state": { "capability": "can_execute_integer_instructions" },
+        "objective": { "action": "implement", "target": "ARM64 integer and logical instruction execution" },
+        "information_state": {
+          "gained": [
+            { "subject": "arm64", "predicate": "knows", "about": "NZCV condition flags and flag-setting instruction variants" },
+            { "subject": "arm64", "predicate": "knows", "about": "32-bit vs 64-bit register views (W vs X registers)" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch07_s04",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 46,
+    "observables": {
+      "participants": ["the_reader", "crate_arm64_translate"],
+      "context": { "setting": "setting_ide", "chapter": 7, "part": 4, "title": "Memory Instructions", "estimated_words": 1500, "source_files": ["crates/arm64-translate/src/execute.rs", "crates/arm64-translate/src/memory.rs"] },
+      "event_type": "implementation"
+    },
+    "structure": {
+      "position": 0.608,
+      "causal_role": "complication",
+      "grouping": { "part": "III — The Platform", "chapter": "Ch 7 — The Interpreter", "beat": "finale_gather" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_reader", "action": "implement", "target": "LDR/STR — load and store with immediate offset, register offset, pre/post-index", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "implement", "target": "LDP/STP — load/store pair for stack frame setup and struct access", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_builder", "action": "explain", "target": "addressing modes: base+offset, base+register, pre-increment, post-increment", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_reader", "action": "implement", "target": "memory access validation — bounds checking against mapped segments", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "capability", "value": "can_compute_in_registers" },
+        "after": { "state_type": "capability", "value": "can_access_memory" },
+        "trigger": "Load/store instructions bridge registers and memory — the interpreter is a real machine",
+        "description": "Memory instructions are the bridge between computation and state. The interpreter can now read data."
+      }
+    },
+    "interpretations": {
+      "subtext": "A CPU without memory access is a calculator. LDR/STR make it a computer.",
+      "motifs": ["assembly_precision", "capability_ladder"],
+      "reader_emotion": "completeness_approaching"
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "can_execute_integer_instructions" },
+        "post_state": { "capability": "can_execute_memory_instructions" },
+        "objective": { "action": "implement", "target": "ARM64 load/store instruction execution with all addressing modes" },
+        "information_state": {
+          "gained": [
+            { "subject": "arm64", "predicate": "knows", "about": "ARM64 addressing modes: immediate, register, pre/post-index" },
+            { "subject": "arm64", "predicate": "knows", "about": "LDP/STP for stack frame and struct access" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch07_s05",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 47,
+    "observables": {
+      "participants": ["the_reader", "crate_arm64_translate"],
+      "context": { "setting": "setting_ide", "chapter": 7, "part": 4, "title": "Branches and Calls", "estimated_words": 1500, "source_files": ["crates/arm64-translate/src/execute.rs"] },
+      "event_type": "implementation"
+    },
+    "structure": {
+      "position": 0.622,
+      "causal_role": "complication",
+      "grouping": { "part": "III — The Platform", "chapter": "Ch 7 — The Interpreter", "beat": "finale_execute" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_reader", "action": "implement", "target": "B, BL — unconditional branch and branch-with-link (function calls)", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "implement", "target": "B.cond — conditional branches using NZCV flags (BEQ, BNE, BLT, BGE, etc.)", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_reader", "action": "implement", "target": "CBZ, CBNZ, TBZ, TBNZ — compare-and-branch instructions", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_reader", "action": "implement", "target": "RET — return via LR register, function call stack management", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "capability", "value": "can_execute_linear_code" },
+        "after": { "state_type": "capability", "value": "can_execute_branches_and_calls" },
+        "trigger": "Branch instructions give the interpreter control flow — real programs can run",
+        "description": "Branches make programs. Without them, the interpreter runs one straight line. With them, it runs real code."
+      }
+    },
+    "interpretations": {
+      "subtext": "Control flow is what makes a program a program. Branches are the if/else/while of the machine.",
+      "motifs": ["capability_ladder"],
+      "reader_emotion": "approaching_completeness",
+      "thematic_function": "Finale execution begins — the interpreter gains the power to run real programs."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "can_execute_memory_instructions" },
+        "post_state": { "capability": "can_execute_branches_and_calls" },
+        "objective": { "action": "implement", "target": "ARM64 branch and call instructions" },
+        "information_state": {
+          "gained": [
+            { "subject": "arm64", "predicate": "knows", "about": "BL saves return address in LR (X30), RET jumps to LR" },
+            { "subject": "arm64", "predicate": "knows", "about": "condition codes: EQ/NE/LT/GE/LS/HI/etc. test NZCV flags" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch07_s06",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 48,
+    "observables": {
+      "participants": ["the_reader", "crate_arm64_translate"],
+      "context": { "setting": "setting_ide", "chapter": 7, "part": 4, "title": "Floating Point and SIMD", "estimated_words": 1200, "source_files": ["crates/arm64-translate/src/execute.rs"] },
+      "event_type": "implementation"
+    },
+    "structure": {
+      "position": 0.635,
+      "causal_role": "complication",
+      "grouping": { "part": "III — The Platform", "chapter": "Ch 7 — The Interpreter", "beat": "finale_execute" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_reader", "action": "implement", "target": "V registers: 128-bit SIMD/FP registers with D/S/H/B views", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "implement", "target": "FADD, FSUB, FMUL, FDIV — scalar floating-point arithmetic", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_reader", "action": "implement", "target": "FCVT, SCVTF, UCVTF — float/int conversion instructions", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_builder", "action": "explain", "target": "SIMD is optional for basic compatibility — most Foundation code uses scalar FP only", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "capability", "value": "integer_and_memory_only" },
+        "after": { "state_type": "capability", "value": "can_execute_floating_point" },
+        "trigger": "V register support allows real floating-point computation",
+        "description": "Floating-point completes the computation model. Real programs use doubles everywhere."
+      }
+    },
+    "interpretations": {
+      "subtext": "The 80/20 rule: scalar FP covers 95% of Foundation code. Full SIMD can wait.",
+      "motifs": ["pragmatic_engineering"],
+      "reader_emotion": "pragmatic_completion"
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "can_execute_branches_and_calls" },
+        "post_state": { "capability": "can_execute_floating_point" },
+        "objective": { "action": "implement", "target": "ARM64 floating-point and basic SIMD" },
+        "information_state": {
+          "gained": [
+            { "subject": "arm64", "predicate": "knows", "about": "V registers: 128-bit with D(64)/S(32)/H(16)/B(8) views" },
+            { "subject": "arm64", "predicate": "knows", "about": "SIMD is breadth — scalar FP is sufficient for compatibility" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch07_s07",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 49,
+    "observables": {
+      "participants": ["the_reader", "crate_arm64_translate", "concept_ffi_boundary"],
+      "context": { "setting": "setting_source", "chapter": 7, "part": 4, "title": "The FFI Boundary", "estimated_words": 1500, "source_files": ["crates/arm64-translate/src/ffi.rs"] },
+      "event_type": "implementation"
+    },
+    "structure": {
+      "position": 0.649,
+      "causal_role": "resolution",
+      "grouping": { "part": "III — The Platform", "chapter": "Ch 7 — The Interpreter", "beat": "finale_execute" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "frame", "target": "interpreted code must call shim functions — the FFI boundary is where virtual meets real", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "implement", "target": "FfiCallArgs: marshal register state into Rust function arguments", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_reader", "action": "implement", "target": "return value marshaling: place Rust return values back into virtual registers", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_builder", "action": "explain", "target": "BL to a shim address triggers FFI trap — the interpreter calls real Rust code", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "capability", "value": "interpreter_runs_in_isolation" },
+        "after": { "state_type": "capability", "value": "interpreter_can_call_shim_functions" },
+        "trigger": "FFI boundary lets interpreted ARM64 code call real Rust shim implementations",
+        "description": "The FFI boundary is where the interpreter meets the loader. Virtual registers become real function arguments."
+      }
+    },
+    "interpretations": {
+      "subtext": "The FFI boundary is the architectural joint. Two systems (interpreter, runtime) must agree on calling convention.",
+      "motifs": ["convergence", "engineering_elegance"],
+      "reader_emotion": "architectural_insight",
+      "thematic_function": "All systems converge — interpreter calls Foundation shims which use the ObjC runtime built in Ch4."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "can_execute_floating_point" },
+        "post_state": { "capability": "interpreter_calls_shims_via_ffi" },
+        "objective": { "action": "bridge", "target": "interpreted ARM64 code to real Rust shim functions" },
+        "information_state": {
+          "gained": [
+            { "subject": "architecture", "predicate": "knows", "about": "FfiCallArgs marshaling: virtual registers → Rust function arguments" },
+            { "subject": "architecture", "predicate": "knows", "about": "BL to shim address triggers FFI trap for host-side execution" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch07_s08",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 50,
+    "observables": {
+      "participants": ["the_reader", "the_builder", "crate_arm64_translate", "crate_objc_runtime"],
+      "context": { "setting": "setting_terminal", "chapter": 7, "part": 4, "title": "The Overhead Report", "estimated_words": 1200, "source_files": ["crates/arm64-translate/src/interp.rs"] },
+      "event_type": "resolution"
+    },
+    "structure": {
+      "position": 0.662,
+      "causal_role": "resolution",
+      "grouping": { "part": "III — The Platform", "chapter": "Ch 7 — The Interpreter", "beat": "finale_execute" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_reader", "action": "run", "target": "27 ObjC test programs through interpreter + Foundation shims", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_builder", "action": "measure", "target": "interpretation overhead: cycles per instruction, FFI call frequency", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_builder", "action": "analyze", "target": "most time is in shim calls (Rust-native), not interpretation — FFI is the performance story", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "confidence", "value": "interpretation_might_be_too_slow" },
+        "after": { "state_type": "confidence", "value": "interpretation_overhead_is_acceptable" },
+        "trigger": "27 ObjC tests pass under interpretation — overhead is in FFI, not decode/execute",
+        "description": "The interpreter works. 27 tests pass. Overhead is dominated by FFI calls to native shims, not instruction interpretation."
+      }
+    },
+    "interpretations": {
+      "subtext": "The bottleneck isn't where you expect. Interpretation overhead is cheap; FFI marshaling is expensive.",
+      "motifs": ["validation_by_numbers", "pragmatic_engineering"],
+      "reader_emotion": "validated_by_measurement",
+      "thematic_function": "Chapter resolution — the interpreter is proven. Bridge to Ch 8: 'But what about threads? Exceptions? Signals?'"
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "interpreter_calls_shims_via_ffi" },
+        "post_state": { "capability": "interpreter_validated_27_objc_tests" },
+        "objective": { "action": "validate", "target": "interpreter correctness and performance with real ObjC programs" },
+        "information_state": {
+          "gained": [
+            { "subject": "performance", "predicate": "knows", "about": "interpretation overhead dominated by FFI marshaling, not decode/execute" },
+            { "subject": "validation", "predicate": "knows", "about": "27 ObjC tests pass under interpretation" }
+          ],
+          "gaps": [
+            { "subject": "system", "predicate": "knows", "about": "threads, exceptions, signals — system-level features still needed (Ch 8)" }
+          ]
+        }
+      }
+    ]
+  }
+]

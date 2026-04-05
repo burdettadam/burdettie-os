@@ -345,6 +345,8 @@ fn get_or_create_main_run_loop() -> u64 {
 
 static NSDEFAULT_RUN_LOOP_MODE: OnceLock<u64> = OnceLock::new();
 static NSRUN_LOOP_COMMON_MODES: OnceLock<u64> = OnceLock::new();
+static NSEVENT_TRACKING_RUN_LOOP_MODE: OnceLock<u64> = OnceLock::new();
+static NSMODAL_PANEL_RUN_LOOP_MODE: OnceLock<u64> = OnceLock::new();
 
 /// Address of the NSDefaultRunLoopMode constant string.
 pub fn nsdefault_run_loop_mode_addr() -> u64 {
@@ -358,6 +360,22 @@ pub fn nsdefault_run_loop_mode_addr() -> u64 {
 pub fn nsrun_loop_common_modes_addr() -> u64 {
     *NSRUN_LOOP_COMMON_MODES.get_or_init(|| {
         let cstr = std::ffi::CString::new("kCFRunLoopCommonModes").unwrap();
+        crate::cfstring::alloc_nsstring_from_cstr(cstr.as_ptr())
+    })
+}
+
+/// Address of the NSEventTrackingRunLoopMode constant string.
+pub fn nsevent_tracking_run_loop_mode_addr() -> u64 {
+    *NSEVENT_TRACKING_RUN_LOOP_MODE.get_or_init(|| {
+        let cstr = std::ffi::CString::new("NSEventTrackingRunLoopMode").unwrap();
+        crate::cfstring::alloc_nsstring_from_cstr(cstr.as_ptr())
+    })
+}
+
+/// Address of the NSModalPanelRunLoopMode constant string.
+pub fn nsmodal_panel_run_loop_mode_addr() -> u64 {
+    *NSMODAL_PANEL_RUN_LOOP_MODE.get_or_init(|| {
+        let cstr = std::ffi::CString::new("NSModalPanelRunLoopMode").unwrap();
         crate::cfstring::alloc_nsstring_from_cstr(cstr.as_ptr())
     })
 }

@@ -1,0 +1,344 @@
+[
+  {
+    "unit_id": "ch06_s01",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 36,
+    "observables": {
+      "participants": ["the_reader", "the_builder", "crate_libsystem_shims", "crate_platform_linux"],
+      "context": { "setting": "setting_terminal", "chapter": 6, "part": 3, "title": "Two ARM64 Worlds", "estimated_words": 1500, "source_files": ["crates/libsystem-shims/src/darwin_compat.rs", "crates/platform-linux/src/"] },
+      "event_type": "crisis"
+    },
+    "structure": {
+      "position": 0.473,
+      "causal_role": "trigger",
+      "grouping": { "part": "III — The Platform", "chapter": "Ch 6 — The Bridge", "beat": "bad_guys_close_in" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "demonstrate", "target": "same binary runs on macOS but crashes in Linux Docker container", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_builder", "action": "reveal", "target": "crash is in libSystem shim layer — the system call interface differs between macOS and Linux", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_builder", "action": "explain", "target": "both platforms are ARM64 but ABI conventions, struct layouts, and system calls diverge", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "confidence", "value": "foundation_works_2682_tests_pass" },
+        "after": { "state_type": "knowledge", "value": "identical_architecture_does_not_mean_identical_platform" },
+        "trigger": "Crash in Docker — same CPU architecture, different platform expectations",
+        "description": "The reader's confidence from Ch5's test suite is shattered. ARM64 doesn't mean compatible."
+      }
+    },
+    "interpretations": {
+      "subtext": "Same architecture, different world. The crash reveals that compatibility is platform-deep, not just instruction-deep.",
+      "motifs": ["crash_as_teacher", "platform_opacity"],
+      "reader_emotion": "shock_at_regression",
+      "thematic_function": "Beat 9 continuation — bad guys closing in. The macOS success was a false victory (Ch5 midpoint). Cross-platform reveals the true scope."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "foundation_validated_2682_tests" },
+        "post_state": { "capability": "understands_platform_divergence" },
+        "objective": { "action": "diagnose", "target": "why same binary crashes on Linux ARM64" },
+        "information_state": {
+          "knows": [
+            { "subject": "foundation", "predicate": "knows", "about": "2,682 tests pass on macOS" }
+          ],
+          "gained": [
+            { "subject": "platform", "predicate": "knows", "about": "macOS and Linux ARM64 ABIs diverge in struct layout, syscalls, variadics" }
+          ],
+          "gaps": [
+            { "subject": "platform", "predicate": "knows", "about": "specific ABI differences that cause the crash" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch06_s02",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 37,
+    "observables": {
+      "participants": ["the_reader", "crate_libsystem_shims", "concept_variadic_abi"],
+      "context": { "setting": "setting_source", "chapter": 6, "part": 3, "title": "The Variadic Crisis", "estimated_words": 1500, "source_files": ["crates/libsystem-shims/src/darwin_compat.rs"] },
+      "event_type": "crisis"
+    },
+    "structure": {
+      "position": 0.486,
+      "causal_role": "complication",
+      "grouping": { "part": "III — The Platform", "chapter": "Ch 6 — The Bridge", "beat": "bad_guys_close_in" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "reveal", "target": "Apple's ARM64 ABI puts ALL variadic arguments on the stack, not in registers", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_builder", "action": "explain", "target": "Linux ARM64 follows AAPCS — first 8 args in registers, then stack", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_reader", "action": "implement", "target": "variadic ABI translation layer that moves stack args to register args", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_builder", "action": "explain", "target": "printf, NSLog, stringWithFormat ALL use variadics — this affects everything", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "arm64_calling_convention_is_universal" },
+        "after": { "state_type": "knowledge", "value": "apple_and_linux_arm64_abis_diverge_on_variadics" },
+        "trigger": "Apple deviates from AAPCS for variadic functions — all args on stack",
+        "description": "The deepest ABI secret: Apple silently broke AAPCS for variadics. Documentation never explains why."
+      }
+    },
+    "interpretations": {
+      "subtext": "Apple documented this nowhere. The specification divergence was discovered by reading assembly output, not documentation.",
+      "motifs": ["documentation_lies", "binary_truth"],
+      "reader_emotion": "frustration_then_clarity",
+      "thematic_function": "Beat 9 climax — the worst 'bad guy' is the undocumented ABI divergence. Foreshadows App B (ABI Secrets)."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "understands_platform_divergence" },
+        "post_state": { "capability": "can_translate_variadic_abi" },
+        "objective": { "action": "solve", "target": "variadic ABI mismatch between Apple and Linux ARM64" },
+        "information_state": {
+          "gained": [
+            { "subject": "abi", "predicate": "knows", "about": "Apple ARM64 puts ALL variadic args on stack, not in registers" },
+            { "subject": "abi", "predicate": "knows", "about": "Linux ARM64 follows standard AAPCS for variadics" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch06_s03",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 38,
+    "observables": {
+      "participants": ["the_reader", "crate_libsystem_shims"],
+      "context": { "setting": "setting_source", "chapter": 6, "part": 3, "title": "setlocale and the Constants", "estimated_words": 1200, "source_files": ["crates/libsystem-shims/src/darwin_compat.rs"] },
+      "event_type": "discovery"
+    },
+    "structure": {
+      "position": 0.500,
+      "causal_role": "complication",
+      "grouping": { "part": "III — The Platform", "chapter": "Ch 6 — The Bridge", "beat": "all_is_lost" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "reveal", "target": "setlocale(LC_ALL, \"\") — macOS LC_ALL=0, Linux LC_ALL=6", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_builder", "action": "explain", "target": "constant value differences break binary compatibility across every enum-like interface", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_reader", "action": "implement", "target": "constant translation tables for locale, signal, and errno values", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "posix_constants_are_portable" },
+        "after": { "state_type": "knowledge", "value": "posix_constants_differ_between_platforms" },
+        "trigger": "LC_ALL=0 on macOS, LC_ALL=6 on Linux — POSIX doesn't mandate values",
+        "description": "All Is Lost begins — even 'portable' POSIX constants aren't portable. The platform differences are fractal."
+      }
+    },
+    "interpretations": {
+      "subtext": "POSIX portability is a polite fiction. The standard says what the call does, not what the constants are.",
+      "motifs": ["documentation_lies", "fractal_complexity"],
+      "reader_emotion": "despair_at_scope",
+      "thematic_function": "Beat 10 (All Is Lost) begins — differences are fractal and bottomless."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "can_translate_variadic_abi" },
+        "post_state": { "capability": "can_translate_posix_constants" },
+        "objective": { "action": "map", "target": "constant value differences between macOS and Linux" },
+        "information_state": {
+          "gained": [{ "subject": "posix", "predicate": "knows", "about": "POSIX constant values are platform-specific — LC_ALL, signals, errno all differ" }]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch06_s04",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 39,
+    "observables": {
+      "participants": ["the_reader", "crate_libsystem_shims"],
+      "context": { "setting": "setting_source", "chapter": 6, "part": 3, "title": "struct stat and the Layouts", "estimated_words": 1200 },
+      "event_type": "discovery"
+    },
+    "structure": {
+      "position": 0.514,
+      "causal_role": "complication",
+      "grouping": { "part": "III — The Platform", "chapter": "Ch 6 — The Bridge", "beat": "all_is_lost" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "reveal", "target": "struct stat is 144 bytes on macOS, 128 bytes on Linux — field order differs too", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_builder", "action": "explain", "target": "Apple added st_birthtimespec, st_flags, st_gen — Linux has different extensions", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_reader", "action": "implement", "target": "struct layout translation: read macOS-layout fields, write Linux-layout struct", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "struct_stat_is_posix_standard" },
+        "after": { "state_type": "knowledge", "value": "struct_stat_layout_differs_between_platforms" },
+        "trigger": "struct stat size and field order differ — binary structs are not portable",
+        "description": "Even fundamental POSIX structures have different sizes. Binary compatibility requires byte-level translation."
+      }
+    },
+    "interpretations": {
+      "subtext": "Binary compatibility means matching byte layouts, not just API signatures. The struct is the contract.",
+      "motifs": ["fractal_complexity", "binary_truth"],
+      "reader_emotion": "grinding_through",
+      "thematic_function": "All Is Lost deepens — every layer reveals another incompatibility."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "can_translate_posix_constants" },
+        "post_state": { "capability": "can_translate_struct_layouts" },
+        "objective": { "action": "translate", "target": "macOS struct stat to Linux struct stat" },
+        "information_state": {
+          "gained": [{ "subject": "abi", "predicate": "knows", "about": "struct stat: 144 bytes macOS vs 128 bytes Linux, different field layouts" }]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch06_s05",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 40,
+    "observables": {
+      "participants": ["the_reader", "crate_libsystem_shims"],
+      "context": { "setting": "setting_source", "chapter": 6, "part": 3, "title": "Data Symbols", "estimated_words": 1200 },
+      "event_type": "crisis"
+    },
+    "structure": {
+      "position": 0.527,
+      "causal_role": "complication",
+      "grouping": { "part": "III — The Platform", "chapter": "Ch 6 — The Bridge", "beat": "dark_night" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "reveal", "target": "__mb_cur_max, mach_task_self_, environ — guest binary reads these directly from memory", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_builder", "action": "explain", "target": "data symbols aren't function calls — they're memory addresses the binary expects to dereference", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_reader", "action": "implement", "target": "DataSymbolStore — allocate dummy globals at known addresses, keep them alive", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "shimming_means_replacing_function_calls" },
+        "after": { "state_type": "knowledge", "value": "some_symbols_are_data_not_functions" },
+        "trigger": "Binary dereferences __mb_cur_max as a pointer, not a function call",
+        "description": "Dark Night begins — you can't shim a memory read. Data symbols require a different strategy entirely."
+      }
+    },
+    "interpretations": {
+      "subtext": "Some platform contracts aren't function calls. They're raw memory expectations. You can't intercept a load instruction.",
+      "motifs": ["platform_opacity", "binary_truth"],
+      "reader_emotion": "dark_night_despair",
+      "thematic_function": "Beat 11 (Dark Night) — the lowest point. Data symbols seem un-shimmable."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "can_translate_struct_layouts" },
+        "post_state": { "capability": "can_provide_data_symbols" },
+        "objective": { "action": "solve", "target": "data symbol resolution for non-function symbols" },
+        "information_state": {
+          "gained": [{ "subject": "loader", "predicate": "knows", "about": "DataSymbolStore pattern for providing data symbols at expected addresses" }],
+          "gaps": [{ "subject": "system", "predicate": "knows", "about": "library load order dependencies still unsolved" }]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch06_s06",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 41,
+    "observables": {
+      "participants": ["the_reader", "crate_libsystem_shims", "crate_macho_runtime"],
+      "context": { "setting": "setting_source", "chapter": 6, "part": 3, "title": "Library Preloading", "estimated_words": 1200 },
+      "event_type": "implementation"
+    },
+    "structure": {
+      "position": 0.541,
+      "causal_role": "resolution",
+      "grouping": { "part": "III — The Platform", "chapter": "Ch 6 — The Bridge", "beat": "dark_night" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "explain", "target": "RTLD_GLOBAL — macOS libraries expect to find each other's symbols globally", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "implement", "target": "library preloading strategy: shim libraries loaded before guest binary", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_builder", "action": "explain", "target": "load order matters: libSystem first, then CoreFoundation, then Foundation", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "capability", "value": "individual_shims_work_in_isolation" },
+        "after": { "state_type": "capability", "value": "shim_libraries_coordinate_via_preloading" },
+        "trigger": "Library preloading with correct load order makes shims discoverable",
+        "description": "Dawn after the dark night — the solution is systematic, not per-symbol."
+      }
+    },
+    "interpretations": {
+      "subtext": "The solution to the dark night: think systemically. Preload in the right order and individual fixes compose.",
+      "motifs": ["systematic_thinking"],
+      "reader_emotion": "dawn_after_darkness",
+      "thematic_function": "Dark Night resolution — systematic approach replaces despair."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "can_provide_data_symbols" },
+        "post_state": { "capability": "library_preloading_works" },
+        "objective": { "action": "implement", "target": "library preloading with correct load order" },
+        "information_state": {
+          "gained": [{ "subject": "loader", "predicate": "knows", "about": "RTLD_GLOBAL preloading with libSystem → CoreFoundation → Foundation order" }]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch06_s07",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 42,
+    "observables": {
+      "participants": ["the_reader", "the_builder", "crate_platform_linux", "tool_cut", "tool_sort"],
+      "context": { "setting": "setting_terminal", "chapter": 6, "part": 3, "title": "The Docker Container", "estimated_words": 1500, "source_files": ["docker/Dockerfile.burdettie"] },
+      "event_type": "resolution"
+    },
+    "structure": {
+      "position": 0.554,
+      "causal_role": "resolution",
+      "grouping": { "part": "III — The Platform", "chapter": "Ch 6 — The Bridge", "beat": "dark_night" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_reader", "action": "build", "target": "Dockerfile.burdettie — multi-stage build for cross-platform loader", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "run", "target": "51+ macOS command-line tools in Linux Docker container", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_builder", "action": "demonstrate", "target": "macOS cut, sort, and Foundation tools produce correct output on Linux", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_builder", "action": "reveal", "target": "identical binary, two platforms, same results — the bridge works", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "confidence", "value": "platform_differences_seem_insurmountable" },
+        "after": { "state_type": "confidence", "value": "51_tools_pass_on_linux" },
+        "trigger": "Docker container runs 51+ macOS tools correctly",
+        "description": "The chapter began with a crash. It ends with 51+ tools running. The bridge between two ARM64 worlds holds."
+      }
+    },
+    "interpretations": {
+      "subtext": "The chapter began with a crash and ends with proof. Systematic engineering beats despair.",
+      "motifs": ["validation_by_numbers", "crash_to_success"],
+      "reader_emotion": "triumph_after_despair",
+      "thematic_function": "Chapter closes the Dark Night arc. Bridge to Ch 7: 'But what about x86_64? What about Intel Macs?'"
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "library_preloading_works" },
+        "post_state": { "capability": "cross_platform_51_tools_pass" },
+        "objective": { "action": "validate", "target": "cross-platform compatibility in Docker container" },
+        "information_state": {
+          "gained": [
+            { "subject": "validation", "predicate": "knows", "about": "51+ macOS tools run correctly in Linux Docker container" },
+            { "subject": "methodology", "predicate": "knows", "about": "systematic ABI translation + preloading = cross-platform compatibility" }
+          ],
+          "gaps": [
+            { "subject": "architecture", "predicate": "knows", "about": "x86_64/Intel Mac binaries still can't run (Ch 7)" }
+          ]
+        }
+      }
+    ]
+  }
+]

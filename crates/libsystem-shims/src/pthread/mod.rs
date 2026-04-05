@@ -106,7 +106,14 @@ impl PthreadShims {
             ("_pthread_main_np", shim_pthread_main_np as *const () as u64, "pthread_main_np (real)"),
         );
 
-        log::debug!("PthreadShims: registered 42 pthread shims");
+        // ── C++ std::mutex (macOS ABI translation) ──
+        register_shims!(table,
+            ("__ZNSt3__15mutex4lockEv", shim_std_mutex_lock as *const () as u64, "std::mutex::lock (Darwin→Linux)"),
+            ("__ZNSt3__15mutex6unlockEv", shim_std_mutex_unlock as *const () as u64, "std::mutex::unlock (Darwin→Linux)"),
+            ("__ZNSt3__15mutex8try_lockEv", shim_std_mutex_try_lock as *const () as u64, "std::mutex::try_lock (Darwin→Linux)"),
+        );
+
+        log::debug!("PthreadShims: registered 45 pthread shims");
     }
 }
 

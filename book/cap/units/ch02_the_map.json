@@ -1,0 +1,304 @@
+[
+  {
+    "unit_id": "ch02_s01",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 7,
+    "observables": {
+      "participants": ["the_reader", "the_builder", "concept_virtual_memory"],
+      "context": {
+        "setting": "setting_source",
+        "chapter": 2,
+        "part": 1,
+        "title": "Virtual Memory Primer",
+        "estimated_words": 2000,
+        "source_files": ["crates/macho-exec/src/mapped.rs"]
+      },
+      "event_type": "theory"
+    },
+    "structure": {
+      "position": 0.081,
+      "causal_role": "setup",
+      "grouping": { "part": "I — The Artifact", "chapter": "Ch 2 — The Map", "beat": "catalyst" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "explain", "target": "pages: 4K (Intel) vs 16K (Apple Silicon) — the unit of memory management", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_builder", "action": "explain", "target": "permissions (RWX): read, write, execute bits per page", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_builder", "action": "explain", "target": "mmap() and MAP_ANONYMOUS — placing data at chosen addresses", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_builder", "action": "frame", "target": "address space as a canvas for loading — from data-on-heap to live-in-memory", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "binary_is_parsed_data_on_heap" },
+        "after": { "state_type": "knowledge", "value": "memory_mapping_gives_binary_a_real_address" },
+        "trigger": "Shift from 'we have data' to 'we need to place data at executable addresses'",
+        "description": "Parsing is academic; a mapped binary is alive. The reader begins the transition from analysis to execution."
+      }
+    },
+    "interpretations": {
+      "subtext": "Analysis is academic; execution is real. The binary needs somewhere to live.",
+      "motifs": ["analysis_to_execution"],
+      "reader_emotion": "foundational_understanding",
+      "thematic_function": "Catalyst beat — parsing isn't enough, momentum builds toward loading. VM concepts recur in Ch 3 (fixups need addresses), Ch 7 (interpreter memory model), and Ch 8 (mprotect)."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "parse_any_macho_binary" },
+        "post_state": { "capability": "understands_vm_basics_for_loading" },
+        "objective": { "action": "learn", "target": "virtual memory fundamentals for binary loading" },
+        "information_state": {
+          "knows": [
+            { "subject": "mach-o", "predicate": "knows", "about": "complete binary format structure" }
+          ],
+          "gaps": [
+            { "subject": "vm", "predicate": "knows", "about": "how segments map to specific addresses" },
+            { "subject": "vm", "predicate": "knows", "about": "ASLR and address randomization" }
+          ],
+          "gained": [
+            { "subject": "vm", "predicate": "knows", "about": "page-level permissions RWX" },
+            { "subject": "vm", "predicate": "knows", "about": "mmap() places data at chosen addresses" },
+            { "subject": "vm", "predicate": "knows", "about": "16K page alignment on Apple Silicon" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch02_s02",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 8,
+    "observables": {
+      "participants": ["the_reader", "crate_macho_exec", "concept_virtual_memory"],
+      "context": {
+        "setting": "setting_source",
+        "chapter": 2,
+        "part": 1,
+        "title": "Segments to Memory",
+        "estimated_words": 2200,
+        "source_files": ["crates/macho-exec/src/mapped.rs"]
+      },
+      "event_type": "implementation"
+    },
+    "structure": {
+      "position": 0.095,
+      "causal_role": "trigger",
+      "grouping": { "part": "I — The Artifact", "chapter": "Ch 2 — The Map", "beat": "catalyst" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_reader", "action": "map", "target": "__TEXT as r-x (read+execute, no write)", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "map", "target": "__DATA as rw- (read+write, no execute)", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_reader", "action": "map", "target": "__LINKEDIT as r-- (read-only)", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_builder", "action": "explain", "target": "page alignment: why segment sizes are multiples of 16K", "significance": "essential" },
+        { "sequence_number": 5, "agent": "the_reader", "action": "observe", "target": "mmap() calls placing segments at real addresses with real protections", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "capability", "value": "understands_vm_theory" },
+        "after": { "state_type": "capability", "value": "can_map_segments_with_correct_permissions" },
+        "trigger": "Segments mapped to memory with real protection bits",
+        "description": "Puzzle pieces fit — each segment gets the right permissions at the right address."
+      }
+    },
+    "interpretations": {
+      "subtext": "The binary's self-description drives its own loading. The format IS the protocol.",
+      "motifs": ["self_describing_binary"],
+      "reader_emotion": "mechanical_satisfaction",
+      "thematic_function": "Catalyst continues — the transition from analysis to execution is physically happening via mmap()."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "understands_vm_basics_for_loading" },
+        "post_state": { "capability": "can_map_binary_segments" },
+        "objective": { "action": "map", "target": "each segment to memory with correct permissions" },
+        "information_state": {
+          "gained": [
+            { "subject": "vm", "predicate": "knows", "about": "__TEXT → r-x, __DATA → rw-, __LINKEDIT → r--" },
+            { "subject": "vm", "predicate": "knows", "about": "segment sizes must be 16K-aligned" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch02_s03",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 9,
+    "observables": {
+      "participants": ["the_reader", "the_platform", "concept_aslr"],
+      "context": {
+        "setting": "setting_debugger",
+        "chapter": 2,
+        "part": 1,
+        "title": "ASLR and the Slide",
+        "estimated_words": 1800,
+        "source_files": ["crates/macho-exec/src/mapped.rs"]
+      },
+      "event_type": "discovery"
+    },
+    "structure": {
+      "position": 0.108,
+      "causal_role": "complication",
+      "grouping": { "part": "I — The Artifact", "chapter": "Ch 2 — The Map", "beat": "catalyst" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "explain", "target": "PIE binaries land at random addresses each run", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "calculate", "target": "slide = actual_base - preferred_base", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_builder", "action": "reveal", "target": "every internal pointer in the binary needs slide adjustment", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_builder", "action": "foreshadow", "target": "rebase fixups in Ch 3 will handle this systematically", "significance": "supplementary" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "segments_mapped_at_fixed_addresses" },
+        "after": { "state_type": "knowledge", "value": "addresses_are_randomized_and_must_be_adjusted" },
+        "trigger": "Discovery that ASLR means all addresses are relative, not absolute",
+        "description": "The binary's addresses are preferences — reality requires adjustment."
+      }
+    },
+    "interpretations": {
+      "subtext": "Security makes everything harder. ASLR is invisible until you build a loader.",
+      "motifs": ["platform_opacity"],
+      "reader_emotion": "aha_moment",
+      "thematic_function": "ASLR complicates the simple mapping model. Connects forward to rebase fixups (Ch 3) and shared cache slide info (Ch 3)."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "can_map_binary_segments" },
+        "post_state": { "capability": "can_apply_aslr_slide" },
+        "objective": { "action": "understand", "target": "Address Space Layout Randomization and pointer adjustment" },
+        "information_state": {
+          "gained": [
+            { "subject": "vm", "predicate": "knows", "about": "ASLR randomizes base address each run" },
+            { "subject": "vm", "predicate": "knows", "about": "slide = actual - preferred, all pointers need adjustment" }
+          ],
+          "gaps": [
+            { "subject": "fixups", "predicate": "knows", "about": "how rebase fixups apply slide systematically (Ch 3)" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch02_s04",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 10,
+    "observables": {
+      "participants": ["the_reader", "crate_macho_exec"],
+      "context": {
+        "setting": "setting_ide",
+        "chapter": 2,
+        "part": 1,
+        "title": "The MappedImage",
+        "estimated_words": 2200,
+        "source_files": ["crates/macho-exec/src/mapped.rs", "crates/macho-exec/src/plan.rs"]
+      },
+      "event_type": "implementation"
+    },
+    "structure": {
+      "position": 0.122,
+      "causal_role": "resolution",
+      "grouping": { "part": "I — The Artifact", "chapter": "Ch 2 — The Map", "beat": "debate" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "introduce", "target": "macho-exec crate and MappedImage struct", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "study", "target": "lifecycle: parse → validate → map → ready for linking", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_reader", "action": "observe", "target": "binary alive at real address with correct page permissions", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_builder", "action": "foreshadow", "target": "MappedImage is alive but every function pointer is NULL — linking needed", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "capability", "value": "manual_mmap_understanding" },
+        "after": { "state_type": "capability", "value": "has_mapped_image_abstraction" },
+        "trigger": "MappedImage struct wraps the complete memory mapping lifecycle",
+        "description": "File on disk → live memory image. The binary is alive but every function pointer is still NULL."
+      }
+    },
+    "interpretations": {
+      "subtext": "Architecture matters — MappedImage makes correctness composable. The abstraction prevents misuse.",
+      "motifs": ["analysis_to_execution"],
+      "reader_emotion": "architectural_clarity",
+      "thematic_function": "Debate beat — the scope of the project becomes clear. The GOT is all zeros. 'Do we need to build an entire dynamic linker?' Yes."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "can_apply_aslr_slide" },
+        "post_state": { "capability": "has_mapped_image_in_memory" },
+        "objective": { "action": "build", "target": "MappedImage with complete memory mapping lifecycle" },
+        "information_state": {
+          "gained": [
+            { "subject": "architecture", "predicate": "knows", "about": "parse → validate → map pipeline" },
+            { "subject": "architecture", "predicate": "knows", "about": "MappedImage wraps mapped memory with metadata" }
+          ],
+          "gaps": [
+            { "subject": "linking", "predicate": "knows", "about": "how to resolve NULL function pointers in GOT" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch02_s05",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 11,
+    "observables": {
+      "participants": ["the_reader", "the_platform"],
+      "context": {
+        "setting": "setting_source",
+        "chapter": 2,
+        "part": 1,
+        "title": "Code Signing and Verification",
+        "estimated_words": 1800
+      },
+      "event_type": "discovery"
+    },
+    "structure": {
+      "position": 0.135,
+      "causal_role": "setup",
+      "grouping": { "part": "I — The Artifact", "chapter": "Ch 2 — The Map", "beat": "debate" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "explain", "target": "LC_CODE_SIGNATURE load command and code directory structure", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_builder", "action": "explain", "target": "page hash verification — each page has a SHA-256 hash", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_reader", "action": "observe", "target": "integrity verification layer Apple uses before execution", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_builder", "action": "frame", "target": "light treatment — enough to understand Apple's security model", "significance": "supplementary" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "binary_loading_is_just_mmap" },
+        "after": { "state_type": "knowledge", "value": "apple_adds_security_verification_layer" },
+        "trigger": "Code signing reveals another layer of platform complexity",
+        "description": "The platform adds a security layer over loading. Foreshadows the platform-as-antagonist role."
+      }
+    },
+    "interpretations": {
+      "subtext": "The platform doesn't just load binaries — it guards them. Security is another layer of opacity.",
+      "motifs": ["platform_opacity"],
+      "reader_emotion": "awareness_of_security_layer",
+      "thematic_function": "Debate beat resolves — the reader now sees the full scope. The binary is mapped but needs linking. Bridge to Ch 3: 'The binary is loaded. But look at the GOT — every entry is zero.'"
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "has_mapped_image_in_memory" },
+        "post_state": { "capability": "understands_code_signing_at_high_level" },
+        "objective": { "action": "learn", "target": "why Apple cares about code signing" },
+        "information_state": {
+          "gained": [
+            { "subject": "security", "predicate": "knows", "about": "LC_CODE_SIGNATURE and code directory" },
+            { "subject": "security", "predicate": "knows", "about": "per-page SHA-256 hash verification" }
+          ],
+          "gaps": [
+            { "subject": "linking", "predicate": "knows", "about": "GOT entries are all zero — need dynamic linking (Ch 3)" }
+          ]
+        }
+      }
+    ]
+  }
+]

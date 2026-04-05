@@ -114,6 +114,39 @@ pub(crate) fn is_window_visible(obj: u64) -> bool {
     read_u64(obj, IS_VISIBLE_OFF) != 0
 }
 
+/// Build a `WindowDesc` for the GUI bridge from a guest window.
+pub(crate) fn window_desc(obj: u64) -> crate::gui_bridge::WindowDesc {
+    let title = {
+        let title_ptr = read_u64(obj, TITLE_OFF);
+        if title_ptr != 0 {
+            crate::cfstring::extract_cfstring_cstr(title_ptr)
+                .unwrap_or("")
+                .to_string()
+        } else {
+            String::new()
+        }
+    };
+    let (x, y, w, h) = if obj != 0 {
+        unsafe {
+            (
+                *((obj as usize + FRAME_X_OFF) as *const f64),
+                *((obj as usize + FRAME_X_OFF + 8) as *const f64),
+                *((obj as usize + FRAME_X_OFF + 16) as *const f64),
+                *((obj as usize + FRAME_X_OFF + 24) as *const f64),
+            )
+        }
+    } else {
+        (0.0, 0.0, 800.0, 600.0)
+    };
+    crate::gui_bridge::WindowDesc {
+        guest_window: obj,
+        title,
+        x, y,
+        width: w,
+        height: h,
+    }
+}
+
 fn set_visible(obj: u64, is_visible: bool) {
     write_u64(obj, IS_VISIBLE_OFF, u64::from(is_visible));
 }
@@ -279,6 +312,12 @@ pub extern "C" fn shim_nswindow_make_key_and_order_front(obj: u64, _cmd: u64, _s
     crate::nsapplication::promote_window(obj);
     crate::nsapplication::set_key_window(obj);
     crate::nsapplication::set_main_window(obj);
+
+    // Notify GUI bridge to create/show a real OS window.
+    if let Some(bridge) = crate::gui_bridge::gui_bridge() {
+        let desc = window_desc(obj);
+        bridge.show_window(&desc);
+    }
 }
 
 /// `-[NSWindow makeKeyWindow]` — makes this the application's key window.
@@ -299,6 +338,17 @@ pub extern "C" fn shim_nswindow_title(obj: u64, _cmd: u64) -> u64 {
 /// `-[NSWindow setTitle:]`
 pub extern "C" fn shim_nswindow_set_title(obj: u64, _cmd: u64, title: u64) {
     write_u64(obj, TITLE_OFF, title);
+
+    if let Some(bridge) = crate::gui_bridge::gui_bridge() {
+        let s = if title != 0 {
+            crate::cfstring::extract_cfstring_cstr(title)
+                .unwrap_or("")
+                .to_string()
+        } else {
+            String::new()
+        };
+        bridge.set_window_title(obj, &s);
+    }
 }
 
 /// `-[NSWindow styleMask]`
@@ -306,23 +356,45 @@ pub extern "C" fn shim_nswindow_style_mask(obj: u64, _cmd: u64) -> u64 {
     read_u64(obj, STYLE_MASK_OFF)
 }
 
-/// `-[NSWindow frame]` — returns CGRect as x0,x1,d0,d1 (>16 bytes, uses x8 indirect on ARM64).
-/// For now we return the origin.x in x0 as a simple stub.
-pub extern "C" fn shim_nswindow_frame(obj: u64, _cmd: u64) -> f64 {
-    if obj == 0 { return 0.0; }
-    unsafe { *((obj as usize + FRAME_X_OFF) as *const f64) }
+/// `-[NSWindow frame]` — returns CGRect (32 bytes, x8 indirect return on ARM64).
+pub extern "C" fn shim_nswindow_frame(obj: u64, _cmd: u64) -> CGRect {
+    if obj == 0 { return CGRect::ZERO; }
+    unsafe {
+        CGRect::new(
+            *((obj as usize + FRAME_X_OFF) as *const f64),
+            *((obj as usize + FRAME_X_OFF + 8) as *const f64),
+            *((obj as usize + FRAME_X_OFF + 16) as *const f64),
+            *((obj as usize + FRAME_X_OFF + 24) as *const f64),
+        )
+    }
+}
+
+/// `-[NSWindow contentRectForFrameRect:]` — returns content rect (frame minus title bar).
+pub extern "C" fn shim_nswindow_content_rect_for_frame_rect(
+    _obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64,
+) -> CGRect {
+    // Approximate: 22pt title bar
+    CGRect::new(x, y, w, h - 22.0)
 }
 
 /// `-[NSWindow close]` — hides the window.
 pub extern "C" fn shim_nswindow_close(obj: u64, _cmd: u64) {
     set_visible(obj, false);
     crate::nsapplication::clear_window_roles(obj);
+
+    if let Some(bridge) = crate::gui_bridge::gui_bridge() {
+        bridge.hide_window(obj);
+    }
 }
 
 /// `-[NSWindow orderOut:]` — hides the window without destroying it.
 pub extern "C" fn shim_nswindow_order_out(obj: u64, _cmd: u64, _sender: u64) {
     set_visible(obj, false);
     crate::nsapplication::clear_window_roles(obj);
+
+    if let Some(bridge) = crate::gui_bridge::gui_bridge() {
+        bridge.hide_window(obj);
+    }
 }
 
 /// `-[NSWindow orderFront:]` — marks the window visible.
@@ -391,6 +463,10 @@ pub extern "C" fn shim_nswindow_set_frame_display(
         *((obj as usize + FRAME_X_OFF + 8) as *mut f64) = y;
         *((obj as usize + FRAME_X_OFF + 16) as *mut f64) = w;
         *((obj as usize + FRAME_X_OFF + 24) as *mut f64) = h;
+    }
+
+    if let Some(bridge) = crate::gui_bridge::gui_bridge() {
+        bridge.set_window_frame(obj, x, y, w, h);
     }
 }
 
@@ -1169,14 +1245,14 @@ mod tests {
 
     #[test]
     fn frame_nil() {
-        assert_eq!(shim_nswindow_frame(0, 0), 0.0);
+        assert_eq!(shim_nswindow_frame(0, 0), CGRect::ZERO);
     }
 
     #[test]
     fn frame_basic() {
         let obj = alloc_obj(SIZE, isa());
         unsafe { *((obj as usize + FRAME_X_OFF) as *mut f64) = 123.5; }
-        assert_eq!(shim_nswindow_frame(obj, 0), 123.5);
+        assert_eq!(shim_nswindow_frame(obj, 0).origin.x, 123.5);
         free_obj(obj);
     }
 

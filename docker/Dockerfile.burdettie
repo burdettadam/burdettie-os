@@ -6,6 +6,8 @@
 #
 # Prerequisites (run on macOS first):
 #   ./scripts/extract_xcode_tools.sh
+#   cargo zigbuild --release --target aarch64-unknown-linux-gnu.2.36 -p macho-inspect
+#   cp /tmp/burdettieOS-target/aarch64-unknown-linux-gnu/release/macho-inspect docker/macho-inspect-linux-arm64
 #
 # Build (from repo root):
 #   docker build --platform linux/arm64 -f docker/Dockerfile.burdettie -t burdettie-os .
@@ -16,39 +18,6 @@
 # Interactive shell:
 #   docker run --rm -it burdettie-os bash
 
-FROM rust:bookworm AS builder
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libstdc++-12-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN rustup component add clippy
-
-WORKDIR /build
-COPY . .
-
-# Build the full runtime stack for Linux ARM64.
-# Override target-dir from .cargo/config.toml (which points to /tmp for macOS SSD perf).
-ENV CARGO_TARGET_DIR=/build/target
-RUN cargo build --release --workspace \
-    --exclude hello-darwin \
-    --exclude control-gallery \
-    --exclude foundation-explorer \
-    --exclude window-backend-darwin \
-    --exclude platform-darwin-host \
-    2>&1 | tee /tmp/build.log ; \
-    echo "BUILD_EXIT=$?" >> /tmp/build.log
-
-# Show errors if build failed
-RUN if [ ! -f target/release/macho-inspect ]; then \
-      echo "BUILD FAILED — error lines:"; \
-      grep -i 'error\|could not compile\|cannot\|undefined\|linking failed\|ld:' /tmp/build.log | head -50 || true; \
-      echo "---"; \
-      echo "Last 50 lines of build.log:"; \
-      tail -50 /tmp/build.log; \
-      exit 1; \
-    fi
-
 # ── Runtime image ──────────────────────────────────────────────────
 
 FROM debian:bookworm-slim
@@ -56,16 +25,62 @@ FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libstdc++6 \
     file \
-    && rm -rf /var/lib/apt/lists/*
+    libbz2-1.0 \
+    zlib1g \
+    liblzma5 \
+    libarchive13 \
+    libssl3 \
+    libacl1 \
+    libc++1 \
+    libc++abi1 \
+    locales \
+    && rm -rf /var/lib/apt/lists/* \
+    && echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen \
+    && locale-gen
 
 # System identity
 RUN echo "burdettie-os 1.0" > /etc/burdettie-release
 
-# Install macho-inspect as the system Mach-O executor
-COPY --from=builder /build/target/release/macho-inspect /usr/local/bin/macho-inspect
+# Provide SystemVersion.plist so sw_vers and other tools can read macOS version info
+RUN mkdir -p /System/Library/CoreServices && \
+    printf '<?xml version="1.0" encoding="UTF-8"?>\n\
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n\
+<plist version="1.0">\n\
+<dict>\n\
+\t<key>ProductBuildVersion</key>\n\
+\t<string>24E248</string>\n\
+\t<key>ProductCopyright</key>\n\
+\t<string>1983-2025 Apple Inc.</string>\n\
+\t<key>ProductName</key>\n\
+\t<string>macOS</string>\n\
+\t<key>ProductUserVisibleVersion</key>\n\
+\t<string>15.4</string>\n\
+\t<key>ProductVersion</key>\n\
+\t<string>15.4</string>\n\
+\t<key>ProductVersionExtra</key>\n\
+\t<string>(a)</string>\n\
+</dict>\n\
+</plist>\n' > /System/Library/CoreServices/SystemVersion.plist
+
+# Install macho-inspect — pre-built via zigbuild for deterministic builds.
+# The in-Docker cargo build uses a subtly different toolchain that causes
+# timing-dependent SIGSEGV in C++ constructors; zigbuild avoids this.
+COPY docker/macho-inspect-linux-arm64 /usr/local/bin/macho-inspect
+RUN chmod +x /usr/local/bin/macho-inspect
 
 # Stage Mach-O tool binaries extracted from macOS host
 COPY docker/xcode-tools/ /opt/xcode-tools/
+
+# Install Apple-ABI libc++ (built with _LIBCPP_ABI_ALTERNATE_STRING_LAYOUT).
+# macOS binaries use Apple's alternate std::string layout; this libc++ matches
+# that ABI. The loader (StubResolver) dlopen()s it with RTLD_LOCAL for targeted
+# symbol resolution of std::basic_string methods.
+COPY docker/apple-libcxx/libc++.so.1.0 /opt/apple-libcxx/libc++.so.1.0
+
+# Replace system libc++ with Apple-ABI version so ALL C++ code (including
+# internal libc++ calls not routed through GOT) uses the correct string layout.
+# macho-inspect uses libstdc++ (not libc++), so this is safe for the host.
+RUN ln -sf /opt/apple-libcxx/libc++.so.1.0 /usr/lib/aarch64-linux-gnu/libc++.so.1
 
 # Install test runner
 COPY scripts/test_xcode_tools_docker.sh /usr/local/bin/test-xcode-tools

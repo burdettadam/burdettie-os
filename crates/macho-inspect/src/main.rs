@@ -12,6 +12,9 @@ mod print_info;
 mod print_text;
 mod why_failed;
 
+#[cfg(feature = "gui")]
+mod winit_bridge;
+
 #[derive(Parser)]
 #[command(name = "macho-inspect", about = "Inspect Mach-O binary structure")]
 struct Cli {
@@ -93,6 +96,11 @@ struct Cli {
     /// CPU architecture to select from fat/universal binaries (arm64, x86_64).
     #[arg(long, value_parser = parse_cpu_type)]
     cpu: Option<CpuType>,
+
+    /// Enable GUI mode: open real windows for guest AppKit applications.
+    #[cfg(feature = "gui")]
+    #[arg(long)]
+    gui: bool,
 }
 
 fn parse_cpu_type(s: &str) -> Result<CpuType, String> {
@@ -106,6 +114,43 @@ fn parse_cpu_type(s: &str) -> Result<CpuType, String> {
 }
 
 fn main() {
+    // On Linux, ensure the Apple-ABI libc++ is globally visible so all C++
+    // code in the process uses the Apple alternate-string-layout ABI.
+    // Without this, internal calls within the system libc++ operate on
+    // guest strings using the wrong ABI and crash.
+    #[cfg(target_os = "linux")]
+    {
+        const APPLE_LIBCXX: &str = "/opt/apple-libcxx/libc++.so.1.0";
+        if std::path::Path::new(APPLE_LIBCXX).exists() {
+            let current = std::env::var("LD_PRELOAD").unwrap_or_default();
+            if !current.contains(APPLE_LIBCXX) {
+                let new_preload = if current.is_empty() {
+                    APPLE_LIBCXX.to_string()
+                } else {
+                    format!("{current}:{APPLE_LIBCXX}")
+                };
+                std::env::set_var("LD_PRELOAD", &new_preload);
+                let args: Vec<std::ffi::CString> = std::env::args()
+                    .map(|a| std::ffi::CString::new(a).unwrap())
+                    .collect();
+                let c_args: Vec<*const std::ffi::c_char> = args
+                    .iter()
+                    .map(|a| a.as_ptr())
+                    .chain(std::iter::once(std::ptr::null()))
+                    .collect();
+                let exe = std::ffi::CString::new(
+                    std::env::current_exe()
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                ).unwrap();
+                unsafe { libc::execv(exe.as_ptr(), c_args.as_ptr()) };
+                // execv only returns on error
+                eprintln!("warning: failed to re-exec with LD_PRELOAD, continuing without Apple-ABI libc++");
+            }
+        }
+    }
+
     env_logger::init();
     let cli = Cli::parse();
 
@@ -166,6 +211,10 @@ fn main() {
     let abs_path = fs::canonicalize(&cli.path).unwrap_or_else(|_| cli.path.clone());
 
     if cli.exec {
+        #[cfg(feature = "gui")]
+        if cli.gui {
+            cf_lite::gui_bridge::set_gui_bridge(Box::new(winit_bridge::WinitGuiBridge::new()));
+        }
         #[cfg(any(target_os = "macos", target_os = "linux"))]
         exec::print_exec(&parsed, &effective_data, &abs_path, &cli.exec_args);
         #[cfg(not(any(target_os = "macos", target_os = "linux")))]

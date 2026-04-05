@@ -119,6 +119,162 @@ pub extern "C" fn shim_nsevent_window(obj: u64, _cmd: u64) -> u64 {
     event_window(obj)
 }
 
+// ── Event allocation helpers (used by factory methods + GUI bridge) ─
+
+const EVENT_SIZE: usize = 64;
+const LOCATION_Y_OFF: usize = 24;
+
+/// Allocate a blank NSEvent with the given type.
+pub(crate) fn alloc_event(event_type: u64) -> u64 {
+    let obj = crate::pal_alloc().calloc(1, EVENT_SIZE) as u64;
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *(obj as *mut u64) = crate::nsobj::nsevent_class_addr();
+        *((obj as usize + EVENT_TYPE_OFF) as *mut u64) = event_type;
+    }
+    obj
+}
+
+/// Allocate a mouse event.
+pub(crate) fn alloc_mouse_event(
+    event_type: u64,
+    location_x: f64,
+    location_y: f64,
+    modifier_flags: u64,
+    window: u64,
+) -> u64 {
+    let obj = alloc_event(event_type);
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *((obj as usize + LOCATION_X_OFF) as *mut f64) = location_x;
+        *((obj as usize + LOCATION_Y_OFF) as *mut f64) = location_y;
+        *((obj as usize + MODIFIER_FLAGS_OFF) as *mut u64) = modifier_flags;
+        *((obj as usize + WINDOW_OFF) as *mut u64) = window;
+    }
+    obj
+}
+
+/// Allocate a key event.
+pub(crate) fn alloc_key_event(
+    event_type: u64,
+    key_code: u64,
+    characters: u64,
+    modifier_flags: u64,
+    window: u64,
+) -> u64 {
+    let obj = alloc_event(event_type);
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *((obj as usize + KEY_CODE_OFF) as *mut u64) = key_code;
+        *((obj as usize + CHARACTERS_OFF) as *mut u64) = characters;
+        *((obj as usize + MODIFIER_FLAGS_OFF) as *mut u64) = modifier_flags;
+        *((obj as usize + WINDOW_OFF) as *mut u64) = window;
+    }
+    obj
+}
+
+// ── NSEvent class factory methods ──────────────────────────────
+
+/// `+[NSEvent mouseEventWithType:location:modifierFlags:timestamp:windowNumber:context:eventNumber:clickCount:pressure:]`
+///
+/// Simplified: takes type + location CGPoint (x, y) + modifierFlags. Other args are ignored.
+pub extern "C" fn shim_nsevent_mouse_event_with_type(
+    _cls: u64, _cmd: u64,
+    event_type: u64,
+    location_x: f64,
+    location_y: f64,
+    modifier_flags: u64,
+    _timestamp: f64,
+    _window_number: i64,
+    _context: u64,
+    _event_number: i64,
+    _click_count: i64,
+    _pressure: f32,
+) -> u64 {
+    alloc_mouse_event(event_type, location_x, location_y, modifier_flags, 0)
+}
+
+/// `+[NSEvent keyEventWithType:location:modifierFlags:timestamp:windowNumber:context:characters:charactersIgnoringModifiers:isARepeat:keyCode:]`
+pub extern "C" fn shim_nsevent_key_event_with_type(
+    _cls: u64, _cmd: u64,
+    event_type: u64,
+    _location_x: f64,
+    _location_y: f64,
+    modifier_flags: u64,
+    _timestamp: f64,
+    _window_number: i64,
+    _context: u64,
+    characters: u64,
+    _characters_ignoring: u64,
+    _is_repeat: u8,
+    key_code: u64,
+) -> u64 {
+    alloc_key_event(event_type, key_code, characters, modifier_flags, 0)
+}
+
+/// `+[NSEvent otherEventWithType:location:modifierFlags:timestamp:windowNumber:context:subtype:data1:data2:]`
+pub extern "C" fn shim_nsevent_other_event_with_type(
+    _cls: u64, _cmd: u64,
+    event_type: u64,
+    location_x: f64,
+    location_y: f64,
+    modifier_flags: u64,
+    _timestamp: f64,
+    _window_number: i64,
+    _context: u64,
+    _subtype: i16,
+    _data1: i64,
+    _data2: i64,
+) -> u64 {
+    alloc_mouse_event(event_type, location_x, location_y, modifier_flags, 0)
+}
+
+/// `-[NSEvent clickCount]` — returns 1 (stub).
+pub extern "C" fn shim_nsevent_click_count(_obj: u64, _cmd: u64) -> i64 {
+    1
+}
+
+/// `-[NSEvent pressure]` — returns 1.0 for mouse down, 0.0 otherwise.
+pub extern "C" fn shim_nsevent_pressure(obj: u64, _cmd: u64) -> f32 {
+    let t = shim_nsevent_type(obj, 0);
+    if t == LEFT_MOUSE_DOWN_TYPE || t == RIGHT_MOUSE_DOWN_TYPE || t == OTHER_MOUSE_DOWN_TYPE {
+        1.0
+    } else {
+        0.0
+    }
+}
+
+/// `-[NSEvent timestamp]` — returns 0 (stub).
+pub extern "C" fn shim_nsevent_timestamp(_obj: u64, _cmd: u64) -> f64 {
+    0.0
+}
+
+/// `-[NSEvent windowNumber]` — returns 0 (stub).
+pub extern "C" fn shim_nsevent_window_number(_obj: u64, _cmd: u64) -> i64 {
+    0
+}
+
+/// `-[NSEvent isARepeat]` — returns NO.
+pub extern "C" fn shim_nsevent_is_a_repeat(_obj: u64, _cmd: u64) -> u8 {
+    0
+}
+
+/// `-[NSEvent subtype]` — returns 0.
+pub extern "C" fn shim_nsevent_subtype(_obj: u64, _cmd: u64) -> i16 {
+    0
+}
+
+/// `-[NSEvent buttonNumber]` — returns 0.
+pub extern "C" fn shim_nsevent_button_number(_obj: u64, _cmd: u64) -> i64 {
+    0
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -309,5 +465,66 @@ mod tests {
         assert_eq!(shim_nsevent_characters(obj, 0), 0);
         assert_eq!(shim_nsevent_window(obj, 0), 0);
         free_obj(obj);
+    }
+
+    // --- factory methods ---
+
+    #[test]
+    fn alloc_mouse_event_roundtrip() {
+        let evt = alloc_mouse_event(LEFT_MOUSE_DOWN_TYPE, 100.0, 200.0, 0x40000, 0xABC);
+        assert_ne!(evt, 0);
+        assert_eq!(shim_nsevent_type(evt, 0), LEFT_MOUSE_DOWN_TYPE);
+        assert!((shim_nsevent_location_in_window(evt, 0) - 100.0).abs() < f64::EPSILON);
+        assert_eq!(shim_nsevent_modifier_flags(evt, 0), 0x40000);
+        assert_eq!(event_window(evt), 0xABC);
+        free_obj(evt);
+    }
+
+    #[test]
+    fn alloc_key_event_roundtrip() {
+        let chars = make_string("a");
+        let evt = alloc_key_event(KEY_DOWN_TYPE, 0, chars, 0, 0);
+        assert_ne!(evt, 0);
+        assert_eq!(shim_nsevent_type(evt, 0), KEY_DOWN_TYPE);
+        assert_eq!(shim_nsevent_characters(evt, 0), chars);
+        free_obj(chars);
+        free_obj(evt);
+    }
+
+    #[test]
+    fn factory_mouse_event_creates_valid() {
+        let evt = shim_nsevent_mouse_event_with_type(
+            0, 0, LEFT_MOUSE_DOWN_TYPE, 50.0, 75.0, 0, 0.0, 0, 0, 0, 1, 1.0,
+        );
+        assert_ne!(evt, 0);
+        assert_eq!(shim_nsevent_type(evt, 0), LEFT_MOUSE_DOWN_TYPE);
+        free_obj(evt);
+    }
+
+    #[test]
+    fn factory_key_event_creates_valid() {
+        let chars = make_string("b");
+        let evt = shim_nsevent_key_event_with_type(
+            0, 0, KEY_DOWN_TYPE, 0.0, 0.0, 0, 0.0, 0, 0, chars, 0, 0, 11,
+        );
+        assert_ne!(evt, 0);
+        assert_eq!(shim_nsevent_type(evt, 0), KEY_DOWN_TYPE);
+        free_obj(chars);
+        free_obj(evt);
+    }
+
+    #[test]
+    fn click_count_default() {
+        assert_eq!(shim_nsevent_click_count(0, 0), 1);
+    }
+
+    #[test]
+    fn timestamp_default() {
+        assert!((shim_nsevent_timestamp(0, 0)).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn is_a_repeat_default() {
+        assert_eq!(shim_nsevent_is_a_repeat(0, 0), 0);
     }
 }

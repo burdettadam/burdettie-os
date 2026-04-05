@@ -178,6 +178,30 @@ pub fn path_is_empty(handle: u64) -> bool {
         .unwrap_or(true)
 }
 
+/// Copy path elements from a standalone path handle into a context's path.
+pub fn copy_path_to_context(path_handle: u64, ctx_handle: u64) {
+    // Collect elements under the path lock first, then apply under the context lock.
+    let elements: Vec<graphics_core::PathElement> = {
+        let guard = PATHS.lock().unwrap_or_else(|e| e.into_inner());
+        guard.as_ref()
+            .and_then(|m| m.get(&path_handle))
+            .map(|p| p.elements().to_vec())
+            .unwrap_or_default()
+    };
+    if elements.is_empty() { return; }
+    with_context(ctx_handle, |c| {
+        for elem in &elements {
+            match *elem {
+                graphics_core::PathElement::MoveTo(p) => { c.path.move_to(p); }
+                graphics_core::PathElement::LineTo(p) => { c.path.line_to(p); }
+                graphics_core::PathElement::QuadTo { ctrl, end } => { c.path.quad_to(ctrl, end); }
+                graphics_core::PathElement::CubicTo { ctrl1, ctrl2, end } => { c.path.cubic_to(ctrl1, ctrl2, end); }
+                graphics_core::PathElement::Close => { c.path.close(); }
+            }
+        }
+    });
+}
+
 // ── Color API ──────────────────────────────────────────────────
 
 pub fn color_create_rgb(r: f64, g: f64, b: f64, a: f64) -> u64 {

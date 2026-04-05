@@ -6,4 +6,13 @@ dist/
 observed/
 vm-image/.build/
 vm-image/.swiftpm/
+vm-image/
+swift/
+examples/
 .DS_Store
+typescript/
+apps/
+corpus/
+fixtures/
+Formula/
+packaging/

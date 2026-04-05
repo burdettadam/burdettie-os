@@ -56,10 +56,11 @@ impl MachExtrasStubs {
             ("_thread_abort", shim_thread_abort as *const () as u64, "thread_abort (stub → KERN_SUCCESS)"),
             ("_thread_abort_safely", shim_thread_abort_safely as *const () as u64, "thread_abort_safely (stub → KERN_SUCCESS)"),
             ("_task_policy_set", shim_task_policy_set as *const () as u64, "task_policy_set (stub → KERN_SUCCESS)"),
-            ("_task_policy_get", shim_task_policy_get as *const () as u64, "task_policy_get (stub → KERN_SUCCESS)")
+            ("_task_policy_get", shim_task_policy_get as *const () as u64, "task_policy_get (stub → KERN_SUCCESS)"),
+            ("_task_set_exception_ports", shim_task_set_exception_ports as *const () as u64, "task_set_exception_ports (stub → KERN_SUCCESS)")
         );
 
-        log::debug!("MachExtrasStubs: registered 32 Mach stubs");
+        log::debug!("MachExtrasStubs: registered 33 Mach stubs");
     }
 }
 
@@ -537,6 +538,15 @@ pub extern "C" fn shim_task_policy_set(
 /// `task_policy_get(task, flavor, policy_info, count, get_default)` → KERN_SUCCESS.
 pub extern "C" fn shim_task_policy_get(
     _task: u32, _flavor: i32, _info: *mut u8, _count: *mut u32, _get_default: *mut i32,
+) -> i32 {
+    0 // KERN_SUCCESS
+}
+
+/// `kern_return_t task_set_exception_ports(task, mask, new_port, behavior, flavor)`
+///
+/// Mach exception port configuration — no-op on Linux.
+pub extern "C" fn shim_task_set_exception_ports(
+    _task: u32, _mask: u32, _new_port: u32, _behavior: u32, _flavor: u32,
 ) -> i32 {
     0 // KERN_SUCCESS
 }

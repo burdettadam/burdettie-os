@@ -1,0 +1,399 @@
+[
+  {
+    "unit_id": "ch05_s01",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 27,
+    "observables": {
+      "participants": ["the_reader", "the_builder", "crate_cf_lite"],
+      "context": { "setting": "setting_source", "chapter": 5, "part": 3, "title": "What Foundation Provides", "estimated_words": 1500, "source_files": ["crates/cf-lite/src/"] },
+      "event_type": "theory"
+    },
+    "structure": {
+      "position": 0.351,
+      "causal_role": "setup",
+      "grouping": { "part": "III — The Platform", "chapter": "Ch 5 — The Foundation", "beat": "midpoint_approach" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "demonstrate", "target": "[NSString stringWithFormat:] returns garbage — no Foundation classes registered", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_builder", "action": "survey", "target": "NSString, NSArray, NSDictionary, NSData — the substrate every macOS binary depends on", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_builder", "action": "frame", "target": "Foundation is 93+ classes — the ObjC runtime without Foundation is a language without vocabulary", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "runtime_works_but_no_framework_classes" },
+        "after": { "state_type": "knowledge", "value": "foundation_is_required_substrate_for_all_applications" },
+        "trigger": "Foundation method calls produce garbage — runtime has no class implementations",
+        "description": "The reader confronts the scope of Foundation: 93+ classes that every macOS binary expects."
+      }
+    },
+    "interpretations": {
+      "subtext": "An ObjC runtime without Foundation is a language without a vocabulary.",
+      "motifs": ["scope_revelation"],
+      "reader_emotion": "determination_at_scale",
+      "thematic_function": "Approaching the Midpoint — the scale of Foundation reveals how far the project must go."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "has_complete_objc_runtime" },
+        "post_state": { "capability": "understands_foundation_scope" },
+        "objective": { "action": "survey", "target": "what Foundation provides and why it's essential" },
+        "information_state": {
+          "gained": [
+            { "subject": "foundation", "predicate": "knows", "about": "93+ classes expected by every macOS binary" },
+            { "subject": "foundation", "predicate": "knows", "about": "NSString, NSArray, NSDictionary, NSData are core substrate" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch05_s02",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 28,
+    "observables": {
+      "participants": ["the_reader", "crate_cf_lite", "crate_objc_runtime"],
+      "context": { "setting": "setting_ide", "chapter": 5, "part": 3, "title": "Synthetic Class Registration", "estimated_words": 1500, "source_files": ["crates/cf-lite/src/foundation/"] },
+      "event_type": "implementation"
+    },
+    "structure": {
+      "position": 0.365,
+      "causal_role": "trigger",
+      "grouping": { "part": "III — The Platform", "chapter": "Ch 5 — The Foundation", "beat": "midpoint" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_reader", "action": "build", "target": "93+ synthetic Foundation classes from Rust-defined templates", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_builder", "action": "explain", "target": "template caching — ClassTemplate → Arc<ClassInfo> shared across registrations", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_builder", "action": "explain", "target": "overlay_from() pattern — composing class implementations from trait impls", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_reader", "action": "register", "target": "synthetic classes into ObjcRuntime class tables", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "capability", "value": "runtime_has_no_foundation_classes" },
+        "after": { "state_type": "capability", "value": "93_plus_synthetic_classes_registered" },
+        "trigger": "Template-based class registration populates the runtime with Foundation stubs",
+        "description": "From empty runtime to populated framework — 93+ classes built without Apple's source code."
+      }
+    },
+    "interpretations": {
+      "subtext": "You don't need source code to recreate behavior. The binary's expectations are the specification.",
+      "motifs": ["binary_truth"],
+      "reader_emotion": "productive_construction",
+      "thematic_function": "Midpoint trigger — the infrastructure for Foundation shimming is in place."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "understands_foundation_scope" },
+        "post_state": { "capability": "has_synthetic_class_registration" },
+        "objective": { "action": "build", "target": "synthetic Foundation class registration" },
+        "information_state": {
+          "gained": [
+            { "subject": "foundation", "predicate": "knows", "about": "template caching with Arc<ClassInfo>" },
+            { "subject": "foundation", "predicate": "knows", "about": "overlay_from() pattern for composing shim methods" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch05_s03",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 29,
+    "observables": {
+      "participants": ["the_reader", "crate_cf_lite", "crate_core_foundation_lite"],
+      "context": { "setting": "setting_ide", "chapter": 5, "part": 3, "title": "NSString Internals", "estimated_words": 1500, "source_files": ["crates/cf-lite/src/cfstring/"] },
+      "event_type": "implementation"
+    },
+    "structure": {
+      "position": 0.378,
+      "causal_role": "resolution",
+      "grouping": { "part": "III — The Platform", "chapter": "Ch 5 — The Foundation", "beat": "midpoint" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_reader", "action": "implement", "target": "NSString UTF-8 storage with CFString-compatible memory layout", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_builder", "action": "explain", "target": "__CFConstantString binary representation — ISA, flags, buffer, length", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_reader", "action": "implement", "target": "stringWithFormat: with va_list parsing and format string interpretation", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_reader", "action": "verify", "target": "[NSString stringWithFormat:@\"Hello, %@\", name] → correct output", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "capability", "value": "foundation_classes_are_stubs" },
+        "after": { "state_type": "capability", "value": "nsstring_works_correctly" },
+        "trigger": "stringWithFormat: produces correct output from synthetic Foundation",
+        "description": "THE Midpoint — A/B stories merge. Linker (A) and runtime (B) combine to make a real framework function. False victory: it works! But only for simple cases."
+      }
+    },
+    "interpretations": {
+      "subtext": "The midpoint false victory — 'it works!' But only for simple cases. The scale of remaining work becomes visible.",
+      "motifs": ["first_working_framework_call"],
+      "reader_emotion": "midpoint_false_victory",
+      "thematic_function": "Midpoint beat — proof of concept established. Midpoint shift: from 'can we make this work?' to 'how do we make 2,682 tests pass?'"
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "has_synthetic_class_registration" },
+        "post_state": { "capability": "nsstring_produces_correct_output" },
+        "objective": { "action": "make", "target": "NSString work end-to-end" },
+        "information_state": {
+          "gained": [
+            { "subject": "foundation", "predicate": "knows", "about": "NSString/CFString duality and __CFConstantString layout" },
+            { "subject": "foundation", "predicate": "knows", "about": "format string interpretation for stringWithFormat:" }
+          ],
+          "gaps": [
+            { "subject": "foundation", "predicate": "knows", "about": "92 more classes need similar treatment" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch05_s04",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 30,
+    "observables": {
+      "participants": ["the_reader", "crate_cf_lite"],
+      "context": { "setting": "setting_ide", "chapter": 5, "part": 3, "title": "Collections", "estimated_words": 1200, "source_files": ["crates/cf-lite/src/foundation/"] },
+      "event_type": "implementation"
+    },
+    "structure": {
+      "position": 0.392,
+      "causal_role": "complication",
+      "grouping": { "part": "III — The Platform", "chapter": "Ch 5 — The Foundation", "beat": "bad_guys_close_in" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_reader", "action": "implement", "target": "NSArray backed by Vec<id> with countByEnumeratingWithState:", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "implement", "target": "NSDictionary backed by HashMap with key hashing via ObjC hash method", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_reader", "action": "implement", "target": "NSSet backed by HashSet, NSFastEnumeration protocol for real iteration", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "capability", "value": "nsstring_works" },
+        "after": { "state_type": "capability", "value": "collection_classes_work" },
+        "trigger": "Guest code can create, populate, and iterate real collections",
+        "description": "Collections multiply the complexity — each one is a surface area commitment."
+      }
+    },
+    "interpretations": {
+      "subtext": "Each class is a surface area commitment. Collections multiply the complexity but unlock real programs.",
+      "motifs": ["montage_momentum"],
+      "reader_emotion": "escalating_momentum"
+    },
+    "participant_states": [
+      { "entity_ref": "the_reader", "role_in_unit": "focalizer", "pre_state": { "capability": "nsstring_produces_correct_output" }, "post_state": { "capability": "collections_work" }, "objective": { "action": "shim", "target": "collection classes with real storage and enumeration" },
+        "information_state": { "gained": [{ "subject": "foundation", "predicate": "knows", "about": "NSFastEnumeration protocol for guest-side iteration" }] }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch05_s05",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 31,
+    "observables": {
+      "participants": ["the_reader", "crate_cf_lite"],
+      "context": { "setting": "setting_ide", "chapter": 5, "part": 3, "title": "NSFileManager and Friends", "estimated_words": 1200 },
+      "event_type": "implementation"
+    },
+    "structure": {
+      "position": 0.405,
+      "causal_role": "complication",
+      "grouping": { "part": "III — The Platform", "chapter": "Ch 5 — The Foundation", "beat": "bad_guys_close_in" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_reader", "action": "shim", "target": "NSFileManager file operations via host std::fs", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "shim", "target": "NSBundle — resource lookup, info.plist, executable path", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_reader", "action": "shim", "target": "NSPropertyListSerialization — plist parsing via our own parser", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "capability", "value": "pure_data_classes_work" },
+        "after": { "state_type": "capability", "value": "file_io_classes_work" },
+        "trigger": "File I/O shims bridge Foundation to the host filesystem",
+        "description": "Foundation reaches outside the process — file I/O connects the synthetic framework to reality."
+      }
+    },
+    "interpretations": {
+      "subtext": "Shimming I/O classes means committing to environment fidelity, not just data semantics.",
+      "motifs": ["montage_momentum"],
+      "reader_emotion": "expanding_scope"
+    },
+    "participant_states": [
+      { "entity_ref": "the_reader", "role_in_unit": "focalizer", "pre_state": { "capability": "collections_work" }, "post_state": { "capability": "file_io_shims_work" }, "objective": { "action": "bridge", "target": "Foundation file operations to host filesystem" },
+        "information_state": { "gained": [{ "subject": "foundation", "predicate": "knows", "about": "NSFileManager/NSBundle/NSPropertyListSerialization shimming patterns" }] }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch05_s06",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 32,
+    "observables": {
+      "participants": ["the_reader", "crate_cf_lite"],
+      "context": { "setting": "setting_ide", "chapter": 5, "part": 3, "title": "NSURLSession", "estimated_words": 1200 },
+      "event_type": "implementation"
+    },
+    "structure": {
+      "position": 0.419,
+      "causal_role": "complication",
+      "grouping": { "part": "III — The Platform", "chapter": "Ch 5 — The Foundation", "beat": "bad_guys_close_in" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_reader", "action": "implement", "target": "NSURLSession backed by ureq for real HTTP requests", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_builder", "action": "explain", "target": "synchronous request on resume — simplified from Apple's async completionHandler model", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_reader", "action": "verify", "target": "real HTTP GET/POST requests work through Foundation API", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "capability", "value": "local_io_only" },
+        "after": { "state_type": "capability", "value": "network_requests_work" },
+        "trigger": "Real HTTP requests via ureq make NSURLSession functional",
+        "description": "The synthetic framework can talk to the network — real functionality, not just stubs."
+      }
+    },
+    "interpretations": {
+      "subtext": "A compatibility layer that does real networking crosses from simulation into interoperability.",
+      "motifs": ["montage_momentum"],
+      "reader_emotion": "real_functionality",
+      "thematic_function": "Bad guys closing in — each Foundation class reveals another surface area to shim."
+    },
+    "participant_states": [
+      { "entity_ref": "the_reader", "role_in_unit": "focalizer", "pre_state": { "capability": "file_io_shims_work" }, "post_state": { "capability": "networking_shims_work" }, "objective": { "action": "implement", "target": "NSURLSession with real HTTP via ureq" },
+        "information_state": { "gained": [{ "subject": "foundation", "predicate": "knows", "about": "synchronous networking shim via ureq" }] }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch05_s07",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 33,
+    "observables": {
+      "participants": ["the_reader", "crate_cf_lite"],
+      "context": { "setting": "setting_ide", "chapter": 5, "part": 3, "title": "NSTask and Process Control", "estimated_words": 1500 },
+      "event_type": "implementation"
+    },
+    "structure": {
+      "position": 0.432,
+      "causal_role": "complication",
+      "grouping": { "part": "III — The Platform", "chapter": "Ch 5 — The Foundation", "beat": "bad_guys_close_in" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_reader", "action": "implement", "target": "posix_spawn for subprocess creation", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "implement", "target": "pipe wiring: stdin/stdout/stderr redirection via NSPipe", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_reader", "action": "implement", "target": "environment bridging between guest and host process", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_builder", "action": "explain", "target": "NSTask is the hardest Foundation class — full subprocess lifecycle management", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "capability", "value": "in_process_classes_work" },
+        "after": { "state_type": "capability", "value": "subprocess_control_works" },
+        "trigger": "NSTask shim manages full subprocess lifecycle via posix_spawn",
+        "description": "The hardest Foundation class — subprocess control requires bridging processes, pipes, and environments."
+      }
+    },
+    "interpretations": {
+      "subtext": "Process control is where shimming becomes system programming. The abstraction must be perfect.",
+      "motifs": ["difficulty_escalation"],
+      "reader_emotion": "peak_difficulty_for_foundation"
+    },
+    "participant_states": [
+      { "entity_ref": "the_reader", "role_in_unit": "focalizer", "pre_state": { "capability": "networking_shims_work" }, "post_state": { "capability": "subprocess_shims_work" }, "objective": { "action": "build", "target": "NSTask subprocess lifecycle management" },
+        "information_state": { "gained": [{ "subject": "foundation", "predicate": "knows", "about": "posix_spawn + pipe wiring + environment bridging for NSTask" }] }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch05_s08",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 34,
+    "observables": {
+      "participants": ["the_reader", "crate_cf_lite", "crate_core_foundation_lite", "concept_toll_free_bridge"],
+      "context": { "setting": "setting_source", "chapter": 5, "part": 3, "title": "Toll-Free Bridging", "estimated_words": 1200 },
+      "event_type": "discovery"
+    },
+    "structure": {
+      "position": 0.446,
+      "causal_role": "resolution",
+      "grouping": { "part": "III — The Platform", "chapter": "Ch 5 — The Foundation", "beat": "bad_guys_close_in" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "reveal", "target": "CF and NS share ISAs — CFStringRef == NSString* at the pointer level", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_builder", "action": "explain", "target": "toll-free bridging means casting between C API and ObjC API is free", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_reader", "action": "implement", "target": "CoreFoundation/Foundation ISA sharing in our synthetic runtime", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "cf_and_ns_are_separate_frameworks" },
+        "after": { "state_type": "knowledge", "value": "cf_and_ns_are_the_same_objects" },
+        "trigger": "Toll-free bridging reveals CoreFoundation and Foundation share identical representations",
+        "description": "Apple's deepest architectural decision: two APIs, one representation. Design determines what's possible."
+      }
+    },
+    "interpretations": {
+      "subtext": "Apple's deepest architectural decision: two APIs, one representation. Design determines what's possible.",
+      "motifs": ["engineering_elegance"],
+      "reader_emotion": "architectural_revelation",
+      "thematic_function": "Reveals Apple's design philosophy at its most elegant. Referenced in App A (Stack Map alignment)."
+    },
+    "participant_states": [
+      { "entity_ref": "the_reader", "role_in_unit": "focalizer", "pre_state": { "capability": "subprocess_shims_work" }, "post_state": { "capability": "toll_free_bridging_works" }, "objective": { "action": "understand", "target": "CFStringRef == NSString* at the ISA level" },
+        "information_state": { "gained": [{ "subject": "architecture", "predicate": "knows", "about": "toll-free bridging: CF and NS share ISAs and memory layout" }] }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch05_s09",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 35,
+    "observables": {
+      "participants": ["the_reader", "crate_cf_lite", "crate_test_harness"],
+      "context": { "setting": "setting_terminal", "chapter": 5, "part": 3, "title": "The 2,682 Tests", "estimated_words": 1200 },
+      "event_type": "resolution"
+    },
+    "structure": {
+      "position": 0.459,
+      "causal_role": "resolution",
+      "grouping": { "part": "III — The Platform", "chapter": "Ch 5 — The Foundation", "beat": "bad_guys_close_in" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "demonstrate", "target": "2,682 cf-lite unit tests pass — regression gates hold", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "run", "target": "39 corpus tools pass against Foundation shims", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_builder", "action": "explain", "target": "test-driven shim development: write test → observe real behavior → match it", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "confidence", "value": "individual_classes_seem_to_work" },
+        "after": { "state_type": "confidence", "value": "2682_tests_prove_foundation_works" },
+        "trigger": "2,682 tests pass, 39 corpus tools succeed",
+        "description": "The test suite proves Foundation shims are correct at scale, not just plausible."
+      }
+    },
+    "interpretations": {
+      "subtext": "Testing at this scale is the difference between a demo and a compatibility layer. Numbers don't lie.",
+      "motifs": ["validation_by_numbers"],
+      "reader_emotion": "validated_confidence",
+      "thematic_function": "Chapter resolution — bare runtime becomes living framework. Bridge to Ch 6: 'Everything works on macOS. Build the Docker image. Run the same tests. Crash.'"
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "toll_free_bridging_works" },
+        "post_state": { "capability": "foundation_validated_2682_tests" },
+        "objective": { "action": "validate", "target": "Foundation correctness via massive test suite" },
+        "information_state": {
+          "gained": [
+            { "subject": "methodology", "predicate": "knows", "about": "test-driven shim development at scale" },
+            { "subject": "validation", "predicate": "knows", "about": "2,682 unit tests + 39 corpus tools = proven compatibility" }
+          ],
+          "gaps": [
+            { "subject": "cross_platform", "predicate": "knows", "about": "this only works on macOS — Linux will break everything (Ch 6)" }
+          ]
+        }
+      }
+    ]
+  }
+]

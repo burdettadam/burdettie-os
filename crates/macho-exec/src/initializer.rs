@@ -26,14 +26,13 @@ pub fn call_constructors(image: &MappedImage, inits: &InitializerInfo) -> Result
     let slide = image.slide;
     let mut count = 0;
 
+    let total = inits.constructors.len();
     for ctor in &inits.constructors {
-        // The ConstructorEntry.address is the virtual address of the
-        // constructor function. Apply slide to get the in-process address.
         let in_process_addr = (ctor.address as i64 + slide) as u64;
 
         log::info!(
-            "Calling constructor at {in_process_addr:#x} (vmaddr={:#x}, slide={slide:#x}, source={:?})",
-            ctor.address, ctor.source
+            "Calling constructor {}/{total} at {in_process_addr:#x} (vmaddr={:#x}, slide={slide:#x}, source={:?})",
+            count + 1, ctor.address, ctor.source
         );
 
         let stripped = ptrauth::ptrauth_strip(in_process_addr);

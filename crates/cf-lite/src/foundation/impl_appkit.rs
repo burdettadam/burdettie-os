@@ -450,4 +450,32 @@ impl FoundationShims {
     pub fn register_nsview_safe_area_methods(rt: &mut objc_runtime::ObjcRuntime) {
         register::register_nsview_safe_area_methods(rt);
     }
+
+    // ── Phase C13: CoreAnimation (CALayer, CATransaction, CADisplayLink) ──
+
+    pub fn register_calayer_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_calayer_class(rt);
+    }
+
+    pub fn register_catransaction_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_catransaction_class(rt);
+    }
+
+    pub fn register_cadisplaylink_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_cadisplaylink_class(rt);
+    }
+
+    pub fn register_camediatimingfunction_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_camediatimingfunction_class(rt);
+    }
+
+    // ── Phase C14: Drawing (NSGraphicsContext, NSBezierPath) ─────
+
+    pub fn register_nsgraphicscontext_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsgraphicscontext_class(rt);
+    }
+
+    pub fn register_nsbezierpath_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsbezierpath_class(rt);
+    }
 }

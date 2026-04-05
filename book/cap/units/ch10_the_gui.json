@@ -1,0 +1,244 @@
+[
+  {
+    "unit_id": "ch10_s01",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 63,
+    "observables": {
+      "participants": ["the_reader", "the_builder", "crate_app_kit_lite"],
+      "context": { "setting": "setting_source", "chapter": 10, "part": 5, "title": "AppKit Stubs", "estimated_words": 1500, "source_files": ["crates/app-kit-lite/src/"] },
+      "event_type": "implementation"
+    },
+    "structure": {
+      "position": 0.838,
+      "causal_role": "setup",
+      "grouping": { "part": "IV — The System", "chapter": "Ch 10 — The GUI", "beat": "final_image_approach" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "frame", "target": "NSApplication, NSWindow, NSView — the AppKit triple that every GUI app needs", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "implement", "target": "NSApplication stub with sharedApplication singleton and run loop stub", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_reader", "action": "implement", "target": "NSWindow stub with frame, contentView, title, and makeKeyAndOrderFront:", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_reader", "action": "implement", "target": "NSView stub with addSubview:, drawRect: dispatch, and bounds/frame", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "capability", "value": "command_line_tools_only" },
+        "after": { "state_type": "capability", "value": "appkit_stubs_exist" },
+        "trigger": "AppKit stubs provide the API surface for GUI applications to link against",
+        "description": "From CLI to GUI — the final frontier. AppKit stubs let GUI binaries start without crashing."
+      }
+    },
+    "interpretations": {
+      "subtext": "The leap from CLI to GUI is the leap from functional to visible. The first window is the proof that matters.",
+      "motifs": ["capability_ladder"],
+      "reader_emotion": "final_push_excitement",
+      "thematic_function": "Final image approach — building toward the visual climax."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "corpus_validated_39_programs" },
+        "post_state": { "capability": "appkit_stubs_provide_api_surface" },
+        "objective": { "action": "stub", "target": "NSApplication, NSWindow, NSView for GUI binary loading" },
+        "information_state": {
+          "gained": [
+            { "subject": "appkit", "predicate": "knows", "about": "NSApplication singleton + run loop, NSWindow frame/content, NSView hierarchy" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch10_s02",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 64,
+    "observables": {
+      "participants": ["the_reader", "crate_app_kit_lite"],
+      "context": { "setting": "setting_source", "chapter": 10, "part": 5, "title": "Core Animation", "estimated_words": 1200, "source_files": ["crates/app-kit-lite/src/"] },
+      "event_type": "implementation"
+    },
+    "structure": {
+      "position": 0.851,
+      "causal_role": "complication",
+      "grouping": { "part": "IV — The System", "chapter": "Ch 10 — The GUI", "beat": "final_image_approach" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_reader", "action": "implement", "target": "CALayer stub — backgroundColor, bounds, sublayers, addSublayer:", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "implement", "target": "CATransaction stub — begin, commit, setAnimationDuration:", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_builder", "action": "explain", "target": "real Core Animation is GPU-backed — our stub captures the layer tree without rendering", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "capability", "value": "window_can_open" },
+        "after": { "state_type": "capability", "value": "layer_tree_can_be_built" },
+        "trigger": "Core Animation stubs let GUI binaries build layer hierarchies",
+        "description": "Core Animation is the rendering layer. Our stub captures intent without GPU backend."
+      }
+    },
+    "interpretations": {
+      "subtext": "Stubbing the render pipeline captures what the app wants to draw, even if we can't draw it natively.",
+      "motifs": ["pragmatic_engineering"],
+      "reader_emotion": "building_toward_visual"
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "appkit_stubs_provide_api_surface" },
+        "post_state": { "capability": "core_animation_layer_tree_works" },
+        "objective": { "action": "stub", "target": "CALayer and CATransaction for layer tree building" },
+        "information_state": {
+          "gained": [{ "subject": "appkit", "predicate": "knows", "about": "CALayer tree captures rendering intent without GPU backend" }]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch10_s03",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 65,
+    "observables": {
+      "participants": ["the_reader", "crate_app_kit_lite", "concept_responder_chain"],
+      "context": { "setting": "setting_source", "chapter": 10, "part": 5, "title": "The Event Loop", "estimated_words": 1200 },
+      "event_type": "implementation"
+    },
+    "structure": {
+      "position": 0.865,
+      "causal_role": "complication",
+      "grouping": { "part": "IV — The System", "chapter": "Ch 10 — The GUI", "beat": "final_image_approach" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "explain", "target": "NSEvent + responder chain: events flow from NSApplication → NSWindow → NSView hierarchy", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "implement", "target": "NSEvent stub with type, locationInWindow, modifierFlags", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_reader", "action": "implement", "target": "responder chain: nextResponder traversal from first responder up to NSApplication", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "capability", "value": "static_window_content" },
+        "after": { "state_type": "capability", "value": "event_dispatch_works" },
+        "trigger": "Responder chain enables event dispatch through the view hierarchy",
+        "description": "Events make a GUI interactive. The responder chain is AppKit's design pattern for event routing."
+      }
+    },
+    "interpretations": {
+      "subtext": "The responder chain is AppKit's deepest design pattern. It determines how every click and keypress is handled.",
+      "motifs": ["engineering_elegance"],
+      "reader_emotion": "design_appreciation",
+      "thematic_function": "The last major design pattern — responder chain completes the GUI architecture."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "core_animation_layer_tree_works" },
+        "post_state": { "capability": "event_dispatch_via_responder_chain" },
+        "objective": { "action": "implement", "target": "NSEvent dispatch via responder chain" },
+        "information_state": {
+          "gained": [
+            { "subject": "appkit", "predicate": "knows", "about": "responder chain: NSApp → NSWindow → contentView → subviews" },
+            { "subject": "appkit", "predicate": "knows", "about": "NSEvent type/location/modifierFlags dispatch" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch10_s04",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 66,
+    "observables": {
+      "participants": ["the_reader", "the_builder", "crate_app_kit_lite", "crate_window_backend"],
+      "context": { "setting": "setting_terminal", "chapter": 10, "part": 5, "title": "The GUI Bridge", "estimated_words": 1500, "source_files": ["crates/window-backend/src/", "crates/window-backend-darwin/src/"] },
+      "event_type": "resolution"
+    },
+    "structure": {
+      "position": 0.878,
+      "causal_role": "resolution",
+      "grouping": { "part": "IV — The System", "chapter": "Ch 10 — The GUI", "beat": "final_image" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_reader", "action": "build", "target": "winit + softbuffer backend — cross-platform window creation and pixel blitting", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_reader", "action": "bridge", "target": "NSView drawRect: calls → softbuffer pixel writes — AppKit rendering to real pixels", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_reader", "action": "run", "target": "cocoa_window fixture — a real macOS GUI app shows a window through our loader", "significance": "essential" },
+        { "sequence_number": 4, "agent": "the_builder", "action": "celebrate", "target": "a window appears — macOS binary running through our Rust loader shows real GUI", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "capability", "value": "appkit_stubs_capture_intent" },
+        "after": { "state_type": "capability", "value": "real_gui_window_renders" },
+        "trigger": "cocoa_window fixture shows a real window through winit+softbuffer backend",
+        "description": "THE Final Image — a window appears. A macOS binary, loaded by a Rust program, draws real pixels."
+      }
+    },
+    "interpretations": {
+      "subtext": "The window is the closing image. From a crash in Chapter 1 to a window in Chapter 10.",
+      "motifs": ["first_window", "crash_to_success"],
+      "reader_emotion": "climactic_triumph",
+      "thematic_function": "Beat 15 (Final Image) — the visual proof that the entire stack works."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "event_dispatch_via_responder_chain" },
+        "post_state": { "capability": "gui_window_renders_real_pixels" },
+        "objective": { "action": "prove", "target": "macOS GUI binary renders through Rust loader" },
+        "information_state": {
+          "gained": [
+            { "subject": "gui", "predicate": "knows", "about": "winit+softbuffer backend for cross-platform window rendering" },
+            { "subject": "validation", "predicate": "knows", "about": "cocoa_window fixture proves end-to-end GUI compatibility" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "unit_id": "ch10_s05",
+    "artifact_id": "loading_darwin",
+    "unit_type": "scene",
+    "sequence_index": 67,
+    "observables": {
+      "participants": ["the_reader", "the_builder"],
+      "context": { "setting": "setting_terminal", "chapter": 10, "part": 5, "title": "What's Next", "estimated_words": 1200 },
+      "event_type": "resolution"
+    },
+    "structure": {
+      "position": 0.892,
+      "causal_role": "resolution",
+      "grouping": { "part": "IV — The System", "chapter": "Ch 10 — The GUI", "beat": "final_image_stinger" },
+      "steps": [
+        { "sequence_number": 1, "agent": "the_builder", "action": "survey", "target": "what's ahead: Swift runtime, Metal shaders, Rosetta comparison, JIT compilation", "significance": "essential" },
+        { "sequence_number": 2, "agent": "the_builder", "action": "reflect", "target": "0xFEEDFACF — the magic number that started everything. The binary is still just bytes.", "significance": "essential" },
+        { "sequence_number": 3, "agent": "the_builder", "action": "frame", "target": "the journey from 'what is a Mach-O?' to 'here is a running macOS window' is the reader's transformation", "significance": "essential" }
+      ],
+      "transition": {
+        "subject": "the_reader",
+        "before": { "state_type": "knowledge", "value": "current_system_works" },
+        "after": { "state_type": "knowledge", "value": "the_path_forward_is_clear" },
+        "trigger": "The story ends but the project continues — the reader knows how to extend it",
+        "description": "The final mirror: 0xFEEDFACF in Chapter 1 was opaque. In Chapter 10 it's a complete map. The reader has changed."
+      }
+    },
+    "interpretations": {
+      "subtext": "The magic number hasn't changed. The reader has. 0xFEEDFACF is still just bytes, but now the reader knows every byte's purpose.",
+      "motifs": ["0xFEEDFACF", "crash_to_success"],
+      "reader_emotion": "closing_reflection",
+      "thematic_function": "Final Image stinger — mirrors Ch1's opening: same magic number, transformed understanding. Opening image = crash, closing image = running window."
+    },
+    "participant_states": [
+      {
+        "entity_ref": "the_reader",
+        "role_in_unit": "focalizer",
+        "pre_state": { "capability": "gui_window_renders_real_pixels" },
+        "post_state": { "capability": "complete_loader_understanding" },
+        "objective": { "action": "reflect", "target": "transformation from Ch1 crash to Ch10 window" },
+        "information_state": {
+          "gained": [
+            { "subject": "roadmap", "predicate": "knows", "about": "Swift runtime, Metal, Rosetta comparison, JIT are future work" },
+            { "subject": "transformation", "predicate": "knows", "about": "0xFEEDFACF → complete understanding of macOS binary loading" }
+          ]
+        }
+      }
+    ]
+  }
+]

@@ -12,6 +12,19 @@
 //! Since our runtime executes in-process (same address space), we strip
 //! PAC by masking to the lower 48 bits. We do NOT verify signatures —
 //! we're simulating the loader, not enforcing PAC security.
+//!
+//! ## Cross-platform strategy
+//!
+//! On macOS aarch64, PAC hardware is always present — we sign GOT pointers
+//! with hardware PACIA/PACIB and the guest binary's authenticated branches
+//! (BRAA/BLRAA) work natively.
+//!
+//! On Linux aarch64 (e.g. Docker on Apple Silicon), we detect PAC support
+//! at runtime via `AT_HWCAP` / `HWCAP_PACA`.  If present, we sign normally.
+//! If absent (QEMU, non-PAC silicon), we leave GOT pointers unsigned and
+//! patch authenticated branches to their unauthenticated equivalents.
+
+use std::sync::OnceLock;
 
 /// Strip PAC bits from a pointer, returning just the raw virtual address.
 ///
@@ -119,10 +132,13 @@ pub fn has_pac_bits(ptr: u64) -> bool {
 /// Blend a pointer address and a 16-bit integer into a PAC discriminator.
 ///
 /// Matches Apple's `ptrauth_blend_discriminator`:
-///   `(uint64_t(diversity) << 48) | (addr & 0xFFFF)`
+///   `((addr & 0xFFFF) << 48) | diversity`
+///
+/// The low 16 bits of the pointer go into bits 48-63 and the 16-bit
+/// diversity value goes into bits 0-15.
 #[inline]
 pub fn blend_discriminator(addr: u64, diversity: u16) -> u64 {
-    ((diversity as u64) << 48) | (addr & 0xFFFF)
+    ((addr & 0xFFFF) << 48) | (diversity as u64)
 }
 
 /// Sign a pointer with the specified PAC key and discriminator.
@@ -150,23 +166,64 @@ pub unsafe fn pac_sign_pointer(
         return 0;
     }
     let modifier = if addr_div {
-        blend_discriminator(slot_addr, diversity)
+        if diversity == 0 {
+            // Auth-GOT stubs do `BRAA x16, x17` where x17 = raw slot address.
+            // When diversity is 0, the modifier IS the raw address — no blending.
+            // (Apple's dyld uses the same convention.)
+            slot_addr
+        } else {
+            blend_discriminator(slot_addr, diversity)
+        }
     } else {
         diversity as u64
     };
     pac_sign_raw(value, key, modifier)
 }
 
-/// Sign a pointer with a PAC key and pre-computed modifier.
+// ── Runtime PAC detection ───────────────────────────────────────────
+
+/// Returns `true` if the host CPU supports Pointer Authentication (PAC).
+///
+/// - macOS aarch64: always `true` (all Apple Silicon has PAC)
+/// - Linux aarch64: checks `AT_HWCAP` for `HWCAP_PACA`
+/// - Other architectures: `false`
+pub fn has_hardware_pac() -> bool {
+    static AVAILABLE: OnceLock<bool> = OnceLock::new();
+    *AVAILABLE.get_or_init(_detect_pac)
+}
+
+fn _detect_pac() -> bool {
+    #[cfg(all(target_arch = "aarch64", target_os = "macos"))]
+    { return true; }
+
+    #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
+    {
+        // HWCAP_PACA = (1 << 30) from Linux asm/hwcap.h
+        const HWCAP_PACA: libc::c_ulong = 1 << 30;
+        let hwcap = unsafe { libc::getauxval(libc::AT_HWCAP) };
+        return hwcap & HWCAP_PACA != 0;
+    }
+
+    #[allow(unreachable_code)]
+    false
+}
+
+// ── PAC signing ─────────────────────────────────────────────────────
+
+/// Sign a pointer using hardware PAC instructions (ARM64 only).
 ///
 /// # Safety
-/// Caller ensures `value` is a valid address.
-#[cfg(all(target_arch = "aarch64", target_os = "macos"))]
-unsafe fn pac_sign_raw(value: u64, key: PacKey, modifier: u64) -> u64 {
+/// Caller ensures `value` is a valid address and the CPU supports PAC.
+#[cfg(target_arch = "aarch64")]
+unsafe fn pac_sign_asm(value: u64, key: PacKey, modifier: u64) -> u64 {
     let result: u64;
+    // `.arch_extension pauth` tells the assembler to accept PAC instructions
+    // on targets where they aren't enabled by default (Linux aarch64).
+    // On macOS aarch64 this is already enabled and the directive is a no-op.
     match key {
         PacKey::IA => {
             core::arch::asm!(
+                ".arch_extension pauth",
                 "pacia {ptr}, {mod}",
                 ptr = inout(reg) value => result,
                 mod = in(reg) modifier,
@@ -174,6 +231,7 @@ unsafe fn pac_sign_raw(value: u64, key: PacKey, modifier: u64) -> u64 {
         }
         PacKey::IB => {
             core::arch::asm!(
+                ".arch_extension pauth",
                 "pacib {ptr}, {mod}",
                 ptr = inout(reg) value => result,
                 mod = in(reg) modifier,
@@ -181,6 +239,7 @@ unsafe fn pac_sign_raw(value: u64, key: PacKey, modifier: u64) -> u64 {
         }
         PacKey::DA => {
             core::arch::asm!(
+                ".arch_extension pauth",
                 "pacda {ptr}, {mod}",
                 ptr = inout(reg) value => result,
                 mod = in(reg) modifier,
@@ -188,6 +247,7 @@ unsafe fn pac_sign_raw(value: u64, key: PacKey, modifier: u64) -> u64 {
         }
         PacKey::DB => {
             core::arch::asm!(
+                ".arch_extension pauth",
                 "pacdb {ptr}, {mod}",
                 ptr = inout(reg) value => result,
                 mod = in(reg) modifier,
@@ -197,10 +257,118 @@ unsafe fn pac_sign_raw(value: u64, key: PacKey, modifier: u64) -> u64 {
     result
 }
 
-#[cfg(not(all(target_arch = "aarch64", target_os = "macos")))]
+/// Sign a pointer with a PAC key and pre-computed modifier.
+///
+/// On macOS aarch64, always signs (PAC always available).
+/// On Linux aarch64, signs only when runtime detection confirms PAC.
+/// On non-aarch64, returns the pointer unchanged.
+///
+/// # Safety
+/// Caller ensures `value` is a valid address.
+#[cfg(all(target_arch = "aarch64", target_os = "macos"))]
+unsafe fn pac_sign_raw(value: u64, key: PacKey, modifier: u64) -> u64 {
+    pac_sign_asm(value, key, modifier)
+}
+
+#[cfg(all(target_arch = "aarch64", target_os = "linux"))]
+unsafe fn pac_sign_raw(value: u64, key: PacKey, modifier: u64) -> u64 {
+    if has_hardware_pac() {
+        pac_sign_asm(value, key, modifier)
+    } else {
+        value
+    }
+}
+
+#[cfg(not(target_arch = "aarch64"))]
 unsafe fn pac_sign_raw(value: u64, _key: PacKey, _modifier: u64) -> u64 {
-    // No hardware PAC support; return unsigned pointer.
     value
+}
+
+// ── PAC branch stripping (fallback for non-PAC hardware) ───────────
+//
+// arm64e Mach-O binaries use authenticated branches (BRAA, BLRAA, etc.)
+// in their stub trampolines.  When PAC hardware is available, we sign
+// GOT pointers with PACIA/PACIB and the authenticated branches work.
+//
+// When PAC hardware is NOT available (QEMU, non-PAC Linux kernels), we
+// leave GOT pointers unsigned and patch the guest binary's authenticated
+// branch instructions to their unauthenticated equivalents.
+//
+// ARM64 "unconditional branch (register)" encoding:
+//   bits[31:25] = 1101011   (group identifier)
+//   bits[20:16] = 11111     (op2 — fixed for all variants)
+//   bits[11:10]             (auth field: 00=none, 10=keyA, 11=keyB)
+//
+// Authenticated variants (BRAA/BRAB/BLRAA/BLRAB and Z forms) have
+// bits[11:10] ≥ 2.  We convert them to their unauthenticated base
+// (BR/BLR) by clearing:
+//   - bit 24    (opc high bit distinguishing BRAA/BRAB from BR)
+//   - bits[11:10] (auth discriminator)
+//   - bits[4:0]   (Rm modifier register, becomes 00000 in non-auth)
+//
+// RETAA/RETAB (opc low-3 = 010) are replaced with RET (x30).
+
+/// Test whether a 32-bit ARM64 instruction is an authenticated
+/// branch-register instruction (BRAA, BRAB, BLRAA, BLRAB, or Z/RET forms).
+#[inline]
+fn is_pac_branch(insn: u32) -> bool {
+    let group = (insn >> 25) & 0x7F;  // bits[31:25]
+    let op2 = (insn >> 16) & 0x1F;    // bits[20:16]
+    let auth = (insn >> 10) & 0x3;    // bits[11:10]
+    group == 0b1101011 && op2 == 0b11111 && auth >= 2
+}
+
+/// Convert an authenticated branch instruction to its unauthenticated
+/// equivalent.  Caller must only pass instructions where `is_pac_branch`
+/// returned true.
+#[inline]
+fn depac_branch(insn: u32) -> u32 {
+    let opc_low3 = (insn >> 21) & 0x7; // bits[23:21]
+    if opc_low3 == 0b010 {
+        // RETAA / RETAB → RET (x30)
+        return 0xD65F_03C0;
+    }
+    // BRAA/BRAB/BRAAZ/BRABZ → BR
+    // BLRAA/BLRAB/BLRAAZ/BLRABZ → BLR
+    // Clear bit 24 (opc high), bits[11:10] (auth), bits[4:0] (Rm).
+    insn & !(0x0100_0000 | 0x0000_0C00 | 0x0000_001F)
+}
+
+/// Strip PAC-authenticated branches from all executable segments of a
+/// mapped Mach-O image.
+///
+/// When PAC hardware is available (`has_hardware_pac() == true`), this is
+/// a no-op — signed GOT pointers match the authenticated branches.
+///
+/// When PAC is absent, this patches BRAA/BLRAA/RETAA instructions to
+/// BR/BLR/RET so the binary can execute with unsigned GOT pointers.
+///
+/// Must be called AFTER fixups are applied and BEFORE `protect()` makes
+/// text segments read-only.
+pub fn strip_pac_branches(image: &crate::MappedImage) {
+    if has_hardware_pac() {
+        return;
+    }
+    let mut patched = 0u32;
+    for seg in &image.segments {
+        // Only patch executable segments (__TEXT and friends)
+        if !seg.name.starts_with("__TEXT") {
+            continue;
+        }
+        let count = seg.size / 4;
+        let base = seg.base as *mut u32;
+        for i in 0..count {
+            let insn = unsafe { base.add(i).read_unaligned() };
+            if is_pac_branch(insn) {
+                let fixed = depac_branch(insn);
+                unsafe { base.add(i).write_unaligned(fixed); }
+                patched += 1;
+            }
+        }
+    }
+    if patched > 0 {
+        log::info!("strip_pac_branches: patched {patched} authenticated branch instructions");
+    }
 }
 
 #[cfg(test)]

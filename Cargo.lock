@@ -412,7 +412,9 @@ dependencies = [
  "arboard",
  "cassowary",
  "cc",
+ "cg-shims",
  "core-foundation-lite",
+ "graphics-core",
  "libc",
  "libsystem-shims",
  "log",
@@ -887,6 +889,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e6853b52649d4ac5c0bd02320cddc5ba956bdb407c4b75a2c6b75bf51500f8c"
 dependencies = [
  "simd-adler32",
+]
+
+[[package]]
+name = "file-explorer"
+version = "0.1.0"
+dependencies = [
+ "app-kit-lite",
+ "graphics-core",
+ "ui-controls",
+ "window-backend",
+ "window-backend-darwin",
 ]
 
 [[package]]
@@ -1678,6 +1691,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2db585e1d738fc771bf08a151420d3ed193d9d895a36df7f6f8a9456b911ddc"
 
 [[package]]
+name = "launchpad"
+version = "0.1.0"
+dependencies = [
+ "app-kit-lite",
+ "graphics-core",
+ "macho-runtime",
+ "ui-controls",
+ "window-backend",
+ "window-backend-darwin",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.183"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1833,6 +1858,7 @@ dependencies = [
  "cf-lite",
  "clap",
  "env_logger",
+ "libc",
  "libsystem-shims",
  "log",
  "macho-exec",
@@ -1850,7 +1876,9 @@ dependencies = [
  "runtime-diagnostics",
  "serde",
  "serde_json",
+ "softbuffer",
  "trust-policy",
+ "winit",
 ]
 
 [[package]]

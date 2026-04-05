@@ -71,7 +71,13 @@ pub(super) fn walk_chain(
                             }
                             None => {
                                 super::UNRESOLVED_BIND_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                                super::trap_addr()
+                                // Auth-GOT stubs use BRAA/BLRAA which require a signed pointer.
+                                // Sign the trap address so the authenticated branch succeeds and
+                                // lands on the trap function instead of faulting on PAC mismatch.
+                                let slot_addr = seg.base as u64 + offset as u64;
+                                unsafe {
+                                    pac_sign_pointer(super::trap_addr(), meta.key, slot_addr, meta.diversity, meta.addr_diversity)
+                                }
                             }
                         };
                         unsafe {
@@ -135,10 +141,15 @@ pub(super) fn walk_chain(
             6 => {
                 let is_bind = (raw >> 63) & 1 == 1;
                 let next = ((raw >> 51) & 0x0FFF) as usize;
+                log::trace!(
+                    "ptr64_offset chain at +{offset:#x}: raw={raw:#018x}, is_bind={is_bind}, next={next}"
+                );
 
                 if is_bind {
                     let ordinal = (raw & 0x00FFFFFF) as usize;
-                    if resolve_and_write_bind(seg, offset, ordinal, 0, imports, resolver) {
+                    let addend = ((raw >> 24) & 0xFF) as u64;
+                    log::trace!("  ptr64_offset bind: ordinal={ordinal}, addend={addend}");
+                    if resolve_and_write_bind(seg, offset, ordinal, addend, imports, resolver) {
                         binds += 1;
                     }
                 } else {
@@ -146,6 +157,9 @@ pub(super) fn walk_chain(
                     let high8 = (raw >> 36) & 0xFF;
                     let rebased = (preferred_base + (high8 << 56 | target)) as i64 + slide;
                     let rebased_u = rebased as u64;
+                    log::trace!(
+                        "  ptr64_offset rebase: target={target:#x}, high8={high8:#x}, preferred_base={preferred_base:#x}, slide={slide:#x}, result={rebased_u:#x}"
+                    );
                     unsafe {
                         let ptr = seg.base.add(offset) as *mut u64;
                         ptr.write_unaligned(rebased_u);
