@@ -76,8 +76,21 @@ impl PosixExtrasShims {
             // ── resource limits ─────────────────────────────────
             ("_getrlimit", shim_getrlimit as *const () as u64, "getrlimit (macOS→Linux RLIMIT_ translation)"),
             ("_setrlimit", shim_setrlimit as *const () as u64, "setrlimit (macOS→Linux RLIMIT_ translation)"),
+
+            // ── sysconf constant translation ────────────────────
+            ("_sysconf", shim_sysconf as *const () as u64, "sysconf (macOS→Linux _SC_ translation)"),
         );
-        log::debug!("PosixExtrasShims: registered 39 POSIX/libc extra shims");
+
+        // ── regex flag translation (Linux-only, glibc regex_t) ──
+        #[cfg(target_os = "linux")]
+        register_shims!(table,
+            ("_regcomp", shim_regcomp as *const () as u64, "regcomp (macOS regex_t bridge + flag translation)"),
+            ("_regexec", shim_regexec as *const () as u64, "regexec (macOS regex_t bridge)"),
+            ("_regfree", shim_regfree as *const () as u64, "regfree (macOS regex_t bridge)"),
+            ("_regerror", shim_regerror as *const () as u64, "regerror (macOS regex_t bridge)"),
+        );
+
+        log::debug!("PosixExtrasShims: registered POSIX/libc extra shims");
     }
 }
 
@@ -243,25 +256,15 @@ pub extern "C" fn shim_atexit_b(block: u64) -> c_int {
 
 /// bootstrap_look_up: Mach bootstrap server lookup.
 ///
-/// Resolves a service name to a synthetic Mach port via the internal
+/// Resolves a service name to a synthetic Mach port via the launchd
 /// bootstrap service registry. Returns `KERN_SUCCESS` (0) on success,
 /// or `BOOTSTRAP_UNKNOWN_SERVICE` (1102) if the name is NULL.
 pub extern "C" fn shim_bootstrap_look_up(
-    _bp: u32,
+    bp: u32,
     service_name: *const c_char,
     sp: *mut u32,
 ) -> c_int {
-    if service_name.is_null() || sp.is_null() {
-        return 1102; // BOOTSTRAP_UNKNOWN_SERVICE
-    }
-    let name = unsafe { std::ffi::CStr::from_ptr(service_name) };
-    let Ok(name_str) = name.to_str() else {
-        return 1102; // BOOTSTRAP_UNKNOWN_SERVICE
-    };
-    let port = crate::darwin_stubs::mach_extras::bootstrap_look_up_service(name_str);
-    unsafe { *sp = port; }
-    log::debug!("bootstrap_look_up(\"{}\") → port {:#x}", name_str, port);
-    0 // KERN_SUCCESS
+    launchd::bootstrap::bootstrap_look_up(bp, service_name, sp) as c_int
 }
 
 // ── posix_spawn core ────────────────────────────────────────────────
@@ -601,6 +604,260 @@ pub extern "C" fn shim_setrlimit(resource: c_int, rlp: *const libc::rlimit) -> c
     unsafe { libc::setrlimit(linux_res as _, rlp) }
 }
 
+// ── sysconf constant translation ────────────────────────────────────
+
+/// Translate macOS `_SC_*` constants to Linux equivalents.
+/// Every single value differs between the two platforms.
+fn translate_sysconf_name(darwin_name: c_int) -> c_int {
+    match darwin_name {
+        1 => 0,    // _SC_ARG_MAX
+        2 => 1,    // _SC_CHILD_MAX
+        3 => 2,    // _SC_CLK_TCK
+        4 => 3,    // _SC_NGROUPS_MAX
+        5 => 4,    // _SC_OPEN_MAX
+        6 => 7,    // _SC_JOB_CONTROL
+        7 => 8,    // _SC_SAVED_IDS
+        8 => 29,   // _SC_VERSION
+        9 => 36,   // _SC_BC_BASE_MAX
+        10 => 37,  // _SC_BC_DIM_MAX
+        11 => 38,  // _SC_BC_SCALE_MAX
+        12 => 39,  // _SC_BC_STRING_MAX
+        13 => 40,  // _SC_COLL_WEIGHTS_MAX
+        14 => 42,  // _SC_EXPR_NEST_MAX
+        15 => 43,  // _SC_LINE_MAX
+        16 => 44,  // _SC_RE_DUP_MAX
+        17 => 46,  // _SC_2_VERSION
+        18 => 47,  // _SC_2_C_BIND
+        19 => 48,  // _SC_2_C_DEV
+        20 => 95,  // _SC_2_CHAR_TERM
+        21 => 49,  // _SC_2_FORT_DEV
+        22 => 50,  // _SC_2_FORT_RUN
+        23 => 52,  // _SC_2_LOCALEDEF
+        24 => 51,  // _SC_2_SW_DEV
+        25 => 97,  // _SC_2_UPE
+        26 => 5,   // _SC_STREAM_MAX
+        27 => 6,   // _SC_TZNAME_MAX
+        29 => 30,  // _SC_PAGESIZE / _SC_PAGE_SIZE
+        56 => 60,  // _SC_IOV_MAX
+        57 => 83,  // _SC_NPROCESSORS_CONF
+        58 => 84,  // _SC_NPROCESSORS_ONLN
+        70 => 69,  // _SC_GETGR_R_SIZE_MAX
+        71 => 70,  // _SC_GETPW_R_SIZE_MAX
+        72 => 180, // _SC_HOST_NAME_MAX
+        73 => 71,  // _SC_LOGIN_NAME_MAX
+        101 => 72, // _SC_TTY_NAME_MAX
+        120 => 173, // _SC_SYMLOOP_MAX
+        200 => 85, // _SC_PHYS_PAGES
+        other => {
+            log::warn!("sysconf: unknown macOS _SC_ constant {other}, passing through");
+            other
+        }
+    }
+}
+
+/// `long sysconf(int name)`
+///
+/// Translates macOS `_SC_*` constants to Linux equivalents before
+/// delegating to the host sysconf.
+pub extern "C" fn shim_sysconf(name: c_int) -> c_long {
+    let linux_name = translate_sysconf_name(name);
+    log::trace!("sysconf: macOS _SC_={name} → Linux _SC_={linux_name}");
+    unsafe { libc::sysconf(linux_name as _) }
+}
+
+// ── regex flag translation ──────────────────────────────────────────
+
+/// Translate macOS `regcomp` cflags to Linux equivalents.
+///
+/// macOS and Linux swap `REG_NOSUB` and `REG_NEWLINE`:
+///
+/// | Flag         | macOS | Linux |
+/// |--------------|-------|-------|
+/// | REG_EXTENDED |   1   |   1   |
+/// | REG_ICASE    |   2   |   2   |
+/// | REG_NOSUB    |   4   |   8   |
+/// | REG_NEWLINE  |   8   |   4   |
+#[cfg(target_os = "linux")]
+fn translate_regcomp_flags(darwin_cflags: c_int) -> c_int {
+    const DARWIN_REG_NOSUB: c_int = 0x0004;
+    const DARWIN_REG_NEWLINE: c_int = 0x0008;
+    const LINUX_REG_NEWLINE: c_int = 0x0004;
+    const LINUX_REG_NOSUB: c_int = 0x0008;
+
+    let mut flags = darwin_cflags;
+
+    // Clear the two bits that differ
+    flags &= !(DARWIN_REG_NOSUB | DARWIN_REG_NEWLINE);
+
+    // Re-set them with Linux values
+    if darwin_cflags & DARWIN_REG_NOSUB != 0 {
+        flags |= LINUX_REG_NOSUB;
+    }
+    if darwin_cflags & DARWIN_REG_NEWLINE != 0 {
+        flags |= LINUX_REG_NEWLINE;
+    }
+
+    flags
+}
+
+/// macOS `regex_t` struct (32 bytes on 64-bit):
+/// ```text
+///   int       re_magic;   // offset 0, 4 bytes
+///   (4 pad)               // offset 4, 4 bytes
+///   size_t    re_nsub;    // offset 8, 8 bytes
+///   char     *re_endp;    // offset 16, 8 bytes
+///   void     *re_g;       // offset 24, 8 bytes
+/// ```
+///
+/// glibc `regex_t` is ~64 bytes — writing it into a 32-byte macOS buffer
+/// corrupts adjacent memory. We allocate glibc-size regex_t on the heap
+/// and store its pointer in the macOS struct's `re_g` field (offset 24).
+/// On Darwin, `re_nsub` at offset 8 receives the sub-expression count.
+
+#[cfg(target_os = "linux")]
+mod regex_shims {
+use super::*;
+use std::sync::Mutex;
+use std::collections::HashMap;
+
+/// Safety: `libc::regex_t` contains raw pointers but we only access
+/// the map while holding the mutex, and the pointees live on the heap.
+struct RegexBox(Box<libc::regex_t>);
+unsafe impl Send for RegexBox {}
+
+static REGEX_MAP: Mutex<Option<HashMap<u64, RegexBox>>> = Mutex::new(None);
+
+fn regex_map_insert(darwin_ptr: u64, linux_re: Box<libc::regex_t>) {
+    let mut guard = REGEX_MAP.lock().unwrap();
+    let map = guard.get_or_insert_with(HashMap::new);
+    map.insert(darwin_ptr, RegexBox(linux_re));
+}
+
+fn regex_map_get(darwin_ptr: u64) -> Option<*const libc::regex_t> {
+    let guard = REGEX_MAP.lock().unwrap();
+    guard.as_ref()?.get(&darwin_ptr).map(|b| &*b.0 as *const libc::regex_t)
+}
+
+fn regex_map_remove(darwin_ptr: u64) -> Option<Box<libc::regex_t>> {
+    let mut guard = REGEX_MAP.lock().unwrap();
+    guard.as_mut()?.remove(&darwin_ptr).map(|b| b.0)
+}
+
+/// `int regcomp(regex_t *preg, const char *pattern, int cflags)`
+///
+/// Allocates a glibc-sized `regex_t`, calls glibc `regcomp`, and stores
+/// the result. The macOS `regex_t` at `preg` gets `re_nsub` written.
+pub extern "C" fn shim_regcomp(
+    preg: u64, // macOS regex_t* (32 bytes, can't fit glibc's ~64 bytes)
+    pattern: *const c_char,
+    cflags: c_int,
+) -> c_int {
+    let linux_cflags = translate_regcomp_flags(cflags);
+    log::trace!("regcomp: preg={preg:#x} flags {cflags:#x} → {linux_cflags:#x}");
+
+    let mut linux_re: Box<libc::regex_t> = Box::new(unsafe { std::mem::zeroed() });
+    let ret = unsafe { libc::regcomp(&mut *linux_re, pattern, linux_cflags) };
+    if ret == 0 {
+        // Write re_nsub into the macOS struct at offset 8
+        if preg != 0 {
+            unsafe {
+                let nsub_ptr = (preg + 8) as *mut u64;
+                *nsub_ptr = 0;
+            }
+        }
+        regex_map_insert(preg, linux_re);
+    }
+    ret
+}
+
+/// `int regexec(const regex_t *preg, const char *string, size_t nmatch,
+///              regmatch_t *pmatch, int eflags)`
+///
+/// Looks up the glibc regex_t from our map and calls glibc regexec.
+/// macOS `regmatch_t` uses `regoff_t = int64_t` (8 bytes each)→ 16 bytes.
+/// Linux  `regmatch_t` uses `regoff_t = int`     (4 bytes each)→  8 bytes.
+#[repr(C)]
+struct DarwinRegmatch {
+    rm_so: i64,
+    rm_eo: i64,
+}
+
+/// `int regexec(const regex_t *preg, const char *string, size_t nmatch,
+///              regmatch_t *pmatch, int eflags)`
+///
+/// Bridges between macOS 16-byte regmatch_t and Linux 8-byte regmatch_t.
+pub extern "C" fn shim_regexec(
+    preg: u64,
+    string: *const c_char,
+    nmatch: u64,
+    darwin_pmatch: u64, // actually *mut DarwinRegmatch (16 bytes each)
+    eflags: c_int,
+) -> c_int {
+    if let Some(linux_re) = regex_map_get(preg) {
+        let nm = nmatch as usize;
+        // Allocate Linux-sized pmatch array
+        let mut linux_pmatch: Vec<libc::regmatch_t> = vec![
+            libc::regmatch_t { rm_so: -1, rm_eo: -1 }; nm.max(1)
+        ];
+
+        // If REG_STARTEND, convert input pmatch[0] from macOS to Linux layout
+        if eflags & 4 != 0 && darwin_pmatch != 0 && nm >= 1 {
+            let darwin = unsafe { &*(darwin_pmatch as *const DarwinRegmatch) };
+            linux_pmatch[0].rm_so = darwin.rm_so as i32;
+            linux_pmatch[0].rm_eo = darwin.rm_eo as i32;
+        }
+
+        let pmatch_ptr = if darwin_pmatch == 0 {
+            std::ptr::null_mut()
+        } else {
+            linux_pmatch.as_mut_ptr()
+        };
+
+        let ret = unsafe { libc::regexec(linux_re, string, nm, pmatch_ptr, eflags) };
+
+        // Convert output pmatch from Linux to macOS layout
+        if darwin_pmatch != 0 && ret == 0 {
+            for i in 0..nm {
+                let darwin = unsafe { &mut *((darwin_pmatch as *mut DarwinRegmatch).add(i)) };
+                darwin.rm_so = linux_pmatch[i].rm_so as i64;
+                darwin.rm_eo = linux_pmatch[i].rm_eo as i64;
+            }
+        }
+
+        ret
+    } else {
+        log::warn!("regexec: no compiled regex found for preg={preg:#x}");
+        1 // REG_NOMATCH
+    }
+}
+
+/// `void regfree(regex_t *preg)`
+///
+/// Frees the glibc regex_t from our map.
+pub extern "C" fn shim_regfree(preg: u64) {
+    if let Some(mut linux_re) = regex_map_remove(preg) {
+        unsafe { libc::regfree(&mut *linux_re); }
+    }
+}
+
+/// `size_t regerror(int errcode, const regex_t *preg, char *errbuf, size_t errbuf_size)`
+pub extern "C" fn shim_regerror(
+    errcode: c_int,
+    preg: u64,
+    errbuf: *mut c_char,
+    errbuf_size: u64,
+) -> u64 {
+    if let Some(linux_re) = regex_map_get(preg) {
+        unsafe { libc::regerror(errcode, linux_re, errbuf, errbuf_size as usize) as u64 }
+    } else {
+        unsafe { libc::regerror(errcode, std::ptr::null(), errbuf, errbuf_size as usize) as u64 }
+    }
+}
+} // mod regex_shims
+
+#[cfg(target_os = "linux")]
+pub use regex_shims::*;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -628,8 +885,9 @@ mod tests {
 
     #[test]
     fn test_bootstrap_look_up() {
-        // NULL service name → BOOTSTRAP_UNKNOWN_SERVICE
-        assert_eq!(shim_bootstrap_look_up(0, std::ptr::null(), std::ptr::null_mut()), 1102);
+        // NULL service name + NULL sp → BOOTSTRAP_BAD_COUNT (1104)
+        // (sp is checked first in launchd::bootstrap::bootstrap_look_up)
+        assert_eq!(shim_bootstrap_look_up(0, std::ptr::null(), std::ptr::null_mut()), 1104);
         // Valid service name → KERN_SUCCESS (0) + non-zero port
         let name = b"com.apple.test.service\0";
         let mut port: u32 = 0;
@@ -729,5 +987,73 @@ mod tests {
         assert_eq!(translate_rlimit_resource(6), 8);  // RLIMIT_MEMLOCK
         assert_eq!(translate_rlimit_resource(7), 6);  // RLIMIT_NPROC
         assert_eq!(translate_rlimit_resource(8), 7);  // RLIMIT_NOFILE
+    }
+
+    // ── sysconf translation tests ───────────────────────────────
+
+    #[test]
+    fn test_sysconf_pagesize() {
+        assert_eq!(translate_sysconf_name(29), 30);  // _SC_PAGESIZE
+    }
+
+    #[test]
+    fn test_sysconf_nprocessors() {
+        assert_eq!(translate_sysconf_name(57), 83);  // _SC_NPROCESSORS_CONF
+        assert_eq!(translate_sysconf_name(58), 84);  // _SC_NPROCESSORS_ONLN
+    }
+
+    #[test]
+    fn test_sysconf_phys_pages() {
+        assert_eq!(translate_sysconf_name(200), 85); // _SC_PHYS_PAGES
+    }
+
+    #[test]
+    fn test_sysconf_common_values() {
+        assert_eq!(translate_sysconf_name(1), 0);    // _SC_ARG_MAX
+        assert_eq!(translate_sysconf_name(3), 2);    // _SC_CLK_TCK
+        assert_eq!(translate_sysconf_name(5), 4);    // _SC_OPEN_MAX
+    }
+
+    #[test]
+    fn test_sysconf_unknown_passthrough() {
+        assert_eq!(translate_sysconf_name(999), 999);
+    }
+
+    // ── regcomp flag translation tests ──────────────────────────
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_regcomp_nosub_swap() {
+        // macOS REG_NOSUB=4 → Linux REG_NOSUB=8
+        assert_eq!(translate_regcomp_flags(0x0004), 0x0008);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_regcomp_newline_swap() {
+        // macOS REG_NEWLINE=8 → Linux REG_NEWLINE=4
+        assert_eq!(translate_regcomp_flags(0x0008), 0x0004);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_regcomp_both_swapped() {
+        // macOS NOSUB(4)|NEWLINE(8) → Linux NOSUB(8)|NEWLINE(4) — same combined value
+        assert_eq!(translate_regcomp_flags(0x000C), 0x000C);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_regcomp_extended_unchanged() {
+        // REG_EXTENDED=1 is the same on both — should pass through
+        assert_eq!(translate_regcomp_flags(0x0001), 0x0001);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_regcomp_combined_flags() {
+        // REG_EXTENDED(1) | REG_ICASE(2) | REG_NOSUB(4) → 7
+        // Linux: REG_EXTENDED(1) | REG_ICASE(2) | REG_NOSUB(8) → 11
+        assert_eq!(translate_regcomp_flags(0x0007), 0x000B);
     }
 }

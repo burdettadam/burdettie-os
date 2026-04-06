@@ -684,7 +684,7 @@ impl StubResolver {
             | "sigprocmask" | "pthread_sigmask"
             | "alarm" | "setsid"
             | "getprogname" | "setprogname"
-            | "confstr" | "sysconf" | "getpagesize"
+            | "confstr" | "getpagesize"
             | "getpriority" | "setpriority" | "getsid"
             | "imaxabs"
             // Stack protection
@@ -1010,8 +1010,7 @@ impl StubResolver {
             // setjmp / longjmp
             | "setjmp" | "longjmp" | "_setjmp" | "_longjmp"
             | "sigsetjmp" | "siglongjmp"
-            // Regex (POSIX)
-            | "regcomp" | "regexec" | "regfree" | "regerror"
+            // Regex (POSIX) — all shimmed in PosixExtras for struct bridging
             // Sorting / directory scanning extras
             | "qsort_b" | "qsort_r" | "heapsort" | "mergesort"
             | "heapsort_b" | "mergesort_b"

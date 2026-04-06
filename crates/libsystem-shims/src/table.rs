@@ -80,7 +80,8 @@ impl ShimTable {
         self.entries.get(name).map(|e| e.address)
     }
 
-    /// Look up without leading underscore (strips `_` prefix if present).
+    /// Look up without leading underscore and/or Darwin variant suffix.
+    /// Strips `_` prefix and `$UNIX2003`/`$DARWIN_EXTSN`/etc. suffixes.
     pub fn resolve_stripped(&self, name: &str) -> Option<u64> {
         // Try exact match first
         if let Some(addr) = self.resolve(name) {
@@ -88,7 +89,22 @@ impl ShimTable {
         }
         // Try with leading underscore
         let with_prefix = format!("_{name}");
-        self.resolve(&with_prefix)
+        if let Some(addr) = self.resolve(&with_prefix) {
+            return Some(addr);
+        }
+        // Strip $VARIANT suffix (e.g. $UNIX2003, $DARWIN_EXTSN) and retry
+        if let Some(base) = name.split('$').next() {
+            if base != name {
+                if let Some(addr) = self.resolve(base) {
+                    return Some(addr);
+                }
+                let with_prefix = format!("_{base}");
+                if let Some(addr) = self.resolve(&with_prefix) {
+                    return Some(addr);
+                }
+            }
+        }
+        None
     }
 
     /// Number of registered shims.
@@ -132,6 +148,21 @@ mod tests {
         table.register("_strlen", 0xBEEF, "string length");
         assert_eq!(table.resolve_stripped("strlen"), Some(0xBEEF));
         assert_eq!(table.resolve_stripped("_strlen"), Some(0xBEEF));
+    }
+
+    #[test]
+    fn resolve_stripped_variant_suffix() {
+        let mut table = ShimTable::new();
+        table.register("_printf", 0xCAFE, "printf shim");
+        // $UNIX2003 variant should resolve to the base shim
+        assert_eq!(table.resolve_stripped("_printf$UNIX2003"), Some(0xCAFE));
+        assert_eq!(table.resolve_stripped("printf$UNIX2003"), Some(0xCAFE));
+        // $DARWIN_EXTSN variant
+        assert_eq!(table.resolve_stripped("_printf$DARWIN_EXTSN"), Some(0xCAFE));
+        // Exact match still works
+        assert_eq!(table.resolve_stripped("_printf"), Some(0xCAFE));
+        // No match
+        assert_eq!(table.resolve_stripped("_missing$UNIX2003"), None);
     }
 
     #[test]
