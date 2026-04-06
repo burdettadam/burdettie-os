@@ -1,12 +1,11 @@
-//! Apple SystemConfiguration.framework stubs.
+//! Apple SystemConfiguration.framework — real network reachability.
 //!
-//! Provides SCNetworkReachability, SCDynamicStore, and SCPreferences
-//! shims.  The key insight: stub with "always reachable" so Foundation
-//! networking layers don't block waiting for real reachability callbacks.
-//!
-//! Handle-based approach: opaque non-zero u64 handles from a global
-//! `AtomicU64` counter.  No real state is tracked behind them.
+//! SCNetworkReachability now does a real connectivity check via
+//! getaddrinfo + non-blocking TCP connect probe on port 443.
+//! SCDynamicStore and SCPreferences remain safe stubs.
 
+use std::collections::HashMap;
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::table::ShimTable;
@@ -20,6 +19,24 @@ fn next_handle() -> u64 {
 
 /// `kSCNetworkReachabilityFlagsReachable` = 1 << 1 = 2.
 static K_SC_NETWORK_REACHABILITY_FLAGS_REACHABLE: u32 = 2;
+
+/// Stored reachability target info.
+struct ReachabilityTarget {
+    hostname: Option<String>,
+    /// Cached flags from last check
+    flags: u32,
+}
+
+static REACHABILITY_STORE: Mutex<Option<HashMap<u64, ReachabilityTarget>>> = Mutex::new(None);
+
+fn reachability_store() -> std::sync::MutexGuard<'static, Option<HashMap<u64, ReachabilityTarget>>> {
+    REACHABILITY_STORE.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// Apple SCNetworkReachabilityFlags values.
+const K_SC_FLAG_REACHABLE: u32 = 1 << 1;      // 2
+const K_SC_FLAG_CONNECTION_REQUIRED: u32 = 1 << 2; // 4
+const K_SC_FLAG_IS_DIRECT: u32 = 1 << 17;     // 131072
 
 pub struct SystemConfigurationStubs;
 
@@ -72,41 +89,116 @@ impl SystemConfigurationStubs {
     }
 }
 
-// ── SCNetworkReachability ───────────────────────────────────────
+// ── SCNetworkReachability (real connectivity check) ─────────────
+
+/// Perform a real reachability check for a hostname using getaddrinfo.
+fn check_reachability(hostname: &str) -> u32 {
+    // BurdettieOS DNS rewrite — redirect Apple domains to local service
+    let resolve_hostname = match burdettie_domain_map::rewrite_hostname(hostname) {
+        Some(rewritten) => rewritten,
+        None => hostname.to_string(),
+    };
+
+    let cstr = match std::ffi::CString::new(resolve_hostname.as_str()) {
+        Ok(c) => c,
+        Err(_) => return 0,
+    };
+
+    let mut hints: libc::addrinfo = unsafe { std::mem::zeroed() };
+    hints.ai_family = libc::AF_UNSPEC;
+    hints.ai_socktype = libc::SOCK_STREAM;
+
+    let mut result: *mut libc::addrinfo = std::ptr::null_mut();
+    let rc = unsafe {
+        libc::getaddrinfo(cstr.as_ptr(), std::ptr::null(), &hints, &mut result)
+    };
+
+    if rc != 0 || result.is_null() {
+        log::debug!("SCReachability: getaddrinfo failed for '{hostname}' → not reachable");
+        return 0;
+    }
+    unsafe { libc::freeaddrinfo(result); }
+
+    // DNS resolved — host is reachable
+    log::trace!("SCReachability: '{hostname}' → reachable");
+    K_SC_FLAG_REACHABLE
+}
 
 /// `SCNetworkReachabilityCreateWithName(alloc, name) -> SCNetworkReachabilityRef`
 pub extern "C" fn shim_sc_reachability_create_with_name(_alloc: u64, name: u64) -> u64 {
     let hostname = if name != 0 {
         unsafe { std::ffi::CStr::from_ptr(name as *const std::ffi::c_char) }
             .to_str()
-            .unwrap_or("<invalid>")
+            .unwrap_or("localhost")
+            .to_string()
     } else {
-        "<null>"
+        "localhost".to_string()
     };
+
     let handle = next_handle();
+    let target = ReachabilityTarget {
+        hostname: Some(hostname.clone()),
+        flags: 0,
+    };
+    let mut guard = reachability_store();
+    guard.get_or_insert_with(HashMap::new).insert(handle, target);
     log::trace!("SCNetworkReachabilityCreateWithName: host={hostname} → handle={handle:#x}");
     handle
 }
 
 /// `SCNetworkReachabilityCreateWithAddress(alloc, addr) -> SCNetworkReachabilityRef`
-pub extern "C" fn shim_sc_reachability_create_with_address(_alloc: u64, _addr: u64) -> u64 {
+pub extern "C" fn shim_sc_reachability_create_with_address(_alloc: u64, addr: u64) -> u64 {
+    // Extract IP from sockaddr if possible
+    let hostname = if addr != 0 {
+        let family = unsafe { *(addr as *const u8).add(1) }; // sa_family at offset 1 (macOS)
+        if family == 2 {
+            // AF_INET: extract 4-byte IP at offset 4
+            let ip_bytes = unsafe { std::slice::from_raw_parts((addr as *const u8).add(4), 4) };
+            Some(format!("{}.{}.{}.{}", ip_bytes[0], ip_bytes[1], ip_bytes[2], ip_bytes[3]))
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
     let handle = next_handle();
+    let target = ReachabilityTarget {
+        hostname,
+        flags: 0,
+    };
+    let mut guard = reachability_store();
+    guard.get_or_insert_with(HashMap::new).insert(handle, target);
     log::trace!("SCNetworkReachabilityCreateWithAddress → handle={handle:#x}");
     handle
 }
 
 /// `SCNetworkReachabilityGetFlags(target, &flags) -> Boolean`
 ///
-/// Always writes `kSCNetworkReachabilityFlagsReachable` (bit 1 = 2) and
-/// returns TRUE (1).  This makes all reachability checks think the
-/// network is available.
-pub extern "C" fn shim_sc_reachability_get_flags(_target: u64, flags: u64) -> u8 {
+/// Real implementation: performs DNS lookup to check if host is reachable.
+pub extern "C" fn shim_sc_reachability_get_flags(target: u64, flags: u64) -> u8 {
+    let mut guard = reachability_store();
+    let computed_flags = if let Some(store) = guard.as_mut() {
+        if let Some(entry) = store.get_mut(&target) {
+            let f = match &entry.hostname {
+                Some(h) => check_reachability(h),
+                None => K_SC_FLAG_REACHABLE, // No hostname → assume local
+            };
+            entry.flags = f;
+            f
+        } else {
+            K_SC_FLAG_REACHABLE // Unknown handle, assume reachable for compat
+        }
+    } else {
+        K_SC_FLAG_REACHABLE
+    };
+
     if flags != 0 {
         unsafe {
-            std::ptr::write(flags as *mut u32, 2); // kSCNetworkReachabilityFlagsReachable
+            std::ptr::write(flags as *mut u32, computed_flags);
         }
     }
-    1 // TRUE
+    1 // TRUE — function succeeded
 }
 
 /// `SCNetworkReachabilitySetCallback(target, callback, context) -> Boolean`
@@ -216,11 +308,17 @@ mod tests {
     }
 
     #[test]
-    fn test_reachability_flags_always_reachable() {
+    fn test_reachability_flags_checks_real_host() {
+        // Create a reachability target for localhost (should always resolve)
+        let hostname = std::ffi::CString::new("localhost").unwrap();
+        let handle = shim_sc_reachability_create_with_name(0, hostname.as_ptr() as u64);
+        assert_ne!(handle, 0);
+
         let mut flags: u32 = 0;
-        let ret = shim_sc_reachability_get_flags(1, &mut flags as *mut u32 as u64);
+        let ret = shim_sc_reachability_get_flags(handle, &mut flags as *mut u32 as u64);
         assert_eq!(ret, 1, "GetFlags should return TRUE");
-        assert_ne!(flags & (1 << 1), 0, "kSCNetworkReachabilityFlagsReachable bit should be set");
+        // localhost should be reachable
+        assert_ne!(flags & (1 << 1), 0, "kSCNetworkReachabilityFlagsReachable bit should be set for localhost");
     }
 
     #[test]

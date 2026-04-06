@@ -11,6 +11,16 @@ log       = { workspace = true }
 libc      = { workspace = true }
 thiserror = { workspace = true }
 rusqlite  = { workspace = true }
+# Open-source replacements for Apple framework stubs
+trust-eval    = { workspace = true }
+flate2        = { workspace = true }
+lz4_flex      = { workspace = true }
+ring          = { workspace = true }
+x509-parser   = { workspace = true }
+hickory-resolver = { workspace = true }
+lzma-rs       = { workspace = true }
+launchd       = { workspace = true }
+burdettie-domain-map = { workspace = true }
 
 [dev-dependencies]
 

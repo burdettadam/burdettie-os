@@ -301,11 +301,77 @@ pub extern "C" fn shim_ct_paragraph_style_get_value(_style: u64, _spec: u32, _va
 }
 
 // ---------------------------------------------------------------------------
+// CTLine registry — stores the text and font size for CTLineDraw
+// ---------------------------------------------------------------------------
+
+struct CtLine {
+    text: String,
+    font_size: f64,
+}
+
+static LINE_REGISTRY: Mutex<Option<HashMap<u64, CtLine>>> = Mutex::new(None);
+
+fn with_line_registry<R>(f: impl FnOnce(&mut HashMap<u64, CtLine>) -> R) -> R {
+    let mut guard = LINE_REGISTRY.lock().unwrap();
+    let map = guard.get_or_insert_with(HashMap::new);
+    f(map)
+}
+
+// ---------------------------------------------------------------------------
 // CTLine
 // ---------------------------------------------------------------------------
 
-pub extern "C" fn shim_ct_line_create(_attr_str: u64) -> u64 {
-    new_handle()
+/// CTLineCreateWithAttributedString(attrStr) → CTLineRef
+///
+/// Extracts the plain text from the NSAttributedString (offset 8 = NSString ptr)
+/// and stores it for CTLineDraw.
+pub extern "C" fn shim_ct_line_create(attr_str: u64) -> u64 {
+    let handle = new_handle();
+    let mut text = String::new();
+    let mut font_size = 12.0;
+
+    if attr_str != 0 {
+        // NSAttributedString layout: [0]=isa, [8]=string_ptr (NSString)
+        let string_ptr = unsafe { *((attr_str as usize + 8) as *const u64) };
+        if string_ptr != 0 {
+            // Try to read the NSString as a C string.
+            // NSString layout: [0]=isa, [8]=c_buf_ptr or [16]=c_buf_ptr depending on class.
+            // Use the cfstring helper pattern: try offset 16 first (common for our NSString),
+            // then offset 8.
+            let buf_ptr = unsafe { *((string_ptr as usize + 16) as *const u64) };
+            if buf_ptr > 0x1000 {
+                if let Ok(cstr) = unsafe { std::ffi::CStr::from_ptr(buf_ptr as *const std::ffi::c_char) }.to_str() {
+                    text = cstr.to_string();
+                }
+            }
+        }
+        // Try to read font from attributes: [16]=attrs_count, [24]=attrs_ptr
+        // AttrRun[0] at attrs_ptr: [16]=dict_ptr → NSDictionary with font
+        // This is best-effort; just use 12.0 default if we can't read it.
+        let attrs_count = unsafe { *((attr_str as usize + 16) as *const u64) };
+        if attrs_count > 0 {
+            let attrs_ptr = unsafe { *((attr_str as usize + 24) as *const u64) };
+            if attrs_ptr > 0x1000 {
+                // AttrRun[0].dict_ptr at offset 16
+                let dict_ptr = unsafe { *((attrs_ptr as usize + 16) as *const u64) };
+                if dict_ptr > 0x1000 {
+                    // Try to find CTFont in dictionary — for now just use any font handle
+                    // that exists in the font registry. This is best-effort.
+                    let size = with_registry(|map| {
+                        map.values().next().map(|f| f.size)
+                    });
+                    if let Some(s) = size {
+                        font_size = s;
+                    }
+                }
+            }
+        }
+    }
+
+    with_line_registry(|map| {
+        map.insert(handle, CtLine { text, font_size });
+    });
+    handle
 }
 
 // ---------------------------------------------------------------------------
@@ -348,9 +414,34 @@ pub extern "C" fn shim_ct_run_get_typo_bounds(_run: u64, _range_loc: i64, _range
 // CTLine extended
 // ---------------------------------------------------------------------------
 
-/// CTLineDraw(line, context) — no-op (we don't have the attributed string text here).
-pub extern "C" fn shim_ct_line_draw(_line: u64, _context: u64) {
-    // no-op: future work could render via CgContext
+/// CTLineDraw(line, context) — renders the stored text via CG context.
+///
+/// Uses the registered draw callback if available, otherwise no-op.
+pub extern "C" fn shim_ct_line_draw(line: u64, context: u64) {
+    let line_data = with_line_registry(|map| {
+        map.get(&line).map(|l| (l.text.clone(), l.font_size))
+    });
+    if let Some((text, font_size)) = line_data {
+        if !text.is_empty() && context != 0 {
+            let cb = CT_LINE_DRAW_CB.load(std::sync::atomic::Ordering::Relaxed);
+            if cb != 0 {
+                // Call: fn(ctx: u64, text_ptr: *const u8, text_len: usize, font_size: f64)
+                let f: extern "C" fn(u64, *const u8, usize, f64) =
+                    unsafe { std::mem::transmute(cb) };
+                f(context, text.as_ptr(), text.len(), font_size);
+            }
+        }
+    }
+}
+
+/// Callback for CTLineDraw to render text through CG context.
+/// Set by cg-shims at initialization time.
+static CT_LINE_DRAW_CB: AtomicU64 = AtomicU64::new(0);
+
+/// Register the CTLineDraw rendering callback.
+/// Called by cg-shims to wire CTLineDraw → CGContext text rendering.
+pub fn set_ct_line_draw_callback(f: extern "C" fn(u64, *const u8, usize, f64)) {
+    CT_LINE_DRAW_CB.store(f as *const () as u64, Ordering::Relaxed);
 }
 
 /// CTLineGetStringRange(line) → CFRange (sret).
@@ -364,12 +455,21 @@ pub extern "C" fn shim_ct_line_get_string_range(sret: u64, _line: u64) {
 }
 
 /// CTLineGetTypographicBounds(line, ascent_out, descent_out, leading_out) → f64 width.
-pub extern "C" fn shim_ct_line_get_typo_bounds(_line: u64, ascent: u64, descent: u64, leading: u64) -> u64 {
-    // Write zero metrics; return 0 width.
-    if ascent != 0 { unsafe { *(ascent as *mut f64) = 0.0; } }
-    if descent != 0 { unsafe { *(descent as *mut f64) = 0.0; } }
-    if leading != 0 { unsafe { *(leading as *mut f64) = 0.0; } }
-    0.0_f64.to_bits()
+pub extern "C" fn shim_ct_line_get_typo_bounds(line: u64, ascent: u64, descent: u64, leading: u64) -> u64 {
+    // Try to get real metrics from the line's stored font size and text
+    let data = with_line_registry(|map| {
+        map.get(&line).map(|l| (l.text.len(), l.font_size))
+    });
+    let (text_len, font_size) = data.unwrap_or((0, 12.0));
+    let fs = if font_size > 0.0 { font_size } else { 12.0 };
+
+    if ascent != 0 { unsafe { *(ascent as *mut f64) = fs * 0.8; } }
+    if descent != 0 { unsafe { *(descent as *mut f64) = fs * 0.2; } }
+    if leading != 0 { unsafe { *(leading as *mut f64) = fs * 0.1; } }
+
+    // Approximate width: ~0.6 * font_size per character
+    let width = text_len as f64 * fs * 0.6;
+    width.to_bits()
 }
 
 /// CTLineGetBoundsWithOptions(line, options) → CGRect (sret, 32 bytes via x8).

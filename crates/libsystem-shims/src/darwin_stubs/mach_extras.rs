@@ -156,8 +156,10 @@ fn handle_bootstrap_look_up_mig(msg: u64, rcv_size: u32) -> u32 {
 
     log::debug!("mach_msg MIG 403: bootstrap_look_up(\"{}\")", name);
 
-    // Look up or create a synthetic port for this service.
-    let port = BOOTSTRAP_SERVICES.look_up_or_create(name);
+    // Look up via the launchd bootstrap registry (auto-creates if missing).
+    let mut port: u32 = 0;
+    let c_name = std::ffi::CString::new(name).unwrap_or_default();
+    launchd::bootstrap::bootstrap_look_up(0, c_name.as_ptr(), &mut port);
 
     // Write the reply message.
     // Minimum reply = 24 (hdr) + 16 (NDR) + 4 (retcode) + 4 (port) = 48 bytes
@@ -257,62 +259,6 @@ fn handle_host_info_mig(msg: u64, rcv_size: u32) -> u32 {
         // memory_size at offset 52 (simplified: report as 0 and let callers use sysctl)
     }
     0
-}
-
-/// Bootstrap service registry — maps service names to synthetic Mach ports.
-///
-/// Thread-safe via `Mutex`. Ports are allocated from a monotonic counter
-/// starting at `0x1000` (above the synthetic host/task port range).
-struct BootstrapServiceRegistry {
-    inner: std::sync::OnceLock<std::sync::Mutex<BootstrapRegistryInner>>,
-}
-
-struct BootstrapRegistryInner {
-    services: std::collections::HashMap<String, u32>,
-    next_port: u32,
-}
-
-impl BootstrapServiceRegistry {
-    const fn new() -> Self {
-        Self {
-            inner: std::sync::OnceLock::new(),
-        }
-    }
-
-    fn get_inner(&self) -> &std::sync::Mutex<BootstrapRegistryInner> {
-        self.inner.get_or_init(|| {
-            std::sync::Mutex::new(BootstrapRegistryInner {
-                services: std::collections::HashMap::new(),
-                next_port: 0x1000,
-            })
-        })
-    }
-
-    /// Look up an existing service or create a new synthetic port.
-    fn look_up_or_create(&self, name: &str) -> u32 {
-        let mut inner = self.get_inner().lock().unwrap_or_else(|e| e.into_inner());
-        if let Some(&port) = inner.services.get(name) {
-            return port;
-        }
-        let port = inner.next_port;
-        inner.next_port += 1;
-        inner.services.insert(name.to_string(), port);
-        log::debug!("bootstrap: registered \"{}\" → port {:#x}", name, port);
-        port
-    }
-
-    /// Look up a service by name.
-    fn look_up(&self, name: &str) -> Option<u32> {
-        let inner = self.get_inner().lock().unwrap_or_else(|e| e.into_inner());
-        inner.services.get(name).copied()
-    }
-}
-
-static BOOTSTRAP_SERVICES: BootstrapServiceRegistry = BootstrapServiceRegistry::new();
-
-/// Public entry point for `bootstrap_look_up` C wrapper (posix_extras.rs).
-pub fn bootstrap_look_up_service(name: &str) -> u32 {
-    BOOTSTRAP_SERVICES.look_up_or_create(name)
 }
 
 /// KERN_INVALID_ARGUMENT = 4
@@ -607,25 +553,32 @@ mod tests {
     // ── Bootstrap / mach_msg tests ──────────────────────────────
 
     #[test]
-    fn bootstrap_registry_creates_ports() {
-        let reg = BootstrapServiceRegistry::new();
-        let port = reg.look_up_or_create("com.test.creates_ports");
+    fn bootstrap_look_up_creates_ports() {
+        let name = std::ffi::CString::new("com.test.creates_ports").unwrap();
+        let mut port: u32 = 0;
+        let r = launchd::bootstrap::bootstrap_look_up(0, name.as_ptr(), &mut port);
+        assert_eq!(r, 0);
         assert!(port >= 0x1000, "port {:#x} should be >= 0x1000", port);
     }
 
     #[test]
-    fn bootstrap_registry_same_service_same_port() {
-        let reg = BootstrapServiceRegistry::new();
-        let p1 = reg.look_up_or_create("com.test.same_service");
-        let p2 = reg.look_up_or_create("com.test.same_service");
+    fn bootstrap_look_up_same_service_same_port() {
+        let name = std::ffi::CString::new("com.test.same_service_shim").unwrap();
+        let mut p1: u32 = 0;
+        let mut p2: u32 = 0;
+        launchd::bootstrap::bootstrap_look_up(0, name.as_ptr(), &mut p1);
+        launchd::bootstrap::bootstrap_look_up(0, name.as_ptr(), &mut p2);
         assert_eq!(p1, p2);
     }
 
     #[test]
-    fn bootstrap_registry_different_services_different_ports() {
-        let reg = BootstrapServiceRegistry::new();
-        let p1 = reg.look_up_or_create("com.test.service_a");
-        let p2 = reg.look_up_or_create("com.test.service_b");
+    fn bootstrap_look_up_different_services_different_ports() {
+        let a = std::ffi::CString::new("com.test.service_a_shim").unwrap();
+        let b = std::ffi::CString::new("com.test.service_b_shim").unwrap();
+        let mut p1: u32 = 0;
+        let mut p2: u32 = 0;
+        launchd::bootstrap::bootstrap_look_up(0, a.as_ptr(), &mut p1);
+        launchd::bootstrap::bootstrap_look_up(0, b.as_ptr(), &mut p2);
         assert_ne!(p1, p2);
     }
 

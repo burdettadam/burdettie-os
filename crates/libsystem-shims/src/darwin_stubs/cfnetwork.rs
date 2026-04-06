@@ -1,11 +1,13 @@
-//! Apple CFNetwork.framework stubs.
+//! Apple CFNetwork.framework — real DNS + benign HTTP stubs.
 //!
-//! CFNetwork is the C-level networking layer underneath NSURLSession.
-//! Xcode CLI tools and Foundation code paths import these symbols.
-//! All operations are safe no-ops: connections never open, DNS lookups
-//! succeed vacuously, and HTTP messages return benign defaults.
+//! CFHost DNS resolution is backed by hickory-resolver (pure-Rust DNS).
+//! CFHTTPMessage and other HTTP APIs remain safe stubs since NSURLSession
+//! already provides real HTTP via ureq.
 
 use crate::table::ShimTable;
+use std::collections::HashMap;
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 pub struct CfNetworkStubs;
 
@@ -27,15 +29,33 @@ static K_CF_NETWORK_PROXIES_HTTP_ENABLE: u64 = 0x4346_4E57_0107;
 static K_CF_NETWORK_PROXIES_HTTP_PROXY: u64 = 0x4346_4E57_0108;
 static K_CF_NETWORK_PROXIES_HTTP_PORT: u64 = 0x4346_4E57_0109;
 
+// ── Real CFHost DNS infrastructure ──────────────────────────────
+
+static NEXT_CFHOST_HANDLE: AtomicU64 = AtomicU64::new(0x4346_4800_0001);
+
+struct CfHostEntry {
+    hostname: String,
+    /// Resolved IPv4/IPv6 addresses (stored as sockaddr bytes in macOS layout).
+    resolved_addrs: Option<Vec<Vec<u8>>>,
+    /// CFArrayRef pointing to the resolved addresses (allocated on first access).
+    cached_array: u64,
+}
+
+static CFHOST_STORE: Mutex<Option<HashMap<u64, CfHostEntry>>> = Mutex::new(None);
+
+fn cfhost_store() -> std::sync::MutexGuard<'static, Option<HashMap<u64, CfHostEntry>>> {
+    CFHOST_STORE.lock().unwrap_or_else(|e| e.into_inner())
+}
+
 impl CfNetworkStubs {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
 
-        // ── CFHost (DNS resolution) ─────────────────────────────
+        // ── CFHost (real DNS resolution via hickory-resolver) ───
         register_shims!(table,
-            ("_CFHostCreateWithName", shim_cfnetwork_sentinel2 as *const () as u64, "CFHostCreateWithName (stub → sentinel)"),
-            ("_CFHostStartInfoResolution", shim_cfnetwork_true3 as *const () as u64, "CFHostStartInfoResolution (stub → true)"),
-            ("_CFHostGetAddressing", shim_cfnetwork_null2 as *const () as u64, "CFHostGetAddressing (stub → NULL)"),
+            ("_CFHostCreateWithName", shim_cfhost_create_with_name as *const () as u64, "CFHostCreateWithName (real DNS)"),
+            ("_CFHostStartInfoResolution", shim_cfhost_start_info_resolution as *const () as u64, "CFHostStartInfoResolution (real DNS lookup)"),
+            ("_CFHostGetAddressing", shim_cfhost_get_addressing as *const () as u64, "CFHostGetAddressing (real resolved addresses)"),
             ("_CFHostGetNames", shim_cfnetwork_null2 as *const () as u64, "CFHostGetNames (stub → NULL)"),
             ("_CFHostSetClient", shim_cfnetwork_void3 as *const () as u64, "CFHostSetClient (stub → no-op)"),
             ("_CFHostScheduleWithRunLoop", shim_cfnetwork_void3 as *const () as u64, "CFHostScheduleWithRunLoop (stub → no-op)"),
@@ -142,6 +162,172 @@ pub extern "C" fn shim_cfnetwork_sentinel4(_a: u64, _b: u64, _c: u64, _d: u64) -
 }
 
 // ── Specific shim functions ─────────────────────────────────────
+
+// ── Real CFHost DNS implementation ──────────────────────────────
+
+/// CFHostCreateWithName(allocator, hostname_cfstring) → CFHostRef
+pub extern "C" fn shim_cfhost_create_with_name(_alloc: u64, name: u64) -> u64 {
+    let hostname = if name != 0 {
+        // Read C string pointer from CFString at offset +16
+        let cstr_ptr = unsafe { *((name as usize + 16) as *const u64) };
+        if cstr_ptr > 0x1000 {
+            unsafe { std::ffi::CStr::from_ptr(cstr_ptr as *const std::ffi::c_char) }
+                .to_str()
+                .unwrap_or("localhost")
+                .to_string()
+        } else {
+            "localhost".to_string()
+        }
+    } else {
+        "localhost".to_string()
+    };
+
+    let handle = NEXT_CFHOST_HANDLE.fetch_add(1, Ordering::Relaxed);
+    let entry = CfHostEntry {
+        hostname: hostname.clone(),
+        resolved_addrs: None,
+        cached_array: 0,
+    };
+    let mut guard = cfhost_store();
+    guard.get_or_insert_with(HashMap::new).insert(handle, entry);
+    log::trace!("CFHostCreateWithName: '{hostname}' → handle={handle:#x}");
+    handle
+}
+
+/// CFHostStartInfoResolution(host, infoType, &error) → Boolean
+///
+/// Real DNS lookup using libc getaddrinfo (synchronous, uses system resolver).
+pub extern "C" fn shim_cfhost_start_info_resolution(host: u64, _info_type: i32, _error: *mut u64) -> i32 {
+    let mut guard = cfhost_store();
+    let store = match guard.as_mut() {
+        Some(s) => s,
+        None => return 0,
+    };
+    let entry = match store.get_mut(&host) {
+        Some(e) => e,
+        None => return 0,
+    };
+
+    // BurdettieOS DNS rewrite — redirect Apple domains to local service
+    let resolve_hostname = match burdettie_domain_map::rewrite_hostname(&entry.hostname) {
+        Some(rewritten) => rewritten,
+        None => entry.hostname.clone(),
+    };
+
+    // Use libc getaddrinfo for portable DNS resolution (works on both macOS and Linux)
+    let hostname_cstr = match std::ffi::CString::new(resolve_hostname.as_str()) {
+        Ok(c) => c,
+        Err(_) => return 0,
+    };
+
+    let mut hints: libc::addrinfo = unsafe { std::mem::zeroed() };
+    hints.ai_family = libc::AF_UNSPEC;
+    hints.ai_socktype = libc::SOCK_STREAM;
+
+    let mut result: *mut libc::addrinfo = std::ptr::null_mut();
+    let rc = unsafe {
+        libc::getaddrinfo(
+            hostname_cstr.as_ptr(),
+            std::ptr::null(),
+            &hints,
+            &mut result,
+        )
+    };
+
+    if rc != 0 || result.is_null() {
+        log::debug!("CFHostStartInfoResolution: getaddrinfo failed for '{}' (resolving as '{}', rc={rc})", entry.hostname, resolve_hostname);
+        entry.resolved_addrs = Some(Vec::new());
+        return 0;
+    }
+
+    let mut addrs = Vec::new();
+    let mut current = result;
+    while !current.is_null() {
+        let ai = unsafe { &*current };
+        if !ai.ai_addr.is_null() && ai.ai_addrlen > 0 {
+            let sa_bytes = unsafe {
+                std::slice::from_raw_parts(ai.ai_addr as *const u8, ai.ai_addrlen as usize)
+            };
+            addrs.push(sa_bytes.to_vec());
+        }
+        current = ai.ai_next;
+    }
+    unsafe { libc::freeaddrinfo(result); }
+
+    log::debug!("CFHostStartInfoResolution: '{}' → {} addresses", entry.hostname, addrs.len());
+    entry.resolved_addrs = Some(addrs);
+    1 // TRUE
+}
+
+/// CFHostGetAddressing(host, &hasBeenResolved) → CFArrayRef
+///
+/// Returns a CFArray of sockaddr data objects from the resolved addresses.
+pub extern "C" fn shim_cfhost_get_addressing(host: u64, resolved: *mut i32) -> u64 {
+    let mut guard = cfhost_store();
+    let store = match guard.as_mut() {
+        Some(s) => s,
+        None => {
+            if !resolved.is_null() { unsafe { *resolved = 0; } }
+            return 0;
+        }
+    };
+    let entry = match store.get_mut(&host) {
+        Some(e) => e,
+        None => {
+            if !resolved.is_null() { unsafe { *resolved = 0; } }
+            return 0;
+        }
+    };
+
+    match &entry.resolved_addrs {
+        None => {
+            if !resolved.is_null() { unsafe { *resolved = 0; } }
+            0
+        }
+        Some(addrs) => {
+            if !resolved.is_null() { unsafe { *resolved = 1; } }
+            if addrs.is_empty() {
+                return 0;
+            }
+            // Return cached array if already built
+            if entry.cached_array != 0 {
+                return entry.cached_array;
+            }
+            // Build a CFArray of CFData objects containing sockaddr bytes
+            let count = addrs.len();
+            // Allocate array: [isa:8][count:8][items_ptr:8][pad:8]
+            let array = unsafe { libc::calloc(1, 32) as u64 };
+            if array == 0 { return 0; }
+
+            let items = unsafe { libc::calloc(count, 8) as *mut u64 };
+            if items.is_null() { return 0; }
+
+            for (i, sa_bytes) in addrs.iter().enumerate() {
+                // CFData: [isa:8][bytes_ptr:8][length:8]
+                let data_obj = unsafe { libc::calloc(1, 24) as u64 };
+                if data_obj != 0 && !sa_bytes.is_empty() {
+                    let buf = unsafe { libc::malloc(sa_bytes.len()) as *mut u8 };
+                    if !buf.is_null() {
+                        unsafe {
+                            std::ptr::copy_nonoverlapping(sa_bytes.as_ptr(), buf, sa_bytes.len());
+                            *((data_obj as usize + 8) as *mut u64) = buf as u64;
+                            *((data_obj as usize + 16) as *mut u64) = sa_bytes.len() as u64;
+                        }
+                    }
+                }
+                unsafe { items.add(i).write(data_obj); }
+            }
+
+            unsafe {
+                *((array as usize + 8) as *mut u64) = count as u64;
+                *((array as usize + 16) as *mut u64) = items as u64;
+            }
+
+            entry.cached_array = array;
+            array
+        }
+    }
+}
 
 /// CFHTTPMessageGetResponseStatusCode(message) → CFIndex (200)
 pub extern "C" fn shim_cf_http_message_get_response_status_code(_msg: u64) -> i64 {

@@ -3,9 +3,11 @@
 //! Provides `compression_encode_buffer`, `compression_decode_buffer`, and the
 //! streaming API (`compression_stream_init`/`process`/`destroy`).
 //!
-//! ZLIB is implemented as stored-only (no actual deflation) — valid zlib that
-//! any real decompressor accepts.  LZ4 uses literal-only encoding for output
-//! and a full block-format decoder for input.  LZMA/LZFSE return 0 (unsupported).
+//! Real compression backed by open-source crates:
+//!   - ZLIB: `flate2` (miniz_oxide backend, pure Rust)
+//!   - LZ4:  `lz4_flex` (pure Rust LZ4 block codec)
+//!   - LZMA: `lzma-rs` (pure Rust LZMA/XZ decoder, encode unsupported)
+//!   - LZFSE: not yet supported (returns 0)
 
 use crate::table::ShimTable;
 
@@ -75,216 +77,69 @@ fn adler32(data: &[u8]) -> u32 {
     (b << 16) | a
 }
 
-// ── ZLIB stored-block encode / decode ────────────────────────────────────────
+// ── ZLIB via flate2 (real deflate compression) ───────────────────────────────
 
-fn zlib_encode_stored(src: &[u8]) -> Vec<u8> {
-    // Header: CMF=0x78 (deflate, window 32K), FLG=0x01 (no dict, check bits)
-    let mut out = Vec::with_capacity(src.len() + 64);
-    out.push(0x78);
-    out.push(0x01);
+fn zlib_encode(src: &[u8]) -> Vec<u8> {
+    use flate2::write::ZlibEncoder;
+    use flate2::Compression;
+    use std::io::Write;
 
-    let chunks = if src.is_empty() { 1 } else { (src.len() + 65534) / 65535 };
-    for i in 0..chunks {
-        let start = i * 65535;
-        let end = std::cmp::min(start + 65535, src.len());
-        let chunk = &src[start..end];
-        let len = chunk.len() as u16;
-        let nlen = !len;
-        let bfinal: u8 = if i + 1 == chunks { 1 } else { 0 };
-        // BFINAL | BTYPE=00 (stored)
-        out.push(bfinal);
-        out.push(len as u8);
-        out.push((len >> 8) as u8);
-        out.push(nlen as u8);
-        out.push((nlen >> 8) as u8);
-        out.extend_from_slice(chunk);
-    }
-
-    let checksum = adler32(src);
-    out.push((checksum >> 24) as u8);
-    out.push((checksum >> 16) as u8);
-    out.push((checksum >> 8) as u8);
-    out.push(checksum as u8);
-    out
+    let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
+    let _ = encoder.write_all(src);
+    encoder.finish().unwrap_or_default()
 }
 
-fn zlib_decode_stored(src: &[u8]) -> Option<Vec<u8>> {
-    if src.len() < 6 {
-        return None;
-    }
-    // Verify zlib header — CMF byte must indicate deflate (method 8)
-    if src[0] & 0x0F != 8 {
-        return None;
-    }
-    // Check header checksum
-    let cmf_flg = (src[0] as u16) * 256 + src[1] as u16;
-    if cmf_flg % 31 != 0 {
-        return None;
-    }
+fn zlib_decode(src: &[u8]) -> Option<Vec<u8>> {
+    use flate2::read::ZlibDecoder;
+    use std::io::Read;
 
-    let mut pos = 2;
-    let trailer_len = 4;
-    if src.len() < pos + trailer_len {
-        return None;
-    }
-    let data_end = src.len() - trailer_len;
+    let mut decoder = ZlibDecoder::new(src);
     let mut out = Vec::new();
-
-    loop {
-        if pos >= data_end {
-            break;
-        }
-        if pos + 5 > data_end {
-            return None;
-        }
-        let bfinal = src[pos] & 1;
-        let btype = (src[pos] >> 1) & 3;
-        if btype != 0 {
-            // We only handle stored blocks
-            return None;
-        }
-        pos += 1;
-        let len = src[pos] as u16 | ((src[pos + 1] as u16) << 8);
-        let nlen = src[pos + 2] as u16 | ((src[pos + 3] as u16) << 8);
-        if len != !nlen {
-            return None;
-        }
-        pos += 4;
-        let block_end = pos + len as usize;
-        if block_end > data_end {
-            return None;
-        }
-        out.extend_from_slice(&src[pos..block_end]);
-        pos = block_end;
-        if bfinal != 0 {
-            break;
-        }
-    }
-
-    // Verify adler-32 trailer
-    let expected = ((src[data_end] as u32) << 24)
-        | ((src[data_end + 1] as u32) << 16)
-        | ((src[data_end + 2] as u32) << 8)
-        | (src[data_end + 3] as u32);
-    if adler32(&out) != expected {
-        return None;
-    }
+    decoder.read_to_end(&mut out).ok()?;
     Some(out)
 }
 
-// ── LZ4 block encode / decode ────────────────────────────────────────────────
+// ── LZ4 via lz4_flex (real LZ4 block compression) ────────────────────────────
 
-/// Encode using literal-only sequences (valid LZ4 that any decoder accepts).
-fn lz4_encode_literals(src: &[u8]) -> Vec<u8> {
+/// Encode using lz4_flex real LZ4 block compression.
+fn lz4_encode(src: &[u8]) -> Vec<u8> {
     if src.is_empty() {
         return Vec::new();
     }
-
-    let mut out = Vec::with_capacity(src.len() + src.len() / 255 + 16);
-    let mut offset = 0;
-
-    while offset < src.len() {
-        let remaining = src.len() - offset;
-        // Emit literal-only token: high nibble = literal length, low nibble = 0 (no match)
-        let lit_len = remaining;
-        if lit_len < 15 {
-            out.push((lit_len as u8) << 4);
-        } else {
-            out.push(0xF0);
-            let mut extra = lit_len - 15;
-            while extra >= 255 {
-                out.push(255);
-                extra -= 255;
-            }
-            out.push(extra as u8);
-        }
-        out.extend_from_slice(&src[offset..offset + lit_len]);
-        offset += lit_len;
-    }
-    out
+    lz4_flex::block::compress_prepend_size(src)
 }
 
-/// Decode LZ4 block format (literals + match copies).
+/// Decode LZ4 block format using lz4_flex.
 fn lz4_decode(src: &[u8], max_output: usize) -> Option<Vec<u8>> {
-    let mut out = Vec::new();
-    let mut pos = 0;
-
-    while pos < src.len() {
-        let token = src[pos];
-        pos += 1;
-
-        // ── Literal length ──
-        let mut lit_len = ((token >> 4) & 0xF) as usize;
-        if lit_len == 15 {
-            loop {
-                if pos >= src.len() {
-                    return None;
-                }
-                let extra = src[pos] as usize;
-                pos += 1;
-                lit_len += extra;
-                if extra < 255 {
-                    break;
-                }
-            }
-        }
-
-        // ── Copy literals ──
-        if pos + lit_len > src.len() {
-            return None;
-        }
-        if out.len() + lit_len > max_output {
-            return None;
-        }
-        out.extend_from_slice(&src[pos..pos + lit_len]);
-        pos += lit_len;
-
-        // If we've consumed all input, we're done (last sequence has no match).
-        if pos >= src.len() {
-            break;
-        }
-
-        // ── Match offset (2 bytes LE) ──
-        if pos + 2 > src.len() {
-            return None;
-        }
-        let match_offset = src[pos] as usize | ((src[pos + 1] as usize) << 8);
-        pos += 2;
-        if match_offset == 0 {
-            return None;
-        }
-
-        // ── Match length ──
-        let mut match_len = (token & 0xF) as usize + 4; // min match = 4
-        if (token & 0xF) == 15 {
-            loop {
-                if pos >= src.len() {
-                    return None;
-                }
-                let extra = src[pos] as usize;
-                pos += 1;
-                match_len += extra;
-                if extra < 255 {
-                    break;
-                }
-            }
-        }
-
-        // ── Copy from already-decoded output ──
-        if match_offset > out.len() {
-            return None;
-        }
-        if out.len() + match_len > max_output {
-            return None;
-        }
-        let start = out.len() - match_offset;
-        for i in 0..match_len {
-            let byte = out[start + i];
-            out.push(byte);
+    // Try prepended-size format first (lz4_flex default)
+    if let Ok(decoded) = lz4_flex::block::decompress_size_prepended(src) {
+        if decoded.len() <= max_output {
+            return Some(decoded);
         }
     }
+    // Fall back to uncompressed-size variant
+    lz4_flex::block::decompress(src, max_output).ok()
+}
 
-    Some(out)
+// ── LZMA via lzma-rs (real LZMA decompression) ──────────────────────────────
+
+fn lzma_decode(src: &[u8]) -> Option<Vec<u8>> {
+    use std::io::BufReader;
+
+    // Try LZMA standalone format first
+    let mut out = Vec::new();
+    if lzma_rs::lzma_decompress(&mut BufReader::new(src), &mut out).is_ok() {
+        return Some(out);
+    }
+
+    // Try XZ container format
+    out.clear();
+    let mut reader = BufReader::new(src);
+    if lzma_rs::xz_decompress(&mut reader, &mut out).is_ok() {
+        return Some(out);
+    }
+
+    None
 }
 
 // ── One-shot shims ───────────────────────────────────────────────────────────
@@ -304,8 +159,12 @@ pub extern "C" fn shim_compression_encode_buffer(
     };
 
     let encoded = match algo {
-        COMPRESSION_ZLIB => zlib_encode_stored(src_slice),
-        COMPRESSION_LZ4 | COMPRESSION_LZ4_RAW => lz4_encode_literals(src_slice),
+        COMPRESSION_ZLIB => zlib_encode(src_slice),
+        COMPRESSION_LZ4 | COMPRESSION_LZ4_RAW => lz4_encode(src_slice),
+        COMPRESSION_LZMA => {
+            log::debug!("compression_encode_buffer: LZMA encode not supported");
+            return 0;
+        }
         _ => {
             log::debug!("compression_encode_buffer: unsupported algo 0x{:x}", algo);
             return 0;
@@ -337,11 +196,15 @@ pub extern "C" fn shim_compression_decode_buffer(
     let src_slice = unsafe { std::slice::from_raw_parts(src as *const u8, src_size) };
 
     let decoded = match algo {
-        COMPRESSION_ZLIB => match zlib_decode_stored(src_slice) {
+        COMPRESSION_ZLIB => match zlib_decode(src_slice) {
             Some(d) => d,
             None => return 0,
         },
         COMPRESSION_LZ4 | COMPRESSION_LZ4_RAW => match lz4_decode(src_slice, dst_size) {
+            Some(d) => d,
+            None => return 0,
+        },
+        COMPRESSION_LZMA => match lzma_decode(src_slice) {
             Some(d) => d,
             None => return 0,
         },
@@ -402,7 +265,7 @@ pub extern "C" fn shim_compression_stream_init(
         return COMPRESSION_STATUS_ERROR;
     }
     match algo {
-        COMPRESSION_ZLIB | COMPRESSION_LZ4 | COMPRESSION_LZ4_RAW => {}
+        COMPRESSION_ZLIB | COMPRESSION_LZ4 | COMPRESSION_LZ4_RAW | COMPRESSION_LZMA => {}
         _ => {
             log::debug!("compression_stream_init: unsupported algo 0x{:x}", algo);
             return COMPRESSION_STATUS_ERROR;
@@ -465,17 +328,22 @@ pub extern "C" fn shim_compression_stream_process(stream: u64, flags: i32) -> i3
 
     let result = if state.operation == COMPRESSION_STREAM_ENCODE {
         match state.algo {
-            COMPRESSION_ZLIB => zlib_encode_stored(&state.buffer),
-            COMPRESSION_LZ4 | COMPRESSION_LZ4_RAW => lz4_encode_literals(&state.buffer),
+            COMPRESSION_ZLIB => zlib_encode(&state.buffer),
+            COMPRESSION_LZ4 | COMPRESSION_LZ4_RAW => lz4_encode(&state.buffer),
+            COMPRESSION_LZMA => return COMPRESSION_STATUS_ERROR, // encode not supported
             _ => return COMPRESSION_STATUS_ERROR,
         }
     } else {
         match state.algo {
-            COMPRESSION_ZLIB => match zlib_decode_stored(&state.buffer) {
+            COMPRESSION_ZLIB => match zlib_decode(&state.buffer) {
                 Some(d) => d,
                 None => return COMPRESSION_STATUS_ERROR,
             },
             COMPRESSION_LZ4 | COMPRESSION_LZ4_RAW => match lz4_decode(&state.buffer, dst_size) {
+                Some(d) => d,
+                None => return COMPRESSION_STATUS_ERROR,
+            },
+            COMPRESSION_LZMA => match lzma_decode(&state.buffer) {
                 Some(d) => d,
                 None => return COMPRESSION_STATUS_ERROR,
             },
@@ -532,8 +400,8 @@ mod tests {
     #[test]
     fn test_zlib_encode_decode_roundtrip() {
         let input = b"hello world";
-        let encoded = zlib_encode_stored(input);
-        let decoded = zlib_decode_stored(&encoded).expect("decode failed");
+        let encoded = zlib_encode(input);
+        let decoded = zlib_decode(&encoded).expect("decode failed");
         assert_eq!(&decoded, input);
     }
 
@@ -541,15 +409,15 @@ mod tests {
     fn test_zlib_encode_large() {
         // 100 KB of patterned data
         let input: Vec<u8> = (0..100_000).map(|i| (i % 251) as u8).collect();
-        let encoded = zlib_encode_stored(&input);
-        let decoded = zlib_decode_stored(&encoded).expect("decode failed");
+        let encoded = zlib_encode(&input);
+        let decoded = zlib_decode(&encoded).expect("decode failed");
         assert_eq!(decoded, input);
     }
 
     #[test]
     fn test_lz4_encode_decode_roundtrip() {
         let input = b"hello world";
-        let encoded = lz4_encode_literals(input);
+        let encoded = lz4_encode(input);
         let decoded = lz4_decode(&encoded, 1024).expect("decode failed");
         assert_eq!(&decoded, &input[..]);
     }
@@ -580,13 +448,13 @@ mod tests {
     fn test_empty_encode() {
         let input: &[u8] = b"";
         // ZLIB: should produce valid empty zlib stream
-        let encoded = zlib_encode_stored(input);
+        let encoded = zlib_encode(input);
         assert!(encoded.len() > 2); // at least header + block header + trailer
-        let decoded = zlib_decode_stored(&encoded).expect("empty decode failed");
+        let decoded = zlib_decode(&encoded).expect("empty decode failed");
         assert!(decoded.is_empty());
 
         // LZ4: empty input → empty output
-        let lz4_enc = lz4_encode_literals(input);
+        let lz4_enc = lz4_encode(input);
         assert!(lz4_enc.is_empty());
     }
 
@@ -639,7 +507,9 @@ mod tests {
         let stream_addr = &mut stream as *mut FakeStream as u64;
 
         let ret = shim_compression_stream_init(stream_addr, COMPRESSION_STREAM_ENCODE, COMPRESSION_LZMA);
-        assert_eq!(ret, COMPRESSION_STATUS_ERROR);
+        // LZMA is now accepted for streaming (decode supported)
+        assert_eq!(ret, COMPRESSION_STATUS_OK);
+        shim_compression_stream_destroy(stream_addr);
     }
 
     #[test]
