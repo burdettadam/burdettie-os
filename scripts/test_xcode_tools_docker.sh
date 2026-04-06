@@ -198,6 +198,218 @@ test_xcode_tc()  { test_dir "$TOOLS_DIR/xcode-tc"  "xcode-tc"  "Xcode Toolchain 
 test_xcode_dev() { test_dir "$TOOLS_DIR/xcode-dev" "xcode-dev" "Xcode Developer Tools"; }
 test_system()    { test_dir "$TOOLS_DIR/system"     "system"    "System CLI Tools"; }
 
+# ── Functional output-validation tests ──────────────────────────────
+
+# Extract just the tool output between the output markers.
+# The loader prints lines containing " output " before and " end " after guest output.
+extract_output() {
+    LC_ALL=C awk '/  .* output .*/{found=1; next} /  .* end .*/{found=0} found'
+}
+
+# Run a functional test: execute tool, validate output contains expected string.
+# Args: $1=description $2=binary $3=expected_grep_pattern $4...=args
+test_functional() {
+    local desc="$1"
+    local bin="$2"
+    local pattern="$3"
+    shift 3
+    local args="$*"
+
+    printf "  %-35s " "$desc"
+
+    if [ ! -f "$bin" ]; then
+        printf "${YELLOW}SKIP${NC}     (binary not found)\n"
+        echo "functional|$desc|SKIP|0|binary not found" >> "$RESULTS_FILE"
+        return
+    fi
+
+    local exit_code=0
+    local raw_out
+    if [ -z "$args" ]; then
+        raw_out=$(timeout 15 "$LOADER" --exec "$bin" 2>/dev/null) || exit_code=$?
+    else
+        raw_out=$(timeout 15 "$LOADER" --exec "$bin" --exec-args $args 2>/dev/null) || exit_code=$?
+    fi
+
+    if [ $exit_code -eq 124 ]; then
+        printf "${YELLOW}TIMEOUT${NC}  (hung after 15s)\n"
+        echo "functional|$desc|TIMEOUT|$exit_code|hung" >> "$RESULTS_FILE"
+        ((FAIL++)) || true
+        return
+    fi
+
+    if [ $exit_code -ge 128 ]; then
+        printf "${RED}CRASH${NC}    (signal %d)\n" "$((exit_code - 128))"
+        echo "functional|$desc|CRASH|$exit_code|signal" >> "$RESULTS_FILE"
+        ((CRASH++)) || true
+        return
+    fi
+
+    # Extract tool output
+    local tool_out
+    tool_out=$(echo "$raw_out" | extract_output)
+
+    if echo "$tool_out" | grep -qE "$pattern"; then
+        local preview
+        preview=$(echo "$tool_out" | head -1 | head -c 60)
+        printf "${GREEN}PASS${NC}     %s\n" "$preview"
+        echo "functional|$desc|PASS|$exit_code|matched" >> "$RESULTS_FILE"
+        ((PASS++)) || true
+    else
+        local preview
+        preview=$(echo "$tool_out" | head -1 | head -c 60)
+        printf "${YELLOW}WRONG${NC}    output: %s\n" "$preview"
+        echo "functional|$desc|WRONG_OUTPUT|$exit_code|expected /$pattern/" >> "$RESULTS_FILE"
+        ((FAIL++)) || true
+    fi
+}
+
+# Run a functional test that checks output line/byte count meets a minimum.
+# Args: $1=description $2=binary $3=min_lines $4...=args
+test_functional_minlines() {
+    local desc="$1"
+    local bin="$2"
+    local min_lines="$3"
+    shift 3
+    local args="$*"
+
+    printf "  %-35s " "$desc"
+
+    if [ ! -f "$bin" ]; then
+        printf "${YELLOW}SKIP${NC}     (binary not found)\n"
+        echo "functional|$desc|SKIP|0|binary not found" >> "$RESULTS_FILE"
+        return
+    fi
+
+    local exit_code=0
+    local raw_out
+    raw_out=$(timeout 15 "$LOADER" --exec "$bin" --exec-args $args 2>/dev/null) || exit_code=$?
+
+    if [ $exit_code -eq 124 ]; then
+        printf "${YELLOW}TIMEOUT${NC}  (hung after 15s)\n"
+        echo "functional|$desc|TIMEOUT|$exit_code|hung" >> "$RESULTS_FILE"
+        ((FAIL++)) || true
+        return
+    fi
+
+    if [ $exit_code -ge 128 ]; then
+        printf "${RED}CRASH${NC}    (signal %d)\n" "$((exit_code - 128))"
+        echo "functional|$desc|CRASH|$exit_code|signal" >> "$RESULTS_FILE"
+        ((CRASH++)) || true
+        return
+    fi
+
+    local tool_out
+    tool_out=$(echo "$raw_out" | extract_output)
+    local actual_lines
+    actual_lines=$(echo "$tool_out" | wc -l | tr -d ' ')
+
+    if [ "$actual_lines" -ge "$min_lines" ]; then
+        printf "${GREEN}PASS${NC}     (%d lines)\n" "$actual_lines"
+        echo "functional|$desc|PASS|$exit_code|${actual_lines} lines" >> "$RESULTS_FILE"
+        ((PASS++)) || true
+    else
+        printf "${YELLOW}WRONG${NC}    (%d lines, need %d)\n" "$actual_lines" "$min_lines"
+        echo "functional|$desc|WRONG_OUTPUT|$exit_code|${actual_lines} lines < ${min_lines}" >> "$RESULTS_FILE"
+        ((FAIL++)) || true
+    fi
+}
+
+test_functional_suite() {
+    echo -e "\n${CYAN}═══ Functional Output Verification ═══${NC}"
+
+    # Create test fixtures
+    echo -e "cherry\napple\nbanana" > /tmp/func_sort.txt
+    echo -e "hello world\nfoo bar\nhello again" > /tmp/func_grep.txt
+    echo -e "line1\nline2\nline3" > /tmp/func_lines.txt
+    echo "hello" > /tmp/func_hash.txt
+    echo "test content for compression" > /tmp/func_compress.txt
+    echo '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>name</key><string>test</string></dict></plist>' > /tmp/func_plist.xml
+
+    local TC="$TOOLS_DIR/xcode-tc"
+    local SYS="$TOOLS_DIR/system"
+    local DEV="$TOOLS_DIR/xcode-dev"
+    local LIPO="$TC/lipo"
+
+    # ── Xcode Toolchain: real binary analysis ──
+    test_functional "lipo -detailed_info"  "$TC/lipo" "fat_magic|architecture" \
+        -detailed_info "$LIPO"
+
+    test_functional_minlines "strings <binary>"  "$TC/strings" 100 "$LIPO"
+
+    test_functional_minlines "nm <binary>"  "$TC/nm" 50 "$LIPO"
+
+    test_functional "size segments"  "$TC/size" "__TEXT.*__DATA" "$LIPO"
+
+    test_functional "clang --version"  "$TC/clang" "clang version" --version
+
+    test_functional "swift-demangle pipe"  "$TC/swift-demangle" "hello" \
+        '_$s4main5helloyyF'
+
+    test_functional "llvm-cxxfilt demangle"  "$TC/llvm-cxxfilt" "foo" \
+        _Z3foov
+
+    test_functional "vtool show"  "$TC/vtool" "minos|platform|sdk" \
+        -show /opt/xcode-tools/xcode-tc/lipo
+
+    # ── System tools: real file operations ──
+    test_functional "basename path"  "$SYS/basename" "baz\\.txt" \
+        /foo/bar/baz.txt
+
+    test_functional "dirname path"  "$SYS/dirname" "/foo/bar" \
+        /foo/bar/baz.txt
+
+    test_functional "stat file size"  "$SYS/stat" "^[0-9]" \
+        -f "%z" /tmp/func_lines.txt
+
+    test_functional "file identify"  "$SYS/file" "." \
+        /opt/xcode-tools/xcode-tc/lipo
+
+    test_functional "uname kernel"  "$SYS/uname" "Darwin" -s
+
+    test_functional "id output"  "$SYS/id" "uid=" ""
+
+    test_functional "openssl version"  "$SYS/openssl" "LibreSSL|OpenSSL" version
+
+    # ── System tools: data processing ──
+    # tar create — just check exit code (no stdout)
+    timeout 15 "$LOADER" --exec "$SYS/tar" --exec-args cf /tmp/func_test.tar /tmp/func_compress.txt >/dev/null 2>/dev/null
+    # Now verify by listing the archive
+    test_functional "tar create+list"  "$SYS/tar" "func_compress" \
+        tf /tmp/func_test.tar
+
+    test_functional "zip create"  "$SYS/zip" "adding.*stored|adding.*deflated" \
+        /tmp/func_test.zip /tmp/func_compress.txt
+    if [ -f /tmp/func_test.zip ]; then
+        test_functional "unzip list"  "$SYS/unzip" "func_compress\\.txt" \
+            -l /tmp/func_test.zip
+    fi
+
+    test_functional "gzip compress"  "$SYS/gzip" "." \
+        -c /tmp/func_compress.txt
+
+    # ── System tools: text processing (regex) ──
+    test_functional "grep match"  "$SYS/grep" "hello" \
+        hello /tmp/func_grep.txt
+    test_functional "grep count"  "$SYS/grep" "^2" \
+        -c hello /tmp/func_grep.txt
+    test_functional "sed subst"  "$SYS/sed" "goodbye" \
+        "s/hello/goodbye/" /tmp/func_grep.txt
+
+    # ── System tools: DNS resolution ──
+    test_functional "nslookup DNS"  "$SYS/nslookup" "Address.*[0-9]+\\.[0-9]+" \
+        github.com 192.168.65.7
+
+    # ── Xcode Developer tools ──
+    test_functional "xcodebuild -version"  "$DEV/xcodebuild" "Xcode" \
+        -version
+
+    test_functional "xcrun --version"  "$DEV/xcrun" "xcrun" --version
+
+    # Clean up
+    rm -f /tmp/func_*.txt /tmp/func_test.tar /tmp/func_test.zip
+}
+
 # ── Main ────────────────────────────────────────────────────────────
 
 echo "================================================================"
@@ -212,15 +424,17 @@ echo "================================================================"
 CATEGORY="${1:-all}"
 
 case "$CATEGORY" in
-    xcode-tc)  test_xcode_tc ;;
-    xcode-dev) test_xcode_dev ;;
-    system)    test_system ;;
+    xcode-tc)    test_xcode_tc ;;
+    xcode-dev)   test_xcode_dev ;;
+    system)      test_system ;;
+    functional)  test_functional_suite ;;
     all)
         test_xcode_tc
         test_xcode_dev
         test_system
+        test_functional_suite
         ;;
-    *) echo "Unknown category: $CATEGORY (try: all, xcode-tc, xcode-dev, system)"; exit 1 ;;
+    *) echo "Unknown category: $CATEGORY (try: all, xcode-tc, xcode-dev, system, functional)"; exit 1 ;;
 esac
 
 echo ""
@@ -259,9 +473,9 @@ if grep -q 'DEP_FAIL' "$RESULTS_FILE" 2>/dev/null; then
 fi
 
 # Other failures
-if grep -q '|FAIL|' "$RESULTS_FILE" 2>/dev/null; then
+if grep -qE '\|FAIL\||\|WRONG_OUTPUT\|' "$RESULTS_FILE" 2>/dev/null; then
     echo "── Other Failures ──"
-    grep '|FAIL|' "$RESULTS_FILE" | awk -F'|' '{printf "    %-30s exit=%s  %s\n", $2, $4, $5}'
+    grep -E '\|FAIL\||\|WRONG_OUTPUT\|' "$RESULTS_FILE" | awk -F'|' '{printf "    %-30s exit=%s  %s\n", $2, $4, $5}'
     echo ""
 fi
 
