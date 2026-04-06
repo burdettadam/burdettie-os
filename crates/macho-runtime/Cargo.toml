@@ -18,6 +18,7 @@ trust-policy   = { workspace = true }
 libsystem-shims = { workspace = true }
 objc-runtime   = { workspace = true }
 cf-lite        = { workspace = true }
+cg-shims       = { workspace = true }
 platform-core  = { workspace = true }
 macho-shared-cache  = { workspace = true }
 runtime-diagnostics = { workspace = true }

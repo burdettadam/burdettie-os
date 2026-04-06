@@ -450,6 +450,7 @@ pub fn print_exec(parsed: &ParsedMachO, data: &[u8], binary_path: &std::path::Pa
     match call_entry_with_args(&app.image, entry, Some(&entry_args)) {
         Ok(result) => {
             // Flush C stdio so any printf output from the guest binary appears
+            #[cfg(target_os = "linux")]
             unsafe { libc::fflush(std::ptr::null_mut()); }
             println!("  ── end ──");
             println!("  Exit code: {}", result.exit_code);

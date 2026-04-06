@@ -32,6 +32,7 @@ fn shim_set_key(s: &ShimSet) -> u16 {
         | ((s.objc as u16) << 7)
         | ((s.foundation as u16) << 8)
         | ((s.random as u16) << 9)
+        | ((s.cg as u16) << 10)
 }
 
 /// Mutable runtime state created at the start of execution.
@@ -103,6 +104,12 @@ impl RuntimeContext {
         // Cross-platform shims: variadic ABI translation, stat struct
         // conversion, POSIX extras, ICU.  Always installed.
         libsystem_shims::cross_platform::install_cross_platform_shims(&mut table);
+
+        // CoreGraphics C API shims: CGContext, CGColorSpace, CGImage, CGPath.
+        // Must come after Foundation shims since they share the shim table.
+        if shim_set.cg {
+            cg_shims::register_cg_shims(&mut table);
+        }
 
         log::info!("RuntimeContext: installed {} shims", table.len());
 

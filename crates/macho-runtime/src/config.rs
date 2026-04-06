@@ -46,6 +46,9 @@ pub struct ShimSet {
     /// These are needed on all platforms — on Linux they provide the only implementation
     /// of macOS-specific APIs that guest Mach-O binaries expect.
     pub darwin_stubs: bool,
+    /// Install CoreGraphics C API shims (CGContext, CGColorSpace, CGImage, CGPath).
+    /// Needed for GUI apps that draw via CoreGraphics.
+    pub cg: bool,
 }
 
 impl Default for ShimSet {
@@ -62,6 +65,7 @@ impl Default for ShimSet {
             foundation: true,
             random: true,
             darwin_stubs: true,
+            cg: true,
         }
     }
 }
@@ -214,6 +218,7 @@ mod tests {
             foundation: false,
             random: false,
             darwin_stubs: false,
+            cg: false,
         };
         assert!(!s.process);
         assert!(!s.tls);
