@@ -186,6 +186,8 @@ pub(crate) mod nstextview;
 pub(crate) mod nsopenpanel;
 pub(crate) mod nstrackingarea;
 pub(crate) mod nscursor;
+pub(crate) mod nscolorpanel;
+pub(crate) mod nsstepper;
 
 // GUI bridge: connects AppKit shims to a real windowing backend
 pub mod gui_bridge;

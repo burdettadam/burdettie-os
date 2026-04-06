@@ -474,6 +474,9 @@ fn populate_foundation_runtime(objc_rt: &mut objc_runtime::ObjcRuntime) {
     cf_lite::FoundationShims::register_nstextview_class(objc_rt);
     cf_lite::FoundationShims::register_nstrackingarea_class(objc_rt);
     cf_lite::FoundationShims::register_nscursor_class(objc_rt);
+    cf_lite::FoundationShims::register_nscolorpanel_class(objc_rt);
+    cf_lite::FoundationShims::register_nsfontpanel_class(objc_rt);
+    cf_lite::FoundationShims::register_nsstepper_class(objc_rt);
 
     // AppKit widget classes (Phase C10 AppKit)
     cf_lite::FoundationShims::register_nsslider_class(objc_rt);

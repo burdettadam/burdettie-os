@@ -164,6 +164,18 @@ impl FoundationShims {
         register::register_nscursor_class(rt);
     }
 
+    pub fn register_nscolorpanel_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nscolorpanel_class(rt);
+    }
+
+    pub fn register_nsfontpanel_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsfontpanel_class(rt);
+    }
+
+    pub fn register_nsstepper_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsstepper_class(rt);
+    }
+
     // ── Phase C10 AppKit widget classes ──────────────────────────
 
     pub fn register_nsslider_class(rt: &mut objc_runtime::ObjcRuntime) {

@@ -107,6 +107,36 @@ pub(super) fn run_native(
     tracer.record_perf_timing("map_images", "shim_setup_us", shim_setup_time);
     tracer.record_perf_counter("map_images", "shims_installed", ctx.shim_table.len() as u64);
 
+    // 4b. Start BurdettieOS cloud services (domain rewrite + local server)
+    let _burdettie_handle = {
+        let domain_config = burdettie_domain_map::RewriteConfig::from_env();
+        let services_enabled = domain_config.enabled;
+        if services_enabled {
+            let svc_config = burdettie_services::ServiceConfig::from_env();
+            match burdettie_services::ServiceServer::start(&svc_config) {
+                Ok(handle) => {
+                    // Update the domain map with the actual bound port
+                    let mut final_config = domain_config;
+                    final_config.target_port = handle.port;
+                    burdettie_domain_map::init(final_config);
+                    tracer.record(
+                        EventKind::Pipeline,
+                        format!("burdettie-services started on port {}", handle.port),
+                    );
+                    Some(handle)
+                }
+                Err(e) => {
+                    log::warn!("burdettie-services: failed to start: {e}");
+                    burdettie_domain_map::init(burdettie_domain_map::RewriteConfig::disabled());
+                    None
+                }
+            }
+        } else {
+            burdettie_domain_map::init(domain_config);
+            None
+        }
+    };
+
     // 5. Build composite resolver: shims → host fallback
     let host_setup_start = Instant::now();
     #[cfg(target_os = "macos")]

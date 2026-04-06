@@ -78,6 +78,8 @@ pub struct WinitGuiBridge {
     frame_updates: Mutex<Vec<FrameUpdate>>,
     /// Hide requests for live windows.
     hide_requests: Mutex<Vec<u64>>,
+    /// Pending cursor type changes (NSCursor type tag).
+    cursor_updates: Mutex<Vec<u64>>,
     /// Whether `request_stop` has been called.
     stop: AtomicBool,
 }
@@ -89,6 +91,7 @@ impl WinitGuiBridge {
             title_updates: Mutex::new(Vec::new()),
             frame_updates: Mutex::new(Vec::new()),
             hide_requests: Mutex::new(Vec::new()),
+            cursor_updates: Mutex::new(Vec::new()),
             stop: AtomicBool::new(false),
         }
     }
@@ -147,6 +150,10 @@ impl GuiBridge for WinitGuiBridge {
 
     fn request_redraw(&self, guest_window: u64) {
         lock(redraw_requests()).push(guest_window);
+    }
+
+    fn set_cursor(&self, cursor_type: u64) {
+        lock(&self.cursor_updates).push(cursor_type);
     }
 }
 
@@ -262,6 +269,15 @@ impl<'a> BridgeState<'a> {
                 if let Some((ref w, _)) = self.surfaces.get(&wid) {
                     w.request_redraw();
                 }
+            }
+        }
+
+        // Cursor updates from NSCursor set/push/pop
+        let cursors = std::mem::take(&mut *lock(&self.bridge.cursor_updates));
+        if let Some(&cursor_type) = cursors.last() {
+            let icon = nscursor_type_to_winit(cursor_type);
+            for (ref w, _) in self.surfaces.values() {
+                w.set_cursor(icon);
             }
         }
     }
@@ -540,5 +556,29 @@ fn winit_key_to_macos(key: winit::keyboard::KeyCode) -> u16 {
         WK::PageUp => 0x74,
         WK::PageDown => 0x79,
         _ => 0xFFFF,
+    }
+}
+
+/// Map NSCursor type tag to winit CursorIcon.
+fn nscursor_type_to_winit(cursor_type: u64) -> winit::window::CursorIcon {
+    use winit::window::CursorIcon;
+    match cursor_type {
+        0 => CursorIcon::Default,     // ARROW
+        1 => CursorIcon::Text,        // IBEAM
+        2 => CursorIcon::Crosshair,   // CROSSHAIR
+        3 => CursorIcon::Pointer,     // POINTING_HAND
+        4 => CursorIcon::Grab,        // OPEN_HAND
+        5 => CursorIcon::Grabbing,    // CLOSED_HAND
+        6 => CursorIcon::EwResize,    // RESIZE_LEFT_RIGHT
+        7 => CursorIcon::NsResize,    // RESIZE_UP_DOWN
+        8 => CursorIcon::WResize,     // RESIZE_LEFT
+        9 => CursorIcon::EResize,     // RESIZE_RIGHT
+        10 => CursorIcon::NResize,    // RESIZE_UP
+        11 => CursorIcon::SResize,    // RESIZE_DOWN
+        13 => CursorIcon::NotAllowed, // OPERATION_NOT_ALLOWED
+        14 => CursorIcon::Alias,      // DRAG_LINK
+        15 => CursorIcon::Copy,       // DRAG_COPY
+        16 => CursorIcon::ContextMenu, // CONTEXTUAL_MENU
+        _ => CursorIcon::Default,
     }
 }

@@ -22,6 +22,8 @@ cg-shims       = { workspace = true }
 platform-core  = { workspace = true }
 macho-shared-cache  = { workspace = true }
 runtime-diagnostics = { workspace = true }
+burdettie-domain-map = { workspace = true }
+burdettie-services   = { workspace = true }
 log            = { workspace = true }
 libc           = { workspace = true }
 serde          = { workspace = true }
