@@ -79,6 +79,12 @@ impl PosixExtrasShims {
 
             // ── sysconf constant translation ────────────────────
             ("_sysconf", shim_sysconf as *const () as u64, "sysconf (macOS→Linux _SC_ translation)"),
+
+            // ── getopt POSIX mode (BSD default) ─────────────────
+            ("_getopt", shim_getopt as *const () as u64, "getopt (POSIX mode — stop at first non-option)"),
+            ("_getopt_long", shim_getopt_long as *const () as u64, "getopt_long (POSIX mode)"),
+            ("_getopt_long_only", shim_getopt_long_only as *const () as u64, "getopt_long_only (POSIX mode)"),
+            ("_optreset", std::ptr::addr_of!(OPTRESET) as *const () as u64, "optreset (BSD compat data symbol)"),
         );
 
         // ── regex flag translation (Linux-only, glibc regex_t) ──
@@ -665,6 +671,108 @@ pub extern "C" fn shim_sysconf(name: c_int) -> c_long {
     unsafe { libc::sysconf(linux_name as _) }
 }
 
+// ── getopt POSIX mode ───────────────────────────────────────────────
+//
+// macOS (BSD) getopt stops at the first non-option argument (POSIX default).
+// Linux glibc getopt *permutes* arguments by default (GNU extension),
+// which breaks many macOS tools (e.g., `find /path -maxdepth 1` where
+// glibc would parse `-maxdepth` as short `-m` option).
+//
+// Fix: prepend `+` to optstring to force POSIX mode on glibc.
+
+/// BSD `optreset` global — macOS programs write `optreset = 1` to reset
+/// getopt state between multiple parse passes.  On Linux we translate
+/// this to `optind = 0` (glibc reset convention) inside the shim.
+#[no_mangle]
+pub static mut OPTRESET: c_int = 0;
+
+/// Ensure optstring starts with `+` for POSIX behavior.
+/// Returns owned CString (caller must keep alive through getopt call).
+fn posix_optstring(optstring: *const c_char) -> Option<std::ffi::CString> {
+    if optstring.is_null() { return None; }
+    let s = unsafe { std::ffi::CStr::from_ptr(optstring) };
+    let bytes = s.to_bytes();
+    if bytes.first() == Some(&b'+') {
+        return None; // already POSIX mode
+    }
+    let mut buf = Vec::with_capacity(1 + bytes.len() + 1);
+    buf.push(b'+');
+    buf.extend_from_slice(bytes);
+    std::ffi::CString::new(buf).ok()
+}
+
+extern "C" {
+    static mut optind: c_int;
+}
+
+/// Check and consume BSD `optreset` flag.
+fn consume_optreset() {
+    unsafe {
+        if OPTRESET != 0 {
+            OPTRESET = 0;
+            // glibc resets getopt state when optind is set to 0
+            optind = 0;
+        }
+    }
+}
+
+pub extern "C" fn shim_getopt(
+    argc: c_int,
+    argv: *const *mut c_char,
+    optstring: *const c_char,
+) -> c_int {
+    consume_optreset();
+    match posix_optstring(optstring) {
+        Some(posix) => unsafe { libc::getopt(argc, argv, posix.as_ptr()) },
+        None => unsafe { libc::getopt(argc, argv, optstring) },
+    }
+}
+
+extern "C" {
+    fn getopt_long(
+        argc: c_int,
+        argv: *const *mut c_char,
+        optstring: *const c_char,
+        longopts: *const libc::option,
+        longindex: *mut c_int,
+    ) -> c_int;
+    fn getopt_long_only(
+        argc: c_int,
+        argv: *const *mut c_char,
+        optstring: *const c_char,
+        longopts: *const libc::option,
+        longindex: *mut c_int,
+    ) -> c_int;
+}
+
+pub extern "C" fn shim_getopt_long(
+    argc: c_int,
+    argv: *const *mut c_char,
+    optstring: *const c_char,
+    longopts: *const libc::option,
+    longindex: *mut c_int,
+) -> c_int {
+    consume_optreset();
+    match posix_optstring(optstring) {
+        Some(posix) => unsafe { getopt_long(argc, argv, posix.as_ptr(), longopts, longindex) },
+        None => unsafe { getopt_long(argc, argv, optstring, longopts, longindex) },
+    }
+}
+
+pub extern "C" fn shim_getopt_long_only(
+    argc: c_int,
+    argv: *const *mut c_char,
+    optstring: *const c_char,
+    longopts: *const libc::option,
+    longindex: *mut c_int,
+) -> c_int {
+    consume_optreset();
+    match posix_optstring(optstring) {
+        Some(posix) => unsafe { getopt_long_only(argc, argv, posix.as_ptr(), longopts, longindex) },
+        None => unsafe { getopt_long_only(argc, argv, optstring, longopts, longindex) },
+    }
+}
+
 // ── regex flag translation ──────────────────────────────────────────
 
 /// Translate macOS `regcomp` cflags to Linux equivalents.
@@ -1055,5 +1163,35 @@ mod tests {
         // REG_EXTENDED(1) | REG_ICASE(2) | REG_NOSUB(4) → 7
         // Linux: REG_EXTENDED(1) | REG_ICASE(2) | REG_NOSUB(8) → 11
         assert_eq!(translate_regcomp_flags(0x0007), 0x000B);
+    }
+
+    // ── getopt POSIX mode tests ─────────────────────────────────
+
+    #[test]
+    fn test_posix_optstring_prepends_plus() {
+        let result = posix_optstring(b"abc:\0".as_ptr() as *const c_char);
+        assert!(result.is_some());
+        let cstr = result.unwrap();
+        assert_eq!(cstr.to_bytes(), b"+abc:");
+    }
+
+    #[test]
+    fn test_posix_optstring_already_posix() {
+        let result = posix_optstring(b"+abc:\0".as_ptr() as *const c_char);
+        assert!(result.is_none()); // already has +, no change needed
+    }
+
+    #[test]
+    fn test_posix_optstring_null() {
+        let result = posix_optstring(std::ptr::null());
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_posix_optstring_empty() {
+        let result = posix_optstring(b"\0".as_ptr() as *const c_char);
+        assert!(result.is_some());
+        let cstr = result.unwrap();
+        assert_eq!(cstr.to_bytes(), b"+");
     }
 }

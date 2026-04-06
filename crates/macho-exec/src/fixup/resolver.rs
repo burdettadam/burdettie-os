@@ -662,7 +662,7 @@ impl StubResolver {
             // Environment mutation
             | "setenv" | "unsetenv" | "putenv"
             // Argument parsing
-            | "getopt" | "optarg" | "optind" | "optopt" | "optreset"
+            | "optarg" | "optind" | "optopt"
             | "getuid" | "geteuid" | "getgid" | "getegid"
             | "fork" | "execv" | "execve" | "execvp" | "execl" | "execlp" | "execle"
             | "posix_spawn" | "posix_spawn_file_actions_init"
@@ -1085,7 +1085,6 @@ impl StubResolver {
             | "__darwin_check_fd_set_overflow"
             // BSD string extras
             | "vasprintf" | "strpbrk" | "fgetln"
-            | "getopt_long" | "getopt_long_only"
             | "strcasestr"
             | "dirname_r" | "basename_r"
             // File/dir extras
