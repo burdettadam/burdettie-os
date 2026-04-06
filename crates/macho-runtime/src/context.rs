@@ -101,6 +101,10 @@ impl RuntimeContext {
         // Always installed — on macOS this is a no-op internally.
         libsystem_shims::DarwinCompatShims::install(&mut table);
 
+        // Socket shims translate macOS AF_*/sockaddr/SOL_SOCKET constants
+        // to Linux equivalents.  Always installed.
+        libsystem_shims::SocketShims::install(&mut table);
+
         // Cross-platform shims: variadic ABI translation, stat struct
         // conversion, POSIX extras, ICU.  Always installed.
         libsystem_shims::cross_platform::install_cross_platform_shims(&mut table);

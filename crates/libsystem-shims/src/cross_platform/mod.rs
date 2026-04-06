@@ -9,6 +9,7 @@
 //! on Linux where the host libraries differ.
 
 mod icu;
+mod kqueue;
 mod posix_extras;
 mod stat;
 mod dirent;
@@ -24,5 +25,6 @@ pub fn install_cross_platform_shims(table: &mut ShimTable) {
     stat::StatShims::install(table);
     dirent::DirentShims::install(table);
     variadic_shims::VariadicShims::install(table);
+    kqueue::KqueueShims::install(table);
     log::info!("cross_platform: registered all cross-platform shims");
 }

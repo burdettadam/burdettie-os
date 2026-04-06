@@ -44,6 +44,7 @@ pub fn register_nsbutton_class(rt: &mut objc_runtime::ObjcRuntime) {
             me("highlight:", nsbutton::shim_nsbutton_highlight as *const () as u64, "v@:B"),
             me("performClick:", nsbutton::shim_nsbutton_perform_click as *const () as u64, "v@:@"),
             me("sizeToFit", nsbutton::shim_nsbutton_size_to_fit as *const () as u64, "v@:"),
+            me("drawRect:", nsbutton::shim_nsbutton_draw_rect as *const () as u64, "v@:{CGRect=dddd}"),
         ],
         class_methods: vec![
             me("buttonWithTitle:target:action:", nsbutton::shim_nsbutton_button_with_title as *const () as u64, "@@:@@:"),

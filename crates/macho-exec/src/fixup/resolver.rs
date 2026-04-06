@@ -933,10 +933,8 @@ impl StubResolver {
             | "NXGetLocalArchInfo" | "NXGetAllArchInfos"
             // Backtrace
             | "backtrace" | "backtrace_symbols" | "backtrace_symbols_fd"
-            // Network (read-only)
-            | "socket" | "bind" | "listen" | "accept" | "connect"
-            | "send" | "recv" | "sendto" | "recvfrom"
-            | "setsockopt" | "getsockopt" | "shutdown"
+            // Network: socket/connect/bind/etc. handled by SocketShims (AF translation)
+            // Only sendfile/sendmsg/recvmsg need safe-list passthrough.
             | "sendfile" | "sendmsg" | "recvmsg"
             | "getpwnam_r" | "getpwuid_r"
             | "getpwnam" | "getpwuid" | "getgrnam" | "getgrgid"
@@ -948,12 +946,11 @@ impl StubResolver {
             | "gethostbyname" | "gethostbyname2" | "gethostbyaddr"
             | "herror" | "hstrerror"
             | "catopen" | "catgets" | "catclose"
-            | "arc4random_stir"
             | "getprotobyname" | "getprotobynumber"
             | "getservbyname" | "getservbyport"
             | "in6addr_any" | "in6addr_loopback"
-            // I/O multiplexing
-            | "select" | "poll" | "kqueue" | "kevent"
+            // I/O multiplexing (kqueue/kevent handled by shim table)
+            | "select" | "poll"
             // Network extras
             | "getaddrinfo" | "getnameinfo" | "freeaddrinfo" | "gai_strerror"
             | "inet_ntop" | "inet_pton"

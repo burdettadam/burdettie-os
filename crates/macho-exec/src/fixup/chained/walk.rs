@@ -62,12 +62,17 @@ pub(super) fn walk_chain(
                         );
                         // Auth bind: resolve, PAC-sign, then write.
                         // On failure install the trap address (unsigned).
+                        let import_name = imports.get(ordinal).map(|i| i.name.as_str()).unwrap_or("?");
                         let addr = match resolve_bind_addr(ordinal, 0, imports, resolver) {
                             Some(a) => {
                                 let slot_addr = seg.base as u64 + offset as u64;
-                                unsafe {
+                                let signed = unsafe {
                                     pac_sign_pointer(a, meta.key, slot_addr, meta.diversity, meta.addr_diversity)
+                                };
+                                if import_name.contains("socket") || import_name.contains("connect") {
+                                    eprintln!("[FIXUP] auth-bind '{import_name}': resolved={a:#x}, signed={signed:#x}, slot={slot_addr:#x}");
                                 }
+                                signed
                             }
                             None => {
                                 super::UNRESOLVED_BIND_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);

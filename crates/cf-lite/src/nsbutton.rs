@@ -1,25 +1,34 @@
 //! NSButton shim: push-button / checkbox control for AppKit.
 //!
-//! Object layout (56 bytes, inherits NSControl at 48):
+//! Object layout (inherits NSView at offsets 0–79):
 //!
-//!   offset  0: isa                  (u64)
-//!   offset  8: title_ptr            (u64 — NSString*)
-//!   offset 16: alternate_title_ptr  (u64 — NSString*)
-//!   offset 24: image_ptr            (u64 — NSImage*)
-//!   offset 32: target_ptr           (u64)
-//!   offset 40: action_sel           (u64 — SEL)
-//!   offset 48: flags                (u64 — bit 0: is_enabled, bit 1: is_bordered,
+//!   offset  0: isa                  (u64)     — from NSView
+//!   offset  8: superview            (u64)     — from NSView
+//!   offset 16: window               (u64)     — from NSView
+//!   offset 24: frame_x              (f64)     — from NSView
+//!   offset 32: frame_y              (f64)     — from NSView
+//!   offset 40: frame_w              (f64)     — from NSView
+//!   offset 48: frame_h              (f64)     — from NSView
+//!   offset 56: subviews_ptr         (u64)     — from NSView
+//!   offset 64: subview_count        (u64)     — from NSView
+//!   offset 72: flags (view)         (u64)     — from NSView
+//!   offset 80: title_ptr            (u64 — NSString*)
+//!   offset 88: alternate_title_ptr  (u64 — NSString*)
+//!   offset 96: image_ptr            (u64 — NSImage*)
+//!   offset 104: target_ptr          (u64)
+//!   offset 112: action_sel          (u64 — SEL)
+//!   offset 120: btn_flags           (u64 — bit 0: is_enabled, bit 1: is_bordered,
 //!                                           bit 2: allows_mixed_state, bit 3: state_on)
 //!
-//! Total: 56 bytes.
+//! Total: 128 bytes.
 
-const TITLE_OFF: usize = 8;
-const ALT_TITLE_OFF: usize = 16;
-const IMAGE_OFF: usize = 24;
-const TARGET_OFF: usize = 32;
-const ACTION_OFF: usize = 40;
-const FLAGS_OFF: usize = 48;
-pub(crate) const BUTTON_SIZE: usize = 56;
+const TITLE_OFF: usize = 80;
+const ALT_TITLE_OFF: usize = 88;
+const IMAGE_OFF: usize = 96;
+const TARGET_OFF: usize = 104;
+const ACTION_OFF: usize = 112;
+const FLAGS_OFF: usize = 120;
+pub(crate) const BUTTON_SIZE: usize = 128;
 
 const FLAG_IS_ENABLED: u64 = 1 << 0;
 const FLAG_IS_BORDERED: u64 = 1 << 1;
@@ -238,6 +247,65 @@ pub extern "C" fn shim_nsbutton_checkbox_with_title(
     // Enabled but NOT bordered for checkbox
     write_flags(obj, FLAG_IS_ENABLED);
     obj
+}
+
+// ── Drawing ────────────────────────────────────────────────────
+
+/// `-[NSButton drawRect:]` — renders the button using CGContext.
+///
+/// Draws a bordered rounded rectangle with the button title centered inside.
+pub extern "C" fn shim_nsbutton_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64) {
+    if obj == 0 { return; }
+
+    let cg_ctx = crate::nsgraphicscontext::current_cg_context_handle();
+    if cg_ctx == 0 { return; }
+
+    let flags = read_flags(obj);
+
+    // Draw button background.
+    let bg_color = if flags & FLAG_IS_BORDERED != 0 {
+        // Light gray rounded button background
+        graphics_core::Color::new(0.92, 0.92, 0.92, 1.0)
+    } else {
+        // Transparent for borderless/checkbox
+        graphics_core::Color::new(0.0, 0.0, 0.0, 0.0)
+    };
+
+    cg_shims::bridge::with_context(cg_ctx, |c| {
+        if bg_color.a > 0.0 {
+            c.fill_color = bg_color;
+            c.fill_rect(x, y, w, h);
+        }
+        // Draw border
+        if flags & FLAG_IS_BORDERED != 0 {
+            c.stroke_color = graphics_core::Color::new(0.7, 0.7, 0.7, 1.0);
+            c.stroke_rect(x, y, w, h);
+        }
+    });
+
+    // Draw title text centered.
+    let title_ptr = read_u64(obj, TITLE_OFF);
+    if title_ptr != 0 {
+        let utf8 = crate::cfstring::shim_nsstring_utf8string(title_ptr, 0);
+        if !utf8.is_null() {
+            let text = unsafe { std::ffi::CStr::from_ptr(utf8) }
+                .to_str()
+                .unwrap_or("");
+            if !text.is_empty() {
+                let text_color = if flags & FLAG_IS_ENABLED != 0 {
+                    graphics_core::Color::BLACK
+                } else {
+                    graphics_core::Color::new(0.5, 0.5, 0.5, 1.0) // gray for disabled
+                };
+                cg_shims::bridge::with_context(cg_ctx, |c| {
+                    c.fill_color = text_color;
+                    // Center text vertically, left-pad slightly.
+                    let text_y = y + (h * 0.65);
+                    c.draw_text(text, x + 8.0, text_y);
+                });
+            }
+        }
+    }
 }
 
 #[cfg(test)]

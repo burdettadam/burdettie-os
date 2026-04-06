@@ -1,24 +1,33 @@
 //! NSTextField shim: text label and input control.
 //!
-//! Object layout:
+//! Object layout (inherits NSView at offsets 0–79):
 //!
-//!   offset  0: isa               (u64)
-//!   offset  8: string_value_ptr  (u64 — NSString*, or 0)
-//!   offset 16: target_ptr        (u64 — id, or 0)
-//!   offset 24: action_sel        (u64 — SEL addr, or 0)
-//!   offset 32: placeholder_ptr   (u64 — NSString*, or 0)
-//!   offset 40: flags             (u64 — bit 0: is_enabled, bit 1: is_editable,
+//!   offset  0: isa               (u64)     — from NSView
+//!   offset  8: superview         (u64)     — from NSView
+//!   offset 16: window            (u64)     — from NSView
+//!   offset 24: frame_x           (f64)     — from NSView
+//!   offset 32: frame_y           (f64)     — from NSView
+//!   offset 40: frame_w           (f64)     — from NSView
+//!   offset 48: frame_h           (f64)     — from NSView
+//!   offset 56: subviews_ptr      (u64)     — from NSView
+//!   offset 64: subview_count     (u64)     — from NSView
+//!   offset 72: flags (view)      (u64)     — from NSView
+//!   offset 80: string_value_ptr  (u64 — NSString*, or 0)
+//!   offset 88: target_ptr        (u64 — id, or 0)
+//!   offset 96: action_sel        (u64 — SEL addr, or 0)
+//!   offset 104: placeholder_ptr  (u64 — NSString*, or 0)
+//!   offset 112: tf_flags         (u64 — bit 0: is_enabled, bit 1: is_editable,
 //!                                        bit 2: is_bezeled, bit 3: draws_background,
 //!                                        bit 4: is_selectable)
 //!
-//! Total: 48 bytes.
+//! Total: 120 bytes.
 
-const STRING_VALUE_OFF: usize = 8;
-const TARGET_OFF: usize = 16;
-const ACTION_OFF: usize = 24;
-const PLACEHOLDER_OFF: usize = 32;
-const FLAGS_OFF: usize = 40;
-pub(crate) const TEXTFIELD_SIZE: usize = 48;
+const STRING_VALUE_OFF: usize = 80;
+const TARGET_OFF: usize = 88;
+const ACTION_OFF: usize = 96;
+const PLACEHOLDER_OFF: usize = 104;
+const FLAGS_OFF: usize = 112;
+pub(crate) const TEXTFIELD_SIZE: usize = 120;
 
 const FLAG_IS_ENABLED: u64 = 1 << 0;
 const FLAG_IS_EDITABLE: u64 = 1 << 1;
@@ -208,6 +217,69 @@ pub extern "C" fn shim_nstextfield_text_field_with_string(_cls: u64, _cmd: u64, 
     }
     init_as_editable(obj, string);
     obj
+}
+
+// ── Drawing ────────────────────────────────────────────────────
+
+/// `-[NSTextField drawRect:]` — renders the text field using CGContext.
+///
+/// Draws optional background/bezel, then the string value (or placeholder)
+/// in the current fill color. Uses the CG context from the current
+/// NSGraphicsContext (set by `display_view_recursive`).
+pub extern "C" fn shim_nstextfield_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64) {
+    if obj == 0 { return; }
+
+    let cg_ctx = crate::nsgraphicscontext::current_cg_context_handle();
+    if cg_ctx == 0 { return; }
+
+    // Draw background if enabled.
+    let flags = read_u64(obj, FLAGS_OFF);
+    if flags & FLAG_DRAWS_BACKGROUND != 0 {
+        // White background
+        cg_shims::bridge::with_context(cg_ctx, |c| {
+            c.fill_color = graphics_core::Color::WHITE;
+            c.fill_rect(x, y, w, h);
+        });
+    }
+
+    // Draw bezel border if enabled.
+    if flags & FLAG_IS_BEZELED != 0 {
+        cg_shims::bridge::with_context(cg_ctx, |c| {
+            c.stroke_color = graphics_core::Color::new(0.7, 0.7, 0.7, 1.0);
+            c.stroke_rect(x, y, w, h);
+        });
+    }
+
+    // Draw text content.
+    let string_ptr = read_u64(obj, STRING_VALUE_OFF);
+    let text_ptr = if string_ptr != 0 {
+        string_ptr
+    } else {
+        read_u64(obj, PLACEHOLDER_OFF)
+    };
+
+    if text_ptr != 0 {
+        let utf8 = crate::cfstring::shim_nsstring_utf8string(text_ptr, 0);
+        if !utf8.is_null() {
+            let text = unsafe { std::ffi::CStr::from_ptr(utf8) }
+                .to_str()
+                .unwrap_or("");
+            if !text.is_empty() {
+                let text_color = if string_ptr != 0 {
+                    graphics_core::Color::BLACK
+                } else {
+                    // Placeholder text in gray
+                    graphics_core::Color::new(0.6, 0.6, 0.6, 1.0)
+                };
+                cg_shims::bridge::with_context(cg_ctx, |c| {
+                    c.fill_color = text_color;
+                    // Draw text with 4px inset, vertically centered.
+                    let text_y = y + (h * 0.7);  // baseline roughly at 70% from top
+                    c.draw_text(text, x + 4.0, text_y);
+                });
+            }
+        }
+    }
 }
 
 #[cfg(test)]

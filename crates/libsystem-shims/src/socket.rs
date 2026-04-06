@@ -1,21 +1,111 @@
 //! POSIX socket syscall interception shims.
 //!
-//! These shims sit in front of the twelve core BSD socket calls so that raw
-//! network activity from emulated binaries is accounted for and policy-checked
-//! before reaching the host network stack.
+//! These shims sit in front of the twelve core BSD socket calls so that
+//! emulated macOS binaries can use networking on a Linux host.
 //!
-//! Policy:
-//!   - `AF_UNIX` (local IPC / XPC): always allowed
-//!   - `AF_INET`  to `127.0.0.1` / `0.0.0.0` (bind): allowed
-//!   - `AF_INET6` to `::1` / `::` (bind): allowed
-//!   - Everything else: denied with `EOPNOTSUPP`
+//! Translation:
+//!   - macOS AF_* constants → Linux equivalents (e.g. AF_INET6: 30→10)
+//!   - macOS sockaddr layout `[sa_len:u8][sa_family:u8]` → Linux `[sa_family:u16]`
+//!   - macOS SOL_SOCKET (0xFFFF) → Linux SOL_SOCKET (1)
 //!
-//! Address validation happens at `connect()` / `bind()` / `sendto()` time.
-//! `socket()` permits creation of AF_UNIX/AF_INET/AF_INET6 sockets since the
-//! destination is not yet known.  Post-validation calls (`send`, `recv`,
-//! `listen`, `accept`, etc.) pass through unconditionally.
+//! `socket()` denies unsupported address families with `EOPNOTSUPP`.
+//! All other calls pass through after ABI translation.
 
 use crate::table::ShimTable;
+
+// ── macOS → Linux constant translation ──────────────────────────────────────
+
+// macOS AF_* constants differ from Linux.
+const DARWIN_AF_UNIX: i32 = 1;
+const DARWIN_AF_INET: i32 = 2;
+const DARWIN_AF_INET6: i32 = 30;
+const DARWIN_AF_ROUTE: i32 = 17;
+const DARWIN_AF_SYSTEM: i32 = 40;
+
+// macOS SOL_SOCKET = 0xFFFF, Linux SOL_SOCKET = 1.
+const DARWIN_SOL_SOCKET: i32 = 0xFFFF;
+
+/// Translate a macOS address-family constant to the Linux equivalent.
+/// Returns `None` for families we don't support.
+fn translate_af(darwin_af: i32) -> Option<i32> {
+    match darwin_af {
+        DARWIN_AF_UNIX => Some(libc::AF_UNIX),
+        DARWIN_AF_INET => Some(libc::AF_INET),
+        DARWIN_AF_INET6 => Some(libc::AF_INET6),
+        #[cfg(target_os = "linux")]
+        DARWIN_AF_ROUTE => Some(libc::AF_NETLINK),
+        // Also pass through already-translated Linux values (when called
+        // from host code or tests that use Linux constants directly).
+        v if v == libc::AF_UNIX || v == libc::AF_INET || v == libc::AF_INET6 => Some(v),
+        _ => None,
+    }
+}
+
+/// Translate a macOS SOL_* level to the Linux equivalent.
+fn translate_sockopt_level(darwin_level: i32) -> i32 {
+    if darwin_level == DARWIN_SOL_SOCKET {
+        libc::SOL_SOCKET
+    } else {
+        darwin_level
+    }
+}
+
+// ── macOS → Linux sockaddr translation ──────────────────────────────────────
+//
+// macOS sockaddr layout:  [sa_len: u8][sa_family: u8][sa_data...]
+// Linux sockaddr layout:  [sa_family: u16][sa_data...]
+//
+// We need to:
+//   1. Read sa_family from the macOS byte position (offset 1)
+//   2. Translate the AF_* constant (e.g. AF_INET6: 30→10)
+//   3. Rewrite sa_family in Linux layout (u16 at offset 0)
+//
+// This is done in a stack-local copy to avoid mutating the guest's buffer.
+
+/// Read the `sa_family` from a macOS-layout `sockaddr`, translate AF_* constants,
+/// and write a Linux-layout sockaddr into `out_buf`. Returns the translated
+/// byte count. On macOS host, this is a no-op copy.
+#[cfg(target_os = "linux")]
+fn translate_sockaddr(src: u64, src_len: u32, out_buf: &mut [u8]) -> u32 {
+    if src == 0 || src_len == 0 || (src_len as usize) > out_buf.len() {
+        return 0;
+    }
+    let n = src_len as usize;
+    // Copy the raw macOS sockaddr bytes.
+    unsafe {
+        std::ptr::copy_nonoverlapping(src as *const u8, out_buf.as_mut_ptr(), n);
+    }
+    if n < 2 {
+        return src_len;
+    }
+    // macOS layout: byte 0 = sa_len, byte 1 = sa_family (u8).
+    let darwin_family = out_buf[1] as i32;
+    let linux_family = translate_af(darwin_family).unwrap_or(darwin_family);
+    // Linux layout: bytes 0-1 = sa_family (u16, native endian).
+    let fam_bytes = (linux_family as u16).to_ne_bytes();
+    out_buf[0] = fam_bytes[0];
+    out_buf[1] = fam_bytes[1];
+    src_len
+}
+
+/// On macOS host, no translation needed — just return the pointer as-is.
+#[cfg(target_os = "macos")]
+fn translate_sockaddr(src: u64, src_len: u32, _out_buf: &mut [u8]) -> u32 {
+    src_len
+}
+
+/// Helper: get the translated sockaddr pointer. On Linux, points to `buf`.
+/// On macOS, points to the original source.
+#[cfg(target_os = "linux")]
+fn translated_sockaddr_ptr(src: u64, buf: &[u8], translated_len: u32) -> *const libc::sockaddr {
+    let _ = (src, translated_len);
+    buf.as_ptr() as *const libc::sockaddr
+}
+
+#[cfg(target_os = "macos")]
+fn translated_sockaddr_ptr(src: u64, _buf: &[u8], _translated_len: u32) -> *const libc::sockaddr {
+    src as *const libc::sockaddr
+}
 
 // ── errno helpers ───────────────────────────────────────────────────────────
 
@@ -46,95 +136,80 @@ fn deny_i64() -> i64 {
 
 // ── Address policy helpers ──────────────────────────────────────────────────
 
-/// Read the `sa_family` field from a raw `sockaddr` pointer.
+/// Read the `sa_family` from a guest (macOS-layout) `sockaddr` pointer.
 ///
-/// Uses `libc::sockaddr` so the platform-specific layout (macOS has a
-/// leading `sa_len` byte, Linux does not) is handled by the C definition.
-fn read_sa_family(addr: u64) -> u16 {
+/// macOS layout: `[sa_len: u8][sa_family: u8][data...]`
+/// We read byte 1 for the family, then translate the AF_* constant.
+#[cfg(target_os = "linux")]
+fn read_guest_sa_family(addr: u64) -> i32 {
+    if addr == 0 {
+        return 0;
+    }
+    // macOS sockaddr: byte 1 is sa_family
+    let darwin_family = unsafe { *((addr as usize + 1) as *const u8) } as i32;
+    translate_af(darwin_family).unwrap_or(darwin_family)
+}
+
+#[cfg(target_os = "macos")]
+fn read_guest_sa_family(addr: u64) -> i32 {
     if addr == 0 {
         return 0;
     }
     let sa = addr as *const libc::sockaddr;
-    unsafe { (*sa).sa_family as u16 }
-}
-
-/// Return `true` if the address is allowed by our localhost-only policy.
-///
-/// - `AF_UNIX`: always allowed (local IPC).
-/// - `AF_INET`: allowed only for `127.0.0.1` or `INADDR_ANY` (`0.0.0.0`,
-///   used by `bind`).
-/// - `AF_INET6`: allowed only for `::1` or `::` (any, used by `bind`).
-/// - Null `addr`: treated as "connected socket" — already validated.
-/// - Everything else: denied.
-fn is_allowed_address(addr: u64, addrlen: u32) -> bool {
-    if addr == 0 {
-        return true; // null addr → already-connected socket
-    }
-    let family = read_sa_family(addr);
-    match family as i32 {
-        libc::AF_UNIX => true,
-        libc::AF_INET => {
-            if (addrlen as usize) < std::mem::size_of::<libc::sockaddr_in>() {
-                return false;
-            }
-            let sin = unsafe { &*(addr as *const libc::sockaddr_in) };
-            let ip = u32::from_be(sin.sin_addr.s_addr);
-            ip == 0x7f00_0001 // 127.0.0.1
-                || ip == 0    // INADDR_ANY (0.0.0.0) — for bind
-        }
-        libc::AF_INET6 => {
-            if (addrlen as usize) < std::mem::size_of::<libc::sockaddr_in6>() {
-                return false;
-            }
-            let sin6 = unsafe { &*(addr as *const libc::sockaddr_in6) };
-            let octets = sin6.sin6_addr.s6_addr;
-            let is_loopback = octets == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
-            let is_any = octets == [0u8; 16];
-            is_loopback || is_any
-        }
-        _ => false,
-    }
+    unsafe { (*sa).sa_family as i32 }
 }
 
 // ── Shim implementations ────────────────────────────────────────────────────
 
 /// `int socket(int domain, int type, int protocol)`
 ///
-/// Allows creation of AF_UNIX / AF_INET / AF_INET6 sockets (address not yet
-/// known).  All other families are denied.
+/// Translates macOS AF_* constants to Linux equivalents and creates the socket.
+/// Denies unsupported address families.
 pub extern "C" fn shim_socket(domain: i32, typ: i32, proto: i32) -> i32 {
-    match domain {
-        libc::AF_UNIX | libc::AF_INET | libc::AF_INET6 => {
-            log::debug!("socket(domain={domain}) — passthrough");
-            unsafe { libc::socket(domain, typ, proto) }
-        }
-        _ => {
-            log::debug!("socket(domain={domain}) — denied (EOPNOTSUPP)");
-            deny_i32()
-        }
+    eprintln!("[SHIM] socket(domain={domain}, type={typ}, proto={proto})");
+    if let Some(linux_domain) = translate_af(domain) {
+        log::debug!("socket(domain={domain}→{linux_domain}) — passthrough");
+        unsafe { libc::socket(linux_domain, typ, proto) }
+    } else {
+        log::debug!("socket(domain={domain}) — denied (EOPNOTSUPP)");
+        deny_i32()
     }
 }
 
 /// `int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)`
+///
+/// Translates macOS sockaddr layout (sa_len+sa_family) to Linux (sa_family u16)
+/// and translates AF_* constants. All destinations are allowed — the guest binary
+/// controls its own network access.
 pub extern "C" fn shim_connect(fd: i32, addr: u64, len: u32) -> i32 {
-    if is_allowed_address(addr, len) {
-        log::debug!("connect(fd={fd}) — passthrough (localhost/unix)");
-        unsafe { libc::connect(fd, addr as *const libc::sockaddr, len) }
-    } else {
-        log::debug!("connect(fd={fd}) — denied (non-localhost)");
-        deny_i32()
+    let mut buf = [0u8; 128];
+    let tlen = translate_sockaddr(addr, len, &mut buf);
+    if tlen == 0 && addr != 0 {
+        return deny_i32();
     }
+    let ptr = if addr == 0 {
+        std::ptr::null()
+    } else {
+        translated_sockaddr_ptr(addr, &buf, tlen)
+    };
+    log::debug!("connect(fd={fd}) — passthrough");
+    unsafe { libc::connect(fd, ptr, tlen) }
 }
 
 /// `int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)`
 pub extern "C" fn shim_bind(fd: i32, addr: u64, len: u32) -> i32 {
-    if is_allowed_address(addr, len) {
-        log::debug!("bind(fd={fd}) — passthrough (localhost/unix)");
-        unsafe { libc::bind(fd, addr as *const libc::sockaddr, len) }
-    } else {
-        log::debug!("bind(fd={fd}) — denied (non-localhost)");
-        deny_i32()
+    let mut buf = [0u8; 128];
+    let tlen = translate_sockaddr(addr, len, &mut buf);
+    if tlen == 0 && addr != 0 {
+        return deny_i32();
     }
+    let ptr = if addr == 0 {
+        std::ptr::null()
+    } else {
+        translated_sockaddr_ptr(addr, &buf, tlen)
+    };
+    log::debug!("bind(fd={fd}) — passthrough");
+    unsafe { libc::bind(fd, ptr, tlen) }
 }
 
 /// `int listen(int sockfd, int backlog)`
@@ -171,10 +246,17 @@ pub extern "C" fn shim_sendto(
     dest: u64,
     dest_len: u32,
 ) -> i64 {
-    if dest != 0 && !is_allowed_address(dest, dest_len) {
-        log::debug!("sendto(fd={fd}) — denied (non-localhost dest)");
-        return deny_i64();
-    }
+    let mut sa_buf = [0u8; 128];
+    let tlen = if dest != 0 {
+        translate_sockaddr(dest, dest_len, &mut sa_buf)
+    } else {
+        0
+    };
+    let ptr = if dest == 0 {
+        std::ptr::null()
+    } else {
+        translated_sockaddr_ptr(dest, &sa_buf, tlen)
+    };
     log::debug!("sendto(fd={fd}) — passthrough");
     unsafe {
         libc::sendto(
@@ -182,8 +264,8 @@ pub extern "C" fn shim_sendto(
             buf as *const libc::c_void,
             len as usize,
             flags,
-            dest as *const libc::sockaddr,
-            dest_len,
+            ptr,
+            tlen,
         ) as i64
     }
 }
@@ -219,11 +301,12 @@ pub extern "C" fn shim_getsockopt(
     optval: u64,
     optlen: u64,
 ) -> i32 {
-    log::debug!("getsockopt(fd={fd}) — passthrough");
+    let linux_level = translate_sockopt_level(level);
+    log::debug!("getsockopt(fd={fd}, level={level}→{linux_level}) — passthrough");
     unsafe {
         libc::getsockopt(
             fd,
-            level,
+            linux_level,
             optname,
             optval as *mut libc::c_void,
             optlen as *mut libc::socklen_t,
@@ -239,8 +322,9 @@ pub extern "C" fn shim_setsockopt(
     optval: u64,
     optlen: u32,
 ) -> i32 {
-    log::debug!("setsockopt(fd={fd}) — passthrough");
-    unsafe { libc::setsockopt(fd, level, optname, optval as *const libc::c_void, optlen) }
+    let linux_level = translate_sockopt_level(level);
+    log::debug!("setsockopt(fd={fd}, level={level}→{linux_level}) — passthrough");
+    unsafe { libc::setsockopt(fd, linux_level, optname, optval as *const libc::c_void, optlen) }
 }
 
 /// `int shutdown(int sockfd, int how)`
@@ -257,14 +341,14 @@ impl SocketShims {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
         register_shims!(table,
-            ("_socket",     shim_socket as *const () as u64,     "socket — localhost/unix passthrough"),
-            ("_connect",    shim_connect as *const () as u64,    "connect — localhost/unix passthrough"),
-            ("_bind",       shim_bind as *const () as u64,       "bind — localhost/unix passthrough"),
+            ("_socket",     shim_socket as *const () as u64,     "socket — AF translation passthrough"),
+            ("_connect",    shim_connect as *const () as u64,    "connect — sockaddr translation passthrough"),
+            ("_bind",       shim_bind as *const () as u64,       "bind — sockaddr translation passthrough"),
             ("_listen",     shim_listen as *const () as u64,     "listen — passthrough"),
             ("_accept",     shim_accept as *const () as u64,     "accept — passthrough"),
             ("_send",       shim_send as *const () as u64,       "send — passthrough"),
             ("_recv",       shim_recv as *const () as u64,       "recv — passthrough"),
-            ("_sendto",     shim_sendto as *const () as u64,     "sendto — localhost/unix passthrough"),
+            ("_sendto",     shim_sendto as *const () as u64,     "sendto — sockaddr translation passthrough"),
             ("_recvfrom",   shim_recvfrom as *const () as u64,   "recvfrom — passthrough"),
             ("_getsockopt", shim_getsockopt as *const () as u64, "getsockopt — passthrough"),
             ("_setsockopt", shim_setsockopt as *const () as u64, "setsockopt — passthrough"),
@@ -356,7 +440,7 @@ mod tests {
     }
 
     #[test]
-    fn test_connect_external_denied() {
+    fn test_connect_external_allowed() {
         let fd = shim_socket(libc::AF_INET, libc::SOCK_STREAM, 0);
         assert!(fd >= 0);
 
@@ -375,8 +459,15 @@ mod tests {
             &sa as *const libc::sockaddr_in as u64,
             std::mem::size_of::<libc::sockaddr_in>() as u32,
         );
-        assert_eq!(ret, -1);
-        assert_eq!(get_errno(), libc::EOPNOTSUPP);
+        // External addresses are now allowed through — connect may fail
+        // (ECONNREFUSED, ETIMEDOUT, etc.) but NOT with EOPNOTSUPP.
+        if ret == -1 {
+            assert_ne!(
+                get_errno(),
+                libc::EOPNOTSUPP,
+                "connect to 8.8.8.8 should not be denied by policy"
+            );
+        }
         close_fd(fd);
     }
 

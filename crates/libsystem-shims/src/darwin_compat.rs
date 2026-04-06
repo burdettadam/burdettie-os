@@ -277,6 +277,17 @@ impl DarwinCompatShims {
                 ("_os_variant_has_internal_content", shim_os_variant_false as *const () as u64, "os_variant_has_internal_content → false"),
             );
 
+            // ── stdio internals (macOS-specific) ────────────────────
+            register_shims!(table,
+                ("___srget", shim_srget as *const () as u64, "__srget → fgetc"),
+            );
+
+            // ── arc4random legacy ───────────────────────────────────
+            register_shims!(table,
+                ("_arc4random_stir", shim_arc4random_stir as *const () as u64, "arc4random_stir no-op"),
+                ("_arc4random_addrandom", shim_arc4random_addrandom as *const () as u64, "arc4random_addrandom no-op"),
+            );
+
             log::info!("DarwinCompatShims: registered compat shims");
         }
     }
@@ -1935,3 +1946,25 @@ extern "C" fn shim_libcpp_verbose_abort(fmt: *const libc::c_char) -> ! {
 extern "C" fn shim_os_variant_false(_subsystem: *const libc::c_char) -> libc::c_int {
     0
 }
+
+// ── __srget (macOS stdio internal) ──────────────────────────────────
+
+/// `int __srget(FILE *fp)` — macOS libc internal that refills a FILE stream
+/// buffer and returns the next character. On Linux, the equivalent is `fgetc`.
+#[cfg(not(target_os = "macos"))]
+extern "C" fn shim_srget(fp: *mut libc::FILE) -> libc::c_int {
+    if fp.is_null() {
+        return -1; // EOF
+    }
+    unsafe { libc::fgetc(fp) }
+}
+
+// ── arc4random legacy ───────────────────────────────────────────────
+
+/// `void arc4random_stir(void)` — deprecated no-op (self-seeding since 10.12).
+#[cfg(not(target_os = "macos"))]
+extern "C" fn shim_arc4random_stir() {}
+
+/// `void arc4random_addrandom(u_char *dat, int datlen)` — deprecated no-op.
+#[cfg(not(target_os = "macos"))]
+extern "C" fn shim_arc4random_addrandom(_dat: *const u8, _datlen: i32) {}

@@ -134,6 +134,7 @@ pub fn apply_chained_fixups(
         .unwrap_or(0);
 
     for seg_i in 0..seg_count {
+        let seg_name = parsed.segments.get(seg_i).map(|s| s.name.as_str()).unwrap_or("?");
         let off_pos = offsets_start + seg_i * 4;
         let seg_info_offset = u32::from_le_bytes([
             buf[off_pos],
@@ -143,8 +144,10 @@ pub fn apply_chained_fixups(
         ]) as usize;
 
         if seg_info_offset == 0 {
+            eprintln!("[CHAIN] seg[{seg_i}] '{seg_name}' — no fixups (offset=0)");
             continue;
         }
+        eprintln!("[CHAIN] seg[{seg_i}] '{seg_name}' — has fixups (offset={seg_info_offset:#x})");
 
         let abs = starts_offset + seg_info_offset;
         if abs + 22 > buf.len() {
@@ -175,9 +178,11 @@ pub fn apply_chained_fixups(
 
         let mapped_seg = find_mapped_segment_for_chain(image, parsed, seg_i, segment_offset);
         let Some(mapped_seg) = mapped_seg else {
+            eprintln!("[CHAIN] seg[{seg_i}] '{seg_name}' — NO MAPPED SEGMENT FOUND");
             log::debug!("chained fixups: seg[{seg_i}] no mapped segment found");
             continue;
         };
+        eprintln!("[CHAIN] seg[{seg_i}] '{seg_name}' — mapped at {:p}, size={}", mapped_seg.base, mapped_seg.size);
 
         log::debug!(
             "chained fixups: seg[{seg_i}] page_count={page_count}, mapped segment base={:p}, size={}",

@@ -101,7 +101,7 @@ pub fn register_nscontrol_class(rt: &mut objc_runtime::ObjcRuntime) {
         ],
         class_methods: vec![],
         ivars: vec![], properties: vec![], protocol_names: Vec::new(),
-        instance_size: 48, is_root: false, is_meta: false,
+        instance_size: 120, is_root: false, is_meta: false,
         superclass_addr: Some(nsobj::nsview_class_addr()),
         method_index: HashMap::new(), class_method_index: HashMap::new(),
     };
@@ -135,6 +135,7 @@ pub fn register_nstextfield_class(rt: &mut objc_runtime::ObjcRuntime) {
             me("setTarget:", nstextfield::shim_nstextfield_set_target as *const () as u64, "v@:@"),
             me("action", nstextfield::shim_nstextfield_action as *const () as u64, ":@:"),
             me("setAction:", nstextfield::shim_nstextfield_set_action as *const () as u64, "v@::"),
+            me("drawRect:", nstextfield::shim_nstextfield_draw_rect as *const () as u64, "v@:{CGRect=dddd}"),
         ],
         class_methods: vec![
             me("labelWithString:", nstextfield::shim_nstextfield_label_with_string as *const () as u64, "@@:@"),
@@ -142,7 +143,7 @@ pub fn register_nstextfield_class(rt: &mut objc_runtime::ObjcRuntime) {
             me("textFieldWithString:", nstextfield::shim_nstextfield_text_field_with_string as *const () as u64, "@@:@"),
         ],
         ivars: vec![], properties: vec![], protocol_names: Vec::new(),
-        instance_size: 48, is_root: false, is_meta: false,
+        instance_size: 120, is_root: false, is_meta: false,
         superclass_addr: Some(nsobj::nscontrol_class_addr()),
         method_index: HashMap::new(), class_method_index: HashMap::new(),
     };

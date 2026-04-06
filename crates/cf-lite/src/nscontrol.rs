@@ -1,22 +1,31 @@
 //! NSControl shim: base class for interactive AppKit controls.
 //!
-//! Object layout:
+//! Object layout (inherits NSView at offsets 0–79):
 //!
-//!   offset  0: isa               (u64)
-//!   offset  8: string_value_ptr  (u64 — NSString*, or 0)
-//!   offset 16: target_ptr        (u64 — id, or 0)
-//!   offset 24: action_sel        (u64 — SEL addr, or 0)
-//!   offset 32: int_value         (i64)
-//!   offset 40: flags             (u64 — bit 0: is_enabled, bit 1: is_continuous)
+//!   offset  0: isa               (u64)     — from NSView
+//!   offset  8: superview         (u64)     — from NSView
+//!   offset 16: window            (u64)     — from NSView
+//!   offset 24: frame_x           (f64)     — from NSView
+//!   offset 32: frame_y           (f64)     — from NSView
+//!   offset 40: frame_w           (f64)     — from NSView
+//!   offset 48: frame_h           (f64)     — from NSView
+//!   offset 56: subviews_ptr      (u64)     — from NSView
+//!   offset 64: subview_count     (u64)     — from NSView
+//!   offset 72: flags (view)      (u64)     — from NSView
+//!   offset 80: string_value_ptr  (u64 — NSString*, or 0)
+//!   offset 88: target_ptr        (u64 — id, or 0)
+//!   offset 96: action_sel        (u64 — SEL addr, or 0)
+//!   offset 104: int_value        (i64)
+//!   offset 112: ctrl_flags       (u64 — bit 0: is_enabled, bit 1: is_continuous)
 //!
-//! Total: 48 bytes.
+//! Total: 120 bytes.
 
-const STRING_VALUE_OFF: usize = 8;
-const TARGET_OFF: usize = 16;
-const ACTION_OFF: usize = 24;
-const INT_VALUE_OFF: usize = 32;
-const FLAGS_OFF: usize = 40;
-pub(crate) const CONTROL_SIZE: usize = 48;
+const STRING_VALUE_OFF: usize = 80;
+const TARGET_OFF: usize = 88;
+const ACTION_OFF: usize = 96;
+const INT_VALUE_OFF: usize = 104;
+const FLAGS_OFF: usize = 112;
+pub(crate) const CONTROL_SIZE: usize = 120;
 
 const FLAG_IS_ENABLED: u64 = 1 << 0;
 const FLAG_IS_CONTINUOUS: u64 = 1 << 1;
