@@ -133,6 +133,22 @@ pub fn register_nsobject_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nsobj::shim_nsobject_debug_description as *const () as u64,
                 "@@:",
             ),
+            // performSelector: family
+            me(
+                "performSelector:",
+                nsobj::shim_nsobject_perform_selector as *const () as u64,
+                "@@::",
+            ),
+            me(
+                "performSelector:withObject:",
+                nsobj::shim_nsobject_perform_selector_with_object as *const () as u64,
+                "@@::@",
+            ),
+            me(
+                "performSelector:withObject:afterDelay:",
+                nsobj::shim_nsobject_perform_selector_after_delay as *const () as u64,
+                "v@::@d",
+            ),
         ],
         class_methods: vec![
             me("alloc", nsobj::shim_nsobject_class_alloc as *const () as u64, "@@:"),
@@ -161,6 +177,11 @@ pub fn register_nsobject_class(rt: &mut objc_runtime::ObjcRuntime) {
                 "superclass",
                 nsobj::shim_nsobject_class_superclass as *const () as u64,
                 "#@:",
+            ),
+            me(
+                "cancelPreviousPerformRequestsWithTarget:",
+                nsobj::shim_nsobject_cancel_previous_perform as *const () as u64,
+                "v@:@",
             ),
         ],
         ivars: vec![],

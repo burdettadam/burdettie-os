@@ -5,7 +5,7 @@
 //!   offset  8: title_ptr     (u64 — NSString)
 //!   offset 16: items_vec_ptr (u64 — Box<Vec<u64>> of NSMenuItem*)
 //!
-//! NSMenuItem object layout (56 bytes):
+//! NSMenuItem object layout (72 bytes):
 //!   offset  0: ISA pointer   (u64)
 //!   offset  8: title_ptr     (u64 — NSString)
 //!   offset 16: target_ptr    (u64)
@@ -13,6 +13,8 @@
 //!   offset 32: submenu_ptr   (u64)
 //!   offset 40: enabled       (u64 — 1=YES, 0=NO; default YES)
 //!   offset 48: key_equiv_ptr (u64 — NSString)
+//!   offset 56: key_equiv_mod (u64 — modifier mask, default NSCommandKeyMask)
+//!   offset 64: state         (u64 — NSControlStateValue: 0=off, 1=on, -1=mixed)
 
 const MENU_TITLE_OFF: usize = 8;
 const MENU_ITEMS_OFF: usize = 16;
@@ -24,7 +26,9 @@ const ITEM_ACTION_OFF: usize = 24;
 const ITEM_SUBMENU_OFF: usize = 32;
 const ITEM_ENABLED_OFF: usize = 40;
 const ITEM_KEY_EQUIV_OFF: usize = 48;
-const ITEM_SIZE: usize = 56;
+const ITEM_KEY_EQUIV_MOD_OFF: usize = 56;
+const ITEM_STATE_OFF: usize = 64;
+const ITEM_SIZE: usize = 72;
 
 fn menu_items_ptr(obj: u64) -> *mut Vec<u64> {
     if obj == 0 {
@@ -171,6 +175,32 @@ pub extern "C" fn shim_nsmenu_remove_all_items(obj: u64, _cmd: u64) {
     }
 }
 
+/// `-[NSMenu insertItem:atIndex:]`
+pub extern "C" fn shim_nsmenu_insert_item(obj: u64, _cmd: u64, item: u64, index: i64) {
+    if obj == 0 || item == 0 { return; }
+    let items_ptr = ensure_menu_items_ptr(obj);
+    if items_ptr.is_null() { return; }
+    unsafe {
+        let items = &mut *items_ptr;
+        let idx = (index as usize).min(items.len());
+        items.insert(idx, item);
+    }
+}
+
+/// `-[NSMenu removeItemAtIndex:]`
+pub extern "C" fn shim_nsmenu_remove_item_at_index(obj: u64, _cmd: u64, index: i64) {
+    if obj == 0 { return; }
+    let items_ptr = menu_items_ptr(obj);
+    if items_ptr.is_null() { return; }
+    unsafe {
+        let items = &mut *items_ptr;
+        let idx = index as usize;
+        if idx < items.len() {
+            items.remove(idx);
+        }
+    }
+}
+
 /// `-[NSMenu title]`
 pub extern "C" fn shim_nsmenu_title(obj: u64, _cmd: u64) -> u64 {
     if obj == 0 { return crate::cfstring::alloc_nsstring_from_cstr(c"".as_ptr()); }
@@ -235,6 +265,8 @@ pub extern "C" fn shim_nsmenuitem_init_with_title(
         *((obj as usize + ITEM_SUBMENU_OFF) as *mut u64) = 0;
         *((obj as usize + ITEM_ENABLED_OFF) as *mut u64) = 1; // default YES
         *((obj as usize + ITEM_KEY_EQUIV_OFF) as *mut u64) = key_equiv;
+        *((obj as usize + ITEM_KEY_EQUIV_MOD_OFF) as *mut u64) = NS_COMMAND_KEY_MASK;
+        *((obj as usize + ITEM_STATE_OFF) as *mut u64) = 0; // NSControlStateValueOff
     }
     obj
 }
@@ -314,6 +346,33 @@ pub extern "C" fn shim_nsmenuitem_set_key_equivalent(obj: u64, _cmd: u64, key_eq
     unsafe { *((obj as usize + ITEM_KEY_EQUIV_OFF) as *mut u64) = key_equiv; }
 }
 
+/// NSEventModifierFlags constants for key equivalent matching.
+const NS_COMMAND_KEY_MASK: u64 = 1 << 20;  // NSEventModifierFlagCommand
+
+/// `-[NSMenuItem keyEquivalentModifierMask]`
+pub extern "C" fn shim_nsmenuitem_key_equivalent_modifier_mask(obj: u64, _cmd: u64) -> u64 {
+    if obj == 0 { return NS_COMMAND_KEY_MASK; }
+    unsafe { *((obj as usize + ITEM_KEY_EQUIV_MOD_OFF) as *const u64) }
+}
+
+/// `-[NSMenuItem setKeyEquivalentModifierMask:]`
+pub extern "C" fn shim_nsmenuitem_set_key_equivalent_modifier_mask(obj: u64, _cmd: u64, mask: u64) {
+    if obj == 0 { return; }
+    unsafe { *((obj as usize + ITEM_KEY_EQUIV_MOD_OFF) as *mut u64) = mask; }
+}
+
+/// `-[NSMenuItem state]` — returns NSControlStateValue (0=off, 1=on, -1=mixed).
+pub extern "C" fn shim_nsmenuitem_state(obj: u64, _cmd: u64) -> i64 {
+    if obj == 0 { return 0; }
+    unsafe { *((obj as usize + ITEM_STATE_OFF) as *const u64) as i64 }
+}
+
+/// `-[NSMenuItem setState:]`
+pub extern "C" fn shim_nsmenuitem_set_state(obj: u64, _cmd: u64, state: i64) {
+    if obj == 0 { return; }
+    unsafe { *((obj as usize + ITEM_STATE_OFF) as *mut u64) = state as u64; }
+}
+
 // ── Action dispatch ────────────────────────────────────────────
 
 /// `-[NSMenu performKeyEquivalent:]` — walk items checking key equivalents.
@@ -352,14 +411,21 @@ pub extern "C" fn shim_nsmenu_perform_key_equivalent(obj: u64, _cmd: u64, event:
         let key_str = crate::cfstring::extract_cfstring_cstr(key_equiv);
         let event_str = crate::cfstring::extract_cfstring_cstr(event_chars);
         if let (Some(k), Some(e)) = (key_str, event_str) {
-            if k == e {
-                // Dispatch the action
-                let action = unsafe { *((item as usize + ITEM_ACTION_OFF) as *const u64) };
-                let target = unsafe { *((item as usize + ITEM_TARGET_OFF) as *const u64) };
-                if action != 0 {
-                    dispatch_menu_action(target, action, item);
+            if !k.is_empty() && k == e {
+                // Check modifier flags match.
+                let item_mod = unsafe { *((item as usize + ITEM_KEY_EQUIV_MOD_OFF) as *const u64) };
+                let event_mod = crate::nsevent::shim_nsevent_modifier_flags(event, 0);
+                // Mask to device-independent modifier bits (Shift/Ctrl/Alt/Cmd).
+                const DEVICE_INDEPENDENT_MASK: u64 = 0xFFFF_0000;
+                if (event_mod & DEVICE_INDEPENDENT_MASK) & item_mod == item_mod {
+                    // Dispatch the action
+                    let action = unsafe { *((item as usize + ITEM_ACTION_OFF) as *const u64) };
+                    let target = unsafe { *((item as usize + ITEM_TARGET_OFF) as *const u64) };
+                    if action != 0 {
+                        dispatch_menu_action(target, action, item);
+                    }
+                    return 1;
                 }
-                return 1;
             }
         }
     }
@@ -374,8 +440,14 @@ fn dispatch_menu_action(target: u64, action_sel: u64, sender: u64) {
     let effective_target = if target != 0 {
         target
     } else {
-        // Walk the responder chain from the key window's first responder
-        // For now, nil target is a no-op since we don't have sendAction: wired up
+        // Nil target — route through NSApp's sendAction:to:from: which walks
+        // the responder chain from the key window's first responder.
+        let app = crate::nsapplication::shim_nsapplication_shared_application(0, 0);
+        if app != 0 {
+            crate::nsapplication::shim_nsapplication_send_action_to_from(
+                app, 0, action_sel, 0, sender,
+            );
+        }
         return;
     };
 

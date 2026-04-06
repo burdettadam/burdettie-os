@@ -165,6 +165,91 @@ pub extern "C" fn shim_nsview_tracking_areas(obj: u64, _cmd: u64) -> u64 {
 /// `-[NSView updateTrackingAreas]` — no-op stub (views can override).
 pub extern "C" fn shim_nsview_update_tracking_areas(_obj: u64, _cmd: u64) {}
 
+/// Check tracking areas for a view at a given point (in the view's coordinate
+/// system).  Returns a list of `(tracking_area, owner)` pairs whose rect
+/// contains the point and whose options include `MouseEnteredAndExited`.
+pub(crate) fn tracking_areas_containing_point(view: u64, px: f64, py: f64) -> Vec<(u64, u64)> {
+    if view == 0 { return Vec::new(); }
+    let guard = VIEW_TRACKING_AREAS.lock().unwrap();
+    let areas = match guard.as_ref().and_then(|m| m.get(&view)) {
+        Some(a) => a,
+        None => return Vec::new(),
+    };
+    let mut result = Vec::new();
+    for &area in areas {
+        let opts = read_u64(area, OPTIONS_OFF);
+        if opts & MOUSE_ENTERED_AND_EXITED == 0 { continue; }
+        let rx = read_f64(area, RECT_X_OFF);
+        let ry = read_f64(area, RECT_Y_OFF);
+        let rw = read_f64(area, RECT_W_OFF);
+        let rh = read_f64(area, RECT_H_OFF);
+        if px >= rx && px <= rx + rw && py >= ry && py <= ry + rh {
+            result.push((area, get_owner(area)));
+        }
+    }
+    result
+}
+
+// ── Per-window mouse-hover tracking ─────────────────────────────
+
+/// Tracks the last view the mouse was hovering over, per-window.
+static LAST_HOVER_VIEW: Mutex<Option<HashMap<u64, u64>>> = Mutex::new(None);
+
+/// Process mouse tracking for a mouse-moved event.
+///
+/// Compares the target view at the mouse position against the last known
+/// hover view and dispatches `mouseExited:` / `mouseEntered:` as needed.
+pub(crate) fn process_mouse_tracking(window: u64, current_view: u64, event: u64) {
+    let previous_view = {
+        let guard = LAST_HOVER_VIEW.lock().unwrap();
+        guard.as_ref().and_then(|m| m.get(&window)).copied().unwrap_or(0)
+    };
+
+    if previous_view == current_view { return; }
+
+    // mouseExited: on the previous view's tracking area owner.
+    if previous_view != 0 {
+        // We don't know the exact point in the old view, but the event itself
+        // carries the window-level coordinates.
+        let owners_exited = tracking_areas_containing_point(previous_view, f64::MAX, f64::MAX);
+        // Since the mouse *left* the view entirely, fire exit on all tracking areas.
+        for &(_area, owner) in &owners_exited {
+            if owner != 0 {
+                crate::nsapplication::dispatch_selector_named_to_target(owner, "mouseExited:", event);
+            }
+        }
+        if owners_exited.is_empty() {
+            // Fall back to the view itself.
+            crate::nsapplication::dispatch_selector_named_to_target(previous_view, "mouseExited:", event);
+        }
+    }
+
+    // mouseEntered: on the new view's tracking area owners.
+    if current_view != 0 {
+        let (px, py) = crate::nsevent::event_location_in_window(event);
+        let local = crate::nsview::shim_nsview_convert_point_from_view(current_view, 0, px, py, 0);
+        let owners_entered = tracking_areas_containing_point(current_view, local.x, local.y);
+        for &(_area, owner) in &owners_entered {
+            if owner != 0 {
+                crate::nsapplication::dispatch_selector_named_to_target(owner, "mouseEntered:", event);
+            }
+        }
+        if owners_entered.is_empty() {
+            // Fall back to the view itself.
+            crate::nsapplication::dispatch_selector_named_to_target(current_view, "mouseEntered:", event);
+        }
+    }
+
+    // Update tracking state.
+    let mut guard = LAST_HOVER_VIEW.lock().unwrap();
+    let map = guard.get_or_insert_with(HashMap::new);
+    if current_view != 0 {
+        map.insert(window, current_view);
+    } else {
+        map.remove(&window);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -105,18 +105,36 @@ pub extern "C" fn shim_nscursor_unhide(_cls: u64, _cmd: u64) {
 /// `-[NSCursor set]` — make this cursor the active cursor.
 pub extern "C" fn shim_nscursor_set(obj: u64, _cmd: u64) {
     if obj == 0 { return; }
-    // No-op visually; just record in stack as current.
+    let cursor_type = unsafe { *((obj as usize + CURSOR_TYPE_OFF) as *const u64) };
+    if let Some(bridge) = crate::gui_bridge::gui_bridge() {
+        bridge.set_cursor(cursor_type);
+    }
 }
 
 /// `-[NSCursor push]` — push onto the cursor stack.
 pub extern "C" fn shim_nscursor_push(obj: u64, _cmd: u64) {
     if obj == 0 { return; }
     CURSOR_STACK.lock().unwrap_or_else(|e| e.into_inner()).push(obj);
+    let cursor_type = unsafe { *((obj as usize + CURSOR_TYPE_OFF) as *const u64) };
+    if let Some(bridge) = crate::gui_bridge::gui_bridge() {
+        bridge.set_cursor(cursor_type);
+    }
 }
 
 /// `-[NSCursor pop]` — class method that pops the top cursor.
 pub extern "C" fn shim_nscursor_pop(_cls: u64, _cmd: u64) {
-    CURSOR_STACK.lock().unwrap_or_else(|e| e.into_inner()).pop();
+    let mut stack = CURSOR_STACK.lock().unwrap_or_else(|e| e.into_inner());
+    stack.pop();
+    // Restore previous cursor or default to arrow
+    let cursor_type = stack.last().map_or(CURSOR_ARROW, |&obj| {
+        if obj == 0 { CURSOR_ARROW } else {
+            unsafe { *((obj as usize + CURSOR_TYPE_OFF) as *const u64) }
+        }
+    });
+    drop(stack);
+    if let Some(bridge) = crate::gui_bridge::gui_bridge() {
+        bridge.set_cursor(cursor_type);
+    }
 }
 
 /// `-[NSCursor image]` — returns nil (no image backing).

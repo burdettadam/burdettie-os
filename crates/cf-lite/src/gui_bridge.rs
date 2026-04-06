@@ -95,6 +95,10 @@ pub trait GuiBridge: Send + Sync {
 
     /// Request the window to redraw on the next frame (called from `setNeedsDisplay:`).
     fn request_redraw(&self, guest_window: u64);
+
+    /// Set the OS cursor to match the NSCursor type tag.
+    /// The `cursor_type` values are defined in `nscursor.rs` (0=Arrow, 1=IBeam, etc.).
+    fn set_cursor(&self, cursor_type: u64) { let _ = cursor_type; }
 }
 
 static GUI_BRIDGE: OnceLock<Box<dyn GuiBridge>> = OnceLock::new();
@@ -139,8 +143,8 @@ pub fn dispatch_gui_event(guest_window: u64, event: &GuiEvent) {
         GuiEvent::MouseMoved { x, y } => {
             crate::nsevent::alloc_mouse_event(5, *x, *y, 0, guest_window) // NSEventTypeMouseMoved
         }
-        GuiEvent::ScrollWheel { dx, dy: _ } => {
-            crate::nsevent::alloc_mouse_event(22, *dx, 0.0, 0, guest_window) // NSEventTypeScrollWheel
+        GuiEvent::ScrollWheel { dx, dy } => {
+            crate::nsevent::alloc_scroll_event(*dx, *dy, 0, guest_window)
         }
         GuiEvent::KeyDown { key_code, ref characters, modifiers } => {
             let chars = crate::cfstring::alloc_nsstring_from_cstr(

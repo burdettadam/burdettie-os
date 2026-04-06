@@ -191,9 +191,13 @@ pub extern "C" fn shim_nscontrol_set_continuous(obj: u64, _cmd: u64, val: u8) {
     write_u64(obj, FLAGS_OFF, flags);
 }
 
-/// `-[NSControl sendAction:to:]` — no-op stub (would need dispatch).
-pub extern "C" fn shim_nscontrol_send_action(_obj: u64, _cmd: u64, _action: u64, _target: u64) -> u8 {
-    1 // pretend success
+/// `-[NSControl sendAction:to:]` — dispatch via NSApp sendAction:to:from:.
+pub extern "C" fn shim_nscontrol_send_action(obj: u64, _cmd: u64, action: u64, target: u64) -> u8 {
+    if action == 0 {
+        return 0;
+    }
+    let nsapp = crate::nsapplication::nsapp_global_addr();
+    crate::nsapplication::shim_nsapplication_send_action_to_from(nsapp, 0, action, target, obj)
 }
 
 /// `-[NSControl sizeToFit]` — no-op stub.
@@ -280,9 +284,10 @@ mod tests {
     }
 
     #[test]
-    fn send_action_returns_success() {
+    fn send_action_with_nil_action_returns_zero() {
         let ctrl = alloc_obj(CONTROL_SIZE, 0xDEAD);
-        assert_eq!(shim_nscontrol_send_action(ctrl, 0, 0x1234, 0x5678), 1);
+        // action=0 → short-circuits to 0 without dispatch
+        assert_eq!(shim_nscontrol_send_action(ctrl, 0, 0, 0x5678), 0);
         free_obj(ctrl);
     }
 

@@ -129,6 +129,31 @@ pub extern "C" fn shim_nsscrollview_content_view(obj: u64, _cmd: u64) -> u64 {
     read_u64(obj, DOC_VIEW_OFF)
 }
 
+/// `-[NSScrollView scrollWheel:]` — handles scroll events by adjusting the
+/// document view's frame origin (simulating a scroll offset).
+///
+/// The scroll delta comes from NSEvent's scrollingDeltaX/Y.
+pub extern "C" fn shim_nsscrollview_scroll_wheel(obj: u64, _cmd: u64, event: u64) {
+    if obj == 0 || event == 0 { return; }
+
+    let (dx, dy) = crate::nsevent::event_scroll_deltas(event);
+    if dx == 0.0 && dy == 0.0 { return; }
+
+    let doc = read_u64(obj, DOC_VIEW_OFF);
+    if doc == 0 { return; }
+
+    // Read the document view's current frame origin (scroll offset is negative origin).
+    let cur_x = crate::nsview::view_frame_x(doc);
+    let cur_y = crate::nsview::view_frame_y(doc);
+
+    // Apply delta — positive dy scrolls down (moves content up → more negative y origin).
+    let new_x = cur_x + dx;
+    let new_y = cur_y + dy;
+
+    crate::nsview::shim_nsview_set_frame_origin(doc, 0, new_x, new_y);
+    crate::nsview::shim_nsview_set_needs_display(doc, 0, 1);
+}
+
 /// `-[NSScrollView drawRect:]` — draws background and lets subviews render.
 pub extern "C" fn shim_nsscrollview_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64) {
     if obj == 0 { return; }
@@ -228,6 +253,71 @@ mod tests {
         let sv = alloc_obj(SCROLL_VIEW_SIZE, 0xDEAD);
         assert_eq!(shim_nsscrollview_content_size(sv, 0), 0);
         shim_nsscrollview_tile(sv, 0); // should not panic
+        free_obj(sv);
+    }
+
+    // ── shim_nsscrollview_scroll_wheel ──────────────────────────
+
+    #[test]
+    fn scroll_wheel_nil_obj_no_panic() {
+        let evt = crate::nsevent::alloc_scroll_event(5.0, 10.0, 0, 0);
+        shim_nsscrollview_scroll_wheel(0, 0, evt);
+        free_obj(evt);
+    }
+
+    #[test]
+    fn scroll_wheel_nil_event_no_panic() {
+        let sv = alloc_obj(SCROLL_VIEW_SIZE, 0xDEAD);
+        shim_nsscrollview_scroll_wheel(sv, 0, 0);
+        free_obj(sv);
+    }
+
+    #[test]
+    fn scroll_wheel_updates_document_view_origin() {
+        let sv = alloc_obj(SCROLL_VIEW_SIZE, crate::nsobj::nsview_class_addr());
+        let doc = alloc_obj(crate::nsview::VIEW_SIZE, crate::nsobj::nsview_class_addr());
+        shim_nsscrollview_set_document_view(sv, 0, doc);
+
+        // Initial origin should be (0, 0).
+        assert!((crate::nsview::view_frame_x(doc)).abs() < f64::EPSILON);
+        assert!((crate::nsview::view_frame_y(doc)).abs() < f64::EPSILON);
+
+        // Scroll by (3.0, -5.0).
+        let evt = crate::nsevent::alloc_scroll_event(3.0, -5.0, 0, 0);
+        shim_nsscrollview_scroll_wheel(sv, 0, evt);
+        free_obj(evt);
+
+        assert!((crate::nsview::view_frame_x(doc) - 3.0).abs() < f64::EPSILON);
+        assert!((crate::nsview::view_frame_y(doc) - (-5.0)).abs() < f64::EPSILON);
+
+        // Scroll again to verify cumulative.
+        let evt2 = crate::nsevent::alloc_scroll_event(1.0, 2.0, 0, 0);
+        shim_nsscrollview_scroll_wheel(sv, 0, evt2);
+        free_obj(evt2);
+
+        assert!((crate::nsview::view_frame_x(doc) - 4.0).abs() < f64::EPSILON);
+        assert!((crate::nsview::view_frame_y(doc) - (-3.0)).abs() < f64::EPSILON);
+
+        free_obj(doc);
+        free_obj(sv);
+    }
+
+    #[test]
+    fn scroll_wheel_zero_delta_no_change() {
+        let sv = alloc_obj(SCROLL_VIEW_SIZE, crate::nsobj::nsview_class_addr());
+        let doc = alloc_obj(crate::nsview::VIEW_SIZE, crate::nsobj::nsview_class_addr());
+        crate::nsview::shim_nsview_set_frame_origin(doc, 0, 10.0, 20.0);
+        shim_nsscrollview_set_document_view(sv, 0, doc);
+
+        let evt = crate::nsevent::alloc_scroll_event(0.0, 0.0, 0, 0);
+        shim_nsscrollview_scroll_wheel(sv, 0, evt);
+        free_obj(evt);
+
+        // Origin should remain unchanged because delta was (0, 0).
+        assert!((crate::nsview::view_frame_x(doc) - 10.0).abs() < f64::EPSILON);
+        assert!((crate::nsview::view_frame_y(doc) - 20.0).abs() < f64::EPSILON);
+
+        free_obj(doc);
         free_obj(sv);
     }
 }

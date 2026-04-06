@@ -343,18 +343,30 @@ pub extern "C" fn shim_nswindow_send_event(obj: u64, _cmd: u64, event: u64) {
         crate::nsevent::set_event_window(event, obj);
     }
 
+    let event_type = crate::nsevent::event_type_raw(event);
+
     let dispatch_target = if crate::nsevent::event_targets_first_responder(event) {
+        // Key events → first responder
         let responder = shim_nswindow_first_responder(obj, 0);
         if responder != 0 { responder } else { obj }
     } else {
+        // Mouse events → hitTest: to find actual target view
         let content_view = shim_nswindow_content_view(obj, 0);
         if content_view != 0 {
-            content_view
+            let (px, py) = crate::nsevent::event_location_in_window(event);
+            let hit = crate::nsview::shim_nsview_hit_test(content_view, 0, px, py);
+            if hit != 0 { hit } else { content_view }
         } else {
             let responder = shim_nswindow_first_responder(obj, 0);
             if responder != 0 { responder } else { obj }
         }
     };
+
+    // For mouse-moved events, process tracking areas (mouseEntered:/mouseExited:).
+    if event_type == 5 {
+        // NSEventTypeMouseMoved
+        crate::nstrackingarea::process_mouse_tracking(obj, dispatch_target, event);
+    }
 
     if let Some(selector) = crate::nsevent::event_dispatch_selector(event) {
         let _ = crate::nsapplication::dispatch_selector_named_to_target(dispatch_target, selector, event);
@@ -367,7 +379,7 @@ pub extern "C" fn shim_nswindow_send_event(obj: u64, _cmd: u64, event: u64) {
 pub extern "C" fn shim_nswindow_make_key_and_order_front(obj: u64, _cmd: u64, _sender: u64) {
     set_visible(obj, true);
     crate::nsapplication::promote_window(obj);
-    crate::nsapplication::set_key_window(obj);
+    notify_key_window_change(obj);
     crate::nsapplication::set_main_window(obj);
 
     // Notify GUI bridge to create/show a real OS window.
@@ -379,7 +391,39 @@ pub extern "C" fn shim_nswindow_make_key_and_order_front(obj: u64, _cmd: u64, _s
 
 /// `-[NSWindow makeKeyWindow]` — makes this the application's key window.
 pub extern "C" fn shim_nswindow_make_key_window(obj: u64, _cmd: u64) {
+    notify_key_window_change(obj);
+}
+
+/// Notify old key window's delegate of `windowDidResignKey:` and new
+/// key window's delegate of `windowDidBecomeKey:`.
+fn notify_key_window_change(obj: u64) {
+    if obj == 0 { return; }
+    let old_key = crate::nsapplication::current_key_window();
     crate::nsapplication::set_key_window(obj);
+
+    // Resign old key window.
+    if old_key != 0 && old_key != obj {
+        let delegate = read_u64(old_key, DELEGATE_OFF);
+        if delegate != 0 {
+            let name_cstr = std::ffi::CString::new("NSWindowDidResignKeyNotification").unwrap();
+            let name_str = crate::cfstring::alloc_nsstring_from_cstr(name_cstr.as_ptr());
+            let note = crate::nsnotificationcenter::make_nsnotification(name_str, old_key, 0);
+            crate::nsapplication::dispatch_selector_named_to_target(
+                delegate, "windowDidResignKey:", note,
+            );
+        }
+    }
+
+    // Become new key window.
+    let delegate = read_u64(obj, DELEGATE_OFF);
+    if delegate != 0 {
+        let name_cstr = std::ffi::CString::new("NSWindowDidBecomeKeyNotification").unwrap();
+        let name_str = crate::cfstring::alloc_nsstring_from_cstr(name_cstr.as_ptr());
+        let note = crate::nsnotificationcenter::make_nsnotification(name_str, obj, 0);
+        crate::nsapplication::dispatch_selector_named_to_target(
+            delegate, "windowDidBecomeKey:", note,
+        );
+    }
 }
 
 /// `-[NSWindow makeMainWindow]` — makes this the application's main window.
@@ -436,6 +480,17 @@ pub extern "C" fn shim_nswindow_content_rect_for_frame_rect(
 
 /// `-[NSWindow close]` — hides the window.
 pub extern "C" fn shim_nswindow_close(obj: u64, _cmd: u64) {
+    // Notify delegate of windowWillClose: before hiding.
+    let delegate = read_u64(obj, DELEGATE_OFF);
+    if delegate != 0 {
+        let name_cstr = std::ffi::CString::new("NSWindowWillCloseNotification").unwrap();
+        let name_str = crate::cfstring::alloc_nsstring_from_cstr(name_cstr.as_ptr());
+        let note = crate::nsnotificationcenter::make_nsnotification(name_str, obj, 0);
+        crate::nsapplication::dispatch_selector_named_to_target(
+            delegate, "windowWillClose:", note,
+        );
+    }
+
     set_visible(obj, false);
     crate::nsapplication::clear_window_roles(obj);
     release_window_cg_context(obj);
@@ -510,12 +565,19 @@ pub extern "C" fn shim_nswindow_perform_key_equivalent(obj: u64, _cmd: u64, even
 }
 
 /// `-[NSWindow setFrame:display:]` — updates window frame geometry.
+///
+/// After updating the frame, resizes the content view and notifies the
+/// delegate with `windowDidResize:` if the size actually changed.
 pub extern "C" fn shim_nswindow_set_frame_display(
     obj: u64, _cmd: u64,
     x: f64, y: f64, w: f64, h: f64,
     _display: u8,
 ) {
     if obj == 0 { return; }
+    // Read old size for change detection.
+    let old_w = unsafe { *((obj as usize + FRAME_W_OFF) as *const f64) };
+    let old_h = unsafe { *((obj as usize + FRAME_H_OFF) as *const f64) };
+
     // Clamp to min/max size (max_w/max_h of 0 means unset → no upper limit)
     let min_w = unsafe { *((obj as usize + MIN_W_OFF) as *const f64) };
     let min_h = unsafe { *((obj as usize + MIN_H_OFF) as *const f64) };
@@ -530,8 +592,28 @@ pub extern "C" fn shim_nswindow_set_frame_display(
         *((obj as usize + FRAME_X_OFF + 24) as *mut f64) = h;
     }
 
+    // Resize the content view to match the new window size.
+    let content_view = read_u64(obj, CONTENT_VIEW_OFF);
+    if content_view != 0 && (old_w != w || old_h != h) {
+        crate::nsview::shim_nsview_set_frame(content_view, 0, 0.0, 0.0, w, h);
+    }
+
     if let Some(bridge) = crate::gui_bridge::gui_bridge() {
         bridge.set_window_frame(obj, x, y, w, h);
+    }
+
+    // Notify delegate of resize if size actually changed.
+    if old_w != w || old_h != h {
+        let delegate = read_u64(obj, DELEGATE_OFF);
+        if delegate != 0 {
+            // Create an NSNotification with the window as the object.
+            let name_cstr = std::ffi::CString::new("NSWindowDidResizeNotification").unwrap();
+            let name_str = crate::cfstring::alloc_nsstring_from_cstr(name_cstr.as_ptr());
+            let note = crate::nsnotificationcenter::make_nsnotification(name_str, obj, 0);
+            crate::nsapplication::dispatch_selector_named_to_target(
+                delegate, "windowDidResize:", note,
+            );
+        }
     }
 }
 
@@ -740,6 +822,129 @@ pub(crate) fn release_window_cg_context(window: u64) {
     if let Some(ctx) = map.remove(&window) {
         cg_shims::bridge::context_release(ctx);
     }
+}
+
+// ── Full-screen toggle ────────────────────────────────────────────
+
+use std::collections::HashMap as StdHashMap;
+
+/// Saved pre-full-screen frames, keyed by window pointer.
+static FULLSCREEN_SAVED_FRAMES: std::sync::Mutex<Option<StdHashMap<u64, (f64, f64, f64, f64)>>> =
+    std::sync::Mutex::new(None);
+
+fn fullscreen_saved_frame(obj: u64) -> Option<(f64, f64, f64, f64)> {
+    FULLSCREEN_SAVED_FRAMES
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .as_ref()
+        .and_then(|m| m.get(&obj).copied())
+}
+
+fn set_fullscreen_saved_frame(obj: u64, frame: Option<(f64, f64, f64, f64)>) {
+    let mut guard = FULLSCREEN_SAVED_FRAMES.lock().unwrap_or_else(|e| e.into_inner());
+    let map = guard.get_or_insert_with(StdHashMap::new);
+    match frame {
+        Some(f) => { map.insert(obj, f); }
+        None => { map.remove(&obj); }
+    }
+}
+
+/// `-[NSWindow toggleFullScreen:]` — toggles between full-screen and windowed.
+pub extern "C" fn shim_nswindow_toggle_full_screen(obj: u64, _cmd: u64, _sender: u64) {
+    if obj == 0 { return; }
+
+    if let Some((sx, sy, sw, sh)) = fullscreen_saved_frame(obj) {
+        // Currently full-screen — restore saved frame.
+        set_fullscreen_saved_frame(obj, None);
+        shim_nswindow_set_frame_display(obj, 0, sx, sy, sw, sh, 1);
+
+        // Notify delegate of windowDidExitFullScreen:.
+        let delegate = read_u64(obj, DELEGATE_OFF);
+        if delegate != 0 {
+            let name_cstr = std::ffi::CString::new("NSWindowDidExitFullScreenNotification").unwrap();
+            let name_str = crate::cfstring::alloc_nsstring_from_cstr(name_cstr.as_ptr());
+            let note = crate::nsnotificationcenter::make_nsnotification(name_str, obj, 0);
+            crate::nsapplication::dispatch_selector_named_to_target(
+                delegate, "windowDidExitFullScreen:", note,
+            );
+        }
+    } else {
+        // Not full-screen — save current frame and go full-screen.
+        let frame = shim_nswindow_frame(obj, 0);
+        set_fullscreen_saved_frame(obj, Some((
+            frame.origin.x, frame.origin.y,
+            frame.size.width, frame.size.height,
+        )));
+
+        // Get screen bounds (main screen).
+        let screen_frame = crate::nsscreen::shim_nsscreen_frame(
+            crate::nsscreen::shim_nsscreen_main_screen(0, 0), 0,
+        );
+        shim_nswindow_set_frame_display(
+            obj, 0,
+            screen_frame.origin.x, screen_frame.origin.y,
+            screen_frame.size.width, screen_frame.size.height,
+            1,
+        );
+
+        // Notify delegate of windowDidEnterFullScreen:.
+        let delegate = read_u64(obj, DELEGATE_OFF);
+        if delegate != 0 {
+            let name_cstr = std::ffi::CString::new("NSWindowDidEnterFullScreenNotification").unwrap();
+            let name_str = crate::cfstring::alloc_nsstring_from_cstr(name_cstr.as_ptr());
+            let note = crate::nsnotificationcenter::make_nsnotification(name_str, obj, 0);
+            crate::nsapplication::dispatch_selector_named_to_target(
+                delegate, "windowDidEnterFullScreen:", note,
+            );
+        }
+    }
+}
+
+/// `-[NSWindow beginSheet:completionHandler:]`
+///
+/// Presents a sheet window attached to this window.  For now, the sheet
+/// is made visible immediately and the completion handler is invoked
+/// synchronously with `NSModalResponseStop` (1001) when the sheet's
+/// `orderOut:` or `endSheet:` API would normally dismiss it.
+///
+/// Since we lack a real modal-sheet event loop, we invoke the handler
+/// right away so the calling code can proceed.
+pub extern "C" fn shim_nswindow_begin_sheet(
+    obj: u64, _cmd: u64, sheet_window: u64, handler: u64,
+) {
+    if obj == 0 { return; }
+
+    // Make the sheet visible (attached to this window conceptually).
+    if sheet_window != 0 {
+        set_visible(sheet_window, true);
+        crate::nsapplication::promote_window(sheet_window);
+    }
+
+    // Invoke the completion handler immediately with NSModalResponseStop.
+    const NS_MODAL_RESPONSE_STOP: i64 = 1001;
+    if handler != 0 {
+        let invoke_ptr = unsafe { *((handler as usize + 16) as *const u64) };
+        if invoke_ptr != 0 {
+            let invoke: extern "C" fn(u64, i64) = unsafe { std::mem::transmute(invoke_ptr) };
+            invoke(handler, NS_MODAL_RESPONSE_STOP);
+        }
+    }
+}
+
+/// `-[NSWindow endSheet:]` — dismisses a sheet previously presented via `beginSheet:`.
+pub extern "C" fn shim_nswindow_end_sheet(obj: u64, _cmd: u64, sheet_window: u64) {
+    if obj == 0 || sheet_window == 0 { return; }
+    set_visible(sheet_window, false);
+    if let Some(bridge) = crate::gui_bridge::gui_bridge() {
+        bridge.hide_window(sheet_window);
+    }
+}
+
+/// `-[NSWindow endSheet:returnCode:]` — dismisses a sheet with a return code.
+pub extern "C" fn shim_nswindow_end_sheet_return_code(
+    obj: u64, _cmd: u64, sheet_window: u64, _return_code: i64,
+) {
+    shim_nswindow_end_sheet(obj, 0, sheet_window);
 }
 
 #[cfg(test)]

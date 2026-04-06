@@ -41,6 +41,10 @@ pub struct CgContext {
     pub ctm: [f64; 6],
     /// Clipping rectangle (None = no clip).
     pub clip_rect: Option<Rect>,
+    /// Line dash pattern (empty = solid line).
+    pub line_dash_lengths: Vec<f64>,
+    /// Line dash phase offset.
+    pub line_dash_phase: f64,
     state_stack: Vec<ContextState>,
 }
 
@@ -55,6 +59,8 @@ struct ContextState {
     text_y: f64,
     ctm: [f64; 6],
     clip_rect: Option<Rect>,
+    line_dash_lengths: Vec<f64>,
+    line_dash_phase: f64,
 }
 
 impl CgContext {
@@ -71,6 +77,8 @@ impl CgContext {
             text_y: 0.0,
             ctm: [1.0, 0.0, 0.0, 1.0, 0.0, 0.0],
             clip_rect: None,
+            line_dash_lengths: Vec::new(),
+            line_dash_phase: 0.0,
             state_stack: Vec::new(),
         }
     }
@@ -86,6 +94,8 @@ impl CgContext {
             text_y: self.text_y,
             ctm: self.ctm,
             clip_rect: self.clip_rect,
+            line_dash_lengths: self.line_dash_lengths.clone(),
+            line_dash_phase: self.line_dash_phase,
         });
     }
 
@@ -100,6 +110,8 @@ impl CgContext {
             self.text_y = s.text_y;
             self.ctm = s.ctm;
             self.clip_rect = s.clip_rect;
+            self.line_dash_lengths = s.line_dash_lengths;
+            self.line_dash_phase = s.line_dash_phase;
         }
     }
 

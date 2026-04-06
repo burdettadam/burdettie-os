@@ -326,6 +326,16 @@ pub(crate) fn view_needs_display(obj: u64) -> bool {
     read_u64(obj, FLAGS_OFF) & FLAG_NEEDS_DISPLAY != 0
 }
 
+/// Internal accessor: frame x position.
+pub(crate) fn view_frame_x(obj: u64) -> f64 {
+    read_f64(obj, FRAME_X_OFF)
+}
+
+/// Internal accessor: frame y position.
+pub(crate) fn view_frame_y(obj: u64) -> f64 {
+    read_f64(obj, FRAME_Y_OFF)
+}
+
 /// `-[NSView drawRect:]` — base implementation does nothing.
 pub extern "C" fn shim_nsview_draw_rect(_obj: u64, _cmd: u64, _x: f64, _y: f64, _w: f64, _h: f64) {}
 
@@ -401,6 +411,168 @@ pub extern "C" fn shim_nsview_window(obj: u64, _cmd: u64) -> u64 {
 /// `-[NSView isFlipped]` — returns NO.
 pub extern "C" fn shim_nsview_is_flipped(_obj: u64, _cmd: u64) -> u8 {
     0
+}
+
+/// `-[NSView hitTest:]` — find the deepest subview containing the point.
+///
+/// `point` is in the receiver's superview coordinate system.
+/// Returns the deepest subview that contains the point, or self, or 0 if
+/// the point is outside this view's frame.
+pub extern "C" fn shim_nsview_hit_test(obj: u64, _cmd: u64, px: f64, py: f64) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
+
+    // Check if point is inside this view's frame
+    let fx = read_f64(obj, FRAME_X_OFF);
+    let fy = read_f64(obj, FRAME_Y_OFF);
+    let fw = read_f64(obj, FRAME_W_OFF);
+    let fh = read_f64(obj, FRAME_H_OFF);
+    if px < fx || px > fx + fw || py < fy || py > fy + fh {
+        return 0;
+    }
+
+    // Convert to local coordinates
+    let local_x = px - fx;
+    let local_y = py - fy;
+
+    // Check subviews in reverse order (front-to-back)
+    let children = snapshot_subviews(obj);
+    for &child in children.iter().rev() {
+        let hit = shim_nsview_hit_test(child, 0, local_x, local_y);
+        if hit != 0 {
+            return hit;
+        }
+    }
+
+    // No child hit — self is the target
+    obj
+}
+
+// ── Coordinate conversion ───────────────────────────────────────
+
+/// Walk the view hierarchy from `view` up to the root, accumulating frame
+/// origins.  Returns the view's frame origin in *window* coordinates.
+fn view_origin_in_window(view: u64) -> (f64, f64) {
+    let mut x = 0.0_f64;
+    let mut y = 0.0_f64;
+    let mut cursor = view;
+    let mut depth = 0;
+    while cursor != 0 && depth < 128 {
+        x += read_f64(cursor, FRAME_X_OFF);
+        y += read_f64(cursor, FRAME_Y_OFF);
+        cursor = read_u64(cursor, SUPERVIEW_OFF);
+        depth += 1;
+    }
+    (x, y)
+}
+
+/// `-[NSView convertPoint:fromView:]`
+///
+/// Converts a point from the coordinate system of `from_view` to this view.
+/// If `from_view` is nil (0), the point is assumed to be in window coordinates.
+pub extern "C" fn shim_nsview_convert_point_from_view(
+    obj: u64, _cmd: u64,
+    px: f64, py: f64,
+    from_view: u64,
+) -> CGPoint {
+    if obj == 0 {
+        return CGPoint { x: px, y: py };
+    }
+
+    // Convert from source to window coordinates.
+    let (wx, wy) = if from_view != 0 {
+        let (ox, oy) = view_origin_in_window(from_view);
+        (px + ox, py + oy)
+    } else {
+        (px, py)
+    };
+
+    // Convert from window coordinates to destination (self).
+    let (dx, dy) = view_origin_in_window(obj);
+    CGPoint { x: wx - dx, y: wy - dy }
+}
+
+/// `-[NSView convertPoint:toView:]`
+///
+/// Converts a point from this view's coordinate system to `to_view`.
+/// If `to_view` is nil (0), the point is converted to window coordinates.
+pub extern "C" fn shim_nsview_convert_point_to_view(
+    obj: u64, _cmd: u64,
+    px: f64, py: f64,
+    to_view: u64,
+) -> CGPoint {
+    if obj == 0 {
+        return CGPoint { x: px, y: py };
+    }
+
+    // Convert from self to window coordinates.
+    let (ox, oy) = view_origin_in_window(obj);
+    let wx = px + ox;
+    let wy = py + oy;
+
+    // Convert from window to destination view.
+    if to_view != 0 {
+        let (dx, dy) = view_origin_in_window(to_view);
+        CGPoint { x: wx - dx, y: wy - dy }
+    } else {
+        CGPoint { x: wx, y: wy }
+    }
+}
+
+/// `-[NSView convertRect:fromView:]`
+pub extern "C" fn shim_nsview_convert_rect_from_view(
+    obj: u64, _cmd: u64,
+    rx: f64, ry: f64, rw: f64, rh: f64,
+    from_view: u64,
+) -> CGRect {
+    let origin = shim_nsview_convert_point_from_view(obj, 0, rx, ry, from_view);
+    CGRect::new(origin.x, origin.y, rw, rh)
+}
+
+/// `-[NSView convertRect:toView:]`
+pub extern "C" fn shim_nsview_convert_rect_to_view(
+    obj: u64, _cmd: u64,
+    rx: f64, ry: f64, rw: f64, rh: f64,
+    to_view: u64,
+) -> CGRect {
+    let origin = shim_nsview_convert_point_to_view(obj, 0, rx, ry, to_view);
+    CGRect::new(origin.x, origin.y, rw, rh)
+}
+
+/// `-[NSView acceptsFirstResponder]` — base NSView returns NO.
+pub extern "C" fn shim_nsview_accepts_first_responder(_obj: u64, _cmd: u64) -> u8 {
+    0
+}
+
+/// `-[NSView mouseDown:]` — forwards up the responder chain.
+pub extern "C" fn shim_nsview_mouse_down(obj: u64, _cmd: u64, event: u64) {
+    crate::nsresponder::shim_nsresponder_mouse_down(obj, 0, event);
+}
+
+/// `-[NSView mouseUp:]` — forwards up the responder chain.
+pub extern "C" fn shim_nsview_mouse_up(obj: u64, _cmd: u64, event: u64) {
+    crate::nsresponder::shim_nsresponder_mouse_up(obj, 0, event);
+}
+
+/// `-[NSView mouseDragged:]` — forwards up the responder chain.
+pub extern "C" fn shim_nsview_mouse_dragged(obj: u64, _cmd: u64, event: u64) {
+    crate::nsresponder::shim_nsresponder_mouse_dragged(obj, 0, event);
+}
+
+/// `-[NSView rightMouseDown:]` — forwards up the responder chain.
+pub extern "C" fn shim_nsview_right_mouse_down(obj: u64, _cmd: u64, event: u64) {
+    crate::nsresponder::shim_nsresponder_right_mouse_down(obj, 0, event);
+}
+
+/// `-[NSView rightMouseUp:]` — forwards up the responder chain.
+pub extern "C" fn shim_nsview_right_mouse_up(obj: u64, _cmd: u64, event: u64) {
+    crate::nsresponder::shim_nsresponder_right_mouse_up(obj, 0, event);
+}
+
+/// `-[NSView rightMouseDragged:]` — forwards up the responder chain.
+pub extern "C" fn shim_nsview_right_mouse_dragged(obj: u64, _cmd: u64, event: u64) {
+    crate::nsresponder::shim_nsresponder_right_mouse_dragged(obj, 0, event);
 }
 
 // ── Auto Layout pass methods ────────────────────────────────────
@@ -1367,5 +1539,94 @@ mod tests {
     fn add_remove_layout_guide_nil_safety() {
         shim_nsview_add_layout_guide(0, 0, 0);
         shim_nsview_remove_layout_guide(0, 0, 0);
+    }
+
+    // ── convertPoint:fromView: / convertPoint:toView: ────────────
+
+    #[test]
+    fn convert_point_from_view_nil_from_is_window_coords() {
+        // from_view == 0 means point is in window coordinates.
+        // View at (10, 20) in window: window point (15, 25) → view local (5, 5).
+        let view = alloc_view_with_frame(10.0, 20.0, 100.0, 80.0);
+        let pt = shim_nsview_convert_point_from_view(view, 0, 15.0, 25.0, 0);
+        assert!((pt.x - 5.0).abs() < f64::EPSILON);
+        assert!((pt.y - 5.0).abs() < f64::EPSILON);
+        free_obj(view);
+    }
+
+    #[test]
+    fn convert_point_to_view_nil_to_is_window_coords() {
+        // to_view == 0 means convert to window coordinates.
+        // View at (10, 20): local point (5, 5) → window (15, 25).
+        let view = alloc_view_with_frame(10.0, 20.0, 100.0, 80.0);
+        let pt = shim_nsview_convert_point_to_view(view, 0, 5.0, 5.0, 0);
+        assert!((pt.x - 15.0).abs() < f64::EPSILON);
+        assert!((pt.y - 25.0).abs() < f64::EPSILON);
+        free_obj(view);
+    }
+
+    #[test]
+    fn convert_point_round_trip_to_window_and_back() {
+        let view = alloc_view_with_frame(30.0, 40.0, 200.0, 150.0);
+        let local = CGPoint { x: 7.0, y: 3.0 };
+        // local → window
+        let window_pt = shim_nsview_convert_point_to_view(view, 0, local.x, local.y, 0);
+        // window → local
+        let back = shim_nsview_convert_point_from_view(view, 0, window_pt.x, window_pt.y, 0);
+        assert!((back.x - local.x).abs() < f64::EPSILON);
+        assert!((back.y - local.y).abs() < f64::EPSILON);
+        free_obj(view);
+    }
+
+    #[test]
+    fn convert_point_between_nested_views() {
+        // Parent at (10, 20), child at (5, 10) within parent.
+        let parent = alloc_view_with_frame(10.0, 20.0, 200.0, 200.0);
+        let child = alloc_view_with_frame(5.0, 10.0, 50.0, 50.0);
+        shim_nsview_add_subview(parent, 0, child);
+
+        // Point (0, 0) in child → window: child origin = (10+5, 20+10) = (15, 30)
+        let to_win = shim_nsview_convert_point_to_view(child, 0, 0.0, 0.0, 0);
+        assert!((to_win.x - 15.0).abs() < f64::EPSILON);
+        assert!((to_win.y - 30.0).abs() < f64::EPSILON);
+
+        // Convert point from parent coords to child coords:
+        // Parent local (5, 10) is child origin → child local (0, 0)
+        let in_child = shim_nsview_convert_point_from_view(child, 0, 5.0, 10.0, parent);
+        assert!((in_child.x).abs() < f64::EPSILON);
+        assert!((in_child.y).abs() < f64::EPSILON);
+
+        // Convert point from child to parent:
+        // Child local (3, 4) → parent local: child is at (5,10) in parent, so (5+3, 10+4) = (8, 14)
+        let in_parent = shim_nsview_convert_point_to_view(child, 0, 3.0, 4.0, parent);
+        assert!((in_parent.x - 8.0).abs() < f64::EPSILON);
+        assert!((in_parent.y - 14.0).abs() < f64::EPSILON);
+
+        free_obj(child);
+        free_obj(parent);
+    }
+
+    #[test]
+    fn convert_rect_from_view_preserves_size() {
+        let view = alloc_view_with_frame(10.0, 20.0, 100.0, 80.0);
+        let rect = shim_nsview_convert_rect_from_view(view, 0, 15.0, 25.0, 50.0, 30.0, 0);
+        // Origin should be converted: (15-10, 25-20) = (5, 5)
+        assert!((rect.origin.x - 5.0).abs() < f64::EPSILON);
+        assert!((rect.origin.y - 5.0).abs() < f64::EPSILON);
+        // Size must be preserved.
+        assert!((rect.size.width - 50.0).abs() < f64::EPSILON);
+        assert!((rect.size.height - 30.0).abs() < f64::EPSILON);
+        free_obj(view);
+    }
+
+    #[test]
+    fn convert_point_nil_obj_returns_same_point() {
+        let pt = shim_nsview_convert_point_from_view(0, 0, 42.0, 99.0, 0);
+        assert!((pt.x - 42.0).abs() < f64::EPSILON);
+        assert!((pt.y - 99.0).abs() < f64::EPSILON);
+
+        let pt2 = shim_nsview_convert_point_to_view(0, 0, 42.0, 99.0, 0);
+        assert!((pt2.x - 42.0).abs() < f64::EPSILON);
+        assert!((pt2.y - 99.0).abs() < f64::EPSILON);
     }
 }

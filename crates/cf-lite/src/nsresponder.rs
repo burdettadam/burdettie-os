@@ -259,6 +259,26 @@ pub extern "C" fn shim_nsresponder_mouse_moved(obj: u64, _cmd: u64, event: u64) 
     forward_event_to_next_responder(obj, "mouseMoved:", event);
 }
 
+/// `-[NSResponder mouseDragged:]` — forwards to next responder when available.
+pub extern "C" fn shim_nsresponder_mouse_dragged(obj: u64, _cmd: u64, event: u64) {
+    forward_event_to_next_responder(obj, "mouseDragged:", event);
+}
+
+/// `-[NSResponder rightMouseDown:]` — forwards to next responder when available.
+pub extern "C" fn shim_nsresponder_right_mouse_down(obj: u64, _cmd: u64, event: u64) {
+    forward_event_to_next_responder(obj, "rightMouseDown:", event);
+}
+
+/// `-[NSResponder rightMouseUp:]` — forwards to next responder when available.
+pub extern "C" fn shim_nsresponder_right_mouse_up(obj: u64, _cmd: u64, event: u64) {
+    forward_event_to_next_responder(obj, "rightMouseUp:", event);
+}
+
+/// `-[NSResponder rightMouseDragged:]` — forwards to next responder when available.
+pub extern "C" fn shim_nsresponder_right_mouse_dragged(obj: u64, _cmd: u64, event: u64) {
+    forward_event_to_next_responder(obj, "rightMouseDragged:", event);
+}
+
 /// `-[NSResponder flagsChanged:]` — forwards to next responder when available.
 pub extern "C" fn shim_nsresponder_flags_changed(obj: u64, _cmd: u64, event: u64) {
     forward_event_to_next_responder(obj, "flagsChanged:", event);

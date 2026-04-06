@@ -469,3 +469,28 @@ define_class_pair!(child NSCURSOR_CLASS_DATA, NSCURSOR_METACLASS_DATA, NSCURSOR_
     meta_addr: nscursor_metaclass_addr,
     parent_class: nsobject_class_addr,
     parent_meta: nsobject_metaclass_addr);
+
+// ── NSColorPanel / NSFontPanel (inspector panels) ─────────────
+
+define_class_pair!(child NSCOLORPANEL_CLASS_DATA, NSCOLORPANEL_METACLASS_DATA, NSCOLORPANEL_INIT,
+    ensure: ensure_nscolorpanel_init,
+    class_addr: nscolorpanel_class_addr,
+    meta_addr: nscolorpanel_metaclass_addr,
+    parent_class: nspanel_class_addr,
+    parent_meta: nspanel_metaclass_addr);
+
+define_class_pair!(child NSFONTPANEL_CLASS_DATA, NSFONTPANEL_METACLASS_DATA, NSFONTPANEL_INIT,
+    ensure: ensure_nsfontpanel_init,
+    class_addr: nsfontpanel_class_addr,
+    meta_addr: nsfontpanel_metaclass_addr,
+    parent_class: nspanel_class_addr,
+    parent_meta: nspanel_metaclass_addr);
+
+// ── NSStepper ─────────────────────────────────────────────────
+
+define_class_pair!(child NSSTEPPER_CLASS_DATA, NSSTEPPER_METACLASS_DATA, NSSTEPPER_INIT,
+    ensure: ensure_nsstepper_init,
+    class_addr: nsstepper_class_addr,
+    meta_addr: nsstepper_metaclass_addr,
+    parent_class: nscontrol_class_addr,
+    parent_meta: nscontrol_metaclass_addr);

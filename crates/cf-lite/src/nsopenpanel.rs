@@ -159,12 +159,41 @@ pub extern "C" fn shim_nssavepanel_url(obj: u64, _cmd: u64) -> u64 {
 
 /// `-[NSSavePanel runModal]`
 ///
-/// Stub implementation: always returns NSModalResponseCancel (0).
-/// TODO: Wire to a native file dialog (rfd or similar) when the dependency is added.
+/// Uses `rfd` (native file dialog) on macOS to show a real save panel.
+/// Falls back to NSModalResponseCancel on other platforms.
 pub extern "C" fn shim_nssavepanel_run_modal(obj: u64, _cmd: u64) -> u64 {
     if obj == 0 { return NS_MODAL_RESPONSE_CANCEL; }
-    log::debug!("NSSavePanel runModal: stub — returning Cancel");
-    NS_MODAL_RESPONSE_CANCEL
+
+    #[cfg(target_os = "macos")]
+    {
+        let mut dialog = rfd::FileDialog::new();
+        // Apply allowed content types as file filters.
+        let types = get_allowed_types(obj);
+        if !types.is_empty() {
+            let refs: Vec<&str> = types.iter().map(|s| s.as_str()).collect();
+            dialog = dialog.add_filter("Allowed", &refs);
+        }
+        // Apply title if set.
+        let title_ptr = read_u64(obj, TITLE_OFF);
+        if title_ptr != 0 {
+            if let Some(t) = crate::cfstring::extract_cfstring_cstr(title_ptr) {
+                dialog = dialog.set_title(t);
+            }
+        }
+        match dialog.save_file() {
+            Some(path) => {
+                let url = file_url_from_path(&path);
+                store_urls(obj, vec![url]);
+                NS_MODAL_RESPONSE_OK
+            }
+            None => NS_MODAL_RESPONSE_CANCEL,
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        log::debug!("NSSavePanel runModal: stub — returning Cancel (no rfd on this platform)");
+        NS_MODAL_RESPONSE_CANCEL
+    }
 }
 
 // ── NSOpenPanel ──────────────────────────────────────────────────
@@ -226,12 +255,77 @@ pub extern "C" fn shim_nsopenpanel_urls(obj: u64, _cmd: u64) -> u64 {
 
 /// `-[NSOpenPanel runModal]`
 ///
-/// Stub implementation: always returns NSModalResponseCancel (0).
-/// TODO: Wire to a native file dialog (rfd or similar) when the dependency is added.
+/// Uses `rfd` (native file dialog) on macOS to show a real open panel.
+/// Falls back to NSModalResponseCancel on other platforms.
 pub extern "C" fn shim_nsopenpanel_run_modal(obj: u64, _cmd: u64) -> u64 {
     if obj == 0 { return NS_MODAL_RESPONSE_CANCEL; }
-    log::debug!("NSOpenPanel runModal: stub — returning Cancel");
-    NS_MODAL_RESPONSE_CANCEL
+
+    #[cfg(target_os = "macos")]
+    {
+        let flags = read_u64(obj, FLAGS_OFF);
+        let can_files = flags & FLAG_CAN_CHOOSE_FILES != 0;
+        let can_dirs = flags & FLAG_CAN_CHOOSE_DIRS != 0;
+        let multi = flags & FLAG_ALLOWS_MULTIPLE != 0;
+
+        let mut dialog = rfd::FileDialog::new();
+        // Apply allowed content types as file filters.
+        let types = get_allowed_types(obj);
+        if !types.is_empty() {
+            let refs: Vec<&str> = types.iter().map(|s| s.as_str()).collect();
+            dialog = dialog.add_filter("Allowed", &refs);
+        }
+        // Apply title from the inherited NSSavePanel title.
+        let title_ptr = read_u64(obj, TITLE_OFF);
+        if title_ptr != 0 {
+            if let Some(t) = crate::cfstring::extract_cfstring_cstr(title_ptr) {
+                dialog = dialog.set_title(t);
+            }
+        }
+
+        if can_dirs && !can_files {
+            // Directory picker mode.
+            if multi {
+                match dialog.pick_folders() {
+                    Some(paths) => {
+                        let urls: Vec<u64> = paths.iter().map(|p| file_url_from_path(p)).collect();
+                        store_urls(obj, urls);
+                        NS_MODAL_RESPONSE_OK
+                    }
+                    None => NS_MODAL_RESPONSE_CANCEL,
+                }
+            } else {
+                match dialog.pick_folder() {
+                    Some(path) => {
+                        store_urls(obj, vec![file_url_from_path(&path)]);
+                        NS_MODAL_RESPONSE_OK
+                    }
+                    None => NS_MODAL_RESPONSE_CANCEL,
+                }
+            }
+        } else if multi {
+            match dialog.pick_files() {
+                Some(paths) => {
+                    let urls: Vec<u64> = paths.iter().map(|p| file_url_from_path(p)).collect();
+                    store_urls(obj, urls);
+                    NS_MODAL_RESPONSE_OK
+                }
+                None => NS_MODAL_RESPONSE_CANCEL,
+            }
+        } else {
+            match dialog.pick_file() {
+                Some(path) => {
+                    store_urls(obj, vec![file_url_from_path(&path)]);
+                    NS_MODAL_RESPONSE_OK
+                }
+                None => NS_MODAL_RESPONSE_CANCEL,
+            }
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        log::debug!("NSOpenPanel runModal: stub — returning Cancel (no rfd on this platform)");
+        NS_MODAL_RESPONSE_CANCEL
+    }
 }
 
 #[cfg(test)]

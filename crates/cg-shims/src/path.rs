@@ -22,7 +22,9 @@ pub fn install(table: &mut ShimTable) {
         ("_CGPathCloseSubpath", shim_cg_path_close as *const () as u64, "CGPathCloseSubpath (bridge → real)"),
         ("_CGPathIsEmpty", shim_cg_path_is_empty as *const () as u64, "CGPathIsEmpty (bridge → real)"),
         ("_CGPathGetBoundingBox", shim_cg_path_void1 as *const () as u64, "CGPathGetBoundingBox (stub → zeroed)"),
-        ("_CGPathContainsPoint", shim_cg_path_false as *const () as u64, "CGPathContainsPoint (stub → false)")
+        ("_CGPathContainsPoint", shim_cg_path_false as *const () as u64, "CGPathContainsPoint (stub → false)"),
+        ("_CGPathAddQuadCurveToPoint", shim_cg_path_quad_curve_to as *const () as u64, "CGPathAddQuadCurveToPoint (bridge → real)"),
+        ("_CGPathAddArc", shim_cg_path_add_arc as *const () as u64, "CGPathAddArc (bridge → real)")
     );
 }
 
@@ -111,3 +113,27 @@ pub extern "C" fn shim_cg_path_is_empty(path: u64) -> i32 {
 // Stubs for not-yet-bridged operations
 pub extern "C" fn shim_cg_path_void1(_a: u64) {}
 pub extern "C" fn shim_cg_path_false(_a: u64, _b: u64, _c: u64, _d: u64) -> i32 { 0 }
+
+/// CGPathAddQuadCurveToPoint(path, transform, cpx, cpy, x, y).
+pub extern "C" fn shim_cg_path_quad_curve_to(
+    path: u64, _transform: u64,
+    cpx: f64, cpy: f64, x: f64, y: f64,
+) {
+    bridge::with_path(path, |p| {
+        p.quad_to(
+            graphics_core::Point::new(cpx, cpy),
+            graphics_core::Point::new(x, y),
+        );
+    });
+}
+
+/// CGPathAddArc(path, transform, x, y, radius, startAngle, endAngle, clockwise).
+pub extern "C" fn shim_cg_path_add_arc(
+    path: u64, _transform: u64,
+    cx: f64, cy: f64, radius: f64,
+    start_angle: f64, end_angle: f64, clockwise: i32,
+) {
+    bridge::with_path(path, |p| {
+        crate::context::add_arc_to_path(p, cx, cy, radius, start_angle, end_angle, clockwise != 0);
+    });
+}

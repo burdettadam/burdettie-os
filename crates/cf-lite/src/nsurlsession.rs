@@ -374,23 +374,42 @@ pub extern "C" fn shim_nsurlsessiondatatask_resume(obj: u64, _cmd: u64) {
 
 /// Perform a synchronous HTTP/HTTPS request and return (status_code, body_bytes).
 fn perform_http_request(url: &str, method: &str, body: Option<&[u8]>) -> Result<(i32, Vec<u8>), String> {
+    // BurdettieOS domain rewrite — redirect Apple service URLs to local server.
+    // The original URL is passed as X-Burdettie-Original-URL header for recording.
+    let (effective_url, original_url) = match burdettie_domain_map::rewrite_url(url) {
+        Some(rewritten) => (rewritten, Some(url.to_string())),
+        None => (url.to_string(), None),
+    };
+
     let agent = http_agent();
     // ureq v3 typestate: POST/PUT use .send(); others use .call().
     // Apply map_err inside each arm so the match produces Result<_, String> uniformly.
     let mut resp = match () {
         _ if method.eq_ignore_ascii_case("HEAD") => {
-            agent.head(url).call().map_err(|e| e.to_string())
+            let mut r = agent.head(&effective_url);
+            if let Some(ref orig) = original_url { r = r.header("X-Burdettie-Original-URL", orig); }
+            r.call().map_err(|e| e.to_string())
         }
         _ if method.eq_ignore_ascii_case("DELETE") => {
-            agent.delete(url).call().map_err(|e| e.to_string())
+            let mut r = agent.delete(&effective_url);
+            if let Some(ref orig) = original_url { r = r.header("X-Burdettie-Original-URL", orig); }
+            r.call().map_err(|e| e.to_string())
         }
         _ if method.eq_ignore_ascii_case("POST") => {
-            agent.post(url).send(body.unwrap_or(b"")).map_err(|e| e.to_string())
+            let mut r = agent.post(&effective_url);
+            if let Some(ref orig) = original_url { r = r.header("X-Burdettie-Original-URL", orig); }
+            r.send(body.unwrap_or(b"")).map_err(|e| e.to_string())
         }
         _ if method.eq_ignore_ascii_case("PUT") => {
-            agent.put(url).send(body.unwrap_or(b"")).map_err(|e| e.to_string())
+            let mut r = agent.put(&effective_url);
+            if let Some(ref orig) = original_url { r = r.header("X-Burdettie-Original-URL", orig); }
+            r.send(body.unwrap_or(b"")).map_err(|e| e.to_string())
         }
-        _ => agent.get(url).call().map_err(|e| e.to_string()),
+        _ => {
+            let mut r = agent.get(&effective_url);
+            if let Some(ref orig) = original_url { r = r.header("X-Burdettie-Original-URL", orig); }
+            r.call().map_err(|e| e.to_string())
+        }
     }?;
     let status = resp.status().as_u16() as i32;
     let body_bytes = resp.body_mut().read_to_vec().map_err(|e| e.to_string())?;

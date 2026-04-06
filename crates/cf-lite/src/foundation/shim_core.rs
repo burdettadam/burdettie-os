@@ -306,6 +306,7 @@ pub(super) fn install_core_shims(table: &mut ShimTable) {
     // NSApp global variable + NSRunLoop mode constants (Phase C5)
     register_shims!(table,
         ("_NSApp", nsapplication::nsapp_global_addr(), "NSApp global variable (data symbol)"),
+        ("_NSApplicationMain", nsapplication::shim_nsapplication_main as *const () as u64, "NSApplicationMain C entry point"),
         ("_NSDefaultRunLoopMode", nsrunloop::nsdefault_run_loop_mode_addr(), "NSDefaultRunLoopMode constant string"),
         ("_NSRunLoopCommonModes", nsrunloop::nsrun_loop_common_modes_addr(), "NSRunLoopCommonModes constant string"),
     );

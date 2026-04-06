@@ -195,8 +195,60 @@ pub extern "C" fn shim_nsbutton_set_bezel_style(_obj: u64, _cmd: u64, _style: u6
 /// `-[NSButton highlight:]` — no-op stub.
 pub extern "C" fn shim_nsbutton_highlight(_obj: u64, _cmd: u64, _flag: u8) {}
 
-/// `-[NSButton performClick:]` — no-op stub.
-pub extern "C" fn shim_nsbutton_perform_click(_obj: u64, _cmd: u64, _sender: u64) {}
+/// `-[NSButton performClick:]` — simulates a click: toggles state and fires action.
+pub extern "C" fn shim_nsbutton_perform_click(obj: u64, _cmd: u64, _sender: u64) {
+    if obj == 0 {
+        return;
+    }
+    // Toggle state for checkboxes
+    let flags = read_flags(obj);
+    if flags & FLAG_STATE_ON != 0 {
+        write_flags(obj, flags & !FLAG_STATE_ON);
+    } else {
+        write_flags(obj, flags | FLAG_STATE_ON);
+    }
+    fire_action(obj);
+}
+
+/// `-[NSButton mouseDown:]` — handle click: fire action on mouse down.
+///
+/// Real AppKit tracks the mouse until mouseUp and only fires if still inside
+/// the button. We simplify: fire immediately on mouseDown (single-threaded
+/// model, no run loop for mouse tracking).
+pub extern "C" fn shim_nsbutton_mouse_down(obj: u64, _cmd: u64, _event: u64) {
+    if obj == 0 {
+        return;
+    }
+    if read_flags(obj) & FLAG_IS_ENABLED == 0 {
+        return; // disabled buttons don't respond
+    }
+    // Toggle state for checkboxes
+    let flags = read_flags(obj);
+    if flags & FLAG_STATE_ON != 0 {
+        write_flags(obj, flags & !FLAG_STATE_ON);
+    } else {
+        write_flags(obj, flags | FLAG_STATE_ON);
+    }
+    fire_action(obj);
+}
+
+/// `-[NSButton acceptsFirstResponder]` — buttons accept first responder.
+pub extern "C" fn shim_nsbutton_accepts_first_responder(obj: u64, _cmd: u64) -> u8 {
+    if obj == 0 { return 0; }
+    u8::from(read_flags(obj) & FLAG_IS_ENABLED != 0)
+}
+
+/// Fire the button's target/action pair via NSApp sendAction:to:from:.
+fn fire_action(obj: u64) {
+    let action = read_u64(obj, ACTION_OFF);
+    let target = read_u64(obj, TARGET_OFF);
+    if action == 0 {
+        return;
+    }
+    // Use NSApp sendAction:to:from: for proper target resolution
+    let nsapp = crate::nsapplication::nsapp_global_addr();
+    crate::nsapplication::shim_nsapplication_send_action_to_from(nsapp, 0, action, target, obj);
+}
 
 /// `-[NSButton sizeToFit]` — no-op stub.
 pub extern "C" fn shim_nsbutton_size_to_fit(_obj: u64, _cmd: u64) {}

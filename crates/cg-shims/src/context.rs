@@ -55,6 +55,9 @@ pub fn install(table: &mut ShimTable) {
         ("_CGContextAddCurveToPoint", shim_cg_curve_to as *const () as u64, "CGContextAddCurveToPoint (bridge → real)"),
         ("_CGContextAddRect", shim_cg_add_rect as *const () as u64, "CGContextAddRect (bridge → real)"),
         ("_CGContextClosePath", shim_cg_close_path as *const () as u64, "CGContextClosePath (bridge → real)"),
+        ("_CGContextAddQuadCurveToPoint", shim_cg_quad_curve_to as *const () as u64, "CGContextAddQuadCurveToPoint (bridge → real)"),
+        ("_CGContextAddArc", shim_cg_add_arc as *const () as u64, "CGContextAddArc (bridge → real)"),
+        ("_CGContextSetLineDash", shim_cg_set_line_dash as *const () as u64, "CGContextSetLineDash (bridge → real)"),
 
         // ── Text ────────────────────────────────────────────────
         ("_CGContextSetFont", shim_cg_void2 as *const () as u64, "CGContextSetFont (stub → void, font name ignored)"),
@@ -208,6 +211,127 @@ pub extern "C" fn shim_cg_add_rect(ctx: u64, x: f64, y: f64, w: f64, h: f64) {
         c.path.line_to(graphics_core::Point::new(x + w, y + h));
         c.path.line_to(graphics_core::Point::new(x, y + h));
         c.path.close();
+    });
+}
+
+/// CGContextAddQuadCurveToPoint(ctx, cpx, cpy, x, y)
+pub extern "C" fn shim_cg_quad_curve_to(ctx: u64, cpx: f64, cpy: f64, x: f64, y: f64) {
+    bridge::with_context(ctx, |c| {
+        c.path.quad_to(
+            graphics_core::Point::new(cpx, cpy),
+            graphics_core::Point::new(x, y),
+        );
+    });
+}
+
+/// CGContextAddArc(ctx, x, y, radius, startAngle, endAngle, clockwise)
+///
+/// Approximates the arc with cubic Bézier segments (≤π/2 each).
+/// `clockwise` follows CG convention: 1 = clockwise in default (Y-up) coords.
+pub extern "C" fn shim_cg_add_arc(
+    ctx: u64,
+    cx: f64,
+    cy: f64,
+    radius: f64,
+    start_angle: f64,
+    end_angle: f64,
+    clockwise: i32,
+) {
+    bridge::with_context(ctx, |c| {
+        add_arc_to_path(&mut c.path, cx, cy, radius, start_angle, end_angle, clockwise != 0);
+    });
+}
+
+/// Generate cubic Bézier segments approximating a circular arc.
+pub fn add_arc_to_path(
+    path: &mut graphics_core::BezierPath,
+    cx: f64,
+    cy: f64,
+    radius: f64,
+    start_angle: f64,
+    end_angle: f64,
+    clockwise: bool,
+) {
+    use std::f64::consts::PI;
+
+    // Normalize the sweep direction
+    let mut sweep = end_angle - start_angle;
+    if clockwise {
+        // CG clockwise = negative sweep in math coords
+        while sweep > 0.0 {
+            sweep -= 2.0 * PI;
+        }
+    } else {
+        while sweep < 0.0 {
+            sweep += 2.0 * PI;
+        }
+    }
+
+    if sweep.abs() < 1e-10 {
+        // Degenerate — just line to start point
+        let sx = cx + radius * start_angle.cos();
+        let sy = cy + radius * start_angle.sin();
+        path.line_to(graphics_core::Point::new(sx, sy));
+        return;
+    }
+
+    // Split into segments of at most π/2
+    let n = (sweep.abs() / (PI / 2.0)).ceil() as usize;
+    let n = n.max(1);
+    let seg_angle = sweep / n as f64;
+
+    let mut angle = start_angle;
+    // Move/line to the start of the arc
+    let sx = cx + radius * angle.cos();
+    let sy = cy + radius * angle.sin();
+
+    // If path is empty, move to start; otherwise line to start
+    if path.elements().is_empty() {
+        path.move_to(graphics_core::Point::new(sx, sy));
+    } else {
+        path.line_to(graphics_core::Point::new(sx, sy));
+    }
+
+    for _ in 0..n {
+        let next_angle = angle + seg_angle;
+        // Magic constant for cubic Bézier approximation of a circular arc
+        let alpha = (seg_angle / 2.0).tan() * (4.0 / 3.0);
+
+        let cos_a = angle.cos();
+        let sin_a = angle.sin();
+        let cos_b = next_angle.cos();
+        let sin_b = next_angle.sin();
+
+        let cp1x = cx + radius * (cos_a - alpha * sin_a);
+        let cp1y = cy + radius * (sin_a + alpha * cos_a);
+        let cp2x = cx + radius * (cos_b + alpha * sin_b);
+        let cp2y = cy + radius * (sin_b - alpha * cos_b);
+        let ex = cx + radius * cos_b;
+        let ey = cy + radius * sin_b;
+
+        path.cubic_to(
+            graphics_core::Point::new(cp1x, cp1y),
+            graphics_core::Point::new(cp2x, cp2y),
+            graphics_core::Point::new(ex, ey),
+        );
+        angle = next_angle;
+    }
+}
+
+/// CGContextSetLineDash(ctx, phase, lengths_ptr, count)
+pub extern "C" fn shim_cg_set_line_dash(ctx: u64, phase: f64, lengths_ptr: u64, count: u64) {
+    bridge::with_context(ctx, |c| {
+        if count == 0 || lengths_ptr == 0 {
+            c.line_dash_lengths.clear();
+            c.line_dash_phase = 0.0;
+        } else {
+            let count = count as usize;
+            let lengths: Vec<f64> = (0..count)
+                .map(|i| unsafe { *((lengths_ptr as *const f64).add(i)) })
+                .collect();
+            c.line_dash_lengths = lengths;
+            c.line_dash_phase = phase;
+        }
     });
 }
 

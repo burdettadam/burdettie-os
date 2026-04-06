@@ -53,15 +53,62 @@ pub extern "C" fn shim_nstabview_select_tab_view_item_at_index(obj: u64, _cmd: u
     if obj == 0 {
         return;
     }
+    let old_idx = read_u64(obj, TAB_VIEW_DATA_OFF) as i64;
+    if old_idx == idx { return; }
+
+    let delegate = read_u64(obj, DELEGATE_OFF);
+
+    // Notify delegate: tabView:willSelectTabViewItem:
+    let new_item = tab_item_at(obj, idx);
+    if delegate != 0 && new_item != 0 {
+        crate::nsapplication::dispatch_selector_named_2arg(
+            delegate, "tabView:willSelectTabViewItem:", obj, new_item,
+        );
+    }
+
     write_u64(obj, TAB_VIEW_DATA_OFF, idx as u64);
+
+    // Notify delegate: tabView:didSelectTabViewItem:
+    if delegate != 0 && new_item != 0 {
+        crate::nsapplication::dispatch_selector_named_2arg(
+            delegate, "tabView:didSelectTabViewItem:", obj, new_item,
+        );
+    }
 }
 
-/// `-[NSTabView selectedTabViewItem]` — stub returning nil.
+/// `-[NSTabView selectedTabViewItem]` — returns the currently selected tab view item.
 pub extern "C" fn shim_nstabview_selected_tab_view_item(obj: u64, _cmd: u64) -> u64 {
     if obj == 0 {
         return 0;
     }
-    0
+    let idx = read_u64(obj, TAB_VIEW_DATA_OFF) as i64;
+    tab_item_at(obj, idx)
+}
+
+/// `-[NSTabView tabViewItemAtIndex:]`
+pub extern "C" fn shim_nstabview_tab_view_item_at_index(obj: u64, _cmd: u64, idx: i64) -> u64 {
+    tab_item_at(obj, idx)
+}
+
+/// `-[NSTabView indexOfTabViewItem:]`
+pub extern "C" fn shim_nstabview_index_of_tab_view_item(obj: u64, _cmd: u64, item: u64) -> i64 {
+    if obj == 0 || item == 0 { return -1; }
+    let guard = TAB_ITEMS.lock().unwrap();
+    if let Some(items) = guard.as_ref().and_then(|m| m.get(&obj)) {
+        for (i, &stored) in items.iter().enumerate() {
+            if stored == item { return i as i64; }
+        }
+    }
+    -1  // NSNotFound
+}
+
+fn tab_item_at(obj: u64, idx: i64) -> u64 {
+    if obj == 0 || idx < 0 { return 0; }
+    let guard = TAB_ITEMS.lock().unwrap();
+    guard.as_ref()
+        .and_then(|m| m.get(&obj))
+        .and_then(|v| v.get(idx as usize).copied())
+        .unwrap_or(0)
 }
 
 /// `-[NSTabView addTabViewItem:]` — stores the item.

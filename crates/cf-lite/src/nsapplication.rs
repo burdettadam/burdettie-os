@@ -430,12 +430,27 @@ pub extern "C" fn shim_nsapplication_run(obj: u64, _cmd: u64) {
 }
 
 /// `-[NSApplication terminate:]`
+///
+/// Queries the delegate with `applicationShouldTerminate:` before actually
+/// terminating.  If the delegate returns `NSTerminateCancel` (0) the
+/// termination is aborted.  `NSTerminateNow` (1) or no delegate proceeds.
 pub extern "C" fn shim_nsapplication_terminate(obj: u64, _cmd: u64, _sender: u64) {
     if obj == 0 {
         return;
     }
 
     let delegate = unsafe { *((obj as usize + DELEGATE_OFF) as *const u64) };
+
+    // Ask delegate: applicationShouldTerminate: → NSTerminateCancel(0) / NSTerminateNow(1) / NSTerminateLater(2)
+    if delegate != 0 {
+        let reply = dispatch_u64_selector_named_to_target(delegate, "applicationShouldTerminate:", obj);
+        // reply == u64::MAX means the delegate does not respond — treat as NSTerminateNow.
+        if reply != u64::MAX && reply == 0 {
+            log::debug!("NSApplication terminate: cancelled by delegate");
+            return;
+        }
+    }
+
     if delegate != 0 {
         send_delegate_message(delegate, "applicationWillTerminate:", 0);
     }
@@ -624,6 +639,34 @@ pub(crate) fn dispatch_selector_named_to_target(target: u64, selector: &str, arg
     true
 }
 
+/// Dispatch a selector with **two** arguments through the ObjC runtime.
+pub(crate) fn dispatch_selector_named_2arg(target: u64, selector: &str, arg1: u64, arg2: u64) -> bool {
+    if target == 0 || selector.is_empty() {
+        return false;
+    }
+
+    let isa = unsafe { *(target as *const u64) };
+
+    let guard = match objc_runtime::OBJC_RUNTIME.read() {
+        Ok(g) => g,
+        Err(e) => e.into_inner(),
+    };
+    let Some(rt) = guard.as_ref() else {
+        return false;
+    };
+
+    let Some(imp) = rt.msg_lookup(isa, selector) else {
+        return false;
+    };
+
+    let sel_ptr = rt.selector_ptr(selector).unwrap_or(0) as u64;
+    drop(guard);
+
+    let func: extern "C" fn(u64, u64, u64, u64) = unsafe { std::mem::transmute(imp) };
+    func(target, sel_ptr, arg1, arg2);
+    true
+}
+
 /// Dispatch a BOOL-returning selector with one argument through the ObjC runtime.
 /// Returns `false` when the runtime or method is unavailable.
 pub(crate) fn dispatch_bool_selector_named_to_target(target: u64, selector: &str, arg: u64) -> bool {
@@ -753,6 +796,34 @@ fn send_delegate_message(delegate: u64, selector: &str, arg: u64) {
     }
 }
 
+/// Dispatch a u64-returning selector with one argument through the ObjC runtime.
+/// Returns `u64::MAX` when the runtime or method is unavailable.
+pub(crate) fn dispatch_u64_selector_named_to_target(target: u64, selector: &str, arg: u64) -> u64 {
+    if target == 0 || selector.is_empty() {
+        return u64::MAX;
+    }
+
+    let isa = unsafe { *(target as *const u64) };
+
+    let guard = match objc_runtime::OBJC_RUNTIME.read() {
+        Ok(g) => g,
+        Err(e) => e.into_inner(),
+    };
+    let Some(rt) = guard.as_ref() else {
+        return u64::MAX;
+    };
+
+    let Some(imp) = rt.msg_lookup(isa, selector) else {
+        return u64::MAX;
+    };
+
+    let sel_ptr = rt.selector_ptr(selector).unwrap_or(0) as u64;
+    drop(guard);
+
+    let func: extern "C" fn(u64, u64, u64) -> u64 = unsafe { std::mem::transmute(imp) };
+    func(target, sel_ptr, arg)
+}
+
 /// `-[NSApplication nextEventMatchingMask:untilDate:inMode:dequeue:]`
 ///
 /// Returns the next event in the queue whose type matches `mask`, or nil if
@@ -827,6 +898,28 @@ pub extern "C" fn shim_nsapplication_perform_key_equivalent(obj: u64, _cmd: u64,
         return 1;
     }
 
+    0
+}
+
+// ── NSApplicationMain C entry point ────────────────────────────
+
+/// `NSApplicationMain(argc, argv)` — the standard C entry point for Cocoa apps.
+///
+/// Creates the shared application, loads the main nib (stub), and calls `[NSApp run]`.
+/// The `principalClassName` and `nibName` from the Info.plist are ignored; we always
+/// use our NSApplication singleton.
+pub extern "C" fn shim_nsapplication_main(_argc: i32, _argv: u64) -> i32 {
+    log::info!("NSApplicationMain: entering");
+    let app = get_or_create_shared_app();
+
+    // Call finishLaunching (sets up initial state).
+    shim_nsapplication_finish_launching(app, 0);
+
+    // Enter the run loop — this blocks until termination.
+    shim_nsapplication_run(app, 0);
+
+    // NSApplicationMain never returns in a real app, but we return 0
+    // for graceful exit after the run loop terminates.
     0
 }
 
@@ -1609,5 +1702,47 @@ mod tests {
     #[test]
     fn next_event_nil_does_not_crash() {
         assert_eq!(shim_nsapplication_next_event(0, 0, 0, 0, 0, 0), 0);
+    }
+
+    // ---- shim_nsapplication_main ----
+
+    #[test]
+    fn nsapplication_main_returns_zero() {
+        let _guard = APP_TEST_LOCK.lock().unwrap();
+        reset_runtime_state_for_reuse();
+        // With no GUI bridge, run exits immediately and main returns 0.
+        let result = shim_nsapplication_main(0, 0);
+        assert_eq!(result, 0);
+        reset_runtime_state_for_reuse();
+    }
+
+    // ---- dispatch_u64_selector_named_to_target ----
+
+    #[test]
+    fn dispatch_u64_selector_nil_target_returns_max() {
+        assert_eq!(dispatch_u64_selector_named_to_target(0, "someMethod:", 0), u64::MAX);
+    }
+
+    #[test]
+    fn dispatch_u64_selector_empty_selector_returns_max() {
+        let target = alloc_obj(16, crate::nsobj::nsresponder_class_addr());
+        assert_eq!(dispatch_u64_selector_named_to_target(target, "", 0), u64::MAX);
+        free_obj(target);
+    }
+
+    #[test]
+    fn dispatch_u64_selector_non_responding_target_returns_max() {
+        let _guard = APP_TEST_LOCK.lock().unwrap();
+        reset_runtime_state_for_reuse();
+
+        with_action_runtime(|| {
+            // A plain NSResponder doesn't respond to "applicationShouldTerminate:"
+            let target = alloc_obj(16, crate::nsobj::nsresponder_class_addr());
+            let result = dispatch_u64_selector_named_to_target(target, "applicationShouldTerminate:", 0);
+            assert_eq!(result, u64::MAX);
+            free_obj(target);
+        });
+
+        reset_runtime_state_for_reuse();
     }
 }

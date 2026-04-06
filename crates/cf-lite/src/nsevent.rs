@@ -10,8 +10,10 @@
 //!   offset 40: key_code        (u64)
 //!   offset 48: characters_ptr  (u64 — NSString*)
 //!   offset 56: window_ptr      (u64 — NSWindow*)
+//!   offset 64: scrolling_dx    (f64 — scrollingDeltaX for scroll wheel events)
+//!   offset 72: scrolling_dy    (f64 — scrollingDeltaY for scroll wheel events)
 //!
-//! Total: 64 bytes.
+//! Total: 80 bytes.
 
 const EVENT_TYPE_OFF: usize = 8;
 const LOCATION_X_OFF: usize = 16;
@@ -64,9 +66,12 @@ pub(crate) fn event_dispatch_selector(obj: u64) -> Option<&'static str> {
         KEY_DOWN_TYPE => Some("keyDown:"),
         KEY_UP_TYPE => Some("keyUp:"),
         FLAGS_CHANGED_TYPE => Some("flagsChanged:"),
-        LEFT_MOUSE_DOWN_TYPE | RIGHT_MOUSE_DOWN_TYPE | OTHER_MOUSE_DOWN_TYPE => Some("mouseDown:"),
-        LEFT_MOUSE_UP_TYPE | RIGHT_MOUSE_UP_TYPE | OTHER_MOUSE_UP_TYPE => Some("mouseUp:"),
-        MOUSE_MOVED_TYPE | LEFT_MOUSE_DRAGGED_TYPE | RIGHT_MOUSE_DRAGGED_TYPE | OTHER_MOUSE_DRAGGED_TYPE => Some("mouseMoved:"),
+        LEFT_MOUSE_DOWN_TYPE | OTHER_MOUSE_DOWN_TYPE => Some("mouseDown:"),
+        RIGHT_MOUSE_DOWN_TYPE => Some("rightMouseDown:"),
+        LEFT_MOUSE_UP_TYPE | OTHER_MOUSE_UP_TYPE => Some("mouseUp:"),
+        RIGHT_MOUSE_UP_TYPE => Some("rightMouseUp:"),
+        MOUSE_MOVED_TYPE => Some("mouseMoved:"),
+        LEFT_MOUSE_DRAGGED_TYPE | RIGHT_MOUSE_DRAGGED_TYPE | OTHER_MOUSE_DRAGGED_TYPE => Some("mouseDragged:"),
         SCROLL_WHEEL_TYPE => Some("scrollWheel:"),
         _ => None,
     }
@@ -94,6 +99,14 @@ pub(crate) fn event_type_raw(obj: u64) -> u64 {
 pub extern "C" fn shim_nsevent_location_in_window(obj: u64, _cmd: u64) -> f64 {
     if obj == 0 { return 0.0; }
     unsafe { *((obj as usize + LOCATION_X_OFF) as *const f64) }
+}
+
+/// Internal: get both (x, y) of locationInWindow.
+pub(crate) fn event_location_in_window(obj: u64) -> (f64, f64) {
+    if obj == 0 { return (0.0, 0.0); }
+    let x = unsafe { *((obj as usize + LOCATION_X_OFF) as *const f64) };
+    let y = unsafe { *((obj as usize + 24) as *const f64) };
+    (x, y)
 }
 
 /// `-[NSEvent modifierFlags]`
@@ -126,8 +139,10 @@ pub extern "C" fn shim_nsevent_window(obj: u64, _cmd: u64) -> u64 {
 
 // ── Event allocation helpers (used by factory methods + GUI bridge) ─
 
-const EVENT_SIZE: usize = 64;
+const EVENT_SIZE: usize = 80;
 const LOCATION_Y_OFF: usize = 24;
+const SCROLLING_DX_OFF: usize = 64;
+const SCROLLING_DY_OFF: usize = 72;
 
 /// Allocate a blank NSEvent with the given type.
 pub(crate) fn alloc_event(event_type: u64) -> u64 {
@@ -280,12 +295,57 @@ pub extern "C" fn shim_nsevent_button_number(_obj: u64, _cmd: u64) -> i64 {
     0
 }
 
+/// `-[NSEvent scrollingDeltaX]`
+pub extern "C" fn shim_nsevent_scrolling_delta_x(obj: u64, _cmd: u64) -> f64 {
+    if obj == 0 { return 0.0; }
+    unsafe { *((obj as usize + SCROLLING_DX_OFF) as *const f64) }
+}
+
+/// `-[NSEvent scrollingDeltaY]`
+pub extern "C" fn shim_nsevent_scrolling_delta_y(obj: u64, _cmd: u64) -> f64 {
+    if obj == 0 { return 0.0; }
+    unsafe { *((obj as usize + SCROLLING_DY_OFF) as *const f64) }
+}
+
+/// `-[NSEvent deltaX]` — alias for scrollingDeltaX.
+pub extern "C" fn shim_nsevent_delta_x(obj: u64, _cmd: u64) -> f64 {
+    shim_nsevent_scrolling_delta_x(obj, 0)
+}
+
+/// `-[NSEvent deltaY]` — alias for scrollingDeltaY.
+pub extern "C" fn shim_nsevent_delta_y(obj: u64, _cmd: u64) -> f64 {
+    shim_nsevent_scrolling_delta_y(obj, 0)
+}
+
+/// Internal: read scroll deltas from an event.
+pub(crate) fn event_scroll_deltas(obj: u64) -> (f64, f64) {
+    (shim_nsevent_scrolling_delta_x(obj, 0), shim_nsevent_scrolling_delta_y(obj, 0))
+}
+
+/// Allocate a scroll wheel event with delta values.
+pub(crate) fn alloc_scroll_event(
+    dx: f64,
+    dy: f64,
+    modifier_flags: u64,
+    window: u64,
+) -> u64 {
+    let obj = alloc_event(SCROLL_WHEEL_TYPE);
+    if obj == 0 { return 0; }
+    unsafe {
+        *((obj as usize + MODIFIER_FLAGS_OFF) as *mut u64) = modifier_flags;
+        *((obj as usize + WINDOW_OFF) as *mut u64) = window;
+        *((obj as usize + SCROLLING_DX_OFF) as *mut f64) = dx;
+        *((obj as usize + SCROLLING_DY_OFF) as *mut f64) = dy;
+    }
+    obj
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::shim_test_helpers::*;
 
-    const SIZE: usize = 64;
+    const SIZE: usize = EVENT_SIZE;
 
     fn make_event() -> u64 {
         alloc_obj(SIZE, crate::nsobj::nsevent_class_addr())
@@ -531,5 +591,87 @@ mod tests {
     #[test]
     fn is_a_repeat_default() {
         assert_eq!(shim_nsevent_is_a_repeat(0, 0), 0);
+    }
+
+    // --- alloc_scroll_event ---
+
+    #[test]
+    fn alloc_scroll_event_creates_type_22() {
+        let evt = alloc_scroll_event(1.5, -3.0, 0, 0);
+        assert_ne!(evt, 0);
+        assert_eq!(shim_nsevent_type(evt, 0), SCROLL_WHEEL_TYPE);
+        free_obj(evt);
+    }
+
+    // --- scrollingDeltaX / scrollingDeltaY ---
+
+    #[test]
+    fn scrolling_delta_x_returns_stored_value() {
+        let evt = alloc_scroll_event(12.5, 0.0, 0, 0);
+        assert!((shim_nsevent_scrolling_delta_x(evt, 0) - 12.5).abs() < f64::EPSILON);
+        free_obj(evt);
+    }
+
+    #[test]
+    fn scrolling_delta_y_returns_stored_value() {
+        let evt = alloc_scroll_event(0.0, -7.25, 0, 0);
+        assert!((shim_nsevent_scrolling_delta_y(evt, 0) - (-7.25)).abs() < f64::EPSILON);
+        free_obj(evt);
+    }
+
+    // --- deltaX / deltaY alias scrolling versions ---
+
+    #[test]
+    fn delta_x_matches_scrolling_delta_x() {
+        let evt = alloc_scroll_event(4.0, 5.0, 0, 0);
+        assert!((shim_nsevent_delta_x(evt, 0) - shim_nsevent_scrolling_delta_x(evt, 0)).abs() < f64::EPSILON);
+        free_obj(evt);
+    }
+
+    #[test]
+    fn delta_y_matches_scrolling_delta_y() {
+        let evt = alloc_scroll_event(4.0, 5.0, 0, 0);
+        assert!((shim_nsevent_delta_y(evt, 0) - shim_nsevent_scrolling_delta_y(evt, 0)).abs() < f64::EPSILON);
+        free_obj(evt);
+    }
+
+    // --- event_scroll_deltas ---
+
+    #[test]
+    fn event_scroll_deltas_returns_tuple() {
+        let evt = alloc_scroll_event(2.0, -3.0, 0, 0);
+        let (dx, dy) = event_scroll_deltas(evt);
+        assert!((dx - 2.0).abs() < f64::EPSILON);
+        assert!((dy - (-3.0)).abs() < f64::EPSILON);
+        free_obj(evt);
+    }
+
+    // --- nil safety for scroll accessors ---
+
+    #[test]
+    fn scrolling_delta_x_nil_returns_zero() {
+        assert!((shim_nsevent_scrolling_delta_x(0, 0)).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn scrolling_delta_y_nil_returns_zero() {
+        assert!((shim_nsevent_scrolling_delta_y(0, 0)).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn delta_x_nil_returns_zero() {
+        assert!((shim_nsevent_delta_x(0, 0)).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn delta_y_nil_returns_zero() {
+        assert!((shim_nsevent_delta_y(0, 0)).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn event_scroll_deltas_nil_returns_zeros() {
+        let (dx, dy) = event_scroll_deltas(0);
+        assert!((dx).abs() < f64::EPSILON);
+        assert!((dy).abs() < f64::EPSILON);
     }
 }

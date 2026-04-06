@@ -7,8 +7,8 @@ use std::collections::HashMap;
 use objc_runtime::ClassInfo;
 use super::me;
 use crate::{
-    nsalert, nsbox, nsbutton, nsclipview, nscursor, nsobj, nspanel,
-    nspopupbutton, nsscrollview, nssplitview, nsstackview, nstabview,
+    nsalert, nsbox, nsbutton, nsclipview, nscolorpanel, nscursor, nsobj, nspanel,
+    nspopupbutton, nsscrollview, nssplitview, nsstackview, nsstepper, nstabview,
     nstabviewitem, nstextview, nstoolbar, nstoolbaritem, nstrackingarea,
 };
 #[cfg(target_os = "macos")]
@@ -47,6 +47,8 @@ pub fn register_nsbutton_class(rt: &mut objc_runtime::ObjcRuntime) {
             me("performClick:", nsbutton::shim_nsbutton_perform_click as *const () as u64, "v@:@"),
             me("sizeToFit", nsbutton::shim_nsbutton_size_to_fit as *const () as u64, "v@:"),
             me("drawRect:", nsbutton::shim_nsbutton_draw_rect as *const () as u64, "v@:{CGRect=dddd}"),
+            me("mouseDown:", nsbutton::shim_nsbutton_mouse_down as *const () as u64, "v@:@"),
+            me("acceptsFirstResponder", nsbutton::shim_nsbutton_accepts_first_responder as *const () as u64, "B@:"),
         ],
         class_methods: vec![
             me("buttonWithTitle:target:action:", nsbutton::shim_nsbutton_button_with_title as *const () as u64, "@@:@@:"),
@@ -168,6 +170,7 @@ pub fn register_nsscrollview_class(rt: &mut objc_runtime::ObjcRuntime) {
             me("tile", nsscrollview::shim_nsscrollview_tile as *const () as u64, "v@:"),
             me("contentView", nsscrollview::shim_nsscrollview_content_view as *const () as u64, "@@:"),
             me("drawRect:", nsscrollview::shim_nsscrollview_draw_rect as *const () as u64, "v@:{CGRect=dddd}"),
+            me("scrollWheel:", nsscrollview::shim_nsscrollview_scroll_wheel as *const () as u64, "v@:@"),
         ],
         class_methods: vec![],
         ivars: vec![], properties: vec![], protocol_names: Vec::new(),
@@ -284,6 +287,8 @@ pub fn register_nstabview_class(rt: &mut objc_runtime::ObjcRuntime) {
             me("setDelegate:", nstabview::shim_nstabview_set_delegate as *const () as u64, "v@:@"),
             me("selectTabViewItemAtIndex:", nstabview::shim_nstabview_select_tab_view_item_at_index as *const () as u64, "v@:q"),
             me("selectedTabViewItem", nstabview::shim_nstabview_selected_tab_view_item as *const () as u64, "@@:"),
+            me("tabViewItemAtIndex:", nstabview::shim_nstabview_tab_view_item_at_index as *const () as u64, "@@:q"),
+            me("indexOfTabViewItem:", nstabview::shim_nstabview_index_of_tab_view_item as *const () as u64, "q@:@"),
             me("addTabViewItem:", nstabview::shim_nstabview_add_tab_view_item as *const () as u64, "v@:@"),
             me("removeTabViewItem:", nstabview::shim_nstabview_remove_tab_view_item as *const () as u64, "v@:@"),
             me("drawRect:", nstabview::shim_nstabview_draw_rect as *const () as u64, "v@:{CGRect=dddd}"),
@@ -589,4 +594,86 @@ pub fn register_nscursor_class(rt: &mut objc_runtime::ObjcRuntime) {
     };
     rt.register_synthetic_class(info);
     rt.register_metaclass_addr(metaclass_addr, "NSCursor");
+}
+
+// ── NSColorPanel ───────────────────────────────────────────────
+
+pub fn register_nscolorpanel_class(rt: &mut objc_runtime::ObjcRuntime) {
+    let class_addr = nsobj::nscolorpanel_class_addr();
+    let metaclass_addr = nsobj::nscolorpanel_metaclass_addr();
+    let info = ClassInfo {
+        name: "NSColorPanel".to_string(),
+        mapped_addr: class_addr,
+        methods: vec![
+            me("orderFront:", nscolorpanel::shim_nscolorpanel_order_front as *const () as u64, "v@:@"),
+            me("close", nscolorpanel::shim_nscolorpanel_close as *const () as u64, "v@:"),
+            me("color", nscolorpanel::shim_nscolorpanel_color as *const () as u64, "@@:"),
+        ],
+        class_methods: vec![
+            me("sharedColorPanel", nscolorpanel::shim_nscolorpanel_shared as *const () as u64, "@@:"),
+            me("sharedColorPanelExists", nscolorpanel::shim_nscolorpanel_shared_exists as *const () as u64, "c@:"),
+        ],
+        ivars: vec![], properties: vec![], protocol_names: Vec::new(),
+        instance_size: 8, is_root: false, is_meta: false,
+        superclass_addr: Some(nsobj::nspanel_class_addr()),
+        method_index: HashMap::new(), class_method_index: HashMap::new(),
+    };
+    rt.register_synthetic_class(info);
+    rt.register_metaclass_addr(metaclass_addr, "NSColorPanel");
+}
+
+// ── NSFontPanel ────────────────────────────────────────────────
+
+pub fn register_nsfontpanel_class(rt: &mut objc_runtime::ObjcRuntime) {
+    let class_addr = nsobj::nsfontpanel_class_addr();
+    let metaclass_addr = nsobj::nsfontpanel_metaclass_addr();
+    let info = ClassInfo {
+        name: "NSFontPanel".to_string(),
+        mapped_addr: class_addr,
+        methods: vec![
+            me("orderFront:", nscolorpanel::shim_nsfontpanel_order_front as *const () as u64, "v@:@"),
+            me("close", nscolorpanel::shim_nsfontpanel_close as *const () as u64, "v@:"),
+        ],
+        class_methods: vec![
+            me("sharedFontPanel", nscolorpanel::shim_nsfontpanel_shared as *const () as u64, "@@:"),
+            me("sharedFontPanelExists", nscolorpanel::shim_nsfontpanel_shared_exists as *const () as u64, "c@:"),
+        ],
+        ivars: vec![], properties: vec![], protocol_names: Vec::new(),
+        instance_size: 8, is_root: false, is_meta: false,
+        superclass_addr: Some(nsobj::nspanel_class_addr()),
+        method_index: HashMap::new(), class_method_index: HashMap::new(),
+    };
+    rt.register_synthetic_class(info);
+    rt.register_metaclass_addr(metaclass_addr, "NSFontPanel");
+}
+
+// ── NSStepper ──────────────────────────────────────────────────
+
+pub fn register_nsstepper_class(rt: &mut objc_runtime::ObjcRuntime) {
+    let class_addr = nsobj::nsstepper_class_addr();
+    let metaclass_addr = nsobj::nsstepper_metaclass_addr();
+    let info = ClassInfo {
+        name: "NSStepper".to_string(),
+        mapped_addr: class_addr,
+        methods: vec![
+            me("initWithFrame:", nsstepper::shim_nsstepper_init_with_frame as *const () as u64, "@@:{CGRect={CGPoint=dd}{CGSize=dd}}"),
+            me("minValue", nsstepper::shim_nsstepper_min_value as *const () as u64, "d@:"),
+            me("setMinValue:", nsstepper::shim_nsstepper_set_min_value as *const () as u64, "v@:d"),
+            me("maxValue", nsstepper::shim_nsstepper_max_value as *const () as u64, "d@:"),
+            me("setMaxValue:", nsstepper::shim_nsstepper_set_max_value as *const () as u64, "v@:d"),
+            me("increment", nsstepper::shim_nsstepper_increment as *const () as u64, "d@:"),
+            me("setIncrement:", nsstepper::shim_nsstepper_set_increment as *const () as u64, "v@:d"),
+            me("autorepeat", nsstepper::shim_nsstepper_autorepeat as *const () as u64, "c@:"),
+            me("setAutorepeat:", nsstepper::shim_nsstepper_set_autorepeat as *const () as u64, "v@:c"),
+            me("valueWraps", nsstepper::shim_nsstepper_value_wraps as *const () as u64, "c@:"),
+            me("setValueWraps:", nsstepper::shim_nsstepper_set_value_wraps as *const () as u64, "v@:c"),
+        ],
+        class_methods: vec![],
+        ivars: vec![], properties: vec![], protocol_names: Vec::new(),
+        instance_size: nsstepper::STEPPER_SIZE as u32, is_root: false, is_meta: false,
+        superclass_addr: Some(nsobj::nscontrol_class_addr()),
+        method_index: HashMap::new(), class_method_index: HashMap::new(),
+    };
+    rt.register_synthetic_class(info);
+    rt.register_metaclass_addr(metaclass_addr, "NSStepper");
 }
