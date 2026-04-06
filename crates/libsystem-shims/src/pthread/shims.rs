@@ -219,7 +219,10 @@ pub(super) extern "C" fn shim_pthread_cond_wait(
     cond: *mut libc::pthread_cond_t,
     mutex: *mut libc::pthread_mutex_t,
 ) -> libc::c_int {
-    unsafe { libc::pthread_cond_wait(cond, mutex) }
+    log::debug!("pthread_cond_wait(cond={cond:?}, mutex={mutex:?})");
+    let ret = unsafe { libc::pthread_cond_wait(cond, mutex) };
+    log::debug!("pthread_cond_wait returned {ret}");
+    ret
 }
 
 pub(super) extern "C" fn shim_pthread_cond_timedwait(
@@ -227,8 +230,20 @@ pub(super) extern "C" fn shim_pthread_cond_timedwait(
     mutex: *mut libc::pthread_mutex_t,
     abstime: *const libc::timespec,
 ) -> libc::c_int {
-    unsafe { libc::pthread_cond_timedwait(cond, mutex, abstime) }
+    let ret = unsafe { libc::pthread_cond_timedwait(cond, mutex, abstime) };
+    // Translate Linux ETIMEDOUT (110) → macOS ETIMEDOUT (60).
+    // Guest code (e.g. BIND9) checks the return value against the macOS
+    // constant and asserts on unexpected values.
+    #[cfg(target_os = "linux")]
+    if ret == libc::ETIMEDOUT {
+        return DARWIN_ETIMEDOUT;
+    }
+    ret
 }
+
+// macOS ETIMEDOUT = 60 (Operation timed out).
+#[cfg(target_os = "linux")]
+const DARWIN_ETIMEDOUT: i32 = 60;
 
 pub(super) extern "C" fn shim_pthread_cond_signal(cond: *mut libc::pthread_cond_t) -> libc::c_int {
     unsafe { libc::pthread_cond_signal(cond) }
@@ -268,6 +283,16 @@ pub(super) extern "C" fn shim_pthread_setspecific(
 
 // ── Once control ────────────────────────────────────────────────────
 
+// macOS pthread_once_t layout (16 bytes):
+//   __sig: i64    = 0x30B1BCBA (PTHREAD_ONCE_INIT magic)
+//   __opaque: i64 = 0
+// Linux pthread_once_t layout (4 bytes):
+//   __once: i32   = 0 (PTHREAD_ONCE_INIT)
+//
+// If the macOS once-control has the DARWIN magic and hasn't run (__opaque == 0),
+// we must zero the first 4 bytes before passing to Linux's pthread_once.
+const DARWIN_PTHREAD_ONCE_SIG: i64 = 0x30B1_BCBA;
+
 pub(super) extern "C" fn shim_pthread_once(
     once_control: *mut libc::pthread_once_t,
     init_routine: Option<extern "C" fn()>,
@@ -278,7 +303,21 @@ pub(super) extern "C" fn shim_pthread_once(
             #[cfg(target_os = "macos")]
             { unsafe { libc::pthread_once(once_control, Some(f)) } }
             #[cfg(not(target_os = "macos"))]
-            { unsafe { libc::pthread_once(once_control, f) } }
+            {
+                // Translate macOS pthread_once_t → Linux pthread_once_t.
+                // The guest binary has macOS PTHREAD_ONCE_INIT: first 4 bytes = 0x30B1BCBA.
+                // Linux PTHREAD_ONCE_INIT: first 4 bytes = 0.
+                // If we see the macOS magic, zero it so Linux treats it as "not yet run".
+                unsafe {
+                    let raw = once_control as *mut i32;
+                    let first_word = raw.read_unaligned();
+                    // macOS magic signature in little-endian:
+                    if first_word == DARWIN_PTHREAD_ONCE_SIG as i32 {
+                        raw.write_unaligned(0);
+                    }
+                    libc::pthread_once(once_control, f)
+                }
+            }
         }
         None => libc::EINVAL,
     }

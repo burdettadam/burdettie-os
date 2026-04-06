@@ -670,3 +670,125 @@ fn write_to_file_returns_zero_stub() {
     assert_eq!(shim_nsdictionary_write_to_file(dict, 0, path, 1), 0);
     free_dictionary(dict);
 }
+
+// ── Fast enumeration tests ─────────────────────────
+
+#[test]
+fn fast_enum_nil_returns_zero() {
+    assert_eq!(shim_nsdictionary_count_by_enumerating_with_state(0, 0, 1, 1, 16), 0);
+}
+
+#[test]
+fn fast_enum_empty_dict() {
+    let dict = make_nsdictionary(&[], &[]);
+    let mut state = [0u64; 4];
+    let mut buf = [0u64; 16];
+    let n = shim_nsdictionary_count_by_enumerating_with_state(
+        dict, 0,
+        state.as_mut_ptr() as u64,
+        buf.as_mut_ptr() as u64,
+        16,
+    );
+    assert_eq!(n, 0);
+    free_dictionary(dict);
+}
+
+#[test]
+fn fast_enum_returns_all_keys() {
+    let k1 = make_cfstring("alpha");
+    let k2 = make_cfstring("beta");
+    let v1 = make_cfstring("1");
+    let v2 = make_cfstring("2");
+    let dict = make_nsdictionary(&[k1, k2], &[v1, v2]);
+
+    let mut state = [0u64; 4];
+    let mut buf = [0u64; 16];
+    let n = shim_nsdictionary_count_by_enumerating_with_state(
+        dict, 0,
+        state.as_mut_ptr() as u64,
+        buf.as_mut_ptr() as u64,
+        16,
+    );
+    assert_eq!(n, 2);
+    // Keys should be k1 and k2
+    assert_eq!(buf[0], k1);
+    assert_eq!(buf[1], k2);
+    // state->state should advance past all items
+    assert_eq!(state[0], 2);
+    // state->itemsPtr should point to buf
+    assert_eq!(state[1], buf.as_ptr() as u64);
+
+    // Second call should return 0 (exhausted)
+    let n2 = shim_nsdictionary_count_by_enumerating_with_state(
+        dict, 0,
+        state.as_mut_ptr() as u64,
+        buf.as_mut_ptr() as u64,
+        16,
+    );
+    assert_eq!(n2, 0);
+    free_dictionary(dict);
+}
+
+#[test]
+fn fast_enum_batched() {
+    let keys: Vec<u64> = (0..5).map(|i| make_cfstring(&format!("k{i}"))).collect();
+    let vals: Vec<u64> = (0..5).map(|i| make_cfstring(&format!("v{i}"))).collect();
+    let dict = make_nsdictionary(&keys, &vals);
+
+    let mut state = [0u64; 4];
+    let mut buf = [0u64; 2]; // buffer smaller than count → forces batching
+
+    let n1 = shim_nsdictionary_count_by_enumerating_with_state(
+        dict, 0,
+        state.as_mut_ptr() as u64,
+        buf.as_mut_ptr() as u64,
+        2,
+    );
+    assert_eq!(n1, 2);
+    assert_eq!(state[0], 2);
+
+    let n2 = shim_nsdictionary_count_by_enumerating_with_state(
+        dict, 0,
+        state.as_mut_ptr() as u64,
+        buf.as_mut_ptr() as u64,
+        2,
+    );
+    assert_eq!(n2, 2);
+    assert_eq!(state[0], 4);
+
+    let n3 = shim_nsdictionary_count_by_enumerating_with_state(
+        dict, 0,
+        state.as_mut_ptr() as u64,
+        buf.as_mut_ptr() as u64,
+        2,
+    );
+    assert_eq!(n3, 1);
+    assert_eq!(state[0], 5);
+
+    let n4 = shim_nsdictionary_count_by_enumerating_with_state(
+        dict, 0,
+        state.as_mut_ptr() as u64,
+        buf.as_mut_ptr() as u64,
+        2,
+    );
+    assert_eq!(n4, 0);
+    free_dictionary(dict);
+}
+
+#[test]
+fn fast_enum_constant_dict() {
+    let k = make_cfstring("key");
+    let v = make_cfstring("val");
+    let dict = make_nsconstantdictionary(&[k], &[v]);
+
+    let mut state = [0u64; 4];
+    let mut buf = [0u64; 16];
+    let n = shim_nsdictionary_count_by_enumerating_with_state(
+        dict, 0,
+        state.as_mut_ptr() as u64,
+        buf.as_mut_ptr() as u64,
+        16,
+    );
+    assert_eq!(n, 1);
+    assert_eq!(buf[0], k);
+}

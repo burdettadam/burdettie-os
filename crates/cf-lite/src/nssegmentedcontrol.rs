@@ -207,6 +207,56 @@ pub extern "C" fn shim_nssegmentedcontrol_set_momentary(obj: u64, _cmd: u64, val
     set_flag(obj, FLAG_MOMENTARY, val != 0);
 }
 
+/// `-[NSSegmentedControl drawRect:]` — renders segments.
+pub extern "C" fn shim_nssegmentedcontrol_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64) {
+    if obj == 0 { return; }
+    let cg_ctx = crate::nsgraphicscontext::current_cg_context_handle();
+    if cg_ctx == 0 { return; }
+
+    let count = read_u64(obj, SEGMENT_COUNT_OFF) as usize;
+    if count == 0 { return; }
+    let selected = read_i64(obj, SELECTED_SEGMENT_OFF);
+    let seg_w = w / count as f64;
+
+    for i in 0..count {
+        let seg_x = x + i as f64 * seg_w;
+        let is_selected = i as i64 == selected;
+
+        cg_shims::bridge::with_context(cg_ctx, |c| {
+            // Segment background.
+            c.fill_color = if is_selected {
+                graphics_core::Color::new(0.2, 0.5, 1.0, 1.0)
+            } else {
+                graphics_core::Color::new(0.92, 0.92, 0.92, 1.0)
+            };
+            c.fill_rect(seg_x, y, seg_w, h);
+
+            // Border.
+            c.stroke_color = graphics_core::Color::new(0.7, 0.7, 0.7, 1.0);
+            c.stroke_rect(seg_x, y, seg_w, h);
+        });
+
+        // Draw label.
+        let label = shim_nssegmentedcontrol_label_for_segment(obj, 0, i as i64);
+        if label != 0 {
+            let utf8 = crate::cfstring::shim_nsstring_utf8string(label, 0);
+            if !utf8.is_null() {
+                let text = unsafe { std::ffi::CStr::from_ptr(utf8) }.to_str().unwrap_or("");
+                if !text.is_empty() {
+                    cg_shims::bridge::with_context(cg_ctx, |c| {
+                        c.fill_color = if is_selected {
+                            graphics_core::Color::WHITE
+                        } else {
+                            graphics_core::Color::BLACK
+                        };
+                        c.draw_text(text, seg_x + 4.0, y + h * 0.65);
+                    });
+                }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -582,7 +582,7 @@ impl StubResolver {
             // I/O — stdio
             "printf" | "puts" | "putchar" | "fprintf" | "snprintf" | "sprintf"
             | "vprintf" | "vfprintf" | "vsnprintf" | "vsprintf" | "asprintf"
-            | "write" | "fputs" | "fwrite" | "fread" | "fflush"
+            | "fputs" | "fwrite" | "fread" | "fflush"
             | "fopen" | "fclose" | "freopen" | "feof" | "ferror" | "fputc"
             | "fgetc" | "getc" | "ungetc" | "fgets" | "rewind" | "fseek" | "ftell"
             | "fileno" | "open_memstream" | "sscanf" | "fscanf"
@@ -596,7 +596,7 @@ impl StubResolver {
             | "malloc" | "calloc" | "realloc" | "reallocf" | "free"
             | "memcpy" | "memset" | "memmove" | "memcmp" | "memchr" | "memset_s"
             | "__memcpy_chk" | "__memmove_chk" | "__memset_chk"
-            | "bzero" | "bcopy" | "mmap" | "munmap" | "madvise" | "posix_madvise"
+            | "bzero" | "bcopy" | "munmap" | "madvise" | "posix_madvise"
             | "malloc_size" | "malloc_good_size"
             | "mprotect" | "mlock" | "munlock" | "mlockall" | "munlockall"
             // Strings
@@ -621,11 +621,11 @@ impl StubResolver {
             | "isupper" | "islower" | "isprint" | "isxdigit" | "iscntrl" | "ispunct"
             | "isascii" | "toascii" | "isblank"
             // File I/O (write is already listed in stdio above)
-            | "open" | "close" | "read" | "lseek" | "pread" | "pwrite" | "creat"
+            | "open" | "lseek" | "pread" | "pwrite" | "creat"
             | "fstat" | "stat" | "lstat" | "access" | "unlink" | "rename" | "remove"
             | "mkdir" | "rmdir" | "chdir" | "fchdir" | "getcwd"
             | "opendir" | "readdir" | "closedir" | "rewinddir"
-            | "fcntl" | "dup" | "dup2" | "pipe"
+            | "dup" | "dup2" | "pipe"
             | "mktemp" | "mkstemp" | "mkdtemp" | "mkstemps"
             | "realpath$DARWIN_EXTSN" | "realpath"
             | "utimensat" | "futimens"
@@ -683,7 +683,6 @@ impl StubResolver {
             | "kill" | "raise"
             | "sigprocmask" | "pthread_sigmask"
             | "alarm" | "setsid"
-            | "getrlimit" | "setrlimit"
             | "getprogname" | "setprogname"
             | "confstr" | "sysconf" | "getpagesize"
             | "getpriority" | "setpriority" | "getsid"
@@ -933,13 +932,11 @@ impl StubResolver {
             | "NXGetLocalArchInfo" | "NXGetAllArchInfos"
             // Backtrace
             | "backtrace" | "backtrace_symbols" | "backtrace_symbols_fd"
-            // Network: socket/connect/bind/etc. handled by SocketShims (AF translation)
-            // Only sendfile/sendmsg/recvmsg need safe-list passthrough.
-            | "sendfile" | "sendmsg" | "recvmsg"
+            // Network: socket/connect/bind/sendmsg/recvmsg handled by SocketShims
+            | "sendfile"
             | "getpwnam_r" | "getpwuid_r"
             | "getpwnam" | "getpwuid" | "getgrnam" | "getgrgid"
-            // Network extras
-            | "getpeername" | "getsockname"
+            // Network extras — getsockname/getpeername handled by SocketShims
             | "getifaddrs" | "freeifaddrs" | "if_nametoindex"
             | "socketpair"
             // DNS / resolver

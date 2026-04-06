@@ -31,12 +31,11 @@ fn write_u64(obj: u64, offset: usize, value: u64) {
 
 // ── Instance method shims ──────────────────────────────────────
 
-/// `-[NSTabView numberOfTabViewItems]` — stub returning 0.
+/// `-[NSTabView numberOfTabViewItems]` — returns actual count of items.
 pub extern "C" fn shim_nstabview_number_of_tab_view_items(obj: u64, _cmd: u64) -> i64 {
-    if obj == 0 {
-        return 0;
-    }
-    0
+    if obj == 0 { return 0; }
+    let guard = TAB_ITEMS.lock().unwrap();
+    guard.as_ref().and_then(|m| m.get(&obj)).map(|v| v.len() as i64).unwrap_or(0)
 }
 
 /// `-[NSTabView delegate]`
@@ -65,11 +64,95 @@ pub extern "C" fn shim_nstabview_selected_tab_view_item(obj: u64, _cmd: u64) -> 
     0
 }
 
-/// `-[NSTabView addTabViewItem:]` — no-op stub.
-pub extern "C" fn shim_nstabview_add_tab_view_item(_obj: u64, _cmd: u64, _item: u64) {}
+/// `-[NSTabView addTabViewItem:]` — stores the item.
+pub extern "C" fn shim_nstabview_add_tab_view_item(obj: u64, _cmd: u64, item: u64) {
+    if obj == 0 || item == 0 { return; }
+    let mut guard = TAB_ITEMS.lock().unwrap();
+    let map = guard.get_or_insert_with(std::collections::HashMap::new);
+    map.entry(obj).or_default().push(item);
+}
 
-/// `-[NSTabView removeTabViewItem:]` — no-op stub.
-pub extern "C" fn shim_nstabview_remove_tab_view_item(_obj: u64, _cmd: u64, _item: u64) {}
+/// `-[NSTabView removeTabViewItem:]` — removes the item.
+pub extern "C" fn shim_nstabview_remove_tab_view_item(obj: u64, _cmd: u64, item: u64) {
+    if obj == 0 || item == 0 { return; }
+    let mut guard = TAB_ITEMS.lock().unwrap();
+    if let Some(map) = guard.as_mut() {
+        if let Some(items) = map.get_mut(&obj) {
+            items.retain(|&i| i != item);
+        }
+    }
+}
+
+/// `-[NSTabView drawRect:]` — renders tab bar and selected content.
+pub extern "C" fn shim_nstabview_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64) {
+    if obj == 0 { return; }
+    let cg_ctx = crate::nsgraphicscontext::current_cg_context_handle();
+    if cg_ctx == 0 { return; }
+
+    let selected = read_u64(obj, TAB_VIEW_DATA_OFF) as i64;
+    let items = {
+        let guard = TAB_ITEMS.lock().unwrap();
+        guard.as_ref().and_then(|m| m.get(&obj)).cloned().unwrap_or_default()
+    };
+    let count = items.len();
+
+    // Draw tab bar at top.
+    let tab_height = 28.0;
+    if count > 0 {
+        let tab_w = w / count as f64;
+        for (i, &item) in items.iter().enumerate() {
+            let tab_x = x + i as f64 * tab_w;
+            let is_selected = i as i64 == selected;
+
+            cg_shims::bridge::with_context(cg_ctx, |c| {
+                c.fill_color = if is_selected {
+                    graphics_core::Color::WHITE
+                } else {
+                    graphics_core::Color::new(0.88, 0.88, 0.88, 1.0)
+                };
+                c.fill_rect(tab_x, y, tab_w, tab_height);
+                c.stroke_color = graphics_core::Color::new(0.7, 0.7, 0.7, 1.0);
+                c.stroke_rect(tab_x, y, tab_w, tab_height);
+            });
+
+            // Draw tab label.
+            let label = crate::nstabviewitem::shim_nstabviewitem_label(item, 0);
+            if label != 0 {
+                let utf8 = crate::cfstring::shim_nsstring_utf8string(label, 0);
+                if !utf8.is_null() {
+                    let text = unsafe { std::ffi::CStr::from_ptr(utf8) }.to_str().unwrap_or("");
+                    if !text.is_empty() {
+                        cg_shims::bridge::with_context(cg_ctx, |c| {
+                            c.fill_color = graphics_core::Color::BLACK;
+                            c.draw_text(text, tab_x + 6.0, y + tab_height * 0.7);
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    // Content area background.
+    cg_shims::bridge::with_context(cg_ctx, |c| {
+        c.fill_color = graphics_core::Color::WHITE;
+        c.fill_rect(x, y + tab_height, w, h - tab_height);
+        c.stroke_color = graphics_core::Color::new(0.7, 0.7, 0.7, 1.0);
+        c.stroke_rect(x, y + tab_height, w, h - tab_height);
+    });
+
+    // Draw the selected tab's view.
+    if selected >= 0 && (selected as usize) < count {
+        let item = items[selected as usize];
+        let view = crate::nstabviewitem::shim_nstabviewitem_view(item, 0);
+        if view != 0 {
+            let cg_ctx = crate::nsgraphicscontext::current_cg_context_handle();
+            crate::nsview::display_view_recursive(view, cg_ctx);
+        }
+    }
+}
+
+use std::sync::Mutex;
+static TAB_ITEMS: Mutex<Option<std::collections::HashMap<u64, Vec<u64>>>> = Mutex::new(None);
 
 #[cfg(test)]
 mod tests {

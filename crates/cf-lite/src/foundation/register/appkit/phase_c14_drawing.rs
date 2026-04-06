@@ -56,6 +56,9 @@ pub fn register_nsbezierpath_class(rt: &mut objc_runtime::ObjcRuntime) {
             me("setLineWidth:", nsbezierpath::shim_nsbezierpath_set_line_width as *const () as u64, "v@:d"),
             me("addClip", nsbezierpath::shim_nsbezierpath_add_clip as *const () as u64, "v@:"),
             me("isEmpty", nsbezierpath::shim_nsbezierpath_is_empty as *const () as u64, "B@:"),
+            me("appendBezierPath:", nsbezierpath::shim_nsbezierpath_append_bezier_path as *const () as u64, "v@:@"),
+            me("appendBezierPathWithRect:", nsbezierpath::shim_nsbezierpath_append_rect as *const () as u64, "v@:{CGRect=dddd}"),
+            me("appendBezierPathWithOvalInRect:", nsbezierpath::shim_nsbezierpath_append_oval as *const () as u64, "v@:{CGRect=dddd}"),
         ],
         class_methods: vec![
             me("bezierPath", nsbezierpath::shim_nsbezierpath_bezier_path as *const () as u64, "@@:"),

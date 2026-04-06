@@ -7,10 +7,12 @@ use std::collections::HashMap;
 use objc_runtime::ClassInfo;
 use super::me;
 use crate::{
-    nsalert, nsbox, nsbutton, nsobj, nspanel, nspopupbutton,
-    nsscrollview, nssplitview, nsstackview, nstabview, nstabviewitem,
-    nstoolbar, nstoolbaritem,
+    nsalert, nsbox, nsbutton, nsclipview, nscursor, nsobj, nspanel,
+    nspopupbutton, nsscrollview, nssplitview, nsstackview, nstabview,
+    nstabviewitem, nstextview, nstoolbar, nstoolbaritem, nstrackingarea,
 };
+#[cfg(target_os = "macos")]
+use crate::nsopenpanel;
 
 // ── NSButton ───────────────────────────────────────────────────
 
@@ -105,6 +107,7 @@ pub fn register_nsalert_class(rt: &mut objc_runtime::ObjcRuntime) {
             me("runModal", nsalert::shim_nsalert_run_modal as *const () as u64, "q@:"),
             me("window", nsalert::shim_nsalert_window as *const () as u64, "@@:"),
             me("buttons", nsalert::shim_nsalert_buttons as *const () as u64, "@@:"),
+            me("beginSheetModalForWindow:completionHandler:", nsalert::shim_nsalert_begin_sheet_modal as *const () as u64, "v@:@@"),
         ],
         class_methods: vec![],
         ivars: vec![], properties: vec![], protocol_names: Vec::new(),
@@ -163,6 +166,8 @@ pub fn register_nsscrollview_class(rt: &mut objc_runtime::ObjcRuntime) {
             me("setDrawsBackground:", nsscrollview::shim_nsscrollview_set_draws_background as *const () as u64, "v@:B"),
             me("contentSize", nsscrollview::shim_nsscrollview_content_size as *const () as u64, "@@:"),
             me("tile", nsscrollview::shim_nsscrollview_tile as *const () as u64, "v@:"),
+            me("contentView", nsscrollview::shim_nsscrollview_content_view as *const () as u64, "@@:"),
+            me("drawRect:", nsscrollview::shim_nsscrollview_draw_rect as *const () as u64, "v@:{CGRect=dddd}"),
         ],
         class_methods: vec![],
         ivars: vec![], properties: vec![], protocol_names: Vec::new(),
@@ -281,6 +286,7 @@ pub fn register_nstabview_class(rt: &mut objc_runtime::ObjcRuntime) {
             me("selectedTabViewItem", nstabview::shim_nstabview_selected_tab_view_item as *const () as u64, "@@:"),
             me("addTabViewItem:", nstabview::shim_nstabview_add_tab_view_item as *const () as u64, "v@:@"),
             me("removeTabViewItem:", nstabview::shim_nstabview_remove_tab_view_item as *const () as u64, "v@:@"),
+            me("drawRect:", nstabview::shim_nstabview_draw_rect as *const () as u64, "v@:{CGRect=dddd}"),
         ],
         class_methods: vec![],
         ivars: vec![], properties: vec![], protocol_names: Vec::new(),
@@ -381,4 +387,206 @@ pub fn register_nstoolbaritem_class(rt: &mut objc_runtime::ObjcRuntime) {
     };
     rt.register_synthetic_class(info);
     rt.register_metaclass_addr(metaclass_addr, "NSToolbarItem");
+}
+
+// ── NSSavePanel ────────────────────────────────────────────────
+
+#[cfg(target_os = "macos")]
+pub fn register_nssavepanel_class(rt: &mut objc_runtime::ObjcRuntime) {
+    let class_addr = nsobj::nssavepanel_class_addr();
+    let metaclass_addr = nsobj::nssavepanel_metaclass_addr();
+    let info = ClassInfo {
+        name: "NSSavePanel".to_string(),
+        mapped_addr: class_addr,
+        methods: vec![
+            me("title", nsopenpanel::shim_nssavepanel_title as *const () as u64, "@@:"),
+            me("setTitle:", nsopenpanel::shim_nssavepanel_set_title as *const () as u64, "v@:@"),
+            me("canCreateDirectories", nsopenpanel::shim_nssavepanel_can_create_directories as *const () as u64, "B@:"),
+            me("setCanCreateDirectories:", nsopenpanel::shim_nssavepanel_set_can_create_directories as *const () as u64, "v@:B"),
+            me("showsHiddenFiles", nsopenpanel::shim_nssavepanel_shows_hidden_files as *const () as u64, "B@:"),
+            me("setShowsHiddenFiles:", nsopenpanel::shim_nssavepanel_set_shows_hidden_files as *const () as u64, "v@:B"),
+            me("allowedContentTypes", nsopenpanel::shim_nssavepanel_allowed_content_types as *const () as u64, "@@:"),
+            me("setAllowedContentTypes:", nsopenpanel::shim_nssavepanel_set_allowed_content_types as *const () as u64, "v@:@"),
+            me("URL", nsopenpanel::shim_nssavepanel_url as *const () as u64, "@@:"),
+            me("runModal", nsopenpanel::shim_nssavepanel_run_modal as *const () as u64, "q@:"),
+        ],
+        class_methods: vec![
+            me("savePanel", nsopenpanel::shim_nssavepanel_save_panel as *const () as u64, "@@:"),
+        ],
+        ivars: vec![], properties: vec![], protocol_names: Vec::new(),
+        instance_size: nsopenpanel::PANEL_SIZE as u32, is_root: false, is_meta: false,
+        superclass_addr: Some(nsobj::nspanel_class_addr()),
+        method_index: HashMap::new(), class_method_index: HashMap::new(),
+    };
+    rt.register_synthetic_class(info);
+    rt.register_metaclass_addr(metaclass_addr, "NSSavePanel");
+}
+
+// ── NSOpenPanel ────────────────────────────────────────────────
+
+#[cfg(target_os = "macos")]
+pub fn register_nsopenpanel_class(rt: &mut objc_runtime::ObjcRuntime) {
+    let class_addr = nsobj::nsopenpanel_class_addr();
+    let metaclass_addr = nsobj::nsopenpanel_metaclass_addr();
+    let info = ClassInfo {
+        name: "NSOpenPanel".to_string(),
+        mapped_addr: class_addr,
+        methods: vec![
+            me("canChooseFiles", nsopenpanel::shim_nsopenpanel_can_choose_files as *const () as u64, "B@:"),
+            me("setCanChooseFiles:", nsopenpanel::shim_nsopenpanel_set_can_choose_files as *const () as u64, "v@:B"),
+            me("canChooseDirectories", nsopenpanel::shim_nsopenpanel_can_choose_directories as *const () as u64, "B@:"),
+            me("setCanChooseDirectories:", nsopenpanel::shim_nsopenpanel_set_can_choose_directories as *const () as u64, "v@:B"),
+            me("allowsMultipleSelection", nsopenpanel::shim_nsopenpanel_allows_multiple_selection as *const () as u64, "B@:"),
+            me("setAllowsMultipleSelection:", nsopenpanel::shim_nsopenpanel_set_allows_multiple_selection as *const () as u64, "v@:B"),
+            me("URLs", nsopenpanel::shim_nsopenpanel_urls as *const () as u64, "@@:"),
+            me("runModal", nsopenpanel::shim_nsopenpanel_run_modal as *const () as u64, "q@:"),
+        ],
+        class_methods: vec![
+            me("openPanel", nsopenpanel::shim_nsopenpanel_open_panel as *const () as u64, "@@:"),
+        ],
+        ivars: vec![], properties: vec![], protocol_names: Vec::new(),
+        instance_size: nsopenpanel::PANEL_SIZE as u32, is_root: false, is_meta: false,
+        superclass_addr: Some(nsobj::nspanel_class_addr()),
+        method_index: HashMap::new(), class_method_index: HashMap::new(),
+    };
+    rt.register_synthetic_class(info);
+    rt.register_metaclass_addr(metaclass_addr, "NSOpenPanel");
+}
+
+// ── NSClipView ─────────────────────────────────────────────────
+
+pub fn register_nsclipview_class(rt: &mut objc_runtime::ObjcRuntime) {
+    let class_addr = nsobj::nsclipview_class_addr();
+    let metaclass_addr = nsobj::nsclipview_metaclass_addr();
+    let info = ClassInfo {
+        name: "NSClipView".to_string(),
+        mapped_addr: class_addr,
+        methods: vec![
+            me("init", nsclipview::shim_nsclipview_init as *const () as u64, "@@:"),
+            me("documentView", nsclipview::shim_nsclipview_document_view as *const () as u64, "@@:"),
+            me("setDocumentView:", nsclipview::shim_nsclipview_set_document_view as *const () as u64, "v@:@"),
+            me("scrollToPoint:", nsclipview::shim_nsclipview_scroll_to_point as *const () as u64, "v@:{CGPoint=dd}"),
+            me("drawRect:", nsclipview::shim_nsclipview_draw_rect as *const () as u64, "v@:{CGRect=dddd}"),
+        ],
+        class_methods: vec![],
+        ivars: vec![], properties: vec![], protocol_names: Vec::new(),
+        instance_size: nsclipview::CLIP_VIEW_SIZE as u32, is_root: false, is_meta: false,
+        superclass_addr: Some(nsobj::nsview_class_addr()),
+        method_index: HashMap::new(), class_method_index: HashMap::new(),
+    };
+    rt.register_synthetic_class(info);
+    rt.register_metaclass_addr(metaclass_addr, "NSClipView");
+}
+
+// ── NSTextView ─────────────────────────────────────────────────
+
+pub fn register_nstextview_class(rt: &mut objc_runtime::ObjcRuntime) {
+    let class_addr = nsobj::nstextview_class_addr();
+    let metaclass_addr = nsobj::nstextview_metaclass_addr();
+    let info = ClassInfo {
+        name: "NSTextView".to_string(),
+        mapped_addr: class_addr,
+        methods: vec![
+            me("initWithFrame:", nstextview::shim_nstextview_init_with_frame as *const () as u64, "@@:{CGRect=dddd}"),
+            me("string", nstextview::shim_nstextview_string as *const () as u64, "@@:"),
+            me("setString:", nstextview::shim_nstextview_set_string as *const () as u64, "v@:@"),
+            me("delegate", nstextview::shim_nstextview_delegate as *const () as u64, "@@:"),
+            me("setDelegate:", nstextview::shim_nstextview_set_delegate as *const () as u64, "v@:@"),
+            me("isEditable", nstextview::shim_nstextview_is_editable as *const () as u64, "B@:"),
+            me("setEditable:", nstextview::shim_nstextview_set_editable as *const () as u64, "v@:B"),
+            me("isSelectable", nstextview::shim_nstextview_is_selectable as *const () as u64, "B@:"),
+            me("setSelectable:", nstextview::shim_nstextview_set_selectable as *const () as u64, "v@:B"),
+            me("isRichText", nstextview::shim_nstextview_is_rich_text as *const () as u64, "B@:"),
+            me("setRichText:", nstextview::shim_nstextview_set_rich_text as *const () as u64, "v@:B"),
+            me("isFieldEditor", nstextview::shim_nstextview_is_field_editor as *const () as u64, "B@:"),
+            me("setFieldEditor:", nstextview::shim_nstextview_set_field_editor as *const () as u64, "v@:B"),
+            me("usesFontPanel", nstextview::shim_nstextview_uses_font_panel as *const () as u64, "B@:"),
+            me("setUsesFontPanel:", nstextview::shim_nstextview_set_uses_font_panel as *const () as u64, "v@:B"),
+            me("allowsUndo", nstextview::shim_nstextview_allows_undo as *const () as u64, "B@:"),
+            me("setAllowsUndo:", nstextview::shim_nstextview_set_allows_undo as *const () as u64, "v@:B"),
+            me("selectedRange", nstextview::shim_nstextview_selected_range as *const () as u64, "{NSRange=QQ}@:"),
+            me("setSelectedRange:", nstextview::shim_nstextview_set_selected_range as *const () as u64, "v@:{NSRange=QQ}"),
+            me("acceptsFirstResponder", nstextview::shim_nstextview_accepts_first_responder as *const () as u64, "B@:"),
+            me("insertText:", nstextview::shim_nstextview_insert_text as *const () as u64, "v@:@"),
+            me("keyDown:", nstextview::shim_nstextview_key_down as *const () as u64, "v@:@"),
+            me("drawRect:", nstextview::shim_nstextview_draw_rect as *const () as u64, "v@:{CGRect=dddd}"),
+        ],
+        class_methods: vec![],
+        ivars: vec![], properties: vec![], protocol_names: Vec::new(),
+        instance_size: nstextview::TEXT_VIEW_SIZE as u32, is_root: false, is_meta: false,
+        superclass_addr: Some(nsobj::nsview_class_addr()),
+        method_index: HashMap::new(), class_method_index: HashMap::new(),
+    };
+    rt.register_synthetic_class(info);
+    rt.register_metaclass_addr(metaclass_addr, "NSTextView");
+}
+
+// ── NSTrackingArea ─────────────────────────────────────────────
+
+pub fn register_nstrackingarea_class(rt: &mut objc_runtime::ObjcRuntime) {
+    let class_addr = nsobj::nstrackingarea_class_addr();
+    let metaclass_addr = nsobj::nstrackingarea_metaclass_addr();
+    let info = ClassInfo {
+        name: "NSTrackingArea".to_string(),
+        mapped_addr: class_addr,
+        methods: vec![
+            me("initWithRect:options:owner:userInfo:", nstrackingarea::shim_nstrackingarea_init as *const () as u64, "@@:{CGRect=dddd}Q@@"),
+            me("rect", nstrackingarea::shim_nstrackingarea_rect_x as *const () as u64, "{CGRect={CGPoint=dd}{CGSize=dd}}@:"),
+            me("options", nstrackingarea::shim_nstrackingarea_options as *const () as u64, "Q@:"),
+            me("owner", nstrackingarea::shim_nstrackingarea_owner as *const () as u64, "@@:"),
+            me("userInfo", nstrackingarea::shim_nstrackingarea_user_info as *const () as u64, "@@:"),
+        ],
+        class_methods: vec![],
+        ivars: vec![], properties: vec![], protocol_names: Vec::new(),
+        instance_size: nstrackingarea::TRACKING_AREA_SIZE as u32, is_root: false, is_meta: false,
+        superclass_addr: Some(nsobj::nsobject_class_addr()),
+        method_index: HashMap::new(), class_method_index: HashMap::new(),
+    };
+    rt.register_synthetic_class(info);
+    rt.register_metaclass_addr(metaclass_addr, "NSTrackingArea");
+}
+
+// ── NSCursor ───────────────────────────────────────────────────
+
+pub fn register_nscursor_class(rt: &mut objc_runtime::ObjcRuntime) {
+    let class_addr = nsobj::nscursor_class_addr();
+    let metaclass_addr = nsobj::nscursor_metaclass_addr();
+    let info = ClassInfo {
+        name: "NSCursor".to_string(),
+        mapped_addr: class_addr,
+        methods: vec![
+            me("set", nscursor::shim_nscursor_set as *const () as u64, "v@:"),
+            me("push", nscursor::shim_nscursor_push as *const () as u64, "v@:"),
+            me("image", nscursor::shim_nscursor_image as *const () as u64, "@@:"),
+        ],
+        class_methods: vec![
+            me("arrowCursor", nscursor::shim_nscursor_arrow_cursor as *const () as u64, "@@:"),
+            me("IBeamCursor", nscursor::shim_nscursor_ibeam_cursor as *const () as u64, "@@:"),
+            me("crosshairCursor", nscursor::shim_nscursor_crosshair_cursor as *const () as u64, "@@:"),
+            me("pointingHandCursor", nscursor::shim_nscursor_pointing_hand_cursor as *const () as u64, "@@:"),
+            me("openHandCursor", nscursor::shim_nscursor_open_hand_cursor as *const () as u64, "@@:"),
+            me("closedHandCursor", nscursor::shim_nscursor_closed_hand_cursor as *const () as u64, "@@:"),
+            me("resizeLeftRightCursor", nscursor::shim_nscursor_resize_left_right_cursor as *const () as u64, "@@:"),
+            me("resizeUpDownCursor", nscursor::shim_nscursor_resize_up_down_cursor as *const () as u64, "@@:"),
+            me("resizeLeftCursor", nscursor::shim_nscursor_resize_left_cursor as *const () as u64, "@@:"),
+            me("resizeRightCursor", nscursor::shim_nscursor_resize_right_cursor as *const () as u64, "@@:"),
+            me("resizeUpCursor", nscursor::shim_nscursor_resize_up_cursor as *const () as u64, "@@:"),
+            me("resizeDownCursor", nscursor::shim_nscursor_resize_down_cursor as *const () as u64, "@@:"),
+            me("disappearingItemCursor", nscursor::shim_nscursor_disappearing_item_cursor as *const () as u64, "@@:"),
+            me("operationNotAllowedCursor", nscursor::shim_nscursor_operation_not_allowed_cursor as *const () as u64, "@@:"),
+            me("dragLinkCursor", nscursor::shim_nscursor_drag_link_cursor as *const () as u64, "@@:"),
+            me("dragCopyCursor", nscursor::shim_nscursor_drag_copy_cursor as *const () as u64, "@@:"),
+            me("contextualMenuCursor", nscursor::shim_nscursor_contextual_menu_cursor as *const () as u64, "@@:"),
+            me("currentCursor", nscursor::shim_nscursor_current_cursor as *const () as u64, "@@:"),
+            me("hide", nscursor::shim_nscursor_hide as *const () as u64, "v@:"),
+            me("unhide", nscursor::shim_nscursor_unhide as *const () as u64, "v@:"),
+            me("pop", nscursor::shim_nscursor_pop as *const () as u64, "v@:"),
+        ],
+        ivars: vec![], properties: vec![], protocol_names: Vec::new(),
+        instance_size: nscursor::CURSOR_SIZE as u32, is_root: false, is_meta: false,
+        superclass_addr: Some(nsobj::nsobject_class_addr()),
+        method_index: HashMap::new(), class_method_index: HashMap::new(),
+    };
+    rt.register_synthetic_class(info);
+    rt.register_metaclass_addr(metaclass_addr, "NSCursor");
 }

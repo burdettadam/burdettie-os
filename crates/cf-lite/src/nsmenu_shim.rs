@@ -314,6 +314,88 @@ pub extern "C" fn shim_nsmenuitem_set_key_equivalent(obj: u64, _cmd: u64, key_eq
     unsafe { *((obj as usize + ITEM_KEY_EQUIV_OFF) as *mut u64) = key_equiv; }
 }
 
+// ── Action dispatch ────────────────────────────────────────────
+
+/// `-[NSMenu performKeyEquivalent:]` — walk items checking key equivalents.
+///
+/// Returns 1 (YES) if a matching item was found and its action dispatched.
+pub extern "C" fn shim_nsmenu_perform_key_equivalent(obj: u64, _cmd: u64, event: u64) -> u8 {
+    if obj == 0 || event == 0 { return 0; }
+
+    // Get the event's characters string
+    let event_chars = crate::nsevent::shim_nsevent_characters(event, 0);
+    if event_chars == 0 { return 0; }
+
+    let items_ptr = menu_items_ptr(obj);
+    if items_ptr.is_null() { return 0; }
+
+    let items = unsafe { &*items_ptr };
+    for &item in items {
+        if item == 0 { continue; }
+
+        // Check submenu first (recursive)
+        let submenu = unsafe { *((item as usize + ITEM_SUBMENU_OFF) as *const u64) };
+        if submenu != 0 {
+            if shim_nsmenu_perform_key_equivalent(submenu, _cmd, event) != 0 {
+                return 1;
+            }
+        }
+
+        // Check this item's key equivalent
+        let enabled = unsafe { *((item as usize + ITEM_ENABLED_OFF) as *const u64) };
+        if enabled == 0 { continue; }
+
+        let key_equiv = unsafe { *((item as usize + ITEM_KEY_EQUIV_OFF) as *const u64) };
+        if key_equiv == 0 { continue; }
+
+        // Compare key equivalent string with event characters
+        let key_str = crate::cfstring::extract_cfstring_cstr(key_equiv);
+        let event_str = crate::cfstring::extract_cfstring_cstr(event_chars);
+        if let (Some(k), Some(e)) = (key_str, event_str) {
+            if k == e {
+                // Dispatch the action
+                let action = unsafe { *((item as usize + ITEM_ACTION_OFF) as *const u64) };
+                let target = unsafe { *((item as usize + ITEM_TARGET_OFF) as *const u64) };
+                if action != 0 {
+                    dispatch_menu_action(target, action, item);
+                }
+                return 1;
+            }
+        }
+    }
+    0
+}
+
+/// Dispatch an action selector to a target or via the responder chain.
+fn dispatch_menu_action(target: u64, action_sel: u64, sender: u64) {
+    if action_sel == 0 { return; }
+
+    // If we have a concrete target, call the action on it
+    let effective_target = if target != 0 {
+        target
+    } else {
+        // Walk the responder chain from the key window's first responder
+        // For now, nil target is a no-op since we don't have sendAction: wired up
+        return;
+    };
+
+    let isa = unsafe { *(effective_target as *const u64) };
+    let guard = match objc_runtime::OBJC_RUNTIME.read() {
+        Ok(g) => g,
+        Err(e) => e.into_inner(),
+    };
+    if let Some(rt) = guard.as_ref() {
+        // Convert action selector (SEL = pointer to C string) to &str
+        let sel_name = unsafe { std::ffi::CStr::from_ptr(action_sel as *const std::ffi::c_char) };
+        if let Ok(name) = sel_name.to_str() {
+            if let Some(imp) = rt.msg_lookup(isa, name) {
+                let f: extern "C" fn(u64, u64, u64) = unsafe { std::mem::transmute(imp) };
+                f(effective_target, action_sel, sender);
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

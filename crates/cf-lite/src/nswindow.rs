@@ -14,8 +14,12 @@
 //!   offset 72: first_responder  (u64 — current first responder, defaults to self)
 //!   offset 80: delegate_ptr     (u64 — window delegate, or 0)
 //!   offset 88: background_color (u64 — NSColor*, or 0)
+//!   offset 96:  min_w           (f64 — minSize width, default 0)
+//!   offset 104: min_h           (f64 — minSize height, default 0)
+//!   offset 112: max_w           (f64 — maxSize width, default f64::MAX)
+//!   offset 120: max_h           (f64 — maxSize height, default f64::MAX)
 //!
-//! Total: 96 bytes.
+//! Total: 128 bytes.
 
 use crate::cg_types::{CGRect, CGPoint, CGSize};
 
@@ -29,7 +33,11 @@ const IS_VISIBLE_OFF: usize = 64;
 const FIRST_RESPONDER_OFF: usize = 72;
 const DELEGATE_OFF: usize = 80;
 const BG_COLOR_OFF: usize = 88;
-const WINDOW_SIZE: usize = 96;
+const MIN_W_OFF: usize = 96;
+const MIN_H_OFF: usize = 104;
+const MAX_W_OFF: usize = 112;
+const MAX_H_OFF: usize = 120;
+const WINDOW_SIZE: usize = 128;
 
 fn read_u64(obj: u64, offset: usize) -> u64 {
     if obj == 0 {
@@ -170,6 +178,9 @@ fn alloc_window(rect: CGRect, style: u64) -> u64 {
         *((obj as usize + FRAME_X_OFF + 8) as *mut f64) = rect.origin.y;
         *((obj as usize + FRAME_X_OFF + 16) as *mut f64) = rect.size.width;
         *((obj as usize + FRAME_X_OFF + 24) as *mut f64) = rect.size.height;
+        // Default min/max size
+        *((obj as usize + MAX_W_OFF) as *mut f64) = f64::MAX;
+        *((obj as usize + MAX_H_OFF) as *mut f64) = f64::MAX;
     }
     let content_view = crate::nsview::alloc_view_with_frame(0.0, 0.0, rect.size.width, rect.size.height);
     if content_view != 0 {
@@ -217,6 +228,11 @@ fn init_window_in_place(obj: u64, rect: CGRect, style: u64) {
         *((obj as usize + FRAME_X_OFF + 8) as *mut f64) = rect.origin.y;
         *((obj as usize + FRAME_X_OFF + 16) as *mut f64) = rect.size.width;
         *((obj as usize + FRAME_X_OFF + 24) as *mut f64) = rect.size.height;
+        // Default min/max size
+        *((obj as usize + MIN_W_OFF) as *mut f64) = 0.0;
+        *((obj as usize + MIN_H_OFF) as *mut f64) = 0.0;
+        *((obj as usize + MAX_W_OFF) as *mut f64) = f64::MAX;
+        *((obj as usize + MAX_H_OFF) as *mut f64) = f64::MAX;
     }
     let content_view = crate::nsview::alloc_view_with_frame(0.0, 0.0, rect.size.width, rect.size.height);
     if content_view != 0 {
@@ -500,6 +516,13 @@ pub extern "C" fn shim_nswindow_set_frame_display(
     _display: u8,
 ) {
     if obj == 0 { return; }
+    // Clamp to min/max size (max_w/max_h of 0 means unset → no upper limit)
+    let min_w = unsafe { *((obj as usize + MIN_W_OFF) as *const f64) };
+    let min_h = unsafe { *((obj as usize + MIN_H_OFF) as *const f64) };
+    let max_w = unsafe { *((obj as usize + MAX_W_OFF) as *const f64) };
+    let max_h = unsafe { *((obj as usize + MAX_H_OFF) as *const f64) };
+    let w = if max_w > 0.0 { w.max(min_w).min(max_w) } else { w.max(min_w) };
+    let h = if max_h > 0.0 { h.max(min_h).min(max_h) } else { h.max(min_h) };
     unsafe {
         *((obj as usize + FRAME_X_OFF) as *mut f64) = x;
         *((obj as usize + FRAME_X_OFF + 8) as *mut f64) = y;
@@ -538,6 +561,44 @@ pub extern "C" fn shim_nswindow_background_color(obj: u64, _cmd: u64) -> u64 {
 /// `-[NSWindow setBackgroundColor:]`
 pub extern "C" fn shim_nswindow_set_background_color(obj: u64, _cmd: u64, color: u64) {
     write_u64(obj, BG_COLOR_OFF, color);
+}
+
+// ── Min / Max size ─────────────────────────────────────────────
+
+/// `-[NSWindow minSize]`
+pub extern "C" fn shim_nswindow_min_size(obj: u64, _cmd: u64) -> CGSize {
+    if obj == 0 { return CGSize { width: 0.0, height: 0.0 }; }
+    CGSize {
+        width: unsafe { *((obj as usize + MIN_W_OFF) as *const f64) },
+        height: unsafe { *((obj as usize + MIN_H_OFF) as *const f64) },
+    }
+}
+
+/// `-[NSWindow setMinSize:]`
+pub extern "C" fn shim_nswindow_set_min_size(obj: u64, _cmd: u64, w: f64, h: f64) {
+    if obj == 0 { return; }
+    unsafe {
+        *((obj as usize + MIN_W_OFF) as *mut f64) = w;
+        *((obj as usize + MIN_H_OFF) as *mut f64) = h;
+    }
+}
+
+/// `-[NSWindow maxSize]`
+pub extern "C" fn shim_nswindow_max_size(obj: u64, _cmd: u64) -> CGSize {
+    if obj == 0 { return CGSize { width: f64::MAX, height: f64::MAX }; }
+    CGSize {
+        width: unsafe { *((obj as usize + MAX_W_OFF) as *const f64) },
+        height: unsafe { *((obj as usize + MAX_H_OFF) as *const f64) },
+    }
+}
+
+/// `-[NSWindow setMaxSize:]`
+pub extern "C" fn shim_nswindow_set_max_size(obj: u64, _cmd: u64, w: f64, h: f64) {
+    if obj == 0 { return; }
+    unsafe {
+        *((obj as usize + MAX_W_OFF) as *mut f64) = w;
+        *((obj as usize + MAX_H_OFF) as *mut f64) = h;
+    }
 }
 
 /// `-[NSWindow performClose:]`

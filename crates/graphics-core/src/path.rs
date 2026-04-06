@@ -68,6 +68,17 @@ impl BezierPath {
         self.elements.is_empty()
     }
 
+    /// Append all elements from another path.
+    pub fn append(&mut self, other: &BezierPath) {
+        self.elements.extend_from_slice(&other.elements);
+    }
+
+    /// Add an ellipse inscribed in the given bounding rect.
+    pub fn add_ellipse(&mut self, rect: crate::geometry::Rect) {
+        let ell = Self::ellipse(rect.x, rect.y, rect.width, rect.height);
+        self.elements.extend_from_slice(&ell.elements);
+    }
+
     // ── Convenience shape constructors ─────────────────────────────
 
     /// Create a rectangle path.

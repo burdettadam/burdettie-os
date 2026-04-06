@@ -69,8 +69,15 @@ impl PosixExtrasShims {
 
             // ── sandbox/security stubs ──────────────────────────
             ("_chroot", shim_chroot as *const () as u64, "chroot (stub → EPERM)"),
+
+            // ── mmap flag translation ───────────────────────────
+            ("_mmap", shim_mmap as *const () as u64, "mmap (macOS→Linux flag translation)"),
+
+            // ── resource limits ─────────────────────────────────
+            ("_getrlimit", shim_getrlimit as *const () as u64, "getrlimit (macOS→Linux RLIMIT_ translation)"),
+            ("_setrlimit", shim_setrlimit as *const () as u64, "setrlimit (macOS→Linux RLIMIT_ translation)"),
         );
-        log::debug!("PosixExtrasShims: registered 36 POSIX/libc extra shims");
+        log::debug!("PosixExtrasShims: registered 39 POSIX/libc extra shims");
     }
 }
 
@@ -512,6 +519,88 @@ pub extern "C" fn shim_chroot(_dirname: *const c_char) -> c_int {
     -1
 }
 
+// ── mmap flag translation ───────────────────────────────────────────
+
+/// Translate macOS mmap flags to Linux mmap flags.
+/// Key differences:
+///   macOS MAP_ANON = 0x1000, Linux MAP_ANONYMOUS = 0x20
+///   macOS MAP_JIT  = 0x0800 (macOS-only, strip it)
+///   MAP_PRIVATE(0x2), MAP_SHARED(0x1), MAP_FIXED(0x10) are the same.
+fn translate_mmap_flags(darwin_flags: c_int) -> c_int {
+    const DARWIN_MAP_ANON: c_int = 0x1000;
+    const DARWIN_MAP_JIT: c_int = 0x0800;
+    const DARWIN_MAP_RESILIENT_CODESIGN: c_int = 0x2000;
+    const DARWIN_MAP_RESILIENT_MEDIA: c_int = 0x4000;
+
+    let mut flags = darwin_flags;
+
+    // Translate MAP_ANON
+    if flags & DARWIN_MAP_ANON != 0 {
+        flags &= !DARWIN_MAP_ANON;
+        flags |= libc::MAP_ANONYMOUS;
+    }
+
+    // Strip macOS-only flags that have no Linux equivalent
+    flags &= !(DARWIN_MAP_JIT | DARWIN_MAP_RESILIENT_CODESIGN | DARWIN_MAP_RESILIENT_MEDIA);
+
+    flags
+}
+
+/// `void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)`
+///
+/// Translates macOS mmap flags (MAP_ANON=0x1000) to Linux (MAP_ANONYMOUS=0x20)
+/// before delegating to the host mmap.
+pub extern "C" fn shim_mmap(
+    addr: u64,
+    len: u64,
+    prot: c_int,
+    flags: c_int,
+    fd: c_int,
+    offset: i64,
+) -> u64 {
+    let linux_flags = translate_mmap_flags(flags);
+    log::trace!("mmap: flags {flags:#x} → {linux_flags:#x}, len={len}, prot={prot:#x}");
+    unsafe { libc::mmap(addr as *mut libc::c_void, len as usize, prot, linux_flags, fd, offset) as u64 }
+}
+
+// ── Resource limit translation ──────────────────────────────────────
+
+/// Translate macOS RLIMIT_* constants to Linux equivalents.
+/// macOS:                    Linux:
+///   RLIMIT_CPU      = 0      RLIMIT_CPU      = 0  (same)
+///   RLIMIT_FSIZE    = 1      RLIMIT_FSIZE    = 1  (same)
+///   RLIMIT_DATA     = 2      RLIMIT_DATA     = 2  (same)
+///   RLIMIT_STACK    = 3      RLIMIT_STACK    = 3  (same)
+///   RLIMIT_CORE     = 4      RLIMIT_CORE     = 4  (same)
+///   RLIMIT_AS       = 5      RLIMIT_AS       = 9
+///   RLIMIT_MEMLOCK  = 6      RLIMIT_MEMLOCK  = 8
+///   RLIMIT_NPROC    = 7      RLIMIT_NPROC    = 6
+///   RLIMIT_NOFILE   = 8      RLIMIT_NOFILE   = 7
+fn translate_rlimit_resource(darwin_res: c_int) -> c_int {
+    match darwin_res {
+        0..=4 => darwin_res, // CPU, FSIZE, DATA, STACK, CORE — same
+        5 => 9,              // RLIMIT_AS
+        6 => 8,              // RLIMIT_MEMLOCK
+        7 => 6,              // RLIMIT_NPROC
+        8 => 7,              // RLIMIT_NOFILE
+        _ => darwin_res,     // pass through unknown values
+    }
+}
+
+/// `int getrlimit(int resource, struct rlimit *rlp)`
+pub extern "C" fn shim_getrlimit(resource: c_int, rlp: *mut libc::rlimit) -> c_int {
+    let linux_res = translate_rlimit_resource(resource);
+    log::trace!("getrlimit: resource {resource} → {linux_res}");
+    unsafe { libc::getrlimit(linux_res as _, rlp) }
+}
+
+/// `int setrlimit(int resource, const struct rlimit *rlp)`
+pub extern "C" fn shim_setrlimit(resource: c_int, rlp: *const libc::rlimit) -> c_int {
+    let linux_res = translate_rlimit_resource(resource);
+    log::trace!("setrlimit: resource {resource} → {linux_res}");
+    unsafe { libc::setrlimit(linux_res as _, rlp) }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -595,5 +684,50 @@ mod tests {
     fn test_posix_spawn_addchdir_returns_enosys() {
         assert_eq!(shim_posix_spawn_file_actions_addchdir_np(0, 0), libc::ENOSYS);
         assert_eq!(shim_posix_spawn_file_actions_addfchdir_np(0, 0), libc::ENOSYS);
+    }
+
+    // ── mmap flag translation tests ─────────────────────────────
+
+    #[test]
+    fn test_mmap_flags_darwin_map_anon() {
+        // macOS MAP_ANON=0x1000 should be replaced with libc::MAP_ANONYMOUS
+        let darwin_flags = 0x1000 | libc::MAP_PRIVATE;
+        let linux_flags = translate_mmap_flags(darwin_flags);
+        assert_eq!(linux_flags & libc::MAP_ANONYMOUS, libc::MAP_ANONYMOUS);
+        assert_eq!(linux_flags & libc::MAP_PRIVATE, libc::MAP_PRIVATE);
+    }
+
+    #[test]
+    fn test_mmap_flags_strip_jit() {
+        // MAP_JIT=0x0800 should be stripped
+        let darwin_flags = 0x0800 | 0x1000 | libc::MAP_PRIVATE;
+        let linux_flags = translate_mmap_flags(darwin_flags);
+        assert_eq!(linux_flags & 0x0800, 0);
+        assert_eq!(linux_flags & libc::MAP_ANONYMOUS, libc::MAP_ANONYMOUS);
+    }
+
+    #[test]
+    fn test_mmap_flags_passthrough() {
+        // Flags that are the same should pass through unchanged
+        let flags = libc::MAP_PRIVATE | libc::MAP_FIXED;
+        assert_eq!(translate_mmap_flags(flags), flags);
+    }
+
+    // ── rlimit translation tests ────────────────────────────────
+
+    #[test]
+    fn test_rlimit_same_values() {
+        // 0..4 are the same on both platforms
+        for i in 0..=4 {
+            assert_eq!(translate_rlimit_resource(i), i);
+        }
+    }
+
+    #[test]
+    fn test_rlimit_divergent_values() {
+        assert_eq!(translate_rlimit_resource(5), 9);  // RLIMIT_AS
+        assert_eq!(translate_rlimit_resource(6), 8);  // RLIMIT_MEMLOCK
+        assert_eq!(translate_rlimit_resource(7), 6);  // RLIMIT_NPROC
+        assert_eq!(translate_rlimit_resource(8), 7);  // RLIMIT_NOFILE
     }
 }

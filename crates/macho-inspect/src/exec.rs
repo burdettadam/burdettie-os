@@ -298,6 +298,7 @@ pub fn print_exec(parsed: &ParsedMachO, data: &[u8], binary_path: &std::path::Pa
     if !guest_args.is_empty() {
         println!("  Guest args: {:?}", guest_args);
     }
+
     println!("  Calling entry...");
 
     // Install a SIGSEGV handler on Linux to get the faulting PC/address
@@ -444,6 +445,18 @@ pub fn print_exec(parsed: &ParsedMachO, data: &[u8], binary_path: &std::path::Pa
         // non-heap Mach-O mapped data) so the test harness sees a
         // clean _exit(1) instead of signal 134.
         libc::sigaction(libc::SIGABRT, &sa, std::ptr::null_mut());
+
+        // Catch SIGTERM (from `timeout` command) so we can flush stdout
+        // and exit cleanly. Without this, tools that hang in event loops
+        // (e.g. nslookup) lose their buffered output when killed.
+        unsafe extern "C" fn term_handler(_sig: libc::c_int, _info: *mut libc::siginfo_t, _ctx: *mut libc::c_void) {
+            libc::fflush(std::ptr::null_mut());
+            libc::_exit(0);
+        }
+        let mut sa_term: libc::sigaction = std::mem::zeroed();
+        sa_term.sa_sigaction = term_handler as usize;
+        sa_term.sa_flags = libc::SA_SIGINFO;
+        libc::sigaction(libc::SIGTERM, &sa_term, std::ptr::null_mut());
     }
 
     println!("  ── output ──");

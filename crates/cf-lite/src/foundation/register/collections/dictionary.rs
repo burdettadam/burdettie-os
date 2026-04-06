@@ -76,6 +76,11 @@ pub fn register_nsdictionary_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nsdictionary::shim_nsdictionary_write_to_file as *const () as u64,
                 "c@:@c",
             ),
+            me(
+                "countByEnumeratingWithState:objects:count:",
+                nsdictionary::shim_nsdictionary_count_by_enumerating_with_state as *const () as u64,
+                "Q@:^{NSFastEnumerationState}^@Q",
+            ),
         ],
         class_methods: vec![
             me(
@@ -146,6 +151,7 @@ pub fn register_nsconstantdictionary_class(rt: &mut objc_runtime::ObjcRuntime) {
             me("keyEnumerator", nsenumerator::shim_nsdictionary_key_enumerator as *const () as u64, "@@:"),
             me("valueForKey:", nsdictionary::shim_nsdictionary_object_for_key as *const () as u64, "@@:@"),
             me("valueForKeyPath:", nskeyvaluecoding::shim_dict_value_for_key_path as *const () as u64, "@@:@"),
+            me("countByEnumeratingWithState:objects:count:", nsdictionary::shim_nsdictionary_count_by_enumerating_with_state as *const () as u64, "Q@:^{NSFastEnumerationState}^@Q"),
         ],
         class_methods: vec![],
         ivars: vec![],
@@ -277,6 +283,11 @@ pub fn register_nsmutabledictionary_class(rt: &mut objc_runtime::ObjcRuntime) {
                 "writeToFile:atomically:",
                 nsdictionary::shim_nsdictionary_write_to_file as *const () as u64,
                 "c@:@c",
+            ),
+            me(
+                "countByEnumeratingWithState:objects:count:",
+                nsdictionary::shim_nsdictionary_count_by_enumerating_with_state as *const () as u64,
+                "Q@:^{NSFastEnumerationState}^@Q",
             ),
         ],
         class_methods: vec![

@@ -41,10 +41,16 @@ pub extern "C" fn shim_cg_cs_components(_cs: u64) -> i64 { 3 }
 // ── Bridge-backed colors ────────────────────────────────────────
 
 /// CGColorCreate(colorspace, components_ptr) → bridge color.
-/// For simplicity, treats components as [r, g, b, a] in device RGB.
-pub extern "C" fn shim_cg_color_create(_cs: u64, _components: u64) -> u64 {
-    // Without reading the pointer (unsafe), default to opaque black.
-    bridge::color_create_rgb(0.0, 0.0, 0.0, 1.0)
+/// Reads [r, g, b, a] from the components pointer (assumes device RGB + alpha).
+pub extern "C" fn shim_cg_color_create(_cs: u64, components: u64) -> u64 {
+    if components == 0 {
+        return bridge::color_create_rgb(0.0, 0.0, 0.0, 1.0);
+    }
+    let (r, g, b, a) = unsafe {
+        let p = components as *const f64;
+        (*p, *p.add(1), *p.add(2), *p.add(3))
+    };
+    bridge::color_create_rgb(r, g, b, a)
 }
 
 /// CGColorCreateGenericRGB(r, g, b, a) → bridge color with real values.

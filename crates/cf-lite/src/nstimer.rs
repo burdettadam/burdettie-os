@@ -1,10 +1,12 @@
 //! NSTimer shim: single-threaded timer with block invocation.
 //!
-//! Object layout: 32 bytes
+//! Object layout: 48 bytes
 //!   [0..8):   ISA pointer
 //!   [8..16):  interval (f64 bits) — time interval in seconds
 //!   [16..24): block_ptr (u64) — block to invoke on fire
 //!   [24..32): flags (u64) — bit 0 = valid, bit 1 = repeats
+//!   [32..40): target (u64) — target object for target/selector variant
+//!   [40..48): selector_ptr (u64) — SEL name pointer for target/selector variant
 //!
 //! Since we're single-threaded with no run loop, `scheduledTimerWithTimeInterval:`
 //! creates the timer but does NOT automatically fire it. The fixture must
@@ -13,9 +15,11 @@
 use crate::cfstring;
 use crate::nsobj;
 
-const NSTIMER_SIZE: usize = 32;
+const NSTIMER_SIZE: usize = 48;
 const FLAG_VALID: u64 = 1;
 const FLAG_REPEATS: u64 = 2;
+const TARGET_OFF: usize = 32;
+const SELECTOR_OFF: usize = 40;
 
 fn alloc_nstimer(interval: f64, block: u64, repeats: bool) -> u64 {
     let obj = crate::pal_alloc().calloc(1, NSTIMER_SIZE) as *mut u64;
@@ -66,19 +70,22 @@ pub extern "C" fn shim_nstimer_timer_with_block(
 /// `+[NSTimer scheduledTimerWithTimeInterval:target:selector:userInfo:repeats:]`
 ///
 /// Target/selector variant — creates and schedules on the current run loop.
-/// We store the target pointer in the block field; the selector cannot be
-/// captured so invoking the target is a no-op.
+/// Stores target and selector so `fire` can dispatch via objc msg_lookup.
 pub extern "C" fn shim_nstimer_scheduled_with_target(
     _cls: u64,
     _cmd: u64,
     interval: f64,
-    _target: u64,
-    _sel: u64,
+    target: u64,
+    sel: u64,
     _info: u64,
     repeats: u64,
 ) -> u64 {
     let t = alloc_nstimer(interval, 0, repeats != 0);
     if t != 0 {
+        unsafe {
+            *((t as usize + TARGET_OFF) as *mut u64) = target;
+            *((t as usize + SELECTOR_OFF) as *mut u64) = sel;
+        }
         crate::nsrunloop::shim_nsrunloop_add_timer_for_mode(0, 0, t, 0);
     }
     t
@@ -86,7 +93,7 @@ pub extern "C" fn shim_nstimer_scheduled_with_target(
 
 // ── Instance methods ───────────────────────────────────────────────
 
-/// `-[NSTimer fire]` — invokes the block immediately.
+/// `-[NSTimer fire]` — invokes the block or target/selector immediately.
 pub extern "C" fn shim_nstimer_fire(obj: u64, _cmd: u64) {
     if obj == 0 {
         return;
@@ -103,6 +110,28 @@ pub extern "C" fn shim_nstimer_fire(obj: u64, _cmd: u64) {
             // Call: invoke(block, timer)
             let f: extern "C" fn(u64, u64) = unsafe { std::mem::transmute(invoke) };
             f(block, obj);
+        }
+    } else {
+        // Target/selector variant: dispatch via objc runtime
+        let target = unsafe { *((obj as usize + TARGET_OFF) as *const u64) };
+        let sel_ptr = unsafe { *((obj as usize + SELECTOR_OFF) as *const u64) };
+        if target != 0 && sel_ptr != 0 {
+            // Look up selector name from the SEL pointer
+            let isa = unsafe { *(target as *const u64) };
+            let guard = match objc_runtime::OBJC_RUNTIME.read() {
+                Ok(g) => g,
+                Err(e) => e.into_inner(),
+            };
+            if let Some(rt) = guard.as_ref() {
+                // sel_ptr is a SEL (pointer to the selector C string)
+                let sel_name = unsafe { std::ffi::CStr::from_ptr(sel_ptr as *const std::ffi::c_char) };
+                if let Ok(name) = sel_name.to_str() {
+                    if let Some(imp) = rt.msg_lookup(isa, name) {
+                        let f: extern "C" fn(u64, u64, u64) = unsafe { std::mem::transmute(imp) };
+                        f(target, sel_ptr, obj);
+                    }
+                }
+            }
         }
     }
     // If non-repeating, auto-invalidate after fire

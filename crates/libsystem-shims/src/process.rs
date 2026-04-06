@@ -440,7 +440,7 @@ mod tests {
     #[test]
     fn all_shims_registered() {
         let table = setup_shims();
-        assert_eq!(table.len(), 10);
+        assert_eq!(table.len(), 11);
     }
 
     #[test]

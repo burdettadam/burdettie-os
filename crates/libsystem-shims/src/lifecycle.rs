@@ -361,6 +361,43 @@ struct DarwinSigaction {
     sa_flags: i32,     // int
 }
 
+/// Translate macOS signal number to Linux signal number.
+/// Most are identical; these are the ones that differ:
+///   macOS SIGBUS=10   → Linux SIGBUS=7
+///   macOS SIGCHLD=20  → Linux SIGCHLD=17
+///   macOS SIGUSR1=30  → Linux SIGUSR1=10
+///   macOS SIGUSR2=31  → Linux SIGUSR2=12
+fn translate_darwin_signal(darwin_sig: i32) -> i32 {
+    match darwin_sig {
+        10 => 7,   // SIGBUS
+        20 => 17,  // SIGCHLD
+        30 => 10,  // SIGUSR1
+        31 => 12,  // SIGUSR2
+        _ => darwin_sig, // SIGINT(2), SIGABRT(6), SIGSEGV(11), SIGPIPE(13), SIGALRM(14), SIGTERM(15) are same
+    }
+}
+
+/// Translate Linux signal number back to macOS signal number (reverse of above).
+fn translate_linux_signal(linux_sig: i32) -> i32 {
+    match linux_sig {
+        7 => 10,   // SIGBUS
+        17 => 20,  // SIGCHLD
+        10 => 30,  // SIGUSR1
+        12 => 31,  // SIGUSR2
+        _ => linux_sig,
+    }
+}
+
+/// Signals that are safe to forward to the host:
+/// - crash recovery: SIGBUS(10), SIGSEGV(11), SIGABRT(6)
+/// - termination/cleanup: SIGTERM(15), SIGINT(2), SIGPIPE(13)
+/// - timers: SIGALRM(14)
+/// - user-defined: SIGUSR1(30), SIGUSR2(31)
+/// - child process: SIGCHLD(20)
+fn is_allowed_signal(darwin_sig: i32) -> bool {
+    matches!(darwin_sig, 2 | 6 | 10 | 11 | 13 | 14 | 15 | 20 | 30 | 31)
+}
+
 /// If `oact` is non-null we zero it to indicate "no previous handler".
 extern "C" fn shim_sigaction(
     sig: i32,
@@ -371,10 +408,9 @@ extern "C" fn shim_sigaction(
         let handler = unsafe { (*act).sa_sigaction };
         let flags = unsafe { (*act).sa_flags };
         log::debug!("sigaction: intercepted sig={sig} handler={handler:#x} flags={flags:#x}");
-        // Allow LLVM's crash recovery handlers for SIGBUS/SIGSEGV/SIGABRT
-        // through to the host so crash diagnostics work properly.
-        if sig == 10 || sig == 11 || sig == 6 {
-            log::debug!("sigaction: ALLOWING sig={sig} through to host");
+        if is_allowed_signal(sig) {
+            let linux_sig = translate_darwin_signal(sig);
+            log::debug!("sigaction: ALLOWING sig={sig} (linux={linux_sig}) through to host");
             // Build a Linux-sized sigaction from the macOS one
             let mut linux_act: libc::sigaction = unsafe { std::mem::zeroed() };
             linux_act.sa_sigaction = handler as usize;
@@ -382,7 +418,7 @@ extern "C" fn shim_sigaction(
             extern "C" { fn sigaction(sig: i32, act: *const libc::sigaction, oact: *mut libc::sigaction) -> i32; }
             let mut linux_oact: libc::sigaction = unsafe { std::mem::zeroed() };
             let oact_ptr = if oact.is_null() { std::ptr::null_mut() } else { &mut linux_oact };
-            let ret = unsafe { sigaction(sig, &linux_act, oact_ptr) };
+            let ret = unsafe { sigaction(linux_sig, &linux_act, oact_ptr) };
             if !oact.is_null() {
                 // Convert Linux oact back to macOS layout
                 unsafe {
@@ -411,9 +447,10 @@ extern "C" fn shim_sigaction(
 extern "C" fn shim_signal(sig: i32, handler: usize) -> usize {
     // SIG_DFL = 0, SIG_IGN = 1 — pass through to host
     if handler <= 1 {
-        log::trace!("signal: passing through SIG_DFL/SIG_IGN for signal {sig}");
+        let linux_sig = translate_darwin_signal(sig);
+        log::trace!("signal: passing through SIG_DFL/SIG_IGN for signal {sig} (linux={linux_sig})");
         extern "C" { fn signal(sig: i32, handler: usize) -> usize; }
-        return unsafe { signal(sig, handler) };
+        return unsafe { signal(linux_sig, handler) };
     }
     log::trace!("signal: intercepted guest handler for signal {sig}");
     0 // SIG_DFL
@@ -523,7 +560,7 @@ mod tests {
         assert!(table.resolve("___deregister_frame").is_some());
         assert!(table.resolve("_abort").is_some());
         assert!(table.resolve("_strlen").is_some());
-        assert_eq!(table.len(), 11);
+        assert_eq!(table.len(), 20);
     }
 
     #[test]

@@ -19,6 +19,7 @@ mod image;
 mod path;
 mod affine;
 mod data_provider;
+mod gradient;
 pub mod bridge;
 
 use libsystem_shims::table::ShimTable;
@@ -31,5 +32,6 @@ pub fn register_cg_shims(table: &mut ShimTable) {
     path::install(table);
     affine::install(table);
     data_provider::install(table);
+    gradient::install(table);
     log::debug!("cg-shims: registered CoreGraphics C API stubs");
 }

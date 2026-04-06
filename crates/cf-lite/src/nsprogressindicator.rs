@@ -135,6 +135,43 @@ pub extern "C" fn shim_nsprogressindicator_start_animation(_obj: u64, _cmd: u64,
 /// `-[NSProgressIndicator stopAnimation:]` — no-op stub.
 pub extern "C" fn shim_nsprogressindicator_stop_animation(_obj: u64, _cmd: u64, _sender: u64) {}
 
+/// `-[NSProgressIndicator drawRect:]` — renders progress bar.
+pub extern "C" fn shim_nsprogressindicator_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64) {
+    if obj == 0 { return; }
+    let cg_ctx = crate::nsgraphicscontext::current_cg_context_handle();
+    if cg_ctx == 0 { return; }
+
+    let min = read_f64(obj, MIN_VALUE_OFF);
+    let max = read_f64(obj, MAX_VALUE_OFF);
+    let val = read_f64(obj, CURRENT_PROGRESS_OFF);
+    let flags = read_u64(obj, FLAGS_OFF);
+    let is_indeterminate = flags & FLAG_IS_INDETERMINATE != 0;
+    let range = if (max - min).abs() < f64::EPSILON { 1.0 } else { max - min };
+    let ratio = ((val - min) / range).clamp(0.0, 1.0);
+
+    cg_shims::bridge::with_context(cg_ctx, |c| {
+        // Track background.
+        c.fill_color = graphics_core::Color::new(0.9, 0.9, 0.9, 1.0);
+        c.fill_rect(x, y, w, h);
+
+        if is_indeterminate {
+            // Indeterminate: draw a striped pattern.
+            c.fill_color = graphics_core::Color::new(0.2, 0.5, 1.0, 0.6);
+            c.fill_rect(x, y, w * 0.3, h);
+        } else {
+            // Determinate: filled portion.
+            c.fill_color = graphics_core::Color::new(0.2, 0.5, 1.0, 1.0);
+            c.fill_rect(x, y, w * ratio, h);
+        }
+
+        // Border.
+        if flags & FLAG_IS_BEZELED != 0 {
+            c.stroke_color = graphics_core::Color::new(0.7, 0.7, 0.7, 1.0);
+            c.stroke_rect(x, y, w, h);
+        }
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -21,10 +21,11 @@ pub fn install(table: &mut ShimTable) {
         ("_CGContextRestoreGState", shim_cg_restore_gstate as *const () as u64, "CGContextRestoreGState (bridge → real)"),
 
         // ── Transform ───────────────────────────────────────────
-        ("_CGContextTranslateCTM", shim_cg_void3 as *const () as u64, "CGContextTranslateCTM (stub → void)"),
-        ("_CGContextScaleCTM", shim_cg_void3 as *const () as u64, "CGContextScaleCTM (stub → void)"),
-        ("_CGContextRotateCTM", shim_cg_void2 as *const () as u64, "CGContextRotateCTM (stub → void)"),
-        ("_CGContextConcatCTM", shim_cg_void2 as *const () as u64, "CGContextConcatCTM (stub → void)"),
+        ("_CGContextTranslateCTM", shim_cg_translate_ctm as *const () as u64, "CGContextTranslateCTM (bridge → real)"),
+        ("_CGContextScaleCTM", shim_cg_scale_ctm as *const () as u64, "CGContextScaleCTM (bridge → real)"),
+        ("_CGContextRotateCTM", shim_cg_rotate_ctm as *const () as u64, "CGContextRotateCTM (bridge → real)"),
+        ("_CGContextConcatCTM", shim_cg_concat_ctm as *const () as u64, "CGContextConcatCTM (bridge → real)"),
+        ("_CGContextGetCTM", shim_cg_get_ctm as *const () as u64, "CGContextGetCTM (bridge → real)"),
 
         // ── Color ───────────────────────────────────────────────
         ("_CGContextSetFillColorWithColor", shim_cg_set_fill_color as *const () as u64, "CGContextSetFillColorWithColor (bridge → real)"),
@@ -39,8 +40,10 @@ pub fn install(table: &mut ShimTable) {
         ("_CGContextFillEllipseInRect", shim_cg_fill_ellipse as *const () as u64, "CGContextFillEllipseInRect (bridge → real)"),
         ("_CGContextStrokePath", shim_cg_stroke_path as *const () as u64, "CGContextStrokePath (bridge → real)"),
         ("_CGContextFillPath", shim_cg_fill_path as *const () as u64, "CGContextFillPath (bridge → real)"),
-        ("_CGContextDrawImage", shim_cg_void6 as *const () as u64, "CGContextDrawImage (stub → void)"),
-        ("_CGContextClipToRect", shim_cg_void5 as *const () as u64, "CGContextClipToRect (stub → void)"),
+        ("_CGContextDrawImage", shim_cg_draw_image as *const () as u64, "CGContextDrawImage (bridge → real)"),
+        ("_CGContextClipToRect", shim_cg_clip_to_rect as *const () as u64, "CGContextClipToRect (bridge → real)"),
+        ("_CGContextClip", shim_cg_void1 as *const () as u64, "CGContextClip (stub → void)"),
+        ("_CGContextEOClip", shim_cg_void1 as *const () as u64, "CGContextEOClip (stub → void)"),
         ("_CGContextSetLineWidth", shim_cg_set_line_width as *const () as u64, "CGContextSetLineWidth (bridge → real)"),
         ("_CGContextSetLineCap", shim_cg_void2 as *const () as u64, "CGContextSetLineCap (stub → void)"),
         ("_CGContextSetLineJoin", shim_cg_void2 as *const () as u64, "CGContextSetLineJoin (stub → void)"),
@@ -99,8 +102,10 @@ pub extern "C" fn shim_cg_bitmap_get_height(ctx: u64) -> u64 {
     bridge::context_get_height(ctx)
 }
 
-/// CGBitmapContextCreateImage → returns the context handle itself.
-pub extern "C" fn shim_cg_bitmap_create_image(ctx: u64) -> u64 { ctx }
+/// CGBitmapContextCreateImage → copies context pixels into a CGImage handle.
+pub extern "C" fn shim_cg_bitmap_create_image(ctx: u64) -> u64 {
+    bridge::image_create_from_context(ctx)
+}
 
 // ── State ───────────────────────────────────────────────────────
 
@@ -214,6 +219,60 @@ pub extern "C" fn shim_cg_void3(_a: u64, _b: u64, _c: u64) {}
 pub extern "C" fn shim_cg_void5(_a: u64, _b: u64, _c: u64, _d: u64, _e: u64) {}
 pub extern "C" fn shim_cg_void6(_a: u64, _b: u64, _c: u64, _d: u64, _e: u64, _f: u64) {}
 pub extern "C" fn shim_cg_void7(_a: u64, _b: u64, _c: u64, _d: u64, _e: u64, _f: u64, _g: u64) {}
+
+// ── CTM transforms ──────────────────────────────────────────────
+
+/// CGContextTranslateCTM(ctx, tx, ty) — tx/ty arrive in d0/d1.
+pub extern "C" fn shim_cg_translate_ctm(ctx: u64, tx: f64, ty: f64) {
+    bridge::with_context(ctx, |c| c.translate_ctm(tx, ty));
+}
+
+/// CGContextScaleCTM(ctx, sx, sy) — sx/sy arrive in d0/d1.
+pub extern "C" fn shim_cg_scale_ctm(ctx: u64, sx: f64, sy: f64) {
+    bridge::with_context(ctx, |c| c.scale_ctm(sx, sy));
+}
+
+/// CGContextRotateCTM(ctx, angle) — angle arrives in d0.
+pub extern "C" fn shim_cg_rotate_ctm(ctx: u64, angle: f64) {
+    bridge::with_context(ctx, |c| c.rotate_ctm(angle));
+}
+
+/// CGContextConcatCTM(ctx, transform_ptr) — transform is >16 bytes, passed by
+/// invisible reference on ARM64 (pointer in x1).
+pub extern "C" fn shim_cg_concat_ctm(ctx: u64, transform_ptr: u64) {
+    if transform_ptr == 0 { return; }
+    let m = unsafe {
+        let p = transform_ptr as *const f64;
+        [*p, *p.add(1), *p.add(2), *p.add(3), *p.add(4), *p.add(5)]
+    };
+    bridge::with_context(ctx, |c| c.concat_ctm(m));
+}
+
+/// CGContextGetCTM(ctx) → CGAffineTransform (48 bytes via x8 sret).
+pub extern "C" fn shim_cg_get_ctm(sret: u64, ctx: u64) {
+    let ctm = bridge::with_context(ctx, |c| c.ctm).unwrap_or([1.0, 0.0, 0.0, 1.0, 0.0, 0.0]);
+    if sret != 0 {
+        unsafe {
+            let p = sret as *mut f64;
+            for (i, v) in ctm.iter().enumerate() {
+                *p.add(i) = *v;
+            }
+        }
+    }
+}
+
+/// CGContextClipToRect(ctx, x, y, w, h)
+pub extern "C" fn shim_cg_clip_to_rect(ctx: u64, x: f64, y: f64, w: f64, h: f64) {
+    bridge::with_context(ctx, |c| c.clip_to_rect(x, y, w, h));
+}
+
+/// CGContextDrawImage(ctx, rect.x, rect.y, rect.w, rect.h, image_handle)
+///
+/// On ARM64: ctx in x0, CGRect in d0-d3, image in x1.
+/// The shim table signature delivers: ctx, x, y, w, h, image.
+pub extern "C" fn shim_cg_draw_image(ctx: u64, x: f64, y: f64, w: f64, h: f64, image: u64) {
+    bridge::draw_image_in_context(ctx, image, x, y, w, h);
+}
 
 // ── Text ────────────────────────────────────────────────────────
 

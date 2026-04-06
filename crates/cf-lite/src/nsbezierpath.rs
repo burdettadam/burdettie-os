@@ -260,6 +260,39 @@ pub extern "C" fn shim_nsbezierpath_add_clip(_obj: u64, _cmd: u64) {
     // Clipping requires CG context clip support — deferred.
 }
 
+/// `-[NSBezierPath appendBezierPath:]` — appends elements from another path.
+pub extern "C" fn shim_nsbezierpath_append_bezier_path(obj: u64, _cmd: u64, other: u64) {
+    if obj == 0 || other == 0 { return; }
+    let dst = path_handle(obj);
+    let src = path_handle(other);
+    if dst == 0 || src == 0 { return; }
+    cg_shims::bridge::path_append_path(dst, src);
+}
+
+/// `-[NSBezierPath appendBezierPathWithRect:]` — appends a rectangle.
+pub extern "C" fn shim_nsbezierpath_append_rect(obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64) {
+    if obj == 0 { return; }
+    let h_path = path_handle(obj);
+    if h_path == 0 { return; }
+    cg_shims::bridge::with_path(h_path, |p| {
+        p.move_to(graphics_core::Point::new(x, y));
+        p.line_to(graphics_core::Point::new(x + w, y));
+        p.line_to(graphics_core::Point::new(x + w, y + h));
+        p.line_to(graphics_core::Point::new(x, y + h));
+        p.close();
+    });
+}
+
+/// `-[NSBezierPath appendBezierPathWithOvalInRect:]` — appends an oval.
+pub extern "C" fn shim_nsbezierpath_append_oval(obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64) {
+    if obj == 0 { return; }
+    let h_path = path_handle(obj);
+    if h_path == 0 { return; }
+    cg_shims::bridge::with_path(h_path, |p| {
+        p.add_ellipse(graphics_core::Rect::new(x, y, w, h));
+    });
+}
+
 /// `-[NSBezierPath isEmpty]`
 pub extern "C" fn shim_nsbezierpath_is_empty(obj: u64, _cmd: u64) -> u8 {
     let h = path_handle(obj);

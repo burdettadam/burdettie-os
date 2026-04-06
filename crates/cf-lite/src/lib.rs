@@ -180,6 +180,12 @@ pub(crate) mod nsanimationcontext;
 pub(crate) mod nsbezierpath;
 pub(crate) mod nstableview;
 pub(crate) mod nsundomanager;
+pub(crate) mod nsclipview;
+pub(crate) mod nstextview;
+#[cfg(target_os = "macos")]
+pub(crate) mod nsopenpanel;
+pub(crate) mod nstrackingarea;
+pub(crate) mod nscursor;
 
 // GUI bridge: connects AppKit shims to a real windowing backend
 pub mod gui_bridge;

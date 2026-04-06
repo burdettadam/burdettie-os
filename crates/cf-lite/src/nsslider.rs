@@ -126,6 +126,41 @@ pub extern "C" fn shim_nsslider_set_orientation(obj: u64, _cmd: u64, orientation
     set_flag(obj, FLAG_VERTICAL, orientation != 0);
 }
 
+/// `-[NSSlider drawRect:]` — renders slider track and knob.
+pub extern "C" fn shim_nsslider_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64) {
+    if obj == 0 { return; }
+    let cg_ctx = crate::nsgraphicscontext::current_cg_context_handle();
+    if cg_ctx == 0 { return; }
+
+    let min = read_f64(obj, MIN_VALUE_OFF);
+    let max = read_f64(obj, MAX_VALUE_OFF);
+    let val = read_f64(obj, CURRENT_VALUE_OFF);
+    let flags = read_u64(obj, FLAGS_OFF);
+    let is_vertical = flags & FLAG_VERTICAL != 0;
+    let range = if (max - min).abs() < f64::EPSILON { 1.0 } else { max - min };
+    let ratio = ((val - min) / range).clamp(0.0, 1.0);
+
+    cg_shims::bridge::with_context(cg_ctx, |c| {
+        // Track background.
+        c.fill_color = graphics_core::Color::new(0.85, 0.85, 0.85, 1.0);
+        if is_vertical {
+            let track_x = x + w / 2.0 - 2.0;
+            c.fill_rect(track_x, y, 4.0, h);
+            // Knob.
+            let knob_y = y + h * (1.0 - ratio) - 6.0;
+            c.fill_color = graphics_core::Color::new(0.2, 0.5, 1.0, 1.0);
+            c.fill_rect(x + 2.0, knob_y, w - 4.0, 12.0);
+        } else {
+            let track_y = y + h / 2.0 - 2.0;
+            c.fill_rect(x, track_y, w, 4.0);
+            // Knob.
+            let knob_x = x + w * ratio - 6.0;
+            c.fill_color = graphics_core::Color::new(0.2, 0.5, 1.0, 1.0);
+            c.fill_rect(knob_x, y + 2.0, 12.0, h - 4.0);
+        }
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

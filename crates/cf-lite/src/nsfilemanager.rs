@@ -480,6 +480,31 @@ pub extern "C" fn shim_nsfilemanager_attributes_of_item(
     crate::nsdictionary::make_nsdictionary(&[key], &[val])
 }
 
+/// `-[NSFileManager enumeratorAtPath:]`
+///
+/// Returns an NSDirectoryEnumerator that iterates over the contents of the
+/// directory at `path`, including all subdirectories. Each call to `nextObject`
+/// returns an NSString with the path relative to the starting directory.
+///
+/// Implementation: eagerly collects all subpaths into an NSArray, then wraps
+/// with an NSEnumerator. This matches the `subpathsOfDirectoryAtPath:` walk
+/// order (breadth-first per directory, then children).
+pub extern "C" fn shim_nsfilemanager_enumerator_at_path(
+    _obj: u64,
+    _cmd: u64,
+    path: u64,
+) -> u64 {
+    if path == 0 {
+        return 0;
+    }
+    // Collect all subpaths into an NSArray, then return an enumerator over it
+    let all_paths_array = shim_nsfilemanager_subpaths_of_directory(_obj, 0, path, 0);
+    if all_paths_array == 0 {
+        return 0;
+    }
+    crate::nsenumerator::alloc_enumerator(all_paths_array)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -810,5 +835,39 @@ mod tests {
         let arr = shim_nsfilemanager_subpaths_of_directory(mgr, 0, path_ns, 0);
         // walk returns an empty vec for non-existent dir, so we get an empty array
         assert_ne!(arr, 0);
+    }
+
+    #[test]
+    fn enumerator_at_path_nil_returns_zero() {
+        let mgr = shim_nsfilemanager_default_manager(0, 0);
+        assert_eq!(shim_nsfilemanager_enumerator_at_path(mgr, 0, 0), 0);
+    }
+
+    #[test]
+    fn enumerator_at_path_iterates_files() {
+        let dir = temp_path("enum_test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("sub")).unwrap();
+        std::fs::write(dir.join("file.txt"), b"hello").unwrap();
+        std::fs::write(dir.join("sub").join("child.txt"), b"world").unwrap();
+
+        let mgr = shim_nsfilemanager_default_manager(0, 0);
+        let path_ns = make_string(dir.to_str().unwrap());
+        let enumer = shim_nsfilemanager_enumerator_at_path(mgr, 0, path_ns);
+        assert_ne!(enumer, 0);
+
+        // Iterate through all entries
+        let mut count = 0u32;
+        loop {
+            let obj = crate::nsenumerator::shim_nsenumerator_next_object(enumer, 0);
+            if obj == 0 {
+                break;
+            }
+            count += 1;
+        }
+        // At least 3: "file.txt", "sub", "sub/child.txt"
+        assert!(count >= 3, "expected >= 3 entries, got {count}");
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

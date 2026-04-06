@@ -417,3 +417,55 @@ define_class_pair!(child NSBEZIERPATH_CLASS_DATA, NSBEZIERPATH_METACLASS_DATA, N
     meta_addr: nsbezierpath_metaclass_addr,
     parent_class: nsobject_class_addr,
     parent_meta: nsobject_metaclass_addr);
+
+// ── File dialog panels ────────────────────────────────────────
+
+define_class_pair!(child NSOPENPANEL_CLASS_DATA, NSOPENPANEL_METACLASS_DATA, NSOPENPANEL_INIT,
+    ensure: ensure_nsopenpanel_init,
+    class_addr: nsopenpanel_class_addr,
+    meta_addr: nsopenpanel_metaclass_addr,
+    parent_class: nspanel_class_addr,
+    parent_meta: nspanel_metaclass_addr);
+
+define_class_pair!(child NSSAVEPANEL_CLASS_DATA, NSSAVEPANEL_METACLASS_DATA, NSSAVEPANEL_INIT,
+    ensure: ensure_nssavepanel_init,
+    class_addr: nssavepanel_class_addr,
+    meta_addr: nssavepanel_metaclass_addr,
+    parent_class: nspanel_class_addr,
+    parent_meta: nspanel_metaclass_addr);
+
+// ── NSClipView (scroll content clipping) ──────────────────────
+
+define_class_pair!(child NSCLIPVIEW_CLASS_DATA, NSCLIPVIEW_METACLASS_DATA, NSCLIPVIEW_INIT,
+    ensure: ensure_nsclipview_init,
+    class_addr: nsclipview_class_addr,
+    meta_addr: nsclipview_metaclass_addr,
+    parent_class: nsview_class_addr,
+    parent_meta: nsview_metaclass_addr);
+
+// ── NSTextView (rich text editing) ────────────────────────────
+
+define_class_pair!(child NSTEXTVIEW_CLASS_DATA, NSTEXTVIEW_METACLASS_DATA, NSTEXTVIEW_INIT,
+    ensure: ensure_nstextview_init,
+    class_addr: nstextview_class_addr,
+    meta_addr: nstextview_metaclass_addr,
+    parent_class: nsview_class_addr,
+    parent_meta: nsview_metaclass_addr);
+
+// ── NSTrackingArea (mouse tracking) ───────────────────────────
+
+define_class_pair!(child NSTRACKINGAREA_CLASS_DATA, NSTRACKINGAREA_METACLASS_DATA, NSTRACKINGAREA_INIT,
+    ensure: ensure_nstrackingarea_init,
+    class_addr: nstrackingarea_class_addr,
+    meta_addr: nstrackingarea_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+// ── NSCursor (cursor management) ──────────────────────────────
+
+define_class_pair!(child NSCURSOR_CLASS_DATA, NSCURSOR_METACLASS_DATA, NSCURSOR_INIT,
+    ensure: ensure_nscursor_init,
+    class_addr: nscursor_class_addr,
+    meta_addr: nscursor_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);

@@ -84,6 +84,7 @@ pub fn register_nsmenu_class(rt: &mut objc_runtime::ObjcRuntime) {
             me("title", nsmenu_shim::shim_nsmenu_title as *const () as u64, "@@:"),
             me("setTitle:", nsmenu_shim::shim_nsmenu_set_title as *const () as u64, "v@:@"),
             me("setSubmenu:forItem:", nsmenu_shim::shim_nsmenu_set_submenu as *const () as u64, "v@:@@"),
+            me("performKeyEquivalent:", nsmenu_shim::shim_nsmenu_perform_key_equivalent as *const () as u64, "B@:@"),
         ],
         class_methods: vec![],
         ivars: vec![], properties: vec![], protocol_names: Vec::new(),

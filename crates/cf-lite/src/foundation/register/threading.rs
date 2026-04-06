@@ -52,7 +52,7 @@ pub fn register_nstimer_class(rt: &mut objc_runtime::ObjcRuntime) {
         ivars: vec![],
         properties: vec![],
         protocol_names: Vec::new(),
-        instance_size: 32,
+        instance_size: 48,
         is_root: false,
         is_meta: false,
         superclass_addr: Some(nsobj::nsobject_class_addr()),

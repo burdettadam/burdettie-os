@@ -230,6 +230,11 @@ pub fn register_nsfilemanager_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nsfilemanager::shim_nsfilemanager_subpaths_of_directory as *const () as u64,
                 "@@:@^@",
             ),
+            me(
+                "enumeratorAtPath:",
+                nsfilemanager::shim_nsfilemanager_enumerator_at_path as *const () as u64,
+                "@@:@",
+            ),
         ],
         class_methods: vec![me(
             "defaultManager",

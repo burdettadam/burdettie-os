@@ -107,6 +107,14 @@ pub extern "C" fn shim_nsimage_name(_obj: u64, _cmd: u64) -> u64 {
     0
 }
 
+/// Get a CGImage handle for an NSImage (for NSImageView rendering).
+/// Returns 0 if no pixel data is available.
+pub fn image_to_cg_handle(_image: u64) -> u64 {
+    // TODO: when NSImage gains real pixel data (from initWithContentsOfFile:
+    // with the imaging feature), create a CGImage from the decoded pixels.
+    0
+}
+
 /// `-[NSImage drawInRect:fromRect:operation:fraction:]` — no-op stub.
 pub extern "C" fn shim_nsimage_draw_in_rect(
     _obj: u64,

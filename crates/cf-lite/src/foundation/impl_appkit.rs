@@ -138,6 +138,32 @@ impl FoundationShims {
         register::register_nstoolbaritem_class(rt);
     }
 
+    #[cfg(target_os = "macos")]
+    pub fn register_nssavepanel_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nssavepanel_class(rt);
+    }
+
+    #[cfg(target_os = "macos")]
+    pub fn register_nsopenpanel_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsopenpanel_class(rt);
+    }
+
+    pub fn register_nsclipview_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsclipview_class(rt);
+    }
+
+    pub fn register_nstextview_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nstextview_class(rt);
+    }
+
+    pub fn register_nstrackingarea_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nstrackingarea_class(rt);
+    }
+
+    pub fn register_nscursor_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nscursor_class(rt);
+    }
+
     // ── Phase C10 AppKit widget classes ──────────────────────────
 
     pub fn register_nsslider_class(rt: &mut objc_runtime::ObjcRuntime) {

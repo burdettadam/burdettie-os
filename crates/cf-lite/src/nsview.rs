@@ -30,6 +30,19 @@ pub(crate) const VIEW_SIZE: usize = 80;
 
 const FLAG_NEEDS_DISPLAY: u64 = 1 << 0;
 const FLAG_WANTS_LAYER: u64 = 1 << 1;
+// Bit 2: translates_autoresize (inverted, managed by nslayoutconstraint.rs)
+// Bit 3: needs_layout (managed by layout_solver.rs)
+
+// ── Autoresizing mask (bits 4-9) — matches Apple values shifted by 4 ──
+// Apple's NSAutoresizingMaskOptions:
+//   NSViewMinXMargin     = 1
+//   NSViewWidthSizable   = 2
+//   NSViewMaxXMargin     = 4
+//   NSViewMinYMargin     = 8
+//   NSViewHeightSizable  = 16
+//   NSViewMaxYMargin     = 32
+const AUTORESIZE_SHIFT: u32 = 4;
+const AUTORESIZE_MASK_BITS: u64 = 0x3F << AUTORESIZE_SHIFT; // 6 bits
 
 fn read_u64(obj: u64, offset: usize) -> u64 {
     if obj == 0 {
@@ -247,7 +260,13 @@ pub extern "C" fn shim_nsview_set_frame(
     _cmd: u64,
     x: f64, y: f64, w: f64, h: f64,
 ) {
+    let old_w = read_f64(obj, FRAME_W_OFF);
+    let old_h = read_f64(obj, FRAME_H_OFF);
     write_frame(obj, x, y, w, h);
+    // Trigger autoresizing for subviews if size changed.
+    if old_w != w || old_h != h {
+        apply_autoresizing(obj, old_w, old_h);
+    }
 }
 
 /// `-[NSView setFrameSize:]`
@@ -255,8 +274,13 @@ pub extern "C" fn shim_nsview_set_frame_size(obj: u64, _cmd: u64, w: f64, h: f64
     if obj == 0 {
         return;
     }
+    let old_w = read_f64(obj, FRAME_W_OFF);
+    let old_h = read_f64(obj, FRAME_H_OFF);
     write_f64(obj, FRAME_W_OFF, w);
     write_f64(obj, FRAME_H_OFF, h);
+    if old_w != w || old_h != h {
+        apply_autoresizing(obj, old_w, old_h);
+    }
 }
 
 /// `-[NSView setFrameOrigin:]`
@@ -557,6 +581,10 @@ pub extern "C" fn shim_nsview_display(obj: u64, _cmd: u64) {
 pub(crate) fn display_view_recursive(view: u64, cg_ctx: u64) {
     if view == 0 || cg_ctx == 0 { return; }
 
+    // Run the auto-layout pass before drawing, so constraint-solved frames
+    // are applied to views before they paint.
+    crate::layout_solver::layout_if_needed(view);
+
     let x = read_f64(view, FRAME_X_OFF);
     let y = read_f64(view, FRAME_Y_OFF);
     let w = read_f64(view, FRAME_W_OFF);
@@ -628,6 +656,152 @@ pub extern "C" fn shim_nsview_lock_focus(obj: u64, _cmd: u64) {
 /// `-[NSView unlockFocus]` — pop the drawing context.
 pub extern "C" fn shim_nsview_unlock_focus(_obj: u64, _cmd: u64) {
     crate::nsgraphicscontext::pop_current_context(0);
+}
+
+// ── Autoresizing mask ───────────────────────────────────────────
+
+/// `-[NSView autoresizingMask]` — returns the 6-bit mask (NSAutoresizingMaskOptions).
+pub extern "C" fn shim_nsview_autoresizing_mask(obj: u64, _cmd: u64) -> u64 {
+    if obj == 0 { return 0; }
+    (read_u64(obj, FLAGS_OFF) & AUTORESIZE_MASK_BITS) >> AUTORESIZE_SHIFT
+}
+
+/// `-[NSView setAutoresizingMask:]`
+pub extern "C" fn shim_nsview_set_autoresizing_mask(obj: u64, _cmd: u64, mask: u64) {
+    if obj == 0 { return; }
+    let mut flags = read_u64(obj, FLAGS_OFF);
+    flags &= !AUTORESIZE_MASK_BITS;          // clear old mask
+    flags |= (mask & 0x3F) << AUTORESIZE_SHIFT; // set new
+    write_u64(obj, FLAGS_OFF, flags);
+}
+
+/// Apply autoresizing (struts-and-springs) for all subviews of `parent`
+/// after the parent's frame changed from `old_w × old_h` to `new_w × new_h`.
+///
+/// Called from `resizeSubviewsWithOldSize:`.
+pub(crate) fn apply_autoresizing(parent: u64, old_w: f64, old_h: f64) {
+    if parent == 0 { return; }
+    let new_w = read_f64(parent, FRAME_W_OFF);
+    let new_h = read_f64(parent, FRAME_H_OFF);
+    let dw = new_w - old_w;
+    let dh = new_h - old_h;
+    if dw == 0.0 && dh == 0.0 { return; }
+
+    for child in snapshot_subviews(parent) {
+        let mask = shim_nsview_autoresizing_mask(child, 0);
+        if mask == 0 { continue; }
+
+        let cx = read_f64(child, FRAME_X_OFF);
+        let cy = read_f64(child, FRAME_Y_OFF);
+        let cw = read_f64(child, FRAME_W_OFF);
+        let ch = read_f64(child, FRAME_H_OFF);
+
+        // Horizontal: MinXMargin(1), WidthSizable(2), MaxXMargin(4)
+        let flex_left  = mask & 1 != 0;
+        let flex_width = mask & 2 != 0;
+        let flex_right = mask & 4 != 0;
+        let h_flex_count = u32::from(flex_left) + u32::from(flex_width) + u32::from(flex_right);
+        let (nx, nw) = if h_flex_count == 0 {
+            (cx, cw)
+        } else {
+            let per = dw / h_flex_count as f64;
+            let dx = if flex_left { per } else { 0.0 };
+            let dwidth = if flex_width { per } else { 0.0 };
+            (cx + dx, (cw + dwidth).max(0.0))
+        };
+
+        // Vertical: MinYMargin(8), HeightSizable(16), MaxYMargin(32)
+        let flex_bottom = mask & 8 != 0;
+        let flex_height = mask & 16 != 0;
+        let flex_top    = mask & 32 != 0;
+        let v_flex_count = u32::from(flex_bottom) + u32::from(flex_height) + u32::from(flex_top);
+        let (ny, nh) = if v_flex_count == 0 {
+            (cy, ch)
+        } else {
+            let per = dh / v_flex_count as f64;
+            let dy = if flex_bottom { per } else { 0.0 };
+            let dheight = if flex_height { per } else { 0.0 };
+            (cy + dy, (ch + dheight).max(0.0))
+        };
+
+        write_frame(child, nx, ny, nw, nh);
+    }
+}
+
+/// `-[NSView resizeSubviewsWithOldSize:]`
+pub extern "C" fn shim_nsview_resize_subviews_with_old_size(
+    obj: u64, _cmd: u64, old_w: f64, old_h: f64,
+) {
+    apply_autoresizing(obj, old_w, old_h);
+}
+
+// ── nextKeyView / previousKeyView ───────────────────────────────
+
+/// Per-view next key view storage.
+static NEXT_KEY_VIEW: Mutex<Option<HashMap<u64, u64>>> = Mutex::new(None);
+
+fn with_key_view_map<F, R>(f: F) -> R
+where
+    F: FnOnce(&mut HashMap<u64, u64>) -> R,
+{
+    let mut guard = NEXT_KEY_VIEW.lock().unwrap_or_else(|e| e.into_inner());
+    let map = guard.get_or_insert_with(HashMap::new);
+    f(map)
+}
+
+/// `-[NSView nextKeyView]`
+pub extern "C" fn shim_nsview_next_key_view(obj: u64, _cmd: u64) -> u64 {
+    if obj == 0 { return 0; }
+    with_key_view_map(|m| m.get(&obj).copied().unwrap_or(0))
+}
+
+/// `-[NSView setNextKeyView:]`
+pub extern "C" fn shim_nsview_set_next_key_view(obj: u64, _cmd: u64, next: u64) {
+    if obj == 0 { return; }
+    with_key_view_map(|m| {
+        if next == 0 {
+            m.remove(&obj);
+        } else {
+            m.insert(obj, next);
+        }
+    });
+}
+
+/// `-[NSView previousKeyView]` — walks all views looking for one whose nextKeyView == self.
+pub extern "C" fn shim_nsview_previous_key_view(obj: u64, _cmd: u64) -> u64 {
+    if obj == 0 { return 0; }
+    with_key_view_map(|m| {
+        for (&view, &next) in m.iter() {
+            if next == obj {
+                return view;
+            }
+        }
+        0
+    })
+}
+
+/// `-[NSView nextValidKeyView]` — walks the nextKeyView chain to find one that accepts
+/// first responder (any non-nil nextKeyView is assumed valid for now).
+pub extern "C" fn shim_nsview_next_valid_key_view(obj: u64, _cmd: u64) -> u64 {
+    if obj == 0 { return 0; }
+    let cursor = shim_nsview_next_key_view(obj, 0);
+    let start = obj;
+    while cursor != 0 && cursor != start {
+        // For now, any view in the chain is considered valid.
+        return cursor;
+    }
+    0
+}
+
+/// `-[NSView previousValidKeyView]` — walks backwards through the key-view chain.
+pub extern "C" fn shim_nsview_previous_valid_key_view(obj: u64, _cmd: u64) -> u64 {
+    shim_nsview_previous_key_view(obj, _cmd)
+}
+
+/// Reset key-view state (called from `reset_runtime_state_for_reuse`).
+pub(crate) fn reset_key_view_state() {
+    let mut guard = NEXT_KEY_VIEW.lock().unwrap_or_else(|e| e.into_inner());
+    *guard = None;
 }
 
 #[cfg(test)]

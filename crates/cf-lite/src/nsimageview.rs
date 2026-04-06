@@ -121,6 +121,23 @@ pub extern "C" fn shim_nsimageview_image_scaling(_obj: u64, _cmd: u64) -> u64 {
 /// `-[NSImageView setImageScaling:]` — no-op stub.
 pub extern "C" fn shim_nsimageview_set_image_scaling(_obj: u64, _cmd: u64, _scaling: u64) {}
 
+/// `-[NSImageView drawRect:]` — renders the image via CGContextDrawImage.
+pub extern "C" fn shim_nsimageview_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64) {
+    if obj == 0 { return; }
+    let cg_ctx = crate::nsgraphicscontext::current_cg_context_handle();
+    if cg_ctx == 0 { return; }
+
+    let image_ptr = read_u64(obj, IMAGE_OFF);
+    if image_ptr == 0 { return; }
+
+    // Get the CGImage handle from our NSImage.
+    // NSImage stores image info in IMAGE_STORE; try to get a CG handle.
+    let cg_image = crate::nsimage::image_to_cg_handle(image_ptr);
+    if cg_image != 0 {
+        cg_shims::bridge::draw_image_in_context(cg_ctx, cg_image, x, y, w, h);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

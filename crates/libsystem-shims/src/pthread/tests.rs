@@ -20,7 +20,7 @@ fn pthread_shims_registered() {
     assert!(table.resolve("_pthread_once").is_some());
     assert!(table.resolve("_sched_yield").is_some());
     assert!(table.resolve("_pthread_main_np").is_some());
-    assert_eq!(table.len(), 42);
+    assert_eq!(table.len(), 45);
 }
 
 #[test]

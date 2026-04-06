@@ -465,6 +465,15 @@ fn populate_foundation_runtime(objc_rt: &mut objc_runtime::ObjcRuntime) {
     cf_lite::FoundationShims::register_nstabviewitem_class(objc_rt);
     cf_lite::FoundationShims::register_nstoolbar_class(objc_rt);
     cf_lite::FoundationShims::register_nstoolbaritem_class(objc_rt);
+    #[cfg(target_os = "macos")]
+    {
+        cf_lite::FoundationShims::register_nssavepanel_class(objc_rt);
+        cf_lite::FoundationShims::register_nsopenpanel_class(objc_rt);
+    }
+    cf_lite::FoundationShims::register_nsclipview_class(objc_rt);
+    cf_lite::FoundationShims::register_nstextview_class(objc_rt);
+    cf_lite::FoundationShims::register_nstrackingarea_class(objc_rt);
+    cf_lite::FoundationShims::register_nscursor_class(objc_rt);
 
     // AppKit widget classes (Phase C10 AppKit)
     cf_lite::FoundationShims::register_nsslider_class(objc_rt);

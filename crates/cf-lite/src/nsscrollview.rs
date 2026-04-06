@@ -66,6 +66,10 @@ pub extern "C" fn shim_nsscrollview_document_view(obj: u64, _cmd: u64) -> u64 {
 /// `-[NSScrollView setDocumentView:]`
 pub extern "C" fn shim_nsscrollview_set_document_view(obj: u64, _cmd: u64, view: u64) {
     write_u64(obj, DOC_VIEW_OFF, view);
+    // Also add as subview so the display pipeline picks it up.
+    if obj != 0 && view != 0 {
+        crate::nsview::shim_nsview_add_subview(obj, 0, view);
+    }
 }
 
 /// `-[NSScrollView hasVerticalScroller]`
@@ -119,6 +123,49 @@ pub extern "C" fn shim_nsscrollview_content_size(obj: u64, _cmd: u64) -> u64 {
 /// `-[NSScrollView tile]` — no-op stub.
 pub extern "C" fn shim_nsscrollview_tile(_obj: u64, _cmd: u64) {}
 
+/// `-[NSScrollView contentView]` — returns the document view as the clip content.
+pub extern "C" fn shim_nsscrollview_content_view(obj: u64, _cmd: u64) -> u64 {
+    // In a real implementation this returns NSClipView; we return documentView.
+    read_u64(obj, DOC_VIEW_OFF)
+}
+
+/// `-[NSScrollView drawRect:]` — draws background and lets subviews render.
+pub extern "C" fn shim_nsscrollview_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64) {
+    if obj == 0 { return; }
+    let cg_ctx = crate::nsgraphicscontext::current_cg_context_handle();
+    if cg_ctx == 0 { return; }
+
+    let flags = read_u64(obj, FLAGS_OFF);
+    if flags & FLAG_DRAWS_BACKGROUND != 0 {
+        cg_shims::bridge::with_context(cg_ctx, |c| {
+            c.fill_color = graphics_core::Color::WHITE;
+            c.fill_rect(x, y, w, h);
+        });
+    }
+
+    // Draw scrollbar indicators if scrollers are visible.
+    if flags & FLAG_HAS_VERTICAL_SCROLLER != 0 {
+        cg_shims::bridge::with_context(cg_ctx, |c| {
+            let scroller_x = x + w - 8.0;
+            c.fill_color = graphics_core::Color::new(0.8, 0.8, 0.8, 0.5);
+            c.fill_rect(scroller_x, y, 8.0, h);
+            // Thumb.
+            c.fill_color = graphics_core::Color::new(0.5, 0.5, 0.5, 0.7);
+            c.fill_rect(scroller_x + 1.0, y + 4.0, 6.0, h * 0.3);
+        });
+    }
+    if flags & FLAG_HAS_HORIZONTAL_SCROLLER != 0 {
+        cg_shims::bridge::with_context(cg_ctx, |c| {
+            let scroller_y = y + h - 8.0;
+            c.fill_color = graphics_core::Color::new(0.8, 0.8, 0.8, 0.5);
+            c.fill_rect(x, scroller_y, w, 8.0);
+            // Thumb.
+            c.fill_color = graphics_core::Color::new(0.5, 0.5, 0.5, 0.7);
+            c.fill_rect(x + 4.0, scroller_y + 1.0, w * 0.3, 6.0);
+        });
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -144,9 +191,11 @@ mod tests {
     fn document_view_round_trip() {
         let sv = alloc_obj(SCROLL_VIEW_SIZE, 0xDEAD);
         assert_eq!(shim_nsscrollview_document_view(sv, 0), 0);
-        let fake_view = 0x4000_u64;
-        shim_nsscrollview_set_document_view(sv, 0, fake_view);
-        assert_eq!(shim_nsscrollview_document_view(sv, 0), fake_view);
+        // Use a properly-allocated view since setDocumentView now calls addSubview.
+        let child = alloc_obj(crate::nsview::VIEW_SIZE, crate::nsobj::nsview_class_addr());
+        shim_nsscrollview_set_document_view(sv, 0, child);
+        assert_eq!(shim_nsscrollview_document_view(sv, 0), child);
+        free_obj(child);
         free_obj(sv);
     }
 

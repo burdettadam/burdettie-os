@@ -250,6 +250,9 @@ pub extern "C" fn shim_nstextfield_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64
         });
     }
 
+    // Draw cursor if this text field is the first responder and is editable.
+    let is_editing = flags & FLAG_IS_EDITABLE != 0 && is_first_responder(obj);
+
     // Draw text content.
     let string_ptr = read_u64(obj, STRING_VALUE_OFF);
     let text_ptr = if string_ptr != 0 {
@@ -276,10 +279,135 @@ pub extern "C" fn shim_nstextfield_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64
                     // Draw text with 4px inset, vertically centered.
                     let text_y = y + (h * 0.7);  // baseline roughly at 70% from top
                     c.draw_text(text, x + 4.0, text_y);
+
+                    // Draw a blinking cursor after the text if editing.
+                    if is_editing {
+                        let cursor_x = c.text_x + 1.0;
+                        c.fill_color = graphics_core::Color::BLACK;
+                        c.fill_rect(cursor_x, y + 4.0, 1.0, h - 8.0);
+                    }
                 });
+                return;
             }
         }
     }
+
+    // Draw cursor at the beginning if field is empty but editing.
+    if is_editing {
+        cg_shims::bridge::with_context(cg_ctx, |c| {
+            c.fill_color = graphics_core::Color::BLACK;
+            c.fill_rect(x + 5.0, y + 4.0, 1.0, h - 8.0);
+        });
+    }
+}
+
+// ── Text editing ───────────────────────────────────────────────
+
+/// Check if this view is the first responder of its window.
+fn is_first_responder(obj: u64) -> bool {
+    let window = read_u64(obj, 16); // WINDOW_OFF from nsview
+    if window == 0 { return false; }
+    crate::nswindow::shim_nswindow_first_responder(window, 0) == obj
+}
+
+/// `-[NSTextField acceptsFirstResponder]` — returns YES if editable.
+pub extern "C" fn shim_nstextfield_accepts_first_responder(obj: u64, _cmd: u64) -> u8 {
+    if obj == 0 { return 0; }
+    let flags = read_u64(obj, FLAGS_OFF);
+    u8::from(flags & FLAG_IS_EDITABLE != 0)
+}
+
+/// `-[NSTextField keyDown:]` — handles keyboard input for editable text fields.
+///
+/// When the text field is editable and is the first responder, keyDown:
+/// reads the event's characters and appends them to the string value.
+/// Backspace (keyCode 51) deletes the last character.
+pub extern "C" fn shim_nstextfield_key_down(obj: u64, _cmd: u64, event: u64) {
+    if obj == 0 || event == 0 { return; }
+
+    let flags = read_u64(obj, FLAGS_OFF);
+    if flags & FLAG_IS_EDITABLE == 0 {
+        // Not editable — forward up the responder chain.
+        crate::nsresponder::shim_nsresponder_key_down(obj, _cmd, event);
+        return;
+    }
+
+    let key_code = crate::nsevent::shim_nsevent_key_code(event, 0);
+
+    if key_code == 51 {
+        // Backspace — delete last character.
+        let string_ptr = read_u64(obj, STRING_VALUE_OFF);
+        if string_ptr != 0 {
+            let utf8 = crate::cfstring::shim_nsstring_utf8string(string_ptr, 0);
+            if !utf8.is_null() {
+                let s = unsafe { std::ffi::CStr::from_ptr(utf8) }
+                    .to_str()
+                    .unwrap_or("");
+                if !s.is_empty() {
+                    // Remove the last character.
+                    let mut chars: Vec<char> = s.chars().collect();
+                    chars.pop();
+                    let new_str: String = chars.into_iter().collect();
+                    let c_str = std::ffi::CString::new(new_str).unwrap_or_default();
+                    let new_nsstring = crate::cfstring::alloc_nsstring_from_cstr(c_str.as_ptr());
+                    write_u64(obj, STRING_VALUE_OFF, new_nsstring);
+                }
+            }
+        }
+        // Request redraw.
+        crate::nsview::shim_nsview_set_needs_display(obj, 0, 1);
+        return;
+    }
+
+    if key_code == 36 {
+        // Return key — fire the action.
+        let target = read_u64(obj, TARGET_OFF);
+        let action = read_u64(obj, ACTION_OFF);
+        if target != 0 && action != 0 {
+            crate::nscontrol::shim_nscontrol_send_action(obj, 0, action, target);
+        }
+        return;
+    }
+
+    // Regular character input — read event characters and append.
+    let chars_ptr = crate::nsevent::shim_nsevent_characters(event, 0);
+    if chars_ptr == 0 { return; }
+
+    let utf8 = crate::cfstring::shim_nsstring_utf8string(chars_ptr, 0);
+    if utf8.is_null() { return; }
+    let typed = unsafe { std::ffi::CStr::from_ptr(utf8) }
+        .to_str()
+        .unwrap_or("");
+    if typed.is_empty() { return; }
+
+    // Filter non-printable characters (control chars).
+    let typed: String = typed.chars().filter(|c| !c.is_control()).collect();
+    if typed.is_empty() { return; }
+
+    // Get current string value.
+    let string_ptr = read_u64(obj, STRING_VALUE_OFF);
+    let current = if string_ptr != 0 {
+        let utf8 = crate::cfstring::shim_nsstring_utf8string(string_ptr, 0);
+        if utf8.is_null() {
+            String::new()
+        } else {
+            unsafe { std::ffi::CStr::from_ptr(utf8) }
+                .to_str()
+                .unwrap_or("")
+                .to_string()
+        }
+    } else {
+        String::new()
+    };
+
+    // Append typed characters.
+    let new_str = format!("{}{}", current, typed);
+    let c_str = std::ffi::CString::new(new_str).unwrap_or_default();
+    let new_nsstring = crate::cfstring::alloc_nsstring_from_cstr(c_str.as_ptr());
+    write_u64(obj, STRING_VALUE_OFF, new_nsstring);
+
+    // Request redraw.
+    crate::nsview::shim_nsview_set_needs_display(obj, 0, 1);
 }
 
 #[cfg(test)]

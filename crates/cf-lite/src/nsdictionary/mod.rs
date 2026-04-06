@@ -416,3 +416,53 @@ pub extern "C" fn shim_nsdictionary_write_to_file(
 ) -> u8 {
     0
 }
+
+// Shared mutations counter for fast-enumeration (immutable → never mutates).
+static NSDICT_FAST_ENUM_MUTATIONS: u64 = 0;
+
+/// `-[NSDictionary countByEnumeratingWithState:objects:count:]`
+///
+/// Supports Objective-C fast enumeration (`for (id key in dict)`).
+/// Enumerates *keys*, matching Apple's NSDictionary semantics.
+pub extern "C" fn shim_nsdictionary_count_by_enumerating_with_state(
+    obj: u64,
+    _cmd: u64,
+    state: u64,
+    stackbuf: u64,
+    len: u64,
+) -> u64 {
+    if obj == 0 || state == 0 || stackbuf == 0 || len == 0 {
+        return 0;
+    }
+
+    let count = dict_count(obj) as usize;
+    // state->state (offset 0) holds the current index
+    let index = unsafe { *(state as *const u64) as usize };
+    if index >= count {
+        return 0;
+    }
+
+    let keys = dict_keys(obj);
+    if keys == 0 {
+        return 0;
+    }
+
+    let batch = std::cmp::min(len as usize, count - index);
+    for offset in 0..batch {
+        let key = unsafe { *((keys as usize + (index + offset) * 8) as *const u64) };
+        unsafe {
+            *((stackbuf as usize + offset * 8) as *mut u64) = key;
+        }
+    }
+
+    unsafe {
+        // state->state = new index
+        *(state as *mut u64) = (index + batch) as u64;
+        // state->itemsPtr = stackbuf
+        *((state as usize + 8) as *mut u64) = stackbuf;
+        // state->mutationsPtr
+        *((state as usize + 16) as *mut u64) = (&raw const NSDICT_FAST_ENUM_MUTATIONS) as u64;
+    }
+
+    batch as u64
+}

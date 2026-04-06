@@ -13,6 +13,84 @@
 
 use crate::table::ShimTable;
 
+// ── macOS `struct msghdr` layout (differs from Linux on ARM64) ──────────────
+//
+// macOS ARM64:
+//   void            *msg_name;       offset 0,  8 bytes
+//   socklen_t        msg_namelen;    offset 8,  4 bytes
+//   [4 pad]                          offset 12
+//   struct iovec    *msg_iov;        offset 16, 8 bytes
+//   int              msg_iovlen;     offset 24, 4 bytes  ← KEY DIFFERENCE
+//   [4 pad]                          offset 28
+//   void            *msg_control;    offset 32, 8 bytes
+//   socklen_t        msg_controllen; offset 40, 4 bytes  ← KEY DIFFERENCE
+//   int              msg_flags;      offset 44, 4 bytes
+//   Total: 48 bytes
+//
+// Linux ARM64:
+//   void            *msg_name;       offset 0,  8 bytes
+//   socklen_t        msg_namelen;    offset 8,  4 bytes
+//   [4 pad]                          offset 12
+//   struct iovec    *msg_iov;        offset 16, 8 bytes
+//   size_t           msg_iovlen;     offset 24, 8 bytes
+//   void            *msg_control;    offset 32, 8 bytes
+//   size_t           msg_controllen; offset 40, 8 bytes
+//   unsigned int     msg_flags;      offset 48, 4 bytes
+//   Total: 56 bytes
+
+/// Read fields from a macOS-layout msghdr at the given pointer.
+#[cfg(target_os = "linux")]
+struct DarwinMsghdr {
+    msg_name: *mut libc::c_void,
+    msg_namelen: u32,
+    msg_iov: *mut libc::iovec,
+    msg_iovlen: i32,
+    msg_control: *mut libc::c_void,
+    msg_controllen: u32,
+    msg_flags: i32,
+}
+
+#[cfg(target_os = "linux")]
+impl DarwinMsghdr {
+    /// Read from a macOS-layout msghdr in guest memory.
+    unsafe fn read_from(ptr: u64) -> Self {
+        let base = ptr as *const u8;
+        Self {
+            msg_name:       unsafe { *(base.add(0) as *const *mut libc::c_void) },
+            msg_namelen:    unsafe { *(base.add(8) as *const u32) },
+            msg_iov:        unsafe { *(base.add(16) as *const *mut libc::iovec) },
+            msg_iovlen:     unsafe { *(base.add(24) as *const i32) },
+            msg_control:    unsafe { *(base.add(32) as *const *mut libc::c_void) },
+            msg_controllen: unsafe { *(base.add(40) as *const u32) },
+            msg_flags:      unsafe { *(base.add(44) as *const i32) },
+        }
+    }
+
+    /// Convert to a Linux-layout msghdr for syscall use.
+    fn to_linux(&self) -> libc::msghdr {
+        libc::msghdr {
+            msg_name: self.msg_name,
+            msg_namelen: self.msg_namelen,
+            msg_iov: self.msg_iov,
+            msg_iovlen: self.msg_iovlen as usize,
+            msg_control: self.msg_control,
+            msg_controllen: self.msg_controllen as usize,
+            msg_flags: self.msg_flags,
+        }
+    }
+
+    /// Write output fields back to the macOS-layout msghdr after recvmsg.
+    unsafe fn write_back(&self, ptr: u64, linux_msg: &libc::msghdr) {
+        let base = ptr as *mut u8;
+        // Write back only the fields that recvmsg modifies.
+        unsafe {
+            *(base.add(8) as *mut u32) = linux_msg.msg_namelen;
+            *(base.add(40) as *mut u32) = linux_msg.msg_controllen as u32;
+            *(base.add(44) as *mut i32) = linux_msg.msg_flags;
+        }
+    }
+}
+
 // ── macOS → Linux constant translation ──────────────────────────────────────
 
 // macOS AF_* constants differ from Linux.
@@ -41,6 +119,126 @@ fn translate_af(darwin_af: i32) -> Option<i32> {
     }
 }
 
+/// Reverse translation: Linux AF → macOS AF (for recvmsg return path).
+fn linux_af_to_darwin(linux_af: u16) -> (u8, u8) {
+    // Returns (sa_len, darwin_sa_family).
+    match linux_af as i32 {
+        libc::AF_INET => (16, DARWIN_AF_INET as u8),    // sockaddr_in = 16 bytes
+        libc::AF_INET6 => (28, DARWIN_AF_INET6 as u8),  // sockaddr_in6 = 28 bytes
+        libc::AF_UNIX => (106, DARWIN_AF_UNIX as u8),    // sockaddr_un ~106 bytes
+        _ => (0, linux_af as u8),                         // unknown — pass through
+    }
+}
+
+/// Rewrite a Linux sockaddr (returned by recvmsg/recvfrom) in-place to macOS
+/// layout:  Linux `[sa_family:u16_le]` → macOS `[sa_len:u8][sa_family:u8]`.
+fn translate_sockaddr_linux_to_darwin(buf: *mut u8, len: u32) {
+    if buf.is_null() || len < 2 {
+        return;
+    }
+    unsafe {
+        // Read Linux sa_family (u16 little-endian at offset 0).
+        let family_lo = *buf;
+        let family_hi = *buf.add(1);
+        let linux_family = u16::from_le_bytes([family_lo, family_hi]);
+        let (sa_len, darwin_family) = linux_af_to_darwin(linux_family);
+        log::trace!(
+            "translate_sockaddr_linux_to_darwin: Linux family={linux_family} → \
+             macOS sa_len={sa_len} sa_family={darwin_family}"
+        );
+        // Overwrite: byte 0 = sa_len, byte 1 = sa_family (u8).
+        *buf = sa_len;
+        *buf.add(1) = darwin_family;
+    }
+}
+
+/// Repack the control message (cmsg) buffer from Linux layout to macOS layout.
+///
+/// Linux cmsghdr on arm64:  [cmsg_len:u64][cmsg_level:i32][cmsg_type:i32]  = 16 byte header, 8-byte aligned
+/// macOS cmsghdr on arm64:  [cmsg_len:u32][cmsg_level:i32][cmsg_type:i32]  = 12 byte header, 4-byte aligned
+///
+/// We walk the Linux cmsg chain, translate level/type, and repack in-place
+/// into macOS layout (which is always smaller, so it fits in the same buffer).
+/// Returns the new macOS-layout total controllen.
+#[cfg(target_os = "linux")]
+fn translate_cmsg_linux_to_darwin(buf: *mut u8, total_len: usize) -> u32 {
+    const LINUX_CMSG_HDR: usize = 16;  // sizeof(struct cmsghdr) on Linux arm64
+    const LINUX_CMSG_ALIGN: usize = 8;
+    const DARWIN_CMSG_HDR: usize = 12;  // sizeof(struct cmsghdr) on macOS arm64
+    const DARWIN_CMSG_ALIGN: usize = 4;
+
+    let mut linux_off = 0usize;
+    let mut darwin_off = 0usize;
+
+    while linux_off + LINUX_CMSG_HDR <= total_len {
+        // Read Linux cmsghdr.
+        let linux_len = unsafe { *(buf.add(linux_off) as *const u64) } as usize;
+        if linux_len < LINUX_CMSG_HDR || linux_len > total_len - linux_off {
+            break;
+        }
+        let linux_level = unsafe { *(buf.add(linux_off + 8) as *const i32) };
+        let linux_type = unsafe { *(buf.add(linux_off + 12) as *const i32) };
+        let data_len = linux_len - LINUX_CMSG_HDR;
+
+        log::trace!("cmsg repack: Linux level={linux_level} type={linux_type} data_len={data_len}");
+
+        // Translate level + type.
+        let (darwin_level, darwin_type) = translate_cmsg_level_type(linux_level, linux_type);
+
+        // macOS cmsg_len includes the 12-byte header + data (no alignment).
+        let darwin_cmsg_len = (DARWIN_CMSG_HDR + data_len) as u32;
+
+        // Write macOS cmsghdr at darwin_off.
+        unsafe {
+            *(buf.add(darwin_off) as *mut u32) = darwin_cmsg_len;
+            *(buf.add(darwin_off + 4) as *mut i32) = darwin_level;
+            *(buf.add(darwin_off + 8) as *mut i32) = darwin_type;
+        }
+
+        // Copy data payload (may overlap since we're shrinking, use copy).
+        if data_len > 0 {
+            unsafe {
+                std::ptr::copy(
+                    buf.add(linux_off + LINUX_CMSG_HDR),
+                    buf.add(darwin_off + DARWIN_CMSG_HDR),
+                    data_len,
+                );
+            }
+        }
+
+        // Advance Linux offset (aligned to 8).
+        linux_off += (linux_len + LINUX_CMSG_ALIGN - 1) & !(LINUX_CMSG_ALIGN - 1);
+        // Advance Darwin offset (aligned to 4).
+        let darwin_total = DARWIN_CMSG_HDR + data_len;
+        darwin_off += (darwin_total + DARWIN_CMSG_ALIGN - 1) & !(DARWIN_CMSG_ALIGN - 1);
+    }
+
+    log::trace!("cmsg repack: Linux {total_len} bytes → macOS {darwin_off} bytes");
+    darwin_off as u32
+}
+
+/// Translate a single cmsg level+type from Linux to macOS.
+#[cfg(target_os = "linux")]
+fn translate_cmsg_level_type(linux_level: i32, linux_type: i32) -> (i32, i32) {
+    if linux_level == libc::SOL_SOCKET {
+        let darwin_type = match linux_type {
+            libc::SCM_TIMESTAMP => 0x02, // macOS SCM_TIMESTAMP
+            _ => linux_type,
+        };
+        return (DARWIN_SOL_SOCKET, darwin_type);
+    }
+    if linux_level == libc::IPPROTO_IP {
+        let darwin_type = match linux_type {
+            8  /* IP_PKTINFO */  => 26, // macOS IP_PKTINFO
+            1  /* IP_TOS */      => 27, // macOS IP_RECVTOS
+            2  /* IP_TTL */      => 24, // macOS IP_RECVTTL
+            _ => linux_type,
+        };
+        return (linux_level, darwin_type);
+    }
+    (linux_level, linux_type)
+}
+
 /// Translate a macOS SOL_* level to the Linux equivalent.
 fn translate_sockopt_level(darwin_level: i32) -> i32 {
     if darwin_level == DARWIN_SOL_SOCKET {
@@ -48,6 +246,92 @@ fn translate_sockopt_level(darwin_level: i32) -> i32 {
     } else {
         darwin_level
     }
+}
+
+// ── macOS socket option constants ────────────────────────────────────────────
+// macOS SOL_SOCKET options (many differ from Linux).
+const DARWIN_SO_DEBUG: i32 = 0x0001;
+const DARWIN_SO_REUSEADDR: i32 = 0x0004;
+const DARWIN_SO_KEEPALIVE: i32 = 0x0008;
+const DARWIN_SO_DONTROUTE: i32 = 0x0010;
+const DARWIN_SO_BROADCAST: i32 = 0x0020;
+const DARWIN_SO_LINGER: i32 = 0x0080;
+const DARWIN_SO_OOBINLINE: i32 = 0x0100;
+const DARWIN_SO_REUSEPORT: i32 = 0x0200;
+const DARWIN_SO_TIMESTAMP: i32 = 0x0400;
+const DARWIN_SO_SNDBUF: i32 = 0x1001;
+const DARWIN_SO_RCVBUF: i32 = 0x1002;
+const DARWIN_SO_SNDLOWAT: i32 = 0x1003;
+const DARWIN_SO_RCVLOWAT: i32 = 0x1004;
+const DARWIN_SO_SNDTIMEO: i32 = 0x1005;
+const DARWIN_SO_RCVTIMEO: i32 = 0x1006;
+const DARWIN_SO_ERROR: i32 = 0x1007;
+const DARWIN_SO_TYPE: i32 = 0x1008;
+const DARWIN_SO_NOSIGPIPE: i32 = 0x1022; // macOS-only, no Linux equivalent
+const DARWIN_SO_NREAD: i32 = 0x1020;     // macOS-only (use FIONREAD ioctl)
+const DARWIN_SO_NUMRCVPKT: i32 = 0x1112; // macOS-only
+
+// macOS IPPROTO_IP option constants that differ.
+const DARWIN_IP_RECVDSTADDR: i32 = 7;  // macOS=7, Linux has IP_PKTINFO=8
+const DARWIN_IP_RECVTOS: i32 = 27;     // macOS=27, Linux IP_RECVTOS=13
+
+/// Translate a macOS socket option name to the Linux equivalent.
+/// Returns `Some(linux_optname)` for translatable options,
+/// `None` for macOS-only options that should be silently ignored.
+#[cfg(target_os = "linux")]
+fn translate_sockopt_name(level: i32, darwin_optname: i32) -> Option<i32> {
+    if level == libc::SOL_SOCKET {
+        match darwin_optname {
+            DARWIN_SO_DEBUG => Some(libc::SO_DEBUG),
+            DARWIN_SO_REUSEADDR => Some(libc::SO_REUSEADDR),
+            DARWIN_SO_KEEPALIVE => Some(libc::SO_KEEPALIVE),
+            DARWIN_SO_DONTROUTE => Some(libc::SO_DONTROUTE),
+            DARWIN_SO_BROADCAST => Some(libc::SO_BROADCAST),
+            DARWIN_SO_LINGER => Some(libc::SO_LINGER),
+            DARWIN_SO_OOBINLINE => Some(libc::SO_OOBINLINE),
+            DARWIN_SO_REUSEPORT => Some(libc::SO_REUSEPORT),
+            DARWIN_SO_TIMESTAMP => Some(libc::SO_TIMESTAMP),
+            DARWIN_SO_SNDBUF => Some(libc::SO_SNDBUF),
+            DARWIN_SO_RCVBUF => Some(libc::SO_RCVBUF),
+            DARWIN_SO_SNDLOWAT => Some(libc::SO_SNDLOWAT),
+            DARWIN_SO_RCVLOWAT => Some(libc::SO_RCVLOWAT),
+            DARWIN_SO_SNDTIMEO => Some(libc::SO_SNDTIMEO),
+            DARWIN_SO_RCVTIMEO => Some(libc::SO_RCVTIMEO),
+            DARWIN_SO_ERROR => Some(libc::SO_ERROR),
+            DARWIN_SO_TYPE => Some(libc::SO_TYPE),
+            DARWIN_SO_NOSIGPIPE | DARWIN_SO_NREAD | DARWIN_SO_NUMRCVPKT => None,
+            _ => Some(darwin_optname),
+        }
+    } else if level == libc::IPPROTO_IP {
+        match darwin_optname {
+            DARWIN_IP_RECVDSTADDR => Some(libc::IP_PKTINFO),
+            DARWIN_IP_RECVTOS => Some(libc::IP_RECVTOS),
+            _ => Some(darwin_optname),
+        }
+    } else if level == libc::IPPROTO_IPV6 {
+        // macOS and Linux IPV6_* option values differ significantly.
+        match darwin_optname {
+            4  /* IPV6_UNICAST_HOPS */   => Some(libc::IPV6_UNICAST_HOPS),    // 16
+            9  /* IPV6_MULTICAST_IF */   => Some(libc::IPV6_MULTICAST_IF),    // 17
+            10 /* IPV6_MULTICAST_HOPS */ => Some(libc::IPV6_MULTICAST_HOPS),  // 18
+            11 /* IPV6_MULTICAST_LOOP */ => Some(libc::IPV6_MULTICAST_LOOP),  // 19
+            27 /* IPV6_V6ONLY */         => Some(libc::IPV6_V6ONLY),          // 26
+            35 /* IPV6_RECVTCLASS */     => Some(libc::IPV6_RECVTCLASS),      // 66
+            36 /* IPV6_TCLASS */         => Some(libc::IPV6_TCLASS),          // 67
+            37 /* IPV6_RECVHOPLIMIT */   => Some(51), // IPV6_RECVHOPLIMIT
+            46 /* IPV6_PKTINFO */        => Some(libc::IPV6_PKTINFO),         // 50
+            47 /* IPV6_HOPLIMIT */       => Some(52), // IPV6_HOPLIMIT
+            61 /* IPV6_RECVPKTINFO */    => Some(libc::IPV6_RECVPKTINFO),     // 49
+            _ => Some(darwin_optname),
+        }
+    } else {
+        Some(darwin_optname)
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn translate_sockopt_name(_level: i32, darwin_optname: i32) -> Option<i32> {
+    Some(darwin_optname)
 }
 
 // ── macOS → Linux sockaddr translation ──────────────────────────────────────
@@ -134,6 +418,70 @@ fn deny_i64() -> i64 {
     -1
 }
 
+/// Translate the current Linux errno to the macOS equivalent.
+/// Should be called after a libc call that returned -1.
+/// Many errno values are the same, but key networking/threading ones differ.
+#[cfg(target_os = "linux")]
+fn translate_errno_to_darwin() {
+    let e = unsafe { *errno_ptr() };
+    let darwin_e = linux_errno_to_darwin(e);
+    if darwin_e != e {
+        unsafe { *errno_ptr() = darwin_e; }
+    }
+}
+
+/// Map a Linux errno value to its macOS equivalent.
+#[cfg(target_os = "linux")]
+pub fn linux_errno_to_darwin(linux_errno: i32) -> i32 {
+    // Only translate values that actually differ.
+    // macOS errno.h vs Linux errno.h for key values:
+    match linux_errno {
+        11  /* EAGAIN/EWOULDBLOCK */  => 35,
+        97  /* EAFNOSUPPORT */        => 47,
+        99  /* EADDRNOTAVAIL */       => 49,
+        98  /* EADDRINUSE */          => 48,
+        100 /* ENETDOWN */            => 50,
+        101 /* ENETUNREACH */         => 51,
+        102 /* ENETRESET */           => 52,
+        103 /* ECONNABORTED */        => 53,
+        104 /* ECONNRESET */          => 54,
+        105 /* ENOBUFS */             => 55,
+        106 /* EISCONN */             => 56,
+        107 /* ENOTCONN */            => 57,
+        110 /* ETIMEDOUT */           => 60,
+        111 /* ECONNREFUSED */        => 61,
+        113 /* EHOSTUNREACH */        => 65,
+        114 /* EALREADY */            => 37,
+        115 /* EINPROGRESS */         => 36,
+        95  /* EOPNOTSUPP */          => 45,
+        92  /* ENOPROTOOPT */         => 42,
+        93  /* EPROTONOSUPPORT */     => 43,
+        _ => linux_errno, // Same on both, or not networking-related
+    }
+}
+
+/// Helper: call function, translate errno on error, return result.
+/// For functions returning i32 where -1 indicates error.
+#[cfg(target_os = "linux")]
+fn with_errno_i32(f: impl FnOnce() -> i32) -> i32 {
+    let ret = f();
+    if ret < 0 {
+        translate_errno_to_darwin();
+    }
+    ret
+}
+
+/// Helper: call function, translate errno on error, return result.
+/// For functions returning i64/ssize_t where -1 indicates error.
+#[cfg(target_os = "linux")]
+fn with_errno_i64(f: impl FnOnce() -> i64) -> i64 {
+    let ret = f();
+    if ret < 0 {
+        translate_errno_to_darwin();
+    }
+    ret
+}
+
 // ── Address policy helpers ──────────────────────────────────────────────────
 
 /// Read the `sa_family` from a guest (macOS-layout) `sockaddr` pointer.
@@ -166,10 +514,10 @@ fn read_guest_sa_family(addr: u64) -> i32 {
 /// Translates macOS AF_* constants to Linux equivalents and creates the socket.
 /// Denies unsupported address families.
 pub extern "C" fn shim_socket(domain: i32, typ: i32, proto: i32) -> i32 {
-    eprintln!("[SHIM] socket(domain={domain}, type={typ}, proto={proto})");
     if let Some(linux_domain) = translate_af(domain) {
-        log::debug!("socket(domain={domain}→{linux_domain}) — passthrough");
-        unsafe { libc::socket(linux_domain, typ, proto) }
+        let fd = unsafe { libc::socket(linux_domain, typ, proto) };
+        log::debug!("socket(domain={domain}→{linux_domain}, type={typ}) → fd={fd}");
+        fd
     } else {
         log::debug!("socket(domain={domain}) — denied (EOPNOTSUPP)");
         deny_i32()
@@ -193,6 +541,9 @@ pub extern "C" fn shim_connect(fd: i32, addr: u64, len: u32) -> i32 {
         translated_sockaddr_ptr(addr, &buf, tlen)
     };
     log::debug!("connect(fd={fd}) — passthrough");
+    #[cfg(target_os = "linux")]
+    return with_errno_i32(|| unsafe { libc::connect(fd, ptr, tlen) });
+    #[cfg(target_os = "macos")]
     unsafe { libc::connect(fd, ptr, tlen) }
 }
 
@@ -209,7 +560,9 @@ pub extern "C" fn shim_bind(fd: i32, addr: u64, len: u32) -> i32 {
         translated_sockaddr_ptr(addr, &buf, tlen)
     };
     log::debug!("bind(fd={fd}) — passthrough");
-    unsafe { libc::bind(fd, ptr, tlen) }
+    let ret = unsafe { libc::bind(fd, ptr, tlen) };
+    log::debug!("bind(fd={fd}) returned {ret}");
+    ret
 }
 
 /// `int listen(int sockfd, int backlog)`
@@ -220,8 +573,44 @@ pub extern "C" fn shim_listen(fd: i32, backlog: i32) -> i32 {
 
 /// `int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)`
 pub extern "C" fn shim_accept(fd: i32, addr: u64, len: u64) -> i32 {
-    log::debug!("accept(fd={fd}) — passthrough");
-    unsafe { libc::accept(fd, addr as *mut libc::sockaddr, len as *mut libc::socklen_t) }
+    log::debug!("accept(fd={fd}) — passthrough + sockaddr translation");
+    let ret = unsafe { libc::accept(fd, addr as *mut libc::sockaddr, len as *mut libc::socklen_t) };
+    #[cfg(target_os = "linux")]
+    if ret >= 0 && addr != 0 {
+        let actual_len = if len != 0 {
+            unsafe { *(len as *const libc::socklen_t) }
+        } else { 0 };
+        translate_sockaddr_linux_to_darwin(addr as *mut u8, actual_len);
+    }
+    ret
+}
+
+/// `int getsockname(int sockfd, struct sockaddr *addr, socklen_t *addrlen)`
+pub extern "C" fn shim_getsockname(fd: i32, addr: u64, len: u64) -> i32 {
+    log::debug!("getsockname(fd={fd}) — passthrough + sockaddr translation");
+    let ret = unsafe { libc::getsockname(fd, addr as *mut libc::sockaddr, len as *mut libc::socklen_t) };
+    #[cfg(target_os = "linux")]
+    if ret >= 0 && addr != 0 {
+        let actual_len = if len != 0 {
+            unsafe { *(len as *const libc::socklen_t) }
+        } else { 0 };
+        translate_sockaddr_linux_to_darwin(addr as *mut u8, actual_len);
+    }
+    ret
+}
+
+/// `int getpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen)`
+pub extern "C" fn shim_getpeername(fd: i32, addr: u64, len: u64) -> i32 {
+    log::debug!("getpeername(fd={fd}) — passthrough + sockaddr translation");
+    let ret = unsafe { libc::getpeername(fd, addr as *mut libc::sockaddr, len as *mut libc::socklen_t) };
+    #[cfg(target_os = "linux")]
+    if ret >= 0 && addr != 0 {
+        let actual_len = if len != 0 {
+            unsafe { *(len as *const libc::socklen_t) }
+        } else { 0 };
+        translate_sockaddr_linux_to_darwin(addr as *mut u8, actual_len);
+    }
+    ret
 }
 
 /// `ssize_t send(int sockfd, const void *buf, size_t len, int flags)`
@@ -258,6 +647,18 @@ pub extern "C" fn shim_sendto(
         translated_sockaddr_ptr(dest, &sa_buf, tlen)
     };
     log::debug!("sendto(fd={fd}) — passthrough");
+    #[cfg(target_os = "linux")]
+    return with_errno_i64(|| unsafe {
+        libc::sendto(
+            fd,
+            buf as *const libc::c_void,
+            len as usize,
+            flags,
+            ptr,
+            tlen,
+        ) as i64
+    });
+    #[cfg(target_os = "macos")]
     unsafe {
         libc::sendto(
             fd,
@@ -280,7 +681,31 @@ pub extern "C" fn shim_recvfrom(
     src: u64,
     src_len: u64,
 ) -> i64 {
-    log::debug!("recvfrom(fd={fd}) — passthrough");
+    log::debug!("recvfrom(fd={fd}) — passthrough + errno/sockaddr translation");
+    #[cfg(target_os = "linux")]
+    {
+        let ret = with_errno_i64(|| unsafe {
+            libc::recvfrom(
+                fd,
+                buf as *mut libc::c_void,
+                len as usize,
+                flags,
+                src as *mut libc::sockaddr,
+                src_len as *mut libc::socklen_t,
+            ) as i64
+        });
+        if ret >= 0 && src != 0 {
+            // Read the actual returned length from the addrlen out-param.
+            let actual_len = if src_len != 0 {
+                unsafe { *(src_len as *const libc::socklen_t) }
+            } else {
+                0
+            };
+            translate_sockaddr_linux_to_darwin(src as *mut u8, actual_len);
+        }
+        return ret;
+    }
+    #[cfg(target_os = "macos")]
     unsafe {
         libc::recvfrom(
             fd,
@@ -302,12 +727,17 @@ pub extern "C" fn shim_getsockopt(
     optlen: u64,
 ) -> i32 {
     let linux_level = translate_sockopt_level(level);
-    log::debug!("getsockopt(fd={fd}, level={level}→{linux_level}) — passthrough");
+    let Some(linux_optname) = translate_sockopt_name(linux_level, optname) else {
+        log::debug!("getsockopt(fd={fd}, level={level}, opt={optname}) — no-op (macOS-only)");
+        unsafe { *errno_ptr() = libc::ENOPROTOOPT; }
+        return -1;
+    };
+    log::debug!("getsockopt(fd={fd}, level={level}→{linux_level}, opt={optname}→{linux_optname}) — passthrough");
     unsafe {
         libc::getsockopt(
             fd,
             linux_level,
-            optname,
+            linux_optname,
             optval as *mut libc::c_void,
             optlen as *mut libc::socklen_t,
         )
@@ -323,14 +753,259 @@ pub extern "C" fn shim_setsockopt(
     optlen: u32,
 ) -> i32 {
     let linux_level = translate_sockopt_level(level);
-    log::debug!("setsockopt(fd={fd}, level={level}→{linux_level}) — passthrough");
-    unsafe { libc::setsockopt(fd, linux_level, optname, optval as *const libc::c_void, optlen) }
+    let Some(linux_optname) = translate_sockopt_name(linux_level, optname) else {
+        // macOS-only option with no Linux equivalent — silently succeed.
+        log::debug!("setsockopt(fd={fd}, level={level}, opt={optname}) — no-op (macOS-only)");
+        return 0;
+    };
+    log::debug!("setsockopt(fd={fd}, level={level}→{linux_level}, opt={optname}→{linux_optname}) — passthrough");
+    unsafe { libc::setsockopt(fd, linux_level, linux_optname, optval as *const libc::c_void, optlen) }
 }
 
 /// `int shutdown(int sockfd, int how)`
 pub extern "C" fn shim_shutdown(fd: i32, how: i32) -> i32 {
     log::debug!("shutdown(fd={fd}) — passthrough");
+    #[cfg(target_os = "linux")]
+    return with_errno_i32(|| unsafe { libc::shutdown(fd, how) });
+    #[cfg(target_os = "macos")]
     unsafe { libc::shutdown(fd, how) }
+}
+
+// ── read/write shims (errno translation) ────────────────────────────────────
+// These override the safe-list to translate Linux errno to macOS equiv.
+
+/// `ssize_t read(int fd, void *buf, size_t count)`
+pub extern "C" fn shim_read(fd: i32, buf: u64, count: u64) -> i64 {
+    #[cfg(target_os = "linux")]
+    {
+        let ret = with_errno_i64(|| unsafe {
+            libc::read(fd, buf as *mut libc::c_void, count as usize) as i64
+        });
+        log::trace!("read(fd={fd}, count={count}) → {ret}");
+        return ret;
+    }
+    #[cfg(target_os = "macos")]
+    unsafe { libc::read(fd, buf as *mut libc::c_void, count as usize) as i64 }
+}
+
+/// `ssize_t write(int fd, const void *buf, size_t count)`
+pub extern "C" fn shim_write(fd: i32, buf: u64, count: u64) -> i64 {
+    #[cfg(target_os = "linux")]
+    {
+        let ret = with_errno_i64(|| unsafe {
+            libc::write(fd, buf as *const libc::c_void, count as usize) as i64
+        });
+        log::trace!("write(fd={fd}, count={count}) → {ret}");
+        return ret;
+    }
+    #[cfg(target_os = "macos")]
+    unsafe { libc::write(fd, buf as *const libc::c_void, count as usize) as i64 }
+}
+
+/// `int close(int fd)`
+pub extern "C" fn shim_close(fd: i32) -> i32 {
+    #[cfg(target_os = "linux")]
+    return with_errno_i32(|| unsafe { libc::close(fd) });
+    #[cfg(target_os = "macos")]
+    unsafe { libc::close(fd) }
+}
+
+// ── sendmsg/recvmsg shims (sockaddr + errno translation) ────────────────────
+
+/// `ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags)`
+///
+/// Reads the macOS-layout msghdr, builds a Linux-layout msghdr with
+/// translated sockaddr, then calls Linux sendmsg.
+pub extern "C" fn shim_sendmsg(fd: i32, msg_ptr: u64, flags: i32) -> i64 {
+    #[cfg(target_os = "linux")]
+    {
+        if msg_ptr == 0 {
+            return with_errno_i64(|| unsafe {
+                libc::sendmsg(fd, std::ptr::null(), flags) as i64
+            });
+        }
+        // Read macOS-layout msghdr and convert to Linux layout.
+        let darwin_msg = unsafe { DarwinMsghdr::read_from(msg_ptr) };
+        let mut linux_msg = darwin_msg.to_linux();
+
+        let mut sa_buf = [0u8; 128];
+        let has_name = !darwin_msg.msg_name.is_null() && darwin_msg.msg_namelen > 0;
+        if has_name {
+            let tlen = translate_sockaddr(
+                darwin_msg.msg_name as u64,
+                darwin_msg.msg_namelen,
+                &mut sa_buf,
+            );
+            linux_msg.msg_name = sa_buf.as_mut_ptr() as *mut libc::c_void;
+            linux_msg.msg_namelen = tlen;
+            log::debug!("sendmsg(fd={fd}) — sockaddr translated (family={}, namelen={tlen}, addr_bytes={:?})", {
+                if tlen >= 2 { u16::from_ne_bytes([sa_buf[0], sa_buf[1]]) } else { 0 }
+            }, &sa_buf[..std::cmp::min(tlen as usize, 16)]);
+            let ret = with_errno_i64(|| unsafe {
+                libc::sendmsg(fd, &linux_msg, flags) as i64
+            });
+            log::debug!("sendmsg(fd={fd}) returned {ret}");
+            return ret;
+        }
+        log::debug!("sendmsg(fd={fd}) — no name, iovlen={}", darwin_msg.msg_iovlen);
+        with_errno_i64(|| unsafe {
+            libc::sendmsg(fd, &linux_msg, flags) as i64
+        })
+    }
+    #[cfg(target_os = "macos")]
+    unsafe { libc::sendmsg(fd, msg_ptr as *const libc::msghdr, flags) as i64 }
+}
+
+/// `ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags)`
+///
+/// Reads the macOS-layout msghdr, builds a Linux msghdr for the syscall,
+/// then writes results back to the macOS layout and translates sockaddr + cmsg.
+pub extern "C" fn shim_recvmsg(fd: i32, msg_ptr: u64, flags: i32) -> i64 {
+    log::debug!("recvmsg(fd={fd}) — msghdr-translated + errno translation");
+    #[cfg(target_os = "linux")]
+    {
+        if msg_ptr == 0 {
+            return with_errno_i64(|| unsafe {
+                libc::recvmsg(fd, std::ptr::null_mut(), flags) as i64
+            });
+        }
+        // Read macOS-layout msghdr and convert to Linux layout.
+        let darwin_msg = unsafe { DarwinMsghdr::read_from(msg_ptr) };
+        let mut linux_msg = darwin_msg.to_linux();
+
+        let ret = with_errno_i64(|| unsafe {
+            libc::recvmsg(fd, &mut linux_msg, flags) as i64
+        });
+        if ret >= 0 {
+            // Write back the output fields to the macOS-layout msghdr.
+            unsafe { darwin_msg.write_back(msg_ptr, &linux_msg); }
+
+            // Translate the returned source sockaddr from Linux → macOS layout.
+            if !linux_msg.msg_name.is_null() && linux_msg.msg_namelen >= 2 {
+                translate_sockaddr_linux_to_darwin(
+                    linux_msg.msg_name as *mut u8,
+                    linux_msg.msg_namelen,
+                );
+            }
+            // Translate control message (cmsg) buffer from Linux to macOS layout.
+            // This repacks the buffer in-place and returns the new (smaller) length.
+            if !linux_msg.msg_control.is_null() && linux_msg.msg_controllen > 0 {
+                let darwin_controllen = translate_cmsg_linux_to_darwin(
+                    linux_msg.msg_control as *mut u8,
+                    linux_msg.msg_controllen,
+                );
+                // Patch the macOS msghdr controllen to the repacked size.
+                unsafe {
+                    let base = msg_ptr as *mut u8;
+                    *(base.add(40) as *mut u32) = darwin_controllen;
+                }
+            }
+            log::debug!(
+                "recvmsg(fd={fd}) → {ret} bytes, namelen={}, controllen={}, flags={:#x}",
+                linux_msg.msg_namelen, linux_msg.msg_controllen, linux_msg.msg_flags
+            );
+        }
+        return ret;
+    }
+    #[cfg(target_os = "macos")]
+    unsafe { libc::recvmsg(fd, msg_ptr as *mut libc::msghdr, flags) as i64 }
+}
+
+// ── fcntl shim (O_NONBLOCK translation) ─────────────────────────────────────
+
+// macOS open/fcntl file status flags that differ from Linux.
+#[cfg(target_os = "linux")]
+const DARWIN_O_NONBLOCK: i32 = 0x0004;
+#[cfg(target_os = "linux")]
+const DARWIN_O_APPEND: i32 = 0x0008;
+#[cfg(target_os = "linux")]
+const DARWIN_O_ASYNC: i32 = 0x0040;
+
+/// Translate macOS file-status flags (F_SETFL arg) to Linux equivalents.
+/// Flags below 0x100 differ significantly between macOS and Linux, so we
+/// do a bit-by-bit translation for the known ones and pass the rest through.
+#[cfg(target_os = "linux")]
+fn translate_file_flags(darwin_flags: i32) -> i32 {
+    let mut linux_flags = 0i32;
+    if darwin_flags & DARWIN_O_NONBLOCK != 0 {
+        linux_flags |= libc::O_NONBLOCK;
+    }
+    if darwin_flags & DARWIN_O_APPEND != 0 {
+        linux_flags |= libc::O_APPEND;
+    }
+    if darwin_flags & DARWIN_O_ASYNC != 0 {
+        linux_flags |= libc::O_ASYNC;
+    }
+    // Pass through any higher flags (O_CLOEXEC, etc. are typically set via F_SETFD)
+    linux_flags |= darwin_flags & !0x00FF;
+    linux_flags
+}
+
+/// Translate Linux file-status flags back to macOS for F_GETFL return.
+#[cfg(target_os = "linux")]
+fn translate_file_flags_to_darwin(linux_flags: i32) -> i32 {
+    let mut darwin_flags = 0i32;
+    if linux_flags & libc::O_NONBLOCK != 0 {
+        darwin_flags |= DARWIN_O_NONBLOCK;
+    }
+    if linux_flags & libc::O_APPEND != 0 {
+        darwin_flags |= DARWIN_O_APPEND;
+    }
+    if linux_flags & libc::O_ASYNC != 0 {
+        darwin_flags |= DARWIN_O_ASYNC;
+    }
+    darwin_flags |= linux_flags & !0x0FFF;
+    darwin_flags
+}
+
+/// `int fcntl(int fd, int cmd, ...)`
+///
+/// Apple ARM64 ABI puts variadic arguments on the stack, not in registers.
+/// This naked trampoline loads the first variadic arg from the stack into
+/// x2 and tail-calls the real implementation.
+#[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+#[unsafe(naked)]
+pub extern "C" fn shim_fcntl() -> i32 {
+    core::arch::naked_asm!(
+        "ldr  x2, [sp]",           // Load first variadic arg from Apple stack
+        "b    {impl_fn}",          // Tail-call implementation
+        impl_fn = sym shim_fcntl_impl,
+    )
+}
+
+/// macOS-host shim (no ABI translation needed).
+#[cfg(target_os = "macos")]
+pub extern "C" fn shim_fcntl(fd: i32, cmd: i32, arg: i64) -> i32 {
+    unsafe { libc::fcntl(fd, cmd, arg as i32) }
+}
+
+/// Implementation of fcntl with O_NONBLOCK translation.
+/// Called via the naked trampoline on Linux aarch64.
+#[cfg(target_os = "linux")]
+extern "C" fn shim_fcntl_impl(fd: i32, cmd: i32, arg: i64) -> i32 {
+    const F_GETFL: i32 = 3;
+    const F_SETFL: i32 = 4;
+    match cmd {
+        F_GETFL => {
+            let ret = unsafe { libc::fcntl(fd, libc::F_GETFL) };
+            if ret < 0 {
+                return ret;
+            }
+            let darwin_ret = translate_file_flags_to_darwin(ret);
+            log::debug!("fcntl(fd={fd}, F_GETFL) → {ret:#x} → darwin {darwin_ret:#x}");
+            darwin_ret
+        }
+        F_SETFL => {
+            let darwin_flags = arg as i32;
+            let linux_flags = translate_file_flags(darwin_flags);
+            log::debug!("fcntl(fd={fd}, F_SETFL, {darwin_flags:#x}) → linux {linux_flags:#x}");
+            unsafe { libc::fcntl(fd, libc::F_SETFL, linux_flags) }
+        }
+        _ => {
+            log::debug!("fcntl(fd={fd}, cmd={cmd}) — passthrough");
+            unsafe { libc::fcntl(fd, cmd, arg as i32) }
+        }
+    }
 }
 
 // ── Registration ────────────────────────────────────────────────────────────
@@ -341,18 +1016,26 @@ impl SocketShims {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
         register_shims!(table,
-            ("_socket",     shim_socket as *const () as u64,     "socket — AF translation passthrough"),
-            ("_connect",    shim_connect as *const () as u64,    "connect — sockaddr translation passthrough"),
-            ("_bind",       shim_bind as *const () as u64,       "bind — sockaddr translation passthrough"),
-            ("_listen",     shim_listen as *const () as u64,     "listen — passthrough"),
-            ("_accept",     shim_accept as *const () as u64,     "accept — passthrough"),
-            ("_send",       shim_send as *const () as u64,       "send — passthrough"),
-            ("_recv",       shim_recv as *const () as u64,       "recv — passthrough"),
-            ("_sendto",     shim_sendto as *const () as u64,     "sendto — sockaddr translation passthrough"),
-            ("_recvfrom",   shim_recvfrom as *const () as u64,   "recvfrom — passthrough"),
-            ("_getsockopt", shim_getsockopt as *const () as u64, "getsockopt — passthrough"),
-            ("_setsockopt", shim_setsockopt as *const () as u64, "setsockopt — passthrough"),
-            ("_shutdown",   shim_shutdown as *const () as u64,   "shutdown — passthrough"),
+            ("_socket",        shim_socket as *const () as u64,        "socket — AF translation passthrough"),
+            ("_connect",       shim_connect as *const () as u64,       "connect — sockaddr translation passthrough"),
+            ("_bind",          shim_bind as *const () as u64,          "bind — sockaddr translation passthrough"),
+            ("_listen",        shim_listen as *const () as u64,        "listen — passthrough"),
+            ("_accept",        shim_accept as *const () as u64,        "accept — sockaddr translation"),
+            ("_send",          shim_send as *const () as u64,          "send — passthrough"),
+            ("_recv",          shim_recv as *const () as u64,          "recv — passthrough"),
+            ("_sendto",        shim_sendto as *const () as u64,        "sendto — sockaddr translation passthrough"),
+            ("_recvfrom",      shim_recvfrom as *const () as u64,      "recvfrom — sockaddr + errno translation"),
+            ("_getsockopt",    shim_getsockopt as *const () as u64,    "getsockopt — passthrough"),
+            ("_setsockopt",    shim_setsockopt as *const () as u64,    "setsockopt — passthrough"),
+            ("_shutdown",      shim_shutdown as *const () as u64,      "shutdown — passthrough"),
+            ("_getsockname",   shim_getsockname as *const () as u64,   "getsockname — sockaddr translation"),
+            ("_getpeername",   shim_getpeername as *const () as u64,   "getpeername — sockaddr translation"),
+            ("_fcntl",         shim_fcntl as *const () as u64,         "fcntl — O_NONBLOCK translation"),
+            ("_read",          shim_read as *const () as u64,          "read — errno translation"),
+            ("_write",         shim_write as *const () as u64,         "write — errno translation"),
+            ("_close",         shim_close as *const () as u64,         "close — errno translation"),
+            ("_sendmsg",       shim_sendmsg as *const () as u64,      "sendmsg — sockaddr + errno translation"),
+            ("_recvmsg",       shim_recvmsg as *const () as u64,      "recvmsg — msghdr + cmsg + errno translation"),
         );
     }
 }
@@ -580,6 +1263,6 @@ mod tests {
         assert!(table.resolve("_getsockopt").is_some());
         assert!(table.resolve("_setsockopt").is_some());
         assert!(table.resolve("_shutdown").is_some());
-        assert_eq!(table.len(), 12);
+        assert_eq!(table.len(), 20);
     }
 }

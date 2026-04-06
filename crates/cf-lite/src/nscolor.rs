@@ -114,6 +114,35 @@ pub extern "C" fn shim_nscolor_highlight_color(_cls: u64, _cmd: u64) -> u64 { al
 /// `+[NSColor shadowColor]`
 pub extern "C" fn shim_nscolor_shadow_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.0, 0.0, 0.0, 1.0) }
 
+// ── System tint colors (macOS 10.10+) ──────────────────────────
+
+/// `+[NSColor systemRedColor]`
+pub extern "C" fn shim_nscolor_system_red_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(1.0, 0.23, 0.19, 1.0) }
+/// `+[NSColor systemGreenColor]`
+pub extern "C" fn shim_nscolor_system_green_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.20, 0.78, 0.35, 1.0) }
+/// `+[NSColor systemBlueColor]`
+pub extern "C" fn shim_nscolor_system_blue_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.0, 0.48, 1.0, 1.0) }
+/// `+[NSColor systemOrangeColor]`
+pub extern "C" fn shim_nscolor_system_orange_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(1.0, 0.58, 0.0, 1.0) }
+/// `+[NSColor systemYellowColor]`
+pub extern "C" fn shim_nscolor_system_yellow_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(1.0, 0.80, 0.0, 1.0) }
+/// `+[NSColor systemPinkColor]`
+pub extern "C" fn shim_nscolor_system_pink_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(1.0, 0.18, 0.33, 1.0) }
+/// `+[NSColor systemPurpleColor]`
+pub extern "C" fn shim_nscolor_system_purple_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.69, 0.32, 0.87, 1.0) }
+/// `+[NSColor systemTealColor]`
+pub extern "C" fn shim_nscolor_system_teal_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.35, 0.78, 0.98, 1.0) }
+/// `+[NSColor systemIndigoColor]`
+pub extern "C" fn shim_nscolor_system_indigo_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.35, 0.34, 0.84, 1.0) }
+/// `+[NSColor systemBrownColor]`
+pub extern "C" fn shim_nscolor_system_brown_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.64, 0.52, 0.37, 1.0) }
+/// `+[NSColor systemMintColor]`
+pub extern "C" fn shim_nscolor_system_mint_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.0, 0.78, 0.75, 1.0) }
+/// `+[NSColor systemCyanColor]`
+pub extern "C" fn shim_nscolor_system_cyan_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.33, 0.67, 0.93, 1.0) }
+/// `+[NSColor systemGrayColor]`
+pub extern "C" fn shim_nscolor_system_gray_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.56, 0.56, 0.58, 1.0) }
+
 /// `+[NSColor colorWithWhite:alpha:]`
 pub extern "C" fn shim_nscolor_with_white_alpha(_cls: u64, _cmd: u64, w: f64, a: f64) -> u64 {
     alloc_color(w, w, w, a)
