@@ -20,6 +20,11 @@ impl Router {
             Box::new(handlers::device::DeviceHandler),
             Box::new(handlers::swupdate::SwupdateHandler),
             Box::new(handlers::certs::CertsHandler),
+            Box::new(handlers::xcode::XcodeHandler),
+            Box::new(handlers::auth::AuthHandler),
+            Box::new(handlers::config::ConfigHandler),
+            Box::new(handlers::dns::DnsHandler),
+            Box::new(handlers::notarize::NotarizeHandler),
             // Catch-all must be last
             Box::new(handlers::catchall::CatchallHandler),
         ];

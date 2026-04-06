@@ -45,6 +45,7 @@ members = [
     "crates/launchd",
     "crates/burdettie-domain-map",
     "crates/burdettie-services",
+    "crates/burdettie-log-pipeline",
     "apps/hello-darwin",
     "apps/control-gallery",
     "apps/foundation-explorer",
@@ -106,6 +107,7 @@ trust-eval            = { path = "crates/trust-eval" }
 launchd               = { path = "crates/launchd" }
 burdettie-domain-map  = { path = "crates/burdettie-domain-map" }
 burdettie-services    = { path = "crates/burdettie-services" }
+burdettie-log-pipeline = { path = "crates/burdettie-log-pipeline" }
 hello-darwin          = { path = "apps/hello-darwin" }
 control-gallery       = { path = "apps/control-gallery" }
 foundation-explorer   = { path = "apps/foundation-explorer" }

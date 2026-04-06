@@ -23,7 +23,8 @@ platform-core  = { workspace = true }
 macho-shared-cache  = { workspace = true }
 runtime-diagnostics = { workspace = true }
 burdettie-domain-map = { workspace = true }
-burdettie-services   = { workspace = true }
+burdettie-services    = { workspace = true }
+burdettie-log-pipeline = { workspace = true }
 log            = { workspace = true }
 libc           = { workspace = true }
 serde          = { workspace = true }

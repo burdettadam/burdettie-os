@@ -113,6 +113,21 @@ pub(super) fn run_native(
         let services_enabled = domain_config.enabled;
         if services_enabled {
             let svc_config = burdettie_services::ServiceConfig::from_env();
+
+            // Initialize the structured os_log pipeline
+            let log_format = match svc_config.log_format {
+                burdettie_services::config::LogFormat::Json => {
+                    burdettie_log_pipeline::OutputFormat::Json
+                }
+                burdettie_services::config::LogFormat::Logfmt => {
+                    burdettie_log_pipeline::OutputFormat::Logfmt
+                }
+                burdettie_services::config::LogFormat::Text => {
+                    burdettie_log_pipeline::OutputFormat::Text
+                }
+            };
+            burdettie_log_pipeline::init(log_format);
+
             match burdettie_services::ServiceServer::start(&svc_config) {
                 Ok(handle) => {
                     // Update the domain map with the actual bound port

@@ -461,4 +461,213 @@ mod tests {
         free(reply);
         free(request);
     }
+
+    // ── Additional coverage ─────────────────────────────────────
+
+    #[test]
+    fn start_job_via_launch_msg() {
+        let label = unique_label("start");
+        let c_label = std::ffi::CString::new(label.clone()).unwrap();
+        job::submit_job(job::Job::new(&label)).unwrap();
+
+        let request = alloc(LaunchDataType::Dictionary as u32);
+        dict_insert(request, new_string(c_label.as_ptr()), c"StartJob".as_ptr());
+        let reply = launch_msg(request);
+        assert_eq!(get_errno(reply), 0);
+        free(reply);
+        free(request);
+    }
+
+    #[test]
+    fn stop_job_via_launch_msg() {
+        let label = unique_label("stop");
+        let c_label = std::ffi::CString::new(label.clone()).unwrap();
+        job::submit_job(job::Job::new(&label)).unwrap();
+
+        let request = alloc(LaunchDataType::Dictionary as u32);
+        dict_insert(request, new_string(c_label.as_ptr()), c"StopJob".as_ptr());
+        let reply = launch_msg(request);
+        assert_eq!(get_errno(reply), 0);
+        free(reply);
+        free(request);
+    }
+
+    #[test]
+    fn start_nonexistent_job_returns_esrch() {
+        let c_label = std::ffi::CString::new("com.nonexistent.start.42").unwrap();
+        let request = alloc(LaunchDataType::Dictionary as u32);
+        dict_insert(request, new_string(c_label.as_ptr()), c"StartJob".as_ptr());
+        let reply = launch_msg(request);
+        assert_eq!(get_errno(reply), libc::ESRCH);
+        free(reply);
+        free(request);
+    }
+
+    #[test]
+    fn stop_nonexistent_job_returns_esrch() {
+        let c_label = std::ffi::CString::new("com.nonexistent.stop.42").unwrap();
+        let request = alloc(LaunchDataType::Dictionary as u32);
+        dict_insert(request, new_string(c_label.as_ptr()), c"StopJob".as_ptr());
+        let reply = launch_msg(request);
+        assert_eq!(get_errno(reply), libc::ESRCH);
+        free(reply);
+        free(request);
+    }
+
+    #[test]
+    fn get_nonexistent_job_returns_esrch() {
+        let c_label = std::ffi::CString::new("com.nonexistent.get.42").unwrap();
+        let request = alloc(LaunchDataType::Dictionary as u32);
+        dict_insert(request, new_string(c_label.as_ptr()), c"GetJob".as_ptr());
+        let reply = launch_msg(request);
+        assert_eq!(get_errno(reply), libc::ESRCH);
+        free(reply);
+        free(request);
+    }
+
+    #[test]
+    fn remove_nonexistent_job_returns_esrch() {
+        let c_label = std::ffi::CString::new("com.nonexistent.rm.42").unwrap();
+        let request = alloc(LaunchDataType::Dictionary as u32);
+        dict_insert(request, new_string(c_label.as_ptr()), c"RemoveJob".as_ptr());
+        let reply = launch_msg(request);
+        assert_eq!(get_errno(reply), libc::ESRCH);
+        free(reply);
+        free(request);
+    }
+
+    #[test]
+    fn submit_invalid_job_dict_returns_einval() {
+        // Job dict with no Label
+        let job_dict = alloc(LaunchDataType::Dictionary as u32);
+        dict_insert(job_dict, new_string(c"/bin/true".as_ptr()), c"Program".as_ptr());
+
+        let request = alloc(LaunchDataType::Dictionary as u32);
+        dict_insert(request, job_dict, c"SubmitJob".as_ptr());
+        let reply = launch_msg(request);
+        assert_eq!(get_errno(reply), libc::EINVAL);
+        free(reply);
+        free(request);
+    }
+
+    #[test]
+    fn unrecognized_dict_command_returns_enotsup() {
+        let request = alloc(LaunchDataType::Dictionary as u32);
+        dict_insert(request, new_bool(true), c"BogusCommand".as_ptr());
+        let reply = launch_msg(request);
+        assert_eq!(get_errno(reply), libc::ENOTSUP);
+        free(reply);
+        free(request);
+    }
+
+    #[test]
+    fn unrecognized_string_command_returns_enotsup() {
+        let request = new_string(c"BogusStringCmd".as_ptr());
+        let reply = launch_msg(request);
+        assert_eq!(get_errno(reply), libc::ENOTSUP);
+        free(reply);
+        free(request);
+    }
+
+    #[test]
+    fn integer_request_returns_einval() {
+        let request = new_integer(42);
+        let reply = launch_msg(request);
+        assert_eq!(get_errno(reply), libc::EINVAL);
+        free(reply);
+        free(request);
+    }
+
+    #[test]
+    fn shutdown_string_command() {
+        let request = new_string(c"Shutdown".as_ptr());
+        let reply = launch_msg(request);
+        assert_eq!(get_errno(reply), 0);
+        free(reply);
+        free(request);
+    }
+
+    #[test]
+    fn single_user_string_command() {
+        let request = new_string(c"SingleUser".as_ptr());
+        let reply = launch_msg(request);
+        assert_eq!(get_errno(reply), 0);
+        free(reply);
+        free(request);
+    }
+
+    #[test]
+    fn set_user_environment_via_launch_msg() {
+        let env_dict = alloc(LaunchDataType::Dictionary as u32);
+        dict_insert(env_dict, new_string(c"bar".as_ptr()), c"LAUNCHD_TEST_FOO".as_ptr());
+
+        let request = alloc(LaunchDataType::Dictionary as u32);
+        dict_insert(request, env_dict, c"SetUserEnvironment".as_ptr());
+        let reply = launch_msg(request);
+        assert_eq!(get_errno(reply), 0);
+        free(reply);
+        free(request);
+
+        assert_eq!(std::env::var("LAUNCHD_TEST_FOO").as_deref(), Ok("bar"));
+        // Cleanup
+        unsafe { std::env::remove_var("LAUNCHD_TEST_FOO"); }
+    }
+
+    #[test]
+    fn set_user_environment_non_dict_returns_einval() {
+        let request = alloc(LaunchDataType::Dictionary as u32);
+        dict_insert(request, new_string(c"not_a_dict".as_ptr()), c"SetUserEnvironment".as_ptr());
+        let reply = launch_msg(request);
+        assert_eq!(get_errno(reply), libc::EINVAL);
+        free(reply);
+        free(request);
+    }
+
+    #[test]
+    fn unset_user_environment_via_launch_msg() {
+        std::env::set_var("LAUNCHD_TEST_UNSET", "value");
+        let request = alloc(LaunchDataType::Dictionary as u32);
+        dict_insert(request, new_string(c"LAUNCHD_TEST_UNSET".as_ptr()), c"UnsetUserEnvironment".as_ptr());
+        let reply = launch_msg(request);
+        assert_eq!(get_errno(reply), 0);
+        free(reply);
+        free(request);
+        assert!(std::env::var("LAUNCHD_TEST_UNSET").is_err());
+    }
+
+    #[test]
+    fn unset_user_environment_non_string_returns_einval() {
+        let request = alloc(LaunchDataType::Dictionary as u32);
+        dict_insert(request, new_integer(42), c"UnsetUserEnvironment".as_ptr());
+        let reply = launch_msg(request);
+        assert_eq!(get_errno(reply), libc::EINVAL);
+        free(reply);
+        free(request);
+    }
+
+    #[test]
+    fn checkin_with_string_label_via_dict() {
+        let label = unique_label("checkin_dict");
+        let c_label = std::ffi::CString::new(label.clone()).unwrap();
+        job::submit_job(job::Job::new(&label)).unwrap();
+
+        let request = alloc(LaunchDataType::Dictionary as u32);
+        dict_insert(request, new_string(c_label.as_ptr()), c"CheckIn".as_ptr());
+        let reply = launch_msg(request);
+        // Should return the job dict
+        assert_eq!(get_type(reply), LaunchDataType::Dictionary as u32);
+        assert_eq!(dict_get_string_value(reply, "Label").as_deref(), Some(label.as_str()));
+        free(reply);
+        free(request);
+    }
+
+    #[test]
+    fn checkin_nonexistent_returns_esrch() {
+        let request = alloc(LaunchDataType::Dictionary as u32);
+        dict_insert(request, new_string(c"com.nonexistent.checkin.42".as_ptr()), c"CheckIn".as_ptr());
+        let reply = launch_msg(request);
+        assert_eq!(get_errno(reply), libc::ESRCH);
+        free(reply);
+        free(request);
+    }
 }

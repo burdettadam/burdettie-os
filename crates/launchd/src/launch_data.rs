@@ -779,4 +779,353 @@ mod tests {
 
         free(dict);
     }
+
+    // ── Additional coverage ─────────────────────────────────────
+
+    #[test]
+    fn set_machport_and_set_opaque() {
+        let mp = alloc(LaunchDataType::MachPort as u32);
+        assert_eq!(get_machport(mp), 0);
+        assert!(set_machport(mp, 0xABCD));
+        assert_eq!(get_machport(mp), 0xABCD);
+        // Type mismatch
+        assert!(!set_machport(new_integer(0), 1));
+        free(mp);
+
+        let op = alloc(LaunchDataType::Opaque as u32);
+        assert_eq!(get_opaque_size(op), 0);
+        let data = b"\x01\x02\x03";
+        assert!(set_opaque(op, data.as_ptr() as *const libc::c_void, 3));
+        assert_eq!(get_opaque_size(op), 3);
+        let ptr = get_opaque(op) as *const u8;
+        assert_eq!(unsafe { std::slice::from_raw_parts(ptr, 3) }, &[1, 2, 3]);
+        // Type mismatch
+        assert!(!set_opaque(new_integer(0), data.as_ptr() as *const _, 3));
+        free(op);
+    }
+
+    #[test]
+    fn new_string_null_returns_null() {
+        assert!(new_string(std::ptr::null()).is_null());
+    }
+
+    #[test]
+    fn new_opaque_null_with_zero_len() {
+        // null + len=0 is valid: creates empty opaque
+        let o = new_opaque(std::ptr::null(), 0);
+        assert!(!o.is_null());
+        assert_eq!(get_opaque_size(o), 0);
+        free(o);
+    }
+
+    #[test]
+    fn new_opaque_null_with_nonzero_len() {
+        // null + len>0 is invalid
+        assert!(new_opaque(std::ptr::null(), 5).is_null());
+    }
+
+    #[test]
+    fn set_string_null_returns_false() {
+        let s = alloc(LaunchDataType::String as u32);
+        assert!(!set_string(s, std::ptr::null()));
+        free(s);
+    }
+
+    #[test]
+    fn set_opaque_null_with_nonzero_len_returns_false() {
+        let o = alloc(LaunchDataType::Opaque as u32);
+        assert!(!set_opaque(o, std::ptr::null(), 10));
+        free(o);
+    }
+
+    #[test]
+    fn set_opaque_null_with_zero_len_succeeds() {
+        let o = alloc(LaunchDataType::Opaque as u32);
+        assert!(set_opaque(o, std::ptr::null(), 0));
+        assert_eq!(get_opaque_size(o), 0);
+        free(o);
+    }
+
+    #[test]
+    fn nested_dict_in_dict() {
+        let outer = alloc(LaunchDataType::Dictionary as u32);
+        let inner = alloc(LaunchDataType::Dictionary as u32);
+        dict_insert(inner, new_integer(99), c"nested_key".as_ptr());
+        dict_insert(outer, inner, c"child".as_ptr());
+
+        let found = dict_lookup(outer, c"child".as_ptr());
+        assert!(!found.is_null());
+        assert_eq!(get_type(found), LaunchDataType::Dictionary as u32);
+        assert_eq!(get_integer(dict_lookup(found, c"nested_key".as_ptr())), 99);
+        free(outer);
+    }
+
+    #[test]
+    fn array_of_dicts() {
+        let arr = alloc(LaunchDataType::Array as u32);
+        for i in 0..3 {
+            let d = alloc(LaunchDataType::Dictionary as u32);
+            dict_insert(d, new_integer(i as i64), c"val".as_ptr());
+            array_set_index(arr, d, i);
+        }
+        assert_eq!(array_get_count(arr), 3);
+        for i in 0..3 {
+            let elem = array_get_index(arr, i);
+            assert_eq!(get_type(elem), LaunchDataType::Dictionary as u32);
+            assert_eq!(get_integer(dict_lookup(elem, c"val".as_ptr())), i as i64);
+        }
+        free(arr);
+    }
+
+    #[test]
+    fn dict_insert_overwrites_existing_key() {
+        let dict = alloc(LaunchDataType::Dictionary as u32);
+        dict_insert(dict, new_integer(1), c"key".as_ptr());
+        assert_eq!(get_integer(dict_lookup(dict, c"key".as_ptr())), 1);
+        dict_insert(dict, new_integer(2), c"key".as_ptr());
+        assert_eq!(dict_get_count(dict), 1); // still 1 entry
+        assert_eq!(get_integer(dict_lookup(dict, c"key".as_ptr())), 2);
+        free(dict);
+    }
+
+    #[test]
+    fn dict_insert_on_non_dict_returns_false() {
+        let arr = alloc(LaunchDataType::Array as u32);
+        // Trying to dict_insert on an array should fail and not leak
+        let val = new_integer(5);
+        assert!(!dict_insert(arr, val, c"key".as_ptr()));
+        free(val); // caller still owns it
+        free(arr);
+    }
+
+    #[test]
+    fn dict_lookup_missing_key_returns_null() {
+        let dict = alloc(LaunchDataType::Dictionary as u32);
+        assert!(dict_lookup(dict, c"nope".as_ptr()).is_null());
+        free(dict);
+    }
+
+    #[test]
+    fn dict_remove_on_non_dict_returns_false() {
+        let arr = alloc(LaunchDataType::Array as u32);
+        assert!(!dict_remove(arr, c"key".as_ptr()));
+        free(arr);
+    }
+
+    #[test]
+    fn dict_iterate_on_empty_dict() {
+        let dict = alloc(LaunchDataType::Dictionary as u32);
+        static mut CALLED: bool = false;
+        unsafe extern "C" fn cb(_: LaunchDataT, _: *const libc::c_char, _: *mut libc::c_void) {
+            unsafe { CALLED = true; }
+        }
+        unsafe { CALLED = false; }
+        dict_iterate(dict, cb, std::ptr::null_mut());
+        assert!(!unsafe { CALLED });
+        free(dict);
+    }
+
+    #[test]
+    fn dict_iterate_on_non_dict_is_noop() {
+        let arr = alloc(LaunchDataType::Array as u32);
+        static mut CALLED: bool = false;
+        unsafe extern "C" fn cb(_: LaunchDataT, _: *const libc::c_char, _: *mut libc::c_void) {
+            unsafe { CALLED = true; }
+        }
+        unsafe { CALLED = false; }
+        dict_iterate(arr, cb, std::ptr::null_mut());
+        assert!(!unsafe { CALLED });
+        free(arr);
+    }
+
+    #[test]
+    fn array_get_index_out_of_bounds() {
+        let arr = alloc(LaunchDataType::Array as u32);
+        array_set_index(arr, new_integer(1), 0);
+        assert!(array_get_index(arr, 5).is_null());
+        free(arr);
+    }
+
+    #[test]
+    fn array_set_index_on_non_array_returns_false() {
+        let dict = alloc(LaunchDataType::Dictionary as u32);
+        let val = new_integer(10);
+        assert!(!array_set_index(dict, val, 0));
+        free(val);
+        free(dict);
+    }
+
+    #[test]
+    fn array_get_count_on_non_array() {
+        let dict = alloc(LaunchDataType::Dictionary as u32);
+        assert_eq!(array_get_count(dict), 0);
+        free(dict);
+    }
+
+    #[test]
+    fn dict_get_count_on_non_dict() {
+        let arr = alloc(LaunchDataType::Array as u32);
+        assert_eq!(dict_get_count(arr), 0);
+        free(arr);
+    }
+
+    #[test]
+    fn deep_copy_nested_structure() {
+        let outer = alloc(LaunchDataType::Dictionary as u32);
+        let inner_arr = alloc(LaunchDataType::Array as u32);
+        array_set_index(inner_arr, new_string(c"hello".as_ptr()), 0);
+        array_set_index(inner_arr, new_integer(42), 1);
+        let inner_dict = alloc(LaunchDataType::Dictionary as u32);
+        dict_insert(inner_dict, new_bool(true), c"flag".as_ptr());
+        dict_insert(outer, inner_arr, c"arr".as_ptr());
+        dict_insert(outer, inner_dict, c"sub".as_ptr());
+        dict_insert(outer, new_opaque(b"\xDE\xAD".as_ptr() as *const _, 2), c"bin".as_ptr());
+
+        let cloned = copy(outer);
+        assert_eq!(dict_get_count(cloned), 3);
+
+        // Verify nested array survived copy
+        let arr_copy = dict_lookup(cloned, c"arr".as_ptr());
+        assert_eq!(array_get_count(arr_copy), 2);
+        assert_eq!(get_integer(array_get_index(arr_copy, 1)), 42);
+
+        // Verify nested dict survived copy
+        let sub_copy = dict_lookup(cloned, c"sub".as_ptr());
+        assert!(get_bool(dict_lookup(sub_copy, c"flag".as_ptr())));
+
+        // Verify opaque survived copy
+        let bin_copy = dict_lookup(cloned, c"bin".as_ptr());
+        assert_eq!(get_opaque_size(bin_copy), 2);
+
+        // Mutations to original don't affect copy
+        dict_remove(outer, c"arr".as_ptr());
+        assert_eq!(dict_get_count(outer), 2);
+        assert_eq!(dict_get_count(cloned), 3);
+
+        free(outer);
+        free(cloned);
+    }
+
+    #[test]
+    fn dict_from_pairs_helper() {
+        let dict = dict_from_pairs(&[
+            ("name", new_string(c"test".as_ptr())),
+            ("count", new_integer(3)),
+            ("enabled", new_bool(true)),
+        ]);
+        assert_eq!(dict_get_count(dict), 3);
+        assert_eq!(dict_get_string_value(dict, "name").as_deref(), Some("test"));
+        assert_eq!(dict_get_integer_value(dict, "count"), Some(3));
+        assert_eq!(dict_get_bool_value(dict, "enabled"), Some(true));
+        free(dict);
+    }
+
+    #[test]
+    fn dict_get_bool_value_helper() {
+        let dict = alloc(LaunchDataType::Dictionary as u32);
+        dict_insert(dict, new_bool(false), c"off".as_ptr());
+        assert_eq!(dict_get_bool_value(dict, "off"), Some(false));
+        assert!(dict_get_bool_value(dict, "missing").is_none());
+        // Wrong type returns None
+        dict_insert(dict, new_integer(1), c"num".as_ptr());
+        assert!(dict_get_bool_value(dict, "num").is_none());
+        free(dict);
+    }
+
+    #[test]
+    fn machport_alloc_and_get() {
+        let mp = alloc(LaunchDataType::MachPort as u32);
+        assert_eq!(get_type(mp), LaunchDataType::MachPort as u32);
+        assert_eq!(get_machport(mp), 0); // default
+        free(mp);
+    }
+
+    #[test]
+    fn getter_type_mismatches_return_defaults() {
+        let s = new_string(c"text".as_ptr());
+        assert_eq!(get_integer(s), 0);
+        assert_eq!(get_fd(s), -1);
+        assert_eq!(get_machport(s), 0);
+        assert_eq!(get_bool(s), false);
+        assert!((get_real(s) - 0.0).abs() < f64::EPSILON);
+        assert!(get_opaque(s).is_null());
+        assert_eq!(get_opaque_size(s), 0);
+        assert_eq!(get_errno(s), 0);
+        free(s);
+
+        let i = new_integer(42);
+        assert!(get_string(i).is_null());
+        free(i);
+    }
+
+    #[test]
+    fn dict_null_args_safety() {
+        assert!(!dict_insert(LAUNCH_DATA_NULL, new_integer(1), c"k".as_ptr()));
+        let dict = alloc(LaunchDataType::Dictionary as u32);
+        assert!(!dict_insert(dict, LAUNCH_DATA_NULL, c"k".as_ptr()));
+        assert!(!dict_insert(dict, new_integer(1), std::ptr::null()));
+        assert!(dict_lookup(LAUNCH_DATA_NULL, c"k".as_ptr()).is_null());
+        assert!(dict_lookup(dict, std::ptr::null()).is_null());
+        assert!(!dict_remove(LAUNCH_DATA_NULL, c"k".as_ptr()));
+        assert!(!dict_remove(dict, std::ptr::null()));
+        free(dict);
+    }
+
+    #[test]
+    fn array_null_args_safety() {
+        assert!(!array_set_index(LAUNCH_DATA_NULL, new_integer(1), 0));
+        let arr = alloc(LaunchDataType::Array as u32);
+        assert!(!array_set_index(arr, LAUNCH_DATA_NULL, 0));
+        assert!(array_get_index(LAUNCH_DATA_NULL, 0).is_null());
+        free(arr);
+    }
+
+    #[test]
+    fn launch_data_type_from_raw_boundaries() {
+        assert!(LaunchDataType::from_raw(0).is_none());
+        assert_eq!(LaunchDataType::from_raw(1), Some(LaunchDataType::Dictionary));
+        assert_eq!(LaunchDataType::from_raw(10), Some(LaunchDataType::MachPort));
+        assert!(LaunchDataType::from_raw(11).is_none());
+        assert!(LaunchDataType::from_raw(u32::MAX).is_none());
+    }
+
+    #[test]
+    fn large_array() {
+        let arr = alloc(LaunchDataType::Array as u32);
+        for i in 0..100 {
+            array_set_index(arr, new_integer(i as i64), i);
+        }
+        assert_eq!(array_get_count(arr), 100);
+        assert_eq!(get_integer(array_get_index(arr, 0)), 0);
+        assert_eq!(get_integer(array_get_index(arr, 50)), 50);
+        assert_eq!(get_integer(array_get_index(arr, 99)), 99);
+        free(arr);
+    }
+
+    #[test]
+    fn large_dict() {
+        let dict = alloc(LaunchDataType::Dictionary as u32);
+        for i in 0..100 {
+            let key = CString::new(format!("key_{}", i)).unwrap();
+            dict_insert(dict, new_integer(i as i64), key.as_ptr());
+        }
+        assert_eq!(dict_get_count(dict), 100);
+        assert_eq!(dict_get_integer_value(dict, "key_0"), Some(0));
+        assert_eq!(dict_get_integer_value(dict, "key_99"), Some(99));
+        free(dict);
+    }
+
+    #[test]
+    fn errno_value_preservation() {
+        // Errno values can be set by creating a new Errno type and mutating
+        let d = alloc(LaunchDataType::Errno as u32);
+        assert_eq!(get_errno(d), 0);
+        // Mutate via raw pointer (simulating how launch_msg builds replies)
+        unsafe {
+            let data = &mut *d;
+            *data = LaunchData::Errno(libc::ENOENT);
+        }
+        assert_eq!(get_errno(d), libc::ENOENT);
+        free(d);
+    }
 }

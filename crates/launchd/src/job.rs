@@ -507,4 +507,469 @@ mod tests {
         free(dict);
         free(dict2);
     }
+
+    // ── from_launch_data edge cases ──────────────────────────────
+
+    #[test]
+    fn from_launch_data_missing_label_returns_none() {
+        use crate::launch_data::*;
+        let dict = alloc(LaunchDataType::Dictionary as u32);
+        // No Label key — should return None
+        assert!(Job::from_launch_data(dict).is_none());
+        free(dict);
+    }
+
+    #[test]
+    fn from_launch_data_null_returns_none() {
+        assert!(Job::from_launch_data(std::ptr::null_mut()).is_none());
+    }
+
+    #[test]
+    fn from_launch_data_non_dict_returns_none() {
+        use crate::launch_data::*;
+        // An integer handle is not a dict
+        let int_handle = new_integer(42);
+        assert!(Job::from_launch_data(int_handle).is_none());
+        free(int_handle);
+    }
+
+    #[test]
+    fn from_launch_data_with_environment_variables() {
+        use crate::launch_data::*;
+        use crate::constants::*;
+
+        let dict = alloc(LaunchDataType::Dictionary as u32);
+        dict_insert(
+            dict,
+            new_string(std::ffi::CString::new("com.test.env").unwrap().as_ptr()),
+            std::ffi::CString::new(LAUNCH_JOBKEY_LABEL).unwrap().as_ptr(),
+        );
+
+        let env = alloc(LaunchDataType::Dictionary as u32);
+        dict_insert(
+            env,
+            new_string(std::ffi::CString::new("/usr/local/bin").unwrap().as_ptr()),
+            std::ffi::CString::new("PATH").unwrap().as_ptr(),
+        );
+        dict_insert(
+            env,
+            new_string(std::ffi::CString::new("/tmp").unwrap().as_ptr()),
+            std::ffi::CString::new("TMPDIR").unwrap().as_ptr(),
+        );
+        dict_insert(
+            dict,
+            env,
+            std::ffi::CString::new(LAUNCH_JOBKEY_ENVIRONMENTVARIABLES).unwrap().as_ptr(),
+        );
+
+        let job = Job::from_launch_data(dict).unwrap();
+        assert_eq!(job.environment.len(), 2);
+        assert_eq!(job.environment.get("PATH").unwrap(), "/usr/local/bin");
+        assert_eq!(job.environment.get("TMPDIR").unwrap(), "/tmp");
+        free(dict);
+    }
+
+    #[test]
+    fn from_launch_data_with_mach_services() {
+        use crate::launch_data::*;
+        use crate::constants::*;
+
+        let dict = alloc(LaunchDataType::Dictionary as u32);
+        dict_insert(
+            dict,
+            new_string(std::ffi::CString::new("com.test.mach").unwrap().as_ptr()),
+            std::ffi::CString::new(LAUNCH_JOBKEY_LABEL).unwrap().as_ptr(),
+        );
+
+        let mach = alloc(LaunchDataType::Dictionary as u32);
+        dict_insert(
+            mach,
+            new_bool(true),
+            std::ffi::CString::new("com.test.mach.port").unwrap().as_ptr(),
+        );
+        dict_insert(
+            mach,
+            new_bool(true),
+            std::ffi::CString::new("com.test.mach.other").unwrap().as_ptr(),
+        );
+        dict_insert(
+            dict,
+            mach,
+            std::ffi::CString::new(LAUNCH_JOBKEY_MACHSERVICES).unwrap().as_ptr(),
+        );
+
+        let job = Job::from_launch_data(dict).unwrap();
+        assert_eq!(job.mach_services.len(), 2);
+        // All ports start as 0 (not yet checked in)
+        assert_eq!(job.mach_services.get("com.test.mach.port"), Some(&0));
+        assert_eq!(job.mach_services.get("com.test.mach.other"), Some(&0));
+        free(dict);
+    }
+
+    #[test]
+    fn from_launch_data_keepalive_bool() {
+        use crate::launch_data::*;
+        use crate::constants::*;
+
+        let dict = alloc(LaunchDataType::Dictionary as u32);
+        dict_insert(
+            dict,
+            new_string(std::ffi::CString::new("com.test.ka.bool").unwrap().as_ptr()),
+            std::ffi::CString::new(LAUNCH_JOBKEY_LABEL).unwrap().as_ptr(),
+        );
+        dict_insert(
+            dict,
+            new_bool(true),
+            std::ffi::CString::new(LAUNCH_JOBKEY_KEEPALIVE).unwrap().as_ptr(),
+        );
+
+        let job = Job::from_launch_data(dict).unwrap();
+        assert!(job.keep_alive);
+        free(dict);
+    }
+
+    #[test]
+    fn from_launch_data_keepalive_dict() {
+        use crate::launch_data::*;
+        use crate::constants::*;
+
+        let dict = alloc(LaunchDataType::Dictionary as u32);
+        dict_insert(
+            dict,
+            new_string(std::ffi::CString::new("com.test.ka.dict").unwrap().as_ptr()),
+            std::ffi::CString::new(LAUNCH_JOBKEY_LABEL).unwrap().as_ptr(),
+        );
+        let ka = alloc(LaunchDataType::Dictionary as u32);
+        dict_insert(
+            ka,
+            new_bool(true),
+            std::ffi::CString::new("SuccessfulExit").unwrap().as_ptr(),
+        );
+        dict_insert(
+            dict,
+            ka,
+            std::ffi::CString::new(LAUNCH_JOBKEY_KEEPALIVE).unwrap().as_ptr(),
+        );
+
+        let job = Job::from_launch_data(dict).unwrap();
+        assert!(job.keep_alive); // non-empty dict → true
+        free(dict);
+    }
+
+    #[test]
+    fn from_launch_data_keepalive_empty_dict() {
+        use crate::launch_data::*;
+        use crate::constants::*;
+
+        let dict = alloc(LaunchDataType::Dictionary as u32);
+        dict_insert(
+            dict,
+            new_string(std::ffi::CString::new("com.test.ka.empty").unwrap().as_ptr()),
+            std::ffi::CString::new(LAUNCH_JOBKEY_LABEL).unwrap().as_ptr(),
+        );
+        let ka = alloc(LaunchDataType::Dictionary as u32);
+        // Empty dict → keep_alive stays false
+        dict_insert(
+            dict,
+            ka,
+            std::ffi::CString::new(LAUNCH_JOBKEY_KEEPALIVE).unwrap().as_ptr(),
+        );
+
+        let job = Job::from_launch_data(dict).unwrap();
+        assert!(!job.keep_alive);
+        free(dict);
+    }
+
+    #[test]
+    fn from_launch_data_start_interval() {
+        use crate::launch_data::*;
+        use crate::constants::*;
+
+        let dict = alloc(LaunchDataType::Dictionary as u32);
+        dict_insert(
+            dict,
+            new_string(std::ffi::CString::new("com.test.interval").unwrap().as_ptr()),
+            std::ffi::CString::new(LAUNCH_JOBKEY_LABEL).unwrap().as_ptr(),
+        );
+        dict_insert(
+            dict,
+            new_integer(300),
+            std::ffi::CString::new(LAUNCH_JOBKEY_STARTINTERVAL).unwrap().as_ptr(),
+        );
+
+        let job = Job::from_launch_data(dict).unwrap();
+        assert_eq!(job.start_interval, 300);
+        free(dict);
+    }
+
+    #[test]
+    fn from_launch_data_negative_start_interval_clamps_to_zero() {
+        use crate::launch_data::*;
+        use crate::constants::*;
+
+        let dict = alloc(LaunchDataType::Dictionary as u32);
+        dict_insert(
+            dict,
+            new_string(std::ffi::CString::new("com.test.neg").unwrap().as_ptr()),
+            std::ffi::CString::new(LAUNCH_JOBKEY_LABEL).unwrap().as_ptr(),
+        );
+        dict_insert(
+            dict,
+            new_integer(-5),
+            std::ffi::CString::new(LAUNCH_JOBKEY_STARTINTERVAL).unwrap().as_ptr(),
+        );
+
+        let job = Job::from_launch_data(dict).unwrap();
+        assert_eq!(job.start_interval, 0); // clamped via .max(0)
+        free(dict);
+    }
+
+    #[test]
+    fn from_launch_data_all_string_fields() {
+        use crate::launch_data::*;
+        use crate::constants::*;
+
+        let dict = alloc(LaunchDataType::Dictionary as u32);
+
+        let mk = |s: &str| std::ffi::CString::new(s).unwrap();
+
+        dict_insert(dict, new_string(mk("com.test.paths").as_ptr()),
+            mk(LAUNCH_JOBKEY_LABEL).as_ptr());
+        dict_insert(dict, new_string(mk("/bin/ls").as_ptr()),
+            mk(LAUNCH_JOBKEY_PROGRAM).as_ptr());
+        dict_insert(dict, new_string(mk("/tmp").as_ptr()),
+            mk(LAUNCH_JOBKEY_WORKINGDIRECTORY).as_ptr());
+        dict_insert(dict, new_string(mk("/var/log/out.log").as_ptr()),
+            mk(LAUNCH_JOBKEY_STANDARDOUTPATH).as_ptr());
+        dict_insert(dict, new_string(mk("/var/log/err.log").as_ptr()),
+            mk(LAUNCH_JOBKEY_STANDARDERRORPATH).as_ptr());
+        dict_insert(dict, new_string(mk("/dev/null").as_ptr()),
+            mk(LAUNCH_JOBKEY_STANDARDINPATH).as_ptr());
+        dict_insert(dict, new_string(mk("Interactive").as_ptr()),
+            mk(LAUNCH_JOBKEY_PROCESSTYPE).as_ptr());
+        dict_insert(dict, new_bool(true),
+            mk(LAUNCH_JOBKEY_DISABLED).as_ptr());
+        dict_insert(dict, new_bool(true),
+            mk(LAUNCH_JOBKEY_ENABLETRANSACTIONS).as_ptr());
+
+        let job = Job::from_launch_data(dict).unwrap();
+        assert_eq!(job.program.as_deref(), Some("/bin/ls"));
+        assert_eq!(job.working_directory.as_deref(), Some("/tmp"));
+        assert_eq!(job.stdout_path.as_deref(), Some("/var/log/out.log"));
+        assert_eq!(job.stderr_path.as_deref(), Some("/var/log/err.log"));
+        assert_eq!(job.stdin_path.as_deref(), Some("/dev/null"));
+        assert_eq!(job.process_type.as_deref(), Some("Interactive"));
+        assert!(job.disabled);
+        assert!(job.transactions_enabled);
+        free(dict);
+    }
+
+    // ── to_launch_data ───────────────────────────────────────────
+
+    #[test]
+    fn to_launch_data_includes_pid_when_nonzero() {
+        use crate::launch_data::*;
+        use crate::constants::*;
+
+        let mut job = Job::new("com.test.to_ld.pid");
+        job.pid = 9876;
+        let dict = job.to_launch_data();
+        let pid_val = dict_get_integer_value(dict, LAUNCH_JOBKEY_PID);
+        assert_eq!(pid_val, Some(9876));
+        free(dict);
+    }
+
+    #[test]
+    fn to_launch_data_omits_pid_when_zero() {
+        use crate::launch_data::*;
+        use crate::constants::*;
+
+        let job = Job::new("com.test.to_ld.nopid");
+        let dict = job.to_launch_data();
+        // PID key should not be present
+        let c_key = std::ffi::CString::new(LAUNCH_JOBKEY_PID).unwrap();
+        let val = dict_lookup(dict, c_key.as_ptr());
+        assert!(val.is_null());
+        free(dict);
+    }
+
+    #[test]
+    fn to_launch_data_includes_program_arguments() {
+        use crate::launch_data::*;
+        use crate::constants::*;
+
+        let mut job = Job::new("com.test.to_ld.args");
+        job.program_arguments = vec!["ls".into(), "-la".into(), "/tmp".into()];
+        let dict = job.to_launch_data();
+
+        let c_key = std::ffi::CString::new(LAUNCH_JOBKEY_PROGRAMARGUMENTS).unwrap();
+        let arr = dict_lookup(dict, c_key.as_ptr());
+        assert!(!arr.is_null());
+        assert_eq!(get_type(arr), LaunchDataType::Array as u32);
+        assert_eq!(array_get_count(arr), 3);
+
+        let get_str = |idx: usize| -> String {
+            let elem = array_get_index(arr, idx);
+            let s = get_string(elem);
+            unsafe { std::ffi::CStr::from_ptr(s) }.to_str().unwrap().to_string()
+        };
+        assert_eq!(get_str(0), "ls");
+        assert_eq!(get_str(1), "-la");
+        assert_eq!(get_str(2), "/tmp");
+
+        free(dict);
+    }
+
+    #[test]
+    fn to_launch_data_omits_empty_program_arguments() {
+        use crate::launch_data::*;
+        use crate::constants::*;
+
+        let job = Job::new("com.test.to_ld.noargs");
+        let dict = job.to_launch_data();
+        let c_key = std::ffi::CString::new(LAUNCH_JOBKEY_PROGRAMARGUMENTS).unwrap();
+        let val = dict_lookup(dict, c_key.as_ptr());
+        assert!(val.is_null());
+        free(dict);
+    }
+
+    #[test]
+    fn to_launch_data_last_exit_status() {
+        use crate::launch_data::*;
+        use crate::constants::*;
+
+        let mut job = Job::new("com.test.to_ld.exit");
+        job.last_exit_status = -1;
+        let dict = job.to_launch_data();
+        let val = dict_get_integer_value(dict, LAUNCH_JOBKEY_LASTEXITSTATUS);
+        assert_eq!(val, Some(-1));
+        free(dict);
+    }
+
+    // ── Registry edge cases ──────────────────────────────────────
+
+    #[test]
+    fn checkin_nonexistent_returns_none() {
+        assert!(checkin("com.nonexistent.label.xyz").is_none());
+    }
+
+    #[test]
+    fn set_pid_on_nonexistent_label_is_noop() {
+        set_job_pid("com.no.such.label.pid", 1234);
+        // No panic, no error — silent no-op
+    }
+
+    #[test]
+    fn set_exit_status_on_nonexistent_label_is_noop() {
+        set_job_exit_status("com.no.such.label.exit", 42);
+    }
+
+    #[test]
+    fn register_mach_service_on_nonexistent_label_is_noop() {
+        register_mach_service("com.no.such.label.mach", "com.test.svc", 0x1234);
+    }
+
+    #[test]
+    fn look_up_mach_service_not_found() {
+        assert!(look_up_mach_service("com.definitely.not.registered.ever").is_none());
+    }
+
+    #[test]
+    fn mach_service_port_zero_not_returned() {
+        let label = unique_label("zero");
+        let svc = format!("{}.svc", label);
+        let mut job = Job::new(&label);
+        job.mach_services.insert(svc.clone(), 0);
+        submit_job(job).unwrap();
+
+        // Port 0 means not yet checked in — look_up should return None
+        assert!(look_up_mach_service(&svc).is_none());
+    }
+
+    #[test]
+    fn multiple_jobs_mach_service_lookup() {
+        let l1 = unique_label("multi1");
+        let l2 = unique_label("multi2");
+        let svc1 = format!("{}.port", l1);
+        let svc2 = format!("{}.port", l2);
+
+        let mut j1 = Job::new(&l1);
+        j1.mach_services.insert(svc1.clone(), 0);
+        submit_job(j1).unwrap();
+        register_mach_service(&l1, &svc1, 0x100);
+
+        let mut j2 = Job::new(&l2);
+        j2.mach_services.insert(svc2.clone(), 0);
+        submit_job(j2).unwrap();
+        register_mach_service(&l2, &svc2, 0x200);
+
+        assert_eq!(look_up_mach_service(&svc1), Some(0x100));
+        assert_eq!(look_up_mach_service(&svc2), Some(0x200));
+    }
+
+    #[test]
+    fn exit_status_clears_pid() {
+        let label = unique_label("exitpid");
+        submit_job(Job::new(&label)).unwrap();
+        set_job_pid(&label, 5555);
+        assert_eq!(get_job(&label).unwrap().pid, 5555);
+
+        set_job_exit_status(&label, 1);
+        let j = get_job(&label).unwrap();
+        assert_eq!(j.pid, 0); // pid cleared
+        assert_eq!(j.last_exit_status, 1);
+    }
+
+    #[test]
+    fn job_new_defaults() {
+        let j = Job::new("com.test.defaults");
+        assert_eq!(j.label, "com.test.defaults");
+        assert!(j.program.is_none());
+        assert!(j.program_arguments.is_empty());
+        assert!(j.environment.is_empty());
+        assert!(j.working_directory.is_none());
+        assert!(!j.disabled);
+        assert!(!j.run_at_load);
+        assert!(!j.keep_alive);
+        assert!(j.mach_services.is_empty());
+        assert!(j.sockets.is_empty());
+        assert_eq!(j.pid, 0);
+        assert_eq!(j.last_exit_status, 0);
+        assert_eq!(j.start_interval, 0);
+        assert_eq!(j.idle_timeout, 0);
+        assert!(!j.transactions_enabled);
+        assert!(j.process_type.is_none());
+        assert!(j.stdout_path.is_none());
+        assert!(j.stderr_path.is_none());
+        assert!(j.stdin_path.is_none());
+    }
+
+    #[test]
+    fn concurrent_submit_and_lookup() {
+        use std::sync::Arc;
+        use std::thread;
+
+        let labels: Vec<String> = (0..20).map(|_| unique_label("conc")).collect();
+        let labels = Arc::new(labels);
+
+        let handles: Vec<_> = (0..4)
+            .map(|t| {
+                let labels = labels.clone();
+                thread::spawn(move || {
+                    for i in 0..5 {
+                        let idx = t * 5 + i;
+                        let _ = submit_job(Job::new(&labels[idx]));
+                    }
+                })
+            })
+            .collect();
+
+        for h in handles {
+            h.join().unwrap();
+        }
+
+        for label in labels.iter() {
+            assert!(get_job(label).is_some(), "missing job: {}", label);
+        }
+    }
 }

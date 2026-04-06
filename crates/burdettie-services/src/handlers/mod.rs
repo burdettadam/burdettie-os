@@ -5,6 +5,11 @@ pub mod captive;
 pub mod device;
 pub mod swupdate;
 pub mod certs;
+pub mod xcode;
+pub mod auth;
+pub mod config;
+pub mod dns;
+pub mod notarize;
 pub mod catchall;
 
 use tiny_http::{Request, Response};

@@ -140,20 +140,25 @@ crates/burdettie-domain-map/
 │   └── sandbox.rs      # Network namespace / iptables isolation (Linux)
 ```
 
-### 3.3 `burdettie-log-pipeline` — Unified Logging
+### 3.3 `burdettie-log-pipeline` — Unified Logging ✅ IMPLEMENTED
 
-Replace the current `os_log → log::debug!()` passthrough with a structured pipeline.
+Structured os_log pipeline replacing `log::debug!()` passthrough.
 
 ```
 crates/burdettie-log-pipeline/
 ├── Cargo.toml  
 ├── src/
-│   ├── lib.rs           # Pipeline init, shared sink
-│   ├── collector.rs     # Receives os_log events (subsystem, category, level, msg)
-│   ├── formatter.rs     # Structured output (JSON lines, logfmt, Apple .tracev3)
-│   ├── sink.rs          # Output targets: file, HTTP POST, stdout
-│   └── query.rs         # log show / log stream equivalent for querying stored logs
+│   ├── lib.rs           # Pipeline init, emit(), drain_events(), event_count()
+│   ├── collector.rs     # Global Collector with LogEvent, LogLevel, 10K buffer
+│   └── formatter.rs     # JSON/logfmt/text formatters (OutputFormat enum)
 ```
+
+**Key features:**
+- `os_log_create` now returns unique handles tracking (subsystem, category)
+- `_os_log_impl` routes through pipeline with full metadata
+- Events buffered in memory (10K cap) + simultaneously emitted via `log` crate
+- `drain_events()` for periodic flush to external store
+- Pipeline initialized from `ServiceConfig.log_format` in pipeline_native.rs
 
 ## 4. Integration Points — What Changes in Existing Code
 
@@ -315,6 +320,11 @@ CREATE TABLE requests (
     -- DNS fields
     dns_query TEXT,
     dns_resolved TEXT,             -- JSON array of addresses
+    -- os_log fields
+    log_subsystem TEXT,            -- e.g. "com.apple.dt.instruments"
+    log_category TEXT,             -- e.g. "default"
+    log_level TEXT,                -- default/info/debug/error/fault
+    log_message TEXT,
     -- Metadata
     guest_binary TEXT,             -- which Mach-O tool made this request
     duration_ms INTEGER
@@ -355,24 +365,41 @@ during development).
 
 ## 8. Implementation Phases
 
-### Phase 1: Foundation (MVP)
-1. Create `burdettie-domain-map` crate with Apple domain table + URL rewriter
-2. Create `burdettie-services` crate with `tiny_http` server skeleton
-3. Wire `perform_http_request()` to domain rewriter
-4. Implement request recording to SQLite
-5. Add `/api/v1/telemetry/xp` handler (accept + store — primary phone-home)
-6. Add `/api/v1/network/captive` handler (return `<HTML><BODY>Success</BODY></HTML>`)
-7. Add `/api/v1/device/activate` handler (return success plist)
-8. Add `BURDETTIE_*` env vars for config
-9. Tests: verify Apple domains rewrite, verify requests hit local server
+### Phase 1: Foundation (MVP) ✅ COMPLETE
+1. ✅ Create `burdettie-domain-map` crate with Apple domain table + URL rewriter
+2. ✅ Create `burdettie-services` crate with `tiny_http` server skeleton
+3. ✅ Wire `perform_http_request()` to domain rewriter
+4. ✅ Implement request recording to SQLite
+5. ✅ Add `/api/v1/telemetry/xp` handler (accept + store — primary phone-home)
+6. ✅ Add `/api/v1/network/captive` handler (return `<HTML><BODY>Success</BODY></HTML>`)
+7. ✅ Add `/api/v1/device/activate` handler (return success plist)
+8. ✅ Add `BURDETTIE_*` env vars for config
+9. ✅ Tests: 10 domain-map + 3 services + 2743 cf-lite = 2756 pass
 
-### Phase 2: XPC Daemons + Logging
-1. Register BurdettieOS pipe handlers for `com.apple.analyticsd`, `diagnosticd`, etc.
-2. Implement structured os_log pipeline with JSON output
-3. Add file and HTTP log sinks
-4. XPC request recording to same SQLite store
-5. Add `/api/v1/swupdate/scan` with minimal valid catalog plist
-6. Add `/api/v1/xcode/devimages` for Xcode component metadata
+### Phase 2: XPC Daemons + Logging ✅ COMPLETE
+1. ✅ Register BurdettieOS pipe handlers for 8 Apple daemons:
+   - `com.apple.analyticsd` — accepts analytics submissions
+   - `com.apple.diagnosticd` — accepts diagnostic reports
+   - `com.apple.symptomsd` — network symptom tracking (healthy status)
+   - `com.apple.lsd` — Launch Services UTI lookups (empty results)
+   - `com.apple.coreservices.quarantine` — reports not quarantined
+   - `com.apple.cfprefsd.daemon` / `.agent` — preferences sync (success)
+   - `com.apple.pluginkit.pkd` — plugin discovery (empty list)
+2. ✅ Create `burdettie-log-pipeline` crate — structured os_log pipeline
+   - `LogEvent` with subsystem, category, level, message, sequence, timestamp
+   - JSON / logfmt / text output formatters
+   - Global collector with 10K event buffer + drain API
+   - os_log_create tracks handle → (subsystem, category) mapping
+   - _os_log_impl routes through pipeline with full metadata
+3. ✅ Log pipeline initialized from ServiceConfig.log_format in pipeline_native.rs
+4. ✅ os_log recording to SQLite (new columns: log_subsystem, log_category, log_level, log_message)
+5. ✅ XPC activity recorded through log pipeline AND SQLite (global_recorder)
+6. ✅ Enhanced `/api/v1/swupdate/scan` with IndexDate + `/api/v1/config` endpoint
+7. ✅ Enhanced `/api/v1/xcode/devimages` with sdks/version fields + component list
+8. ✅ TOML config file support (burdettie.toml with services/logging/domain_rewrite sections)
+9. ✅ Additional handlers: `/api/v1/auth/*` (401), `/api/v1/dns/resolve` (DoH sandbox),
+   `/api/v1/notarize` (ticket validation), `/api/v1/xcode/download` (404 not-available)
+10. ✅ Tests: 7 log-pipeline + 10 domain-map + 6 services + 333 libsystem-shims + 2750 cf-lite
 
 ### Phase 3: Protocol Fidelity
 1. Analyze recorded requests to understand Apple's actual protocol format

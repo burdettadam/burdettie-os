@@ -13,6 +13,7 @@ serde                = { workspace = true }
 serde_json           = { workspace = true }
 rusqlite             = { workspace = true }
 plist                = { workspace = true }
+toml                 = { workspace = true }
 tiny_http            = "0.12"
 
 [dev-dependencies]

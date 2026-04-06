@@ -565,4 +565,321 @@ mod tests {
         assert_eq!(count, 2);
         assert!(!condemned);
     }
+
+    // ── Additional coverage ─────────────────────────────────────
+
+    #[test]
+    fn handle_based_standby() {
+        let h1 = vproc_standby_begin(std::ptr::null_mut());
+        assert!(!h1.is_null());
+        let h2 = vproc_standby_begin(std::ptr::null_mut());
+        // Two outstanding standbys
+        assert!(_vproc_standby_count() >= 2);
+        vproc_standby_end(std::ptr::null_mut(), h1);
+        vproc_standby_end(std::ptr::null_mut(), h2);
+    }
+
+    #[test]
+    fn swap_integer_all_readable_keys() {
+        // Read all GSK keys that have meaningful values
+        for key in [
+            VprocGsk::LastExitStatus,
+            VprocGsk::GlobalOnDemand,
+            VprocGsk::MgrUid,
+            VprocGsk::MgrPid,
+            VprocGsk::IsManaged,
+            VprocGsk::IdleTimeout,
+            VprocGsk::ExitTimeout,
+            VprocGsk::TransactionsEnabled,
+        ] {
+            let mut out: i64 = -999;
+            let r = vproc_swap_integer(
+                std::ptr::null_mut(),
+                key as u32,
+                std::ptr::null(),
+                &mut out,
+            );
+            assert!(r.is_null(), "swap_integer({:?}) should succeed", key);
+            // We just verify it doesn't crash and returns *some* value
+        }
+    }
+
+    #[test]
+    fn swap_integer_invalid_key() {
+        let mut out: i64 = 0;
+        let r = vproc_swap_integer(
+            std::ptr::null_mut(),
+            999, // invalid key
+            std::ptr::null(),
+            &mut out,
+        );
+        assert!(!r.is_null()); // error
+    }
+
+    #[test]
+    fn swap_integer_write_global_on_demand() {
+        let val: i64 = 0; // off
+        let r = vproc_swap_integer(
+            std::ptr::null_mut(),
+            VprocGsk::GlobalOnDemand as u32,
+            &val,
+            std::ptr::null_mut(),
+        );
+        assert!(r.is_null());
+
+        let mut out: i64 = -1;
+        vproc_swap_integer(
+            std::ptr::null_mut(),
+            VprocGsk::GlobalOnDemand as u32,
+            std::ptr::null(),
+            &mut out,
+        );
+        assert_eq!(out, 0);
+
+        // Restore
+        let val: i64 = 1;
+        vproc_swap_integer(
+            std::ptr::null_mut(),
+            VprocGsk::GlobalOnDemand as u32,
+            &val,
+            std::ptr::null_mut(),
+        );
+    }
+
+    #[test]
+    fn swap_integer_write_exit_timeout() {
+        let val: i64 = 60;
+        vproc_swap_integer(
+            std::ptr::null_mut(),
+            VprocGsk::ExitTimeout as u32,
+            &val,
+            std::ptr::null_mut(),
+        );
+        let mut out: i64 = 0;
+        vproc_swap_integer(
+            std::ptr::null_mut(),
+            VprocGsk::ExitTimeout as u32,
+            std::ptr::null(),
+            &mut out,
+        );
+        assert_eq!(out, 60);
+    }
+
+    #[test]
+    fn swap_integer_write_transactions_enabled() {
+        let val: i64 = 1;
+        vproc_swap_integer(
+            std::ptr::null_mut(),
+            VprocGsk::TransactionsEnabled as u32,
+            &val,
+            std::ptr::null_mut(),
+        );
+        let mut out: i64 = 0;
+        vproc_swap_integer(
+            std::ptr::null_mut(),
+            VprocGsk::TransactionsEnabled as u32,
+            std::ptr::null(),
+            &mut out,
+        );
+        assert_eq!(out, 1);
+    }
+
+    #[test]
+    fn swap_integer_read_only_keys_ignore_writes() {
+        // MgrUid and MgrPid are read-only; writes are no-ops
+        let mut original: i64 = 0;
+        vproc_swap_integer(
+            std::ptr::null_mut(),
+            VprocGsk::MgrUid as u32,
+            std::ptr::null(),
+            &mut original,
+        );
+        let val: i64 = 9999;
+        vproc_swap_integer(
+            std::ptr::null_mut(),
+            VprocGsk::MgrUid as u32,
+            &val,
+            std::ptr::null_mut(),
+        );
+        let mut after: i64 = 0;
+        vproc_swap_integer(
+            std::ptr::null_mut(),
+            VprocGsk::MgrUid as u32,
+            std::ptr::null(),
+            &mut after,
+        );
+        assert_eq!(after, original); // unchanged
+    }
+
+    #[test]
+    fn swap_string_non_mgr_name_key_returns_error() {
+        let mut outstr: *mut libc::c_char = std::ptr::null_mut();
+        let r = vproc_swap_string(
+            std::ptr::null_mut(),
+            VprocGsk::LastExitStatus as u32, // not MgrName
+            std::ptr::null(),
+            &mut outstr,
+        );
+        assert!(!r.is_null()); // error
+    }
+
+    #[test]
+    fn swap_string_null_outstr() {
+        // Should succeed without crashing even if outstr is null
+        let r = vproc_swap_string(
+            std::ptr::null_mut(),
+            VprocGsk::MgrName as u32,
+            std::ptr::null(),
+            std::ptr::null_mut(),
+        );
+        assert!(r.is_null()); // success
+    }
+
+    #[test]
+    fn swap_complex_environment() {
+        let mut outval: crate::launch_data::LaunchDataT = crate::launch_data::LAUNCH_DATA_NULL;
+        let r = vproc_swap_complex(
+            std::ptr::null_mut(),
+            VprocGsk::Environment as u32,
+            crate::launch_data::LAUNCH_DATA_NULL,
+            &mut outval,
+        );
+        assert!(r.is_null()); // success
+        assert!(!outval.is_null());
+        assert_eq!(
+            crate::launch_data::get_type(outval),
+            crate::launch_data::LaunchDataType::Dictionary as u32
+        );
+        // Should contain at least PATH (most environments have it)
+        let count = crate::launch_data::dict_get_count(outval);
+        assert!(count > 0, "environment should have at least one variable");
+        crate::launch_data::free(outval);
+    }
+
+    #[test]
+    fn swap_complex_all_jobs() {
+        let mut outval: crate::launch_data::LaunchDataT = crate::launch_data::LAUNCH_DATA_NULL;
+        let r = vproc_swap_complex(
+            std::ptr::null_mut(),
+            VprocGsk::AllJobs as u32,
+            crate::launch_data::LAUNCH_DATA_NULL,
+            &mut outval,
+        );
+        assert!(r.is_null()); // success
+        assert!(!outval.is_null());
+        assert_eq!(
+            crate::launch_data::get_type(outval),
+            crate::launch_data::LaunchDataType::Dictionary as u32
+        );
+        crate::launch_data::free(outval);
+    }
+
+    #[test]
+    fn swap_complex_invalid_key() {
+        let mut outval: crate::launch_data::LaunchDataT = crate::launch_data::LAUNCH_DATA_NULL;
+        let r = vproc_swap_complex(
+            std::ptr::null_mut(),
+            VprocGsk::LastExitStatus as u32, // only Environment and AllJobs supported
+            crate::launch_data::LAUNCH_DATA_NULL,
+            &mut outval,
+        );
+        assert!(!r.is_null()); // error
+    }
+
+    #[test]
+    fn get_last_exit_status_null_ptr() {
+        let r = _vproc_get_last_exit_status(std::ptr::null_mut());
+        assert!(!r.is_null()); // error
+    }
+
+    #[test]
+    fn set_global_on_demand_returns_success() {
+        let r = _vproc_set_global_on_demand(true);
+        assert!(r.is_null()); // success
+    }
+
+    #[test]
+    fn send_signal_by_label_null_returns_error() {
+        let r = _vproc_send_signal_by_label(std::ptr::null(), 15);
+        assert!(!r.is_null());
+    }
+
+    #[test]
+    fn send_signal_by_label_valid() {
+        let r = _vproc_send_signal_by_label(c"com.test.svc".as_ptr(), libc::SIGTERM);
+        assert!(r.is_null()); // success
+    }
+
+    #[test]
+    fn kickstart_by_label_returns_error() {
+        // Not supported in emulation
+        let r = _vproc_kickstart_by_label(
+            c"com.test.svc".as_ptr(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            0,
+        );
+        assert!(!r.is_null());
+    }
+
+    #[test]
+    fn standby_timeout_is_zero() {
+        assert_eq!(_vproc_standby_timeout(), 0);
+    }
+
+    #[test]
+    fn vprocmgr_session_functions_succeed() {
+        assert!(_vprocmgr_move_subset_to_user(501, c"Aqua".as_ptr(), 0).is_null());
+        assert!(_vprocmgr_switch_to_session(c"Background".as_ptr(), 0).is_null());
+        assert!(_vprocmgr_detach_from_console(0).is_null());
+    }
+
+    #[test]
+    fn set_last_exit_status_helper() {
+        set_last_exit_status(42);
+        let mut wstatus: i32 = 0;
+        _vproc_get_last_exit_status(&mut wstatus);
+        assert_eq!(wstatus, 42);
+        set_last_exit_status(0); // cleanup
+    }
+
+    #[test]
+    fn vproc_retain_release_identity() {
+        let vp = 0x1234usize as VprocT;
+        let retained = vproc_retain(vp);
+        assert_eq!(retained, vp);
+        vproc_release(vp); // no-op, shouldn't crash
+    }
+
+    #[test]
+    fn gsk_from_raw_boundaries() {
+        assert!(gsk_from_raw(0).is_some()); // VprocGsk starts at 0
+        assert!(gsk_from_raw(26).is_some()); // EmbeddedRootEquivalent
+        assert!(gsk_from_raw(27).is_none()); // out of range
+        assert!(gsk_from_raw(u32::MAX).is_none());
+    }
+
+    #[test]
+    fn concurrent_transaction_tracking() {
+        use std::sync::Arc;
+        let barrier = Arc::new(std::sync::Barrier::new(4));
+        let handles: Vec<_> = (0..4).map(|_| {
+            let b = barrier.clone();
+            std::thread::spawn(move || {
+                b.wait();
+                for _ in 0..100 {
+                    _vproc_transaction_begin();
+                }
+                for _ in 0..100 {
+                    _vproc_transaction_end();
+                }
+            })
+        }).collect();
+        for h in handles {
+            h.join().unwrap();
+        }
+        // After all threads do 100 begins and 100 ends, net effect is 0
+        // (relative to whatever count existed before)
+    }
 }

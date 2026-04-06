@@ -55,6 +55,16 @@ pub struct DnsRecord {
     pub guest_binary: String,
 }
 
+/// A recorded os_log event.
+#[derive(Debug, Clone)]
+pub struct OsLogRecord {
+    pub subsystem: String,
+    pub category: String,
+    pub level: String,
+    pub message: String,
+    pub guest_binary: String,
+}
+
 /// Thread-safe request recorder backed by SQLite.
 pub struct RequestRecorder {
     conn: Mutex<Connection>,
@@ -82,6 +92,10 @@ impl RequestRecorder {
                 xpc_reply TEXT,
                 dns_query TEXT,
                 dns_resolved TEXT,
+                log_subsystem TEXT,
+                log_category TEXT,
+                log_level TEXT,
+                log_message TEXT,
                 guest_binary TEXT,
                 duration_ms INTEGER
             );
@@ -163,6 +177,29 @@ impl RequestRecorder {
         }
     }
 
+    /// Record an os_log event.
+    pub fn record_os_log(&self, record: &OsLogRecord) {
+        let conn = match self.conn.lock() {
+            Ok(c) => c,
+            Err(e) => { log::warn!("recorder lock poisoned: {e}"); return; }
+        };
+        if let Err(e) = conn.execute(
+            "INSERT INTO requests (source, log_subsystem, log_category, log_level,
+             log_message, guest_binary)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            rusqlite::params![
+                RequestSource::OsLog.as_str(),
+                record.subsystem,
+                record.category,
+                record.level,
+                record.message,
+                record.guest_binary,
+            ],
+        ) {
+            log::warn!("recorder: failed to record os_log: {e}");
+        }
+    }
+
     /// Return the total number of recorded requests.
     pub fn count(&self) -> i64 {
         let conn = match self.conn.lock() {
@@ -211,5 +248,14 @@ mod tests {
             guest_binary: "xcodebuild".into(),
         });
         assert_eq!(recorder.count(), 3);
+
+        recorder.record_os_log(&OsLogRecord {
+            subsystem: "com.apple.dt.instruments".into(),
+            category: "default".into(),
+            level: "info".into(),
+            message: "test log message".into(),
+            guest_binary: "instruments".into(),
+        });
+        assert_eq!(recorder.count(), 4);
     }
 }

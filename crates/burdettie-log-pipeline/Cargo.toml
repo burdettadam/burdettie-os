@@ -1,0 +1,15 @@
+[package]
+name         = "burdettie-log-pipeline"
+description  = "Structured os_log pipeline — collects, formats, and routes Apple unified logs"
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+rust-version.workspace = true
+
+[dependencies]
+log        = { workspace = true }
+serde      = { workspace = true }
+serde_json = { workspace = true }
+
+[lints]
+workspace = true

@@ -76,7 +76,10 @@ impl ServiceServer {
                         "burdettie-services: recording requests to {}",
                         config.record_db_path
                     );
-                    Some(Arc::new(r))
+                    let arc = Arc::new(r);
+                    // Install as global recorder so other crates can use it
+                    crate::set_global_recorder(Arc::clone(&arc));
+                    Some(arc)
                 }
                 Err(e) => {
                     log::warn!("burdettie-services: failed to open recorder: {e}");

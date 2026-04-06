@@ -88,6 +88,27 @@ pub fn routine(pipe: u64, request: u64, reply_out: u64) -> i32 {
         Some(h) => {
             log::debug!("xpc_pipe: routing to handler for '{}'", name_str);
             let reply = h(request);
+
+            // Record XPC activity through the log pipeline
+            burdettie_log_pipeline::emit(burdettie_log_pipeline::LogEvent {
+                subsystem: "com.burdettie.xpc".into(),
+                category: "pipe".into(),
+                level: burdettie_log_pipeline::LogLevel::Info,
+                message: format!("xpc_pipe_routine: {} → reply={:#x}", name_str, reply),
+                sequence: 0,
+                timestamp_ms: 0,
+            });
+
+            // Record to SQLite if the global recorder is available
+            if let Some(recorder) = burdettie_services::global_recorder() {
+                recorder.record_xpc(&burdettie_services::XpcRecord {
+                    service: name_str.to_string(),
+                    request_json: format!("{{\"handle\":\"{:#x}\"}}", request),
+                    reply_json: format!("{{\"handle\":\"{:#x}\"}}", reply),
+                    guest_binary: String::new(),
+                });
+            }
+
             // Write reply handle to reply_out pointer if non-NULL
             if reply_out != 0 && reply != 0 {
                 unsafe {
@@ -120,12 +141,130 @@ fn launchd_stub_handler(request: u64) -> u64 {
     reply
 }
 
+// ── BurdettieOS daemon handlers ─────────────────────────────────
+
+/// Analytics daemon — accepts analytics submissions silently.
+///
+/// Apple's analyticsd collects crash/usage/diagnostic data.  We accept
+/// every submission and return success so tools don't retry.
+fn burdettie_analytics_handler(request: u64) -> u64 {
+    let _ = request;
+    log::debug!("xpc_pipe: burdettie analytics handler invoked");
+    let reply = xpc_objects::create_dictionary_empty();
+    xpc_objects::dict_set_int64(reply, b"error\0".as_ptr() as u64, 0);
+    xpc_objects::dict_set_bool(reply, b"success\0".as_ptr() as u64, true);
+    reply
+}
+
+/// Diagnostics daemon — accepts diagnostic reports silently.
+///
+/// Apple's diagnosticd manages diagnostic data collection.  We return
+/// success for all queries.
+fn burdettie_diagnostics_handler(request: u64) -> u64 {
+    let _ = request;
+    log::debug!("xpc_pipe: burdettie diagnostics handler invoked");
+    let reply = xpc_objects::create_dictionary_empty();
+    xpc_objects::dict_set_int64(reply, b"error\0".as_ptr() as u64, 0);
+    xpc_objects::dict_set_bool(reply, b"success\0".as_ptr() as u64, true);
+    reply
+}
+
+/// Symptom daemon — network symptom tracking.
+///
+/// Apple's symptomsd tracks network conditions and issues.
+/// We return a healthy status.
+fn burdettie_symptom_handler(request: u64) -> u64 {
+    let _ = request;
+    log::debug!("xpc_pipe: burdettie symptom handler invoked");
+    let reply = xpc_objects::create_dictionary_empty();
+    xpc_objects::dict_set_int64(reply, b"error\0".as_ptr() as u64, 0);
+    xpc_objects::dict_set_string(
+        reply,
+        b"status\0".as_ptr() as u64,
+        b"healthy\0".as_ptr() as u64,
+    );
+    reply
+}
+
+/// Launch Services daemon — UTI/app association queries.
+///
+/// Apple's lsd provides Uniform Type Identifier lookups and app
+/// registration.  We return "not found" cleanly so callers handle
+/// the absence gracefully.
+fn burdettie_launch_services_handler(request: u64) -> u64 {
+    let _ = request;
+    log::debug!("xpc_pipe: burdettie launch services handler invoked");
+    let reply = xpc_objects::create_dictionary_empty();
+    xpc_objects::dict_set_int64(reply, b"error\0".as_ptr() as u64, 0);
+    // Return an empty result set — no registered apps
+    xpc_objects::dict_set_int64(reply, b"result-count\0".as_ptr() as u64, 0);
+    reply
+}
+
+/// Quarantine daemon — file quarantine attributes.
+///
+/// Apple's quarantine service manages Gatekeeper/quarantine extended
+/// attributes.  We report all files as non-quarantined.
+fn burdettie_quarantine_handler(request: u64) -> u64 {
+    let _ = request;
+    log::debug!("xpc_pipe: burdettie quarantine handler invoked");
+    let reply = xpc_objects::create_dictionary_empty();
+    xpc_objects::dict_set_int64(reply, b"error\0".as_ptr() as u64, 0);
+    xpc_objects::dict_set_bool(reply, b"quarantined\0".as_ptr() as u64, false);
+    reply
+}
+
+/// CFPreferences daemon — preferences/defaults sync.
+///
+/// Apple's cfprefsd manages plist-based preference synchronization.
+/// We return success (preferences are handled in-process by cf-lite).
+fn burdettie_cfprefs_handler(request: u64) -> u64 {
+    let _ = request;
+    log::debug!("xpc_pipe: burdettie cfprefs handler invoked");
+    let reply = xpc_objects::create_dictionary_empty();
+    xpc_objects::dict_set_int64(reply, b"error\0".as_ptr() as u64, 0);
+    xpc_objects::dict_set_bool(reply, b"success\0".as_ptr() as u64, true);
+    reply
+}
+
+/// PluginKit daemon — plugin discovery and management.
+///
+/// Apple's pkd manages app extensions and plugins.  We return an empty
+/// list of available plugins.
+fn burdettie_pluginkit_handler(request: u64) -> u64 {
+    let _ = request;
+    log::debug!("xpc_pipe: burdettie pluginkit handler invoked");
+    let reply = xpc_objects::create_dictionary_empty();
+    xpc_objects::dict_set_int64(reply, b"error\0".as_ptr() as u64, 0);
+    xpc_objects::dict_set_int64(reply, b"result-count\0".as_ptr() as u64, 0);
+    reply
+}
+
 /// Install default pipe handlers for well-known service names.
 pub fn install_defaults() {
     // launchd domain lookup — used by `launchctl`, `xpcproxy`, etc.
     register_pipe_handler("com.apple.xpc.launchd.domain-port", launchd_stub_handler);
     register_pipe_handler("com.apple.xpc.launchd", launchd_stub_handler);
-    log::debug!("xpc_pipe: installed default launchd stub handlers");
+
+    // BurdettieOS daemon handlers — replace Apple system services
+    register_pipe_handler("com.apple.analyticsd", burdettie_analytics_handler);
+    register_pipe_handler("com.apple.diagnosticd", burdettie_diagnostics_handler);
+    register_pipe_handler("com.apple.symptomsd", burdettie_symptom_handler);
+    register_pipe_handler("com.apple.lsd", burdettie_launch_services_handler);
+    register_pipe_handler(
+        "com.apple.coreservices.quarantine",
+        burdettie_quarantine_handler,
+    );
+    register_pipe_handler("com.apple.cfprefsd.daemon", burdettie_cfprefs_handler);
+    register_pipe_handler("com.apple.cfprefsd.agent", burdettie_cfprefs_handler);
+    register_pipe_handler(
+        "com.apple.pluginkit.pkd",
+        burdettie_pluginkit_handler,
+    );
+
+    log::debug!(
+        "xpc_pipe: installed default launchd + 8 BurdettieOS daemon handlers"
+    );
 }
 
 #[cfg(test)]
@@ -200,5 +339,62 @@ mod tests {
         assert!(has_pipe_handler("com.test.unreg"));
         unregister_pipe_handler("com.test.unreg");
         assert!(!has_pipe_handler("com.test.unreg"));
+    }
+
+    #[test]
+    fn burdettie_analytics_handler_returns_success() {
+        install_defaults();
+        assert!(has_pipe_handler("com.apple.analyticsd"));
+        let pipe = create(b"com.apple.analyticsd\0".as_ptr() as u64, 0);
+        let request = xpc_objects::create_dictionary_empty();
+        let mut reply: u64 = 0;
+        let result = routine(pipe, request, &mut reply as *mut u64 as u64);
+        assert_eq!(result, 0);
+        assert_ne!(reply, 0);
+        assert_eq!(xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64), 0);
+        assert!(xpc_objects::dict_get_bool(reply, b"success\0".as_ptr() as u64));
+    }
+
+    #[test]
+    fn burdettie_diagnostics_handler_returns_success() {
+        install_defaults();
+        assert!(has_pipe_handler("com.apple.diagnosticd"));
+        let pipe = create(b"com.apple.diagnosticd\0".as_ptr() as u64, 0);
+        let request = xpc_objects::create_dictionary_empty();
+        let mut reply: u64 = 0;
+        let result = routine(pipe, request, &mut reply as *mut u64 as u64);
+        assert_eq!(result, 0);
+        assert_ne!(reply, 0);
+        assert_eq!(xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64), 0);
+    }
+
+    #[test]
+    fn burdettie_quarantine_reports_not_quarantined() {
+        install_defaults();
+        let pipe = create(b"com.apple.coreservices.quarantine\0".as_ptr() as u64, 0);
+        let request = xpc_objects::create_dictionary_empty();
+        let mut reply: u64 = 0;
+        let result = routine(pipe, request, &mut reply as *mut u64 as u64);
+        assert_eq!(result, 0);
+        assert_ne!(reply, 0);
+        assert!(!xpc_objects::dict_get_bool(reply, b"quarantined\0".as_ptr() as u64));
+    }
+
+    #[test]
+    fn all_burdettie_handlers_registered() {
+        install_defaults();
+        let expected = [
+            "com.apple.analyticsd",
+            "com.apple.diagnosticd",
+            "com.apple.symptomsd",
+            "com.apple.lsd",
+            "com.apple.coreservices.quarantine",
+            "com.apple.cfprefsd.daemon",
+            "com.apple.cfprefsd.agent",
+            "com.apple.pluginkit.pkd",
+        ];
+        for name in &expected {
+            assert!(has_pipe_handler(name), "missing handler for {name}");
+        }
     }
 }

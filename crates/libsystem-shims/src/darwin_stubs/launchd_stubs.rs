@@ -488,7 +488,10 @@ impl LaunchdStubs {
             ("__vproc_standby_count", shim__vproc_standby_count as *const () as u64, "_vproc_standby_count"),
             ("__vproc_standby_timeout", shim__vproc_standby_timeout as *const () as u64, "_vproc_standby_timeout"),
             ("__vproc_pid_is_managed", shim__vproc_pid_is_managed as *const () as u64, "_vproc_pid_is_managed"),
-            ("__vproc_transaction_try_exit", shim__vproc_transaction_try_exit as *const () as u64, "_vproc_transaction_try_exit")
+            ("__vproc_transaction_try_exit", shim__vproc_transaction_try_exit as *const () as u64, "_vproc_transaction_try_exit"),
+
+            // ── data symbols ────────────────────────────────────
+            ("_bootstrap_port", launchd::bootstrap::bootstrap_port_ptr() as u64, "bootstrap_port data symbol (mach_port_t)")
         );
 
         log::debug!("launchd_stubs: registered all launch/bootstrap/vproc shims");

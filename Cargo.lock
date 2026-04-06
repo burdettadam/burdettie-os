@@ -379,6 +379,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "burdettie-log-pipeline"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "burdettie-services"
 version = "0.1.0"
 dependencies = [
@@ -389,6 +398,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tiny_http",
+ "toml",
  "ureq",
 ]
 
@@ -2136,6 +2146,8 @@ name = "libsystem-shims"
 version = "0.1.0"
 dependencies = [
  "burdettie-domain-map",
+ "burdettie-log-pipeline",
+ "burdettie-services",
  "flate2",
  "hickory-resolver",
  "launchd",
@@ -2358,6 +2370,7 @@ version = "0.1.0"
 dependencies = [
  "arm64-translate",
  "burdettie-domain-map",
+ "burdettie-log-pipeline",
  "burdettie-services",
  "cf-lite",
  "cg-shims",
