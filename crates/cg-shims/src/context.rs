@@ -54,9 +54,15 @@ pub fn install(table: &mut ShimTable) {
         ("_CGContextClosePath", shim_cg_close_path as *const () as u64, "CGContextClosePath (bridge → real)"),
 
         // ── Text ────────────────────────────────────────────────
-        ("_CGContextSetFont", shim_cg_void2 as *const () as u64, "CGContextSetFont (stub → void)"),
-        ("_CGContextSetFontSize", shim_cg_void2 as *const () as u64, "CGContextSetFontSize (stub → void)"),
-        ("_CGContextShowTextAtPoint", shim_cg_void5 as *const () as u64, "CGContextShowTextAtPoint (stub → void)"),
+        ("_CGContextSetFont", shim_cg_void2 as *const () as u64, "CGContextSetFont (stub → void, font name ignored)"),
+        ("_CGContextSetFontSize", shim_cg_set_font_size as *const () as u64, "CGContextSetFontSize (bridge → real)"),
+        ("_CGContextShowTextAtPoint", shim_cg_show_text_at_point as *const () as u64, "CGContextShowTextAtPoint (bridge → real)"),
+        ("_CGContextSelectFont", shim_cg_select_font as *const () as u64, "CGContextSelectFont (bridge → font size only)"),
+        ("_CGContextSetTextDrawingMode", shim_cg_void2 as *const () as u64, "CGContextSetTextDrawingMode (stub → void)"),
+        ("_CGContextSetTextPosition", shim_cg_set_text_position as *const () as u64, "CGContextSetTextPosition (bridge → real)"),
+        ("_CGContextGetTextPosition", shim_cg_get_text_position as *const () as u64, "CGContextGetTextPosition (bridge → real)"),
+        ("_CGContextSetCharacterSpacing", shim_cg_void2 as *const () as u64, "CGContextSetCharacterSpacing (stub → void)"),
+        ("_CGContextShowText", shim_cg_show_text as *const () as u64, "CGContextShowText (bridge → real)"),
 
         // ── Lifecycle ───────────────────────────────────────────
         ("_CGContextRetain", shim_cg_retain as *const () as u64, "CGContextRetain (bridge → same ptr)"),
@@ -208,6 +214,66 @@ pub extern "C" fn shim_cg_void3(_a: u64, _b: u64, _c: u64) {}
 pub extern "C" fn shim_cg_void5(_a: u64, _b: u64, _c: u64, _d: u64, _e: u64) {}
 pub extern "C" fn shim_cg_void6(_a: u64, _b: u64, _c: u64, _d: u64, _e: u64, _f: u64) {}
 pub extern "C" fn shim_cg_void7(_a: u64, _b: u64, _c: u64, _d: u64, _e: u64, _f: u64, _g: u64) {}
+
+// ── Text ────────────────────────────────────────────────────────
+
+/// CGContextSetFontSize(ctx, size)
+pub extern "C" fn shim_cg_set_font_size(ctx: u64, size: f64) {
+    bridge::with_context(ctx, |c| { c.font_size = size; });
+}
+
+/// CGContextSelectFont(ctx, name, size, encoding) — we only use `size`.
+pub extern "C" fn shim_cg_select_font(ctx: u64, _name: u64, size: f64, _encoding: u32) {
+    bridge::with_context(ctx, |c| { c.font_size = size; });
+}
+
+/// CGContextSetTextPosition(ctx, x, y)
+pub extern "C" fn shim_cg_set_text_position(ctx: u64, x: f64, y: f64) {
+    bridge::with_context(ctx, |c| { c.text_x = x; c.text_y = y; });
+}
+
+/// CGContextGetTextPosition(ctx) → CGPoint (returned as two f64 via x8 indirect).
+pub extern "C" fn shim_cg_get_text_position(result: u64, ctx: u64) {
+    let (x, y) = bridge::with_context(ctx, |c| (c.text_x, c.text_y))
+        .unwrap_or((0.0, 0.0));
+    if result != 0 {
+        unsafe {
+            *(result as *mut f64) = x;
+            *((result as usize + 8) as *mut f64) = y;
+        }
+    }
+}
+
+/// CGContextShowTextAtPoint(ctx, x, y, chars, length)
+///
+/// Draws `length` bytes of C string at (x, y) using the current fill color
+/// and font size. The text position is advanced by the rendered width.
+pub extern "C" fn shim_cg_show_text_at_point(ctx: u64, x: f64, y: f64, chars: u64, length: u64) {
+    if chars == 0 || length == 0 { return; }
+    let text = unsafe {
+        let slice = std::slice::from_raw_parts(chars as *const u8, length as usize);
+        String::from_utf8_lossy(slice).into_owned()
+    };
+    bridge::with_context(ctx, |c| {
+        c.draw_text(&text, x, y);
+    });
+}
+
+/// CGContextShowText(ctx, chars, length)
+///
+/// Draws text at the current text position.
+pub extern "C" fn shim_cg_show_text(ctx: u64, chars: u64, length: u64) {
+    if chars == 0 || length == 0 { return; }
+    let text = unsafe {
+        let slice = std::slice::from_raw_parts(chars as *const u8, length as usize);
+        String::from_utf8_lossy(slice).into_owned()
+    };
+    bridge::with_context(ctx, |c| {
+        let x = c.text_x;
+        let y = c.text_y;
+        c.draw_text(&text, x, y);
+    });
+}
 
 pub extern "C" fn shim_cg_context_release(ctx: u64) {
     bridge::context_release(ctx);

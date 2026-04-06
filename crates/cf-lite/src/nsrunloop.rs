@@ -275,6 +275,9 @@ pub(crate) fn reset_runtime_state_for_reuse() {
     pending_timers().lock().unwrap_or_else(|e| e.into_inner()).clear();
     sources().lock().unwrap_or_else(|e| e.into_inner()).clear();
     observers().lock().unwrap_or_else(|e| e.into_inner()).clear();
+    // Clear stale view entries in the layout solver so flush_pending_layouts()
+    // doesn't dereference freed view memory from previous test runs.
+    crate::layout_solver::reset_global_state();
     if let Some(run_loop) = MAIN_RUN_LOOP.get().copied() {
         unsafe {
             *((run_loop as usize + 8) as *mut u64) = 0;

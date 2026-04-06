@@ -40,6 +40,8 @@ pub enum GuiEvent {
     WindowCloseRequested,
     /// Application should terminate.
     AppTerminate,
+    /// Window needs to redraw its content.
+    RedrawRequested,
 }
 
 /// Window descriptor passed to the bridge when showing a window.
@@ -90,6 +92,9 @@ pub trait GuiBridge: Send + Sync {
     /// so `drawRect:` can route CGContext output to the window surface.
     /// Returns (data_ptr, width, height, stride) or None if not available.
     fn window_surface(&self, guest_window: u64) -> Option<(*mut u8, u32, u32, u32)>;
+
+    /// Request the window to redraw on the next frame (called from `setNeedsDisplay:`).
+    fn request_redraw(&self, guest_window: u64);
 }
 
 static GUI_BRIDGE: OnceLock<Box<dyn GuiBridge>> = OnceLock::new();
@@ -155,9 +160,17 @@ pub fn dispatch_gui_event(guest_window: u64, event: &GuiEvent) {
         GuiEvent::WindowResized { .. } | GuiEvent::WindowCloseRequested | GuiEvent::AppTerminate => {
             return; // handled separately
         }
+        GuiEvent::RedrawRequested => {
+            // Trigger display cycle on the guest window's content view.
+            crate::nswindow::display_window_content(guest_window);
+            return;
+        }
     };
 
     if event_addr != 0 {
+        // Enqueue for nextEventMatchingMask: to pick up
+        crate::nsapplication::enqueue_event(event_addr);
+
         crate::nsapplication::shim_nsapplication_send_event(
             crate::nsapplication::shim_nsapplication_shared_application(0, 0),
             0,

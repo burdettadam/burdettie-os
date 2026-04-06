@@ -23,6 +23,8 @@ const CONTENT_VIEW_OFF: usize = 8;
 const TITLE_OFF: usize = 16;
 const STYLE_MASK_OFF: usize = 24;
 const FRAME_X_OFF: usize = 32;
+const FRAME_W_OFF: usize = 48;
+const FRAME_H_OFF: usize = 56;
 const IS_VISIBLE_OFF: usize = 64;
 const FIRST_RESPONDER_OFF: usize = 72;
 const DELEGATE_OFF: usize = 80;
@@ -34,6 +36,13 @@ fn read_u64(obj: u64, offset: usize) -> u64 {
         return 0;
     }
     unsafe { *((obj as usize + offset) as *const u64) }
+}
+
+fn read_f64(obj: u64, offset: usize) -> f64 {
+    if obj == 0 {
+        return 0.0;
+    }
+    unsafe { *((obj as usize + offset) as *const f64) }
 }
 
 fn write_u64(obj: u64, offset: usize, value: u64) {
@@ -173,7 +182,7 @@ fn alloc_window(rect: CGRect, style: u64) -> u64 {
 
 /// `-[NSWindow initWithContentRect:styleMask:backing:defer:]`
 pub extern "C" fn shim_nswindow_init_with_content_rect(
-    _obj: u64,
+    obj: u64,
     _cmd: u64,
     x: f64, y: f64, w: f64, h: f64, // CGRect passed as 4 doubles on ARM64
     style_mask: u64,
@@ -185,13 +194,45 @@ pub extern "C" fn shim_nswindow_init_with_content_rect(
         size: CGSize { width: w, height: h },
     };
     log::debug!("NSWindow initWithContentRect:{} styleMask:{}", rect, style_mask);
-    let window = alloc_window(rect, style_mask);
+
+    // If the caller already allocated the object (e.g. via +alloc or
+    // objc_allocateClassPair), initialise it in-place so that any dynamic
+    // subclass ISA is preserved.
+    let window = if obj != 0 {
+        init_window_in_place(obj, rect, style_mask);
+        obj
+    } else {
+        alloc_window(rect, style_mask)
+    };
     crate::nsapplication::register_window(window);
     window
 }
 
+/// Initialise an already-allocated NSWindow object in-place (preserving its ISA).
+fn init_window_in_place(obj: u64, rect: CGRect, style: u64) {
+    unsafe {
+        // ISA at offset 0 is already set from +alloc — do NOT overwrite.
+        *((obj as usize + STYLE_MASK_OFF) as *mut u64) = style;
+        *((obj as usize + FRAME_X_OFF) as *mut f64) = rect.origin.x;
+        *((obj as usize + FRAME_X_OFF + 8) as *mut f64) = rect.origin.y;
+        *((obj as usize + FRAME_X_OFF + 16) as *mut f64) = rect.size.width;
+        *((obj as usize + FRAME_X_OFF + 24) as *mut f64) = rect.size.height;
+    }
+    let content_view = crate::nsview::alloc_view_with_frame(0.0, 0.0, rect.size.width, rect.size.height);
+    if content_view != 0 {
+        crate::nsview::set_view_window(content_view, obj);
+        write_u64(obj, CONTENT_VIEW_OFF, content_view);
+    }
+    write_u64(obj, FIRST_RESPONDER_OFF, obj);
+}
+
 /// `-[NSWindow contentView]`
 pub extern "C" fn shim_nswindow_content_view(obj: u64, _cmd: u64) -> u64 {
+    read_u64(obj, CONTENT_VIEW_OFF)
+}
+
+/// Internal accessor for other modules.
+pub(crate) fn window_content_view(obj: u64) -> u64 {
     read_u64(obj, CONTENT_VIEW_OFF)
 }
 
@@ -381,6 +422,7 @@ pub extern "C" fn shim_nswindow_content_rect_for_frame_rect(
 pub extern "C" fn shim_nswindow_close(obj: u64, _cmd: u64) {
     set_visible(obj, false);
     crate::nsapplication::clear_window_roles(obj);
+    release_window_cg_context(obj);
 
     if let Some(bridge) = crate::gui_bridge::gui_bridge() {
         bridge.hide_window(obj);
@@ -541,6 +583,102 @@ pub extern "C" fn shim_nswindow_content_layout_guide(obj: u64, _cmd: u64) -> u64
         return 0;
     }
     crate::nslayoutguide::make_layout_guide(content_view)
+}
+
+// ── Window drawing pipeline ────────────────────────────────────
+
+use std::collections::HashMap as WindowMap;
+use std::sync::Mutex;
+
+/// Per-window CGContext handle, keyed by guest NSWindow address.
+static WINDOW_CONTEXTS: std::sync::OnceLock<Mutex<WindowMap<u64, u64>>> =
+    std::sync::OnceLock::new();
+
+fn window_ctx_map() -> &'static Mutex<WindowMap<u64, u64>> {
+    WINDOW_CONTEXTS.get_or_init(|| Mutex::new(WindowMap::new()))
+}
+
+/// Get or create a CGContext for a window. The context matches the window's frame size.
+pub(crate) fn get_or_create_window_cg_context(window: u64) -> u64 {
+    if window == 0 { return 0; }
+
+    let w = read_f64(window, FRAME_W_OFF) as u32;
+    let h = read_f64(window, FRAME_H_OFF) as u32;
+    let w = if w == 0 { 800 } else { w };
+    let h = if h == 0 { 600 } else { h };
+
+    let mut map = window_ctx_map().lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(&ctx) = map.get(&window) {
+        // Check if size matches; if not, recreate.
+        let cur_w = cg_shims::bridge::context_get_width(ctx) as u32;
+        let cur_h = cg_shims::bridge::context_get_height(ctx) as u32;
+        if cur_w == w && cur_h == h {
+            return ctx;
+        }
+        cg_shims::bridge::context_release(ctx);
+    }
+
+    let ctx = cg_shims::bridge::context_create(w, h);
+    map.insert(window, ctx);
+    ctx
+}
+
+/// Called by the GUI bridge on `RedrawRequested` to trigger the guest draw cycle.
+///
+/// Creates/updates the window's CGContext, runs the display cycle on the content view,
+/// then copies the CGContext's pixels to the bridge's window surface.
+pub(crate) fn display_window_content(window: u64) {
+    if window == 0 { return; }
+
+    let content_view = read_u64(window, CONTENT_VIEW_OFF);
+    if content_view == 0 { return; }
+
+    let cg_ctx = get_or_create_window_cg_context(window);
+    if cg_ctx == 0 { return; }
+
+    // Clear the surface before drawing.
+    cg_shims::bridge::with_context(cg_ctx, |c| {
+        c.surface.clear(graphics_core::Color::WHITE);
+    });
+
+    // Run the display cycle: pushes NSGraphicsContext, calls drawRect: recursively.
+    crate::nsview::display_view_recursive(content_view, cg_ctx);
+
+    // Copy pixels from CGContext surface to the bridge's window surface.
+    if let Some(bridge) = crate::gui_bridge::gui_bridge() {
+        if let Some((dst_ptr, dst_w, dst_h, _stride)) = bridge.window_surface(window) {
+            let src_pixels = cg_shims::bridge::with_context(cg_ctx, |c| {
+                let pixels = c.surface.pixels();
+                let src_w = c.surface.width();
+                let src_h = c.surface.height();
+                (pixels.as_ptr(), src_w, src_h)
+            });
+            if let Some((src_ptr, src_w, src_h)) = src_pixels {
+                let copy_w = (src_w).min(dst_w) as usize;
+                let copy_h = (src_h).min(dst_h) as usize;
+                // Copy row by row (ARGB32 → u32 per pixel).
+                unsafe {
+                    let src = src_ptr as *const u32;
+                    let dst = dst_ptr as *mut u32;
+                    for row in 0..copy_h {
+                        std::ptr::copy_nonoverlapping(
+                            src.add(row * src_w as usize),
+                            dst.add(row * dst_w as usize),
+                            copy_w,
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Release the CGContext for a window (called when window closes).
+pub(crate) fn release_window_cg_context(window: u64) {
+    let mut map = window_ctx_map().lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(ctx) = map.remove(&window) {
+        cg_shims::bridge::context_release(ctx);
+    }
 }
 
 #[cfg(test)]

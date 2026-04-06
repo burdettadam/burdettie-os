@@ -85,6 +85,11 @@ pub extern "C" fn shim_nsevent_type(obj: u64, _cmd: u64) -> u64 {
     unsafe { *((obj as usize + EVENT_TYPE_OFF) as *const u64) }
 }
 
+/// Get the raw event type value for internal use (e.g. event queue filtering).
+pub(crate) fn event_type_raw(obj: u64) -> u64 {
+    shim_nsevent_type(obj, 0)
+}
+
 /// `-[NSEvent locationInWindow]` — returns x coordinate as f64 stub.
 pub extern "C" fn shim_nsevent_location_in_window(obj: u64, _cmd: u64) -> f64 {
     if obj == 0 { return 0.0; }

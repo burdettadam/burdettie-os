@@ -188,13 +188,23 @@ pub(crate) fn alloc_view_with_frame(x: f64, y: f64, w: f64, h: f64) -> u64 {
 }
 
 /// `-[NSView initWithFrame:]`
+///
+/// If obj was already allocated by `+[CustomViewSubclass alloc]`, we must preserve
+/// the original ISA (class identity) and just initialize the frame fields.
+/// This is critical for dynamic subclasses that override `drawRect:`.
 pub extern "C" fn shim_nsview_init_with_frame(
-    _obj: u64,
+    obj: u64,
     _cmd: u64,
     x: f64, y: f64, w: f64, h: f64,
 ) -> u64 {
-    let obj = alloc_view_with_frame(x, y, w, h);
-    let _ = CGRect { origin: CGPoint { x, y }, size: CGSize { width: w, height: h } };
+    if obj == 0 {
+        // No object provided — allocate with base NSView ISA.
+        return alloc_view_with_frame(x, y, w, h);
+    }
+    // Object is already allocated (via +alloc). Initialize frame fields in-place,
+    // preserving the ISA that was set by the alloc step.
+    // Ensure the object has enough space — alloc should have used instance_size.
+    write_frame(obj, x, y, w, h);
     obj
 }
 
@@ -270,11 +280,26 @@ pub extern "C" fn shim_nsview_set_needs_display(obj: u64, _cmd: u64, flag: u8) {
         flags &= !FLAG_NEEDS_DISPLAY;
     }
     write_u64(obj, FLAGS_OFF, flags);
+
+    // If marking dirty, request a redraw from the bridge.
+    if flag != 0 {
+        let window = read_u64(obj, WINDOW_OFF);
+        if window != 0 {
+            if let Some(bridge) = crate::gui_bridge::gui_bridge() {
+                bridge.request_redraw(window);
+            }
+        }
+    }
 }
 
 /// `-[NSView needsDisplay]`
 pub extern "C" fn shim_nsview_needs_display(obj: u64, _cmd: u64) -> u8 {
     u8::from(read_u64(obj, FLAGS_OFF) & FLAG_NEEDS_DISPLAY != 0)
+}
+
+/// Internal accessor for other modules.
+pub(crate) fn view_needs_display(obj: u64) -> bool {
+    read_u64(obj, FLAGS_OFF) & FLAG_NEEDS_DISPLAY != 0
 }
 
 /// `-[NSView drawRect:]` — base implementation does nothing.
@@ -503,6 +528,106 @@ pub extern "C" fn shim_nsview_add_layout_guide(obj: u64, _cmd: u64, guide: u64) 
 pub extern "C" fn shim_nsview_remove_layout_guide(_obj: u64, _cmd: u64, guide: u64) {
     if guide == 0 { return; }
     crate::nslayoutguide::shim_nslayoutguide_set_owning_view(guide, 0, 0);
+}
+
+// ── Display / drawing pipeline ─────────────────────────────────
+
+/// `-[NSView display]` — trigger the full draw cycle for this view and its subviews.
+///
+/// 1. Obtains the window's CGContext (created by the bridge from the window surface).
+/// 2. Pushes it as the current NSGraphicsContext.
+/// 3. Calls `drawRect:` on this view via ObjC dispatch (so guest subclass overrides work).
+/// 4. Recursively displays all subviews.
+/// 5. Pops the graphics context.
+pub extern "C" fn shim_nsview_display(obj: u64, _cmd: u64) {
+    if obj == 0 { return; }
+    let w = read_f64(obj, FRAME_W_OFF);
+    let h = read_f64(obj, FRAME_H_OFF);
+    if w <= 0.0 || h <= 0.0 { return; }
+
+    // Find or create a per-window CGContext.
+    let window = read_u64(obj, WINDOW_OFF);
+    let cg_ctx = crate::nswindow::get_or_create_window_cg_context(window);
+    if cg_ctx == 0 { return; }
+
+    display_view_recursive(obj, cg_ctx);
+}
+
+/// Recursively display a view tree into the given CGContext.
+pub(crate) fn display_view_recursive(view: u64, cg_ctx: u64) {
+    if view == 0 || cg_ctx == 0 { return; }
+
+    let x = read_f64(view, FRAME_X_OFF);
+    let y = read_f64(view, FRAME_Y_OFF);
+    let w = read_f64(view, FRAME_W_OFF);
+    let h = read_f64(view, FRAME_H_OFF);
+
+    // Push the CGContext as the current NSGraphicsContext for this view's draw cycle.
+    let prev_ctx = crate::nsgraphicscontext::push_current_context(cg_ctx);
+
+    // Call drawRect: via ObjC dispatch so guest subclass overrides are honored.
+    call_draw_rect(view, x, y, w, h);
+
+    // Clear the needs-display flag.
+    let mut flags = read_u64(view, FLAGS_OFF);
+    flags &= !FLAG_NEEDS_DISPLAY;
+    write_u64(view, FLAGS_OFF, flags);
+
+    // Recursively display subviews.
+    for child in snapshot_subviews(view) {
+        display_view_recursive(child, cg_ctx);
+    }
+
+    crate::nsgraphicscontext::pop_current_context(prev_ctx);
+}
+
+/// Call `-[view drawRect:rect]` through ObjC dispatch so guest overrides work.
+fn call_draw_rect(view: u64, x: f64, y: f64, w: f64, h: f64) {
+    extern "C" {
+        fn objc_msg_lookup_imp(obj: u64, sel: u64) -> u64;
+    }
+
+    // Get the interned selector pointer for "drawRect:".
+    static DRAW_RECT_SEL: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+    let sel = *DRAW_RECT_SEL.get_or_init(|| {
+        let cstr = std::ffi::CString::new("drawRect:").unwrap();
+        let ptr = cstr.as_ptr() as u64;
+        std::mem::forget(cstr);
+        ptr
+    });
+
+    let imp = unsafe { objc_msg_lookup_imp(view, sel) };
+    if imp == 0 { return; }
+
+    // drawRect: takes (self, _cmd, CGRect{x,y,w,h}) — on ARM64 CGRect is passed
+    // as 4 f64 args in d0-d3 (or x2-x5 on stack for the Apple variadic ABI).
+    // Since our shim and guest code both use the same ABI, we call directly with 4 f64s.
+    let f: extern "C" fn(u64, u64, f64, f64, f64, f64) =
+        unsafe { std::mem::transmute(imp) };
+    f(view, sel, x, y, w, h);
+}
+
+/// `-[NSView displayIfNeeded]` — display only if needsDisplay is set.
+pub extern "C" fn shim_nsview_display_if_needed(obj: u64, _cmd: u64) {
+    if obj == 0 { return; }
+    if read_u64(obj, FLAGS_OFF) & FLAG_NEEDS_DISPLAY != 0 {
+        shim_nsview_display(obj, _cmd);
+    }
+}
+
+/// `-[NSView lockFocus]` — push a drawing context for this view.
+pub extern "C" fn shim_nsview_lock_focus(obj: u64, _cmd: u64) {
+    if obj == 0 { return; }
+    let window = read_u64(obj, WINDOW_OFF);
+    let cg_ctx = crate::nswindow::get_or_create_window_cg_context(window);
+    if cg_ctx != 0 {
+        crate::nsgraphicscontext::push_current_context(cg_ctx);
+    }
+}
+
+/// `-[NSView unlockFocus]` — pop the drawing context.
+pub extern "C" fn shim_nsview_unlock_focus(_obj: u64, _cmd: u64) {
+    crate::nsgraphicscontext::pop_current_context(0);
 }
 
 #[cfg(test)]

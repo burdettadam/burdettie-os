@@ -7,7 +7,14 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use graphics_core::{BezierPath, Color, Rect, Surface, SoftwareRenderer, Renderer};
+use graphics_core::{BezierPath, Color, Font, FontManager, Rect, Surface, SoftwareRenderer, Renderer, Point};
+
+/// Global shared font manager (TrueType via ab_glyph).
+static FONT_MANAGER: std::sync::OnceLock<FontManager> = std::sync::OnceLock::new();
+
+fn font_manager() -> &'static FontManager {
+    FONT_MANAGER.get_or_init(FontManager::new)
+}
 
 /// A heap-allocated CGContext backed by a `Surface` + `SoftwareRenderer`.
 pub struct CgContext {
@@ -17,6 +24,9 @@ pub struct CgContext {
     pub line_width: f64,
     pub alpha: f64,
     pub path: BezierPath,
+    pub font_size: f64,
+    pub text_x: f64,
+    pub text_y: f64,
     state_stack: Vec<ContextState>,
 }
 
@@ -26,6 +36,9 @@ struct ContextState {
     stroke_color: Color,
     line_width: f64,
     alpha: f64,
+    font_size: f64,
+    text_x: f64,
+    text_y: f64,
 }
 
 impl CgContext {
@@ -37,6 +50,9 @@ impl CgContext {
             line_width: 1.0,
             alpha: 1.0,
             path: BezierPath::new(),
+            font_size: 12.0,
+            text_x: 0.0,
+            text_y: 0.0,
             state_stack: Vec::new(),
         }
     }
@@ -47,6 +63,9 @@ impl CgContext {
             stroke_color: self.stroke_color,
             line_width: self.line_width,
             alpha: self.alpha,
+            font_size: self.font_size,
+            text_x: self.text_x,
+            text_y: self.text_y,
         });
     }
 
@@ -56,6 +75,9 @@ impl CgContext {
             self.stroke_color = s.stroke_color;
             self.line_width = s.line_width;
             self.alpha = s.alpha;
+            self.font_size = s.font_size;
+            self.text_x = s.text_x;
+            self.text_y = s.text_y;
         }
     }
 
@@ -84,6 +106,19 @@ impl CgContext {
         let path = std::mem::take(&mut self.path);
         let mut renderer = SoftwareRenderer::new(&mut self.surface);
         renderer.stroke_path(&path, self.stroke_color, self.line_width);
+    }
+
+    /// Draw text at (x, y) using the current fill color and font size.
+    /// After drawing, advances text_x by the width of the rendered string.
+    pub fn draw_text(&mut self, text: &str, x: f64, y: f64) {
+        let font = Font::system(self.font_size);
+        let fm = font_manager();
+        let mut renderer = SoftwareRenderer::with_fonts(&mut self.surface, fm);
+        renderer.draw_text(text, Point::new(x, y), &font, self.fill_color);
+        // Advance text position by the measured width.
+        let advance = fm.system().measure_text(text, self.font_size);
+        self.text_x = x + advance;
+        self.text_y = y;
     }
 }
 

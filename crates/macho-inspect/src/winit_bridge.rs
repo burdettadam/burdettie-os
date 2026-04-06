@@ -21,6 +21,46 @@ fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
     m.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
+// ── Shared per-window pixel buffer ─────────────────────────────────
+
+/// Per-window pixel buffer shared between the guest draw cycle and the event loop.
+/// The guest writes ARGB32 pixels via `window_surface()`, then the event loop
+/// copies them into the softbuffer surface on redraw.
+struct WindowPixelBuffer {
+    /// ARGB32 pixel data (u32 per pixel, row-major).
+    data: Vec<u32>,
+    width: u32,
+    height: u32,
+}
+
+/// Global map from guest window address → shared pixel buffer.
+static WINDOW_BUFFERS: std::sync::OnceLock<Mutex<HashMap<u64, WindowPixelBuffer>>> =
+    std::sync::OnceLock::new();
+
+fn window_buffers() -> &'static Mutex<HashMap<u64, WindowPixelBuffer>> {
+    WINDOW_BUFFERS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Ensure a pixel buffer exists for the given guest window at the given size.
+fn ensure_buffer(guest: u64, w: u32, h: u32) {
+    let mut map = lock(window_buffers());
+    let needs_resize = map.get(&guest).map_or(true, |b| b.width != w || b.height != h);
+    if needs_resize {
+        map.insert(guest, WindowPixelBuffer {
+            data: vec![0x00FF_FFFFu32; (w as usize) * (h as usize)],
+            width: w,
+            height: h,
+        });
+    }
+}
+
+/// Redraw requests queued from guest threads (guest window addresses).
+static REDRAW_REQUESTS: std::sync::OnceLock<Mutex<Vec<u64>>> = std::sync::OnceLock::new();
+
+fn redraw_requests() -> &'static Mutex<Vec<u64>> {
+    REDRAW_REQUESTS.get_or_init(|| Mutex::new(Vec::new()))
+}
+
 // ── Public bridge ──────────────────────────────────────────────────
 
 /// A `GuiBridge` backed by winit + softbuffer.
@@ -95,10 +135,18 @@ impl GuiBridge for WinitGuiBridge {
         self.stop.store(true, Ordering::SeqCst);
     }
 
-    fn window_surface(&self, _guest_window: u64) -> Option<(*mut u8, u32, u32, u32)> {
-        // Surface access is not thread-safe across the bridge boundary.
-        // Drawing goes through redraw requests instead.
-        None
+    fn window_surface(&self, guest_window: u64) -> Option<(*mut u8, u32, u32, u32)> {
+        let mut map = lock(window_buffers());
+        let buf = map.get_mut(&guest_window)?;
+        let ptr = buf.data.as_mut_ptr() as *mut u8;
+        let w = buf.width;
+        let h = buf.height;
+        let stride = w * 4; // ARGB32, 4 bytes per pixel
+        Some((ptr, w, h, stride))
+    }
+
+    fn request_redraw(&self, guest_window: u64) {
+        lock(redraw_requests()).push(guest_window);
     }
 }
 
@@ -157,6 +205,11 @@ impl<'a> BridgeState<'a> {
         self.windows.insert(wid, desc.guest_window);
         self.guest_to_winit.insert(desc.guest_window, wid);
         self.surfaces.insert(wid, (window.clone(), surface));
+
+        // Create a shared pixel buffer for guest drawing.
+        let phys = window.inner_size();
+        ensure_buffer(desc.guest_window, phys.width.max(1), phys.height.max(1));
+
         window.request_redraw();
     }
 
@@ -201,10 +254,21 @@ impl<'a> BridgeState<'a> {
                 }
             }
         }
+
+        // Redraw requests from guest setNeedsDisplay:
+        let redraws = std::mem::take(&mut *lock(redraw_requests()));
+        for guest in redraws {
+            if let Some(&wid) = self.guest_to_winit.get(&guest) {
+                if let Some((ref w, _)) = self.surfaces.get(&wid) {
+                    w.request_redraw();
+                }
+            }
+        }
     }
 
-    /// Fill the window surface with a light gray background (placeholder drawing).
+    /// Draw the window's content: trigger guest drawRect: cycle, then blit to softbuffer.
     fn redraw(&mut self, wid: WindowId) {
+        let guest = self.guest_for(wid);
         let Some((ref window, ref mut surface)) = self.surfaces.get_mut(&wid) else {
             return;
         };
@@ -219,16 +283,37 @@ impl<'a> BridgeState<'a> {
             log::warn!("winit_bridge: resize failed: {e}");
             return;
         }
+
+        // Ensure the shared pixel buffer matches the window size.
+        ensure_buffer(guest, phys.width, phys.height);
+
+        // Trigger the guest drawing cycle: NSWindow → NSView.display → drawRect:.
+        // This writes into the shared pixel buffer via CGContext → window_surface().
+        if guest != 0 {
+            (self.callback)(guest, GuiEvent::RedrawRequested);
+        }
+
         let Ok(mut buffer) = surface.buffer_mut() else {
             return;
         };
 
-        // Fill with light background (0xF0F0F0) as placeholder.
-        // TODO: route guest drawRect: → CGContext → this surface.
-        let bg = 0x00F0_F0F0u32;
-        for pixel in buffer.iter_mut() {
-            *pixel = bg;
+        // Copy guest-drawn pixels from the shared buffer to the softbuffer surface.
+        {
+            let map = lock(window_buffers());
+            if let Some(buf) = map.get(&guest) {
+                let src_len = buf.data.len();
+                let dst_len = buffer.len();
+                let copy_len = src_len.min(dst_len);
+                buffer[..copy_len].copy_from_slice(&buf.data[..copy_len]);
+            } else {
+                // No guest drawing — fill with light gray placeholder.
+                let bg = 0x00F0_F0F0u32;
+                for pixel in buffer.iter_mut() {
+                    *pixel = bg;
+                }
+            }
         }
+
         if let Err(e) = buffer.present() {
             log::warn!("winit_bridge: present failed: {e}");
         }
@@ -270,6 +355,9 @@ impl<'a> ApplicationHandler for BridgeState<'a> {
 
             WindowEvent::Resized(size) => {
                 if size.width > 0 && size.height > 0 {
+                    // Resize the shared pixel buffer.
+                    ensure_buffer(guest, size.width, size.height);
+
                     let scale = self.surfaces.get(&wid)
                         .map(|(w, _)| w.scale_factor())
                         .unwrap_or(1.0);

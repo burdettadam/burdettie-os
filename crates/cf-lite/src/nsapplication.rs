@@ -12,6 +12,7 @@
 //!
 //! Total: 56 bytes.
 
+use std::collections::VecDeque;
 use std::sync::{Mutex, OnceLock};
 
 const DELEGATE_OFF: usize = 8;
@@ -24,6 +25,52 @@ const APP_SIZE: usize = 56;
 
 static SHARED_APP: OnceLock<u64> = OnceLock::new();
 static APP_WINDOWS: OnceLock<Mutex<Vec<u64>>> = OnceLock::new();
+static EVENT_QUEUE: OnceLock<Mutex<VecDeque<u64>>> = OnceLock::new();
+
+fn event_queue() -> &'static Mutex<VecDeque<u64>> {
+    EVENT_QUEUE.get_or_init(|| Mutex::new(VecDeque::new()))
+}
+
+/// Push an NSEvent address onto the application event queue.
+pub(crate) fn enqueue_event(event: u64) {
+    if event == 0 {
+        return;
+    }
+    event_queue().lock().unwrap_or_else(|e| e.into_inner()).push_back(event);
+}
+
+/// Dequeue the first event whose type matches `mask`, or any event if mask is
+/// `NSEventMaskAny` (all bits set / `u64::MAX`). Returns 0 if no matching event.
+fn dequeue_event(mask: u64, dequeue: bool) -> u64 {
+    let mut queue = event_queue().lock().unwrap_or_else(|e| e.into_inner());
+    if queue.is_empty() {
+        return 0;
+    }
+    // NSEventMaskAny = NSUIntegerMax = all bits set
+    let match_any = mask == u64::MAX || mask == 0;
+    for i in 0..queue.len() {
+        let event = queue[i];
+        if match_any || event_matches_mask(event, mask) {
+            if dequeue {
+                queue.remove(i);
+            }
+            return event;
+        }
+    }
+    0
+}
+
+/// Check if an NSEvent's type matches the given event mask.
+fn event_matches_mask(event: u64, mask: u64) -> bool {
+    if event == 0 {
+        return false;
+    }
+    let event_type = crate::nsevent::event_type_raw(event);
+    if event_type >= 64 {
+        return false; // invalid type
+    }
+    (mask & (1u64 << event_type)) != 0
+}
 
 fn app_windows() -> &'static Mutex<Vec<u64>> {
     APP_WINDOWS.get_or_init(|| Mutex::new(Vec::new()))
@@ -151,6 +198,7 @@ pub(crate) fn clear_window_roles(window: u64) {
 
 pub(crate) fn reset_runtime_state_for_reuse() {
     clear_registered_windows();
+    event_queue().lock().unwrap_or_else(|e| e.into_inner()).clear();
     if let Some(app) = SHARED_APP.get().copied() {
         unsafe {
             *((app as usize + DELEGATE_OFF) as *mut u64) = 0;
@@ -706,12 +754,64 @@ fn send_delegate_message(delegate: u64, selector: &str, arg: u64) {
 }
 
 /// `-[NSApplication nextEventMatchingMask:untilDate:inMode:dequeue:]`
-/// Stub — returns nil (no real event loop).
+///
+/// Returns the next event in the queue whose type matches `mask`, or nil if
+/// none is available. When `dequeue` is YES (non-zero), the event is removed
+/// from the queue.
 pub extern "C" fn shim_nsapplication_next_event(
     _obj: u64, _cmd: u64,
-    _mask: u64, _until_date: u64, _mode: u64, _dequeue: u8,
+    mask: u64, _until_date: u64, _mode: u64, dequeue: u8,
 ) -> u64 {
-    0
+    dequeue_event(mask, dequeue != 0)
+}
+
+/// `-[NSApplication postEvent:atStart:]`
+///
+/// Inserts an event into the application event queue. If `at_start` is YES,
+/// the event is placed at the front of the queue; otherwise at the end.
+pub extern "C" fn shim_nsapplication_post_event(
+    _obj: u64, _cmd: u64, event: u64, at_start: u8,
+) {
+    if event == 0 { return; }
+    let mut queue = event_queue().lock().unwrap_or_else(|e| e.into_inner());
+    if at_start != 0 {
+        queue.push_front(event);
+    } else {
+        queue.push_back(event);
+    }
+}
+
+/// `-[NSApplication discardEventsMatchingMask:beforeEvent:]`
+pub extern "C" fn shim_nsapplication_discard_events(
+    _obj: u64, _cmd: u64, mask: u64, before_event: u64,
+) {
+    let match_any = mask == u64::MAX || mask == 0;
+    let mut queue = event_queue().lock().unwrap_or_else(|e| e.into_inner());
+    queue.retain(|&event| {
+        // If before_event is non-zero, only discard events that came before it.
+        if before_event != 0 && event == before_event {
+            return true; // keep this event and everything after it
+        }
+        if match_any || event_matches_mask(event, mask) {
+            return false; // discard
+        }
+        true
+    });
+}
+
+/// `-[NSApplication updateWindows]`
+///
+/// Sends `display` to every visible window that has been marked as needing
+/// display. This is the standard AppKit mechanism for flushing dirty views.
+pub extern "C" fn shim_nsapplication_update_windows(_obj: u64, _cmd: u64) {
+    for &window in &snapshot_windows() {
+        if crate::nswindow::is_window_visible(window) {
+            let content_view = crate::nswindow::window_content_view(window);
+            if content_view != 0 && crate::nsview::view_needs_display(content_view) {
+                crate::nsview::shim_nsview_display(content_view, 0);
+            }
+        }
+    }
 }
 
 /// `-[NSApplication performKeyEquivalent:]`
