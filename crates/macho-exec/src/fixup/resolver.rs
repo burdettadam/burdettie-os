@@ -126,9 +126,11 @@ impl StubResolver {
         "liblzma.so.5",
         "libz.so.1",
         "libarchive.so.13",
-        "libssl.so.3",
-        "libcrypto.so.3",
-        "/usr/local/lib/libressl_compat.so",
+        // LibreSSL 3.3.6 — ABI-matching the macOS /usr/bin/openssl binary.
+        // Built natively in Docker; see Dockerfile.burdettie libressl-builder stage.
+        "/opt/libressl/lib/libcrypto.so",
+        "/opt/libressl/lib/libssl.so",
+        "/opt/libressl/lib/libtls.so",
         "libacl.so.1",
         "libc++.so.1",
         "libc++abi.so.1",
@@ -593,18 +595,16 @@ impl StubResolver {
         }
         matches!(
             name,
-            // I/O — stdio
-            "printf" | "puts" | "putchar" | "fprintf" | "snprintf" | "sprintf"
-            | "vprintf" | "vfprintf" | "vsnprintf" | "vsprintf" | "asprintf"
-            | "fputs" | "fwrite" | "fread" | "fflush"
-            | "fopen" | "fclose" | "freopen" | "feof" | "ferror" | "fputc"
-            | "fgetc" | "getc" | "ungetc" | "fgets" | "rewind" | "fseek" | "ftell"
-            | "fileno" | "open_memstream" | "sscanf" | "fscanf"
+            // I/O — stdio (non-FILE functions remain on safe-list;
+            // all FILE*-taking functions are shimmed in cross_platform/stdio.rs)
+            "printf" | "puts" | "snprintf" | "sprintf"
+            | "vprintf" | "vsnprintf" | "vsprintf" | "asprintf"
+            | "sscanf"
             | "__stderrp" | "__stdoutp" | "__stdinp"
-            | "__sprintf_chk" | "__snprintf_chk" | "__fprintf_chk"
-            // Additional stdio
-            | "putc" | "fdopen" | "getline" | "getdelim" | "getchar" | "getlogin"
-            | "pclose" | "tmpfile" | "setvbuf" | "setbuf" | "clearerr"
+            | "__sprintf_chk" | "__snprintf_chk"
+            // Additional non-FILE stdio
+            | "getlogin"
+            | "pclose"
             | "dprintf"
             // Memory
             | "malloc" | "calloc" | "realloc" | "reallocf" | "free"
@@ -1102,13 +1102,8 @@ impl StubResolver {
             | "dirname_r" | "basename_r"
             // File/dir extras
             | "mkpath_np" | "clonefile"
-            | "fopen$DARWIN_EXTSN"
             | "nftw" | "ftw"
-            | "setlinebuf"
             | "fmtcheck"
-            | "fseeko" | "ftello"
-            | "flockfile" | "funlockfile" | "ftrylockfile"
-            | "getc_unlocked" | "putc_unlocked"
             // Locale
             | "nl_langinfo" | "nl_langinfo_l" | "localeconv"
             | "newlocale" | "uselocale" | "freelocale" | "duplocale"
@@ -1193,7 +1188,7 @@ impl StubResolver {
             // FP environment
             | "feclearexcept" | "fetestexcept" | "fegetenv" | "fesetenv"
             | "feraiseexcept" | "fegetround" | "fesetround"
-            | "__srget" | "__swbuf"
+            | "__srget"
             // Shared memory
             | "shm_open" | "shm_unlink"
             // Signal extras

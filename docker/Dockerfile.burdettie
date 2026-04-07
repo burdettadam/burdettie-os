@@ -18,6 +18,31 @@
 # Interactive shell:
 #   docker run --rm -it burdettie-os bash
 
+# ── Build LibreSSL 3.3.6 natively ──────────────────────────────────
+# Cross-compiling with zig introduces a codegen bug in the EC big-number
+# arithmetic ("point is not on curve"), so we build natively in a stage.
+
+FROM debian:bookworm-slim AS libressl-builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc libc6-dev cmake make wget ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+ARG LIBRESSL_VERSION=3.3.6
+RUN cd /tmp \
+    && wget -q "https://ftp.openbsd.org/pub/OpenBSD/LibreSSL/libressl-${LIBRESSL_VERSION}.tar.gz" \
+    && tar xzf "libressl-${LIBRESSL_VERSION}.tar.gz" \
+    && mkdir build && cd build \
+    && cmake "../libressl-${LIBRESSL_VERSION}" \
+        -DBUILD_SHARED_LIBS=ON \
+        -DLIBRESSL_APPS=OFF \
+        -DLIBRESSL_TESTS=OFF \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/opt/libressl \
+    && make -j"$(nproc)" \
+    && make install \
+    && strip --strip-debug /opt/libressl/lib/*.so*
+
 # ── Runtime image ──────────────────────────────────────────────────
 
 FROM debian:bookworm-slim
@@ -29,27 +54,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zlib1g \
     liblzma5 \
     libarchive13 \
-    libssl3 \
     libacl1 \
     libc++1 \
     libc++abi1 \
     locales \
-    gcc \
-    libc6-dev \
     && rm -rf /var/lib/apt/lists/* \
     && echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen \
     && locale-gen
 
-# Build LibreSSL-to-OpenSSL 3 compatibility shim.
-# macOS ships LibreSSL whose API predates OpenSSL 3's renames/removals.
-# This .so provides the deprecated symbol names, delegating to OpenSSL 3.
-COPY docker/libressl_compat.c /tmp/libressl_compat.c
-RUN gcc -shared -fPIC -O2 -o /usr/local/lib/libressl_compat.so \
-        /tmp/libressl_compat.c \
-        -ldl -Wl,--no-as-needed \
-    && rm /tmp/libressl_compat.c \
-    && apt-get purge -y --auto-remove gcc libc6-dev \
-    && rm -rf /var/lib/apt/lists/*
+# Install LibreSSL 3.3.6 (matches macOS Sequoia's /usr/bin/openssl).
+# Built natively in the libressl-builder stage above.
+# The macOS openssl binary is linked against LibreSSL, not OpenSSL 3.x.
+# Bundling the real LibreSSL .so files avoids the struct-layout ABI mismatch
+# that occurs when LibreSSL symbols resolve to OpenSSL 3.x.
+COPY --from=libressl-builder /opt/libressl/lib/libcrypto.so /opt/libressl/lib/
+COPY --from=libressl-builder /opt/libressl/lib/libssl.so    /opt/libressl/lib/
+COPY --from=libressl-builder /opt/libressl/lib/libtls.so    /opt/libressl/lib/
 
 # System identity
 RUN echo "burdettie-os 1.0" > /etc/burdettie-release

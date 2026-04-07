@@ -537,15 +537,16 @@ mod tests {
 
     fn make_width_constraint(view: u64, width: f64) -> u64 {
         // attr 7 = Width, relation 0 = EQ, no second item.
+        // Mark active directly (not via setActive: which auto-installs).
         let c = shim_nslayoutconstraint_create(0, 0, view, 7, 0, 0, 0, 1.0, width);
-        shim_nslayoutconstraint_set_active(c, 0, 1);
+        unsafe { *((c as usize + 72) as *mut u64) = 1; } // C_ACTIVE
         c
     }
 
     fn make_height_constraint(view: u64, height: f64) -> u64 {
         // attr 8 = Height, relation 0 = EQ, no second item.
         let c = shim_nslayoutconstraint_create(0, 0, view, 8, 0, 0, 0, 1.0, height);
-        shim_nslayoutconstraint_set_active(c, 0, 1);
+        unsafe { *((c as usize + 72) as *mut u64) = 1; } // C_ACTIVE
         c
     }
 
@@ -558,7 +559,7 @@ mod tests {
         let c = shim_nslayoutconstraint_create(
             0, 0, view_a, attr_a, 0, view_b, attr_b, 1.0, constant,
         );
-        shim_nslayoutconstraint_set_active(c, 0, 1);
+        unsafe { *((c as usize + 72) as *mut u64) = 1; } // C_ACTIVE
         c
     }
 
@@ -857,6 +858,39 @@ mod tests {
         // Flush should clear the flag.
         flush_pending_layouts();
         assert!(!needs_layout(parent), "flush should clear needs_layout");
+
+        free_obj(child);
+        free_obj(parent);
+    }
+
+    #[test]
+    fn solve_via_set_active_auto_install() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset();
+        let parent = make_view(0.0, 0.0, 400.0, 300.0);
+        let child = make_view(0.0, 0.0, 0.0, 0.0);
+        add_subview_raw(parent, child);
+
+        // Use setActive: (modern API) — auto-installs constraint onto the view.
+        let cw = shim_nslayoutconstraint_create(0, 0, child, 7, 0, 0, 0, 1.0, 100.0);
+        shim_nslayoutconstraint_set_active(cw, 0, 1);
+        let ch = shim_nslayoutconstraint_create(0, 0, child, 8, 0, 0, 0, 1.0, 50.0);
+        shim_nslayoutconstraint_set_active(ch, 0, 1);
+
+        // Pin to parent edges via setActive:.
+        let cl = shim_nslayoutconstraint_create(0, 0, child, 9, 0, parent, 9, 1.0, 0.0); // centerX
+        shim_nslayoutconstraint_set_active(cl, 0, 1);
+        let ct = shim_nslayoutconstraint_create(0, 0, child, 10, 0, parent, 10, 1.0, 0.0); // centerY
+        shim_nslayoutconstraint_set_active(ct, 0, 1);
+
+        // Layout should solve from parent down.
+        layout_if_needed(parent);
+
+        let (x, y, w, h) = read_frame(child);
+        assert!((w - 100.0).abs() < 1.0, "width should be ~100, got {w}");
+        assert!((h - 50.0).abs() < 1.0, "height should be ~50, got {h}");
+        assert!((x - 150.0).abs() < 1.0, "x should be ~150 (centered), got {x}");
+        assert!((y - 125.0).abs() < 1.0, "y should be ~125 (centered), got {y}");
 
         free_obj(child);
         free_obj(parent);

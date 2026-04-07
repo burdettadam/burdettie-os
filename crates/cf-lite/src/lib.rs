@@ -220,6 +220,7 @@ pub fn reset_runtime_state_for_reuse() {
     nsnotificationcenter::clear_all_observers();
     nsrunloop::reset_runtime_state_for_reuse();
     layout_solver::reset_global_state();
+    nsview::reset_layout_priority_state();
 }
 
 /// Install the platform provider for Foundation shims.

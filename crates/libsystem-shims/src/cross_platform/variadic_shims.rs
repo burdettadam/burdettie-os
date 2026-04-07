@@ -111,6 +111,26 @@ mod inner {
             format: *const libc::c_char,
             ap: *const u8,
         ) -> libc::c_int;
+
+        // Shadow wrappers that translate DarwinFile* → glibc FILE* before
+        // calling the real v-function. Defined in cross_platform/stdio.rs.
+        fn vfprintf_shadow(
+            darwin_fp: *mut u8,
+            fmt: *const libc::c_char,
+            ap: *mut libc::c_void,
+        ) -> libc::c_int;
+        fn vfscanf_shadow(
+            darwin_fp: *mut u8,
+            fmt: *const libc::c_char,
+            ap: *mut libc::c_void,
+        ) -> libc::c_int;
+        fn vfprintf_chk_shadow(
+            darwin_fp: *mut u8,
+            flag: libc::c_int,
+            fmt: *const libc::c_char,
+            ap: *mut libc::c_void,
+        ) -> libc::c_int;
+
         fn vprintf(format: *const libc::c_char, ap: *const u8) -> libc::c_int;
         fn vsnprintf(
             buf: *mut libc::c_char,
@@ -201,7 +221,7 @@ mod inner {
         // ── printf family ──────────────────────────────────
 
         /// `int fprintf(FILE *stream, const char *fmt, ...)`
-        ///   → `vfprintf(stream, fmt, &va_list)`
+        ///   → `vfprintf_shadow(stream, fmt, &va_list)`
         /// Named args: x0=stream, x1=fmt  ⇒ va_list in x2
         #[unsafe(naked)]
         pub extern "C" fn shim_fprintf() -> libc::c_int {
@@ -216,7 +236,7 @@ mod inner {
                 "bl   {v_func}",
                 "ldp  x29, x30, [sp], #64",
                 "ret",
-                v_func = sym vfprintf,
+                v_func = sym vfprintf_shadow,
             )
         }
 
@@ -343,7 +363,7 @@ mod inner {
         }
 
         /// `int fscanf(FILE *stream, const char *fmt, ...)`
-        ///   → `vfscanf(stream, fmt, &va_list)`
+        ///   → `vfscanf_shadow(stream, fmt, &va_list)`
         /// Named args: x0=stream, x1=fmt  ⇒ va_list in x2
         #[unsafe(naked)]
         pub extern "C" fn shim_fscanf() -> libc::c_int {
@@ -358,7 +378,7 @@ mod inner {
                 "bl   {v_func}",
                 "ldp  x29, x30, [sp], #64",
                 "ret",
-                v_func = sym vfscanf,
+                v_func = sym vfscanf_shadow,
             )
         }
 
@@ -427,7 +447,7 @@ mod inner {
                 "bl   {v_func}",
                 "ldp  x29, x30, [sp], #64",
                 "ret",
-                v_func = sym vfprintf,
+                v_func = sym vfprintf_shadow,
             )
         }
 
@@ -553,7 +573,7 @@ mod inner {
                 "bl   {v_func}",
                 "ldp  x29, x30, [sp], #64",
                 "ret",
-                v_func = sym vfscanf,
+                v_func = sym vfscanf_shadow,
             )
         }
 
@@ -642,7 +662,7 @@ mod inner {
 
         /// `int __fprintf_chk(stream, flag, fmt, ...)`
         /// Named args: x0=stream, x1=flag, x2=fmt ⇒ va in x3
-        /// → `__vfprintf_chk(stream, flag, fmt, &va_list)`
+        /// → `vfprintf_chk_shadow(stream, flag, fmt, &va_list)`
         #[unsafe(naked)]
         pub extern "C" fn shim_fprintf_chk() -> libc::c_int {
             core::arch::naked_asm!(
@@ -656,7 +676,7 @@ mod inner {
                 "bl   {v_func}",
                 "ldp  x29, x30, [sp], #64",
                 "ret",
-                v_func = sym vfprintf_chk,
+                v_func = sym vfprintf_chk_shadow,
             )
         }
 
@@ -732,7 +752,7 @@ mod inner {
                 "bl   {v_func}",
                 "ldp  x29, x30, [sp], #64",
                 "ret",
-                v_func = sym vfprintf_chk,
+                v_func = sym vfprintf_chk_shadow,
             )
         }
 

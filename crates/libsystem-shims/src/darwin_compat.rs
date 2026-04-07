@@ -58,12 +58,16 @@ impl DarwinCompatShims {
             );
 
             // ── stdio file pointers ─────────────────────────────────
-            init_stdio_pointers();
-            register_shims!(table,
-                ("___stderrp", stdio_ptr_addr(StdioStream::Stderr) as u64, "__stderrp data"),
-                ("___stdoutp", stdio_ptr_addr(StdioStream::Stdout) as u64, "__stdoutp data"),
-                ("___stdinp", stdio_ptr_addr(StdioStream::Stdin) as u64, "__stdinp data"),
-            );
+            // Use shadow FILE structs from the stdio module so that
+            // inline putc/getc macros see macOS-layout fields.
+            {
+                use crate::cross_platform::stdio::stdio_shadow_ptr_addr;
+                register_shims!(table,
+                    ("___stderrp", stdio_shadow_ptr_addr(2) as u64, "__stderrp data (shadow)"),
+                    ("___stdoutp", stdio_shadow_ptr_addr(1) as u64, "__stdoutp data (shadow)"),
+                    ("___stdinp", stdio_shadow_ptr_addr(0) as u64, "__stdinp data (shadow)"),
+                );
+            }
 
             // ── MB_CUR_MAX ──────────────────────────────────────────
             // `___mb_cur_max` is a DATA symbol (extern int __mb_cur_max).
@@ -256,15 +260,8 @@ impl DarwinCompatShims {
                 ("_os_variant_has_internal_content", shim_os_variant_false as *const () as u64, "os_variant_has_internal_content → false"),
             );
 
-            // ── stdio internals (macOS-specific) ────────────────────
-            register_shims!(table,
-                ("___srget", shim_srget as *const () as u64, "__srget → fgetc"),
-                // NOTE: ___swbuf is implemented (shim_swbuf) but not registered here.
-                // The macOS inline putc macro reads FILE struct fields at macOS offsets
-                // before calling __swbuf. This corrupts glibc FILE structs, causing
-                // SIGABRT in tools like xcodebuild. Enabling requires a FILE struct
-                // translation layer first.
-            );
+            // NOTE: ___srget and ___swbuf are now registered in
+            // cross_platform/stdio.rs along with all other FILE shims.
 
             // ── BSD number parsing ──────────────────────────────────
             register_shims!(table,
@@ -525,10 +522,20 @@ enum StdioStream {
 #[cfg(not(target_os = "macos"))]
 fn init_stdio_pointers() {
     INIT_STDIO.call_once(|| {
+        // Use glibc's REAL stdout/stderr/stdin — NOT fdopen'd copies.
+        // fdopen creates a separate FILE object with its own buffer on
+        // the same fd.  When macOS binaries mix fputs(__stdoutp,...)
+        // with printf() (which uses glibc's internal stdout), the two
+        // independent buffers produce garbled interleaved output.
+        extern "C" {
+            static mut stdout: *mut libc::FILE;
+            static mut stderr: *mut libc::FILE;
+            static mut stdin: *mut libc::FILE;
+        }
         unsafe {
-            STDERR_PTR = libc::fdopen(2, b"w\0".as_ptr().cast());
-            STDOUT_PTR = libc::fdopen(1, b"w\0".as_ptr().cast());
-            STDIN_PTR = libc::fdopen(0, b"r\0".as_ptr().cast());
+            STDERR_PTR = stderr;
+            STDOUT_PTR = stdout;
+            STDIN_PTR = stdin;
         }
     });
 }
@@ -1223,13 +1230,17 @@ extern "C" fn shim_fgetln(
     len: *mut libc::size_t,
 ) -> *mut libc::c_char {
     use std::cell::RefCell;
+    // Translate shadow DarwinFile* → real glibc FILE*
+    let real_stream = unsafe {
+        crate::cross_platform::stdio::extract_real_fp(stream as *mut u8)
+    };
     thread_local! {
         static BUF: RefCell<(*mut libc::c_char, libc::size_t)> = RefCell::new((std::ptr::null_mut(), 0));
     }
     BUF.with(|cell| {
         let mut guard = cell.borrow_mut();
         let (ref mut lineptr, ref mut n) = *guard;
-        let ret = unsafe { libc::getline(lineptr, n, stream) };
+        let ret = unsafe { libc::getline(lineptr, n, real_stream) };
         if ret < 0 {
             if !len.is_null() {
                 unsafe { *len = 0 };
@@ -1533,6 +1544,10 @@ extern "C" fn shim_fgetwln(
     len: *mut libc::size_t,
 ) -> *const libc::wchar_t {
     use std::cell::RefCell;
+    // Translate shadow DarwinFile* → real glibc FILE*
+    let real_stream = unsafe {
+        crate::cross_platform::stdio::extract_real_fp(stream as *mut u8)
+    };
     extern "C" {
         fn fgetwc(stream: *mut libc::FILE) -> u32;
     }
@@ -1544,7 +1559,7 @@ extern "C" fn shim_fgetwln(
         let mut buf = cell.borrow_mut();
         buf.clear();
         loop {
-            let wc = unsafe { fgetwc(stream) };
+            let wc = unsafe { fgetwc(real_stream) };
             if wc == WEOF_VAL {
                 if buf.is_empty() {
                     if !len.is_null() {

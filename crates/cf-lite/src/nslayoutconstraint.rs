@@ -28,6 +28,76 @@ const IDENTIFIER_OFF: usize = 80;
 const SHOULD_ARCHIVE_OFF: usize = 88;
 pub(crate) const CONSTRAINT_SIZE: usize = 96;
 
+/// NSView superview offset (must match nsview.rs SUPERVIEW_OFF).
+const VIEW_SUPERVIEW_OFF: usize = 8;
+
+/// Walk the superview chain to collect all ancestors (including `view` itself).
+fn ancestor_chain(view: u64) -> Vec<u64> {
+    let mut chain = Vec::new();
+    let mut v = view;
+    while v != 0 {
+        chain.push(v);
+        v = unsafe { *((v as usize + VIEW_SUPERVIEW_OFF) as *const u64) };
+    }
+    chain
+}
+
+/// Find the nearest common ancestor of two views.
+/// If `b` is 0 (constant-only constraint), returns `a`.
+/// If no common ancestor exists, returns `a` as fallback.
+fn nearest_common_ancestor(a: u64, b: u64) -> u64 {
+    if a == 0 { return b; }
+    if b == 0 { return a; }
+    if a == b { return a; }
+
+    let chain_a = ancestor_chain(a);
+    let chain_b = ancestor_chain(b);
+
+    // Walk chain_b looking for the first view that's also in chain_a.
+    for &v in &chain_b {
+        if chain_a.contains(&v) {
+            return v;
+        }
+    }
+    // No common ancestor found — fall back to first item.
+    a
+}
+
+/// Activate a single constraint: set the active flag, find the nearest
+/// common ancestor of firstItem/secondItem, and install the constraint
+/// into the layout solver on that view.
+fn activate_constraint(c: u64) {
+    if c == 0 { return; }
+    let was_active = read_u64(c, ACTIVE_OFF) != 0;
+    write_u64(c, ACTIVE_OFF, 1);
+
+    if !was_active {
+        let first = read_u64(c, FIRST_ITEM_OFF);
+        let second = read_u64(c, SECOND_ITEM_OFF);
+        let host_view = nearest_common_ancestor(first, second);
+        if host_view != 0 {
+            crate::layout_solver::add_constraint(host_view, c);
+        }
+    }
+}
+
+/// Deactivate a single constraint: clear the active flag and remove
+/// from the layout solver.
+fn deactivate_constraint(c: u64) {
+    if c == 0 { return; }
+    let was_active = read_u64(c, ACTIVE_OFF) != 0;
+    write_u64(c, ACTIVE_OFF, 0);
+
+    if was_active {
+        let first = read_u64(c, FIRST_ITEM_OFF);
+        let second = read_u64(c, SECOND_ITEM_OFF);
+        let host_view = nearest_common_ancestor(first, second);
+        if host_view != 0 {
+            crate::layout_solver::remove_constraint(host_view, c);
+        }
+    }
+}
+
 fn read_u64(obj: u64, offset: usize) -> u64 {
     if obj == 0 { return 0; }
     unsafe { *((obj as usize + offset) as *const u64) }
@@ -84,7 +154,7 @@ pub extern "C" fn shim_nslayoutconstraint_activate_constraints(
     let count = crate::nsarray::shim_nsarray_count(constraints_array, 0);
     for i in 0..count {
         let c = crate::nsarray::shim_nsarray_object_at_index(constraints_array, 0, i);
-        write_u64(c, ACTIVE_OFF, 1);
+        activate_constraint(c);
     }
 }
 
@@ -98,7 +168,7 @@ pub extern "C" fn shim_nslayoutconstraint_deactivate_constraints(
     let count = crate::nsarray::shim_nsarray_count(constraints_array, 0);
     for i in 0..count {
         let c = crate::nsarray::shim_nsarray_object_at_index(constraints_array, 0, i);
-        write_u64(c, ACTIVE_OFF, 0);
+        deactivate_constraint(c);
     }
 }
 
@@ -109,7 +179,12 @@ pub extern "C" fn shim_nslayoutconstraint_is_active(obj: u64, _cmd: u64) -> u8 {
 
 /// `-[NSLayoutConstraint setActive:]`
 pub extern "C" fn shim_nslayoutconstraint_set_active(obj: u64, _cmd: u64, flag: u8) {
-    write_u64(obj, ACTIVE_OFF, u64::from(flag != 0));
+    if obj == 0 { return; }
+    if flag != 0 {
+        activate_constraint(obj);
+    } else {
+        deactivate_constraint(obj);
+    }
 }
 
 /// `-[NSLayoutConstraint constant]`
@@ -441,5 +516,96 @@ mod tests {
         shim_nsview_remove_constraints(view, 0, 0);
         free_obj(c);
         free_obj(view);
+    }
+
+    // ── setActive: auto-install ─────────────────────────────────
+
+    /// Serialise tests that touch the process-global layout solver.
+    static LAYOUT_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    #[test]
+    fn set_active_auto_installs_to_first_item() {
+        let _guard = LAYOUT_TEST_LOCK.lock().unwrap();
+        crate::layout_solver::reset_global_state();
+        let view = crate::nsview::alloc_view_with_frame(0.0, 0.0, 100.0, 100.0);
+        // Width = 200, no second item → installs on firstItem.
+        let c = shim_nslayoutconstraint_create(0, 0, view, 7, 0, 0, 0, 1.0, 200.0);
+        shim_nslayoutconstraint_set_active(c, 0, 1);
+        assert_eq!(shim_nslayoutconstraint_is_active(c, 0), 1);
+        // Should now be in the constraint list of `view`.
+        let arr = crate::layout_solver::get_constraints(view);
+        assert_eq!(crate::nsarray::shim_nsarray_count(arr, 0), 1);
+        free_obj(c);
+        free_obj(view);
+        crate::layout_solver::reset_global_state();
+    }
+
+    #[test]
+    fn set_active_auto_installs_to_common_ancestor() {
+        let _guard = LAYOUT_TEST_LOCK.lock().unwrap();
+        crate::layout_solver::reset_global_state();
+        let parent = crate::nsview::alloc_view_with_frame(0.0, 0.0, 400.0, 300.0);
+        let child = crate::nsview::alloc_view_with_frame(0.0, 0.0, 100.0, 50.0);
+        crate::nsview::shim_nsview_add_subview(parent, 0, child);
+        // child.left == parent.left → installs on parent (nearest common ancestor).
+        let c = shim_nslayoutconstraint_create(0, 0, child, 1, 0, parent, 1, 1.0, 0.0);
+        shim_nslayoutconstraint_set_active(c, 0, 1);
+        let arr = crate::layout_solver::get_constraints(parent);
+        assert_eq!(crate::nsarray::shim_nsarray_count(arr, 0), 1);
+        free_obj(c);
+        crate::layout_solver::reset_global_state();
+    }
+
+    #[test]
+    fn deactivate_removes_from_solver() {
+        let _guard = LAYOUT_TEST_LOCK.lock().unwrap();
+        crate::layout_solver::reset_global_state();
+        let view = crate::nsview::alloc_view_with_frame(0.0, 0.0, 100.0, 100.0);
+        let c = shim_nslayoutconstraint_create(0, 0, view, 7, 0, 0, 0, 1.0, 200.0);
+        shim_nslayoutconstraint_set_active(c, 0, 1);
+        assert_eq!(crate::nsarray::shim_nsarray_count(crate::layout_solver::get_constraints(view), 0), 1);
+        shim_nslayoutconstraint_set_active(c, 0, 0);
+        assert_eq!(shim_nslayoutconstraint_is_active(c, 0), 0);
+        assert_eq!(crate::nsarray::shim_nsarray_count(crate::layout_solver::get_constraints(view), 0), 0);
+        free_obj(c);
+        free_obj(view);
+        crate::layout_solver::reset_global_state();
+    }
+
+    #[test]
+    fn activate_constraints_batch_auto_installs() {
+        let _guard = LAYOUT_TEST_LOCK.lock().unwrap();
+        crate::layout_solver::reset_global_state();
+        let parent = crate::nsview::alloc_view_with_frame(0.0, 0.0, 400.0, 300.0);
+        let child = crate::nsview::alloc_view_with_frame(0.0, 0.0, 0.0, 0.0);
+        crate::nsview::shim_nsview_add_subview(parent, 0, child);
+
+        let cw = shim_nslayoutconstraint_create(0, 0, child, 7, 0, 0, 0, 1.0, 100.0);
+        let ch = shim_nslayoutconstraint_create(0, 0, child, 8, 0, 0, 0, 1.0, 50.0);
+        let arr = crate::nsarray::make_nsarray(&[cw, ch]);
+        shim_nslayoutconstraint_activate_constraints(0, 0, arr);
+
+        // Width-only constraint auto-installs on child (firstItem, no secondItem).
+        let child_constraints = crate::layout_solver::get_constraints(child);
+        assert_eq!(crate::nsarray::shim_nsarray_count(child_constraints, 0), 2);
+        free_obj(ch);
+        free_obj(cw);
+        crate::layout_solver::reset_global_state();
+    }
+
+    #[test]
+    fn set_active_idempotent() {
+        let _guard = LAYOUT_TEST_LOCK.lock().unwrap();
+        crate::layout_solver::reset_global_state();
+        let view = crate::nsview::alloc_view_with_frame(0.0, 0.0, 100.0, 100.0);
+        let c = shim_nslayoutconstraint_create(0, 0, view, 7, 0, 0, 0, 1.0, 200.0);
+        shim_nslayoutconstraint_set_active(c, 0, 1);
+        shim_nslayoutconstraint_set_active(c, 0, 1); // double activate
+        // Should still only have 1 constraint, not 2.
+        let arr = crate::layout_solver::get_constraints(view);
+        assert_eq!(crate::nsarray::shim_nsarray_count(arr, 0), 1);
+        free_obj(c);
+        free_obj(view);
+        crate::layout_solver::reset_global_state();
     }
 }

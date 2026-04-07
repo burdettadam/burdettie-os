@@ -24,10 +24,12 @@ const REL_LE: u64 = (-1i64) as u64;
 const REL_EQ: u64 = 0;
 const REL_GE: u64 = 1;
 
-/// A parsed size predicate (e.g., `(>=50)`, `(==200@750)`).
+/// A parsed size predicate (e.g., `(>=50)`, `(==200@750)`, `(==metricName)`).
 struct SizePredicate {
     relation: u64,
     constant: f64,
+    /// Metric name if the predicate uses a named metric instead of a literal number.
+    metric_name: Option<String>,
     priority: f64,
 }
 
@@ -39,6 +41,8 @@ enum VflElement {
         predicates: Vec<SizePredicate>,
     },
     Spacing(f64),
+    /// Spacing that uses a named metric (resolved at constraint generation time).
+    MetricSpacing(String),
     StandardSpacing,
     Flush,
 }
@@ -66,13 +70,21 @@ fn parse_vfl(format: &str) -> (bool, Vec<VflElement>) {
             elements.push(VflElement::Superview);
             chars = rest;
         } else if let Some(rest) = chars.strip_prefix('-') {
-            // Could be `-number-` or just `-` (standard spacing).
+            // Could be `-number-`, `-metricName-`, or just `-` (standard spacing).
             if let Some((num, after)) = parse_number_dash(rest) {
                 elements.push(VflElement::Spacing(num));
                 chars = after;
             } else {
-                elements.push(VflElement::StandardSpacing);
-                chars = rest;
+                // Try metric name: `-identifier-`
+                let (name, after_name) = parse_identifier(rest);
+                if !name.is_empty() {
+                    let after_dash = after_name.strip_prefix('-').unwrap_or(after_name);
+                    elements.push(VflElement::MetricSpacing(name));
+                    chars = after_dash;
+                } else {
+                    elements.push(VflElement::StandardSpacing);
+                    chars = rest;
+                }
             }
         } else if let Some(rest) = chars.strip_prefix('[') {
             // Parse view name.
@@ -151,16 +163,24 @@ fn parse_predicates(s: &str) -> (Vec<SizePredicate>, &str) {
             (REL_EQ, chars)
         };
 
-        // Parse number.
+        // Parse number or metric name.
         let mut end = 0;
         let bytes = after_rel.as_bytes();
         while end < bytes.len() && (bytes[end].is_ascii_digit() || bytes[end] == b'.') {
             end += 1;
         }
-        let constant = if end > 0 {
-            after_rel[..end].parse().unwrap_or(0.0)
+        let (constant, metric_name) = if end > 0 {
+            // Numeric literal.
+            (after_rel[..end].parse().unwrap_or(0.0), None)
         } else {
-            0.0
+            // Try metric name (identifier).
+            let (name, _) = parse_identifier(after_rel);
+            if !name.is_empty() {
+                end = name.len();
+                (0.0, Some(name))
+            } else {
+                (0.0, None)
+            }
         };
         chars = &after_rel[end..];
 
@@ -181,6 +201,7 @@ fn parse_predicates(s: &str) -> (Vec<SizePredicate>, &str) {
         preds.push(SizePredicate {
             relation,
             constant,
+            metric_name,
             priority,
         });
 
@@ -224,6 +245,31 @@ fn nsstring_to_rust(ptr: u64) -> String {
         .to_string()
 }
 
+/// Resolve a metric name from the `metrics` NSDictionary (NSNumber values).
+fn resolve_metric(metrics: u64, name: &str) -> Option<f64> {
+    if metrics == 0 {
+        return None;
+    }
+    let ns_key = make_nsstring(name);
+    if ns_key == 0 {
+        return None;
+    }
+    let val = crate::nsdictionary::shim_nsdictionary_object_for_key(metrics, 0, ns_key);
+    if val == 0 {
+        return None;
+    }
+    Some(crate::nsnumber::shim_nsnumber_double_value(val, 0))
+}
+
+/// Resolve the constant for a size predicate, looking up metric names if present.
+fn resolve_metric_value(metrics: u64, pred: &SizePredicate) -> f64 {
+    if let Some(ref name) = pred.metric_name {
+        resolve_metric(metrics, name).unwrap_or(pred.constant)
+    } else {
+        pred.constant
+    }
+}
+
 /// Resolve a view key from the `views` NSDictionary.
 fn resolve_view(views: u64, key: &str) -> u64 {
     if views == 0 {
@@ -264,7 +310,6 @@ pub extern "C" fn shim_nslayoutconstraint_constraints_with_visual_format(
     metrics: u64,
     views: u64,
 ) -> u64 {
-    let _ = metrics; // TODO: metric name resolution
     if format_str == 0 {
         return crate::nsarray::make_nsarray(&[]);
     }
@@ -302,6 +347,9 @@ pub extern "C" fn shim_nslayoutconstraint_constraints_with_visual_format(
             }
             VflElement::Spacing(s) => {
                 pending_spacing = Some(*s);
+            }
+            VflElement::MetricSpacing(ref name) => {
+                pending_spacing = Some(resolve_metric(metrics, name).unwrap_or(DEFAULT_SPACING));
             }
             VflElement::Flush => {
                 pending_spacing = Some(0.0);
@@ -343,8 +391,9 @@ pub extern "C" fn shim_nslayoutconstraint_constraints_with_visual_format(
 
                 // Emit size predicates.
                 for pred in predicates {
+                    let constant = resolve_metric_value(metrics, pred);
                     let c = make_constraint(
-                        view, size_attr, pred.relation, 0, 0, pred.constant, pred.priority,
+                        view, size_attr, pred.relation, 0, 0, constant, pred.priority,
                     );
                     if c != 0 {
                         constraints.push(c);
@@ -547,5 +596,89 @@ mod tests {
         let result = shim_nslayoutconstraint_constraints_with_visual_format(0, 0, 0, 0, 0, 0);
         let count = crate::nsarray::shim_nsarray_count(result, 0);
         assert_eq!(count, 0);
+    }
+
+    // ── metric name resolution ─────────────────────────────────
+
+    #[test]
+    fn metric_in_size_predicate() {
+        let parent = crate::nsview::alloc_view_with_frame(0.0, 0.0, 400.0, 300.0);
+        let child = crate::nsview::alloc_view_with_frame(0.0, 0.0, 100.0, 50.0);
+        crate::nsview::shim_nsview_add_subview(parent, 0, child);
+
+        let views_keys = [make_nsstring("child")];
+        let views_vals = [child];
+        let views = crate::nsdictionary::make_nsdictionary(&views_keys, &views_vals);
+
+        // Metrics: { "myWidth": 150 }
+        let metric_keys = [make_nsstring("myWidth")];
+        let metric_vals = [crate::nsnumber::make_nsnumber_double(150.0)];
+        let metrics = crate::nsdictionary::make_nsdictionary(&metric_keys, &metric_vals);
+
+        let format = make_nsstring("H:[child(==myWidth)]");
+        let result = shim_nslayoutconstraint_constraints_with_visual_format(
+            0, 0, format, 0, metrics, views,
+        );
+        let count = crate::nsarray::shim_nsarray_count(result, 0);
+        assert_eq!(count, 1, "expected 1 constraint, got {count}");
+
+        let c = crate::nsarray::shim_nsarray_object_at_index(result, 0, 0);
+        let constant = unsafe { *((c as usize + 56) as *const f64) };
+        assert!((constant - 150.0).abs() < f64::EPSILON, "expected metric value 150, got {constant}");
+
+        free_obj(parent);
+    }
+
+    #[test]
+    fn metric_in_spacing() {
+        let parent = crate::nsview::alloc_view_with_frame(0.0, 0.0, 400.0, 300.0);
+        let v1 = crate::nsview::alloc_view_with_frame(0.0, 0.0, 100.0, 50.0);
+        let v2 = crate::nsview::alloc_view_with_frame(0.0, 0.0, 100.0, 50.0);
+        crate::nsview::shim_nsview_add_subview(parent, 0, v1);
+        crate::nsview::shim_nsview_add_subview(parent, 0, v2);
+
+        let keys = [make_nsstring("v1"), make_nsstring("v2")];
+        let vals = [v1, v2];
+        let views = crate::nsdictionary::make_nsdictionary(&keys, &vals);
+
+        let metric_keys = [make_nsstring("gap")];
+        let metric_vals = [crate::nsnumber::make_nsnumber_double(30.0)];
+        let metrics = crate::nsdictionary::make_nsdictionary(&metric_keys, &metric_vals);
+
+        let format = make_nsstring("H:[v1]-gap-[v2]");
+        let result = shim_nslayoutconstraint_constraints_with_visual_format(
+            0, 0, format, 0, metrics, views,
+        );
+        let count = crate::nsarray::shim_nsarray_count(result, 0);
+        assert_eq!(count, 1, "expected 1 spacing constraint, got {count}");
+
+        let c = crate::nsarray::shim_nsarray_object_at_index(result, 0, 0);
+        let constant = unsafe { *((c as usize + 56) as *const f64) };
+        assert!((constant - 30.0).abs() < f64::EPSILON, "expected metric spacing 30, got {constant}");
+
+        free_obj(parent);
+    }
+
+    #[test]
+    fn parse_metric_name_in_predicate() {
+        let (_, elems) = parse_vfl("H:[view1(==myMetric)]");
+        if let Some(VflElement::View { predicates, .. }) =
+            elems.iter().find(|e| matches!(e, VflElement::View { .. }))
+        {
+            assert_eq!(predicates.len(), 1);
+            assert_eq!(predicates[0].metric_name.as_deref(), Some("myMetric"));
+        } else {
+            panic!("expected View element");
+        }
+    }
+
+    #[test]
+    fn parse_metric_name_in_spacing() {
+        let (_, elems) = parse_vfl("H:[v1]-gap-[v2]");
+        let spacing = elems.iter().find(|e| matches!(e, VflElement::MetricSpacing(_)));
+        assert!(spacing.is_some(), "expected MetricSpacing element");
+        if let Some(VflElement::MetricSpacing(name)) = spacing {
+            assert_eq!(name, "gap");
+        }
     }
 }

@@ -1,0 +1,2 @@
+# .so files are built natively inside Docker (not committed).
+lib/*.so

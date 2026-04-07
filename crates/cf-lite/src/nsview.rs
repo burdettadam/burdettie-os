@@ -17,6 +17,9 @@
 
 use crate::cg_types::{CGRect, CGPoint, CGSize};
 
+use std::collections::HashMap;
+use std::sync::Mutex;
+
 const SUPERVIEW_OFF: usize = 8;
 const WINDOW_OFF: usize = 16;
 const FRAME_X_OFF: usize = 24;
@@ -43,6 +46,56 @@ const FLAG_WANTS_LAYER: u64 = 1 << 1;
 //   NSViewMaxYMargin     = 32
 const AUTORESIZE_SHIFT: u32 = 4;
 const AUTORESIZE_MASK_BITS: u64 = 0x3F << AUTORESIZE_SHIFT; // 6 bits
+
+// ── Per-view layout priority storage (outside the 80-byte object) ───
+
+/// Content hugging and compression resistance priorities per view.
+struct ViewLayoutPriorities {
+    hugging_h: f64,
+    hugging_v: f64,
+    compression_h: f64,
+    compression_v: f64,
+}
+
+impl Default for ViewLayoutPriorities {
+    fn default() -> Self {
+        Self {
+            hugging_h: 250.0,     // NSLayoutPriorityDefaultLow
+            hugging_v: 250.0,
+            compression_h: 750.0, // NSLayoutPriorityDefaultHigh
+            compression_v: 750.0,
+        }
+    }
+}
+
+static VIEW_PRIORITIES: Mutex<Option<HashMap<u64, ViewLayoutPriorities>>> = Mutex::new(None);
+
+fn view_layout_priorities<F, R>(view: u64, f: F) -> R
+where
+    F: FnOnce(&ViewLayoutPriorities) -> R,
+{
+    let guard = VIEW_PRIORITIES.lock().unwrap_or_else(|e| e.into_inner());
+    let default = ViewLayoutPriorities::default();
+    match &*guard {
+        Some(map) => f(map.get(&view).unwrap_or(&default)),
+        None => f(&default),
+    }
+}
+
+fn view_layout_priorities_mut<F>(view: u64, f: F)
+where
+    F: FnOnce(&mut ViewLayoutPriorities),
+{
+    let mut guard = VIEW_PRIORITIES.lock().unwrap_or_else(|e| e.into_inner());
+    let map = guard.get_or_insert_with(HashMap::new);
+    f(map.entry(view).or_default());
+}
+
+/// Reset priority state (called from `reset_runtime_state_for_reuse`).
+pub(crate) fn reset_layout_priority_state() {
+    let mut guard = VIEW_PRIORITIES.lock().unwrap_or_else(|e| e.into_inner());
+    *guard = None;
+}
 
 fn read_u64(obj: u64, offset: usize) -> u64 {
     if obj == 0 {
@@ -627,22 +680,38 @@ pub extern "C" fn shim_nsview_invalidate_intrinsic_content_size(obj: u64, _cmd: 
 }
 
 /// `-[NSView contentHuggingPriorityForOrientation:]`
-/// Returns default 250 (NSLayoutPriorityDefaultLow).
-pub extern "C" fn shim_nsview_content_hugging_priority(_obj: u64, _cmd: u64, _orientation: u64) -> f64 {
-    250.0
+/// Orientation 0 = horizontal, 1 = vertical. Default 250 (NSLayoutPriorityDefaultLow).
+pub extern "C" fn shim_nsview_content_hugging_priority(obj: u64, _cmd: u64, orientation: u64) -> f64 {
+    if obj == 0 { return 250.0; }
+    view_layout_priorities(obj, |p| {
+        if orientation == 1 { p.hugging_v } else { p.hugging_h }
+    })
 }
 
-/// `-[NSView setContentHuggingPriority:forOrientation:]` — no-op (priorities not stored yet).
-pub extern "C" fn shim_nsview_set_content_hugging_priority(_obj: u64, _cmd: u64, _priority: f64, _orientation: u64) {}
+/// `-[NSView setContentHuggingPriority:forOrientation:]`
+pub extern "C" fn shim_nsview_set_content_hugging_priority(obj: u64, _cmd: u64, priority: f64, orientation: u64) {
+    if obj == 0 { return; }
+    view_layout_priorities_mut(obj, |p| {
+        if orientation == 1 { p.hugging_v = priority; } else { p.hugging_h = priority; }
+    });
+}
 
 /// `-[NSView contentCompressionResistancePriorityForOrientation:]`
-/// Returns default 750 (NSLayoutPriorityDefaultHigh).
-pub extern "C" fn shim_nsview_content_compression_resistance_priority(_obj: u64, _cmd: u64, _orientation: u64) -> f64 {
-    750.0
+/// Default 750 (NSLayoutPriorityDefaultHigh).
+pub extern "C" fn shim_nsview_content_compression_resistance_priority(obj: u64, _cmd: u64, orientation: u64) -> f64 {
+    if obj == 0 { return 750.0; }
+    view_layout_priorities(obj, |p| {
+        if orientation == 1 { p.compression_v } else { p.compression_h }
+    })
 }
 
-/// `-[NSView setContentCompressionResistancePriority:forOrientation:]` — no-op.
-pub extern "C" fn shim_nsview_set_content_compression_resistance_priority(_obj: u64, _cmd: u64, _priority: f64, _orientation: u64) {}
+/// `-[NSView setContentCompressionResistancePriority:forOrientation:]`
+pub extern "C" fn shim_nsview_set_content_compression_resistance_priority(obj: u64, _cmd: u64, priority: f64, orientation: u64) {
+    if obj == 0 { return; }
+    view_layout_priorities_mut(obj, |p| {
+        if orientation == 1 { p.compression_v = priority; } else { p.compression_h = priority; }
+    });
+}
 
 /// `-[NSView fittingSize]` — returns intrinsic content size (or 0,0 if no intrinsic).
 pub extern "C" fn shim_nsview_fitting_size_w(obj: u64, _cmd: u64) -> f64 {
@@ -657,9 +726,6 @@ pub extern "C" fn shim_nsview_fitting_size_h(obj: u64, _cmd: u64) -> f64 {
 }
 
 // ── Safe area / layout margins ──────────────────────────────────
-
-use std::collections::HashMap;
-use std::sync::Mutex;
 
 /// Per-view cached layout guides: (safe_area_guide, layout_margins_guide).
 static VIEW_GUIDES: Mutex<Option<HashMap<u64, (u64, u64)>>> = Mutex::new(None);
@@ -1455,6 +1521,44 @@ mod tests {
         shim_nsview_invalidate_intrinsic_content_size(0, 0);
         shim_nsview_set_content_hugging_priority(0, 0, 500.0, 0);
         shim_nsview_set_content_compression_resistance_priority(0, 0, 500.0, 0);
+    }
+
+    #[test]
+    fn set_content_hugging_priority_roundtrip() {
+        reset_layout_priority_state();
+        let view = make_view();
+        shim_nsview_set_content_hugging_priority(view, 0, 500.0, 0); // horizontal
+        shim_nsview_set_content_hugging_priority(view, 0, 600.0, 1); // vertical
+        assert!((shim_nsview_content_hugging_priority(view, 0, 0) - 500.0).abs() < f64::EPSILON);
+        assert!((shim_nsview_content_hugging_priority(view, 0, 1) - 600.0).abs() < f64::EPSILON);
+        free_obj(view);
+        reset_layout_priority_state();
+    }
+
+    #[test]
+    fn set_compression_resistance_roundtrip() {
+        reset_layout_priority_state();
+        let view = make_view();
+        shim_nsview_set_content_compression_resistance_priority(view, 0, 900.0, 0);
+        shim_nsview_set_content_compression_resistance_priority(view, 0, 800.0, 1);
+        assert!((shim_nsview_content_compression_resistance_priority(view, 0, 0) - 900.0).abs() < f64::EPSILON);
+        assert!((shim_nsview_content_compression_resistance_priority(view, 0, 1) - 800.0).abs() < f64::EPSILON);
+        free_obj(view);
+        reset_layout_priority_state();
+    }
+
+    #[test]
+    fn priorities_independent_per_view() {
+        reset_layout_priority_state();
+        let v1 = make_view();
+        let v2 = make_view();
+        shim_nsview_set_content_hugging_priority(v1, 0, 400.0, 0);
+        shim_nsview_set_content_hugging_priority(v2, 0, 700.0, 0);
+        assert!((shim_nsview_content_hugging_priority(v1, 0, 0) - 400.0).abs() < f64::EPSILON);
+        assert!((shim_nsview_content_hugging_priority(v2, 0, 0) - 700.0).abs() < f64::EPSILON);
+        free_obj(v1);
+        free_obj(v2);
+        reset_layout_priority_state();
     }
 
     // ── safe area / layout margins ─────────────────────────────

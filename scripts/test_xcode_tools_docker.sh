@@ -4441,6 +4441,481 @@ test_filetools_suite() {
     rm -rf /tmp/ft_uniq.txt
 }
 
+# STDIO test suite — comprehensive stdio correctness: grep -n, grep -rn,
+# tail from file, head from file, wc variants, awk output, sed output,
+# multi-tool pipelines via temp files, and format-preserving output tests.
+# ══════════════════════════════════════════════════════════════════════
+test_stdio_suite() {
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "  STDIO SUITE — formatted output, line numbering, grep modes"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+    local SYS="$TOOLS_DIR/system"
+    local L="$LOADER"
+    local out
+
+    # ── 1. grep -n line numbering ─────────────────────────────
+    printf "  %-35s " "grep -n line numbers"
+    printf "aaa\nbbb\naaa\n" > /tmp/st_grep.txt
+    out=$(timeout 10 "$L" --exec "$SYS/grep" --exec-args -n aaa /tmp/st_grep.txt 2>/dev/null | extract_output)
+    if echo "$out" | grep -q "^1:aaa$" && echo "$out" | grep -q "^3:aaa$"; then
+        printf "${GREEN}PASS${NC}     1:aaa, 3:aaa\n"; echo "stdio|grep -n|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | tr '\n' '|' | head -c 60)\n"; echo "stdio|grep -n|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 2. grep -rn recursive with line numbers ───────────────
+    printf "  %-35s " "grep -rn recursive"
+    mkdir -p /tmp/st_rn
+    echo "TODO: fix this" > /tmp/st_rn/a.txt
+    echo "nothing here" > /tmp/st_rn/b.txt
+    echo "TODO: also this" > /tmp/st_rn/c.txt
+    out=$(timeout 10 "$L" --exec "$SYS/grep" --exec-args -rn TODO /tmp/st_rn/ 2>/dev/null | extract_output)
+    if echo "$out" | grep -q "a\.txt:1:TODO" && echo "$out" | grep -q "c\.txt:1:TODO"; then
+        printf "${GREEN}PASS${NC}     2 files matched\n"; echo "stdio|grep -rn|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | tr '\n' '|' | head -c 60)\n"; echo "stdio|grep -rn|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 3. grep -c count ──────────────────────────────────────
+    printf "  %-35s " "grep -c count"
+    out=$(timeout 10 "$L" --exec "$SYS/grep" --exec-args -c aaa /tmp/st_grep.txt 2>/dev/null | extract_output)
+    if echo "$out" | grep -q "^2$"; then
+        printf "${GREEN}PASS${NC}     count=2\n"; echo "stdio|grep -c|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | head -c 20)\n"; echo "stdio|grep -c|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 4. grep -i case insensitive ───────────────────────────
+    printf "  %-35s " "grep -i case insensitive"
+    printf "Hello\nhello\nHELLO\nworld\n" > /tmp/st_ci.txt
+    out=$(timeout 10 "$L" --exec "$SYS/grep" --exec-args -i hello /tmp/st_ci.txt 2>/dev/null | extract_output)
+    local ci_count
+    ci_count=$(echo "$out" | grep -c .)
+    if [ "$ci_count" = "3" ]; then
+        printf "${GREEN}PASS${NC}     3 matches\n"; echo "stdio|grep -i|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got $ci_count matches\n"; echo "stdio|grep -i|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 5. grep -v invert ─────────────────────────────────────
+    printf "  %-35s " "grep -v invert match"
+    out=$(timeout 10 "$L" --exec "$SYS/grep" --exec-args -v aaa /tmp/st_grep.txt 2>/dev/null | extract_output)
+    if echo "$out" | grep -q "^bbb$" && ! echo "$out" | grep -q "^aaa$"; then
+        printf "${GREEN}PASS${NC}     bbb only\n"; echo "stdio|grep -v|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | head -c 30)\n"; echo "stdio|grep -v|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 6. grep -E extended regex ─────────────────────────────
+    printf "  %-35s " "grep -E extended regex"
+    printf "cat\ndog\ncar\ncup\n" > /tmp/st_ere.txt
+    out=$(timeout 10 "$L" --exec "$SYS/grep" --exec-args -E "^c(at|up)$" /tmp/st_ere.txt 2>/dev/null | extract_output)
+    if echo "$out" | grep -q "^cat$" && echo "$out" | grep -q "^cup$" && ! echo "$out" | grep -q "dog"; then
+        printf "${GREEN}PASS${NC}     cat,cup\n"; echo "stdio|grep -E|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | tr '\n' '|' | head -c 40)\n"; echo "stdio|grep -E|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 7. grep -w word match ─────────────────────────────────
+    printf "  %-35s " "grep -w word boundary"
+    printf "cat\ncatalog\nconcatenate\nthe cat sat\n" > /tmp/st_word.txt
+    out=$(timeout 10 "$L" --exec "$SYS/grep" --exec-args -w cat /tmp/st_word.txt 2>/dev/null | extract_output)
+    if echo "$out" | grep -q "^cat$" && echo "$out" | grep -q "the cat sat" && ! echo "$out" | grep -q "^catalog$"; then
+        printf "${GREEN}PASS${NC}     word match\n"; echo "stdio|grep -w|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | tr '\n' '|' | head -c 40)\n"; echo "stdio|grep -w|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 8. grep -l file list ──────────────────────────────────
+    printf "  %-35s " "grep -l file list"
+    echo "needle" > /tmp/st_l1.txt
+    echo "haystack" > /tmp/st_l2.txt
+    echo "needle two" > /tmp/st_l3.txt
+    out=$(timeout 10 "$L" --exec "$SYS/grep" --exec-args -l needle /tmp/st_l1.txt /tmp/st_l2.txt /tmp/st_l3.txt 2>/dev/null | extract_output)
+    if echo "$out" | grep -q "st_l1.txt" && echo "$out" | grep -q "st_l3.txt" && ! echo "$out" | grep -q "st_l2.txt"; then
+        printf "${GREEN}PASS${NC}     2 files\n"; echo "stdio|grep -l|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | tr '\n' '|' | head -c 40)\n"; echo "stdio|grep -l|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 9. tail -n from file (previously broken) ──────────────
+    printf "  %-35s " "tail -n 3 from file"
+    printf "l1\nl2\nl3\nl4\nl5\n" > /tmp/st_tail.txt
+    out=$(timeout 10 "$L" --exec "$SYS/tail" --exec-args -n 3 /tmp/st_tail.txt 2>/dev/null | extract_output)
+    if echo "$out" | grep -q "^l3$" && echo "$out" | grep -q "^l5$" && ! echo "$out" | grep -q "^l1$"; then
+        printf "${GREEN}PASS${NC}     l3,l4,l5\n"; echo "stdio|tail file|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | tr '\n' '|' | head -c 40)\n"; echo "stdio|tail file|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 10. head -n from file ─────────────────────────────────
+    printf "  %-35s " "head -n 2 from file"
+    out=$(timeout 10 "$L" --exec "$SYS/head" --exec-args -n 2 /tmp/st_tail.txt 2>/dev/null | extract_output)
+    if echo "$out" | grep -q "^l1$" && echo "$out" | grep -q "^l2$" && ! echo "$out" | grep -q "^l3$"; then
+        printf "${GREEN}PASS${NC}     l1,l2\n"; echo "stdio|head file|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | tr '\n' '|' | head -c 40)\n"; echo "stdio|head file|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 11. wc -l line count ──────────────────────────────────
+    printf "  %-35s " "wc -l line count"
+    out=$(timeout 10 "$L" --exec "$SYS/wc" --exec-args -l /tmp/st_tail.txt 2>/dev/null | extract_output)
+    if echo "$out" | grep -q "5"; then
+        printf "${GREEN}PASS${NC}     5 lines\n"; echo "stdio|wc -l|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | head -c 30)\n"; echo "stdio|wc -l|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 12. wc -w word count ──────────────────────────────────
+    printf "  %-35s " "wc -w word count"
+    echo "one two three four" > /tmp/st_wc.txt
+    out=$(timeout 10 "$L" --exec "$SYS/wc" --exec-args -w /tmp/st_wc.txt 2>/dev/null | extract_output)
+    if echo "$out" | grep -q "4"; then
+        printf "${GREEN}PASS${NC}     4 words\n"; echo "stdio|wc -w|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | head -c 30)\n"; echo "stdio|wc -w|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 13. wc -c byte count ──────────────────────────────────
+    printf "  %-35s " "wc -c byte count"
+    out=$(timeout 10 "$L" --exec "$SYS/wc" --exec-args -c /tmp/st_wc.txt 2>/dev/null | extract_output)
+    if echo "$out" | grep -q "19"; then
+        printf "${GREEN}PASS${NC}     19 bytes\n"; echo "stdio|wc -c|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | head -c 30)\n"; echo "stdio|wc -c|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 14. wc multi-file with total ──────────────────────────
+    printf "  %-35s " "wc -l multi total"
+    printf "a\nb\n" > /tmp/st_wc_a.txt
+    printf "x\ny\nz\n" > /tmp/st_wc_b.txt
+    out=$(timeout 10 "$L" --exec "$SYS/wc" --exec-args -l /tmp/st_wc_a.txt /tmp/st_wc_b.txt 2>/dev/null | extract_output)
+    if echo "$out" | grep -q "total"; then
+        printf "${GREEN}PASS${NC}     total line\n"; echo "stdio|wc multi|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | tr '\n' '|' | head -c 40)\n"; echo "stdio|wc multi|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 15. awk printf format ─────────────────────────────────
+    printf "  %-35s " "awk printf format"
+    printf "10\n20\n30\n" > /tmp/st_awk.txt
+    out=$(timeout 10 "$L" --exec "$SYS/awk" --exec-args '{printf "val=%03d\n", $1}' /tmp/st_awk.txt 2>/dev/null | extract_output)
+    if echo "$out" | grep -q "val=010" && echo "$out" | grep -q "val=030"; then
+        printf "${GREEN}PASS${NC}     val=010,030\n"; echo "stdio|awk printf|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | tr '\n' '|' | head -c 40)\n"; echo "stdio|awk printf|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 16. awk NR line numbers ───────────────────────────────
+    printf "  %-35s " "awk NR line numbering"
+    out=$(timeout 10 "$L" --exec "$SYS/awk" --exec-args '{print NR": "$0}' /tmp/st_tail.txt 2>/dev/null | extract_output)
+    if echo "$out" | grep -q "^1: l1$" && echo "$out" | grep -q "^5: l5$"; then
+        printf "${GREEN}PASS${NC}     1: l1...5: l5\n"; echo "stdio|awk NR|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | tr '\n' '|' | head -c 40)\n"; echo "stdio|awk NR|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 17. sed with line-numbered output (=) ─────────────────
+    printf "  %-35s " "sed = line numbers"
+    out=$(timeout 10 "$L" --exec "$SYS/sed" --exec-args "=" /tmp/st_grep.txt 2>/dev/null | extract_output)
+    if echo "$out" | grep -q "^1$" && echo "$out" | grep -q "^3$"; then
+        printf "${GREEN}PASS${NC}     1,aaa,2,bbb,...\n"; echo "stdio|sed =|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | tr '\n' '|' | head -c 40)\n"; echo "stdio|sed =|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 18. sort from file ────────────────────────────────────
+    printf "  %-35s " "sort from file"
+    printf "banana\napple\ncherry\n" > /tmp/st_sort.txt
+    out=$(timeout 10 "$L" --exec "$SYS/sort" --exec-args /tmp/st_sort.txt 2>/dev/null | extract_output)
+    local sorted_first
+    sorted_first=$(echo "$out" | head -1)
+    if [ "$sorted_first" = "apple" ]; then
+        printf "${GREEN}PASS${NC}     apple first\n"; echo "stdio|sort file|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | tr '\n' '|' | head -c 40)\n"; echo "stdio|sort file|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 19. sort -r reverse ───────────────────────────────────
+    printf "  %-35s " "sort -r reverse"
+    out=$(timeout 10 "$L" --exec "$SYS/sort" --exec-args -r /tmp/st_sort.txt 2>/dev/null | extract_output)
+    sorted_first=$(echo "$out" | head -1)
+    if [ "$sorted_first" = "cherry" ]; then
+        printf "${GREEN}PASS${NC}     cherry first\n"; echo "stdio|sort -r|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | tr '\n' '|' | head -c 40)\n"; echo "stdio|sort -r|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 20. sort -n numeric ───────────────────────────────────
+    printf "  %-35s " "sort -n numeric"
+    printf "20\n3\n100\n1\n" > /tmp/st_sortn.txt
+    out=$(timeout 10 "$L" --exec "$SYS/sort" --exec-args -n /tmp/st_sortn.txt 2>/dev/null | extract_output)
+    sorted_first=$(echo "$out" | head -1)
+    if [ "$sorted_first" = "1" ]; then
+        printf "${GREEN}PASS${NC}     1 first\n"; echo "stdio|sort -n|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | tr '\n' '|' | head -c 40)\n"; echo "stdio|sort -n|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 21. sort -u unique ────────────────────────────────────
+    printf "  %-35s " "sort -u unique"
+    printf "b\na\nb\nc\na\n" > /tmp/st_sortu.txt
+    out=$(timeout 10 "$L" --exec "$SYS/sort" --exec-args -u /tmp/st_sortu.txt 2>/dev/null | extract_output)
+    local u_count
+    u_count=$(echo "$out" | wc -l | tr -d ' ')
+    if [ "$u_count" = "3" ]; then
+        printf "${GREEN}PASS${NC}     3 unique\n"; echo "stdio|sort -u|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got $u_count lines\n"; echo "stdio|sort -u|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 22. diff -u unified format ────────────────────────────
+    printf "  %-35s " "diff -u unified format"
+    printf "a\nb\nc\n" > /tmp/st_d1.txt
+    printf "a\nB\nc\n" > /tmp/st_d2.txt
+    out=$(timeout 10 "$L" --exec "$SYS/diff" --exec-args -u /tmp/st_d1.txt /tmp/st_d2.txt 2>/dev/null | extract_output)
+    if echo "$out" | grep -q "^---" && echo "$out" | grep -q "^+++" && echo "$out" | grep -q "^@@"; then
+        printf "${GREEN}PASS${NC}     unified format\n"; echo "stdio|diff -u|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | head -c 40)\n"; echo "stdio|diff -u|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 23. diff -rq recursive brief ──────────────────────────
+    printf "  %-35s " "diff -rq recursive brief"
+    mkdir -p /tmp/st_da /tmp/st_db
+    echo "same" > /tmp/st_da/x.txt && echo "same" > /tmp/st_db/x.txt
+    echo "aaa" > /tmp/st_da/y.txt && echo "bbb" > /tmp/st_db/y.txt
+    out=$(timeout 10 "$L" --exec "$SYS/diff" --exec-args -rq /tmp/st_da /tmp/st_db 2>/dev/null | extract_output)
+    if echo "$out" | grep -q "y\.txt differ" && ! echo "$out" | grep -q "x\.txt"; then
+        printf "${GREEN}PASS${NC}     y.txt differs\n"; echo "stdio|diff -rq|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | tr '\n' '|' | head -c 40)\n"; echo "stdio|diff -rq|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 24. grep→wc pipeline via temp file ────────────────────
+    printf "  %-35s " "grep→wc pipeline"
+    cat > /tmp/st_log.txt <<'LOG'
+ERROR: disk full
+INFO: started
+ERROR: timeout
+WARNING: slow
+ERROR: network
+INFO: done
+LOG
+    timeout 10 "$L" --exec "$SYS/grep" --exec-args ERROR /tmp/st_log.txt 2>/dev/null | extract_output > /tmp/st_pipe1.txt
+    out=$(timeout 10 "$L" --exec "$SYS/wc" --exec-args -l /tmp/st_pipe1.txt 2>/dev/null | extract_output)
+    if echo "$out" | grep -q "3"; then
+        printf "${GREEN}PASS${NC}     3 errors\n"; echo "stdio|grep→wc|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | head -c 30)\n"; echo "stdio|grep→wc|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 25. cut→sort→uniq pipeline ────────────────────────────
+    printf "  %-35s " "cut→sort→uniq pipeline"
+    cat > /tmp/st_csv.txt <<'CSV'
+alice,NYC
+bob,LA
+charlie,NYC
+diana,SF
+eve,LA
+frank,NYC
+CSV
+    timeout 10 "$L" --exec "$SYS/cut" --exec-args -d, -f2 /tmp/st_csv.txt 2>/dev/null | extract_output > /tmp/st_cities.txt
+    timeout 10 "$L" --exec "$SYS/sort" --exec-args /tmp/st_cities.txt 2>/dev/null | extract_output > /tmp/st_sorted.txt
+    out=$(timeout 10 "$L" --exec "$SYS/uniq" --exec-args -c /tmp/st_sorted.txt 2>/dev/null | extract_output)
+    if echo "$out" | grep -q "3 NYC" && echo "$out" | grep -q "2 LA"; then
+        printf "${GREEN}PASS${NC}     3 NYC, 2 LA\n"; echo "stdio|cut→sort→uniq|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | tr '\n' '|' | head -c 50)\n"; echo "stdio|cut→sort→uniq|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 26. awk field processing + output ─────────────────────
+    printf "  %-35s " "awk field sum"
+    printf "10 20\n30 40\n50 60\n" > /tmp/st_sum.txt
+    out=$(timeout 10 "$L" --exec "$SYS/awk" --exec-args '{s+=$1+$2} END{print s}' /tmp/st_sum.txt 2>/dev/null | extract_output)
+    if echo "$out" | grep -q "^210$"; then
+        printf "${GREEN}PASS${NC}     sum=210\n"; echo "stdio|awk sum|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | head -c 20)\n"; echo "stdio|awk sum|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 27. sed multi-command ─────────────────────────────────
+    printf "  %-35s " "sed multi-command"
+    echo "Hello World 2024" > /tmp/st_sed.txt
+    out=$(timeout 10 "$L" --exec "$SYS/sed" --exec-args -e "s/Hello/Hi/" -e "s/World/Earth/" /tmp/st_sed.txt 2>/dev/null | extract_output)
+    if echo "$out" | grep -q "Hi Earth 2024"; then
+        printf "${GREEN}PASS${NC}     Hi Earth 2024\n"; echo "stdio|sed multi|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | head -c 30)\n"; echo "stdio|sed multi|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 28. grep -n + awk field extraction pipeline ──────────
+    printf "  %-35s " "grep -n + awk extract"
+    timeout 10 "$L" --exec "$SYS/grep" --exec-args -n ERROR /tmp/st_log.txt 2>/dev/null | extract_output > /tmp/st_gn.txt
+    out=$(timeout 10 "$L" --exec "$SYS/awk" --exec-args -F: '{print $1}' /tmp/st_gn.txt 2>/dev/null | extract_output)
+    if echo "$out" | grep -q "^1$" && echo "$out" | grep -q "^3$" && echo "$out" | grep -q "^5$"; then
+        printf "${GREEN}PASS${NC}     lines 1,3,5\n"; echo "stdio|grep+awk|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | tr '\n' '|' | head -c 30)\n"; echo "stdio|grep+awk|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 29. find + wc file count ──────────────────────────────
+    printf "  %-35s " "find -type f + wc -l"
+    mkdir -p /tmp/st_find/sub
+    touch /tmp/st_find/a.txt /tmp/st_find/b.txt /tmp/st_find/sub/c.txt
+    timeout 10 "$L" --exec "$SYS/find" --exec-args /tmp/st_find -type f 2>/dev/null | extract_output > /tmp/st_flist.txt
+    out=$(timeout 10 "$L" --exec "$SYS/wc" --exec-args -l /tmp/st_flist.txt 2>/dev/null | extract_output)
+    if echo "$out" | grep -q "3"; then
+        printf "${GREEN}PASS${NC}     3 files\n"; echo "stdio|find+wc|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | head -c 20)\n"; echo "stdio|find+wc|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 30. awk CSV→TSV format conversion ─────────────────────
+    printf "  %-35s " "awk CSV→TSV convert"
+    out=$(timeout 10 "$L" --exec "$SYS/awk" --exec-args -F, '{OFS="\t"; $1=$1; print}' /tmp/st_csv.txt 2>/dev/null | extract_output)
+    if echo "$out" | grep -qP "alice\tNYC"; then
+        printf "${GREEN}PASS${NC}     tab-separated\n"; echo "stdio|awk csv→tsv|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | head -c 40)\n"; echo "stdio|awk csv→tsv|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 31. head + tail extract middle lines ──────────────────
+    printf "  %-35s " "head+tail middle lines"
+    printf "L1\nL2\nL3\nL4\nL5\nL6\nL7\n" > /tmp/st_mid.txt
+    timeout 10 "$L" --exec "$SYS/head" --exec-args -n 5 /tmp/st_mid.txt 2>/dev/null | extract_output > /tmp/st_h5.txt
+    out=$(timeout 10 "$L" --exec "$SYS/tail" --exec-args -n 3 /tmp/st_h5.txt 2>/dev/null | extract_output)
+    if echo "$out" | grep -q "^L3$" && echo "$out" | grep -q "^L5$" && ! echo "$out" | grep -q "^L1$"; then
+        printf "${GREEN}PASS${NC}     L3,L4,L5\n"; echo "stdio|head+tail mid|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | tr '\n' '|' | head -c 30)\n"; echo "stdio|head+tail mid|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 32. grep -n multifile ─────────────────────────────────
+    printf "  %-35s " "grep -n multi-file"
+    printf "foo\nbar\nfoo\n" > /tmp/st_mf1.txt
+    printf "baz\nfoo\n" > /tmp/st_mf2.txt
+    out=$(timeout 10 "$L" --exec "$SYS/grep" --exec-args -n foo /tmp/st_mf1.txt /tmp/st_mf2.txt 2>/dev/null | extract_output)
+    if echo "$out" | grep -q "st_mf1.txt:1:foo" && echo "$out" | grep -q "st_mf2.txt:2:foo"; then
+        printf "${GREEN}PASS${NC}     file:line:match\n"; echo "stdio|grep -n multi|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | tr '\n' '|' | head -c 50)\n"; echo "stdio|grep -n multi|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 33. sed in-place simulation ───────────────────────────
+    printf "  %-35s " "sed -i in-place edit"
+    echo "old value" > /tmp/st_inplace.txt
+    timeout 10 "$L" --exec "$SYS/sed" --exec-args -i '' "s/old/new/" /tmp/st_inplace.txt 2>/dev/null > /dev/null
+    out=$(cat /tmp/st_inplace.txt)
+    if echo "$out" | grep -q "new value"; then
+        printf "${GREEN}PASS${NC}     new value\n"; echo "stdio|sed -i|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | head -c 30)\n"; echo "stdio|sed -i|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 34. awk associative array ─────────────────────────────
+    printf "  %-35s " "awk associative array"
+    cat > /tmp/st_aa.txt <<'AA'
+apple 3
+banana 5
+apple 2
+cherry 1
+banana 4
+AA
+    out=$(timeout 10 "$L" --exec "$SYS/awk" --exec-args '{a[$1]+=$2} END{for(k in a) print k,a[k]}' /tmp/st_aa.txt 2>/dev/null | extract_output)
+    if echo "$out" | grep -q "apple 5" && echo "$out" | grep -q "banana 9"; then
+        printf "${GREEN}PASS${NC}     apple=5, banana=9\n"; echo "stdio|awk assoc|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | tr '\n' '|' | head -c 40)\n"; echo "stdio|awk assoc|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 35. grep -E multiline pattern ─────────────────────────
+    printf "  %-35s " "grep -E complex pattern"
+    cat > /tmp/st_email.txt <<'EMAIL'
+user@example.com
+not-an-email
+admin@test.org
+plain text
+info@company.co.uk
+EMAIL
+    out=$(timeout 10 "$L" --exec "$SYS/grep" --exec-args -E "[a-z]+@[a-z]+\.[a-z]+" /tmp/st_email.txt 2>/dev/null | extract_output)
+    local email_count
+    email_count=$(echo "$out" | grep -c .)
+    if [ "$email_count" = "3" ]; then
+        printf "${GREEN}PASS${NC}     3 emails\n"; echo "stdio|grep -E email|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got $email_count matches\n"; echo "stdio|grep -E email|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 36. awk conditional print ─────────────────────────────
+    printf "  %-35s " "awk conditional print"
+    cat > /tmp/st_score.txt <<'SCORE'
+alice 95
+bob 60
+charlie 85
+diana 45
+eve 90
+SCORE
+    out=$(timeout 10 "$L" --exec "$SYS/awk" --exec-args '$2 >= 80 {print $1}' /tmp/st_score.txt 2>/dev/null | extract_output)
+    if echo "$out" | grep -q "alice" && echo "$out" | grep -q "charlie" && echo "$out" | grep -q "eve" && ! echo "$out" | grep -q "bob"; then
+        printf "${GREEN}PASS${NC}     alice,charlie,eve\n"; echo "stdio|awk cond|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | tr '\n' '|' | head -c 40)\n"; echo "stdio|awk cond|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 37. sed address range extraction ──────────────────────
+    printf "  %-35s " "sed range extraction"
+    cat > /tmp/st_range.txt <<'RANGE'
+header
+--- BEGIN ---
+important line 1
+important line 2
+--- END ---
+footer
+RANGE
+    out=$(timeout 10 "$L" --exec "$SYS/sed" --exec-args -n '/BEGIN/,/END/p' /tmp/st_range.txt 2>/dev/null | extract_output)
+    if echo "$out" | grep -q "important line 1" && echo "$out" | grep -q "important line 2" && ! echo "$out" | grep -q "^footer$"; then
+        printf "${GREEN}PASS${NC}     extracted range\n"; echo "stdio|sed range|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | tr '\n' '|' | head -c 40)\n"; echo "stdio|sed range|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 38. grep -o only matching ─────────────────────────────
+    printf "  %-35s " "grep -o only matching"
+    echo "version 1.2.3 released on 2024-01-15" > /tmp/st_ver.txt
+    out=$(timeout 10 "$L" --exec "$SYS/grep" --exec-args -oE "[0-9]+\.[0-9]+\.[0-9]+" /tmp/st_ver.txt 2>/dev/null | extract_output)
+    if echo "$out" | grep -q "^1\.2\.3$"; then
+        printf "${GREEN}PASS${NC}     1.2.3\n"; echo "stdio|grep -o|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | head -c 20)\n"; echo "stdio|grep -o|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 39. awk BEGIN/END blocks ──────────────────────────────
+    printf "  %-35s " "awk BEGIN/END blocks"
+    out=$(timeout 10 "$L" --exec "$SYS/awk" --exec-args 'BEGIN{print "START"} {print NR} END{print "DONE"}' /tmp/st_grep.txt 2>/dev/null | extract_output)
+    if echo "$out" | grep -q "^START$" && echo "$out" | grep -q "^DONE$" && echo "$out" | grep -q "^3$"; then
+        printf "${GREEN}PASS${NC}     START...3...DONE\n"; echo "stdio|awk begin/end|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | tr '\n' '|' | head -c 40)\n"; echo "stdio|awk begin/end|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 40. grep -Hn filename:line format ─────────────────────
+    printf "  %-35s " "grep -Hn explicit filename"
+    out=$(timeout 10 "$L" --exec "$SYS/grep" --exec-args -Hn aaa /tmp/st_grep.txt 2>/dev/null | extract_output)
+    if echo "$out" | grep -q "/tmp/st_grep.txt:1:aaa" && echo "$out" | grep -q "/tmp/st_grep.txt:3:aaa"; then
+        printf "${GREEN}PASS${NC}     file:line:match\n"; echo "stdio|grep -Hn|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | tr '\n' '|' | head -c 50)\n"; echo "stdio|grep -Hn|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── Clean up ──────────────────────────────────────────────
+    rm -rf /tmp/st_*.txt /tmp/st_rn /tmp/st_da /tmp/st_db /tmp/st_find
+    rm -f /tmp/st_pipe1.txt /tmp/st_cities.txt /tmp/st_sorted.txt
+    rm -f /tmp/st_gn.txt /tmp/st_flist.txt /tmp/st_h5.txt
+}
+
 # ── Main ────────────────────────────────────────────────────────────
 
 echo "================================================================"
@@ -4470,6 +4945,7 @@ case "$CATEGORY" in
     rune)        test_rune_suite ;;
     regex)       test_regex_suite ;;
     filetools)   test_filetools_suite ;;
+    stdio)       test_stdio_suite ;;
     all)
         test_xcode_tc
         test_xcode_dev
@@ -4485,8 +4961,9 @@ case "$CATEGORY" in
         test_rune_suite
         test_regex_suite
         test_filetools_suite
+        test_stdio_suite
         ;;
-    *) echo "Unknown category: $CATEGORY (try: all, xcode-tc, xcode-dev, system, functional, complex, advanced, stress, integration, toolchain, pipeline, devops, rune, regex, filetools)"; exit 1 ;;
+    *) echo "Unknown category: $CATEGORY (try: all, xcode-tc, xcode-dev, system, functional, complex, advanced, stress, integration, toolchain, pipeline, devops, rune, regex, filetools, stdio)"; exit 1 ;;
 esac
 
 echo ""
