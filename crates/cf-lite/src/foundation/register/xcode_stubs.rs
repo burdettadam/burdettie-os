@@ -4,10 +4,14 @@
 //! classes referenced by Xcode tools. Each class inherits from
 //! NSObject and has no custom methods — unknown selectors fall through
 //! to the unrecognized selector handler which returns 0.
+//!
+//! DVTDeveloperPaths, DVTFilePath, and DVTLogAspect have real class
+//! method implementations that return paths / NSString objects needed
+//! by the DVTFoundation init chain.
 
 use std::collections::HashMap;
 
-use objc_runtime::ClassInfo;
+use objc_runtime::{ClassInfo, MethodEntry};
 
 use crate::nsobj;
 
@@ -36,6 +40,9 @@ const XCODE_STUB_CLASSES: &[StubClassDesc] = &[
     StubClassDesc { name: "XCDevice", class_addr: nsobj::xcdevice_class_addr, meta_addr: nsobj::xcdevice_metaclass_addr },
     StubClassDesc { name: "SimRuntime", class_addr: nsobj::simruntime_class_addr, meta_addr: nsobj::simruntime_metaclass_addr },
     StubClassDesc { name: "SimDeviceType", class_addr: nsobj::simdevicetype_class_addr, meta_addr: nsobj::simdevicetype_metaclass_addr },
+    StubClassDesc { name: "DVTDeveloperPaths", class_addr: nsobj::dvtdeveloperpaths_class_addr, meta_addr: nsobj::dvtdeveloperpaths_metaclass_addr },
+    StubClassDesc { name: "DVTPlugInManager", class_addr: nsobj::dvtpluginmgr_class_addr, meta_addr: nsobj::dvtpluginmgr_metaclass_addr },
+    StubClassDesc { name: "IDEInitializer", class_addr: nsobj::ideinitializer_class_addr, meta_addr: nsobj::ideinitializer_metaclass_addr },
 ];
 
 /// Register all Xcode stub classes in the ObjC runtime.
@@ -49,11 +56,13 @@ pub fn register_xcode_stub_classes(rt: &mut objc_runtime::ObjcRuntime) {
         let class_addr = (desc.class_addr)();
         let metaclass_addr = (desc.meta_addr)();
 
+        let class_methods = dvt_class_methods_for(desc.name);
+
         let info = ClassInfo {
             name: desc.name.to_string(),
             mapped_addr: class_addr,
             methods: vec![],
-            class_methods: vec![],
+            class_methods,
             ivars: vec![],
             properties: vec![],
             protocol_names: Vec::new(),
@@ -106,7 +115,192 @@ pub fn install_xcode_stub_class_symbols(table: &mut libsystem_shims::ShimTable) 
         ("_OBJC_CLASS_$_SimRuntime", nsobj::simruntime_class_addr(), "SimRuntime class (Xcode stub)"),
         ("_OBJC_METACLASS_$_SimRuntime", nsobj::simruntime_metaclass_addr(), "SimRuntime metaclass (Xcode stub)"),
         ("_OBJC_CLASS_$_SimDeviceType", nsobj::simdevicetype_class_addr(), "SimDeviceType class (Xcode stub)"),
-        ("_OBJC_METACLASS_$_SimDeviceType", nsobj::simdevicetype_metaclass_addr(), "SimDeviceType metaclass (Xcode stub)")
+        ("_OBJC_METACLASS_$_SimDeviceType", nsobj::simdevicetype_metaclass_addr(), "SimDeviceType metaclass (Xcode stub)"),
+        // New DVT/IDE classes
+        ("_OBJC_CLASS_$_DVTDeveloperPaths", nsobj::dvtdeveloperpaths_class_addr(), "DVTDeveloperPaths class (Xcode stub)"),
+        ("_OBJC_METACLASS_$_DVTDeveloperPaths", nsobj::dvtdeveloperpaths_metaclass_addr(), "DVTDeveloperPaths metaclass (Xcode stub)"),
+        ("_OBJC_CLASS_$_DVTPlugInManager", nsobj::dvtpluginmgr_class_addr(), "DVTPlugInManager class (Xcode stub)"),
+        ("_OBJC_METACLASS_$_DVTPlugInManager", nsobj::dvtpluginmgr_metaclass_addr(), "DVTPlugInManager metaclass (Xcode stub)"),
+        ("_OBJC_CLASS_$_IDEInitializer", nsobj::ideinitializer_class_addr(), "IDEInitializer class (Xcode stub)"),
+        ("_OBJC_METACLASS_$_IDEInitializer", nsobj::ideinitializer_metaclass_addr(), "IDEInitializer metaclass (Xcode stub)")
     );
-    log::debug!("xcode_stubs: registered 32 class/metaclass data symbols");
+    log::debug!("xcode_stubs: registered {} class/metaclass data symbols", XCODE_STUB_CLASSES.len() * 2);
+}
+
+// ── Class method implementations for DVT/IDE classes ──────────────────
+
+/// Return class methods for classes that need real method implementations.
+fn dvt_class_methods_for(class_name: &str) -> Vec<MethodEntry> {
+    match class_name {
+        "DVTDeveloperPaths" => vec![
+            MethodEntry {
+                selector: "_systemDeveloperDir".into(),
+                imp: shim_dvt_developer_paths_system_developer_dir as *const () as u64,
+                type_encoding: "@@:".into(),
+            },
+            MethodEntry {
+                selector: "xcodeAppPath".into(),
+                imp: shim_dvt_developer_paths_xcode_app_path as *const () as u64,
+                type_encoding: "@@:".into(),
+            },
+            MethodEntry {
+                selector: "toolchainPath".into(),
+                imp: shim_dvt_developer_paths_toolchain_path as *const () as u64,
+                type_encoding: "@@:".into(),
+            },
+            MethodEntry {
+                selector: "platformsPath".into(),
+                imp: shim_dvt_developer_paths_platforms_path as *const () as u64,
+                type_encoding: "@@:".into(),
+            },
+            MethodEntry {
+                selector: "sdksPath".into(),
+                imp: shim_dvt_developer_paths_sdks_path as *const () as u64,
+                type_encoding: "@@:".into(),
+            },
+            MethodEntry {
+                selector: "applicationDirectoryPaths".into(),
+                imp: shim_dvt_null_stub as *const () as u64,
+                type_encoding: "@@:".into(),
+            },
+        ],
+        "DVTFilePath" => vec![
+            MethodEntry {
+                selector: "filePathForPathString:".into(),
+                imp: shim_dvt_filepath_for_path_string as *const () as u64,
+                type_encoding: "@@:@".into(),
+            },
+            MethodEntry {
+                selector: "_rootFilePath".into(),
+                imp: shim_dvt_filepath_root as *const () as u64,
+                type_encoding: "@@:".into(),
+            },
+        ],
+        "DVTLogAspect" => vec![
+            MethodEntry {
+                selector: "logAspectWithName:".into(),
+                imp: shim_dvt_log_aspect_with_name as *const () as u64,
+                type_encoding: "@@:@".into(),
+            },
+        ],
+        "DVTPlugInManager" => vec![
+            MethodEntry {
+                selector: "defaultPlugInManager".into(),
+                imp: shim_dvt_null_stub as *const () as u64,
+                type_encoding: "@@:".into(),
+            },
+            MethodEntry {
+                selector: "scanForPlugIns:".into(),
+                imp: shim_dvt_null_stub as *const () as u64,
+                type_encoding: "v@:@".into(),
+            },
+        ],
+        _ => vec![],
+    }
+}
+
+// ── NSString allocation helper ──────────────────────────────────────
+
+fn nsstring_from_str(s: &str) -> u64 {
+    let cstr = std::ffi::CString::new(s).unwrap_or_default();
+    crate::cfstring::alloc_nsstring_from_cstr(cstr.as_ptr())
+}
+
+fn xcode_app_path() -> String {
+    if let Ok(dev_dir) = std::env::var("DEVELOPER_DIR") {
+        if let Some(app) = dev_dir.strip_suffix("/Contents/Developer") {
+            return app.to_string();
+        }
+        return dev_dir;
+    }
+    if std::path::Path::new("/opt/xcode-tools").exists() {
+        return "/opt/xcode-tools".to_string();
+    }
+    "/Applications/Xcode.app".to_string()
+}
+
+fn developer_dir() -> String {
+    if let Ok(dev_dir) = std::env::var("DEVELOPER_DIR") {
+        return dev_dir;
+    }
+    format!("{}/Contents/Developer", xcode_app_path())
+}
+
+// ── DVTDeveloperPaths class method shims ────────────────────────────
+
+extern "C" fn shim_dvt_developer_paths_system_developer_dir(_cls: u64, _cmd: u64) -> u64 {
+    nsstring_from_str(&developer_dir())
+}
+
+extern "C" fn shim_dvt_developer_paths_xcode_app_path(_cls: u64, _cmd: u64) -> u64 {
+    nsstring_from_str(&xcode_app_path())
+}
+
+extern "C" fn shim_dvt_developer_paths_toolchain_path(_cls: u64, _cmd: u64) -> u64 {
+    let path = format!(
+        "{}/Toolchains/XcodeDefault.xctoolchain",
+        developer_dir()
+    );
+    nsstring_from_str(&path)
+}
+
+extern "C" fn shim_dvt_developer_paths_platforms_path(_cls: u64, _cmd: u64) -> u64 {
+    let path = format!("{}/Platforms", developer_dir());
+    nsstring_from_str(&path)
+}
+
+extern "C" fn shim_dvt_developer_paths_sdks_path(_cls: u64, _cmd: u64) -> u64 {
+    let path = format!(
+        "{}/Platforms/MacOSX.platform/Developer/SDKs",
+        developer_dir()
+    );
+    nsstring_from_str(&path)
+}
+
+// ── DVTFilePath class method shims ──────────────────────────────────
+
+/// +[DVTFilePath filePathForPathString:] — allocates a DVTFilePath object
+/// that stores the path string at offset 8.
+extern "C" fn shim_dvt_filepath_for_path_string(_cls: u64, _cmd: u64, path_str: u64) -> u64 {
+    // Allocate a minimal DVTFilePath: [ISA:8][pathString:8][parent:8]
+    let isa = nsobj::dvtfilepath_class_addr();
+    let obj = unsafe { libc::calloc(1, 24) } as u64;
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *(obj as *mut u64) = isa;
+        *((obj + 8) as *mut u64) = path_str; // store the NSString arg
+    }
+    obj
+}
+
+/// +[DVTFilePath _rootFilePath] — returns a DVTFilePath for "/"
+extern "C" fn shim_dvt_filepath_root(_cls: u64, _cmd: u64) -> u64 {
+    let root_str = nsstring_from_str("/");
+    shim_dvt_filepath_for_path_string(0, 0, root_str)
+}
+
+// ── DVTLogAspect class method shims ─────────────────────────────────
+
+/// +[DVTLogAspect logAspectWithName:] — returns a minimal DVTLogAspect
+/// that stores the name at offset 8.
+extern "C" fn shim_dvt_log_aspect_with_name(_cls: u64, _cmd: u64, name: u64) -> u64 {
+    let isa = nsobj::dvtlogaspect_class_addr();
+    let obj = unsafe { libc::calloc(1, 24) } as u64;
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *(obj as *mut u64) = isa;
+        *((obj + 8) as *mut u64) = name;
+    }
+    obj
+}
+
+// ── Generic stubs ───────────────────────────────────────────────────
+
+/// Returns NULL (0) — used for class methods that return optional objects.
+extern "C" fn shim_dvt_null_stub(_cls: u64, _cmd: u64) -> u64 {
+    0
 }

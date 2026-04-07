@@ -10,7 +10,18 @@ pub mod auth;
 pub mod config;
 pub mod dns;
 pub mod notarize;
+pub mod replay;
+pub mod status;
+pub mod icloud;
+pub mod push;
+pub mod cache;
+pub mod time;
+pub mod diagnostics;
+pub mod recovery;
+pub mod content;
 pub mod catchall;
+pub mod admin;
+pub mod forward;
 
 use tiny_http::{Request, Response};
 

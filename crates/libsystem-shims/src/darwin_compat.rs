@@ -66,8 +66,18 @@ impl DarwinCompatShims {
             );
 
             // ── MB_CUR_MAX ──────────────────────────────────────────
+            // `___mb_cur_max` is a DATA symbol (extern int __mb_cur_max).
+            // `____mb_cur_max` is a FUNCTION (int ___mb_cur_max(void)) —
+            // some tools (awk) call the function variant rather than
+            // loading the data symbol.
             register_shims!(table,
                 ("___mb_cur_max", shim_mb_cur_max_addr() as u64, "__mb_cur_max data"),
+                ("____mb_cur_max", shim_mb_cur_max_fn as *const () as u64, "___mb_cur_max() function"),
+            );
+
+            // ── collate lookup ──────────────────────────────────────
+            register_shims!(table,
+                ("___collate_lookup_l", shim_collate_lookup_l as *const () as u64, "__collate_lookup_l stub"),
             );
 
             // ── setlocale (category-number translation) ─────────────
@@ -184,7 +194,7 @@ impl DarwinCompatShims {
 
             // ── fgetwln (BSD wide-char line reader) ─────────────────
             register_shims!(table,
-                ("_fgetwln", shim_fgetwln as *const () as u64, "fgetwln stub"),
+                ("_fgetwln", shim_fgetwln as *const () as u64, "fgetwln → fgetwc loop"),
             );
 
             // ── quarantine stubs ────────────────────────────────────
@@ -220,38 +230,7 @@ impl DarwinCompatShims {
                 ("_acl_get_link_np", shim_acl_get_link_np as *const () as u64, "acl_get_link_np stub"),
             );
 
-            // ── libxo stubs (text-mode passthroughs) ────────────────
-            register_shims!(table,
-                ("_xo_parse_args", shim_xo_parse_args as *const () as u64, "xo_parse_args stub"),
-                ("_xo_create_to_file", shim_xo_create_to_file as *const () as u64, "xo_create_to_file stub"),
-                ("_xo_open_container", shim_xo_open_container as *const () as u64, "xo_open_container stub"),
-                ("_xo_close_container", shim_xo_close_container as *const () as u64, "xo_close_container stub"),
-                ("_xo_open_list", shim_xo_open_list as *const () as u64, "xo_open_list stub"),
-                ("_xo_close_list", shim_xo_close_list as *const () as u64, "xo_close_list stub"),
-                ("_xo_open_instance", shim_xo_open_instance as *const () as u64, "xo_open_instance stub"),
-                ("_xo_close_instance", shim_xo_close_instance as *const () as u64, "xo_close_instance stub"),
-                ("_xo_emit_h", shim_xo_emit_h as *const () as u64, "xo_emit_h stub"),
-                ("_xo_emit", shim_xo_emit as *const () as u64, "xo_emit stub"),
-                ("_xo_emit_hv", shim_xo_emit_hv as *const () as u64, "xo_emit_hv stub"),
-                ("_xo_finish", shim_xo_finish as *const () as u64, "xo_finish stub"),
-                ("_xo_finish_h", shim_xo_finish as *const () as u64, "xo_finish_h stub"),
-                ("_xo_err", shim_xo_err as *const () as u64, "xo_err stub"),
-                ("_xo_errx", shim_xo_errx as *const () as u64, "xo_errx stub"),
-                ("_xo_error", shim_xo_error as *const () as u64, "xo_error stub"),
-                ("_xo_warn", shim_xo_warn as *const () as u64, "xo_warn stub"),
-                ("_xo_warnx", shim_xo_warnx as *const () as u64, "xo_warnx stub"),
-                ("_xo_message", shim_xo_message as *const () as u64, "xo_message stub"),
-                ("_xo_set_style", shim_xo_set_style as *const () as u64, "xo_set_style stub"),
-                ("_xo_set_flags", shim_xo_set_flags as *const () as u64, "xo_set_flags stub"),
-                ("_xo_set_options", shim_xo_set_options as *const () as u64, "xo_set_options stub"),
-                ("_xo_no_setlocale", shim_xo_no_setlocale as *const () as u64, "xo_no_setlocale stub"),
-                ("_xo_set_allocator", shim_xo_noop as *const () as u64, "xo_set_allocator stub"),
-                ("_xo_set_writer", shim_xo_noop as *const () as u64, "xo_set_writer stub"),
-                ("_xo_flush", shim_xo_flush as *const () as u64, "xo_flush stub"),
-                ("_xo_flush_h", shim_xo_flush as *const () as u64, "xo_flush_h stub"),
-                ("_xo_destroy", shim_xo_noop as *const () as u64, "xo_destroy stub"),
-                ("_xo_attr", shim_xo_attr as *const () as u64, "xo_attr stub"),
-            );
+            // libxo stubs are now in darwin_stubs/libxo_stubs.rs
 
             // ── lchmod (not implemented on most Linux fs) ───────────
             register_shims!(table,
@@ -280,6 +259,16 @@ impl DarwinCompatShims {
             // ── stdio internals (macOS-specific) ────────────────────
             register_shims!(table,
                 ("___srget", shim_srget as *const () as u64, "__srget → fgetc"),
+                // NOTE: ___swbuf is implemented (shim_swbuf) but not registered here.
+                // The macOS inline putc macro reads FILE struct fields at macOS offsets
+                // before calling __swbuf. This corrupts glibc FILE structs, causing
+                // SIGABRT in tools like xcodebuild. Enabling requires a FILE struct
+                // translation layer first.
+            );
+
+            // ── BSD number parsing ──────────────────────────────────
+            register_shims!(table,
+                ("_expand_number", shim_expand_number as *const () as u64, "expand_number compat"),
             );
 
             // ── arc4random legacy ───────────────────────────────────
@@ -448,11 +437,12 @@ struct RuneLocale {
     __magic: [u8; 8],
     /// Encoding name (null-terminated, 32 bytes on macOS).
     __encoding: [u8; 32],
-    /// Mapping functions (6 function pointers — unused, zeroed).
+    /// Mapping functions (2 function pointers — unused, zeroed).
     __sgetrune: u64,
     __sputrune: u64,
     __invalid_rune: i32,
-    _pad0: u32,
+    // No padding here — __runetype immediately follows __invalid_rune
+    // at offset 60, matching the real macOS _RuneLocale layout.
     /// Rune flags for codepoints 0..=255.
     __runetype: [u32; 256],
     /// Case-mapping for 0..=255.
@@ -468,7 +458,6 @@ static mut DEFAULT_RUNE_LOCALE: RuneLocale = RuneLocale {
     __sgetrune: 0,
     __sputrune: 0,
     __invalid_rune: 0xFFFD_u32 as i32,
-    _pad0: 0,
     __runetype: [0; 256],
     __maplower: [0; 256],
     __mapupper: [0; 256],
@@ -560,13 +549,24 @@ fn stdio_ptr_addr(stream: StdioStream) -> *const () {
 
 /// `__mb_cur_max` is a **data symbol** on macOS: `extern int __mb_cur_max;`.
 /// The binary reads the value by dereferencing the GOT entry (not calling
-/// a function).  We provide a static `i32` with the UTF-8 maximum of 4.
+/// a function).  We provide 1 (single-byte) to keep tools on the narrow
+/// I/O path, avoiding wide-char codepaths that depend on fgetwln/fwprintf.
+/// Value 1 (single-byte) keeps sort on the narrow I/O path.
+/// sort -n numeric comparison is currently broken with this value.
 #[cfg(not(target_os = "macos"))]
-static MB_CUR_MAX_VALUE: i32 = 4;
+static MB_CUR_MAX_VALUE: i32 = 1;
 
 #[cfg(not(target_os = "macos"))]
 fn shim_mb_cur_max_addr() -> *const () {
     &MB_CUR_MAX_VALUE as *const i32 as *const ()
+}
+
+/// `___mb_cur_max()` is a function on macOS that returns the current
+/// `MB_CUR_MAX` value.  Some binaries (awk) import the function symbol
+/// `____mb_cur_max` (4 underscores in Mach-O) instead of the data symbol.
+#[cfg(not(target_os = "macos"))]
+extern "C" fn shim_mb_cur_max_fn() -> i32 {
+    MB_CUR_MAX_VALUE
 }
 
 // ── setlocale (macOS → Linux category translation) ──────────────────
@@ -756,6 +756,35 @@ extern "C" fn shim_nl_langinfo_l(
             NL_EMPTY.as_ptr() as *mut libc::c_char
         }
     }
+}
+
+// ── __collate_lookup_l ──────────────────────────────────────────────
+
+/// `void __collate_lookup_l(const wchar_t *s, int *len, int *prim,
+///                          int *sec, locale_t loc)`
+///
+/// macOS internal collation lookup used by regex and sort.  In the "C"
+/// locale, each character's primary weight is its ordinal and secondary
+/// weight is 0.  We implement this simple case.
+#[cfg(not(target_os = "macos"))]
+extern "C" fn shim_collate_lookup_l(
+    s: *const libc::wchar_t,
+    len: *mut libc::c_int,
+    prim: *mut libc::c_int,
+    sec: *mut libc::c_int,
+    _loc: libc::locale_t,
+) {
+    if s.is_null() {
+        if !len.is_null()  { unsafe { *len = 0 }; }
+        if !prim.is_null() { unsafe { *prim = 0 }; }
+        if !sec.is_null()  { unsafe { *sec = 0 }; }
+        return;
+    }
+    let wc = unsafe { *s } as libc::c_int;
+    // In "C" locale: one character consumed, primary = ordinal, secondary = 0
+    if !len.is_null()  { unsafe { *len = 1 }; }
+    if !prim.is_null() { unsafe { *prim = wc }; }
+    if !sec.is_null()  { unsafe { *sec = 0 }; }
 }
 
 // ── fortified string functions ──────────────────────────────────────
@@ -1493,18 +1522,48 @@ extern "C" fn shim_semaphore_wait(_semaphore: u32) -> libc::c_int {
 
 // ── fgetwln (BSD wide-char line reader) ─────────────────────────────
 
-/// `wchar_t *fgetwln(FILE *stream, size_t *len)` — stub returning NULL.
-/// This is a rare BSD function; returning NULL tells callers to fall
-/// back to regular line reading.
+/// `wchar_t *fgetwln(FILE *stream, size_t *len)` — reads a wide-char
+/// line from `stream`.  Returns a pointer (valid until the next call)
+/// and sets `*len` to the number of `wchar_t` elements.
+///
+/// Implemented via `fgetwc` in a loop, cached in a thread-local buffer.
 #[cfg(not(target_os = "macos"))]
 extern "C" fn shim_fgetwln(
-    _stream: *mut libc::FILE,
+    stream: *mut libc::FILE,
     len: *mut libc::size_t,
 ) -> *const libc::wchar_t {
-    if !len.is_null() {
-        unsafe { *len = 0 };
+    use std::cell::RefCell;
+    extern "C" {
+        fn fgetwc(stream: *mut libc::FILE) -> u32;
     }
-    std::ptr::null()
+    const WEOF_VAL: u32 = 0xFFFF_FFFF;
+    thread_local! {
+        static BUF: RefCell<Vec<libc::wchar_t>> = RefCell::new(Vec::with_capacity(256));
+    }
+    BUF.with(|cell| {
+        let mut buf = cell.borrow_mut();
+        buf.clear();
+        loop {
+            let wc = unsafe { fgetwc(stream) };
+            if wc == WEOF_VAL {
+                if buf.is_empty() {
+                    if !len.is_null() {
+                        unsafe { *len = 0 };
+                    }
+                    return std::ptr::null();
+                }
+                break;
+            }
+            buf.push(wc as libc::wchar_t);
+            if wc as libc::wchar_t == '\n' as libc::wchar_t {
+                break;
+            }
+        }
+        if !len.is_null() {
+            unsafe { *len = buf.len() };
+        }
+        buf.as_ptr()
+    })
 }
 
 // ── quarantine stubs ────────────────────────────────────────────────
@@ -1690,224 +1749,7 @@ extern "C" fn shim_lchmod(
     -1
 }
 
-// ── libxo stubs (text-mode passthroughs) ────────────────────────────
-//
-// libxo is the FreeBSD/macOS structured-output library used by system
-// tools like wc, sort, df.  In text mode (the default), we can provide
-// minimal stubs that let tools produce their normal text output.
-
-/// `int xo_parse_args(int argc, char **argv)` — strips --libxo options.
-/// Stub: returns argc unchanged (no libxo options present).
-#[cfg(not(target_os = "macos"))]
-extern "C" fn shim_xo_parse_args(
-    argc: libc::c_int,
-    _argv: *mut *mut libc::c_char,
-) -> libc::c_int {
-    argc
-}
-
-/// `xo_handle_t *xo_create_to_file(FILE *fp, unsigned style, const char *info)`
-/// Stub: returns the FILE* pointer as a fake handle.
-#[cfg(not(target_os = "macos"))]
-extern "C" fn shim_xo_create_to_file(
-    fp: *mut libc::c_void,
-    _style: libc::c_uint,
-    _info: *const libc::c_char,
-) -> *mut libc::c_void {
-    if fp.is_null() {
-        // Return stdout as default handle
-        unsafe { STDOUT_PTR as *mut libc::c_void }
-    } else {
-        fp
-    }
-}
-
-/// Container/list/instance open/close — all no-ops returning 0.
-#[cfg(not(target_os = "macos"))]
-extern "C" fn shim_xo_open_container(_name: *const libc::c_char) -> libc::c_int { 0 }
-#[cfg(not(target_os = "macos"))]
-extern "C" fn shim_xo_close_container(_name: *const libc::c_char) -> libc::c_int { 0 }
-#[cfg(not(target_os = "macos"))]
-extern "C" fn shim_xo_open_list(_name: *const libc::c_char) -> libc::c_int { 0 }
-#[cfg(not(target_os = "macos"))]
-extern "C" fn shim_xo_close_list(_name: *const libc::c_char) -> libc::c_int { 0 }
-#[cfg(not(target_os = "macos"))]
-extern "C" fn shim_xo_open_instance(_name: *const libc::c_char) -> libc::c_int { 0 }
-#[cfg(not(target_os = "macos"))]
-extern "C" fn shim_xo_close_instance(_name: *const libc::c_char) -> libc::c_int { 0 }
-
-/// `int xo_emit_h(xo_handle_t *handle, const char *fmt, ...)`
-///
-/// The key output function.  libxo format strings use `{:field/%fmt}`
-/// syntax.  In text mode, we extract the printf format specifiers and
-/// pass the varargs through to fprintf.  Since we can't portably forward
-/// variadic arguments in Rust, we use a simplified approach: parse the
-/// libxo format to extract embedded printf formats and print text
-/// segments directly.
-///
-/// For the simplified stub, we just extract literal text and %fmt from
-/// the libxo format and call fprintf on each segment.
-#[cfg(not(target_os = "macos"))]
-extern "C" fn shim_xo_emit_h(
-    handle: *mut libc::c_void,
-    fmt: *const libc::c_char,
-    // varargs follow — we use va_list manually via assembly or just
-    // pass the format + args to vfprintf
-) -> libc::c_int {
-    // Since we can't forward varargs from Rust, the simplest approach
-    // is to use the underlying vfprintf mechanism.  We transmute the
-    // function to take va_list and use platform ABI.
-    //
-    // Actually, the cleanest approach: treat the handle as FILE* and
-    // emit the libxo format string directly to it as-is.  This will
-    // show the raw format but at least won't crash.
-    //
-    // For wc specifically, the format strings are like:
-    //   "{:lines/%7llu} " and "{:words/%7llu} " etc.
-    // We need to extract just the printf part.
-    //
-    // Since we CANNOT forward varargs in Rust, we use a different
-    // approach: register this as a C-ABI function that keeps all
-    // args on the stack and forwards to vfprintf after rewriting fmt.
-    //
-    // Minimal stub: return 0 and let the caller handle it.
-    // The output just won't be produced for xo_emit calls.
-    let _ = handle;
-    let _ = fmt;
-    0
-}
-
-/// `void xo_finish(void)` — no-op.
-#[cfg(not(target_os = "macos"))]
-extern "C" fn shim_xo_finish() {}
-
-/// `void xo_err(int eval, const char *fmt, ...)` — print error and exit.
-#[cfg(not(target_os = "macos"))]
-extern "C" fn shim_xo_err(eval: libc::c_int, fmt: *const libc::c_char) {
-    if !fmt.is_null() {
-        unsafe {
-            let se = STDERR_PTR as *mut libc::FILE;
-            libc::fprintf(se, fmt);
-            libc::fprintf(se, b"\n\0".as_ptr() as *const libc::c_char);
-        }
-    }
-    unsafe { libc::exit(eval); }
-}
-
-/// `void xo_error(const char *fmt, ...)` — print to stderr.
-#[cfg(not(target_os = "macos"))]
-extern "C" fn shim_xo_error(fmt: *const libc::c_char) {
-    if !fmt.is_null() {
-        unsafe { libc::fprintf(STDERR_PTR as *mut libc::FILE, fmt); }
-    }
-}
-
-/// `void xo_warn(const char *fmt, ...)` — print warning.
-#[cfg(not(target_os = "macos"))]
-extern "C" fn shim_xo_warn(fmt: *const libc::c_char) {
-    if !fmt.is_null() {
-        unsafe {
-            let se = STDERR_PTR as *mut libc::FILE;
-            libc::fprintf(se, fmt);
-            libc::fprintf(se, b"\n\0".as_ptr() as *const libc::c_char);
-        }
-    }
-}
-
-/// `int xo_emit(const char *fmt, ...)` — default-handle text output.
-///
-/// Convenience wrapper around `xo_emit_h(NULL, fmt, ...)`.  Since we
-/// cannot forward varargs from Rust, this is a no-op stub like `xo_emit_h`.
-#[cfg(not(target_os = "macos"))]
-extern "C" fn shim_xo_emit(
-    _fmt: *const libc::c_char,
-    // varargs follow
-) -> libc::c_int {
-    0
-}
-
-/// `int xo_emit_hv(xo_handle_t *, const char *fmt, va_list)` — va_list variant.
-#[cfg(not(target_os = "macos"))]
-extern "C" fn shim_xo_emit_hv(
-    _handle: *mut libc::c_void,
-    _fmt: *const libc::c_char,
-    _args: *mut libc::c_void,
-) -> libc::c_int {
-    0
-}
-
-/// `void xo_errx(int eval, const char *fmt, ...)` — error (no errno) and exit.
-#[cfg(not(target_os = "macos"))]
-extern "C" fn shim_xo_errx(eval: libc::c_int, fmt: *const libc::c_char) {
-    if !fmt.is_null() {
-        unsafe {
-            let se = STDERR_PTR as *mut libc::FILE;
-            libc::fprintf(se, fmt);
-            libc::fprintf(se, b"\n\0".as_ptr() as *const libc::c_char);
-        }
-    }
-    unsafe { libc::exit(eval); }
-}
-
-/// `void xo_warnx(const char *fmt, ...)` — warning (no errno).
-#[cfg(not(target_os = "macos"))]
-extern "C" fn shim_xo_warnx(fmt: *const libc::c_char) {
-    if !fmt.is_null() {
-        unsafe {
-            let se = STDERR_PTR as *mut libc::FILE;
-            libc::fprintf(se, fmt);
-            libc::fprintf(se, b"\n\0".as_ptr() as *const libc::c_char);
-        }
-    }
-}
-
-/// `void xo_message(xo_handle_t *, int, const char *fmt, ...)` — general message.
-#[cfg(not(target_os = "macos"))]
-extern "C" fn shim_xo_message(
-    _handle: *mut libc::c_void,
-    _code: libc::c_int,
-    _fmt: *const libc::c_char,
-) {}
-
-/// `void xo_set_style(xo_handle_t *, int)` — set output style.
-#[cfg(not(target_os = "macos"))]
-extern "C" fn shim_xo_set_style(_handle: *mut libc::c_void, _style: libc::c_int) {}
-
-/// `void xo_set_flags(xo_handle_t *, int)` — set output flags.
-#[cfg(not(target_os = "macos"))]
-extern "C" fn shim_xo_set_flags(_handle: *mut libc::c_void, _flags: libc::c_int) {}
-
-/// `int xo_set_options(xo_handle_t *, const char *)` — set options string.
-#[cfg(not(target_os = "macos"))]
-extern "C" fn shim_xo_set_options(
-    _handle: *mut libc::c_void,
-    _opts: *const libc::c_char,
-) -> libc::c_int {
-    0
-}
-
-/// `void xo_no_setlocale(void)` — suppress automatic setlocale.
-#[cfg(not(target_os = "macos"))]
-extern "C" fn shim_xo_no_setlocale() {}
-
-/// Generic no-op stub returning 0 for xo functions we don't need.
-#[cfg(not(target_os = "macos"))]
-extern "C" fn shim_xo_noop() -> libc::c_int { 0 }
-
-/// `void xo_flush(void)` / `void xo_flush_h(xo_handle_t *)` — flush output.
-#[cfg(not(target_os = "macos"))]
-extern "C" fn shim_xo_flush() {
-    unsafe { libc::fflush(STDOUT_PTR as *mut libc::FILE); }
-}
-
-/// `int xo_attr(const char *, const char *, ...)` — set attribute on next field.
-#[cfg(not(target_os = "macos"))]
-extern "C" fn shim_xo_attr(
-    _name: *const libc::c_char,
-    _fmt: *const libc::c_char,
-) -> libc::c_int {
-    0
-}
+// ── libxo stubs moved to darwin_stubs/libxo_stubs.rs ────────────────
 
 // ── mach_error_string (Mach API) ────────────────────────────────────
 
@@ -1957,6 +1799,108 @@ extern "C" fn shim_srget(fp: *mut libc::FILE) -> libc::c_int {
         return -1; // EOF
     }
     unsafe { libc::fgetc(fp) }
+}
+
+// ── __swbuf (macOS stdio internal) ──────────────────────────────────
+
+/// `int __swbuf(int c, FILE *fp)` — macOS libc internal that flushes a FILE
+/// stream buffer and writes a character.  On Linux, the equivalent is `fputc`.
+///
+/// Because macOS guest code may call this with a `FILE *` whose struct layout
+/// doesn't match glibc (the inline `putc` macro reads fields at macOS offsets),
+/// we validate that `fp` is one of our known stdio pointers before calling
+/// `fputc`.  For unknown FILE pointers we fall back to a raw `write(2)` to
+/// stdout to avoid passing a misinterpreted struct to glibc.
+#[cfg(not(target_os = "macos"))]
+extern "C" fn shim_swbuf(c: libc::c_int, fp: *mut libc::FILE) -> libc::c_int {
+    if fp.is_null() {
+        return -1; // EOF
+    }
+    unsafe {
+        init_stdio_pointers();
+        // If fp matches one of our known-good Linux FILE pointers, use fputc
+        if fp == STDOUT_PTR || fp == STDERR_PTR || fp == STDIN_PTR {
+            return libc::fputc(c, fp);
+        }
+        // For FILE pointers opened by the guest via fopen (which goes through
+        // host libc), fp should be a valid Linux FILE.  Try fputc, but guard
+        // against obviously-bad pointers by checking alignment.
+        if (fp as usize) & 0x7 == 0 {
+            return libc::fputc(c, fp);
+        }
+        // Last resort: write the byte to stdout
+        let byte = c as u8;
+        libc::write(1, &byte as *const u8 as *const libc::c_void, 1);
+        c
+    }
+}
+
+// ── expand_number (BSD number parser) ───────────────────────────────
+
+/// `int expand_number(const char *buf, uint64_t *num)`
+///
+/// Parse human-readable number strings like "1K", "2M", "3G".
+/// Returns 0 on success, -1 on error (sets errno).
+#[cfg(not(target_os = "macos"))]
+extern "C" fn shim_expand_number(
+    buf: *const libc::c_char,
+    num: *mut u64,
+) -> libc::c_int {
+    if buf.is_null() || num.is_null() {
+        unsafe { *libc::__errno_location() = libc::EINVAL };
+        return -1;
+    }
+    let s = unsafe { std::ffi::CStr::from_ptr(buf) };
+    let s = match s.to_str() {
+        Ok(s) => s.trim(),
+        Err(_) => {
+            unsafe { *libc::__errno_location() = libc::EINVAL };
+            return -1;
+        }
+    };
+    if s.is_empty() {
+        unsafe { *libc::__errno_location() = libc::EINVAL };
+        return -1;
+    }
+
+    // Split into numeric part and optional suffix
+    let (num_str, suffix) = match s.find(|c: char| !c.is_ascii_digit()) {
+        Some(i) => (&s[..i], &s[i..]),
+        None => (s, ""),
+    };
+
+    let base: u64 = match num_str.parse() {
+        Ok(v) => v,
+        Err(_) => {
+            unsafe { *libc::__errno_location() = libc::EINVAL };
+            return -1;
+        }
+    };
+
+    let multiplier: u64 = match suffix {
+        "" => 1,
+        "k" | "K" => 1024,
+        "m" | "M" => 1024 * 1024,
+        "g" | "G" => 1024 * 1024 * 1024,
+        "t" | "T" => 1024u64 * 1024 * 1024 * 1024,
+        "p" | "P" => 1024u64 * 1024 * 1024 * 1024 * 1024,
+        "e" | "E" => 1024u64 * 1024 * 1024 * 1024 * 1024 * 1024,
+        _ => {
+            unsafe { *libc::__errno_location() = libc::EINVAL };
+            return -1;
+        }
+    };
+
+    match base.checked_mul(multiplier) {
+        Some(result) => {
+            unsafe { *num = result };
+            0
+        }
+        None => {
+            unsafe { *libc::__errno_location() = libc::ERANGE };
+            -1
+        }
+    }
 }
 
 // ── arc4random legacy ───────────────────────────────────────────────

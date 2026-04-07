@@ -544,28 +544,30 @@ pub extern "C" fn shim_cf_run_loop_run() {
 pub extern "C" fn shim_cf_run_loop_run_in_mode(
     _mode: u64,
     seconds: f64,
-    _return_after_source: u8,
+    return_after_source: u8,
 ) -> i32 {
-    let rl = shim_cf_run_loop_get_current();
-    // Fire observers + sources + timers via the full cycle path.
-    let ms = (seconds * 1000.0) as u64;
-    if ms > 0 {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs_f64();
-        let date = crate::nsdate::alloc_nsdate(now + seconds);
-        crate::nsrunloop::shim_nsrunloop_run_until_date(rl, 0, date);
+    let deadline = if seconds > 1.0e9 {
+        // distantFuture-like value — treat as indefinite
+        None
+    } else if seconds <= 0.0 {
+        Some(std::time::Instant::now())
     } else {
-        crate::nsrunloop::shim_nsrunloop_run_until_date(rl, 0, 0);
-    }
-    2 // kCFRunLoopRunTimedOut
+        Some(std::time::Instant::now() + std::time::Duration::from_secs_f64(seconds))
+    };
+    let single_pass = return_after_source != 0;
+    crate::nsrunloop::run_loop_blocking(deadline, single_pass)
 }
 
 /// `void CFRunLoopStop(CFRunLoopRef rl)`
 pub extern "C" fn shim_cf_run_loop_stop(_rl: u64) {
-    // Our NSRunLoop exits once timers are drained; this is a no-op for now.
     log::debug!("CFRunLoopStop called");
+    crate::nsrunloop::stop();
+}
+
+/// `void CFRunLoopWakeUp(CFRunLoopRef rl)`
+pub extern "C" fn shim_cf_run_loop_wakeup(_rl: u64) {
+    log::debug!("CFRunLoopWakeUp called");
+    crate::nsrunloop::wakeup();
 }
 
 /// `void CFRunLoopAddTimer(CFRunLoopRef rl, CFRunLoopTimerRef timer, CFStringRef mode)`

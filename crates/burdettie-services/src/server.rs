@@ -90,7 +90,7 @@ impl ServiceServer {
             None
         };
 
-        let router = Arc::new(Router::new(recorder));
+        let router = Arc::new(Router::new(recorder, config));
         let stop = Arc::new(AtomicBool::new(false));
         let stop_clone = Arc::clone(&stop);
 
@@ -183,8 +183,12 @@ mod tests {
             bind_addr: "127.0.0.1:0".into(),
             record_requests: false,
             record_db_path: String::new(),
+            replay_db_path: None,
             log_format: crate::config::LogFormat::Text,
             log_sink: crate::config::LogSink::Stdout,
+            admin: crate::config::AdminConfig { enabled: false, token: None },
+            remote: crate::config::RemoteConfig { endpoint: None, auth_token: None },
+            instance_id: "test".into(),
         };
 
         let handle = ServiceServer::start(&config).expect("server should start");
@@ -224,8 +228,12 @@ mod tests {
             bind_addr: "127.0.0.1:0".into(),
             record_requests: true,
             record_db_path: ":memory:".into(),
+            replay_db_path: None,
             log_format: crate::config::LogFormat::Text,
             log_sink: crate::config::LogSink::Stdout,
+            admin: crate::config::AdminConfig { enabled: false, token: None },
+            remote: crate::config::RemoteConfig { endpoint: None, auth_token: None },
+            instance_id: "test".into(),
         };
 
         let handle = ServiceServer::start(&config).expect("server should start");

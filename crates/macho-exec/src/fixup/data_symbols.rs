@@ -53,6 +53,7 @@ impl DataSymbolStore {
         store.register_swift_runtime_globals();
         store.register_objc_runtime_globals();
         store.register_objc_ivar_offsets();
+        store.register_dvt_ide_constants();
         store
     }
 
@@ -666,6 +667,68 @@ impl DataSymbolStore {
         static NSBUNDLE_PATH: u64 = 8;
 
         self.symbols.insert("_OBJC_IVAR_$_NSBundle._bundlePath", &NSBUNDLE_PATH as *const u64 as u64);
+    }
+
+    // ── DVTFoundation / IDEFoundation constant data symbols ─────────
+
+    fn register_dvt_ide_constants(&mut self) {
+        // DVT internal constants — opaque non-NULL sentinels.
+        // These are used as dictionary keys, notification names, or
+        // configuration flags by Xcode tool init paths.
+        //
+        // Sentinel range: 0x4456_54xx ("DVT" prefix)
+        static DVT_CURRENT_ARCH:           u64 = 0x4456_5402;
+        static DVT_PLUGIN_COMPAT_UUID:     u64 = 0x4456_5403;
+        static DVT_PLUGIN_EXTENSION_KEY:   u64 = 0x4456_5404;
+        static DVT_DEFAULT_TOOLCHAIN:      u64 = 0x4456_5405;
+        static DVT_PLATFORM_FAMILY:        u64 = 0x4456_5406;
+        static DVT_BUILD_SETTING_KEY:      u64 = 0x4456_5407;
+        static DVT_FS_EVENT_LATENCY:       u64 = 0x4456_5408;
+
+        self.symbols.insert("_kDVTCurrentArchitecture",             &DVT_CURRENT_ARCH          as *const u64 as u64);
+        self.symbols.insert("_kDVTPlugInCompatibilityUUID",         &DVT_PLUGIN_COMPAT_UUID    as *const u64 as u64);
+        self.symbols.insert("_kDVTPlugInExtensionPointKey",         &DVT_PLUGIN_EXTENSION_KEY  as *const u64 as u64);
+        self.symbols.insert("_kDVTDefaultToolchainIdentifier",      &DVT_DEFAULT_TOOLCHAIN     as *const u64 as u64);
+        self.symbols.insert("_kDVTPlatformFamilyKey",               &DVT_PLATFORM_FAMILY       as *const u64 as u64);
+        self.symbols.insert("_kDVTBuildSettingKey",                 &DVT_BUILD_SETTING_KEY     as *const u64 as u64);
+        self.symbols.insert("_kDVTFileSystemEventStreamLatencyKey", &DVT_FS_EVENT_LATENCY      as *const u64 as u64);
+
+        // IDE internal constants — sentinel range: 0x4944_45xx ("IDE" prefix)
+        static IDE_INDEX_DB_DIR:            u64 = 0x4944_4501;
+        static IDE_WORKSPACE_CHECK_KEY:     u64 = 0x4944_4502;
+        static IDE_SOURCE_TREE_ROOT:        u64 = 0x4944_4503;
+        static IDE_BUILD_OP_SUCCEEDED:      u64 = 0x4944_4504;
+        static IDE_BUILD_OP_FAILED:         u64 = 0x4944_4505;
+        static IDE_ACTIVITY_LOG_SECTION:    u64 = 0x4944_4506;
+
+        self.symbols.insert("_kIDEIndexDatabaseDirectoryKey",       &IDE_INDEX_DB_DIR          as *const u64 as u64);
+        self.symbols.insert("_kIDEWorkspaceChecksKey",              &IDE_WORKSPACE_CHECK_KEY   as *const u64 as u64);
+        self.symbols.insert("_kIDESourceTreeRootKey",               &IDE_SOURCE_TREE_ROOT      as *const u64 as u64);
+        self.symbols.insert("_kIDEBuildOperationDidSucceedNotification",   &IDE_BUILD_OP_SUCCEEDED as *const u64 as u64);
+        self.symbols.insert("_kIDEBuildOperationDidFailNotification",      &IDE_BUILD_OP_FAILED    as *const u64 as u64);
+        self.symbols.insert("_kIDEActivityLogSectionKey",           &IDE_ACTIVITY_LOG_SECTION  as *const u64 as u64);
+
+        // DVT OBJC_IVAR offsets — DVT classes have ISA at 0, then fields.
+        // DVTFilePath: [ISA:8][pathString:8][parent:8]
+        static DVTFILEPATH_PATH:    u64 = 8;
+        static DVTFILEPATH_PARENT:  u64 = 16;
+
+        self.symbols.insert("_OBJC_IVAR_$_DVTFilePath._pathString",   &DVTFILEPATH_PATH   as *const u64 as u64);
+        self.symbols.insert("_OBJC_IVAR_$_DVTFilePath._parentPath",   &DVTFILEPATH_PARENT as *const u64 as u64);
+
+        // DVTLogAspect: [ISA:8][name:8][level:8]
+        static DVTLOGASPECT_NAME:   u64 = 8;
+        static DVTLOGASPECT_LEVEL:  u64 = 16;
+
+        self.symbols.insert("_OBJC_IVAR_$_DVTLogAspect._name",  &DVTLOGASPECT_NAME  as *const u64 as u64);
+        self.symbols.insert("_OBJC_IVAR_$_DVTLogAspect._level", &DVTLOGASPECT_LEVEL as *const u64 as u64);
+
+        // DVTPlatform: [ISA:8][name:8][identifier:8]
+        static DVTPLATFORM_NAME:  u64 = 8;
+        static DVTPLATFORM_IDENT: u64 = 16;
+
+        self.symbols.insert("_OBJC_IVAR_$_DVTPlatform._name",       &DVTPLATFORM_NAME  as *const u64 as u64);
+        self.symbols.insert("_OBJC_IVAR_$_DVTPlatform._identifier", &DVTPLATFORM_IDENT as *const u64 as u64);
     }
 
     /// Resolve a symbol via `dlsym(RTLD_DEFAULT, c_name)` and insert it.

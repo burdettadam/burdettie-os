@@ -121,3 +121,26 @@ define_class_pair!(child SIMDEVICETYPE_CLASS_DATA, SIMDEVICETYPE_METACLASS_DATA,
     meta_addr: simdevicetype_metaclass_addr,
     parent_class: nsobject_class_addr,
     parent_meta: nsobject_metaclass_addr);
+
+// Additional DVT/IDE classes needed for Xcode tool init paths
+
+define_class_pair!(child DVTDEVELOPERPATHS_CLASS_DATA, DVTDEVELOPERPATHS_METACLASS_DATA, DVTDEVELOPERPATHS_INIT,
+    ensure: ensure_dvtdeveloperpaths_init,
+    class_addr: dvtdeveloperpaths_class_addr,
+    meta_addr: dvtdeveloperpaths_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child DVTPLUGINMGR_CLASS_DATA, DVTPLUGINMGR_METACLASS_DATA, DVTPLUGINMGR_INIT,
+    ensure: ensure_dvtpluginmgr_init,
+    class_addr: dvtpluginmgr_class_addr,
+    meta_addr: dvtpluginmgr_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child IDEINITIALIZER_CLASS_DATA, IDEINITIALIZER_METACLASS_DATA, IDEINITIALIZER_INIT,
+    ensure: ensure_ideinitializer_init,
+    class_addr: ideinitializer_class_addr,
+    meta_addr: ideinitializer_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);

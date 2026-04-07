@@ -21,6 +21,8 @@ impl Handler for TelemetryHandler {
             return None;
         }
 
+        super::status::inc_telemetry();
+
         log::info!(
             "burdettie-services: telemetry {method} {path} ({} bytes)",
             body.len()

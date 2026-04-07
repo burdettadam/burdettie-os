@@ -43,6 +43,7 @@ members = [
     "crates/trust-eval",
     "crates/swift-stub-gen",
     "crates/launchd",
+    "crates/libxo",
     "crates/burdettie-domain-map",
     "crates/burdettie-services",
     "crates/burdettie-log-pipeline",
@@ -105,6 +106,7 @@ icu-shims             = { path = "crates/icu-shims" }
 macho-shared-cache    = { path = "crates/macho-shared-cache" }
 trust-eval            = { path = "crates/trust-eval" }
 launchd               = { path = "crates/launchd" }
+libxo                  = { path = "crates/libxo" }
 burdettie-domain-map  = { path = "crates/burdettie-domain-map" }
 burdettie-services    = { path = "crates/burdettie-services" }
 burdettie-log-pipeline = { path = "crates/burdettie-log-pipeline" }

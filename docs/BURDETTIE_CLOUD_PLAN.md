@@ -115,7 +115,8 @@ crates/burdettie-services/
 │   │   ├── auth.rs         # /api/v1/auth/*     — Apple ID stubs
 │   │   ├── captive.rs      # /api/v1/network/*  — connectivity check
 │   │   ├── dns.rs          # /api/v1/dns/*      — DoH resolver
-│   │   └── notarize.rs     # /api/v1/notarize   — notarization
+│   │   ├── notarize.rs     # /api/v1/notarize   — notarization
+│   │   └── status.rs       # /_burdettie/status  — diagnostics
 │   └── replay.rs           # Replay recorded responses for testing
 ```
 
@@ -401,19 +402,62 @@ during development).
    `/api/v1/notarize` (ticket validation), `/api/v1/xcode/download` (404 not-available)
 10. ✅ Tests: 7 log-pipeline + 10 domain-map + 6 services + 333 libsystem-shims + 2750 cf-lite
 
-### Phase 3: Protocol Fidelity
-1. Analyze recorded requests to understand Apple's actual protocol format
-2. Build response generators that produce Apple-compatible plists/JSON
-3. OCSP responder using local cert store
-4. Software update catalog serving
-5. Notarization ticket validation
+### Phase 3: Protocol Fidelity ✅ COMPLETE
+1. ✅ OCSP responder — RFC 6960 DER-encoded OCSPResponse with BasicOCSPResponse,
+   SingleResponse (certStatus=good), CertID with SHA-256, dummy 64-byte signature.
+   Manual byte-level DER construction (no ASN.1 library dependency).
+2. ✅ CRL endpoint — X.509 v2 empty CRL with sha256WithRSAEncryption,
+   BurdettieOS CA issuer (CN=BurdettieOS CA), thisUpdate/nextUpdate dates.
+3. ✅ Notarization ticket validator — Apple CloudKit-format JSON responses with
+   CDHash lookup (`2/<cdhash>` record names), base64-encoded signed ticket plists,
+   submission acceptance, and ticket retrieval endpoints.
+4. ✅ DNS handler protocol upgrade — AAAA records (::1), CNAME chains for CDN
+   edge domains (edgekey.net, akamaiedge.net), NXDOMAIN (Status 3) for telemetry
+   domains (telemetry.apple.com, xp.apple.com, metrics.apple.com), query `type`
+   parameter support.
+5. ✅ Request replay infrastructure — `ReplayHandler` serves previously-recorded
+   HTTP responses from SQLite for deterministic testing and offline protocol
+   analysis. Registered as first handler when `BURDETTIE_REPLAY_DB` is set.
+6. ✅ Tests: 25 burdettie-services (3 certs DER + 6 DNS + 5 notarize + 5 replay
+   + 3 config + 2 recorder + 1 server)
 
-### Phase 4: Remote Deployment
-1. Configuration for remote `burdettie-services` endpoint
-2. Authentication for remote service access
-3. S3-compatible storage backend for recorded data
-4. Multi-tenant support (multiple loader instances → one remote server)
-5. Dashboard / admin API for viewing recorded requests
+### Phase 4: Integration & Diagnostics ✅ COMPLETE
+1. ✅ Wired `ReplayHandler` into router — prepended when `BURDETTIE_REPLAY_DB` is set
+   via new `replay_db_path` field on `ServiceConfig` and `BURDETTIE_REPLAY_DB` env var.
+2. ✅ Added `/_burdettie/status` diagnostic endpoint — returns JSON with uptime,
+   request counters (total, telemetry, certs, dns, notarize, replay_hits),
+   recording stats, and server version.
+3. ✅ Wired burdettie services into `macho-inspect --exec` path (`exec.rs`) —
+   previously only `pipeline_native.rs` initialized the domain map + HTTP server.
+   Now both execution paths start the full burdettie stack.
+4. ✅ Fixed libxo cross-compilation — `libc::stderr` → `get_stderr()` helper,
+   removed duplicate `xo_emit_text_trampoline` extern declaration.
+5. ✅ End-to-end validation in Docker: 154/154 tools passing with burdettie
+   services active (HTTP server + SQLite recorder + os_log pipeline + XPC handlers).
+6. ✅ Tests: 27 burdettie-services (3 certs + 6 DNS + 5 notarize + 5 replay
+   + 2 status + 3 config + 2 recorder + 1 server)
+
+### Phase 5: Remote Deployment ✅ COMPLETE
+1. ✅ Configuration for remote `burdettie-services` endpoint — `[remote]` TOML
+   section with `endpoint`, `auth_token`, `instance_id` + env var overrides
+   (`BURDETTIE_REMOTE_ENDPOINT`, `BURDETTIE_REMOTE_TOKEN`, `BURDETTIE_INSTANCE_ID`)
+2. ✅ Authentication for remote service access — Bearer token auth in
+   `ForwardHandler` (`X-Burdettie-Instance` + `Authorization` headers)
+3. ✅ Admin API for viewing recorded requests — `AdminHandler` with 4 endpoints:
+   `/_burdettie/admin/requests` (paginated query with source filter),
+   `/_burdettie/admin/requests/summary` (count by source),
+   `/_burdettie/admin/logs` (drain structured os_log events),
+   `/_burdettie/admin/config` (server config)
+4. ✅ Multi-tenant support — `instance_id` tagging on all admin responses +
+   `X-Burdettie-Instance` header on forwarded requests
+5. ✅ Remote forwarding — `ForwardHandler` proxies unmatched requests to remote
+   BurdettieOS instance (ureq v3, typed request builders, header forwarding)
+6. ✅ Admin auth middleware — `[admin]` TOML section with `enabled`/`token`,
+   `BURDETTIE_ADMIN_TOKEN` env var, Bearer token validation on all admin endpoints
+7. ✅ Recorder query methods — `query_recent(source, limit, offset)` +
+   `count_by_source()` for admin API backing
+8. ✅ Tests: 36 burdettie-services (3 admin + 2 forward + 3 certs + 6 DNS +
+   5 notarize + 5 replay + 2 status + 3 config + 1 recorder + 2 server + 4 icloud)
 
 ## 9. Open Source Dependencies
 

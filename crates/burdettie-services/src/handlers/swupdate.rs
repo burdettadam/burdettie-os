@@ -27,11 +27,18 @@ const EMPTY_CATALOG_PLIST: &[u8] = br#"<?xml version="1.0" encoding="UTF-8"?>
 </plist>"#;
 
 /// Configuration plist for Rosetta 2 / system config endpoint.
+///
+/// This is the merged version: contains both SwupdateHandler's `RosettaEnabled`
+/// and ConfigHandler's `RosettaUpdateAvailable` + `AdditionalComponentsAvailable`.
 const CONFIG_PLIST: &[u8] = br#"<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
     <key>RosettaEnabled</key>
+    <false/>
+    <key>RosettaUpdateAvailable</key>
+    <false/>
+    <key>AdditionalComponentsAvailable</key>
     <false/>
 </dict>
 </plist>"#;

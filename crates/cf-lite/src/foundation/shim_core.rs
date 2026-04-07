@@ -423,6 +423,7 @@ pub(super) fn install_core_shims(table: &mut ShimTable) {
         ("_CFRunLoopRun", cf_core::shim_cf_run_loop_run as *const () as u64, "CFRunLoopRun → run default mode"),
         ("_CFRunLoopRunInMode", cf_core::shim_cf_run_loop_run_in_mode as *const () as u64, "CFRunLoopRunInMode → timed mode run"),
         ("_CFRunLoopStop", cf_core::shim_cf_run_loop_stop as *const () as u64, "CFRunLoopStop → exit run loop"),
+        ("_CFRunLoopWakeUp", cf_core::shim_cf_run_loop_wakeup as *const () as u64, "CFRunLoopWakeUp → interrupt sleeping run loop"),
         ("_CFRunLoopAddTimer", cf_core::shim_cf_run_loop_add_timer as *const () as u64, "CFRunLoopAddTimer → schedule timer"),
         ("_CFRunLoopAddSource", cf_core::shim_cf_run_loop_add_source as *const () as u64, "CFRunLoopAddSource → add input source"),
         ("_CFRunLoopRemoveSource", cf_core::shim_cf_run_loop_remove_source as *const () as u64, "CFRunLoopRemoveSource → remove input source"),

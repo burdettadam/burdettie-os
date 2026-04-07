@@ -27,16 +27,24 @@
 
 mod collector;
 mod formatter;
+mod sink;
 
 pub use collector::{Collector, LogEvent, LogLevel, GLOBAL_COLLECTOR};
 pub use formatter::{format_event, OutputFormat};
+pub use sink::SinkConfig;
 
 /// Initialize the global log pipeline.
 ///
 /// Call this once at startup.  After initialization, `emit()` will route
 /// events through the configured formatter and sink.
 pub fn init(format: OutputFormat) {
+    init_with_sink(format, SinkConfig::Stdout);
+}
+
+/// Initialize with a specific sink configuration.
+pub fn init_with_sink(format: OutputFormat, sink: SinkConfig) {
     GLOBAL_COLLECTOR.init(format);
+    sink::GLOBAL_SINK.init(sink);
     log::debug!("burdettie-log-pipeline: initialized with format {:?}", format);
 }
 

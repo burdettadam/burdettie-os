@@ -20,6 +20,9 @@ impl PosixExtrasShims {
             // ── file/pty ────────────────────────────────────────
             ("_mkostemp", shim_mkostemp as *const () as u64, "mkostemp (mkstemp + flags)"),
             ("_openpty", shim_openpty as *const () as u64, "openpty (allocate pty)"),
+            ("_open", shim_open as *const () as u64, "open (macOS→Linux flag translation)"),
+            ("_open$NOCANCEL", shim_open as *const () as u64, "open$NOCANCEL (macOS→Linux flags)"),
+            ("_openat", shim_openat as *const () as u64, "openat (macOS→Linux flag translation)"),
 
             // ── process ─────────────────────────────────────────
             ("_waitid", shim_waitid as *const () as u64, "waitid (wait for process state change)"),
@@ -121,6 +124,66 @@ pub extern "C" fn shim_fls(value: c_int) -> c_int {
 }
 
 // ── File / PTY ──────────────────────────────────────────────────────
+
+// ── open() flag translation (macOS → Linux) ────────────────────────
+
+/// macOS and Linux use different values for open(2) flags.  The critical
+/// mismatches (on aarch64):
+///
+/// | Flag       | macOS   | Linux   |
+/// |------------|---------|---------|
+/// | O_NONBLOCK | 0x0004  | 0x0800  |
+/// | O_APPEND   | 0x0008  | 0x0400  |
+/// | O_CREAT    | 0x0200  | 0x0040  |
+/// | O_TRUNC    | 0x0400  | 0x0200  |
+/// | O_EXCL     | 0x0800  | 0x0080  |
+/// | O_NOFOLLOW | 0x0100  | 0x8000  |
+/// | O_DIRECTORY| 0x100000| 0x4000  |
+/// | O_CLOEXEC  |0x1000000| 0x80000 |
+///
+/// O_RDONLY (0), O_WRONLY (1), O_RDWR (2) are the same on both.
+fn translate_open_flags(mac_flags: c_int) -> c_int {
+    // Start with access mode (bottom 2 bits are the same)
+    let mut linux_flags = mac_flags & 0x3; // O_RDONLY / O_WRONLY / O_RDWR
+
+    // Map each macOS flag bit to its Linux equivalent
+    if mac_flags & 0x0004 != 0 { linux_flags |= libc::O_NONBLOCK; }
+    if mac_flags & 0x0008 != 0 { linux_flags |= libc::O_APPEND; }
+    if mac_flags & 0x0010 != 0 { /* O_SHLOCK — no Linux equiv, ignore */ }
+    if mac_flags & 0x0020 != 0 { /* O_EXLOCK — no Linux equiv, ignore */ }
+    if mac_flags & 0x0100 != 0 { linux_flags |= libc::O_NOFOLLOW; }
+    if mac_flags & 0x0200 != 0 { linux_flags |= libc::O_CREAT; }
+    if mac_flags & 0x0400 != 0 { linux_flags |= libc::O_TRUNC; }
+    if mac_flags & 0x0800 != 0 { linux_flags |= libc::O_EXCL; }
+    if mac_flags & 0x00100000 != 0 { linux_flags |= libc::O_DIRECTORY; }
+    if mac_flags & 0x01000000 != 0 { linux_flags |= libc::O_CLOEXEC; }
+
+    linux_flags
+}
+
+/// `int open(const char *path, int oflag, ...)` — translate macOS open flags
+/// to Linux equivalents.  On AArch64 the optional mode_t argument is always
+/// in x2 whether or not O_CREAT is set, so we unconditionally accept it.
+extern "C" fn shim_open(
+    path: *const c_char,
+    mac_flags: c_int,
+    mode: libc::mode_t,
+) -> c_int {
+    let linux_flags = translate_open_flags(mac_flags);
+    unsafe { libc::open(path, linux_flags, mode as libc::c_uint) }
+}
+
+/// `int openat(int dirfd, const char *path, int oflag, ...)` — same flag
+/// translation for directory-relative open.
+extern "C" fn shim_openat(
+    dirfd: c_int,
+    path: *const c_char,
+    mac_flags: c_int,
+    mode: libc::mode_t,
+) -> c_int {
+    let linux_flags = translate_open_flags(mac_flags);
+    unsafe { libc::openat(dirfd, path, linux_flags, mode as libc::c_uint) }
+}
 
 /// mkostemp: like mkstemp but with additional flags (O_CLOEXEC etc.)
 /// Falls back to mkstemp if mkostemp is unavailable (flags ignored).
@@ -867,13 +930,26 @@ pub extern "C" fn shim_regcomp(
     let ret = unsafe { libc::regcomp(&mut *linux_re, pattern, linux_cflags) };
     if ret == 0 {
         // Write re_nsub into the macOS struct at offset 8
+        // Also write re_magic at offset 0 (0xF265 = BSD regex magic)
+        // Linux glibc regex_t stores re_nsub at offset 48 (size_t)
+        let nsub = unsafe {
+            let re_ptr = &*linux_re as *const libc::regex_t as *const u8;
+            *(re_ptr.add(48) as *const u64)
+        };
         if preg != 0 {
             unsafe {
+                // re_magic at offset 0 (i32)
+                let magic_ptr = preg as *mut i32;
+                *magic_ptr = 0xF265_u32 as i32; // BSD regex magic number
+                // re_nsub at offset 8 (u64 / size_t)
                 let nsub_ptr = (preg + 8) as *mut u64;
-                *nsub_ptr = 0;
+                *nsub_ptr = nsub;
             }
         }
+        log::trace!("regcomp: success, re_nsub={nsub}");
         regex_map_insert(preg, linux_re);
+    } else {
+        log::trace!("regcomp: failed with error {ret}");
     }
     ret
 }
@@ -901,27 +977,34 @@ pub extern "C" fn shim_regexec(
     darwin_pmatch: u64, // actually *mut DarwinRegmatch (16 bytes each)
     eflags: c_int,
 ) -> c_int {
+    log::trace!("regexec: preg={preg:#x} nmatch={nmatch} eflags={eflags:#x}");
+    
     if let Some(linux_re) = regex_map_get(preg) {
         let nm = nmatch as usize;
+        let has_startend = eflags & 4 != 0 && darwin_pmatch != 0;
+        // REG_STARTEND requires at least 1 pmatch entry for the input range
+        let effective_nm = if has_startend { nm.max(1) } else { nm };
         // Allocate Linux-sized pmatch array
         let mut linux_pmatch: Vec<libc::regmatch_t> = vec![
-            libc::regmatch_t { rm_so: -1, rm_eo: -1 }; nm.max(1)
+            libc::regmatch_t { rm_so: -1, rm_eo: -1 }; effective_nm.max(1)
         ];
 
-        // If REG_STARTEND, convert input pmatch[0] from macOS to Linux layout
-        if eflags & 4 != 0 && darwin_pmatch != 0 && nm >= 1 {
+        // If REG_STARTEND, convert input pmatch[0] from macOS (16-byte) to Linux (8-byte)
+        if has_startend {
             let darwin = unsafe { &*(darwin_pmatch as *const DarwinRegmatch) };
             linux_pmatch[0].rm_so = darwin.rm_so as i32;
             linux_pmatch[0].rm_eo = darwin.rm_eo as i32;
+            log::trace!("regexec REG_STARTEND: range [{}, {})", linux_pmatch[0].rm_so, linux_pmatch[0].rm_eo);
         }
 
-        let pmatch_ptr = if darwin_pmatch == 0 {
+        let pmatch_ptr = if darwin_pmatch == 0 && !has_startend {
             std::ptr::null_mut()
         } else {
             linux_pmatch.as_mut_ptr()
         };
 
-        let ret = unsafe { libc::regexec(linux_re, string, nm, pmatch_ptr, eflags) };
+        let ret = unsafe { libc::regexec(linux_re, string, effective_nm, pmatch_ptr, eflags) };
+        log::trace!("regexec: result={ret} (0=match, 1=nomatch)");
 
         // Convert output pmatch from Linux to macOS layout
         if darwin_pmatch != 0 && ret == 0 {
@@ -934,7 +1017,10 @@ pub extern "C" fn shim_regexec(
 
         ret
     } else {
-        log::warn!("regexec: no compiled regex found for preg={preg:#x}");
+        log::warn!("regexec: no compiled regex found for preg={preg:#x} (map has {} entries)", {
+            let guard = REGEX_MAP.lock().unwrap();
+            guard.as_ref().map_or(0, |m| m.len())
+        });
         1 // REG_NOMATCH
     }
 }

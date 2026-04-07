@@ -108,6 +108,7 @@ pub(super) fn run_native(
     tracer.record_perf_counter("map_images", "shims_installed", ctx.shim_table.len() as u64);
 
     // 4b. Start BurdettieOS cloud services (domain rewrite + local server)
+    burdettie_services::set_guest_binary(&shim_config.process_name);
     let _burdettie_handle = {
         let domain_config = burdettie_domain_map::RewriteConfig::from_env();
         let services_enabled = domain_config.enabled;
@@ -126,7 +127,18 @@ pub(super) fn run_native(
                     burdettie_log_pipeline::OutputFormat::Text
                 }
             };
-            burdettie_log_pipeline::init(log_format);
+            let log_sink = match &svc_config.log_sink {
+                burdettie_services::config::LogSink::Stdout => {
+                    burdettie_log_pipeline::SinkConfig::Stdout
+                }
+                burdettie_services::config::LogSink::File(path) => {
+                    burdettie_log_pipeline::SinkConfig::File(path.clone())
+                }
+                burdettie_services::config::LogSink::Http(url) => {
+                    burdettie_log_pipeline::SinkConfig::Http(url.clone())
+                }
+            };
+            burdettie_log_pipeline::init_with_sink(log_format, log_sink);
 
             match burdettie_services::ServiceServer::start(&svc_config) {
                 Ok(handle) => {

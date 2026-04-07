@@ -114,6 +114,9 @@ impl Collector {
         let fmt = *self.format.lock().unwrap_or_else(|e| e.into_inner());
         let formatted = formatter::format_event(&event, fmt);
 
+        // Write to configured sink (file or HTTP)
+        crate::sink::GLOBAL_SINK.write_line(&formatted);
+
         // Route to the `log` crate at the appropriate level
         match event.level {
             LogLevel::Error | LogLevel::Fault => log::error!("{formatted}"),

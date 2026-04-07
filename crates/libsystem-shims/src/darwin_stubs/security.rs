@@ -105,12 +105,19 @@ impl SecurityStubs {
             ("_SecPKCS12Import", shim_sec_return_unimplemented as *const () as u64, "SecPKCS12Import (stub → errSecUnimplemented)")
         );
 
-        // ── Keychain refs (legacy) ──────────────────────────────
+        // ── Keychain refs (legacy — bridged to SQLite store) ──────
         register_shims!(table,
-            ("_SecKeychainItemCopyContent", shim_sec_return_unimplemented as *const () as u64, "SecKeychainItemCopyContent (stub → errSecUnimplemented)"),
-            ("_SecKeychainFindGenericPassword", shim_sec_return_item_not_found as *const () as u64, "SecKeychainFindGenericPassword (stub → errSecItemNotFound)"),
-            ("_SecKeychainFindInternetPassword", shim_sec_return_item_not_found as *const () as u64, "SecKeychainFindInternetPassword (stub → errSecItemNotFound)"),
-            ("_SecKeychainAddGenericPassword", shim_sec_return_unimplemented as *const () as u64, "SecKeychainAddGenericPassword (stub → errSecUnimplemented)")
+            ("_SecKeychainItemCopyContent", shim_sec_keychain_item_copy_content as *const () as u64, "SecKeychainItemCopyContent (real → SQLite)"),
+            ("_SecKeychainItemModifyContent", shim_sec_keychain_item_modify_content as *const () as u64, "SecKeychainItemModifyContent (real → SQLite)"),
+            ("_SecKeychainItemFreeContent", shim_sec_keychain_item_free_content as *const () as u64, "SecKeychainItemFreeContent (real → free)"),
+            ("_SecKeychainFindGenericPassword", shim_sec_keychain_find_generic_password as *const () as u64, "SecKeychainFindGenericPassword (real → SQLite)"),
+            ("_SecKeychainFindInternetPassword", shim_sec_keychain_find_internet_password as *const () as u64, "SecKeychainFindInternetPassword (real → SQLite)"),
+            ("_SecKeychainAddGenericPassword", shim_sec_keychain_add_generic_password as *const () as u64, "SecKeychainAddGenericPassword (real → SQLite)"),
+            ("_SecKeychainCopyDefault", shim_sec_keychain_copy_default as *const () as u64, "SecKeychainCopyDefault (stub → sentinel)"),
+            ("_SecKeychainOpen", shim_sec_keychain_open as *const () as u64, "SecKeychainOpen (stub → sentinel)"),
+            ("_SecKeychainGetPath", shim_sec_keychain_get_path as *const () as u64, "SecKeychainGetPath (stub → default path)"),
+            ("_SecKeychainCopySearchList", shim_sec_return_null as *const () as u64, "SecKeychainCopySearchList (stub → NULL)"),
+            ("_SecKeychainSetSearchList", shim_sec_return_success as *const () as u64, "SecKeychainSetSearchList (stub → success)")
         );
 
         // ── kSec* string constant data symbols ──────────────────
@@ -287,6 +294,31 @@ fn keychain_db() -> std::sync::MutexGuard<'static, Option<rusqlite::Connection>>
     KEYCHAIN_DB.lock().unwrap_or_else(|e| e.into_inner())
 }
 
+// ── Legacy SecKeychain item ref registry ────────────────────────
+
+/// Maps opaque SecKeychainItemRef handles back to (service, account)
+/// so that SecKeychainItemCopyContent / ModifyContent can operate.
+struct KeychainItemRef {
+    service: String,
+    account: String,
+}
+
+static KEYCHAIN_ITEM_STORE: Mutex<Option<HashMap<u64, KeychainItemRef>>> = Mutex::new(None);
+
+fn keychain_item_store() -> std::sync::MutexGuard<'static, Option<HashMap<u64, KeychainItemRef>>> {
+    KEYCHAIN_ITEM_STORE.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// Default keychain sentinel — returned by SecKeychainCopyDefault / SecKeychainOpen.
+static SEC_KEYCHAIN_SENTINEL: u64 = 0x5345_4B43_0001; // "SEKC" + keychain
+
+/// Extract a UTF-8 string from a raw C pointer + byte length (no NUL required).
+fn extract_c_buf(ptr: *const u8, len: usize) -> String {
+    if ptr.is_null() || len == 0 { return String::new(); }
+    let slice = unsafe { std::slice::from_raw_parts(ptr, len) };
+    String::from_utf8_lossy(slice).into_owned()
+}
+
 fn ensure_keychain(guard: &mut Option<rusqlite::Connection>) -> &mut rusqlite::Connection {
     guard.get_or_insert_with(|| {
         let path = std::env::var("TMPDIR")
@@ -341,20 +373,48 @@ fn extract_data(obj: u64) -> Option<Vec<u8>> {
 }
 
 /// Scan an NSDictionary for a value at a specific sentinel key.
-/// NSDictionary layout: [isa:8][count:8][keys_ptr:8][vals_ptr:8]
+///
+/// Handles two layouts:
+///   - Dynamic NSDictionary:  [isa:8][count:8][keys_ptr:8][vals_ptr:8]
+///   - NSConstantDictionary:  [isa:8][flags:8][count:8][keys_ptr:8][vals_ptr:8]
+///
+/// We try the dynamic layout first; if it yields nothing useful we
+/// fall back to the constant-dictionary offsets.
 fn dict_value_for_sentinel(dict: u64, sentinel: u64) -> u64 {
     if dict < 0x1000 { return 0; }
-    let count = raw_read_u64(dict, 8) as usize;
-    let keys_ptr = raw_read_u64(dict, 16);
-    let vals_ptr = raw_read_u64(dict, 24);
-    if keys_ptr == 0 || vals_ptr == 0 || count == 0 { return 0; }
+
+    // Try dynamic NSDictionary layout (count@8, keys@16, vals@24)
+    if let Some(v) = scan_dict_at(dict, 8, 16, 24, sentinel) {
+        return v;
+    }
+    // Fallback: NSConstantDictionary layout (count@16, keys@24, vals@32)
+    if let Some(v) = scan_dict_at(dict, 16, 24, 32, sentinel) {
+        return v;
+    }
+    0
+}
+
+/// Scan a dictionary's key/value arrays at the given offsets.
+fn scan_dict_at(
+    dict: u64,
+    count_off: usize,
+    keys_off: usize,
+    vals_off: usize,
+    sentinel: u64,
+) -> Option<u64> {
+    let count = raw_read_u64(dict, count_off) as usize;
+    let keys_ptr = raw_read_u64(dict, keys_off);
+    let vals_ptr = raw_read_u64(dict, vals_off);
+    if keys_ptr < 0x1000 || vals_ptr < 0x1000 || count == 0 || count > 1024 {
+        return None;
+    }
     for i in 0..count {
         let k = unsafe { *((keys_ptr as usize + i * 8) as *const u64) };
         if k == sentinel {
-            return unsafe { *((vals_ptr as usize + i * 8) as *const u64) };
+            return Some(unsafe { *((vals_ptr as usize + i * 8) as *const u64) });
         }
     }
-    0
+    None
 }
 
 /// Parse a SecItem query/attributes dictionary into components.
@@ -369,6 +429,327 @@ fn parse_query(dict: u64) -> (u64, String, String, Option<Vec<u8>>) {
     let data = if data_obj != 0 { extract_data(data_obj) } else { None };
 
     (class, service, account, data)
+}
+
+// ── Legacy SecKeychain shims (bridged to SQLite store) ──────────
+
+/// SecKeychainFindGenericPassword(keychain, serviceLen, service, accountLen,
+///     account, *passwordLen, **passwordData, *itemRef) → OSStatus
+///
+/// Real implementation: queries the SQLite keychain by service+account.
+pub extern "C" fn shim_sec_keychain_find_generic_password(
+    _keychain: u64,
+    service_len: u32,
+    service_ptr: *const u8,
+    account_len: u32,
+    account_ptr: *const u8,
+    password_len_out: *mut u32,
+    password_data_out: *mut *mut u8,
+    item_ref_out: *mut u64,
+) -> i32 {
+    let service = extract_c_buf(service_ptr, service_len as usize);
+    let account = extract_c_buf(account_ptr, account_len as usize);
+
+    let mut guard = keychain_db();
+    let conn = ensure_keychain(&mut guard);
+    let row_data: Result<Vec<u8>, _> = conn.query_row(
+        "SELECT data FROM keychain WHERE service = ?1 AND account = ?2",
+        rusqlite::params![&service, &account],
+        |row| row.get(0),
+    );
+    match row_data {
+        Ok(data) => {
+            if !password_len_out.is_null() {
+                unsafe { *password_len_out = data.len() as u32; }
+            }
+            if !password_data_out.is_null() {
+                if data.is_empty() {
+                    unsafe { *password_data_out = std::ptr::null_mut(); }
+                } else {
+                    let buf = unsafe { libc::malloc(data.len()) as *mut u8 };
+                    if !buf.is_null() {
+                        unsafe { std::ptr::copy_nonoverlapping(data.as_ptr(), buf, data.len()); }
+                    }
+                    unsafe { *password_data_out = buf; }
+                }
+            }
+            if !item_ref_out.is_null() {
+                let handle = next_sec_handle();
+                let mut istore = keychain_item_store();
+                istore.get_or_insert_with(HashMap::new).insert(handle, KeychainItemRef {
+                    service: service.clone(),
+                    account: account.clone(),
+                });
+                unsafe { *item_ref_out = handle; }
+            }
+            log::trace!("SecKeychainFindGenericPassword: found {service}/{account}");
+            ERR_SEC_SUCCESS
+        }
+        Err(_) => {
+            if !password_len_out.is_null() { unsafe { *password_len_out = 0; } }
+            if !password_data_out.is_null() { unsafe { *password_data_out = std::ptr::null_mut(); } }
+            if !item_ref_out.is_null() { unsafe { *item_ref_out = 0; } }
+            ERR_SEC_ITEM_NOT_FOUND
+        }
+    }
+}
+
+/// SecKeychainAddGenericPassword(keychain, serviceLen, service, accountLen,
+///     account, passwordLen, passwordData, *itemRef) → OSStatus
+///
+/// Real implementation: inserts into the SQLite keychain.
+pub extern "C" fn shim_sec_keychain_add_generic_password(
+    _keychain: u64,
+    service_len: u32,
+    service_ptr: *const u8,
+    account_len: u32,
+    account_ptr: *const u8,
+    password_len: u32,
+    password_data: *const u8,
+    item_ref_out: *mut u64,
+) -> i32 {
+    let service = extract_c_buf(service_ptr, service_len as usize);
+    let account = extract_c_buf(account_ptr, account_len as usize);
+    let data = if password_data.is_null() || password_len == 0 {
+        Vec::new()
+    } else {
+        unsafe { std::slice::from_raw_parts(password_data, password_len as usize) }.to_vec()
+    };
+
+    let mut guard = keychain_db();
+    let conn = ensure_keychain(&mut guard);
+    // Check for duplicate
+    let exists: bool = conn.query_row(
+        "SELECT COUNT(*) FROM keychain WHERE service = ?1 AND account = ?2",
+        rusqlite::params![&service, &account],
+        |row| row.get::<_, i64>(0),
+    ).unwrap_or(0) > 0;
+    if exists {
+        return ERR_SEC_DUPLICATE_ITEM;
+    }
+    let rc = conn.execute(
+        "INSERT INTO keychain (service, account, class, data) VALUES (?1, ?2, ?3, ?4)",
+        rusqlite::params![&service, &account, KSEC_CLASS_GENERIC_PW as i64, &data],
+    );
+    if rc.is_err() {
+        return ERR_SEC_UNIMPLEMENTED;
+    }
+    if !item_ref_out.is_null() {
+        let handle = next_sec_handle();
+        let mut istore = keychain_item_store();
+        istore.get_or_insert_with(HashMap::new).insert(handle, KeychainItemRef {
+            service: service.clone(),
+            account: account.clone(),
+        });
+        unsafe { *item_ref_out = handle; }
+    }
+    log::trace!("SecKeychainAddGenericPassword: added {service}/{account}");
+    ERR_SEC_SUCCESS
+}
+
+/// SecKeychainFindInternetPassword — uses server+account as the lookup key.
+///
+/// Signature: (keychain, serverLen, server, domainLen, domain, accountLen, account,
+///             pathLen, path, port, protocol, authType, *passwordLen, **passwordData, *itemRef)
+pub extern "C" fn shim_sec_keychain_find_internet_password(
+    _keychain: u64,
+    server_len: u32,
+    server_ptr: *const u8,
+    _domain_len: u32,
+    _domain_ptr: *const u8,
+    account_len: u32,
+    account_ptr: *const u8,
+    _path_len: u32,
+    _path_ptr: *const u8,
+    _port: u16,
+    _protocol: u32,
+    _auth_type: u32,
+    password_len_out: *mut u32,
+    password_data_out: *mut *mut u8,
+    item_ref_out: *mut u64,
+) -> i32 {
+    // Map server → service for storage compatibility
+    let service = extract_c_buf(server_ptr, server_len as usize);
+    let account = extract_c_buf(account_ptr, account_len as usize);
+
+    let mut guard = keychain_db();
+    let conn = ensure_keychain(&mut guard);
+    let row_data: Result<Vec<u8>, _> = conn.query_row(
+        "SELECT data FROM keychain WHERE service = ?1 AND account = ?2",
+        rusqlite::params![&service, &account],
+        |row| row.get(0),
+    );
+    match row_data {
+        Ok(data) => {
+            if !password_len_out.is_null() {
+                unsafe { *password_len_out = data.len() as u32; }
+            }
+            if !password_data_out.is_null() {
+                if data.is_empty() {
+                    unsafe { *password_data_out = std::ptr::null_mut(); }
+                } else {
+                    let buf = unsafe { libc::malloc(data.len()) as *mut u8 };
+                    if !buf.is_null() {
+                        unsafe { std::ptr::copy_nonoverlapping(data.as_ptr(), buf, data.len()); }
+                    }
+                    unsafe { *password_data_out = buf; }
+                }
+            }
+            if !item_ref_out.is_null() {
+                let handle = next_sec_handle();
+                let mut istore = keychain_item_store();
+                istore.get_or_insert_with(HashMap::new).insert(handle, KeychainItemRef {
+                    service: service.clone(),
+                    account: account.clone(),
+                });
+                unsafe { *item_ref_out = handle; }
+            }
+            ERR_SEC_SUCCESS
+        }
+        Err(_) => {
+            if !password_len_out.is_null() { unsafe { *password_len_out = 0; } }
+            if !password_data_out.is_null() { unsafe { *password_data_out = std::ptr::null_mut(); } }
+            if !item_ref_out.is_null() { unsafe { *item_ref_out = 0; } }
+            ERR_SEC_ITEM_NOT_FOUND
+        }
+    }
+}
+
+/// SecKeychainItemCopyContent(item, *itemClass, *attrList, *length, **outData) → OSStatus
+///
+/// Real implementation: looks up the item ref in the registry and queries SQLite.
+pub extern "C" fn shim_sec_keychain_item_copy_content(
+    item: u64,
+    item_class_out: *mut u32,
+    _attr_list: u64,
+    length_out: *mut u32,
+    data_out: *mut *mut u8,
+) -> i32 {
+    let guard = keychain_item_store();
+    let iref = match guard.as_ref().and_then(|s| s.get(&item)) {
+        Some(r) => r,
+        None => {
+            if !length_out.is_null() { unsafe { *length_out = 0; } }
+            if !data_out.is_null() { unsafe { *data_out = std::ptr::null_mut(); } }
+            return ERR_SEC_ITEM_NOT_FOUND;
+        }
+    };
+    let service = iref.service.clone();
+    let account = iref.account.clone();
+    drop(guard);
+
+    let mut dbguard = keychain_db();
+    let conn = ensure_keychain(&mut dbguard);
+    let row: Result<(i64, Vec<u8>), _> = conn.query_row(
+        "SELECT class, data FROM keychain WHERE service = ?1 AND account = ?2",
+        rusqlite::params![&service, &account],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    );
+    match row {
+        Ok((class, data)) => {
+            if !item_class_out.is_null() {
+                // Map to SecItemClass: kSecGenericPasswordItemClass = 'genp' = 0x67656E70
+                unsafe { *item_class_out = if class == KSEC_CLASS_GENERIC_PW as i64 { 0x67656E70 } else { 0 }; }
+            }
+            if !length_out.is_null() {
+                unsafe { *length_out = data.len() as u32; }
+            }
+            if !data_out.is_null() {
+                if data.is_empty() {
+                    unsafe { *data_out = std::ptr::null_mut(); }
+                } else {
+                    let buf = unsafe { libc::malloc(data.len()) as *mut u8 };
+                    if !buf.is_null() {
+                        unsafe { std::ptr::copy_nonoverlapping(data.as_ptr(), buf, data.len()); }
+                    }
+                    unsafe { *data_out = buf; }
+                }
+            }
+            ERR_SEC_SUCCESS
+        }
+        Err(_) => {
+            if !length_out.is_null() { unsafe { *length_out = 0; } }
+            if !data_out.is_null() { unsafe { *data_out = std::ptr::null_mut(); } }
+            ERR_SEC_ITEM_NOT_FOUND
+        }
+    }
+}
+
+/// SecKeychainItemModifyContent(item, attrList, length, data) → OSStatus
+pub extern "C" fn shim_sec_keychain_item_modify_content(
+    item: u64,
+    _attr_list: u64,
+    length: u32,
+    data: *const u8,
+) -> i32 {
+    let guard = keychain_item_store();
+    let iref = match guard.as_ref().and_then(|s| s.get(&item)) {
+        Some(r) => r,
+        None => return ERR_SEC_ITEM_NOT_FOUND,
+    };
+    let service = iref.service.clone();
+    let account = iref.account.clone();
+    drop(guard);
+
+    let new_data = if data.is_null() || length == 0 {
+        Vec::new()
+    } else {
+        unsafe { std::slice::from_raw_parts(data, length as usize) }.to_vec()
+    };
+
+    let mut dbguard = keychain_db();
+    let conn = ensure_keychain(&mut dbguard);
+    let rows = conn.execute(
+        "UPDATE keychain SET data = ?1 WHERE service = ?2 AND account = ?3",
+        rusqlite::params![&new_data, &service, &account],
+    ).unwrap_or(0);
+    if rows > 0 { ERR_SEC_SUCCESS } else { ERR_SEC_ITEM_NOT_FOUND }
+}
+
+/// SecKeychainItemFreeContent(attrList, data) → OSStatus
+pub extern "C" fn shim_sec_keychain_item_free_content(_attr_list: u64, data: *mut u8) -> i32 {
+    if !data.is_null() {
+        unsafe { libc::free(data as *mut libc::c_void); }
+    }
+    ERR_SEC_SUCCESS
+}
+
+/// SecKeychainCopyDefault(&keychain) → OSStatus
+pub extern "C" fn shim_sec_keychain_copy_default(keychain_out: *mut u64) -> i32 {
+    if !keychain_out.is_null() {
+        unsafe { *keychain_out = &SEC_KEYCHAIN_SENTINEL as *const u64 as u64; }
+    }
+    ERR_SEC_SUCCESS
+}
+
+/// SecKeychainOpen(path, &keychain) → OSStatus
+pub extern "C" fn shim_sec_keychain_open(_path: *const u8, keychain_out: *mut u64) -> i32 {
+    if !keychain_out.is_null() {
+        unsafe { *keychain_out = &SEC_KEYCHAIN_SENTINEL as *const u64 as u64; }
+    }
+    ERR_SEC_SUCCESS
+}
+
+/// SecKeychainGetPath(keychain, &ioPathLength, pathName) → OSStatus
+pub extern "C" fn shim_sec_keychain_get_path(
+    _keychain: u64,
+    path_len: *mut u32,
+    path_buf: *mut u8,
+) -> i32 {
+    let default_path = b"/tmp/burdettieOS-keychain.db\0";
+    let copy_len = if !path_len.is_null() {
+        let max = unsafe { *path_len } as usize;
+        max.min(default_path.len())
+    } else {
+        default_path.len()
+    };
+    if !path_buf.is_null() && copy_len > 0 {
+        unsafe { std::ptr::copy_nonoverlapping(default_path.as_ptr(), path_buf, copy_len); }
+    }
+    if !path_len.is_null() {
+        unsafe { *path_len = (default_path.len() - 1) as u32; } // Exclude NUL
+    }
+    ERR_SEC_SUCCESS
 }
 
 // ── Shim functions ──────────────────────────────────────────────
@@ -1164,5 +1545,216 @@ mod tests {
         let mut result: u64 = 42;
         assert_eq!(shim_sec_item_copy_matching(query, &mut result), ERR_SEC_ITEM_NOT_FOUND);
         assert_eq!(result, 0);
+    }
+
+    // ── Legacy SecKeychain API tests ────────────────────────────
+
+    /// Helper: clean up a legacy keychain entry by service+account.
+    fn legacy_cleanup(service: &str, account: &str) {
+        let mut guard = keychain_db();
+        let conn = ensure_keychain(&mut guard);
+        let _ = conn.execute(
+            "DELETE FROM keychain WHERE service = ?1 AND account = ?2",
+            rusqlite::params![service, account],
+        );
+    }
+
+    #[test]
+    fn legacy_add_and_find_generic_password() {
+        let svc = "com.test.legacy.add_find";
+        let acct = "alice_legacy";
+        legacy_cleanup(svc, acct);
+
+        let status = shim_sec_keychain_add_generic_password(
+            0, // default keychain
+            svc.len() as u32, svc.as_ptr(),
+            acct.len() as u32, acct.as_ptr(),
+            6, b"secret".as_ptr(),
+            std::ptr::null_mut(), // no item ref
+        );
+        assert_eq!(status, ERR_SEC_SUCCESS);
+
+        let mut pw_len: u32 = 0;
+        let mut pw_data: *mut u8 = std::ptr::null_mut();
+        let mut item_ref: u64 = 0;
+        let status = shim_sec_keychain_find_generic_password(
+            0,
+            svc.len() as u32, svc.as_ptr(),
+            acct.len() as u32, acct.as_ptr(),
+            &mut pw_len, &mut pw_data, &mut item_ref,
+        );
+        assert_eq!(status, ERR_SEC_SUCCESS);
+        assert_eq!(pw_len, 6);
+        assert!(!pw_data.is_null());
+        let found = unsafe { std::slice::from_raw_parts(pw_data, pw_len as usize) };
+        assert_eq!(found, b"secret");
+        assert_ne!(item_ref, 0, "should return a valid item ref");
+
+        // Free the data
+        shim_sec_keychain_item_free_content(0, pw_data);
+    }
+
+    #[test]
+    fn legacy_add_duplicate_fails() {
+        let svc = "com.test.legacy.dup";
+        let acct = "bob_legacy";
+        legacy_cleanup(svc, acct);
+
+        let add = |pw: &[u8]| shim_sec_keychain_add_generic_password(
+            0, svc.len() as u32, svc.as_ptr(),
+            acct.len() as u32, acct.as_ptr(),
+            pw.len() as u32, pw.as_ptr(),
+            std::ptr::null_mut(),
+        );
+        assert_eq!(add(b"pw1"), ERR_SEC_SUCCESS);
+        assert_eq!(add(b"pw2"), ERR_SEC_DUPLICATE_ITEM);
+    }
+
+    #[test]
+    fn legacy_find_nonexistent_returns_not_found() {
+        let svc = "com.test.legacy.nope.xyz";
+        let acct = "nobody_here_xyz";
+        let mut pw_len: u32 = 99;
+        let mut pw_data: *mut u8 = 0x42 as *mut u8;
+        let status = shim_sec_keychain_find_generic_password(
+            0,
+            svc.len() as u32, svc.as_ptr(),
+            acct.len() as u32, acct.as_ptr(),
+            &mut pw_len, &mut pw_data, std::ptr::null_mut(),
+        );
+        assert_eq!(status, ERR_SEC_ITEM_NOT_FOUND);
+        assert_eq!(pw_len, 0);
+        assert!(pw_data.is_null());
+    }
+
+    #[test]
+    fn legacy_item_copy_content() {
+        let svc = "com.test.legacy.copy_content";
+        let acct = "carol_legacy";
+        legacy_cleanup(svc, acct);
+
+        // Add via legacy API
+        shim_sec_keychain_add_generic_password(
+            0, svc.len() as u32, svc.as_ptr(),
+            acct.len() as u32, acct.as_ptr(),
+            3, b"abc".as_ptr(),
+            std::ptr::null_mut(),
+        );
+
+        // Find to get an item ref
+        let mut item_ref: u64 = 0;
+        shim_sec_keychain_find_generic_password(
+            0, svc.len() as u32, svc.as_ptr(),
+            acct.len() as u32, acct.as_ptr(),
+            std::ptr::null_mut(), std::ptr::null_mut(), &mut item_ref,
+        );
+        assert_ne!(item_ref, 0);
+
+        // CopyContent
+        let mut item_class: u32 = 0;
+        let mut length: u32 = 0;
+        let mut data_out: *mut u8 = std::ptr::null_mut();
+        let status = shim_sec_keychain_item_copy_content(
+            item_ref, &mut item_class, 0, &mut length, &mut data_out,
+        );
+        assert_eq!(status, ERR_SEC_SUCCESS);
+        assert_eq!(item_class, 0x67656E70); // 'genp'
+        assert_eq!(length, 3);
+        let content = unsafe { std::slice::from_raw_parts(data_out, length as usize) };
+        assert_eq!(content, b"abc");
+        shim_sec_keychain_item_free_content(0, data_out);
+    }
+
+    #[test]
+    fn legacy_item_modify_content() {
+        let svc = "com.test.legacy.modify";
+        let acct = "dave_legacy";
+        legacy_cleanup(svc, acct);
+
+        shim_sec_keychain_add_generic_password(
+            0, svc.len() as u32, svc.as_ptr(),
+            acct.len() as u32, acct.as_ptr(),
+            3, b"old".as_ptr(),
+            std::ptr::null_mut(),
+        );
+
+        // Get item ref
+        let mut item_ref: u64 = 0;
+        shim_sec_keychain_find_generic_password(
+            0, svc.len() as u32, svc.as_ptr(),
+            acct.len() as u32, acct.as_ptr(),
+            std::ptr::null_mut(), std::ptr::null_mut(), &mut item_ref,
+        );
+
+        // Modify
+        let new_pw = b"new_password";
+        let status = shim_sec_keychain_item_modify_content(
+            item_ref, 0, new_pw.len() as u32, new_pw.as_ptr(),
+        );
+        assert_eq!(status, ERR_SEC_SUCCESS);
+
+        // Verify the update via find
+        let mut pw_len: u32 = 0;
+        let mut pw_data: *mut u8 = std::ptr::null_mut();
+        shim_sec_keychain_find_generic_password(
+            0, svc.len() as u32, svc.as_ptr(),
+            acct.len() as u32, acct.as_ptr(),
+            &mut pw_len, &mut pw_data, std::ptr::null_mut(),
+        );
+        assert_eq!(pw_len, 12);
+        let found = unsafe { std::slice::from_raw_parts(pw_data, pw_len as usize) };
+        assert_eq!(found, b"new_password");
+        shim_sec_keychain_item_free_content(0, pw_data);
+    }
+
+    #[test]
+    fn legacy_keychain_copy_default() {
+        let mut kc: u64 = 0;
+        assert_eq!(shim_sec_keychain_copy_default(&mut kc), ERR_SEC_SUCCESS);
+        assert_ne!(kc, 0, "should return a sentinel");
+    }
+
+    #[test]
+    fn legacy_keychain_get_path() {
+        let mut path_buf = [0u8; 256];
+        let mut path_len: u32 = 256;
+        let status = shim_sec_keychain_get_path(0, &mut path_len, path_buf.as_mut_ptr());
+        assert_eq!(status, ERR_SEC_SUCCESS);
+        let path = std::str::from_utf8(&path_buf[..path_len as usize]).unwrap();
+        assert!(path.contains("burdettieOS-keychain"), "path should reference keychain db: {path}");
+    }
+
+    #[test]
+    fn legacy_stubs_registered() {
+        let mut table = ShimTable::new();
+        SecurityStubs::install(&mut table);
+        assert!(table.resolve("_SecKeychainFindGenericPassword").is_some());
+        assert!(table.resolve("_SecKeychainAddGenericPassword").is_some());
+        assert!(table.resolve("_SecKeychainItemCopyContent").is_some());
+        assert!(table.resolve("_SecKeychainItemModifyContent").is_some());
+        assert!(table.resolve("_SecKeychainItemFreeContent").is_some());
+        assert!(table.resolve("_SecKeychainFindInternetPassword").is_some());
+        assert!(table.resolve("_SecKeychainCopyDefault").is_some());
+        assert!(table.resolve("_SecKeychainOpen").is_some());
+        assert!(table.resolve("_SecKeychainGetPath").is_some());
+        assert!(table.resolve("_SecKeychainCopySearchList").is_some());
+        assert!(table.resolve("_SecKeychainSetSearchList").is_some());
+    }
+
+    #[test]
+    fn legacy_free_content_null_safe() {
+        assert_eq!(shim_sec_keychain_item_free_content(0, std::ptr::null_mut()), ERR_SEC_SUCCESS);
+    }
+
+    #[test]
+    fn legacy_item_copy_content_invalid_ref() {
+        let mut length: u32 = 99;
+        let mut data_out: *mut u8 = 0x42 as *mut u8;
+        let status = shim_sec_keychain_item_copy_content(
+            0xDEAD, std::ptr::null_mut(), 0, &mut length, &mut data_out,
+        );
+        assert_eq!(status, ERR_SEC_ITEM_NOT_FOUND);
+        assert_eq!(length, 0);
+        assert!(data_out.is_null());
     }
 }

@@ -209,6 +209,98 @@ impl RequestRecorder {
         conn.query_row("SELECT COUNT(*) FROM requests", [], |row| row.get(0))
             .unwrap_or(-1)
     }
+
+    /// Query recent requests with optional source filter and limit.
+    pub fn query_recent(
+        &self,
+        source: Option<&str>,
+        limit: usize,
+        offset: usize,
+    ) -> Vec<serde_json::Value> {
+        let conn = match self.conn.lock() {
+            Ok(c) => c,
+            Err(_) => return Vec::new(),
+        };
+
+        let (sql, params): (&str, Vec<Box<dyn rusqlite::types::ToSql>>) = match source {
+            Some(s) => (
+                "SELECT id, timestamp, source, original_url, method, xpc_service,
+                 dns_query, log_subsystem, log_category, log_level, log_message,
+                 guest_binary, duration_ms, response_status
+                 FROM requests WHERE source = ?1
+                 ORDER BY id DESC LIMIT ?2 OFFSET ?3",
+                vec![
+                    Box::new(s.to_string()),
+                    Box::new(limit as i64),
+                    Box::new(offset as i64),
+                ],
+            ),
+            None => (
+                "SELECT id, timestamp, source, original_url, method, xpc_service,
+                 dns_query, log_subsystem, log_category, log_level, log_message,
+                 guest_binary, duration_ms, response_status
+                 FROM requests ORDER BY id DESC LIMIT ?1 OFFSET ?2",
+                vec![
+                    Box::new(limit as i64),
+                    Box::new(offset as i64),
+                ],
+            ),
+        };
+
+        let mut stmt = match conn.prepare(sql) {
+            Ok(s) => s,
+            Err(_) => return Vec::new(),
+        };
+
+        let params_refs: Vec<&dyn rusqlite::types::ToSql> =
+            params.iter().map(|p| p.as_ref()).collect();
+
+        let rows = stmt.query_map(params_refs.as_slice(), |row| {
+            Ok(serde_json::json!({
+                "id": row.get::<_, i64>(0).unwrap_or(0),
+                "timestamp": row.get::<_, String>(1).unwrap_or_default(),
+                "source": row.get::<_, String>(2).unwrap_or_default(),
+                "original_url": row.get::<_, Option<String>>(3).unwrap_or(None),
+                "method": row.get::<_, Option<String>>(4).unwrap_or(None),
+                "xpc_service": row.get::<_, Option<String>>(5).unwrap_or(None),
+                "dns_query": row.get::<_, Option<String>>(6).unwrap_or(None),
+                "log_subsystem": row.get::<_, Option<String>>(7).unwrap_or(None),
+                "log_category": row.get::<_, Option<String>>(8).unwrap_or(None),
+                "log_level": row.get::<_, Option<String>>(9).unwrap_or(None),
+                "log_message": row.get::<_, Option<String>>(10).unwrap_or(None),
+                "guest_binary": row.get::<_, Option<String>>(11).unwrap_or(None),
+                "duration_ms": row.get::<_, Option<i64>>(12).unwrap_or(None),
+                "response_status": row.get::<_, Option<i32>>(13).unwrap_or(None),
+            }))
+        });
+
+        match rows {
+            Ok(mapped) => mapped.filter_map(|r| r.ok()).collect(),
+            Err(_) => Vec::new(),
+        }
+    }
+
+    /// Count requests grouped by source.
+    pub fn count_by_source(&self) -> Vec<(String, i64)> {
+        let conn = match self.conn.lock() {
+            Ok(c) => c,
+            Err(_) => return Vec::new(),
+        };
+        let mut stmt = match conn.prepare(
+            "SELECT source, COUNT(*) FROM requests GROUP BY source ORDER BY source"
+        ) {
+            Ok(s) => s,
+            Err(_) => return Vec::new(),
+        };
+        stmt.query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0).unwrap_or_default(),
+                row.get::<_, i64>(1).unwrap_or(0),
+            ))
+        })
+        .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        .unwrap_or_default()
+    }
 }
 
 #[cfg(test)]

@@ -385,6 +385,7 @@ dependencies = [
  "log",
  "serde",
  "serde_json",
+ "ureq",
 ]
 
 [[package]]
@@ -392,6 +393,7 @@ name = "burdettie-services"
 version = "0.1.0"
 dependencies = [
  "burdettie-domain-map",
+ "burdettie-log-pipeline",
  "log",
  "plist",
  "rusqlite",
@@ -2152,6 +2154,7 @@ dependencies = [
  "hickory-resolver",
  "launchd",
  "libc",
+ "libxo",
  "log",
  "lz4_flex",
  "lzma-rs",
@@ -2160,6 +2163,14 @@ dependencies = [
  "thiserror 2.0.18",
  "trust-eval",
  "x509-parser",
+]
+
+[[package]]
+name = "libxo"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "log",
 ]
 
 [[package]]
@@ -2271,6 +2282,9 @@ dependencies = [
 name = "macho-inspect"
 version = "0.1.0"
 dependencies = [
+ "burdettie-domain-map",
+ "burdettie-log-pipeline",
+ "burdettie-services",
  "cf-lite",
  "clap",
  "env_logger",

@@ -7,17 +7,18 @@ license.workspace      = true
 rust-version.workspace = true
 
 [dependencies]
-burdettie-domain-map = { workspace = true }
+burdettie-domain-map   = { workspace = true }
+burdettie-log-pipeline = { workspace = true }
 log                  = { workspace = true }
 serde                = { workspace = true }
 serde_json           = { workspace = true }
 rusqlite             = { workspace = true }
 plist                = { workspace = true }
 toml                 = { workspace = true }
+ureq                 = { workspace = true }
 tiny_http            = "0.12"
 
 [dev-dependencies]
-ureq                 = { workspace = true }
 
 [lints]
 workspace = true

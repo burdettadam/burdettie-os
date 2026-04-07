@@ -1,15 +1,19 @@
 //! Grand Central Dispatch (GCD) shims.
 //!
 //! Thread-safe implementations of `dispatch_once`, `dispatch_once_f`,
-//! `dispatch_async`, and `dispatch_sync`. The once-primitives use
-//! atomic CAS for correctness under concurrent access. Dispatch
-//! async/sync currently execute blocks inline (suitable for programs
-//! that use GCD purely for initialization patterns). Full concurrent
-//! queue dispatch can be added in a future phase.
+//! `dispatch_async`, and `dispatch_sync`.  The once-primitives use
+//! atomic CAS for correctness under concurrent access.
+//!
+//! `dispatch_async` and `dispatch_sync` route through the real queue
+//! model in `dispatch_queue` which provides:
+//! - Serial queues with FIFO ordering (dedicated worker thread)
+//! - Concurrent queues with a bounded thread pool
+//! - Per-queue identity and label storage
 
 use std::sync::atomic::{AtomicI64, Ordering};
 
 use crate::table::ShimTable;
+use crate::darwin_stubs::dispatch_queue;
 
 /// Installs dispatch-related shims.
 pub struct DispatchShims;
@@ -27,15 +31,13 @@ const DISPATCH_ONCE_GATE: i64 = 1;
 /// Fake dispatch_queue_t for `_dispatch_main_q`.
 ///
 /// `dispatch_get_main_queue()` is a macro expanding to `&_dispatch_main_q`.
-/// We only need a stable non-null address — queue identity is ignored by our
-/// inline dispatch_sync/dispatch_async shims.
+/// The sentinel address is backed by a real queue object in dispatch_queue.
 static DISPATCH_MAIN_Q: [u8; 8] = [0; 8];
 
 /// Fake dispatch_queue_t for global queues.
 ///
 /// `dispatch_get_global_queue(identifier, flags)` returns a global concurrent
-/// queue. Since our dispatch is inline (single-threaded), we return a stable
-/// non-null address distinct from the main queue.
+/// queue.  The sentinel is backed by a real concurrent queue + thread pool.
 static DISPATCH_GLOBAL_Q: [u8; 8] = [0; 8];
 
 impl DispatchShims {
@@ -164,50 +166,52 @@ extern "C" fn shim_dispatch_once_f(
 
 /// `void dispatch_async(dispatch_queue_t queue, dispatch_block_t block)`
 ///
-/// Spawns a thread to execute the block asynchronously.
+/// Routes the block through the queue model:
+/// - Serial queues: enqueued for FIFO execution on a dedicated worker thread
+/// - Concurrent queues: submitted to the bounded thread pool
 /// SAFETY: The block must remain valid for the duration of execution.
-/// In practice, Mach-O blocks dispatched via dispatch_async are heap-allocated
-/// (copied by the compiler) and thus safe to use from another thread.
-extern "C" fn shim_dispatch_async(_queue: *const u8, block: *const u8) {
+extern "C" fn shim_dispatch_async(queue: *const u8, block: *const u8) {
     if block.is_null() {
         log::warn!("dispatch_async called with null block");
         return;
     }
 
-    // Read the invoke pointer before spawning (block layout: isa(8) + flags(4) + reserved(4) + invoke(8))
     let invoke_ptr = unsafe { *(block.add(16) as *const usize) };
     let block_addr = block as usize;
+    let queue_handle = queue as u64;
 
-    std::thread::spawn(move || {
-        // SAFETY: block is heap-allocated (Block_copy'd by compiler for async dispatch),
-        // invoke pointer was read before spawn. We trust the Mach-O binary's block layout.
+    dispatch_queue::queue_async(queue_handle, Box::new(move || {
         unsafe {
             let invoke: extern "C" fn(*const u8) = std::mem::transmute(invoke_ptr);
             invoke(block_addr as *const u8);
         }
-    });
+    }));
 }
 
 /// `void dispatch_sync(dispatch_queue_t queue, dispatch_block_t block)`
 ///
-/// Executes the block inline (identical to dispatch_async for now).
-extern "C" fn shim_dispatch_sync(_queue: *const u8, block: *const u8) {
+/// Routes the block through the queue model synchronously (blocks until done).
+extern "C" fn shim_dispatch_sync(queue: *const u8, block: *const u8) {
     if block.is_null() {
         log::warn!("dispatch_sync called with null block");
         return;
     }
 
-    unsafe {
-        let invoke_ptr = *(block.add(16) as *const extern "C" fn(*const u8));
-        invoke_ptr(block);
-    }
+    let invoke_ptr = unsafe { *(block.add(16) as *const usize) };
+    let block_addr = block as usize;
+    let queue_handle = queue as u64;
+
+    dispatch_queue::queue_sync(queue_handle, Box::new(move || {
+        unsafe {
+            let invoke: extern "C" fn(*const u8) = std::mem::transmute(invoke_ptr);
+            invoke(block_addr as *const u8);
+        }
+    }));
 }
 
 /// `dispatch_queue_t dispatch_get_global_queue(long identifier, unsigned long flags)`
 ///
-/// Returns a pointer to the global concurrent queue. Since our dispatch is
-/// inline (single-threaded), the queue identity doesn't matter — we just
-/// return a stable non-null address.
+/// Returns the global concurrent queue, backed by a real bounded thread pool.
 extern "C" fn shim_dispatch_get_global_queue(
     _identifier: i64,
     _flags: u64,

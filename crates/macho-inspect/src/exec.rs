@@ -137,6 +137,57 @@ pub fn print_exec(parsed: &ParsedMachO, data: &[u8], binary_path: &std::path::Pa
     let ctx = macho_runtime::RuntimeContext::new(&shim_config, &shim_set);
     println!("  Shims installed: {}", ctx.shim_table.len());
 
+    // Start BurdettieOS cloud services (domain rewrite + local server)
+    burdettie_services::set_guest_binary(&process_name);
+    let _burdettie_handle = {
+        let domain_config = burdettie_domain_map::RewriteConfig::from_env();
+        if domain_config.enabled {
+            let svc_config = burdettie_services::ServiceConfig::from_env();
+
+            // Initialize the structured os_log pipeline
+            let log_format = match svc_config.log_format {
+                burdettie_services::config::LogFormat::Json => {
+                    burdettie_log_pipeline::OutputFormat::Json
+                }
+                burdettie_services::config::LogFormat::Logfmt => {
+                    burdettie_log_pipeline::OutputFormat::Logfmt
+                }
+                burdettie_services::config::LogFormat::Text => {
+                    burdettie_log_pipeline::OutputFormat::Text
+                }
+            };
+            let log_sink = match &svc_config.log_sink {
+                burdettie_services::config::LogSink::Stdout => {
+                    burdettie_log_pipeline::SinkConfig::Stdout
+                }
+                burdettie_services::config::LogSink::File(path) => {
+                    burdettie_log_pipeline::SinkConfig::File(path.clone())
+                }
+                burdettie_services::config::LogSink::Http(url) => {
+                    burdettie_log_pipeline::SinkConfig::Http(url.clone())
+                }
+            };
+            burdettie_log_pipeline::init_with_sink(log_format, log_sink);
+
+            match burdettie_services::ServiceServer::start(&svc_config) {
+                Ok(handle) => {
+                    let mut final_config = domain_config;
+                    final_config.target_port = handle.port;
+                    burdettie_domain_map::init(final_config);
+                    Some(handle)
+                }
+                Err(e) => {
+                    log::warn!("burdettie-services: failed to start: {e}");
+                    burdettie_domain_map::init(burdettie_domain_map::RewriteConfig::disabled());
+                    None
+                }
+            }
+        } else {
+            burdettie_domain_map::init(domain_config);
+            None
+        }
+    };
+
     // Apply all fixups with composite resolver (shim table → stub resolver)
     #[cfg(target_os = "macos")]
     let host_syms: std::sync::Arc<dyn platform_core::symbols::HostSymbolResolver> =

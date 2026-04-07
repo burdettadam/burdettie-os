@@ -133,12 +133,12 @@ extern "C" fn shim_dispatch_group_leave(group: u64) {
             let mut notify = g.notify.lock().unwrap();
             std::mem::take(&mut *notify)
         };
-        for (_queue, block) in pending {
+        for (queue, block) in pending {
             let block_val = block;
-            std::thread::spawn(move || {
+            super::dispatch_queue::queue_async(queue, Box::new(move || {
                 // SAFETY: caller guaranteed valid block layout.
                 unsafe { invoke_block(block_val) };
-            });
+            }));
         }
     }
 }
@@ -198,23 +198,23 @@ extern "C" fn shim_dispatch_group_notify(group: u64, queue: u64, block: u64) {
 
     if g.count.load(Ordering::Acquire) == 0 {
         // Already done — fire immediately.
-        std::thread::spawn(move || {
+        super::dispatch_queue::queue_async(queue, Box::new(move || {
             // SAFETY: caller guaranteed valid block layout.
             unsafe { invoke_block(block) };
-        });
+        }));
     } else {
         g.notify.lock().unwrap().push((queue, block));
     }
 }
 
-extern "C" fn shim_dispatch_group_async(group: u64, _queue: u64, block: u64) {
-    // Enter before spawning so the group count is incremented synchronously.
+extern "C" fn shim_dispatch_group_async(group: u64, queue: u64, block: u64) {
+    // Enter before submitting so the group count is incremented synchronously.
     shim_dispatch_group_enter(group);
-    std::thread::spawn(move || {
+    super::dispatch_queue::queue_async(queue, Box::new(move || {
         // SAFETY: caller guaranteed valid block layout.
         unsafe { invoke_block(block) };
         shim_dispatch_group_leave(group);
-    });
+    }));
 }
 
 // ---------------------------------------------------------------------------

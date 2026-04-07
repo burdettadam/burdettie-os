@@ -14,10 +14,36 @@ pub struct ServiceConfig {
     pub record_requests: bool,
     /// Path to the SQLite database for request recording.
     pub record_db_path: String,
+    /// Path to a SQLite database for request replay (optional).
+    pub replay_db_path: Option<String>,
     /// Log format for the unified logging pipeline.
     pub log_format: LogFormat,
     /// Log output sink.
     pub log_sink: LogSink,
+    /// Admin API configuration.
+    pub admin: AdminConfig,
+    /// Remote forwarding configuration.
+    pub remote: RemoteConfig,
+    /// Instance identifier for multi-tenant tagging.
+    pub instance_id: String,
+}
+
+/// Admin API settings.
+#[derive(Debug, Clone)]
+pub struct AdminConfig {
+    /// Whether the admin API is enabled.
+    pub enabled: bool,
+    /// Bearer token required for admin endpoints (None = no auth).
+    pub token: Option<String>,
+}
+
+/// Remote forwarding settings.
+#[derive(Debug, Clone)]
+pub struct RemoteConfig {
+    /// Remote BurdettieOS endpoint (e.g. "https://burdettie.example.com").
+    pub endpoint: Option<String>,
+    /// Auth token for the remote server.
+    pub auth_token: Option<String>,
 }
 
 /// Log output format.
@@ -66,6 +92,10 @@ impl ServiceConfig {
             .or(toml.services.record_db)
             .unwrap_or_else(|| "/tmp/burdettie-requests.db".into());
 
+        let replay_db_path = std::env::var("BURDETTIE_REPLAY_DB")
+            .ok()
+            .or(toml.services.replay_db);
+
         let log_format = std::env::var("BURDETTIE_LOG_FORMAT")
             .ok()
             .or(toml.logging.format)
@@ -98,12 +128,39 @@ impl ServiceConfig {
             })
             .unwrap_or(LogSink::Stdout);
 
+        let admin_enabled = std::env::var("BURDETTIE_ADMIN_ENABLED")
+            .ok()
+            .map(|v| !matches!(v.as_str(), "0" | "false" | "no" | "off"))
+            .or(toml.admin.enabled)
+            .unwrap_or(true);
+
+        let admin_token = std::env::var("BURDETTIE_ADMIN_TOKEN")
+            .ok()
+            .or(toml.admin.token);
+
+        let remote_endpoint = std::env::var("BURDETTIE_REMOTE_ENDPOINT")
+            .ok()
+            .or(toml.remote.endpoint);
+
+        let remote_auth_token = std::env::var("BURDETTIE_REMOTE_TOKEN")
+            .ok()
+            .or(toml.remote.auth_token);
+
+        let instance_id = std::env::var("BURDETTIE_INSTANCE_ID")
+            .ok()
+            .or(toml.remote.instance_id)
+            .unwrap_or_else(|| "default".into());
+
         Self {
             bind_addr,
             record_requests,
             record_db_path,
+            replay_db_path,
             log_format,
             log_sink,
+            admin: AdminConfig { enabled: admin_enabled, token: admin_token },
+            remote: RemoteConfig { endpoint: remote_endpoint, auth_token: remote_auth_token },
+            instance_id,
         }
     }
 }
@@ -125,6 +182,10 @@ struct TomlConfig {
     logging: TomlLogging,
     #[serde(default)]
     domain_rewrite: TomlDomainRewrite,
+    #[serde(default)]
+    admin: TomlAdmin,
+    #[serde(default)]
+    remote: TomlRemote,
 }
 
 #[derive(Debug, serde::Deserialize, Default)]
@@ -132,6 +193,7 @@ struct TomlServices {
     bind: Option<String>,
     record_requests: Option<bool>,
     record_db: Option<String>,
+    replay_db: Option<String>,
 }
 
 #[derive(Debug, serde::Deserialize, Default)]
@@ -155,6 +217,19 @@ struct TomlDomainRewrite {
 struct TomlPassthrough {
     #[serde(default)]
     domains: Vec<String>,
+}
+
+#[derive(Debug, serde::Deserialize, Default)]
+struct TomlAdmin {
+    enabled: Option<bool>,
+    token: Option<String>,
+}
+
+#[derive(Debug, serde::Deserialize, Default)]
+struct TomlRemote {
+    endpoint: Option<String>,
+    auth_token: Option<String>,
+    instance_id: Option<String>,
 }
 
 /// Try to load a TOML configuration file.

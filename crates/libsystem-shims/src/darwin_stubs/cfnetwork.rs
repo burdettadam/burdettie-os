@@ -130,6 +130,24 @@ impl CfNetworkStubs {
             ("_kCFNetworkProxiesHTTPPort", &K_CF_NETWORK_PROXIES_HTTP_PORT as *const u64 as u64, "kCFNetworkProxiesHTTPPort data symbol")
         );
 
+        // ── POSIX DNS shims (domain rewrite interception) ───────
+        register_shims!(table,
+            ("_getaddrinfo", shim_getaddrinfo as *const () as u64, "getaddrinfo (domain rewrite + forward to libc)"),
+            ("_freeaddrinfo", shim_freeaddrinfo as *const () as u64, "freeaddrinfo (forward to libc)"),
+            ("_getnameinfo", shim_getnameinfo as *const () as u64, "getnameinfo (forward to libc)"),
+            ("_gethostbyname", shim_gethostbyname as *const () as u64, "gethostbyname (domain rewrite + forward to libc)"),
+            ("_gethostbyname2", shim_gethostbyname2 as *const () as u64, "gethostbyname2 (domain rewrite + forward to libc)")
+        );
+
+        // ── libresolv stubs (prevent DNS leaks to host) ─────────
+        register_shims!(table,
+            ("_res_query", shim_res_query as *const () as u64, "res_query (stub → SERVFAIL)"),
+            ("_res_search", shim_res_search as *const () as u64, "res_search (stub → SERVFAIL)"),
+            ("_res_send", shim_res_send as *const () as u64, "res_send (stub → SERVFAIL)"),
+            ("_res_init", shim_res_init as *const () as u64, "res_init (stub → success)"),
+            ("_dn_expand", shim_dn_expand as *const () as u64, "dn_expand (stub → error)")
+        );
+
         log::debug!("CfNetworkStubs: registered CFNetwork.framework stubs");
     }
 }
@@ -375,6 +393,142 @@ pub extern "C" fn shim_cf_stream_create_pair_with_socket(
     }
 }
 
+// ── POSIX DNS shim implementations ──────────────────────────────
+
+/// Read a C string from the guest at `ptr`, returning an owned String.
+fn read_cstr(ptr: *const std::ffi::c_char) -> Option<String> {
+    if ptr.is_null() { return None; }
+    let cstr = unsafe { std::ffi::CStr::from_ptr(ptr) };
+    cstr.to_str().ok().map(|s| s.to_string())
+}
+
+/// getaddrinfo(node, service, hints, res) → int
+///
+/// Intercepts DNS lookups: applies BurdettieOS domain rewrite for Apple
+/// domains (redirecting to the local proxy), then forwards to libc.
+pub extern "C" fn shim_getaddrinfo(
+    node: *const std::ffi::c_char,
+    service: *const std::ffi::c_char,
+    hints: *const libc::addrinfo,
+    res: *mut *mut libc::addrinfo,
+) -> i32 {
+    let hostname = read_cstr(node);
+    let resolve_hostname = hostname.as_deref().and_then(|h| {
+        burdettie_domain_map::rewrite_hostname(h)
+    });
+
+    if let Some(ref rewritten) = resolve_hostname {
+        log::info!("getaddrinfo: domain rewrite {} → {rewritten}", hostname.as_deref().unwrap_or("?"));
+        let cstr = match std::ffi::CString::new(rewritten.as_str()) {
+            Ok(c) => c,
+            Err(_) => return libc::EAI_FAIL,
+        };
+        return unsafe { libc::getaddrinfo(cstr.as_ptr(), service, hints, res) };
+    }
+
+    // No rewrite — pass through to host libc
+    unsafe { libc::getaddrinfo(node, service, hints, res) }
+}
+
+/// freeaddrinfo(res) — direct forward to libc.
+pub extern "C" fn shim_freeaddrinfo(res: *mut libc::addrinfo) {
+    unsafe { libc::freeaddrinfo(res); }
+}
+
+/// getnameinfo — direct forward to libc (reverse DNS doesn't need rewrite).
+pub extern "C" fn shim_getnameinfo(
+    sa: *const libc::sockaddr,
+    salen: libc::socklen_t,
+    host: *mut std::ffi::c_char,
+    hostlen: libc::socklen_t,
+    serv: *mut std::ffi::c_char,
+    servlen: libc::socklen_t,
+    flags: i32,
+) -> i32 {
+    unsafe { libc::getnameinfo(sa, salen, host, hostlen, serv, servlen, flags) }
+}
+
+/// gethostbyname(name) → *hostent
+///
+/// Returns NULL (host not found). Guest should use getaddrinfo instead.
+/// Legacy gethostbyname is not thread-safe and deprecated.
+pub extern "C" fn shim_gethostbyname(name: *const std::ffi::c_char) -> u64 {
+    let hostname = read_cstr(name).unwrap_or_default();
+    log::debug!("gethostbyname: '{hostname}' → NULL (use getaddrinfo)");
+    0
+}
+
+/// gethostbyname2(name, af) → *hostent
+///
+/// Returns NULL (host not found). Guest should use getaddrinfo instead.
+pub extern "C" fn shim_gethostbyname2(name: *const std::ffi::c_char, _af: i32) -> u64 {
+    let hostname = read_cstr(name).unwrap_or_default();
+    log::debug!("gethostbyname2: '{hostname}' → NULL (use getaddrinfo)");
+    0
+}
+
+// ── libresolv stub implementations ──────────────────────────────
+//
+// These prevent DNS queries via libresolv from leaking to the host's
+// real DNS resolver, bypassing BurdettieOS domain interception.
+// Returns -1 (SERVFAIL equivalent) for all wire-format queries.
+
+/// res_query(dname, class, type, answer, anslen) → int
+///
+/// Stub returns -1 (error). Guest binaries that need DNS should use
+/// getaddrinfo (which we intercept) instead of raw libresolv.
+pub extern "C" fn shim_res_query(
+    dname: *const std::ffi::c_char,
+    _class: i32,
+    _type: i32,
+    _answer: *mut u8,
+    _anslen: i32,
+) -> i32 {
+    let name = read_cstr(dname).unwrap_or_default();
+    log::debug!("res_query: blocked query for '{name}' (use getaddrinfo instead)");
+    -1
+}
+
+/// res_search(dname, class, type, answer, anslen) → int
+pub extern "C" fn shim_res_search(
+    dname: *const std::ffi::c_char,
+    _class: i32,
+    _type: i32,
+    _answer: *mut u8,
+    _anslen: i32,
+) -> i32 {
+    let name = read_cstr(dname).unwrap_or_default();
+    log::debug!("res_search: blocked query for '{name}' (use getaddrinfo instead)");
+    -1
+}
+
+/// res_send(msg, msglen, answer, anslen) → int
+pub extern "C" fn shim_res_send(
+    _msg: *const u8,
+    _msglen: i32,
+    _answer: *mut u8,
+    _anslen: i32,
+) -> i32 {
+    log::debug!("res_send: blocked raw DNS send");
+    -1
+}
+
+/// res_init() → int  (always succeeds, no real resolver state needed)
+pub extern "C" fn shim_res_init() -> i32 {
+    0
+}
+
+/// dn_expand(msg, eomorig, comp_dn, exp_dn, length) → int
+pub extern "C" fn shim_dn_expand(
+    _msg: *const u8,
+    _eomorig: *const u8,
+    _comp_dn: *const u8,
+    _exp_dn: *mut u8,
+    _length: i32,
+) -> i32 {
+    -1
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -401,5 +555,72 @@ mod tests {
         assert!(table.resolve("_kCFHTTPVersion1_1").is_some());
         let addr = table.resolve("_kCFHTTPVersion1_1").unwrap();
         assert_ne!(addr, 0);
+    }
+
+    #[test]
+    fn posix_dns_shims_registered() {
+        let mut table = ShimTable::new();
+        CfNetworkStubs::install(&mut table);
+        assert!(table.resolve("_getaddrinfo").is_some());
+        assert!(table.resolve("_freeaddrinfo").is_some());
+        assert!(table.resolve("_getnameinfo").is_some());
+        assert!(table.resolve("_gethostbyname").is_some());
+        assert!(table.resolve("_gethostbyname2").is_some());
+    }
+
+    #[test]
+    fn libresolv_stubs_registered() {
+        let mut table = ShimTable::new();
+        CfNetworkStubs::install(&mut table);
+        assert!(table.resolve("_res_query").is_some());
+        assert!(table.resolve("_res_search").is_some());
+        assert!(table.resolve("_res_send").is_some());
+        assert!(table.resolve("_res_init").is_some());
+        assert!(table.resolve("_dn_expand").is_some());
+    }
+
+    #[test]
+    fn res_query_returns_error() {
+        let name = std::ffi::CString::new("apple.com").unwrap();
+        let mut buf = [0u8; 512];
+        assert_eq!(shim_res_query(name.as_ptr(), 1, 1, buf.as_mut_ptr(), 512), -1);
+    }
+
+    #[test]
+    fn res_search_returns_error() {
+        let name = std::ffi::CString::new("apple.com").unwrap();
+        let mut buf = [0u8; 512];
+        assert_eq!(shim_res_search(name.as_ptr(), 1, 1, buf.as_mut_ptr(), 512), -1);
+    }
+
+    #[test]
+    fn res_send_returns_error() {
+        let msg = [0u8; 12];
+        let mut buf = [0u8; 512];
+        assert_eq!(shim_res_send(msg.as_ptr(), 12, buf.as_mut_ptr(), 512), -1);
+    }
+
+    #[test]
+    fn res_init_returns_success() {
+        assert_eq!(shim_res_init(), 0);
+    }
+
+    #[test]
+    fn getaddrinfo_resolves_non_apple_domain() {
+        // Non-Apple domains should pass through to host libc
+        let node = std::ffi::CString::new("localhost").unwrap();
+        let mut hints: libc::addrinfo = unsafe { std::mem::zeroed() };
+        hints.ai_family = libc::AF_UNSPEC;
+        hints.ai_socktype = libc::SOCK_STREAM;
+        let mut res: *mut libc::addrinfo = std::ptr::null_mut();
+        let rc = shim_getaddrinfo(
+            node.as_ptr(),
+            std::ptr::null(),
+            &hints,
+            &mut res,
+        );
+        assert_eq!(rc, 0);
+        assert!(!res.is_null());
+        shim_freeaddrinfo(res);
     }
 }

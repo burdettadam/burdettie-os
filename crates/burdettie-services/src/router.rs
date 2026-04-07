@@ -1,5 +1,6 @@
 //! Request router — dispatches incoming HTTP requests to the appropriate handler.
 
+use crate::config::ServiceConfig;
 use crate::handlers::{self, Handler, HandlerResponse};
 use crate::recorder::{HttpRecord, RequestRecorder};
 use std::sync::Arc;
@@ -13,23 +14,61 @@ pub struct Router {
 
 impl Router {
     /// Create a router with the default set of handlers.
-    pub fn new(recorder: Option<Arc<RequestRecorder>>) -> Self {
-        let handlers: Vec<Box<dyn Handler>> = vec![
-            Box::new(handlers::telemetry::TelemetryHandler),
-            Box::new(handlers::captive::CaptiveHandler),
-            Box::new(handlers::device::DeviceHandler),
-            Box::new(handlers::swupdate::SwupdateHandler),
-            Box::new(handlers::certs::CertsHandler),
-            Box::new(handlers::xcode::XcodeHandler),
-            Box::new(handlers::auth::AuthHandler),
-            Box::new(handlers::config::ConfigHandler),
-            Box::new(handlers::dns::DnsHandler),
-            Box::new(handlers::notarize::NotarizeHandler),
-            // Catch-all must be last
-            Box::new(handlers::catchall::CatchallHandler),
-        ];
+    ///
+    /// If `replay_db` is `Some`, a `ReplayHandler` is prepended so that
+    /// previously-recorded responses are served first.
+    pub fn new(recorder: Option<Arc<RequestRecorder>>, config: &ServiceConfig) -> Self {
+        let mut handler_list: Vec<Box<dyn Handler>> = Vec::new();
 
-        Self { handlers, recorder }
+        // Replay handler goes first — if it matches, other handlers are skipped
+        if let Some(ref db_path) = config.replay_db_path {
+            if let Some(replay) = handlers::replay::ReplayHandler::open(db_path) {
+                log::info!("burdettie-services: replay handler active from {db_path}");
+                handler_list.push(Box::new(replay));
+            }
+        }
+
+        // Status endpoint — always available
+        handlers::status::init_start_time();
+        handler_list.push(Box::new(handlers::status::StatusHandler));
+
+        // Admin API (before domain-specific handlers)
+        if config.admin.enabled {
+            handler_list.push(Box::new(handlers::admin::AdminHandler::new(
+                config.admin.token.clone(),
+                config.instance_id.clone(),
+            )));
+        }
+
+        // Standard handlers in priority order
+        handler_list.push(Box::new(handlers::telemetry::TelemetryHandler));
+        handler_list.push(Box::new(handlers::captive::CaptiveHandler));
+        handler_list.push(Box::new(handlers::device::DeviceHandler));
+        handler_list.push(Box::new(handlers::swupdate::SwupdateHandler));
+        handler_list.push(Box::new(handlers::certs::CertsHandler));
+        handler_list.push(Box::new(handlers::xcode::XcodeHandler));
+        handler_list.push(Box::new(handlers::auth::AuthHandler));
+        handler_list.push(Box::new(handlers::dns::DnsHandler));
+        handler_list.push(Box::new(handlers::notarize::NotarizeHandler));
+        handler_list.push(Box::new(handlers::icloud::ICloudHandler));
+        handler_list.push(Box::new(handlers::push::PushHandler));
+        handler_list.push(Box::new(handlers::cache::CacheHandler));
+        handler_list.push(Box::new(handlers::time::TimeHandler));
+        handler_list.push(Box::new(handlers::diagnostics::DiagnosticsHandler));
+        handler_list.push(Box::new(handlers::recovery::RecoveryHandler));
+        handler_list.push(Box::new(handlers::content::ContentHandler));
+        // Remote forwarding — proxy unmatched requests to remote BurdettieOS
+        if let Some(ref endpoint) = config.remote.endpoint {
+            handler_list.push(Box::new(handlers::forward::ForwardHandler::new(
+                endpoint.clone(),
+                config.remote.auth_token.clone(),
+                config.instance_id.clone(),
+            )));
+        }
+        // Catch-all must be last
+        handler_list.push(Box::new(handlers::catchall::CatchallHandler));
+
+        Self { handlers: handler_list, recorder }
     }
 
     /// Route a request and return a response.
@@ -42,6 +81,7 @@ impl Router {
         original_url: &str,
     ) -> HandlerResponse {
         let start = Instant::now();
+        handlers::status::inc_total();
 
         for handler in &self.handlers {
             if let Some(response) = handler.handle(path, method, body, request) {
@@ -58,7 +98,7 @@ impl Router {
                         response_status: i32::from(response.status_code),
                         response_headers: format!("{{\"content-type\":\"{}\"}}", response.content_type),
                         response_body: response.body.clone(),
-                        guest_binary: String::new(), // filled by caller if known
+                        guest_binary: crate::guest_binary().to_string(),
                         duration_ms: duration.as_millis() as i64,
                     });
                 }

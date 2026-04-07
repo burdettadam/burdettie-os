@@ -20,6 +20,7 @@ x509-parser   = { workspace = true }
 hickory-resolver = { workspace = true }
 lzma-rs       = { workspace = true }
 launchd       = { workspace = true }
+libxo         = { workspace = true }
 burdettie-domain-map = { workspace = true }
 burdettie-log-pipeline = { workspace = true }
 burdettie-services = { workspace = true }

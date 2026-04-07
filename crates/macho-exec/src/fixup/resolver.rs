@@ -418,6 +418,20 @@ impl StubResolver {
         {
             return true;
         }
+        // DVTFoundation / IDEFoundation private frameworks
+        // These are Xcode's internal frameworks; symbols are either stubbed
+        // in our ShimTable or resolved via dlsym on macOS.
+        if name.starts_with("DVT") || name.starts_with("IDE")
+            || name.starts_with("kDVT") || name.starts_with("kIDE")
+            || name.starts_with("_DVT") || name.starts_with("_IDE")
+            || name.starts_with("_kDVT") || name.starts_with("_kIDE")
+        {
+            return true;
+        }
+        // PBX project model (Xcode IDE)
+        if name.starts_with("PBX") {
+            return true;
+        }
         // CFPreferences
         if name.starts_with("CFPreferences") || name.starts_with("_CFPreferences")
             || name.starts_with("_CFPref") || name.starts_with("_CFX")
@@ -621,7 +635,8 @@ impl StubResolver {
             | "isupper" | "islower" | "isprint" | "isxdigit" | "iscntrl" | "ispunct"
             | "isascii" | "toascii" | "isblank"
             // File I/O (write is already listed in stdio above)
-            | "open" | "lseek" | "pread" | "pwrite" | "creat"
+            // NOTE: open() is shimmed (flag translation) — not listed here
+            | "lseek" | "pread" | "pwrite" | "creat"
             | "fstat" | "stat" | "lstat" | "access" | "unlink" | "rename" | "remove"
             | "mkdir" | "rmdir" | "chdir" | "fchdir" | "getcwd"
             | "opendir" | "readdir" | "closedir" | "rewinddir"
@@ -645,7 +660,8 @@ impl StubResolver {
             // Scatter/gather I/O
             | "writev" | "readv"
             // *at() directory-relative operations
-            | "fstatat" | "openat" | "mkdirat" | "unlinkat" | "renameat"
+            // NOTE: openat() is shimmed (flag translation) — not listed here
+            | "fstatat" | "mkdirat" | "unlinkat" | "renameat"
             | "faccessat" | "readlinkat" | "linkat" | "symlinkat"
             | "fchmodat" | "fchownat"
             // Dynamic loading
@@ -1007,7 +1023,6 @@ impl StubResolver {
             | "mbrlen" | "mblen" | "mbsinit"
             | "__mb_cur_max"
             | "___mb_cur_max"
-            | "__collate_lookup_l"
             | "wcsdup" | "wcsnlen" | "wcsnrtombs" | "wcsrtombs" | "wcslcpy" | "wcslcat"
             | "fgetwc" | "fgetwln" | "fputwc" | "fputws" | "fwprintf" | "fwide"
             | "getwc" | "putwc" | "putwchar" | "ungetwc" | "swprintf" | "vswprintf" | "vfwprintf"
@@ -1058,8 +1073,6 @@ impl StubResolver {
             // Sorting / directory scanning extras
             | "qsort_b" | "qsort_r" | "heapsort" | "mergesort"
             | "heapsort_b" | "mergesort_b"
-            | "alphasort" | "scandir" | "scandir_b" | "scandir$INODE64"
-            | "alphasort$INODE64"
             // Fortified extras
             | "__vsnprintf_chk" | "__vsprintf_chk"
             // Memory extras
@@ -1090,7 +1103,6 @@ impl StubResolver {
             // File/dir extras
             | "mkpath_np" | "clonefile"
             | "fopen$DARWIN_EXTSN"
-            | "fts_open" | "fts_read" | "fts_close" | "fts_set" | "fts_children"
             | "nftw" | "ftw"
             | "setlinebuf"
             | "fmtcheck"
@@ -1118,7 +1130,7 @@ impl StubResolver {
             | "rpmatch"
             | "strtoq" | "strtouq" | "strtonum"
             | "errc" | "warnc" | "verrc" | "vwarnc"
-            | "expand_number" | "devname"
+            | "devname"
             | "compat_mode"
             | "fsctl" | "gethostuuid"
             | "kdebug_trace" | "kdebug_trace_string"

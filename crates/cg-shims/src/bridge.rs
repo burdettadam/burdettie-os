@@ -21,7 +21,7 @@ fn intersect_rects(a: Rect, b: Rect) -> Rect {
 /// Global shared font manager (TrueType via ab_glyph).
 static FONT_MANAGER: std::sync::OnceLock<FontManager> = std::sync::OnceLock::new();
 
-fn font_manager() -> &'static FontManager {
+pub fn font_manager() -> &'static FontManager {
     FONT_MANAGER.get_or_init(FontManager::new)
 }
 
@@ -243,13 +243,20 @@ impl CgContext {
     /// Draw text at (x, y) using the current fill color and font size.
     /// After drawing, advances text_x by the width of the rendered string.
     pub fn draw_text(&mut self, text: &str, x: f64, y: f64) {
+        self.draw_text_with_font(text, x, y, "System");
+    }
+
+    /// Draw text at (x, y) using a specific font name.
+    /// After drawing, advances text_x by the width of the rendered string.
+    pub fn draw_text_with_font(&mut self, text: &str, x: f64, y: f64, font_name: &str) {
         let (tx, ty) = self.transform_point(x, y);
-        let font = Font::system(self.font_size);
         let fm = font_manager();
+        let face = fm.get(font_name);
+        let font = Font::new(font_name, self.font_size);
         let mut renderer = SoftwareRenderer::with_fonts(&mut self.surface, fm);
         renderer.draw_text(text, Point::new(tx, ty), &font, self.fill_color);
         // Advance text position by the measured width.
-        let advance = fm.system().measure_text(text, self.font_size);
+        let advance = face.measure_text(text, self.font_size);
         self.text_x = x + advance;
         self.text_y = y;
     }

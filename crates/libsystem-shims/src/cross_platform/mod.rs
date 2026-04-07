@@ -13,6 +13,7 @@ mod kqueue;
 mod posix_extras;
 mod stat;
 mod dirent;
+mod fts;
 pub mod variadic_shims;
 
 use crate::table::ShimTable;
@@ -26,5 +27,6 @@ pub fn install_cross_platform_shims(table: &mut ShimTable) {
     dirent::DirentShims::install(table);
     variadic_shims::VariadicShims::install(table);
     kqueue::KqueueShims::install(table);
+    fts::FtsShims::install(table);
     log::info!("cross_platform: registered all cross-platform shims");
 }

@@ -125,11 +125,17 @@ pub extern "C" fn shim_os_log_type_enabled(_log: u64, _type: u8) -> i32 {
 /// _os_log_impl(dso, log, type, format, buf, size)
 ///
 /// Routes through the BurdettieOS structured log pipeline with full
-/// subsystem/category/level metadata.
+/// subsystem/category/level metadata.  Decodes the Apple binary argument
+/// buffer to produce the actual formatted message.
 pub extern "C" fn shim_os_log_impl(
-    _dso: u64, log_obj: u64, log_type: u8, format: u64, _buf: u64, _size: u32,
+    _dso: u64, log_obj: u64, log_type: u8, format: u64, buf: u64, size: u32,
 ) {
-    let msg = extract_format_string(format);
+    let fmt = extract_format_string(format);
+    let msg = if buf != 0 && size >= 2 {
+        decode_os_log_message(fmt, buf, size)
+    } else {
+        format_os_log_string(fmt, &[])
+    };
     let (subsystem, category) = lookup_log_handle(log_obj);
     let level = burdettie_log_pipeline::LogLevel::from_apple(log_type);
 
@@ -137,27 +143,324 @@ pub extern "C" fn shim_os_log_impl(
         subsystem,
         category,
         level,
-        message: msg.to_string(),
-        sequence: 0,     // filled by collector
-        timestamp_ms: 0, // filled by collector
+        message: msg,
+        sequence: 0,
+        timestamp_ms: 0,
     });
 }
 
 /// _os_log_error_impl — same as _os_log_impl but forces error level.
 pub extern "C" fn shim_os_log_error_impl(
-    _dso: u64, log_obj: u64, _type: u8, format: u64, _buf: u64, _size: u32,
+    _dso: u64, log_obj: u64, _type: u8, format: u64, buf: u64, size: u32,
 ) {
-    let msg = extract_format_string(format);
+    let fmt = extract_format_string(format);
+    let msg = if buf != 0 && size >= 2 {
+        decode_os_log_message(fmt, buf, size)
+    } else {
+        format_os_log_string(fmt, &[])
+    };
     let (subsystem, category) = lookup_log_handle(log_obj);
 
     burdettie_log_pipeline::emit(burdettie_log_pipeline::LogEvent {
         subsystem,
         category,
         level: burdettie_log_pipeline::LogLevel::Error,
-        message: msg.to_string(),
+        message: msg,
         sequence: 0,
         timestamp_ms: 0,
     });
+}
+
+// ── os_log binary argument buffer decoder ───────────────────────
+//
+// Apple's `_os_log_impl` receives `buf` and `size` containing pre-encoded
+// argument values.  The compiler generates this buffer at the call site.
+//
+// Buffer layout:
+//   [summary:1][num_args:1] then for each arg:
+//   [type_descriptor:1][size:1][data:size bytes]
+//
+// Type descriptors (lower 4 bits):
+//   0 = scalar (unsigned)
+//   1 = scalar (signed)
+//   2 = pointer to C string  (8 bytes on 64-bit)
+//   3 = pointer to data blob (preceded by length)
+//   4 = pointer to ObjC object
+//
+// Visibility bits (upper 4 bits of type_descriptor):
+//   0x00 = default/private
+//   0x02 = public
+//   0x04 = sensitive
+//
+// Format specifiers in the format string use the pattern:
+//   %{modifier}[flags][width][.precision]type
+// where modifier can be `public`, `private`, `sensitive`, or domain-specific.
+
+/// Decode an os_log binary argument buffer and format the message.
+fn decode_os_log_message(fmt: &str, buf: u64, size: u32) -> String {
+    let size = size as usize;
+    if size < 2 {
+        return format_os_log_string(fmt, &[]);
+    }
+
+    // Read the buffer header
+    let buf_ptr = buf as *const u8;
+    let _summary = unsafe { *buf_ptr };
+    let num_args = unsafe { *buf_ptr.add(1) } as usize;
+
+    // Extract argument values from the buffer
+    let mut args: Vec<OsLogArg> = Vec::with_capacity(num_args);
+    let mut offset = 2usize;
+
+    for _ in 0..num_args {
+        if offset + 2 > size {
+            break;
+        }
+        let type_desc = unsafe { *buf_ptr.add(offset) };
+        let arg_size = unsafe { *buf_ptr.add(offset + 1) } as usize;
+        offset += 2;
+
+        if offset + arg_size > size {
+            break;
+        }
+
+        let data_slice = unsafe { std::slice::from_raw_parts(buf_ptr.add(offset), arg_size) };
+        let arg_type = type_desc & 0x0F;
+
+        let arg = match arg_type {
+            0 | 1 => {
+                // Scalar (unsigned or signed integer)
+                let val = read_scalar(data_slice, arg_type == 1);
+                OsLogArg::Scalar(val)
+            }
+            2 => {
+                // Pointer to C string
+                if arg_size >= 8 {
+                    let ptr = u64::from_le_bytes(data_slice[..8].try_into().unwrap_or([0; 8]));
+                    if ptr != 0 {
+                        let s = extract_cstring(ptr);
+                        OsLogArg::String(s.to_string())
+                    } else {
+                        OsLogArg::String("(null)".to_string())
+                    }
+                } else {
+                    OsLogArg::String("(?)".to_string())
+                }
+            }
+            3 => {
+                // Data blob pointer (length-prefixed)
+                OsLogArg::String(format!("<data:{} bytes>", arg_size))
+            }
+            4 => {
+                // ObjC object pointer
+                if arg_size >= 8 {
+                    let ptr = u64::from_le_bytes(data_slice[..8].try_into().unwrap_or([0; 8]));
+                    OsLogArg::String(format!("<obj:{ptr:#x}>"))
+                } else {
+                    OsLogArg::String("<obj>".to_string())
+                }
+            }
+            _ => OsLogArg::String(format!("<type:{type_desc:#x}>")),
+        };
+
+        args.push(arg);
+        offset += arg_size;
+    }
+
+    // Now format the string by replacing specifiers with decoded args
+    format_os_log_string(fmt, &args)
+}
+
+#[derive(Debug)]
+enum OsLogArg {
+    Scalar(i64),
+    String(String),
+}
+
+/// Read a scalar value from a little-endian byte slice.
+fn read_scalar(data: &[u8], signed: bool) -> i64 {
+    match data.len() {
+        1 => {
+            if signed { data[0] as i8 as i64 } else { data[0] as i64 }
+        }
+        2 => {
+            let v = u16::from_le_bytes(data[..2].try_into().unwrap_or([0; 2]));
+            if signed { v as i16 as i64 } else { v as i64 }
+        }
+        4 => {
+            let v = u32::from_le_bytes(data[..4].try_into().unwrap_or([0; 4]));
+            if signed { v as i32 as i64 } else { v as i64 }
+        }
+        8 => {
+            let v = u64::from_le_bytes(data[..8].try_into().unwrap_or([0; 8]));
+            if signed { v as i64 } else { v as i64 }
+        }
+        _ => 0,
+    }
+}
+
+/// Format an os_log format string by substituting %specifiers with decoded args.
+///
+/// Handles Apple extensions like `%{public}s`, `%{private}d`, etc.
+/// Strips the `{modifier}` part and uses the underlying printf specifier.
+fn format_os_log_string(fmt: &str, args: &[OsLogArg]) -> String {
+    let mut result = String::with_capacity(fmt.len() + 64);
+    let mut arg_idx = 0;
+    let bytes = fmt.as_bytes();
+    let len = bytes.len();
+    let mut i = 0;
+
+    while i < len {
+        if bytes[i] != b'%' {
+            result.push(bytes[i] as char);
+            i += 1;
+            continue;
+        }
+
+        // Check for %%
+        if i + 1 < len && bytes[i + 1] == b'%' {
+            result.push('%');
+            i += 2;
+            continue;
+        }
+
+        i += 1; // skip '%'
+
+        // Skip {modifier} if present (e.g., {public}, {private}, {signpost.description:begin})
+        if i < len && bytes[i] == b'{' {
+            while i < len && bytes[i] != b'}' {
+                i += 1;
+            }
+            if i < len {
+                i += 1; // skip '}'
+            }
+        }
+
+        // Parse flags: -, +, 0, space, #
+        while i < len && matches!(bytes[i], b'-' | b'+' | b'0' | b' ' | b'#') {
+            i += 1;
+        }
+
+        // Parse width (digits or *)
+        if i < len && bytes[i] == b'*' {
+            // Width from argument
+            if arg_idx < args.len() {
+                arg_idx += 1; // consume the width arg
+            }
+            i += 1;
+        } else {
+            while i < len && bytes[i].is_ascii_digit() {
+                i += 1;
+            }
+        }
+
+        // Parse precision  (.digits or .*)
+        if i < len && bytes[i] == b'.' {
+            i += 1;
+            if i < len && bytes[i] == b'*' {
+                if arg_idx < args.len() {
+                    arg_idx += 1; // consume precision arg
+                }
+                i += 1;
+            } else {
+                while i < len && bytes[i].is_ascii_digit() {
+                    i += 1;
+                }
+            }
+        }
+
+        // Parse length modifier (l, ll, h, hh, z, t, q, L)
+        while i < len && matches!(bytes[i], b'l' | b'h' | b'z' | b't' | b'q' | b'L' | b'j') {
+            i += 1;
+        }
+
+        // Parse conversion specifier
+        if i >= len {
+            break;
+        }
+
+        let spec = bytes[i] as char;
+        i += 1;
+
+        let arg = if arg_idx < args.len() {
+            let a = &args[arg_idx];
+            arg_idx += 1;
+            a
+        } else {
+            result.push_str("<?>");
+            continue;
+        };
+
+        match spec {
+            'd' | 'i' => match arg {
+                OsLogArg::Scalar(v) => result.push_str(&v.to_string()),
+                OsLogArg::String(s) => result.push_str(s),
+            },
+            'u' => match arg {
+                OsLogArg::Scalar(v) => result.push_str(&(*v as u64).to_string()),
+                OsLogArg::String(s) => result.push_str(s),
+            },
+            'x' => match arg {
+                OsLogArg::Scalar(v) => result.push_str(&format!("{:x}", *v as u64)),
+                OsLogArg::String(s) => result.push_str(s),
+            },
+            'X' => match arg {
+                OsLogArg::Scalar(v) => result.push_str(&format!("{:X}", *v as u64)),
+                OsLogArg::String(s) => result.push_str(s),
+            },
+            'o' => match arg {
+                OsLogArg::Scalar(v) => result.push_str(&format!("{:o}", *v as u64)),
+                OsLogArg::String(s) => result.push_str(s),
+            },
+            'p' => match arg {
+                OsLogArg::Scalar(v) => result.push_str(&format!("0x{:x}", *v as u64)),
+                OsLogArg::String(s) => result.push_str(s),
+            },
+            'f' | 'F' | 'e' | 'E' | 'g' | 'G' => match arg {
+                OsLogArg::Scalar(v) => {
+                    let fval = f64::from_bits(*v as u64);
+                    result.push_str(&format!("{fval}"));
+                }
+                OsLogArg::String(s) => result.push_str(s),
+            },
+            's' => match arg {
+                OsLogArg::String(s) => result.push_str(s),
+                OsLogArg::Scalar(v) => {
+                    // Might be a string pointer encoded as scalar
+                    if *v != 0 {
+                        let s = extract_cstring(*v as u64);
+                        result.push_str(s);
+                    } else {
+                        result.push_str("(null)");
+                    }
+                }
+            },
+            'c' => match arg {
+                OsLogArg::Scalar(v) => {
+                    if let Some(c) = char::from_u32(*v as u32) {
+                        result.push(c);
+                    }
+                }
+                OsLogArg::String(s) => result.push_str(s),
+            },
+            '@' => {
+                // ObjC object description — just render whatever we have
+                match arg {
+                    OsLogArg::String(s) => result.push_str(s),
+                    OsLogArg::Scalar(v) => result.push_str(&format!("<obj:{v:#x}>")),
+                }
+            }
+            _ => {
+                // Unknown specifier — render raw
+                match arg {
+                    OsLogArg::Scalar(v) => result.push_str(&v.to_string()),
+                    OsLogArg::String(s) => result.push_str(s),
+                }
+            }
+        }
+    }
+
+    result
 }
 
 /// Extract the C format string from a `_os_log_impl` call.
@@ -312,5 +615,131 @@ mod tests {
     fn os_log_type_always_enabled() {
         assert_eq!(shim_os_log_type_enabled(0, 0), 1);
         assert_eq!(shim_os_log_type_enabled(0, 3), 1);
+    }
+
+    // ── os_log argument buffer decoder tests ────────────────────
+
+    #[test]
+    fn decode_no_args() {
+        let msg = decode_os_log_message("hello world", 0, 0);
+        assert_eq!(msg, "hello world");
+    }
+
+    #[test]
+    fn decode_scalar_int() {
+        // Buffer: [summary:0][num_args:1][type:0x01(signed)][size:4][value:42_i32_le]
+        let buf: Vec<u8> = vec![0x00, 0x01, 0x01, 0x04, 42, 0, 0, 0];
+        let msg = decode_os_log_message("count=%d", buf.as_ptr() as u64, buf.len() as u32);
+        assert_eq!(msg, "count=42");
+    }
+
+    #[test]
+    fn decode_unsigned_int() {
+        // Buffer: [summary][num_args:1][type:0x00(unsigned)][size:4][value:255_u32_le]
+        let buf: Vec<u8> = vec![0x00, 0x01, 0x00, 0x04, 255, 0, 0, 0];
+        let msg = decode_os_log_message("val=%u", buf.as_ptr() as u64, buf.len() as u32);
+        assert_eq!(msg, "val=255");
+    }
+
+    #[test]
+    fn decode_hex_format() {
+        let buf: Vec<u8> = vec![0x00, 0x01, 0x00, 0x04, 0xAB, 0xCD, 0x00, 0x00];
+        let msg = decode_os_log_message("addr=0x%x", buf.as_ptr() as u64, buf.len() as u32);
+        assert_eq!(msg, "addr=0xcdab");
+    }
+
+    #[test]
+    fn decode_string_pointer() {
+        let hello = b"hello\0";
+        let ptr_bytes = (hello.as_ptr() as u64).to_le_bytes();
+        let mut buf: Vec<u8> = vec![0x00, 0x01, 0x02, 0x08];
+        buf.extend_from_slice(&ptr_bytes);
+        let msg = decode_os_log_message("msg=%{public}s", buf.as_ptr() as u64, buf.len() as u32);
+        assert_eq!(msg, "msg=hello");
+    }
+
+    #[test]
+    fn decode_null_string_pointer() {
+        let ptr_bytes = 0u64.to_le_bytes();
+        let mut buf: Vec<u8> = vec![0x00, 0x01, 0x02, 0x08];
+        buf.extend_from_slice(&ptr_bytes);
+        let msg = decode_os_log_message("msg=%s", buf.as_ptr() as u64, buf.len() as u32);
+        assert_eq!(msg, "msg=(null)");
+    }
+
+    #[test]
+    fn decode_multiple_args() {
+        // Two args: signed int 7, unsigned int 42
+        let buf: Vec<u8> = vec![
+            0x00, 0x02, // summary, 2 args
+            0x01, 0x04, 7, 0, 0, 0,   // signed i32 = 7
+            0x00, 0x04, 42, 0, 0, 0,  // unsigned u32 = 42
+        ];
+        let msg = decode_os_log_message("x=%d y=%u", buf.as_ptr() as u64, buf.len() as u32);
+        assert_eq!(msg, "x=7 y=42");
+    }
+
+    #[test]
+    fn decode_mixed_string_and_int() {
+        let name = b"world\0";
+        let ptr_bytes = (name.as_ptr() as u64).to_le_bytes();
+        let mut buf: Vec<u8> = vec![
+            0x00, 0x02, // summary, 2 args
+            0x02, 0x08, // string pointer, 8 bytes
+        ];
+        buf.extend_from_slice(&ptr_bytes);
+        buf.extend_from_slice(&[0x01, 0x04, 99, 0, 0, 0]); // signed int = 99
+        let msg = decode_os_log_message(
+            "hello %{public}s code=%d",
+            buf.as_ptr() as u64,
+            buf.len() as u32,
+        );
+        assert_eq!(msg, "hello world code=99");
+    }
+
+    #[test]
+    fn decode_percent_escape() {
+        let msg = decode_os_log_message("100%% done", 0, 0);
+        assert_eq!(msg, "100% done");
+    }
+
+    #[test]
+    fn decode_negative_int() {
+        // signed i32 = -1
+        let buf: Vec<u8> = vec![0x00, 0x01, 0x01, 0x04, 0xFF, 0xFF, 0xFF, 0xFF];
+        let msg = decode_os_log_message("err=%d", buf.as_ptr() as u64, buf.len() as u32);
+        assert_eq!(msg, "err=-1");
+    }
+
+    #[test]
+    fn decode_i64_scalar() {
+        // signed i64 = -42
+        let val_bytes = (-42i64).to_le_bytes();
+        let mut buf: Vec<u8> = vec![0x00, 0x01, 0x01, 0x08];
+        buf.extend_from_slice(&val_bytes);
+        let msg = decode_os_log_message("big=%lld", buf.as_ptr() as u64, buf.len() as u32);
+        assert_eq!(msg, "big=-42");
+    }
+
+    #[test]
+    fn decode_pointer_format() {
+        let buf: Vec<u8> = vec![
+            0x00, 0x01, 0x00, 0x08,
+            0x78, 0x56, 0x34, 0x12, 0x00, 0x00, 0x00, 0x00,
+        ];
+        let msg = decode_os_log_message("ptr=%p", buf.as_ptr() as u64, buf.len() as u32);
+        assert_eq!(msg, "ptr=0x12345678");
+    }
+
+    #[test]
+    fn format_string_strips_apple_modifiers() {
+        // Test that {public}, {private} etc. are stripped from the format
+        let args = vec![OsLogArg::String("test".to_string())];
+        let msg = format_os_log_string("val=%{public}s", &args);
+        assert_eq!(msg, "val=test");
+
+        let args2 = vec![OsLogArg::Scalar(42)];
+        let msg2 = format_os_log_string("n=%{private}d", &args2);
+        assert_eq!(msg2, "n=42");
     }
 }

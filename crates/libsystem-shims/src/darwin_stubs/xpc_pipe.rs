@@ -240,6 +240,119 @@ fn burdettie_pluginkit_handler(request: u64) -> u64 {
     reply
 }
 
+/// Security daemon — keychain access and credential management.
+///
+/// On real macOS, `securityd` handles keychain items, certificate trust
+/// evaluation, and authorization.  We return "item not found" for queries
+/// and "success" for operations that callers can survive without.
+fn burdettie_securityd_handler(request: u64) -> u64 {
+    let _ = request;
+    log::debug!("xpc_pipe: burdettie securityd handler invoked");
+    let reply = xpc_objects::create_dictionary_empty();
+    // errSecItemNotFound = -25300
+    xpc_objects::dict_set_int64(reply, b"error\0".as_ptr() as u64, -25300);
+    xpc_objects::dict_set_int64(reply, b"result\0".as_ptr() as u64, -25300);
+    reply
+}
+
+/// Trust evaluation daemon — certificate chain validation.
+///
+/// On real macOS, `trustd` handles SecTrust XPC requests from client
+/// processes.  BurdettieOS handles SecTrust directly in-process via
+/// `trust-eval` (rustls-webpki + Mozilla roots), so this XPC endpoint
+/// just returns success for any fallthrough requests.
+fn burdettie_trustd_handler(request: u64) -> u64 {
+    let _ = request;
+    log::debug!("xpc_pipe: burdettie trustd handler invoked");
+    let reply = xpc_objects::create_dictionary_empty();
+    xpc_objects::dict_set_int64(reply, b"error\0".as_ptr() as u64, 0);
+    // Trust evaluation result = kSecTrustResultProceed (1)
+    xpc_objects::dict_set_int64(reply, b"trust-result\0".as_ptr() as u64, 1);
+    reply
+}
+
+/// Mobile File Integrity — runtime code signing enforcement.
+///
+/// On real macOS, `amfid` / MobileFileIntegrity enforces code signing
+/// on running processes.  We report all code as valid since trust-policy
+/// gates handle this at load time.
+fn burdettie_amfi_handler(request: u64) -> u64 {
+    let _ = request;
+    log::debug!("xpc_pipe: burdettie AMFI handler invoked");
+    let reply = xpc_objects::create_dictionary_empty();
+    xpc_objects::dict_set_int64(reply, b"error\0".as_ptr() as u64, 0);
+    // Valid code signing status
+    xpc_objects::dict_set_bool(reply, b"valid\0".as_ptr() as u64, true);
+    xpc_objects::dict_set_int64(reply, b"status\0".as_ptr() as u64, 0);
+    reply
+}
+
+/// Launch Services daemon — full app registration and UTI database.
+///
+/// On real macOS, `launchservicesd` manages the app database, UTI
+/// associations, and default handler lookups.  We return empty results
+/// for all queries — no apps registered.
+fn burdettie_launchservicesd_handler(request: u64) -> u64 {
+    let _ = request;
+    log::debug!("xpc_pipe: burdettie launchservicesd handler invoked");
+    let reply = xpc_objects::create_dictionary_empty();
+    xpc_objects::dict_set_int64(reply, b"error\0".as_ptr() as u64, 0);
+    // kLSApplicationNotFoundErr = -10814
+    xpc_objects::dict_set_int64(reply, b"result\0".as_ptr() as u64, -10814);
+    xpc_objects::dict_set_int64(reply, b"result-count\0".as_ptr() as u64, 0);
+    reply
+}
+
+/// Darwin notification center — cross-process notification posting.
+///
+/// On real macOS, `notifyd` manages Darwin notifications (not
+/// NSNotificationCenter).  Used for state change notifications between
+/// processes (e.g., timezone changes, network changes).  We accept all
+/// registrations and posts silently.
+fn burdettie_notifyd_handler(request: u64) -> u64 {
+    let _ = request;
+    log::debug!("xpc_pipe: burdettie notifyd handler invoked");
+    let reply = xpc_objects::create_dictionary_empty();
+    xpc_objects::dict_set_int64(reply, b"error\0".as_ptr() as u64, 0);
+    // Token for notification registration
+    xpc_objects::dict_set_int64(reply, b"token\0".as_ptr() as u64, 1);
+    xpc_objects::dict_set_int64(reply, b"status\0".as_ptr() as u64, 0);
+    reply
+}
+
+/// Directory Services — user/group membership resolution.
+///
+/// On real macOS, `DirectoryService` resolves UIDs to usernames, group
+/// membership, and similar identity queries.  We return the current
+/// process identity.
+fn burdettie_directory_service_handler(request: u64) -> u64 {
+    let _ = request;
+    log::debug!("xpc_pipe: burdettie directory service handler invoked");
+    let reply = xpc_objects::create_dictionary_empty();
+    xpc_objects::dict_set_int64(reply, b"error\0".as_ptr() as u64, 0);
+    // Return basic identity — current uid/gid
+    let uid = unsafe { libc::getuid() };
+    let gid = unsafe { libc::getgid() };
+    xpc_objects::dict_set_int64(reply, b"uid\0".as_ptr() as u64, uid as i64);
+    xpc_objects::dict_set_int64(reply, b"gid\0".as_ptr() as u64, gid as i64);
+    xpc_objects::dict_set_int64(reply, b"member\0".as_ptr() as u64, 1); // is member
+    reply
+}
+
+/// Syslog — legacy unified log drain.
+///
+/// On real macOS, the syslog daemon collects system log messages.
+/// Since BurdettieOS uses `burdettie-log-pipeline` for all os_log
+/// events, this just returns success.
+fn burdettie_syslog_handler(request: u64) -> u64 {
+    let _ = request;
+    log::debug!("xpc_pipe: burdettie syslog handler invoked");
+    let reply = xpc_objects::create_dictionary_empty();
+    xpc_objects::dict_set_int64(reply, b"error\0".as_ptr() as u64, 0);
+    xpc_objects::dict_set_bool(reply, b"success\0".as_ptr() as u64, true);
+    reply
+}
+
 /// Install default pipe handlers for well-known service names.
 pub fn install_defaults() {
     // launchd domain lookup — used by `launchctl`, `xpcproxy`, etc.
@@ -262,8 +375,28 @@ pub fn install_defaults() {
         burdettie_pluginkit_handler,
     );
 
+    // Security & trust — keychain, certificate validation, code signing
+    register_pipe_handler("com.apple.securityd", burdettie_securityd_handler);
+    register_pipe_handler("com.apple.trustd", burdettie_trustd_handler);
+    register_pipe_handler(
+        "com.apple.MobileFileIntegrity",
+        burdettie_amfi_handler,
+    );
+
+    // System services — launch services, notifications, directory, syslog
+    register_pipe_handler(
+        "com.apple.coreservices.launchservicesd",
+        burdettie_launchservicesd_handler,
+    );
+    register_pipe_handler("com.apple.notifyd", burdettie_notifyd_handler);
+    register_pipe_handler(
+        "com.apple.system.DirectoryService.membership_v1",
+        burdettie_directory_service_handler,
+    );
+    register_pipe_handler("com.apple.syslog", burdettie_syslog_handler);
+
     log::debug!(
-        "xpc_pipe: installed default launchd + 8 BurdettieOS daemon handlers"
+        "xpc_pipe: installed default launchd + 15 BurdettieOS daemon handlers"
     );
 }
 
@@ -381,6 +514,109 @@ mod tests {
     }
 
     #[test]
+    fn burdettie_securityd_returns_item_not_found() {
+        install_defaults();
+        let pipe = create(b"com.apple.securityd\0".as_ptr() as u64, 0);
+        let request = xpc_objects::create_dictionary_empty();
+        let mut reply: u64 = 0;
+        let result = routine(pipe, request, &mut reply as *mut u64 as u64);
+        assert_eq!(result, 0);
+        assert_ne!(reply, 0);
+        // errSecItemNotFound = -25300
+        assert_eq!(xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64), -25300);
+        assert_eq!(xpc_objects::dict_get_int64(reply, b"result\0".as_ptr() as u64), -25300);
+    }
+
+    #[test]
+    fn burdettie_trustd_returns_proceed() {
+        install_defaults();
+        let pipe = create(b"com.apple.trustd\0".as_ptr() as u64, 0);
+        let request = xpc_objects::create_dictionary_empty();
+        let mut reply: u64 = 0;
+        let result = routine(pipe, request, &mut reply as *mut u64 as u64);
+        assert_eq!(result, 0);
+        assert_ne!(reply, 0);
+        assert_eq!(xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64), 0);
+        assert_eq!(xpc_objects::dict_get_int64(reply, b"trust-result\0".as_ptr() as u64), 1);
+    }
+
+    #[test]
+    fn burdettie_amfi_returns_valid() {
+        install_defaults();
+        let pipe = create(b"com.apple.MobileFileIntegrity\0".as_ptr() as u64, 0);
+        let request = xpc_objects::create_dictionary_empty();
+        let mut reply: u64 = 0;
+        let result = routine(pipe, request, &mut reply as *mut u64 as u64);
+        assert_eq!(result, 0);
+        assert_ne!(reply, 0);
+        assert_eq!(xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64), 0);
+        assert!(xpc_objects::dict_get_bool(reply, b"valid\0".as_ptr() as u64));
+        assert_eq!(xpc_objects::dict_get_int64(reply, b"status\0".as_ptr() as u64), 0);
+    }
+
+    #[test]
+    fn burdettie_launchservicesd_returns_not_found() {
+        install_defaults();
+        let pipe = create(b"com.apple.coreservices.launchservicesd\0".as_ptr() as u64, 0);
+        let request = xpc_objects::create_dictionary_empty();
+        let mut reply: u64 = 0;
+        let result = routine(pipe, request, &mut reply as *mut u64 as u64);
+        assert_eq!(result, 0);
+        assert_ne!(reply, 0);
+        assert_eq!(xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64), 0);
+        // kLSApplicationNotFoundErr = -10814
+        assert_eq!(xpc_objects::dict_get_int64(reply, b"result\0".as_ptr() as u64), -10814);
+        assert_eq!(xpc_objects::dict_get_int64(reply, b"result-count\0".as_ptr() as u64), 0);
+    }
+
+    #[test]
+    fn burdettie_notifyd_returns_token() {
+        install_defaults();
+        let pipe = create(b"com.apple.notifyd\0".as_ptr() as u64, 0);
+        let request = xpc_objects::create_dictionary_empty();
+        let mut reply: u64 = 0;
+        let result = routine(pipe, request, &mut reply as *mut u64 as u64);
+        assert_eq!(result, 0);
+        assert_ne!(reply, 0);
+        assert_eq!(xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64), 0);
+        assert_eq!(xpc_objects::dict_get_int64(reply, b"token\0".as_ptr() as u64), 1);
+        assert_eq!(xpc_objects::dict_get_int64(reply, b"status\0".as_ptr() as u64), 0);
+    }
+
+    #[test]
+    fn burdettie_directory_service_returns_identity() {
+        install_defaults();
+        let pipe = create(
+            b"com.apple.system.DirectoryService.membership_v1\0".as_ptr() as u64,
+            0,
+        );
+        let request = xpc_objects::create_dictionary_empty();
+        let mut reply: u64 = 0;
+        let result = routine(pipe, request, &mut reply as *mut u64 as u64);
+        assert_eq!(result, 0);
+        assert_ne!(reply, 0);
+        assert_eq!(xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64), 0);
+        let uid = unsafe { libc::getuid() } as i64;
+        let gid = unsafe { libc::getgid() } as i64;
+        assert_eq!(xpc_objects::dict_get_int64(reply, b"uid\0".as_ptr() as u64), uid);
+        assert_eq!(xpc_objects::dict_get_int64(reply, b"gid\0".as_ptr() as u64), gid);
+        assert_eq!(xpc_objects::dict_get_int64(reply, b"member\0".as_ptr() as u64), 1);
+    }
+
+    #[test]
+    fn burdettie_syslog_returns_success() {
+        install_defaults();
+        let pipe = create(b"com.apple.syslog\0".as_ptr() as u64, 0);
+        let request = xpc_objects::create_dictionary_empty();
+        let mut reply: u64 = 0;
+        let result = routine(pipe, request, &mut reply as *mut u64 as u64);
+        assert_eq!(result, 0);
+        assert_ne!(reply, 0);
+        assert_eq!(xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64), 0);
+        assert!(xpc_objects::dict_get_bool(reply, b"success\0".as_ptr() as u64));
+    }
+
+    #[test]
     fn all_burdettie_handlers_registered() {
         install_defaults();
         let expected = [
@@ -392,6 +628,13 @@ mod tests {
             "com.apple.cfprefsd.daemon",
             "com.apple.cfprefsd.agent",
             "com.apple.pluginkit.pkd",
+            "com.apple.securityd",
+            "com.apple.trustd",
+            "com.apple.MobileFileIntegrity",
+            "com.apple.coreservices.launchservicesd",
+            "com.apple.notifyd",
+            "com.apple.system.DirectoryService.membership_v1",
+            "com.apple.syslog",
         ];
         for name in &expected {
             assert!(has_pipe_handler(name), "missing handler for {name}");
