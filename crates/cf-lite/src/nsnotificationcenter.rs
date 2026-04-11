@@ -153,6 +153,11 @@ fn default_center_ptr() -> u64 {
     })
 }
 
+/// Public accessor for CFNotificationCenterGetLocalCenter bridge.
+pub fn default_center_addr() -> u64 {
+    default_center_ptr()
+}
+
 /// `+[NSNotificationCenter defaultCenter]`
 pub extern "C" fn shim_nsnotificationcenter_default_center(_cls: u64, _cmd: u64) -> u64 {
     default_center_ptr()

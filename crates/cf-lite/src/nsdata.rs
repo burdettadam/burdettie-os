@@ -276,7 +276,7 @@ fn base64_decode(input: &str) -> Option<Vec<u8>> {
 }
 
 /// Helper: read raw byte slice from an NSData object.
-fn nsdata_bytes_slice(obj: u64) -> &'static [u8] {
+pub fn nsdata_bytes_slice(obj: u64) -> &'static [u8] {
     let length = unsafe { *((obj as usize + NSDATA_LENGTH_OFF) as *const u64) } as usize;
     let bytes_ptr = unsafe { *((obj as usize + NSDATA_BYTES_OFF) as *const u64) };
     if length == 0 || bytes_ptr == 0 {

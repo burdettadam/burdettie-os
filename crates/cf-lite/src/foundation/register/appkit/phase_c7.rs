@@ -88,7 +88,9 @@ pub fn register_nsmenu_class(rt: &mut objc_runtime::ObjcRuntime) {
             me("setSubmenu:forItem:", nsmenu_shim::shim_nsmenu_set_submenu as *const () as u64, "v@:@@"),
             me("performKeyEquivalent:", nsmenu_shim::shim_nsmenu_perform_key_equivalent as *const () as u64, "B@:@"),
         ],
-        class_methods: vec![],
+        class_methods: vec![
+            me("popUpContextMenu:withEvent:forView:", nsmenu_shim::shim_nsmenu_popup_context_menu as *const () as u64, "v@:@@@"),
+        ],
         ivars: vec![], properties: vec![], protocol_names: Vec::new(),
         instance_size: 24, is_root: false, is_meta: false,
         superclass_addr: Some(nsobj::nsobject_class_addr()),
@@ -123,6 +125,7 @@ pub fn register_nsmenuitem_class(rt: &mut objc_runtime::ObjcRuntime) {
             me("setKeyEquivalentModifierMask:", nsmenu_shim::shim_nsmenuitem_set_key_equivalent_modifier_mask as *const () as u64, "v@:Q"),
             me("state", nsmenu_shim::shim_nsmenuitem_state as *const () as u64, "q@:"),
             me("setState:", nsmenu_shim::shim_nsmenuitem_set_state as *const () as u64, "v@:q"),
+            me("performClick:", nsmenu_shim::shim_nsmenuitem_perform_click as *const () as u64, "v@:@"),
         ],
         class_methods: vec![
             me("separatorItem", nsmenu_shim::shim_nsmenuitem_separator as *const () as u64, "@@:"),
@@ -151,7 +154,7 @@ pub fn register_nsnib_class(rt: &mut objc_runtime::ObjcRuntime) {
             me("alloc", nsnib::shim_nsnib_alloc as *const () as u64, "@@:"),
         ],
         ivars: vec![], properties: vec![], protocol_names: Vec::new(),
-        instance_size: 16, is_root: false, is_meta: false,
+        instance_size: 24, is_root: false, is_meta: false,
         superclass_addr: Some(nsobj::nsobject_class_addr()),
         method_index: HashMap::new(), class_method_index: HashMap::new(),
     };

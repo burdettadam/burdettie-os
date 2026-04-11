@@ -42,6 +42,9 @@ pub fn register_cg_shims(table: &mut ShimTable) {
     libsystem_shims::darwin_stubs::core_text::set_ct_text_measure_callback(ct_text_measure_impl);
     libsystem_shims::darwin_stubs::core_text::set_ct_char_advance_callback(ct_char_advance_impl);
 
+    // Wire font family enumeration from graphics-core into CoreText shims
+    libsystem_shims::darwin_stubs::core_text::set_ct_font_families_callback(ct_font_families_impl);
+
     log::debug!("cg-shims: registered CoreGraphics C API stubs");
 }
 
@@ -97,9 +100,8 @@ extern "C" fn ct_text_measure_impl(
 ) -> f64 {
     let text = unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(text_ptr, text_len)) };
     let name = unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(name_ptr, name_len)) };
-    let fm = bridge::font_manager();
-    let face = fm.get(name);
-    face.measure_text(text, size)
+    let m = graphics_core::text_system::measure_shaped_text(text, size, name, None);
+    m.width
 }
 
 /// Per-character advance callback: returns the advance width for a Unicode codepoint.
@@ -113,4 +115,29 @@ extern "C" fn ct_char_advance_impl(
     let face = fm.get(name);
     let c = char::from_u32(ch).unwrap_or(' ');
     face.char_width(c, size)
+}
+
+/// Font family enumeration callback for CTFontManagerCopyAvailableFontFamilyNames.
+///
+/// First call with null `out` returns the count.
+/// Second call fills `out` with `malloc`'d C strings (caller frees).
+extern "C" fn ct_font_families_impl(out: *mut *mut u8, cap: usize) -> usize {
+    let families = bridge::font_family_names();
+    let count = families.len();
+
+    if out.is_null() || cap == 0 {
+        return count;
+    }
+
+    let n = count.min(cap);
+    for (i, name) in families.into_iter().take(n).enumerate() {
+        let c_string = std::ffi::CString::new(name).unwrap_or_default();
+        let bytes = c_string.as_bytes_with_nul();
+        let ptr = unsafe { libc::malloc(bytes.len()) as *mut u8 };
+        if !ptr.is_null() {
+            unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len()); }
+        }
+        unsafe { out.add(i).write(ptr); }
+    }
+    n
 }

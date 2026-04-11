@@ -1747,14 +1747,15 @@ else
 fi
 rm -rf "$TMPDIR_INT"
 
-# 4.13 EC curve listing — hits an unresolved bind trap in the macOS binary
-# (a function not yet shimmed). This is a known limitation of the loader,
-# not a LibreSSL bundling issue. The native crypto:ec-builtin-curves test
-# validates the curve database directly.
-if macho-inspect --exec "$OPENSSL" --exec-args ecparam -list_curves >/dev/null 2>&1; then
-    pass "integration:openssl-ecparam-list"
+# 4.13 EC curve listing — previously crashed in BIO_printf (Apple variadic ABI mismatch).
+# Fixed by adding BIO_printf/BIO_vprintf variadic shims that construct a proper
+# Linux va_list from Apple stack-based variadic arguments.
+output=$(macho-inspect --exec "$OPENSSL" --exec-args ecparam -list_curves 2>/dev/null || true)
+curve_count=$(echo "$output" | grep -c ":" || true)
+if [[ "$curve_count" -ge 10 ]]; then
+    pass "integration:openssl-ecparam-list ($curve_count curves)"
 else
-    skip "integration:openssl-ecparam-list" "unresolved bind in macOS binary"
+    fail "integration:openssl-ecparam-list" "expected >=10 curves, got $curve_count"
 fi
 
 # 4.14 SHA-512 digest
@@ -1806,7 +1807,8 @@ fi
 rm -rf "$TMPDIR_INT"
 
 # 4.17 Self-signed certificate generation
-# Requires openssl.cnf — create a minimal one for the test.
+# openssl.cnf is now bundled in the Docker image (COPY from libressl-builder).
+# Create a minimal config for the test to set subject fields.
 TMPDIR_INT=$(mktemp -d)
 cat > "$TMPDIR_INT/openssl.cnf" << 'SSLCNF'
 [req]
@@ -1826,9 +1828,7 @@ unset OPENSSL_CONF
 if [[ -s "$TMPDIR_INT/cert.pem" ]] && grep -q "BEGIN CERTIFICATE" "$TMPDIR_INT/cert.pem"; then
     pass "integration:openssl-self-signed-cert"
 else
-    # req subcommand requires openssl.cnf and may hit unresolved symbols;
-    # this is a known limitation, not a LibreSSL bundling issue.
-    skip "integration:openssl-self-signed-cert" "req needs openssl.cnf (config path issue)"
+    fail "integration:openssl-self-signed-cert" "cert generation failed"
 fi
 rm -rf "$TMPDIR_INT"
 

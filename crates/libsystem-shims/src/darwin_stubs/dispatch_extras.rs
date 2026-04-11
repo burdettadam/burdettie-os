@@ -16,24 +16,16 @@ impl DispatchExtrasStubs {
             ("_dispatch_assert_queue", shim_dispatch_void1 as *const () as u64, "dispatch_assert_queue (stub → void)"),
             ("_dispatch_assert_queue_barrier", shim_dispatch_void1 as *const () as u64, "dispatch_assert_queue_barrier (stub → void)"),
             ("_dispatch_assert_queue_not", shim_dispatch_void1 as *const () as u64, "dispatch_assert_queue_not (stub → void)"),
-            ("_dispatch_block_create", shim_dispatch_block_create as *const () as u64, "dispatch_block_create (stub → passthrough block)"),
-            ("_dispatch_block_create_with_qos_class", shim_dispatch_block_create_qos as *const () as u64, "dispatch_block_create_with_qos_class (stub → passthrough)"),
-            ("_dispatch_block_cancel", shim_dispatch_void1 as *const () as u64, "dispatch_block_cancel (stub → void)"),
-            ("_dispatch_block_testcancel", shim_dispatch_zero1 as *const () as u64, "dispatch_block_testcancel (stub → 0)"),
-            ("_dispatch_block_wait", shim_dispatch_zero2 as *const () as u64, "dispatch_block_wait (stub → 0)"),
-            ("_dispatch_block_notify", shim_dispatch_void3 as *const () as u64, "dispatch_block_notify (stub → void)"),
-            ("_dispatch_block_perform", shim_dispatch_void2 as *const () as u64, "dispatch_block_perform (stub → void)"),
-            ("_dispatch_io_create", shim_dispatch_null3 as *const () as u64, "dispatch_io_create (stub → NULL)"),
-            ("_dispatch_io_read", shim_dispatch_void4 as *const () as u64, "dispatch_io_read (stub → void)"),
-            ("_dispatch_io_write", shim_dispatch_void4 as *const () as u64, "dispatch_io_write (stub → void)"),
-            ("_dispatch_io_close", shim_dispatch_void2 as *const () as u64, "dispatch_io_close (stub → void)"),
-            ("_dispatch_io_set_high_water", shim_dispatch_void2 as *const () as u64, "dispatch_io_set_high_water (stub → void)"),
-            ("_dispatch_io_set_low_water", shim_dispatch_void2 as *const () as u64, "dispatch_io_set_low_water (stub → void)"),
+            ("_dispatch_block_create", shim_dispatch_block_create as *const () as u64, "dispatch_block_create (real cancel/wait tracking)"),
+            ("_dispatch_block_create_with_qos_class", shim_dispatch_block_create_qos as *const () as u64, "dispatch_block_create_with_qos_class (real)"),
+            ("_dispatch_block_cancel", shim_dispatch_block_cancel as *const () as u64, "dispatch_block_cancel (real)"),
+            ("_dispatch_block_testcancel", shim_dispatch_block_testcancel as *const () as u64, "dispatch_block_testcancel (real)"),
+            ("_dispatch_block_wait", shim_dispatch_block_wait as *const () as u64, "dispatch_block_wait (real condvar)"),
+            ("_dispatch_block_notify", shim_dispatch_block_notify as *const () as u64, "dispatch_block_notify (real)"),
+            ("_dispatch_block_perform", shim_dispatch_block_perform as *const () as u64, "dispatch_block_perform (real)"),
+            // dispatch_io: now handled by dispatch_io.rs — removed stubs
             ("_dispatch_queue_attr_make_with_autorelease_frequency", shim_dispatch_first_arg as *const () as u64, "dispatch_queue_attr_make_with_autorelease_frequency (stub → attr passthrough)"),
-            ("_dispatch_queue_get_specific", shim_dispatch_null1 as *const () as u64, "dispatch_queue_get_specific (stub → NULL)"),
-            ("_dispatch_source_get_data", shim_dispatch_zero1 as *const () as u64, "dispatch_source_get_data (stub → 0)"),
-            ("_dispatch_source_get_handle", shim_dispatch_zero1 as *const () as u64, "dispatch_source_get_handle (stub → 0)"),
-            ("_dispatch_source_merge_data", shim_dispatch_void2 as *const () as u64, "dispatch_source_merge_data (stub → void)"),
+            // dispatch_source data/handle/merge_data: now in dispatch_data_source.rs
             // dispatch_apply — serial loop implementation
             ("_dispatch_apply", shim_dispatch_apply as *const () as u64, "dispatch_apply (serial loop)"),
             ("_dispatch_apply_f", shim_dispatch_apply_f as *const () as u64, "dispatch_apply_f (serial loop)"),
@@ -57,9 +49,11 @@ impl DispatchExtrasStubs {
             // ── dispatch_set_target_queue ────────────────────────
             ("_dispatch_set_target_queue", shim_dispatch_void2 as *const () as u64, "dispatch_set_target_queue (stub → void)"),
             // ── dispatch_queue_set_specific ──────────────────────
-            ("_dispatch_queue_set_specific", shim_dispatch_void4 as *const () as u64, "dispatch_queue_set_specific (stub → void)"),
+            ("_dispatch_queue_set_specific", shim_dispatch_queue_set_specific as *const () as u64, "dispatch_queue_set_specific (real)"),
             // ── dispatch_get_specific ────────────────────────────
-            ("_dispatch_get_specific", shim_dispatch_null1 as *const () as u64, "dispatch_get_specific (stub → NULL)"),
+            ("_dispatch_get_specific", shim_dispatch_get_specific as *const () as u64, "dispatch_get_specific (real)"),
+            // ── dispatch_queue_get_specific ──────────────────────
+            ("_dispatch_queue_get_specific", shim_dispatch_queue_get_specific as *const () as u64, "dispatch_queue_get_specific (real)"),
         );
         log::debug!("DispatchExtrasStubs: registered 39 dispatch stubs");
     }
@@ -69,13 +63,330 @@ pub extern "C" fn shim_dispatch_void1(_a: u64) {}
 pub extern "C" fn shim_dispatch_void2(_a: u64, _b: u64) {}
 pub extern "C" fn shim_dispatch_void3(_a: u64, _b: u64, _c: u64) {}
 pub extern "C" fn shim_dispatch_void4(_a: u64, _b: u64, _c: u64, _d: u64) {}
-pub extern "C" fn shim_dispatch_zero1(_a: u64) -> u64 { 0 }
-pub extern "C" fn shim_dispatch_zero2(_a: u64, _b: u64) -> u64 { 0 }
 pub extern "C" fn shim_dispatch_null1(_a: u64) -> u64 { 0 }
 pub extern "C" fn shim_dispatch_null3(_a: u64, _b: u64, _c: u64) -> u64 { 0 }
-pub extern "C" fn shim_dispatch_block_create(_flags: u64, _block: u64) -> u64 { _block }
-pub extern "C" fn shim_dispatch_block_create_qos(_flags: u64, _qos: u64, _rel: i32, _block: u64) -> u64 { _block }
 pub extern "C" fn shim_dispatch_first_arg(a: u64, _b: u64) -> u64 { a }
+
+// ═══════════════════════════════════════════════════════════════════
+//  dispatch_block — real cancel / wait / notify tracking
+// ═══════════════════════════════════════════════════════════════════
+
+use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
+use std::sync::{Arc, Condvar};
+
+/// Per-block metadata tracked by the block registry.
+struct BlockWrapper {
+    /// Guest block pointer (the original block passed to dispatch_block_create).
+    inner_block: usize,
+    /// Invoke function pointer extracted from the inner block (offset 16).
+    inner_invoke: usize,
+    /// Whether dispatch_block_cancel has been called.
+    cancelled: AtomicBool,
+    /// True once the wrapper trampoline has finished executing.
+    completed: Mutex<bool>,
+    /// Wakes waiters blocked in dispatch_block_wait.
+    completed_cv: Condvar,
+    /// (queue_handle, notification_block_ptr) pairs to dispatch on completion.
+    notifications: Mutex<Vec<(u64, usize)>>,
+}
+
+/// Registry of blocks created via dispatch_block_create.
+///
+/// Key = address of the leaked `SyntheticBlock` we hand back to the caller.
+static BLOCK_REGISTRY: OnceLock<Mutex<HashMap<usize, Arc<BlockWrapper>>>> = OnceLock::new();
+
+fn block_registry() -> &'static Mutex<HashMap<usize, Arc<BlockWrapper>>> {
+    BLOCK_REGISTRY.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Matches the first 24 bytes of the Apple Block ABI.
+///
+/// ```text
+/// offset  0: isa     (u64)
+/// offset  8: flags   (i32)
+/// offset 12: reserved(i32)
+/// offset 16: invoke  (fn ptr)
+/// ```
+#[repr(C)]
+struct SyntheticBlock {
+    isa: u64,
+    flags: i32,
+    reserved: i32,
+    invoke: extern "C" fn(*const u8),
+}
+
+/// Trampoline installed at offset 16 of every synthetic block.
+///
+/// When the Mach-O caller invokes this block, the trampoline:
+/// 1. Looks up the `BlockWrapper` by its own address.
+/// 2. Skips the inner block if cancelled.
+/// 3. Invokes the original block.
+/// 4. Marks completed, wakes waiters, fires notification blocks.
+extern "C" fn block_trampoline(block: *const u8) {
+    let addr = block as usize;
+    let wrapper = {
+        let reg = block_registry().lock().unwrap();
+        reg.get(&addr).cloned()
+    };
+    let Some(wrapper) = wrapper else { return; };
+
+    if !wrapper.cancelled.load(AtomicOrdering::Acquire) {
+        let invoke: extern "C" fn(*const u8) =
+            unsafe { std::mem::transmute(wrapper.inner_invoke) };
+        invoke(wrapper.inner_block as *const u8);
+    }
+
+    // Mark completed and wake waiters.
+    {
+        let mut done = wrapper.completed.lock().unwrap();
+        *done = true;
+        wrapper.completed_cv.notify_all();
+    }
+
+    // Fire notification blocks.
+    let notes: Vec<(u64, usize)> = wrapper.notifications.lock().unwrap().drain(..).collect();
+    for (queue, nb) in notes {
+        dispatch_queue::queue_async(
+            queue,
+            Box::new(move || {
+                let ptr = nb as *const u8;
+                let inv: extern "C" fn(*const u8) =
+                    unsafe { *(ptr.add(16) as *const extern "C" fn(*const u8)) };
+                inv(ptr);
+            }),
+        );
+    }
+}
+
+/// `dispatch_block_t dispatch_block_create(dispatch_block_flags_t flags,
+///     dispatch_block_t block)`
+///
+/// Allocates a synthetic block that wraps `block` with cancellation and
+/// completion tracking.
+pub extern "C" fn shim_dispatch_block_create(flags: u64, block: u64) -> u64 {
+    if block == 0 {
+        return 0;
+    }
+    let inner_invoke = unsafe { *(block as *const u8).add(16) as usize };
+    let wrapper = Arc::new(BlockWrapper {
+        inner_block: block as usize,
+        inner_invoke: inner_invoke as usize,
+        cancelled: AtomicBool::new(false),
+        completed: Mutex::new(false),
+        completed_cv: Condvar::new(),
+        notifications: Mutex::new(Vec::new()),
+    });
+
+    let syn = Box::new(SyntheticBlock {
+        isa: 0,
+        flags: flags as i32,
+        reserved: 0,
+        invoke: block_trampoline,
+    });
+    let syn_ptr = Box::into_raw(syn) as usize;
+    block_registry().lock().unwrap().insert(syn_ptr, wrapper);
+    syn_ptr as u64
+}
+
+/// `dispatch_block_t dispatch_block_create_with_qos_class(
+///     dispatch_block_flags_t flags, dispatch_qos_class_t qos,
+///     int relative_priority, dispatch_block_t block)`
+pub extern "C" fn shim_dispatch_block_create_qos(
+    flags: u64,
+    _qos: u64,
+    _rel: i32,
+    block: u64,
+) -> u64 {
+    // QoS is ignored — just delegate to the base create.
+    shim_dispatch_block_create(flags, block)
+}
+
+/// `void dispatch_block_cancel(dispatch_block_t block)`
+pub extern "C" fn shim_dispatch_block_cancel(block: u64) {
+    if block == 0 {
+        return;
+    }
+    let reg = block_registry().lock().unwrap();
+    if let Some(w) = reg.get(&(block as usize)) {
+        w.cancelled.store(true, AtomicOrdering::Release);
+    }
+}
+
+/// `long dispatch_block_testcancel(dispatch_block_t block)`
+///
+/// Returns non-zero if the block has been cancelled.
+pub extern "C" fn shim_dispatch_block_testcancel(block: u64) -> u64 {
+    if block == 0 {
+        return 0;
+    }
+    let reg = block_registry().lock().unwrap();
+    reg.get(&(block as usize))
+        .map(|w| w.cancelled.load(AtomicOrdering::Acquire) as u64)
+        .unwrap_or(0)
+}
+
+/// `long dispatch_block_wait(dispatch_block_t block, dispatch_time_t timeout)`
+///
+/// Blocks the caller until the block finishes or the timeout expires.
+/// Returns 0 on completion, non-zero on timeout.
+pub extern "C" fn shim_dispatch_block_wait(block: u64, timeout: u64) -> u64 {
+    if block == 0 {
+        return 0;
+    }
+    let wrapper = {
+        let reg = block_registry().lock().unwrap();
+        reg.get(&(block as usize)).cloned()
+    };
+    let Some(wrapper) = wrapper else { return 0; };
+
+    let mut done = wrapper.completed.lock().unwrap();
+    if *done {
+        return 0;
+    }
+
+    if timeout == DISPATCH_TIME_FOREVER {
+        while !*done {
+            done = wrapper.completed_cv.wait(done).unwrap();
+        }
+        0
+    } else if timeout == DISPATCH_TIME_NOW {
+        if *done { 0 } else { 1 }
+    } else {
+        let now = nanos_now_monotonic();
+        let dur = if timeout > now {
+            std::time::Duration::from_nanos(timeout - now)
+        } else {
+            std::time::Duration::ZERO
+        };
+        let (d, result) = wrapper
+            .completed_cv
+            .wait_timeout(done, dur)
+            .unwrap();
+        done = d;
+        if *done { 0 } else { 1 }
+    }
+}
+
+/// `void dispatch_block_notify(dispatch_block_t block,
+///     dispatch_queue_t queue, dispatch_block_t notification_block)`
+///
+/// Registers `notification_block` to be submitted to `queue` when `block`
+/// completes.  If the block has already completed, the notification is
+/// dispatched immediately.
+pub extern "C" fn shim_dispatch_block_notify(block: u64, queue: u64, notification: u64) {
+    if block == 0 || notification == 0 {
+        return;
+    }
+    let wrapper = {
+        let reg = block_registry().lock().unwrap();
+        reg.get(&(block as usize)).cloned()
+    };
+    let Some(wrapper) = wrapper else {
+        // Not a tracked block — fire immediately.
+        fire_notification(queue, notification as usize);
+        return;
+    };
+
+    let already_done = *wrapper.completed.lock().unwrap();
+    if already_done {
+        fire_notification(queue, notification as usize);
+    } else {
+        wrapper
+            .notifications
+            .lock()
+            .unwrap()
+            .push((queue, notification as usize));
+    }
+}
+
+fn fire_notification(queue: u64, nb: usize) {
+    dispatch_queue::queue_async(
+        queue,
+        Box::new(move || {
+            let ptr = nb as *const u8;
+            let inv: extern "C" fn(*const u8) =
+                unsafe { *(ptr.add(16) as *const extern "C" fn(*const u8)) };
+            inv(ptr);
+        }),
+    );
+}
+
+/// `void dispatch_block_perform(dispatch_block_flags_t flags,
+///     dispatch_block_t block)`
+///
+/// Creates a block wrapper and executes it synchronously inline.
+pub extern "C" fn shim_dispatch_block_perform(flags: u64, block: u64) {
+    if block == 0 {
+        return;
+    }
+    let wrapped = shim_dispatch_block_create(flags, block);
+    // Invoke the trampoline directly.
+    block_trampoline(wrapped as *const u8);
+}
+
+// ── Queue-specific data ────────────────────────────────────────
+//
+// Stores (queue, key) → (context, destructor) triples in a global map.
+// dispatch_get_specific walks up the target queue chain, but since we
+// don't track that, we short-circuit to check the current queue only.
+
+use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
+
+static QUEUE_SPECIFIC_DATA: OnceLock<Mutex<HashMap<(u64, u64), (u64, u64)>>> = OnceLock::new();
+
+fn specific_data() -> &'static Mutex<HashMap<(u64, u64), (u64, u64)>> {
+    QUEUE_SPECIFIC_DATA.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// `void dispatch_queue_set_specific(dispatch_queue_t queue, const void *key,
+///     void *context, dispatch_function_t destructor)`
+pub extern "C" fn shim_dispatch_queue_set_specific(
+    queue: u64,
+    key: u64,
+    context: u64,
+    destructor: u64,
+) {
+    if key == 0 {
+        return;
+    }
+    let mut map = specific_data().lock().unwrap();
+    if context == 0 {
+        // Remove the entry and call destructor for old value.
+        if let Some((old_ctx, old_dtor)) = map.remove(&(queue, key)) {
+            if old_dtor != 0 && old_ctx != 0 {
+                let dtor: extern "C" fn(u64) = unsafe { std::mem::transmute(old_dtor) };
+                dtor(old_ctx);
+            }
+        }
+    } else {
+        map.insert((queue, key), (context, destructor));
+    }
+}
+
+/// `void *dispatch_queue_get_specific(dispatch_queue_t queue, const void *key)`
+pub extern "C" fn shim_dispatch_queue_get_specific(queue: u64, key: u64) -> u64 {
+    if key == 0 {
+        return 0;
+    }
+    let map = specific_data().lock().unwrap();
+    map.get(&(queue, key)).map(|(ctx, _)| *ctx).unwrap_or(0)
+}
+
+/// `void *dispatch_get_specific(const void *key)`
+///
+/// Returns the specific data for the key on the current queue.
+/// Since we can't easily determine "the current queue" from Rust,
+/// we check the main queue sentinel first, then return NULL.
+pub extern "C" fn shim_dispatch_get_specific(key: u64) -> u64 {
+    if key == 0 {
+        return 0;
+    }
+    // Check main queue as a best-effort.
+    let main_q = dispatch_queue::main_queue_sentinel();
+    let map = specific_data().lock().unwrap();
+    map.get(&(main_q, key)).map(|(ctx, _)| *ctx).unwrap_or(0)
+}
 
 /// Sentinel for `_dispatch_queue_attr_concurrent` data symbol.
 static DISPATCH_QUEUE_ATTR_CONCURRENT: [u8; 8] = [0; 8];
@@ -488,7 +799,7 @@ mod tests {
     fn dispatch_extras_install_count() {
         let mut table = ShimTable::new();
         DispatchExtrasStubs::install(&mut table);
-        // Should have 39 entries
-        assert!(table.len() >= 39, "expected ≥39 dispatch stubs, got {}", table.len());
+        // Should have 30 entries (dispatch_io + source accessors moved to their own modules)
+        assert!(table.len() >= 30, "expected ≥30 dispatch stubs, got {}", table.len());
     }
 }

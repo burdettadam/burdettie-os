@@ -7,6 +7,7 @@
 mod asl;
 mod audit;
 mod blocks_runtime;
+mod cf_notification_center;
 mod cfnetwork;
 mod common_crypto;
 mod compression;
@@ -17,6 +18,7 @@ mod dispatch_concurrency;
 mod dvt_foundation;
 mod dispatch_data_source;
 mod dispatch_extras;
+mod dispatch_io;
 pub(crate) mod dispatch_queue;
 pub(crate) mod dyld_introspection;
 mod iokit;
@@ -47,6 +49,9 @@ mod xpc_transport;
 mod swift_reflection;
 mod swift_foundation_bridge;
 mod swift_type_metadata;
+mod dns_sd;
+mod core_audio;
+mod fsevents;
 
 use crate::table::ShimTable;
 
@@ -59,6 +64,7 @@ pub fn install_darwin_stubs(table: &mut ShimTable) {
     // be shadowed (doing so breaks the Block copy/release ABI).
     #[cfg(not(target_os = "macos"))]
     blocks_runtime::BlocksRuntimeStubs::install(table);
+    cf_notification_center::CfNotificationCenterStubs::install(table);
     cfnetwork::CfNetworkStubs::install(table);
     common_crypto::CommonCryptoStubs::install(table);
     compression::CompressionStubs::install(table);
@@ -69,6 +75,7 @@ pub fn install_darwin_stubs(table: &mut ShimTable) {
     dispatch_concurrency::DispatchConcurrencyStubs::install(table);
     dispatch_data_source::DispatchDataSourceStubs::install(table);
     dispatch_extras::DispatchExtrasStubs::install(table);
+    dispatch_io::DispatchIoStubs::install(table);
     iokit::IOKitStubs::install(table);
     launch_services::LaunchServicesStubs::install(table);
     launchd_stubs::LaunchdStubs::install(table);
@@ -94,5 +101,8 @@ pub fn install_darwin_stubs(table: &mut ShimTable) {
     swift_reflection::LibswiftRemoteMirrorStubs::install(table);
     swift_foundation_bridge::SwiftFoundationBridgeStubs::install(table);
     swift_type_metadata::SwiftTypeMetadataStubs::install(table);
+    dns_sd::DnsSdStubs::install(table);
+    core_audio::CoreAudioStubs::install(table);
+    fsevents::FsEventsStubs::install(table);
     log::debug!("darwin_stubs: registered all macOS-specific stubs");
 }

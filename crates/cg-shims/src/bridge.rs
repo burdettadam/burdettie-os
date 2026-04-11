@@ -7,7 +7,7 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use graphics_core::{BezierPath, Color, Font, FontManager, ImageBuffer, Rect, Surface, SoftwareRenderer, Renderer, Point};
+use graphics_core::{BezierPath, Color, FontManager, ImageBuffer, Rect, Surface, SoftwareRenderer, Renderer, Point};
 
 /// Intersect two axis-aligned rectangles. Returns a zero-area rect if no overlap.
 fn intersect_rects(a: Rect, b: Rect) -> Rect {
@@ -250,13 +250,20 @@ impl CgContext {
     /// After drawing, advances text_x by the width of the rendered string.
     pub fn draw_text_with_font(&mut self, text: &str, x: f64, y: f64, font_name: &str) {
         let (tx, ty) = self.transform_point(x, y);
-        let fm = font_manager();
-        let face = fm.get(font_name);
-        let font = Font::new(font_name, self.font_size);
-        let mut renderer = SoftwareRenderer::with_fonts(&mut self.surface, fm);
-        renderer.draw_text(text, Point::new(tx, ty), &font, self.fill_color);
-        // Advance text position by the measured width.
-        let advance = face.measure_text(text, self.font_size);
+        let sw = self.surface.width();
+        let sh = self.surface.height();
+        let advance = graphics_core::text_system::draw_shaped_text(
+            self.surface.pixels_mut(),
+            sw,
+            sh,
+            text,
+            tx,
+            ty - self.font_size, // cosmic-text origin is top-left; CG y is baseline
+            self.font_size,
+            font_name,
+            self.fill_color,
+            None, // no word wrap for CG calls
+        );
         self.text_x = x + advance;
         self.text_y = y;
     }
@@ -501,6 +508,14 @@ pub fn image_create(width: u32, height: u32, bits_per_component: u32, bits_per_p
     handle
 }
 
+/// Create a CGImage handle from an already-decoded `ImageBuffer`.
+pub fn image_create_from_buffer(img: ImageBuffer) -> u64 {
+    let handle = next_handle();
+    let mut guard = IMAGES.lock().unwrap_or_else(|e| e.into_inner());
+    guard.get_or_insert_with(HashMap::new).insert(handle, Box::new(img));
+    handle
+}
+
 /// Create a CGImage from a CGBitmapContext — copies current pixel data.
 pub fn image_create_from_context(ctx_handle: u64) -> u64 {
     let guard = CONTEXTS.lock().unwrap_or_else(|e| e.into_inner());
@@ -545,6 +560,28 @@ pub fn image_release(handle: u64) {
     if let Some(m) = guard.as_mut() { m.remove(&handle); }
 }
 
+/// Get the RGBA8 pixel data, width, and height of a CGImage.
+/// Returns `None` if the handle is invalid.
+pub fn image_get_rgba_data(handle: u64) -> Option<(u32, u32, Vec<u8>)> {
+    let guard = IMAGES.lock().unwrap_or_else(|e| e.into_inner());
+    guard.as_ref().and_then(|m| m.get(&handle)).map(|img| {
+        let rgba = img.to_rgba8();
+        (rgba.width(), rgba.height(), rgba.data().to_vec())
+    })
+}
+
+/// Get a raw pointer to the RGBA8 pixel data of a CGImage.
+///
+/// Returns 0 if the handle is invalid.  The pointer is valid only while
+/// the IMAGES map entry is alive (i.e. until `image_release`).
+pub fn image_data_ptr(handle: u64) -> u64 {
+    let mut guard = IMAGES.lock().unwrap_or_else(|e| e.into_inner());
+    match guard.as_mut().and_then(|m| m.get_mut(&handle)) {
+        Some(img) => img.data_mut().as_mut_ptr() as u64,
+        None => 0,
+    }
+}
+
 /// Draw a CGImage into a CGContext at the given dest rect.
 pub fn draw_image_in_context(ctx_handle: u64, image_handle: u64, x: f64, y: f64, w: f64, h: f64) {
     // Read image data under the image lock first.
@@ -555,6 +592,13 @@ pub fn draw_image_in_context(ctx_handle: u64, image_handle: u64, x: f64, y: f64,
     if let Some(img) = img {
         with_context(ctx_handle, |c| c.draw_image(&img, x, y, w, h));
     }
+}
+
+// ── Font enumeration ───────────────────────────────────────────
+
+/// Return all available font family names (embedded + system).
+pub fn font_family_names() -> Vec<String> {
+    graphics_core::text_system::available_font_families()
 }
 
 #[cfg(test)]

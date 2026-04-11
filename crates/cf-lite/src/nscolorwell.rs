@@ -119,6 +119,50 @@ pub extern "C" fn shim_nscolorwell_set_bordered(obj: u64, _cmd: u64, val: u8) {
 /// `-[NSColorWell deactivate]` — no-op stub.
 pub extern "C" fn shim_nscolorwell_deactivate(_obj: u64, _cmd: u64) {}
 
+// ── Drawing ────────────────────────────────────────────────────
+
+/// `-[NSColorWell drawRect:]` — renders the color swatch.
+pub extern "C" fn shim_nscolorwell_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64) {
+    if obj == 0 { return; }
+    let cg_ctx = crate::nsgraphicscontext::current_cg_context_handle();
+    if cg_ctx == 0 { return; }
+
+    let color_ptr = read_u64(obj, COLOR_OFF);
+    let (r, g, b, a) = if color_ptr != 0 {
+        (
+            crate::nscolor::shim_nscolor_red_component(color_ptr, 0),
+            crate::nscolor::shim_nscolor_green_component(color_ptr, 0),
+            crate::nscolor::shim_nscolor_blue_component(color_ptr, 0),
+            crate::nscolor::shim_nscolor_alpha_component(color_ptr, 0),
+        )
+    } else {
+        (0.0, 0.0, 0.0, 1.0) // default black
+    };
+
+    let is_bordered = read_flags(obj) & FLAG_IS_BORDERED != 0;
+
+    cg_shims::bridge::with_context(cg_ctx, |c| {
+        if is_bordered {
+            // Draw gray border then inset the swatch.
+            c.stroke_color = graphics_core::Color::new(0.5, 0.5, 0.5, 1.0);
+            c.stroke_rect(x, y, w, h);
+            c.fill_color = graphics_core::Color::new(r, g, b, a);
+            c.fill_rect(x + 2.0, y + 2.0, w - 4.0, h - 4.0);
+        } else {
+            c.fill_color = graphics_core::Color::new(r, g, b, a);
+            c.fill_rect(x, y, w, h);
+        }
+    });
+}
+
+/// `-[NSColorWell mouseDown:]` — activates the color well.
+pub extern "C" fn shim_nscolorwell_mouse_down(obj: u64, _cmd: u64, _event: u64) {
+    if obj == 0 { return; }
+    if read_flags(obj) & FLAG_IS_ENABLED == 0 { return; }
+    // Activate the well (which would normally open the color panel).
+    shim_nscolorwell_activate(obj, 0, 1);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -148,6 +192,8 @@ mod tests {
         assert_eq!(shim_nscolorwell_is_bordered(0, 0), 0);
         shim_nscolorwell_set_bordered(0, 0, 1);
         shim_nscolorwell_deactivate(0, 0);
+        shim_nscolorwell_draw_rect(0, 0, 0.0, 0.0, 50.0, 50.0);
+        shim_nscolorwell_mouse_down(0, 0, 0);
     }
 
     #[test]

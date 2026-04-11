@@ -189,6 +189,18 @@ pub fn remove_constraint(view: u64, constraint: u64) {
     mark_needs_layout(view);
 }
 
+/// Remove all constraints stored on a view (used by NSStackView to regenerate).
+pub(crate) fn clear_view_constraints(view: u64) {
+    if view == 0 {
+        return;
+    }
+    with_state(|state| {
+        if let Some(entry) = state.view_constraints.get_mut(&view) {
+            entry.constraint_ptrs.clear();
+        }
+    });
+}
+
 /// `-[NSView removeConstraints:]`
 pub fn remove_constraints(view: u64, constraints_array: u64) {
     if view == 0 || constraints_array == 0 {
@@ -259,6 +271,17 @@ pub fn layout_if_needed(view: u64) {
     // Collect the full view subtree.
     let mut views = Vec::new();
     collect_subtree(view, &mut views);
+
+    // For any NSStackView in the subtree, regenerate stack-layout constraints
+    // before the solver runs so they participate in the solve step.
+    let stack_isa = crate::nsobj::nsstackview_class_addr();
+    for &v in &views {
+        let isa = unsafe { *((v as usize) as *const u64) };
+        if isa == stack_isa {
+            clear_view_constraints(v);
+            crate::nsstackview::perform_stack_layout(v);
+        }
+    }
 
     // Collect all active constraints from all views in the subtree.
     let all_constraints: Vec<u64> = with_state(|state| {

@@ -6,8 +6,9 @@
 #
 # Prerequisites (run on macOS first):
 #   ./scripts/extract_xcode_tools.sh
-#   cargo zigbuild --release --target aarch64-unknown-linux-gnu.2.36 -p macho-inspect
+#   cargo zigbuild --release --target aarch64-unknown-linux-gnu.2.36 -p macho-inspect -p burdettie-plutil
 #   cp /tmp/burdettieOS-target/aarch64-unknown-linux-gnu/release/macho-inspect docker/macho-inspect-linux-arm64
+#   cp /tmp/burdettieOS-target/aarch64-unknown-linux-gnu/release/plutil docker/plutil-linux-arm64
 #
 # Build (from repo root):
 #   docker build --platform linux/arm64 -f docker/Dockerfile.burdettie -t burdettie-os .
@@ -71,6 +72,11 @@ COPY --from=libressl-builder /opt/libressl/lib/libcrypto.so /opt/libressl/lib/
 COPY --from=libressl-builder /opt/libressl/lib/libssl.so    /opt/libressl/lib/
 COPY --from=libressl-builder /opt/libressl/lib/libtls.so    /opt/libressl/lib/
 
+# Install LibreSSL config — OPENSSLDIR is compiled as /opt/libressl/etc/ssl.
+# The openssl CLI needs openssl.cnf for operations like `req`, `ca`, `x509`.
+COPY --from=libressl-builder /opt/libressl/etc/ssl/openssl.cnf /opt/libressl/etc/ssl/openssl.cnf
+RUN mkdir -p /opt/libressl/etc/ssl/certs
+
 # System identity
 RUN echo "burdettie-os 1.0" > /etc/burdettie-release
 
@@ -100,6 +106,12 @@ RUN mkdir -p /System/Library/CoreServices && \
 # timing-dependent SIGSEGV in C++ constructors; zigbuild avoids this.
 COPY docker/macho-inspect-linux-arm64 /usr/local/bin/macho-inspect
 RUN chmod +x /usr/local/bin/macho-inspect
+
+# Install burdettie-plutil — native Rust replacement for macOS plutil.
+# The macOS plutil is a Swift binary needing 273+ Foundation stubs;
+# this native implementation handles all plist operations directly.
+COPY docker/plutil-linux-arm64 /usr/local/bin/plutil
+RUN chmod +x /usr/local/bin/plutil
 
 # Stage Mach-O tool binaries extracted from macOS host
 COPY docker/xcode-tools/ /opt/xcode-tools/

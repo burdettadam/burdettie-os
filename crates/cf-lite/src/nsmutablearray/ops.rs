@@ -143,12 +143,80 @@ pub extern "C" fn shim_nsmutablearray_remove_objects_at_indexes(
 /// `-[NSMutableArray sortUsingDescriptors:]` — sort using NSSortDescriptor array.
 /// No-op stub: descriptor-based sorting requires runtime introspection of key paths
 /// and comparator selectors that the shim environment doesn't fully support yet.
-pub extern "C" fn shim_nsmutablearray_sort_using_descriptors(obj: u64, _cmd: u64, _descriptors: u64) {
-    if obj == 0 {
+/// `-[NSMutableArray sortUsingDescriptors:]` — sort using NSSortDescriptor array.
+/// Implements real sorting using the provided descriptors.
+pub extern "C" fn shim_nsmutablearray_sort_using_descriptors(obj: u64, _cmd: u64, descriptors: u64) {
+    if obj == 0 || descriptors == 0 {
         return;
     }
-    // No-op: NSSortDescriptor resolution not yet implemented.
-    log::debug!("NSMutableArray sortUsingDescriptors: stub (no-op)");
+    let count = unsafe { *((obj as usize + NSMUTABLEARRAY_COUNT_OFF) as *const u64) } as usize;
+    let elems = unsafe { *((obj as usize + NSMUTABLEARRAY_ELEMS_OFF) as *const u64) };
+    if count <= 1 || elems == 0 {
+        return;
+    }
+
+    // Read elements into a Vec
+    let mut items: Vec<u64> = Vec::with_capacity(count);
+    for i in 0..count {
+        let elem = unsafe { *((elems as usize + i * 8) as *const u64) };
+        items.push(elem);
+    }
+
+    // Read descriptors into a Vec
+    let desc_count = crate::nsarray::shim_nsarray_count(descriptors, 0);
+    let mut descs = Vec::with_capacity(desc_count as usize);
+    for i in 0..desc_count {
+        let desc = crate::nsarray::shim_nsarray_object_at_index(descriptors, 0, i);
+        if desc != 0 {
+            descs.push(desc);
+        }
+    }
+
+    // Sort using the descriptors
+    items.sort_by(|&a, &b| {
+        for &desc in &descs {
+            // NSSortDescriptor: get key and ascending
+            let key_ptr = crate::nssortdescriptor::shim_nssortdescriptor_key(desc, 0);
+            let ascending = crate::nssortdescriptor::shim_nssortdescriptor_ascending(desc, 0) != 0;
+            let key = if key_ptr == 0 {
+                "self"
+            } else {
+                crate::cfstring::extract_cfstring_cstr(key_ptr).unwrap_or("self")
+            };
+
+            // Get values for key
+            let va = if key == "self" {
+                a
+            } else {
+                crate::nskeyvaluecoding::shim_value_for_key(a, 0, key_ptr)
+            };
+            let vb = if key == "self" {
+                b
+            } else {
+                crate::nskeyvaluecoding::shim_value_for_key(b, 0, key_ptr)
+            };
+
+            // Compare values (NSString only for now)
+            let cmp = crate::cfstring::shim_nsstring_compare(va, 0, vb);
+            let ord = match cmp {
+                x if x < 0 => std::cmp::Ordering::Less,
+                0 => std::cmp::Ordering::Equal,
+                _ => std::cmp::Ordering::Greater,
+            };
+            let ord = if ascending { ord } else { ord.reverse() };
+            if ord != std::cmp::Ordering::Equal {
+                return ord;
+            }
+        }
+        std::cmp::Ordering::Equal
+    });
+
+    // Write sorted elements back
+    for (i, item) in items.iter().enumerate() {
+        unsafe {
+            *((elems as usize + i * 8) as *mut u64) = *item;
+        }
+    }
 }
 
 /// `-[NSMutableArray removeObjectsInRange:]` — removes elements in the given range

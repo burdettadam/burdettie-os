@@ -31,10 +31,16 @@ impl SysInfoStubs {
             ("_gethostname", shim_gethostname as *const () as u64, "gethostname get system hostname"),
             ("_sethostname", shim_sethostname as *const () as u64, "sethostname stub (returns EPERM)"),
             ("_getgroups", shim_getgroups as *const () as u64, "getgroups get supplementary group IDs"),
+            ("_getgrouplist", shim_getgrouplist as *const () as u64, "getgrouplist get groups for user"),
             ("_getgrouplist_2", shim_getgrouplist_2 as *const () as u64, "getgrouplist_2 macOS extended group list"),
             ("_getaudit_addr", shim_getaudit_addr as *const () as u64, "getaudit_addr stub (returns ENOSYS)"),
+            // membership.h UUID functions (opendirectoryd replacement)
+            ("_mbr_uid_to_uuid", shim_mbr_uid_to_uuid as *const () as u64, "mbr_uid_to_uuid → synthetic UUID"),
+            ("_mbr_gid_to_uuid", shim_mbr_gid_to_uuid as *const () as u64, "mbr_gid_to_uuid → synthetic UUID"),
+            ("_mbr_uuid_to_id", shim_mbr_uuid_to_id as *const () as u64, "mbr_uuid_to_id → extract uid/gid"),
+            ("_mbr_check_membership", shim_mbr_check_membership as *const () as u64, "mbr_check_membership → stub"),
         );
-        log::debug!("SysInfoStubs: registered 19 stubs");
+        log::debug!("SysInfoStubs: registered 24 stubs");
     }
 }
 
@@ -261,6 +267,131 @@ pub extern "C" fn shim_getaudit_addr(_info: u64, _length: i32) -> i32 {
 }
 
 // ---------------------------------------------------------------------------
+// getgrouplist (POSIX)
+// ---------------------------------------------------------------------------
+
+/// `int getgrouplist(const char *user, gid_t group, gid_t *groups, int *ngroups)`
+pub extern "C" fn shim_getgrouplist(
+    user: u64,
+    group: u32,
+    groups: u64,
+    ngroups: u64,
+) -> i32 {
+    if user == 0 || ngroups == 0 {
+        return -1;
+    }
+    #[cfg(target_os = "macos")]
+    unsafe {
+        libc::getgrouplist(
+            user as *const c_char,
+            group as libc::c_int,
+            groups as *mut libc::c_int,
+            ngroups as *mut libc::c_int,
+        )
+    }
+    #[cfg(not(target_os = "macos"))]
+    unsafe {
+        libc::getgrouplist(
+            user as *const c_char,
+            group as libc::gid_t,
+            groups as *mut libc::gid_t,
+            ngroups as *mut libc::c_int,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// membership.h UUID functions (opendirectoryd replacement)
+// ---------------------------------------------------------------------------
+
+/// UUID type id markers.
+const MBR_ID_TYPE_UID: i32 = 0;
+const MBR_ID_TYPE_GID: i32 = 1;
+
+/// `int mbr_uid_to_uuid(uid_t uid, uuid_t uu)`
+///
+/// Apple uses a deterministic UUID encoding: FFFFEEEE-DDDD-CCCC-BBBB-uid_bytes.
+/// We use a simpler scheme: bytes[0..4] = 0xAA (type marker UID),
+/// bytes[12..16] = uid in big-endian.
+pub extern "C" fn shim_mbr_uid_to_uuid(uid: u32, uu: u64) -> i32 {
+    if uu == 0 {
+        return -1;
+    }
+    let buf = uu as *mut u8;
+    unsafe {
+        // Zero the 16-byte UUID
+        std::ptr::write_bytes(buf, 0, 16);
+        // Type marker at byte 0
+        *buf = 0xAA;
+        // UID in big-endian at bytes 12..16
+        let uid_be = uid.to_be_bytes();
+        std::ptr::copy_nonoverlapping(uid_be.as_ptr(), buf.add(12), 4);
+    }
+    0
+}
+
+/// `int mbr_gid_to_uuid(gid_t gid, uuid_t uu)`
+pub extern "C" fn shim_mbr_gid_to_uuid(gid: u32, uu: u64) -> i32 {
+    if uu == 0 {
+        return -1;
+    }
+    let buf = uu as *mut u8;
+    unsafe {
+        std::ptr::write_bytes(buf, 0, 16);
+        // Type marker at byte 0 (0xBB for GID)
+        *buf = 0xBB;
+        // GID in big-endian at bytes 12..16
+        let gid_be = gid.to_be_bytes();
+        std::ptr::copy_nonoverlapping(gid_be.as_ptr(), buf.add(12), 4);
+    }
+    0
+}
+
+/// `int mbr_uuid_to_id(const uuid_t uu, uid_t *uid_or_gid, int *id_type)`
+///
+/// Reverses the encoding from `mbr_uid_to_uuid` / `mbr_gid_to_uuid`.
+pub extern "C" fn shim_mbr_uuid_to_id(uu: u64, id_out: u64, id_type_out: u64) -> i32 {
+    if uu == 0 || id_out == 0 || id_type_out == 0 {
+        return -1;
+    }
+    let buf = uu as *const u8;
+    unsafe {
+        let marker = *buf;
+        let mut id_bytes = [0u8; 4];
+        std::ptr::copy_nonoverlapping(buf.add(12), id_bytes.as_mut_ptr(), 4);
+        let id_val = u32::from_be_bytes(id_bytes);
+
+        match marker {
+            0xAA => {
+                *(id_out as *mut u32) = id_val;
+                *(id_type_out as *mut i32) = MBR_ID_TYPE_UID;
+            }
+            0xBB => {
+                *(id_out as *mut u32) = id_val;
+                *(id_type_out as *mut i32) = MBR_ID_TYPE_GID;
+            }
+            _ => return -1,
+        }
+    }
+    0
+}
+
+/// `int mbr_check_membership(const uuid_t user, const uuid_t group, int *ismember)`
+///
+/// Stub: always returns "is member" (ismember=1).
+pub extern "C" fn shim_mbr_check_membership(
+    _user: u64,
+    _group: u64,
+    ismember: u64,
+) -> i32 {
+    if ismember == 0 {
+        return -1;
+    }
+    unsafe { *(ismember as *mut i32) = 1; }
+    0
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -317,5 +448,74 @@ mod tests {
         );
         assert_eq!(rc, 0, "getpwuid_r for uid 0 should return 0");
         assert!(!result.is_null(), "result pointer should be non-null for root");
+    }
+
+    #[test]
+    fn test_mbr_uid_to_uuid_roundtrip() {
+        let uid: u32 = 501;
+        let mut uuid = [0u8; 16];
+        let rc = shim_mbr_uid_to_uuid(uid, uuid.as_mut_ptr() as u64);
+        assert_eq!(rc, 0);
+        assert_eq!(uuid[0], 0xAA); // UID marker
+
+        let mut id_out: u32 = 0;
+        let mut id_type: i32 = -1;
+        let rc = shim_mbr_uuid_to_id(
+            uuid.as_ptr() as u64,
+            &mut id_out as *mut u32 as u64,
+            &mut id_type as *mut i32 as u64,
+        );
+        assert_eq!(rc, 0);
+        assert_eq!(id_out, 501);
+        assert_eq!(id_type, MBR_ID_TYPE_UID);
+    }
+
+    #[test]
+    fn test_mbr_gid_to_uuid_roundtrip() {
+        let gid: u32 = 20;
+        let mut uuid = [0u8; 16];
+        let rc = shim_mbr_gid_to_uuid(gid, uuid.as_mut_ptr() as u64);
+        assert_eq!(rc, 0);
+        assert_eq!(uuid[0], 0xBB); // GID marker
+
+        let mut id_out: u32 = 0;
+        let mut id_type: i32 = -1;
+        let rc = shim_mbr_uuid_to_id(
+            uuid.as_ptr() as u64,
+            &mut id_out as *mut u32 as u64,
+            &mut id_type as *mut i32 as u64,
+        );
+        assert_eq!(rc, 0);
+        assert_eq!(id_out, 20);
+        assert_eq!(id_type, MBR_ID_TYPE_GID);
+    }
+
+    #[test]
+    fn test_mbr_check_membership_always_true() {
+        let user = [0xAAu8; 16];
+        let group = [0xBBu8; 16];
+        let mut ismember: i32 = 0;
+        let rc = shim_mbr_check_membership(
+            user.as_ptr() as u64,
+            group.as_ptr() as u64,
+            &mut ismember as *mut i32 as u64,
+        );
+        assert_eq!(rc, 0);
+        assert_eq!(ismember, 1);
+    }
+
+    #[test]
+    fn test_getgrouplist_root() {
+        let name = b"root\0".as_ptr() as u64;
+        let mut groups = [0u32; 64];
+        let mut ngroups: i32 = 64;
+        let rc = shim_getgrouplist(
+            name,
+            0,
+            groups.as_mut_ptr() as u64,
+            &mut ngroups as *mut i32 as u64,
+        );
+        // rc >= 0 means success (returns number of groups or 0)
+        assert!(rc >= 0 || ngroups > 0, "getgrouplist for root should succeed or indicate needed size");
     }
 }

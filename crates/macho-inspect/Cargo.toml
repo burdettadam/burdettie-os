@@ -35,6 +35,8 @@ env_logger     = { workspace = true }
 log            = { workspace = true }
 winit          = { version = "0.30", optional = true }
 softbuffer     = { version = "0.4", optional = true }
+accesskit      = { workspace = true, optional = true }
+accesskit_winit = { workspace = true, optional = true }
 
 [features]
 default = []

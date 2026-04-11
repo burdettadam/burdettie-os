@@ -13,6 +13,7 @@ mod phase_c11_appkit;
 mod phase_c12_appkit;
 mod phase_c13_coreanimation;
 mod phase_c14_drawing;
+mod phase_c15_textkit;
 
 pub use phase_c5::*;
 pub use phase_c7::*;
@@ -23,3 +24,4 @@ pub use phase_c11_appkit::*;
 pub use phase_c12_appkit::*;
 pub use phase_c13_coreanimation::*;
 pub use phase_c14_drawing::*;
+pub use phase_c15_textkit::*;

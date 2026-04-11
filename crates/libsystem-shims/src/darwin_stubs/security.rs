@@ -36,10 +36,10 @@ impl SecurityStubs {
 
         // ── Keychain / SecItem ──────────────────────────────────
         register_shims!(table,
-            ("_SecItemAdd", shim_sec_item_add as *const () as u64, "SecItemAdd (stub → errSecUnimplemented)"),
-            ("_SecItemCopyMatching", shim_sec_item_copy_matching as *const () as u64, "SecItemCopyMatching (stub → errSecItemNotFound)"),
-            ("_SecItemUpdate", shim_sec_item_update as *const () as u64, "SecItemUpdate (stub → errSecUnimplemented)"),
-            ("_SecItemDelete", shim_sec_item_delete as *const () as u64, "SecItemDelete (stub → errSecUnimplemented)")
+            ("_SecItemAdd", shim_sec_item_add as *const () as u64, "SecItemAdd (real → SQLite)"),
+            ("_SecItemCopyMatching", shim_sec_item_copy_matching as *const () as u64, "SecItemCopyMatching (real → SQLite)"),
+            ("_SecItemUpdate", shim_sec_item_update as *const () as u64, "SecItemUpdate (real → SQLite)"),
+            ("_SecItemDelete", shim_sec_item_delete as *const () as u64, "SecItemDelete (real → SQLite)")
         );
 
         // ── SecCertificate ──────────────────────────────────────

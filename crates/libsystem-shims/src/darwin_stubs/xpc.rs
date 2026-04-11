@@ -116,7 +116,37 @@ impl XpcStubs {
         register_shims!(table,
             ("_xpc_endpoint_create", shim_xpc_endpoint_create as *const () as u64, "xpc_endpoint_create → real endpoint object"),
             ("_xpc_pipe_create", shim_xpc_pipe_create as *const () as u64, "xpc_pipe_create → named pipe with handler registry"),
-            ("_xpc_pipe_routine", shim_xpc_pipe_routine as *const () as u64, "xpc_pipe_routine → routes to handler or EPIPE")
+            ("_xpc_pipe_routine", shim_xpc_pipe_routine as *const () as u64, "xpc_pipe_routine → routes to handler or EPIPE"),
+            ("_xpc_pipe_routine_with_flags", shim_xpc_pipe_routine_with_flags as *const () as u64, "xpc_pipe_routine_with_flags → routes to handler or EPIPE")
+        );
+
+        // ── Missing XPC shims (gap closure) ─────────────────────
+        register_shims!(table,
+            ("_xpc_connection_create_from_endpoint", shim_xpc_connection_create_from_endpoint as *const () as u64, "xpc_connection_create_from_endpoint → tracked connection"),
+            ("_xpc_connection_get_name", shim_xpc_connection_get_name as *const () as u64, "xpc_connection_get_name → service name C string"),
+            ("_xpc_connection_get_euid", shim_xpc_connection_get_euid as *const () as u64, "xpc_connection_get_euid → current euid"),
+            ("_xpc_connection_get_egid", shim_xpc_connection_get_egid as *const () as u64, "xpc_connection_get_egid → current egid"),
+            ("_xpc_connection_get_asid", shim_xpc_connection_get_asid as *const () as u64, "xpc_connection_get_asid → 0"),
+            ("_xpc_connection_set_context", shim_xpc_connection_set_context as *const () as u64, "xpc_connection_set_context → stores opaque pointer"),
+            ("_xpc_connection_get_context", shim_xpc_connection_get_context as *const () as u64, "xpc_connection_get_context → retrieves opaque pointer"),
+            ("_xpc_connection_set_finalizer_f", shim_xpc_void2 as *const () as u64, "xpc_connection_set_finalizer_f → stub"),
+            ("_xpc_dictionary_create_reply", shim_xpc_dictionary_create_reply as *const () as u64, "xpc_dictionary_create_reply → empty reply dict"),
+            ("_xpc_dictionary_get_data_with_size", shim_xpc_dictionary_get_data_with_size as *const () as u64, "xpc_dictionary_get_data_with_size → data ptr + size"),
+            ("_xpc_dictionary_set_connection", shim_xpc_void3 as *const () as u64, "xpc_dictionary_set_connection → stub"),
+            ("_xpc_dictionary_dup_fd", shim_xpc_dictionary_dup_fd as *const () as u64, "xpc_dictionary_dup_fd → dup'd fd or -1"),
+            ("_xpc_dictionary_get_fd", shim_xpc_dictionary_get_fd as *const () as u64, "xpc_dictionary_get_fd → raw fd or -1"),
+            ("_xpc_dictionary_set_uuid", shim_xpc_dictionary_set_uuid as *const () as u64, "xpc_dictionary_set_uuid → stores uuid"),
+            ("_xpc_dictionary_get_uuid", shim_xpc_dictionary_get_uuid as *const () as u64, "xpc_dictionary_get_uuid → uuid bytes ptr"),
+            ("_xpc_dictionary_set_double", shim_xpc_dictionary_set_double as *const () as u64, "xpc_dictionary_set_double → stores double"),
+            ("_xpc_dictionary_get_double", shim_xpc_dictionary_get_double as *const () as u64, "xpc_dictionary_get_double → retrieves double"),
+            ("_xpc_dictionary_set_date", shim_xpc_dictionary_set_date as *const () as u64, "xpc_dictionary_set_date → stores date"),
+            ("_xpc_dictionary_get_date", shim_xpc_dictionary_get_date as *const () as u64, "xpc_dictionary_get_date → retrieves date"),
+            ("_xpc_array_set_value", shim_xpc_void3 as *const () as u64, "xpc_array_set_value → stub"),
+            ("_xpc_array_create_empty", shim_xpc_array_create_empty as *const () as u64, "xpc_array_create_empty → empty array"),
+            ("_xpc_shmem_create", shim_xpc_shmem_create as *const () as u64, "xpc_shmem_create → real shared memory region"),
+            ("_xpc_shmem_map", shim_xpc_shmem_map as *const () as u64, "xpc_shmem_map → maps shared memory region"),
+            ("_xpc_type_get_name", shim_xpc_type_get_name as *const () as u64, "xpc_type_get_name → type name string"),
+            ("_xpc_data_get_bytes", shim_xpc_data_get_bytes as *const () as u64, "xpc_data_get_bytes → copies bytes to buffer")
         );
 
         // Install default pipe handlers for well-known services
@@ -438,6 +468,248 @@ pub extern "C" fn shim_xpc_pipe_routine(
     pipe_handle: u64, msg: u64, reply_out: u64,
 ) -> i32 {
     pipe::routine(pipe_handle, msg, reply_out)
+}
+
+pub extern "C" fn shim_xpc_pipe_routine_with_flags(
+    pipe_handle: u64, msg: u64, reply_out: u64, _flags: u64,
+) -> i32 {
+    pipe::routine(pipe_handle, msg, reply_out)
+}
+
+// ── Missing XPC shims (gap closure) ─────────────────────────────
+
+pub extern "C" fn shim_xpc_void2(_a: u64, _b: u64) {}
+pub extern "C" fn shim_xpc_void3(_a: u64, _b: u64, _c: u64) {}
+
+pub extern "C" fn shim_xpc_connection_create_from_endpoint(endpoint: u64, queue: u64) -> u64 {
+    // Just create a fresh connection — the endpoint carries a connection id
+    // but in our loopback model connections are independent.
+    transport::create_connection(0, queue, 0)
+}
+
+pub extern "C" fn shim_xpc_connection_get_name(conn: u64) -> u64 {
+    transport::get_service_name_ptr(conn)
+}
+
+pub extern "C" fn shim_xpc_connection_get_euid(_conn: u64) -> u64 {
+    unsafe { libc::geteuid() as u64 }
+}
+
+pub extern "C" fn shim_xpc_connection_get_egid(_conn: u64) -> u64 {
+    unsafe { libc::getegid() as u64 }
+}
+
+pub extern "C" fn shim_xpc_connection_get_asid(_conn: u64) -> u64 {
+    0 // audit session ID — not meaningful in emulation
+}
+
+pub extern "C" fn shim_xpc_connection_set_context(conn: u64, ctx: u64) {
+    transport::set_context(conn, ctx);
+}
+
+pub extern "C" fn shim_xpc_connection_get_context(conn: u64) -> u64 {
+    transport::get_context(conn)
+}
+
+/// `xpc_dictionary_t xpc_dictionary_create_reply(xpc_object_t original)`
+///
+/// Creates a reply dictionary for an incoming request. We just return a
+/// fresh empty dictionary since our transport doesn't track message IDs.
+pub extern "C" fn shim_xpc_dictionary_create_reply(_original: u64) -> u64 {
+    obj::create_dictionary_empty()
+}
+
+/// `const void *xpc_dictionary_get_data_with_size(dict, key, length_out)`
+pub extern "C" fn shim_xpc_dictionary_get_data_with_size(dict: u64, key: u64, length_out: u64) -> u64 {
+    if key == 0 { return 0; }
+    let k = unsafe { std::ffi::CStr::from_ptr(key as *const std::ffi::c_char) };
+    let handle = obj::dict_get(dict, k);
+    if handle == 0 { return 0; }
+
+    obj::with_table(|t| {
+        if let Some(obj::XpcValue::Data(bytes)) = t.get(&handle) {
+            if length_out != 0 {
+                unsafe { *(length_out as *mut u64) = bytes.len() as u64 };
+            }
+            bytes.as_ptr() as u64
+        } else {
+            0
+        }
+    })
+}
+
+pub extern "C" fn shim_xpc_dictionary_dup_fd(dict: u64, key: u64) -> i32 {
+    if key == 0 { return -1; }
+    let k = unsafe { std::ffi::CStr::from_ptr(key as *const std::ffi::c_char) };
+    let handle = obj::dict_get(dict, k);
+    if handle == 0 { return -1; }
+
+    obj::with_table(|t| {
+        if let Some(obj::XpcValue::Fd(fd)) = t.get(&handle) {
+            let duped = unsafe { libc::dup(*fd) };
+            if duped < 0 { -1 } else { duped }
+        } else {
+            -1
+        }
+    })
+}
+
+pub extern "C" fn shim_xpc_dictionary_get_fd(dict: u64, key: u64) -> i32 {
+    if key == 0 { return -1; }
+    let k = unsafe { std::ffi::CStr::from_ptr(key as *const std::ffi::c_char) };
+    let handle = obj::dict_get(dict, k);
+    if handle == 0 { return -1; }
+
+    obj::with_table(|t| {
+        if let Some(obj::XpcValue::Fd(fd)) = t.get(&handle) {
+            *fd
+        } else {
+            -1
+        }
+    })
+}
+
+pub extern "C" fn shim_xpc_dictionary_set_uuid(dict: u64, key: u64, uuid_ptr: u64) {
+    if key == 0 { return; }
+    let k = unsafe { std::ffi::CStr::from_ptr(key as *const std::ffi::c_char) };
+    let h = obj::create_uuid_from_ptr(uuid_ptr);
+    obj::dict_set(dict, k, h);
+}
+
+pub extern "C" fn shim_xpc_dictionary_get_uuid(dict: u64, key: u64) -> u64 {
+    if key == 0 { return 0; }
+    let k = unsafe { std::ffi::CStr::from_ptr(key as *const std::ffi::c_char) };
+    let handle = obj::dict_get(dict, k);
+    if handle == 0 { return 0; }
+
+    obj::with_table(|t| {
+        if let Some(obj::XpcValue::Uuid(bytes)) = t.get(&handle) {
+            bytes.as_ptr() as u64
+        } else {
+            0
+        }
+    })
+}
+
+pub extern "C" fn shim_xpc_dictionary_set_double(dict: u64, key: u64, val: f64) {
+    if key == 0 { return; }
+    let k = unsafe { std::ffi::CStr::from_ptr(key as *const std::ffi::c_char) };
+    let h = obj::create_double(val);
+    obj::dict_set(dict, k, h);
+}
+
+pub extern "C" fn shim_xpc_dictionary_get_double(dict: u64, key: u64) -> f64 {
+    if key == 0 { return 0.0; }
+    let k = unsafe { std::ffi::CStr::from_ptr(key as *const std::ffi::c_char) };
+    let handle = obj::dict_get(dict, k);
+    if handle == 0 { return 0.0; }
+
+    obj::with_table(|t| {
+        match t.get(&handle) {
+            Some(obj::XpcValue::Double(v)) => *v,
+            _ => 0.0,
+        }
+    })
+}
+
+pub extern "C" fn shim_xpc_dictionary_set_date(dict: u64, key: u64, val: i64) {
+    if key == 0 { return; }
+    let k = unsafe { std::ffi::CStr::from_ptr(key as *const std::ffi::c_char) };
+    let h = obj::create_date(val);
+    obj::dict_set(dict, k, h);
+}
+
+pub extern "C" fn shim_xpc_dictionary_get_date(dict: u64, key: u64) -> i64 {
+    if key == 0 { return 0; }
+    let k = unsafe { std::ffi::CStr::from_ptr(key as *const std::ffi::c_char) };
+    let handle = obj::dict_get(dict, k);
+    if handle == 0 { return 0; }
+    obj::get_date_value(handle)
+}
+
+pub extern "C" fn shim_xpc_array_create_empty() -> u64 {
+    obj::create_array_empty()
+}
+
+/// `xpc_object_t xpc_shmem_create(void *region, size_t length)`
+///
+/// Creates a shared memory object. In our emulation, this wraps an
+/// mmap'd anonymous region. The region pointer is stored as Data bytes.
+pub extern "C" fn shim_xpc_shmem_create(region: u64, length: u64) -> u64 {
+    if region == 0 || length == 0 {
+        return obj::create_null();
+    }
+    // Store the region address and length in a dictionary for later retrieval
+    let shmem = obj::create_dictionary_empty();
+    obj::dict_set_uint64(shmem, b"_shmem_addr\0".as_ptr() as u64, region);
+    obj::dict_set_uint64(shmem, b"_shmem_size\0".as_ptr() as u64, length);
+    shmem
+}
+
+/// `size_t xpc_shmem_map(xpc_object_t shmem, void **region)`
+///
+/// Maps the shared memory region and writes the address to *region.
+/// Returns the size. In our emulation we just pass through the original pointer.
+pub extern "C" fn shim_xpc_shmem_map(shmem: u64, region_out: u64) -> u64 {
+    let addr = obj::dict_get_uint64(shmem, b"_shmem_addr\0".as_ptr() as u64);
+    let size = obj::dict_get_uint64(shmem, b"_shmem_size\0".as_ptr() as u64);
+
+    if region_out != 0 && addr != 0 {
+        unsafe { *(region_out as *mut u64) = addr };
+    }
+    size
+}
+
+/// `const char *xpc_type_get_name(xpc_type_t type)`
+pub extern "C" fn shim_xpc_type_get_name(type_tag: u64) -> u64 {
+    let name: &[u8] = match type_tag {
+        obj::XPC_TYPE_TAG_DICTIONARY => b"dictionary\0",
+        obj::XPC_TYPE_TAG_ARRAY => b"array\0",
+        obj::XPC_TYPE_TAG_STRING => b"string\0",
+        obj::XPC_TYPE_TAG_INT64 => b"int64\0",
+        obj::XPC_TYPE_TAG_UINT64 => b"uint64\0",
+        obj::XPC_TYPE_TAG_BOOL => b"bool\0",
+        obj::XPC_TYPE_TAG_DATA => b"data\0",
+        obj::XPC_TYPE_TAG_DATE => b"date\0",
+        obj::XPC_TYPE_TAG_UUID => b"uuid\0",
+        obj::XPC_TYPE_TAG_FD => b"fd\0",
+        obj::XPC_TYPE_TAG_NULL => b"null\0",
+        obj::XPC_TYPE_TAG_ERROR => b"error\0",
+        obj::XPC_TYPE_TAG_CONNECTION => b"connection\0",
+        obj::XPC_TYPE_TAG_ENDPOINT => b"endpoint\0",
+        _ => b"unknown\0",
+    };
+    name.as_ptr() as u64
+}
+
+/// `size_t xpc_data_get_bytes(xpc_object_t data_obj, void *buffer,
+///     size_t offset, size_t length)`
+///
+/// Copies up to `length` bytes from `offset` into `buffer`. Returns bytes copied.
+pub extern "C" fn shim_xpc_data_get_bytes(data_obj: u64, buffer: u64, offset: u64, length: u64) -> u64 {
+    if buffer == 0 {
+        return 0;
+    }
+
+    obj::with_table(|t| {
+        if let Some(obj::XpcValue::Data(bytes)) = t.get(&data_obj) {
+            let off = offset as usize;
+            let len = length as usize;
+            if off >= bytes.len() { return 0; }
+            let end = (off + len).min(bytes.len());
+            let count = end - off;
+            unsafe {
+                std::ptr::copy_nonoverlapping(
+                    bytes[off..end].as_ptr(),
+                    buffer as *mut u8,
+                    count,
+                );
+            }
+            count as u64
+        } else {
+            0
+        }
+    })
 }
 
 // ── Tests ───────────────────────────────────────────────────────

@@ -19,6 +19,7 @@ ring          = { workspace = true }
 x509-parser   = { workspace = true }
 hickory-resolver = { workspace = true }
 lzma-rs       = { workspace = true }
+lzfse_rust    = { workspace = true }
 launchd       = { workspace = true }
 libxo         = { workspace = true }
 burdettie-domain-map = { workspace = true }

@@ -207,6 +207,88 @@ pub extern "C" fn shim_nscombobox_uses_data_source(_obj: u64, _cmd: u64) -> u8 {
 /// `-[NSComboBox setUsesDataSource:]` — no-op stub.
 pub extern "C" fn shim_nscombobox_set_uses_data_source(_obj: u64, _cmd: u64, _val: u8) {}
 
+// ── Drawing ────────────────────────────────────────────────────
+
+/// `-[NSComboBox drawRect:]` — renders the combo box: text field + dropdown arrow.
+pub extern "C" fn shim_nscombobox_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64) {
+    if obj == 0 { return; }
+    let cg_ctx = crate::nsgraphicscontext::current_cg_context_handle();
+    if cg_ctx == 0 { return; }
+
+    let arrow_w = 20.0;
+
+    cg_shims::bridge::with_context(cg_ctx, |c| {
+        // White background
+        c.fill_color = graphics_core::Color::WHITE;
+        c.fill_rect(x, y, w, h);
+        // Border
+        c.stroke_color = graphics_core::Color::new(0.7, 0.7, 0.7, 1.0);
+        c.stroke_rect(x, y, w, h);
+        // Arrow region separator + indicator
+        c.stroke_rect(x + w - arrow_w, y, arrow_w, h);
+
+        let font_size = c.font_size.max(12.0);
+        let sw = c.surface.width();
+        let sh = c.surface.height();
+        // Draw "▾" in arrow region
+        let _ = graphics_core::text_system::draw_shaped_text(
+            c.surface.pixels_mut(), sw, sh,
+            "▾", x + w - arrow_w + 4.0, y + (h - font_size * 1.2) / 2.0,
+            font_size, "System", graphics_core::Color::BLACK, None,
+        );
+
+        // Draw selected item text (or placeholder)
+        let idx = selected_index(obj);
+        let text_ptr = if idx >= 0 {
+            get_items(obj).and_then(|items| items.get(idx as usize).copied()).unwrap_or(0)
+        } else {
+            0
+        };
+        if text_ptr != 0 {
+            let utf8 = crate::cfstring::shim_nsstring_utf8string(text_ptr, 0);
+            if !utf8.is_null() {
+                let text = unsafe { std::ffi::CStr::from_ptr(utf8) }
+                    .to_str().unwrap_or("");
+                if !text.is_empty() {
+                    let _ = graphics_core::text_system::draw_shaped_text(
+                        c.surface.pixels_mut(), sw, sh,
+                        text, x + 4.0, y + (h - font_size * 1.2) / 2.0,
+                        font_size, "System", graphics_core::Color::BLACK, None,
+                    );
+                }
+            }
+        }
+    });
+}
+
+/// `-[NSComboBox mouseDown:]` — cycle through items on arrow click.
+pub extern "C" fn shim_nscombobox_mouse_down(obj: u64, _cmd: u64, event: u64) {
+    if obj == 0 || event == 0 { return; }
+
+    let (loc_x, _loc_y) = crate::nsevent::event_location_in_window(event);
+    let frame = crate::nsview::view_frame(obj);
+    let local_x = loc_x - frame.origin.x;
+    let arrow_w = 20.0;
+
+    if local_x >= frame.size.width - arrow_w {
+        // Click in arrow region — cycle to next item
+        let count = shim_nscombobox_number_of_items(obj, 0);
+        if count > 0 {
+            let cur = selected_index(obj);
+            let next = if cur < 0 || cur >= count - 1 { 0 } else { cur + 1 };
+            shim_nscombobox_select_item_at_index(obj, 0, next);
+        }
+        crate::nsview::shim_nsview_set_needs_display(obj, 0, 1);
+    } else {
+        // Click in text region — focus the control
+        let window = unsafe { *((obj as usize + 16) as *const u64) }; // WINDOW_OFF
+        if window != 0 {
+            crate::nswindow::shim_nswindow_make_first_responder(window, 0, obj);
+        }
+        crate::nsview::shim_nsview_set_needs_display(obj, 0, 1);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -235,6 +317,8 @@ mod tests {
         shim_nscombobox_set_autocompletes(0, 0, 1);
         assert_eq!(shim_nscombobox_uses_data_source(0, 0), 0);
         shim_nscombobox_set_uses_data_source(0, 0, 1);
+        shim_nscombobox_draw_rect(0, 0, 0.0, 0.0, 100.0, 30.0);
+        shim_nscombobox_mouse_down(0, 0, 0);
     }
 
     #[test]

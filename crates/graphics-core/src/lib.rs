@@ -9,6 +9,7 @@ mod color;
 mod font;
 mod font_manager;
 mod text_layout;
+pub mod text_system;
 mod surface;
 mod renderer;
 mod software;

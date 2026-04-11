@@ -12,7 +12,7 @@ libsystem-shims      = { workspace = true }
 objc-runtime         = { workspace = true }
 platform-core        = { workspace = true }
 cg-shims             = { workspace = true }
-graphics-core        = { workspace = true }
+graphics-core        = { workspace = true, features = ["imaging"] }
 burdettie-domain-map = { workspace = true }
 log                  = { workspace = true }
 libc                 = { workspace = true }
@@ -23,6 +23,8 @@ plist                = { workspace = true }
 quick-xml            = { workspace = true }
 rusqlite             = { workspace = true }
 cassowary            = { workspace = true }
+tiny-skia            = { workspace = true }
+accesskit            = { workspace = true }
 arboard = { version = "3.6.1", optional = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]

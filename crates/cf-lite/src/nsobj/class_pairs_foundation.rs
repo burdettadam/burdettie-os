@@ -165,6 +165,13 @@ define_class_pair!(child NSNOTIFICATIONCENTER_CLASS_DATA, NSNOTIFICATIONCENTER_M
     parent_class: nsobject_class_addr,
     parent_meta: nsobject_metaclass_addr);
 
+define_class_pair!(child NSDISTRIBUTEDNOTIFICATIONCENTER_CLASS_DATA, NSDISTRIBUTEDNOTIFICATIONCENTER_METACLASS_DATA, NSDISTRIBUTEDNOTIFICATIONCENTER_INIT,
+    ensure: ensure_nsdistributednotificationcenter_init,
+    class_addr: nsdistributednotificationcenter_class_addr,
+    meta_addr: nsdistributednotificationcenter_metaclass_addr,
+    parent_class: nsnotificationcenter_class_addr,
+    parent_meta: nsnotificationcenter_metaclass_addr);
+
 define_class_pair!(child NSNOTIFICATION_CLASS_DATA, NSNOTIFICATION_METACLASS_DATA, NSNOTIFICATION_INIT,
     ensure: ensure_nsnotification_init,
     class_addr: nsnotification_class_addr,

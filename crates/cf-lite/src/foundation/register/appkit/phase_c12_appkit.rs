@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use objc_runtime::ClassInfo;
 use super::me;
 use crate::{
-    nsanimationcontext, nsobj, nstableview, nstraitcollection, nsundomanager, nsview,
+    nsanimationcontext, nsobj, nsoutlineview, nstableview, nstraitcollection, nsundomanager, nsview,
 };
 
 // ── NSTraitCollection ──────────────────────────────────────────
@@ -98,6 +98,11 @@ pub fn register_nstableview_class(rt: &mut objc_runtime::ObjcRuntime) {
             me("selectedRow", nstableview::shim_nstableview_selected_row as *const () as u64, "q@:"),
             me("selectRowIndexes:byExtendingSelection:", nstableview::shim_nstableview_select_row_indexes as *const () as u64, "v@:@B"),
             me("deselectAll:", nstableview::shim_nstableview_deselect_all as *const () as u64, "v@:@"),
+            me("rowHeight", nstableview::shim_nstableview_row_height as *const () as u64, "d@:"),
+            me("setRowHeight:", nstableview::shim_nstableview_set_row_height as *const () as u64, "v@:d"),
+            me("headerView", nstableview::shim_nstableview_header_view as *const () as u64, "@@:"),
+            me("drawRect:", nstableview::shim_nstableview_draw_rect as *const () as u64, "v@:{CGRect=dddd}"),
+            me("mouseDown:", nstableview::shim_nstableview_mouse_down as *const () as u64, "v@:@"),
         ],
         class_methods: vec![],
         ivars: vec![], properties: vec![], protocol_names: Vec::new(),
@@ -108,6 +113,39 @@ pub fn register_nstableview_class(rt: &mut objc_runtime::ObjcRuntime) {
     };
     rt.register_synthetic_class(info);
     rt.register_metaclass_addr(metaclass_addr, "NSTableView");
+}
+
+// ── NSOutlineView ──────────────────────────────────────────────
+
+pub fn register_nsoutlineview_class(rt: &mut objc_runtime::ObjcRuntime) {
+    let class_addr = nsobj::nsoutlineview_class_addr();
+    let metaclass_addr = nsobj::nsoutlineview_metaclass_addr();
+    let info = ClassInfo {
+        name: "NSOutlineView".to_string(),
+        mapped_addr: class_addr,
+        methods: vec![
+            me("reloadData", nsoutlineview::shim_nsoutlineview_reload_data as *const () as u64, "v@:"),
+            me("isItemExpanded:", nsoutlineview::shim_nsoutlineview_is_item_expanded as *const () as u64, "B@:@"),
+            me("expandItem:", nsoutlineview::shim_nsoutlineview_expand_item as *const () as u64, "v@:@"),
+            me("collapseItem:", nsoutlineview::shim_nsoutlineview_collapse_item as *const () as u64, "v@:@"),
+            me("itemAtRow:", nsoutlineview::shim_nsoutlineview_item_at_row as *const () as u64, "@@:q"),
+            me("rowForItem:", nsoutlineview::shim_nsoutlineview_row_for_item as *const () as u64, "q@:@"),
+            me("numberOfRows", nsoutlineview::shim_nsoutlineview_number_of_rows as *const () as u64, "Q@:"),
+            me("levelForItem:", nsoutlineview::shim_nsoutlineview_level_for_item as *const () as u64, "q@:@"),
+            me("levelForRow:", nsoutlineview::shim_nsoutlineview_level_for_row as *const () as u64, "q@:q"),
+            me("indentationPerLevel", nsoutlineview::shim_nsoutlineview_indentation_per_level as *const () as u64, "d@:"),
+            me("drawRect:", nsoutlineview::shim_nsoutlineview_draw_rect as *const () as u64, "v@:{CGRect=dddd}"),
+            me("mouseDown:", nsoutlineview::shim_nsoutlineview_mouse_down as *const () as u64, "v@:@"),
+        ],
+        class_methods: vec![],
+        ivars: vec![], properties: vec![], protocol_names: Vec::new(),
+        instance_size: nsoutlineview::OUTLINE_VIEW_SIZE as u32,
+        is_root: false, is_meta: false,
+        superclass_addr: Some(nsobj::nstableview_class_addr()),
+        method_index: HashMap::new(), class_method_index: HashMap::new(),
+    };
+    rt.register_synthetic_class(info);
+    rt.register_metaclass_addr(metaclass_addr, "NSOutlineView");
 }
 
 // ── NSUndoManager ──────────────────────────────────────────────

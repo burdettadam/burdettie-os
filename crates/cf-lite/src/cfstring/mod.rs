@@ -169,6 +169,12 @@ pub fn alloc_nsstring_from_cstr(c_str: *const c_char) -> u64 {
     shim_cf_string_create_with_cstring(0, c_str, 0)
 }
 
+/// Convenience: allocate an NSString from a Rust `&str`.
+pub fn make_cfstring(s: &str) -> u64 {
+    let c_str = std::ffi::CString::new(s).unwrap_or_default();
+    alloc_nsstring_from_cstr(c_str.as_ptr())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

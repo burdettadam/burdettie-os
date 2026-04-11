@@ -99,6 +99,10 @@ pub trait GuiBridge: Send + Sync {
     /// Set the OS cursor to match the NSCursor type tag.
     /// The `cursor_type` values are defined in `nscursor.rs` (0=Arrow, 1=IBeam, etc.).
     fn set_cursor(&self, cursor_type: u64) { let _ = cursor_type; }
+
+    /// Push an accessibility tree update for a guest window's content view.
+    /// Called after view hierarchy changes or on redraw.
+    fn update_accessibility(&self, _guest_window: u64, _content_view: u64) {}
 }
 
 static GUI_BRIDGE: OnceLock<Box<dyn GuiBridge>> = OnceLock::new();
@@ -167,6 +171,11 @@ pub fn dispatch_gui_event(guest_window: u64, event: &GuiEvent) {
         GuiEvent::RedrawRequested => {
             // Trigger display cycle on the guest window's content view.
             crate::nswindow::display_window_content(guest_window);
+            // Push accessibility tree update.
+            if let Some(bridge) = gui_bridge() {
+                let content_view = crate::nswindow::window_content_view(guest_window);
+                bridge.update_accessibility(guest_window, content_view);
+            }
             return;
         }
     };

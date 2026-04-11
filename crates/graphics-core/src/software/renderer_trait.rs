@@ -8,7 +8,7 @@ use crate::font_manager::FontManager;
 use crate::geometry::{Point, Rect, Size};
 use crate::gradient::Gradient;
 use crate::image_buf::ImageBuffer;
-use crate::path::BezierPath;
+use crate::path::{BezierPath, PathElement};
 use crate::renderer::{LineCap, LineJoin, Renderer};
 use crate::shadow::Shadow;
 use crate::text_layout::AttributedLayout;
@@ -337,96 +337,222 @@ impl Renderer for SoftwareRenderer<'_> {
     }
 
     fn fill_path(&mut self, path: &BezierPath, color: Color) {
-        let subpaths = path.flatten(0.5);
-        if subpaths.is_empty() {
+        let elements = path.elements();
+        if elements.is_empty() {
             return;
         }
-        let c = color.to_argb32();
-        let sw = self.surface.width() as i32;
-        let sh = self.surface.height() as i32;
 
-        // Clip bounds
-        let (clip_x0, clip_y0, clip_x1, clip_y1) = if let Some(clip) = self.effective_clip() {
-            (clip.x as i32, clip.y as i32, (clip.x + clip.width) as i32, (clip.y + clip.height) as i32)
-        } else if !self.clip_stack.is_empty() {
-            return; // degenerate clip
-        } else {
-            (0, 0, sw, sh)
-        };
+        let sw = self.surface.width();
+        let sh = self.surface.height();
+        if sw == 0 || sh == 0 {
+            return;
+        }
 
-        // Compute bounding box
-        let mut min_y = f64::MAX;
-        let mut max_y = f64::MIN;
-        for sp in &subpaths {
-            for p in sp {
-                if p.y < min_y { min_y = p.y; }
-                if p.y > max_y { max_y = p.y; }
+        // Build a tiny-skia path from our BezierPath elements.
+        let mut pb = tiny_skia::PathBuilder::new();
+        for el in elements {
+            match *el {
+                PathElement::MoveTo(p) => pb.move_to(p.x as f32, p.y as f32),
+                PathElement::LineTo(p) => pb.line_to(p.x as f32, p.y as f32),
+                PathElement::QuadTo { ctrl, end } => {
+                    pb.quad_to(ctrl.x as f32, ctrl.y as f32, end.x as f32, end.y as f32);
+                }
+                PathElement::CubicTo { ctrl1, ctrl2, end } => {
+                    pb.cubic_to(
+                        ctrl1.x as f32, ctrl1.y as f32,
+                        ctrl2.x as f32, ctrl2.y as f32,
+                        end.x as f32, end.y as f32,
+                    );
+                }
+                PathElement::Close => pb.close(),
             }
         }
-        let y0 = (min_y as i32).max(0).max(clip_y0);
-        let y1 = ((max_y as i32) + 1).min(sh).min(clip_y1);
+        let Some(ts_path) = pb.finish() else { return };
 
-        // Scanline fill with even-odd rule
-        let mut crossings: Vec<f64> = Vec::new();
+        let mut paint = tiny_skia::Paint::default();
+        paint.set_color_rgba8(
+            (color.r.clamp(0.0, 1.0) * 255.0) as u8,
+            (color.g.clamp(0.0, 1.0) * 255.0) as u8,
+            (color.b.clamp(0.0, 1.0) * 255.0) as u8,
+            (color.a.clamp(0.0, 1.0) * 255.0) as u8,
+        );
+        paint.anti_alias = true;
+
+        // Build clip rect if active.
+        let clip_mask = self.effective_clip().and_then(|c| {
+            tiny_skia::Rect::from_xywh(c.x as f32, c.y as f32, c.width as f32, c.height as f32)
+        });
+        if clip_mask.is_none() && !self.clip_stack.is_empty() {
+            return; // degenerate clip
+        }
+
+        // Render into a temporary pixmap, then composite onto our ARGB32 surface.
+        let Some(mut pixmap) = tiny_skia::Pixmap::new(sw, sh) else { return };
+
+        // Build clip mask pixmap if needed.
+        let mask = clip_mask.and_then(|cr| {
+            let mut m = tiny_skia::Mask::new(sw, sh)?;
+            let mut mp = tiny_skia::Paint::default();
+            mp.set_color_rgba8(255, 255, 255, 255);
+            let mut p = tiny_skia::PathBuilder::new();
+            p.push_rect(cr);
+            let path = p.finish()?;
+            m.fill_path(&path, tiny_skia::FillRule::Winding, false, tiny_skia::Transform::identity());
+            Some(m)
+        });
+
+        pixmap.fill_path(
+            &ts_path,
+            &paint,
+            tiny_skia::FillRule::EvenOdd,
+            tiny_skia::Transform::identity(),
+            mask.as_ref(),
+        );
+
+        // Composite tiny-skia result onto our ARGB32 surface (source-over).
+        let ts_data = pixmap.data();
         let pixels = self.surface.pixels_mut();
-        for y in y0..y1 {
-            crossings.clear();
-            let scan_y = y as f64 + 0.5;
-            for sp in &subpaths {
-                if sp.len() < 2 { continue; }
-                for i in 0..sp.len() - 1 {
-                    let p0 = sp[i];
-                    let p1 = sp[i + 1];
-                    let (y_lo, y_hi) = if p0.y <= p1.y { (p0.y, p1.y) } else { (p1.y, p0.y) };
-                    if scan_y < y_lo || scan_y >= y_hi {
-                        continue;
-                    }
-                    let dy = p1.y - p0.y;
-                    if dy.abs() < 1e-12 { continue; }
-                    let t = (scan_y - p0.y) / dy;
-                    let x_cross = p0.x + t * (p1.x - p0.x);
-                    crossings.push(x_cross);
-                }
-            }
-            crossings.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-            // Fill between pairs (even-odd rule)
-            let mut i = 0;
-            while i + 1 < crossings.len() {
-                let x0 = (crossings[i] as i32).max(0).max(clip_x0);
-                let x1 = ((crossings[i + 1] as i32) + 1).min(sw).min(clip_x1);
-                for x in x0..x1 {
-                    let idx = (y * sw + x) as usize;
-                    let ca = (c >> 24) & 0xFF;
-                    if ca >= 255 {
-                        pixels[idx] = c;
-                    } else if ca > 0 {
-                        let inv = 255 - ca;
-                        let sr = (c >> 16) & 0xFF;
-                        let sg = (c >> 8) & 0xFF;
-                        let sb = c & 0xFF;
-                        let dst = pixels[idx];
-                        let dr = (dst >> 16) & 0xFF;
-                        let dg = (dst >> 8) & 0xFF;
-                        let db = dst & 0xFF;
-                        let da = (dst >> 24) & 0xFF;
-                        let or = (sr * ca + dr * inv) / 255;
-                        let og = (sg * ca + dg * inv) / 255;
-                        let ob = (sb * ca + db * inv) / 255;
-                        let oa = ca + (da * inv) / 255;
-                        pixels[idx] = (oa << 24) | (or << 16) | (og << 8) | ob;
-                    }
-                }
-                i += 2;
+        for i in 0..pixels.len() {
+            let base = i * 4;
+            let sa = ts_data[base + 3] as u32;
+            if sa == 0 { continue; }
+            let sr = ts_data[base] as u32;
+            let sg = ts_data[base + 1] as u32;
+            let sb = ts_data[base + 2] as u32;
+            if sa == 255 {
+                // Un-premultiply and write ARGB32.
+                pixels[i] = 0xFF00_0000 | (sr << 16) | (sg << 8) | sb;
+            } else {
+                // Source-over blend (premultiplied src onto straight-alpha dst).
+                let dst_pixel = pixels[i];
+                let da = (dst_pixel >> 24) & 0xFF;
+                let dr = (dst_pixel >> 16) & 0xFF;
+                let dg = (dst_pixel >> 8) & 0xFF;
+                let db = dst_pixel & 0xFF;
+                let inv_sa = 255 - sa;
+                let oa = sa + ((da * inv_sa + 128) / 255);
+                let or_ch = sr + ((dr * inv_sa + 128) / 255);
+                let og = sg + ((dg * inv_sa + 128) / 255);
+                let ob = sb + ((db * inv_sa + 128) / 255);
+                pixels[i] = (oa.min(255) << 24) | (or_ch.min(255) << 16)
+                    | (og.min(255) << 8) | ob.min(255);
             }
         }
     }
 
     fn stroke_path(&mut self, path: &BezierPath, color: Color, width: f64) {
-        let subpaths = path.flatten(0.5);
-        for sp in &subpaths {
-            if sp.len() < 2 { continue; }
-            for i in 0..sp.len() - 1 {
-                self.draw_line(sp[i], sp[i + 1], color, width);
+        let elements = path.elements();
+        if elements.is_empty() {
+            return;
+        }
+
+        let sw = self.surface.width();
+        let sh = self.surface.height();
+        if sw == 0 || sh == 0 {
+            return;
+        }
+
+        // Build a tiny-skia path from our BezierPath elements.
+        let mut pb = tiny_skia::PathBuilder::new();
+        for el in elements {
+            match *el {
+                PathElement::MoveTo(p) => pb.move_to(p.x as f32, p.y as f32),
+                PathElement::LineTo(p) => pb.line_to(p.x as f32, p.y as f32),
+                PathElement::QuadTo { ctrl, end } => {
+                    pb.quad_to(ctrl.x as f32, ctrl.y as f32, end.x as f32, end.y as f32);
+                }
+                PathElement::CubicTo { ctrl1, ctrl2, end } => {
+                    pb.cubic_to(
+                        ctrl1.x as f32, ctrl1.y as f32,
+                        ctrl2.x as f32, ctrl2.y as f32,
+                        end.x as f32, end.y as f32,
+                    );
+                }
+                PathElement::Close => pb.close(),
+            }
+        }
+        let Some(ts_path) = pb.finish() else { return };
+
+        let mut paint = tiny_skia::Paint::default();
+        paint.set_color_rgba8(
+            (color.r.clamp(0.0, 1.0) * 255.0) as u8,
+            (color.g.clamp(0.0, 1.0) * 255.0) as u8,
+            (color.b.clamp(0.0, 1.0) * 255.0) as u8,
+            (color.a.clamp(0.0, 1.0) * 255.0) as u8,
+        );
+        paint.anti_alias = true;
+
+        let line_cap = match self.line_cap {
+            LineCap::Butt => tiny_skia::LineCap::Butt,
+            LineCap::Round => tiny_skia::LineCap::Round,
+            LineCap::Square => tiny_skia::LineCap::Square,
+        };
+        let line_join = match self.line_join {
+            LineJoin::Miter => tiny_skia::LineJoin::Miter,
+            LineJoin::Round => tiny_skia::LineJoin::Round,
+            LineJoin::Bevel => tiny_skia::LineJoin::Bevel,
+        };
+
+        let stroke = tiny_skia::Stroke {
+            width: width as f32,
+            line_cap,
+            line_join,
+            ..Default::default()
+        };
+
+        let clip_mask = self.effective_clip().and_then(|c| {
+            tiny_skia::Rect::from_xywh(c.x as f32, c.y as f32, c.width as f32, c.height as f32)
+        });
+        if clip_mask.is_none() && !self.clip_stack.is_empty() {
+            return;
+        }
+
+        let Some(mut pixmap) = tiny_skia::Pixmap::new(sw, sh) else { return };
+
+        let mask = clip_mask.and_then(|cr| {
+            let mut m = tiny_skia::Mask::new(sw, sh)?;
+            let mut mp = tiny_skia::Paint::default();
+            mp.set_color_rgba8(255, 255, 255, 255);
+            let mut p = tiny_skia::PathBuilder::new();
+            p.push_rect(cr);
+            let path = p.finish()?;
+            m.fill_path(&path, tiny_skia::FillRule::Winding, false, tiny_skia::Transform::identity());
+            Some(m)
+        });
+
+        pixmap.stroke_path(
+            &ts_path,
+            &paint,
+            &stroke,
+            tiny_skia::Transform::identity(),
+            mask.as_ref(),
+        );
+
+        // Composite onto ARGB32 surface.
+        let ts_data = pixmap.data();
+        let pixels = self.surface.pixels_mut();
+        for i in 0..pixels.len() {
+            let base = i * 4;
+            let sa = ts_data[base + 3] as u32;
+            if sa == 0 { continue; }
+            let sr = ts_data[base] as u32;
+            let sg = ts_data[base + 1] as u32;
+            let sb = ts_data[base + 2] as u32;
+            if sa == 255 {
+                pixels[i] = 0xFF00_0000 | (sr << 16) | (sg << 8) | sb;
+            } else {
+                let dst_pixel = pixels[i];
+                let da = (dst_pixel >> 24) & 0xFF;
+                let dr = (dst_pixel >> 16) & 0xFF;
+                let dg = (dst_pixel >> 8) & 0xFF;
+                let db = dst_pixel & 0xFF;
+                let inv_sa = 255 - sa;
+                let oa = sa + ((da * inv_sa + 128) / 255);
+                let or_ch = sr + ((dr * inv_sa + 128) / 255);
+                let og = sg + ((dg * inv_sa + 128) / 255);
+                let ob = sb + ((db * inv_sa + 128) / 255);
+                pixels[i] = (oa.min(255) << 24) | (or_ch.min(255) << 16)
+                    | (og.min(255) << 8) | ob.min(255);
             }
         }
     }

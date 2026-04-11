@@ -48,6 +48,18 @@ impl FoundationShims {
         register::register_nsimage_class(rt);
     }
 
+    pub fn register_nsimagerep_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsimagerep_class(rt);
+    }
+
+    pub fn register_nsbitmapimagerep_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsbitmapimagerep_class(rt);
+    }
+
+    pub fn register_nsfontmanager_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsfontmanager_class(rt);
+    }
+
     // ── Phase C7 AppKit class registrations ─────────────────────
 
     pub fn register_nsappearance_class(rt: &mut objc_runtime::ObjcRuntime) {
@@ -316,6 +328,12 @@ impl FoundationShims {
     pub fn register_nsurlsessiondatatask_class(rt: &mut objc_runtime::ObjcRuntime) {
         register::register_nsurlsessiondatatask_class(rt);
     }
+    pub fn register_nsurlsessionuploadtask_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsurlsessionuploadtask_class(rt);
+    }
+    pub fn register_nsurlsessiondownloadtask_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsurlsessiondownloadtask_class(rt);
+    }
     pub fn register_nskeyedarchiver_class(rt: &mut objc_runtime::ObjcRuntime) {
         register::register_nskeyedarchiver_class(rt);
     }
@@ -481,6 +499,10 @@ impl FoundationShims {
         register::register_nstableview_class(rt);
     }
 
+    pub fn register_nsoutlineview_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsoutlineview_class(rt);
+    }
+
     pub fn register_nsundomanager_class(rt: &mut objc_runtime::ObjcRuntime) {
         register::register_nsundomanager_class(rt);
     }
@@ -515,5 +537,19 @@ impl FoundationShims {
 
     pub fn register_nsbezierpath_class(rt: &mut objc_runtime::ObjcRuntime) {
         register::register_nsbezierpath_class(rt);
+    }
+
+    // ── Phase C15: TextKit (NSTextStorage, NSLayoutManager, NSTextContainer) ──
+
+    pub fn register_nstextstorage_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nstextstorage_class(rt);
+    }
+
+    pub fn register_nslayoutmanager_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nslayoutmanager_class(rt);
+    }
+
+    pub fn register_nstextcontainer_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nstextcontainer_class(rt);
     }
 }

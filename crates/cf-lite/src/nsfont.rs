@@ -27,6 +27,11 @@ fn alloc_font(name: &str, size: f64) -> u64 {
     obj
 }
 
+/// Public wrapper for other shim modules (e.g. NSFontManager).
+pub fn alloc_font_pub(name: &str, size: f64) -> u64 {
+    alloc_font(name, size)
+}
+
 /// Read the pointSize from a font object (or default to 13.0 for nil).
 fn font_size(obj: u64) -> f64 {
     if obj == 0 { return 0.0; }

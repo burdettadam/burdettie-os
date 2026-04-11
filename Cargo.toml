@@ -47,6 +47,7 @@ members = [
     "crates/burdettie-domain-map",
     "crates/burdettie-services",
     "crates/burdettie-log-pipeline",
+    "crates/burdettie-plutil",
     "apps/hello-darwin",
     "apps/control-gallery",
     "apps/foundation-explorer",
@@ -132,6 +133,8 @@ plist     = "1"
 quick-xml = "0.37"
 rusqlite  = { version = "0.35", features = ["bundled"] }
 cassowary = "0.3.0"
+tiny-skia = "0.11"
+cosmic-text = "0.18"
 # Open-source replacements for Apple framework stubs
 flate2    = "1"
 lz4_flex  = "0.11"
@@ -139,7 +142,10 @@ ring      = "0.17"
 x509-parser = "0.16"
 hickory-resolver = { version = "0.25", features = ["https-ring", "webpki-roots"] }
 lzma-rs   = "0.3"
+lzfse_rust = "0.2"
 tiny_http = "0.12"
+accesskit = "0.17.1"
+accesskit_winit = { version = "0.23.1", default-features = false }
 
 # ── Workspace-wide lints ────────────────────────────────────────────
 # Inherited by every crate via `[lints] workspace = true`.

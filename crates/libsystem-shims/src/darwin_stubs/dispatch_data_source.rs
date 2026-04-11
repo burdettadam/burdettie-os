@@ -11,6 +11,24 @@ use std::sync::{Arc, Mutex};
 
 use crate::table::ShimTable;
 
+// ── Public helpers for dispatch_io ─────────────────────────────
+
+/// Create a dispatch_data_t from a byte slice (used by dispatch_io.rs).
+pub(crate) fn create_data_from_bytes(bytes: &[u8]) -> u64 {
+    let handle = alloc_handle();
+    data_registry()
+        .lock()
+        .unwrap()
+        .insert(handle, Arc::new(bytes.to_vec()));
+    handle
+}
+
+/// Get a copy of the bytes stored in a dispatch_data_t (used by dispatch_io.rs).
+pub(crate) fn get_data_bytes(data: u64) -> Option<Vec<u8>> {
+    let reg = data_registry().lock().unwrap();
+    reg.get(&data).map(|v| v.as_ref().clone())
+}
+
 // ---------------------------------------------------------------------------
 // Handle allocator
 // ---------------------------------------------------------------------------
@@ -57,6 +75,8 @@ struct Source {
     timer: Mutex<Option<TimerConfig>>,
     cancelled: AtomicBool,
     suspended: AtomicBool,
+    /// Accumulated data for DATA_ADD/DATA_OR sources.
+    pending_data: AtomicU64,
 }
 
 fn source_registry() -> &'static Mutex<HashMap<u64, Arc<Source>>> {
@@ -74,6 +94,13 @@ static SOURCE_TYPE_READ: u8 = 2;
 static SOURCE_TYPE_WRITE: u8 = 3;
 static SOURCE_TYPE_SIGNAL: u8 = 4;
 static SOURCE_TYPE_PROC: u8 = 5;
+static SOURCE_TYPE_DATA_ADD: u8 = 6;
+static SOURCE_TYPE_DATA_OR: u8 = 7;
+static SOURCE_TYPE_VNODE: u8 = 8;
+static SOURCE_TYPE_MACH_SEND: u8 = 9;
+static SOURCE_TYPE_MACH_RECV: u8 = 10;
+static SOURCE_TYPE_MEMORYPRESSURE: u8 = 11;
+static SOURCE_TYPE_DATA_REPLACE: u8 = 12;
 
 // ---------------------------------------------------------------------------
 // Block invocation helper
@@ -246,6 +273,7 @@ extern "C" fn shim_dispatch_source_create(
         timer: Mutex::new(None),
         cancelled: AtomicBool::new(false),
         suspended: AtomicBool::new(true), // sources start suspended
+        pending_data: AtomicU64::new(0),
     });
     let h = alloc_handle();
     source_registry().lock().unwrap().insert(h, src);
@@ -300,34 +328,165 @@ extern "C" fn shim_dispatch_resume(object: u64) {
     if let Some(src) = reg.get(&object) {
         src.suspended.store(false, Ordering::Release);
 
-        // For timer sources: if interval > 0 and not cancelled, spawn a
-        // background thread that periodically fires the event handler.
-        let timer_interval = src
-            .timer
-            .lock()
-            .unwrap()
-            .as_ref()
-            .map(|t| t.interval)
-            .unwrap_or(0);
-
         let is_timer = src.source_type == &SOURCE_TYPE_TIMER as *const u8 as u64;
-        if is_timer && timer_interval > 0 && !src.cancelled.load(Ordering::Acquire) {
-            let src_arc = Arc::clone(src);
-            std::thread::spawn(move || {
-                let dur = std::time::Duration::from_nanos(timer_interval);
-                loop {
-                    std::thread::sleep(dur);
-                    if src_arc.cancelled.load(Ordering::Acquire)
-                        || src_arc.suspended.load(Ordering::Acquire)
-                    {
-                        break;
+        let is_read = src.source_type == &SOURCE_TYPE_READ as *const u8 as u64;
+        let is_write = src.source_type == &SOURCE_TYPE_WRITE as *const u8 as u64;
+        let is_signal = src.source_type == &SOURCE_TYPE_SIGNAL as *const u8 as u64;
+
+        // Timer sources: periodic background thread.
+        if is_timer {
+            let timer_interval = src
+                .timer
+                .lock()
+                .unwrap()
+                .as_ref()
+                .map(|t| t.interval)
+                .unwrap_or(0);
+
+            if timer_interval > 0 && !src.cancelled.load(Ordering::Acquire) {
+                let src_arc = Arc::clone(src);
+                std::thread::spawn(move || {
+                    let dur = std::time::Duration::from_nanos(timer_interval);
+                    loop {
+                        std::thread::sleep(dur);
+                        if src_arc.cancelled.load(Ordering::Acquire)
+                            || src_arc.suspended.load(Ordering::Acquire)
+                        {
+                            break;
+                        }
+                        if let Some(handler) = *src_arc.event_handler.lock().unwrap() {
+                            unsafe { invoke_block(handler) };
+                        }
                     }
-                    if let Some(handler) = *src_arc.event_handler.lock().unwrap() {
-                        // SAFETY: caller guaranteed valid block layout.
-                        unsafe { invoke_block(handler) };
+                });
+            }
+        }
+
+        // READ sources: poll the fd for readability.
+        if is_read && !src.cancelled.load(Ordering::Acquire) {
+            let src_arc = Arc::clone(src);
+            let fd = src._handle as i32;
+            std::thread::Builder::new()
+                .name(format!("dispatch-source-read-{fd}"))
+                .spawn(move || {
+                    source_poll_fd(src_arc, fd, libc::POLLIN as i16);
+                })
+                .ok();
+        }
+
+        // WRITE sources: poll the fd for writability.
+        if is_write && !src.cancelled.load(Ordering::Acquire) {
+            let src_arc = Arc::clone(src);
+            let fd = src._handle as i32;
+            std::thread::Builder::new()
+                .name(format!("dispatch-source-write-{fd}"))
+                .spawn(move || {
+                    source_poll_fd(src_arc, fd, libc::POLLOUT as i16);
+                })
+                .ok();
+        }
+
+        // SIGNAL sources: use signalfd on Linux, poll on macOS.
+        if is_signal && !src.cancelled.load(Ordering::Acquire) {
+            let src_arc = Arc::clone(src);
+            let signum = src._handle as i32;
+            std::thread::Builder::new()
+                .name(format!("dispatch-source-signal-{signum}"))
+                .spawn(move || {
+                    source_wait_signal(src_arc, signum);
+                })
+                .ok();
+        }
+    }
+}
+
+/// Poll a file descriptor for the specified events (POLLIN or POLLOUT).
+/// Fires the event handler each time the fd becomes ready.
+fn source_poll_fd(src: Arc<Source>, fd: i32, events: i16) {
+    loop {
+        if src.cancelled.load(Ordering::Acquire) || src.suspended.load(Ordering::Acquire) {
+            break;
+        }
+
+        let mut pfd = libc::pollfd {
+            fd,
+            events,
+            revents: 0,
+        };
+
+        // Poll with 100ms timeout to allow cancellation checks.
+        let ret = unsafe { libc::poll(&mut pfd, 1, 100) };
+
+        if ret < 0 {
+            let err = std::io::Error::last_os_error();
+            if err.kind() == std::io::ErrorKind::Interrupted {
+                continue;
+            }
+            break; // fd went bad
+        }
+
+        if ret == 0 {
+            continue; // timeout, check cancel again
+        }
+
+        if pfd.revents & (libc::POLLERR | libc::POLLHUP | libc::POLLNVAL) as i16 != 0 {
+            break;
+        }
+
+        if pfd.revents & events != 0 {
+            // Store estimated readable/writable bytes.
+            if events == libc::POLLIN as i16 {
+                let mut available: i32 = 0;
+                unsafe { libc::ioctl(fd, libc::FIONREAD, &mut available) };
+                src.pending_data.store(available.max(0) as u64, Ordering::Release);
+            }
+
+            if let Some(handler) = *src.event_handler.lock().unwrap() {
+                unsafe { invoke_block(handler) };
+            }
+        }
+    }
+}
+
+/// Wait for a signal using sigtimedwait (avoids global signal handler conflicts).
+fn source_wait_signal(src: Arc<Source>, signum: i32) {
+    // Block the signal on this thread so sigtimedwait can catch it.
+    #[cfg(target_os = "linux")]
+    {
+        unsafe {
+            let mut set: libc::sigset_t = std::mem::zeroed();
+            libc::sigemptyset(&mut set);
+            libc::sigaddset(&mut set, signum);
+            libc::pthread_sigmask(libc::SIG_BLOCK, &set, std::ptr::null_mut());
+
+            let timeout = libc::timespec {
+                tv_sec: 0,
+                tv_nsec: 100_000_000, // 100ms
+            };
+
+            loop {
+                if src.cancelled.load(Ordering::Acquire) || src.suspended.load(Ordering::Acquire) {
+                    break;
+                }
+
+                let ret = libc::sigtimedwait(&set, std::ptr::null_mut(), &timeout);
+                if ret == signum {
+                    src.pending_data.fetch_add(1, Ordering::Release);
+                    if let Some(handler) = *src.event_handler.lock().unwrap() {
+                        invoke_block(handler);
                     }
                 }
-            });
+                // ret == -1 with EAGAIN means timeout — loop and check cancellation
+            }
+        }
+    }
+
+    // On macOS, use kqueue-based signal monitoring (placeholder).
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = signum;
+        while !src.cancelled.load(Ordering::Acquire) && !src.suspended.load(Ordering::Acquire) {
+            std::thread::sleep(std::time::Duration::from_millis(100));
         }
     }
 }
@@ -341,6 +500,104 @@ extern "C" fn shim_dispatch_suspend(object: u64) {
 
 extern "C" fn shim_dispatch_set_target_queue(_object: u64, _queue: u64) {
     // No-op — our implementation does not use real queues.
+}
+
+/// `size_t dispatch_source_get_data(dispatch_source_t source)`
+/// Returns the accumulated data for data sources, readable bytes for READ, etc.
+extern "C" fn shim_dispatch_source_get_data(source: u64) -> u64 {
+    let reg = source_registry().lock().unwrap();
+    if let Some(src) = reg.get(&source) {
+        // For DATA_ADD: return and atomically clear the pending data.
+        let is_data_add = src.source_type == &SOURCE_TYPE_DATA_ADD as *const u8 as u64;
+        let is_data_or = src.source_type == &SOURCE_TYPE_DATA_OR as *const u8 as u64;
+        let is_data_replace = src.source_type == &SOURCE_TYPE_DATA_REPLACE as *const u8 as u64;
+        if is_data_add || is_data_or || is_data_replace {
+            return src.pending_data.swap(0, Ordering::AcqRel);
+        }
+        // For READ/WRITE/SIGNAL: return the current pending data.
+        src.pending_data.load(Ordering::Acquire)
+    } else {
+        0
+    }
+}
+
+/// `uintptr_t dispatch_source_get_handle(dispatch_source_t source)`
+/// Returns the underlying handle (fd, signal number, pid, etc.).
+extern "C" fn shim_dispatch_source_get_handle(source: u64) -> u64 {
+    let reg = source_registry().lock().unwrap();
+    if let Some(src) = reg.get(&source) {
+        src._handle
+    } else {
+        0
+    }
+}
+
+/// `unsigned long dispatch_source_get_mask(dispatch_source_t source)`
+extern "C" fn shim_dispatch_source_get_mask(source: u64) -> u64 {
+    let reg = source_registry().lock().unwrap();
+    if let Some(src) = reg.get(&source) {
+        src._mask
+    } else {
+        0
+    }
+}
+
+/// `void dispatch_source_merge_data(dispatch_source_t source, unsigned long value)`
+/// For DATA_ADD, adds value to pending_data. For DATA_OR, ORs it in.
+/// For DATA_REPLACE, replaces it. Then fires the event handler.
+extern "C" fn shim_dispatch_source_merge_data(source: u64, value: u64) {
+    let handler = {
+        let reg = source_registry().lock().unwrap();
+        if let Some(src) = reg.get(&source) {
+            let is_data_add = src.source_type == &SOURCE_TYPE_DATA_ADD as *const u8 as u64;
+            let is_data_or = src.source_type == &SOURCE_TYPE_DATA_OR as *const u8 as u64;
+            let is_data_replace = src.source_type == &SOURCE_TYPE_DATA_REPLACE as *const u8 as u64;
+
+            if is_data_add {
+                src.pending_data.fetch_add(value, Ordering::AcqRel);
+            } else if is_data_or {
+                src.pending_data.fetch_or(value, Ordering::AcqRel);
+            } else if is_data_replace {
+                src.pending_data.store(value, Ordering::Release);
+            }
+
+            if !src.suspended.load(Ordering::Acquire) && !src.cancelled.load(Ordering::Acquire) {
+                *src.event_handler.lock().unwrap()
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    };
+
+    if let Some(handler) = handler {
+        unsafe { invoke_block(handler) };
+    }
+}
+
+/// `void dispatch_source_set_event_handler_f(dispatch_source_t source,
+///     dispatch_function_t handler)`
+extern "C" fn shim_dispatch_source_set_event_handler_f(_source: u64, _handler: u64) {
+    // Function-pointer event handlers — store as a synthetic block.
+    // For now, log and no-op since callers typically use block variant.
+    log::trace!("dispatch_source_set_event_handler_f: stub");
+}
+
+/// `void dispatch_source_set_cancel_handler_f(dispatch_source_t source,
+///     dispatch_function_t handler)`
+extern "C" fn shim_dispatch_source_set_cancel_handler_f(_source: u64, _handler: u64) {
+    log::trace!("dispatch_source_set_cancel_handler_f: stub");
+}
+
+/// `void dispatch_source_set_registration_handler(dispatch_source_t source,
+///     dispatch_block_t handler)`
+extern "C" fn shim_dispatch_source_set_registration_handler(_source: u64, _handler: u64) {
+    // Registration handlers fire when a source is resumed for the first time.
+    // For now, stub — fire inline if the handler is provided.
+    if _handler != 0 {
+        unsafe { invoke_block(_handler) };
+    }
 }
 
 extern "C" fn shim_dispatch_release(object: u64) {
@@ -384,14 +641,29 @@ impl DispatchDataSourceStubs {
             ("_dispatch_set_target_queue", shim_dispatch_set_target_queue as *const () as u64, "dispatch_set_target_queue (stub → void)"),
             ("_dispatch_release", shim_dispatch_release as *const () as u64, "dispatch_release (real)"),
             ("_dispatch_retain", shim_dispatch_retain as *const () as u64, "dispatch_retain (stub → no-op)"),
+            // dispatch_source data/handle/mask accessors
+            ("_dispatch_source_get_data", shim_dispatch_source_get_data as *const () as u64, "dispatch_source_get_data (real)"),
+            ("_dispatch_source_get_handle", shim_dispatch_source_get_handle as *const () as u64, "dispatch_source_get_handle (real)"),
+            ("_dispatch_source_get_mask", shim_dispatch_source_get_mask as *const () as u64, "dispatch_source_get_mask (real)"),
+            ("_dispatch_source_merge_data", shim_dispatch_source_merge_data as *const () as u64, "dispatch_source_merge_data (real)"),
+            ("_dispatch_source_set_event_handler_f", shim_dispatch_source_set_event_handler_f as *const () as u64, "dispatch_source_set_event_handler_f (stub)"),
+            ("_dispatch_source_set_cancel_handler_f", shim_dispatch_source_set_cancel_handler_f as *const () as u64, "dispatch_source_set_cancel_handler_f (stub)"),
+            ("_dispatch_source_set_registration_handler", shim_dispatch_source_set_registration_handler as *const () as u64, "dispatch_source_set_registration_handler (stub)"),
             // dispatch_source type sentinels
             ("__dispatch_source_type_timer", &SOURCE_TYPE_TIMER as *const u8 as u64, "dispatch_source_type_timer sentinel"),
             ("__dispatch_source_type_read", &SOURCE_TYPE_READ as *const u8 as u64, "dispatch_source_type_read sentinel"),
             ("__dispatch_source_type_write", &SOURCE_TYPE_WRITE as *const u8 as u64, "dispatch_source_type_write sentinel"),
             ("__dispatch_source_type_signal", &SOURCE_TYPE_SIGNAL as *const u8 as u64, "dispatch_source_type_signal sentinel"),
             ("__dispatch_source_type_proc", &SOURCE_TYPE_PROC as *const u8 as u64, "dispatch_source_type_proc sentinel"),
+            ("__dispatch_source_type_data_add", &SOURCE_TYPE_DATA_ADD as *const u8 as u64, "dispatch_source_type_data_add sentinel"),
+            ("__dispatch_source_type_data_or", &SOURCE_TYPE_DATA_OR as *const u8 as u64, "dispatch_source_type_data_or sentinel"),
+            ("__dispatch_source_type_data_replace", &SOURCE_TYPE_DATA_REPLACE as *const u8 as u64, "dispatch_source_type_data_replace sentinel"),
+            ("__dispatch_source_type_vnode", &SOURCE_TYPE_VNODE as *const u8 as u64, "dispatch_source_type_vnode sentinel"),
+            ("__dispatch_source_type_mach_send", &SOURCE_TYPE_MACH_SEND as *const u8 as u64, "dispatch_source_type_mach_send sentinel"),
+            ("__dispatch_source_type_mach_recv", &SOURCE_TYPE_MACH_RECV as *const u8 as u64, "dispatch_source_type_mach_recv sentinel"),
+            ("__dispatch_source_type_memorypressure", &SOURCE_TYPE_MEMORYPRESSURE as *const u8 as u64, "dispatch_source_type_memorypressure sentinel"),
         );
-        log::debug!("DispatchDataSourceStubs: registered 22 stubs");
+        log::debug!("DispatchDataSourceStubs: registered 36 stubs");
     }
 }
 

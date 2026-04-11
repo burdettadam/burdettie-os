@@ -13,7 +13,7 @@ const NSBUNDLE_PATH_OFF: usize = 8;
 
 static MAIN_BUNDLE: OnceLock<u64> = OnceLock::new();
 
-fn get_or_create_main_bundle() -> u64 {
+pub fn get_or_create_main_bundle() -> u64 {
     *MAIN_BUNDLE.get_or_init(|| {
         let obj = crate::pal_alloc().calloc(1, 16) as u64;
         if obj == 0 {
@@ -280,11 +280,93 @@ pub extern "C" fn shim_nsbundle_path_for_resource(
     0
 }
 
-/// `-[NSBundle loadNibNamed:owner:topLevelObjects:]` — stub, returns NO.
+/// `-[NSBundle loadNibNamed:owner:topLevelObjects:]`
+///
+/// Finds a `.nib` file in the bundle, unarchives it via NSKeyedUnarchiver,
+/// and returns the decoded object graph. Returns YES if the nib was found
+/// and loaded, NO otherwise.
 pub extern "C" fn shim_nsbundle_load_nib_named(
-    _obj: u64, _cmd: u64, _name: u64, _owner: u64, _top: u64,
+    obj: u64, _cmd: u64, name: u64, owner: u64, top_out: u64,
 ) -> u8 {
-    0 // NO
+    if obj == 0 || name == 0 { return 0; }
+
+    let Some(nib_name) = crate::cfstring::extract_cfstring_cstr(name) else { return 0; };
+
+    // Get bundle path
+    let path_ptr = unsafe { *((obj as usize + NSBUNDLE_PATH_OFF) as *const u64) };
+    if path_ptr == 0 { return 0; }
+    let Some(bundle_path) = crate::cfstring::extract_cfstring_cstr(path_ptr) else { return 0; };
+
+    // Search for the .nib file in multiple locations
+    let candidates = [
+        format!("{}/Contents/Resources/{}.nib", bundle_path, nib_name),
+        format!("{}/{}.nib", bundle_path, nib_name),
+        format!("{}/Contents/Resources/Base.lproj/{}.nib", bundle_path, nib_name),
+        format!("{}/Contents/Resources/en.lproj/{}.nib", bundle_path, nib_name),
+    ];
+
+    let mut nib_path = None;
+    for candidate in &candidates {
+        let p = std::path::Path::new(candidate);
+        // NIB can be a directory (contains keyedobjects.nib) or a file
+        if p.is_file() {
+            nib_path = Some(candidate.clone());
+            break;
+        }
+        let inner = p.join("keyedobjects.nib");
+        if inner.is_file() {
+            nib_path = Some(inner.to_string_lossy().to_string());
+            break;
+        }
+        let inner2 = p.join("keyedobjects-101.nib");
+        if inner2.is_file() {
+            nib_path = Some(inner2.to_string_lossy().to_string());
+            break;
+        }
+    }
+
+    let Some(nib_file) = nib_path else {
+        log::debug!("NSBundle loadNibNamed: '{}' not found in bundle '{}'", nib_name, bundle_path);
+        return 0;
+    };
+
+    log::debug!("NSBundle loadNibNamed: loading '{}'", nib_file);
+
+    // Read the nib file
+    let Ok(bytes) = std::fs::read(&nib_file) else { return 0; };
+    if bytes.is_empty() { return 0; }
+
+    // Unarchive the nib data
+    let data = crate::nsdata::make_nsdata(&bytes);
+    let result = crate::nskeyedarchiver::shim_nskeyedunarchiver_unarchived_object(
+        0, 0, 0, data, 0,
+    );
+
+    if result == 0 {
+        log::debug!("NSBundle loadNibNamed: unarchive failed for '{}'", nib_file);
+        return 0;
+    }
+
+    // Wire IBOutlet / IBAction connections decoded from the NIB.
+    wire_nib_connections(owner);
+
+    // If topLevelObjects: out-parameter was provided, write the result
+    if top_out != 0 {
+        // result might be an NSArray of top-level objects, or a single object
+        let isa = unsafe { *(result as *const u64) };
+        if isa == crate::nsobj::nsarray_class_addr()
+            || isa == crate::nsobj::nsmutablearray_class_addr()
+        {
+            unsafe { *(top_out as *mut u64) = result; }
+        } else {
+            // Wrap single object in array
+            let arr = crate::nsarray::make_nsarray(&[result]);
+            unsafe { *(top_out as *mut u64) = arr; }
+        }
+    }
+
+    log::debug!("NSBundle loadNibNamed: loaded '{}' successfully", nib_name);
+    1 // YES
 }
 
 /// `+[NSBundle bundleForClass:]` — returns mainBundle.
@@ -313,6 +395,79 @@ pub extern "C" fn shim_nsbundle_localized_string(
     }
     // Otherwise return the key itself (standard Foundation fallback)
     if key != 0 { key } else { 0 }
+}
+
+// ── NIB connection wiring ──────────────────────────────────────
+
+/// Wire IBOutlet and IBAction connections decoded from a NIB archive.
+///
+/// Outlet connections call `setValue:forKey:` on the source with the label
+/// as the key and the destination as the value.
+///
+/// Action connections call `setTarget:` and `setAction:` on the source
+/// (typically an NSControl) with the destination as the target.
+fn wire_nib_connections(owner: u64) {
+    use crate::nskeyedarchiver::NibConnection;
+
+    let connections = crate::nskeyedarchiver::drain_nib_connections();
+    if connections.is_empty() { return; }
+
+    log::debug!("NIB wiring: {} connections to process", connections.len());
+
+    for conn in &connections {
+        match conn {
+            NibConnection::Outlet { source, destination, label } => {
+                // For file's-owner outlets: source might be the placeholder
+                // file's owner object (typically UID 2 in NIB archives).
+                // If `owner` was provided and source is non-zero, we use owner
+                // as the target for KVC.
+                let target = if owner != 0 { owner } else { *source };
+                let key_c = std::ffi::CString::new(label.as_str()).unwrap_or_default();
+                let key_ns = crate::cfstring::alloc_nsstring_from_cstr(key_c.as_ptr());
+                log::debug!("NIB wiring outlet: target={:#x} key='{}' value={:#x}",
+                    target, label, destination);
+                crate::nskeyvaluecoding::shim_set_value_for_key(
+                    target, 0, *destination, key_ns,
+                );
+            }
+            NibConnection::Action { source, destination, label } => {
+                if *source == 0 { continue; }
+                // Set target on the control.
+                let set_target_imp = crate::nskeyedarchiver::lookup_imp(*source, "setTarget:");
+                if set_target_imp != 0 {
+                    let f: extern "C" fn(u64, u64, u64) = unsafe { std::mem::transmute(set_target_imp) };
+                    f(*source, 0, *destination);
+                }
+                // Set action selector string on the control.
+                let set_action_imp = crate::nskeyedarchiver::lookup_imp(*source, "setAction:");
+                if set_action_imp != 0 {
+                    let sel_c = std::ffi::CString::new(label.as_str()).unwrap_or_default();
+                    let sel = crate::cfstring::alloc_nsstring_from_cstr(sel_c.as_ptr());
+                    let f: extern "C" fn(u64, u64, u64) = unsafe { std::mem::transmute(set_action_imp) };
+                    f(*source, 0, sel);
+                    log::debug!("NIB wiring action: source={:#x} target={:#x} action='{}'",
+                        source, destination, label);
+                }
+            }
+        }
+    }
+
+    // Call awakeFromNib on all objects that respond to it.
+    let mut seen = std::collections::HashSet::new();
+    for conn in &connections {
+        let objects = match conn {
+            NibConnection::Outlet { source, destination, .. } => vec![*source, *destination],
+            NibConnection::Action { source, destination, .. } => vec![*source, *destination],
+        };
+        for obj in objects {
+            if obj == 0 || !seen.insert(obj) { continue; }
+            let awake_imp = crate::nskeyedarchiver::lookup_imp(obj, "awakeFromNib");
+            if awake_imp != 0 {
+                let f: extern "C" fn(u64, u64) = unsafe { std::mem::transmute(awake_imp) };
+                f(obj, 0);
+            }
+        }
+    }
 }
 
 #[cfg(test)]

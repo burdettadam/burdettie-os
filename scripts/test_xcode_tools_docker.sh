@@ -4916,6 +4916,393 @@ RANGE
     rm -f /tmp/st_gn.txt /tmp/st_flist.txt /tmp/st_h5.txt
 }
 
+# PLUTIL test suite — native Rust plutil replacement tests:
+# lint, pretty-print, convert, insert, replace, remove, extract, type, create.
+# These tests run the native plutil binary directly (not through the loader).
+# ══════════════════════════════════════════════════════════════════════
+test_plutil_suite() {
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "  PLUTIL SUITE — native Rust plutil operations"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+    local PLUTIL="plutil"
+
+    # Create a test XML plist
+    cat > /tmp/pltest.plist <<'XMLPLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Name</key>
+	<string>BurdettieOS</string>
+	<key>Version</key>
+	<integer>1</integer>
+	<key>Enabled</key>
+	<true/>
+	<key>Score</key>
+	<real>99.5</real>
+	<key>Tags</key>
+	<array>
+		<string>macho</string>
+		<string>linux</string>
+	</array>
+	<key>Settings</key>
+	<dict>
+		<key>Theme</key>
+		<string>dark</string>
+		<key>FontSize</key>
+		<integer>14</integer>
+	</dict>
+</dict>
+</plist>
+XMLPLIST
+
+    local out
+
+    # ── 1. plutil -help ───────────────────────────────────────
+    printf "  %-35s " "plutil -help"
+    out=$($PLUTIL -help 2>&1)
+    if echo "$out" | grep -qi "usage"; then
+        printf "${GREEN}PASS${NC}     shows usage\n"; echo "plutil|help|PASS|0|usage shown" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     no usage output\n"; echo "plutil|help|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 2. plutil -lint valid ─────────────────────────────────
+    printf "  %-35s " "plutil -lint valid plist"
+    out=$($PLUTIL -lint /tmp/pltest.plist 2>&1)
+    if echo "$out" | grep -q "OK"; then
+        printf "${GREEN}PASS${NC}     OK\n"; echo "plutil|lint-valid|PASS|0|OK" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | head -c 60)\n"; echo "plutil|lint-valid|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 3. plutil -lint invalid ───────────────────────────────
+    printf "  %-35s " "plutil -lint invalid plist"
+    echo "not a plist {{{" > /tmp/pltest_bad.plist
+    $PLUTIL -lint /tmp/pltest_bad.plist >/dev/null 2>&1
+    local rc=$?
+    if [ "$rc" -ne 0 ]; then
+        printf "${GREEN}PASS${NC}     exit=1\n"; echo "plutil|lint-invalid|PASS|1|detected" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     exit=0 (should fail)\n"; echo "plutil|lint-invalid|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 4. plutil -lint silent ────────────────────────────────
+    printf "  %-35s " "plutil -lint -s silent mode"
+    out=$($PLUTIL -lint -s /tmp/pltest.plist 2>&1)
+    if [ -z "$out" ]; then
+        printf "${GREEN}PASS${NC}     no output\n"; echo "plutil|lint-silent|PASS|0|silent" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got output: $(echo "$out" | head -c 40)\n"; echo "plutil|lint-silent|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 5. plutil -p pretty print ────────────────────────────
+    printf "  %-35s " "plutil -p pretty print"
+    out=$($PLUTIL -p /tmp/pltest.plist 2>&1)
+    if echo "$out" | grep -q '"BurdettieOS"' && echo "$out" | grep -q '"Name"'; then
+        printf "${GREEN}PASS${NC}     Name => BurdettieOS\n"; echo "plutil|pretty-print|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | head -c 60)\n"; echo "plutil|pretty-print|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 6. plutil -convert xml1 to json ──────────────────────
+    printf "  %-35s " "plutil -convert json"
+    cp /tmp/pltest.plist /tmp/pltest_cvt.plist
+    $PLUTIL -convert json -o /tmp/pltest_cvt.json /tmp/pltest_cvt.plist 2>/dev/null
+    rc=$?
+    if [ "$rc" -eq 0 ] && [ -f /tmp/pltest_cvt.json ]; then
+        # Verify it's valid JSON with the right content
+        if grep -q '"Name"' /tmp/pltest_cvt.json && grep -q '"BurdettieOS"' /tmp/pltest_cvt.json; then
+            printf "${GREEN}PASS${NC}     valid JSON\n"; echo "plutil|convert-json|PASS|0|converted" >> "$RESULTS_FILE"; ((PASS++)) || true
+        else
+            printf "${RED}FAIL${NC}     JSON missing expected keys\n"; echo "plutil|convert-json|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+        fi
+    else
+        printf "${RED}FAIL${NC}     exit=$rc\n"; echo "plutil|convert-json|FAIL|$rc|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 7. plutil -convert binary1 ───────────────────────────
+    printf "  %-35s " "plutil -convert binary1"
+    cp /tmp/pltest.plist /tmp/pltest_bin.plist
+    $PLUTIL -convert binary1 /tmp/pltest_bin.plist 2>/dev/null
+    rc=$?
+    if [ "$rc" -eq 0 ]; then
+        # Verify it starts with bplist magic (first 6 bytes)
+        if head -c 6 /tmp/pltest_bin.plist | grep -q "bplist"; then
+            printf "${GREEN}PASS${NC}     bplist magic\n"; echo "plutil|convert-binary|PASS|0|bplist" >> "$RESULTS_FILE"; ((PASS++)) || true
+        else
+            printf "${RED}FAIL${NC}     not bplist format\n"; echo "plutil|convert-binary|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+        fi
+    else
+        printf "${RED}FAIL${NC}     exit=$rc\n"; echo "plutil|convert-binary|FAIL|$rc|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 8. plutil -convert binary1 then back to xml1 ─────────
+    printf "  %-35s " "plutil binary1 → xml1 roundtrip"
+    $PLUTIL -convert xml1 /tmp/pltest_bin.plist 2>/dev/null
+    rc=$?
+    if [ "$rc" -eq 0 ]; then
+        out=$(cat /tmp/pltest_bin.plist)
+        if echo "$out" | grep -q "<string>BurdettieOS</string>"; then
+            printf "${GREEN}PASS${NC}     roundtrip OK\n"; echo "plutil|roundtrip-bin-xml|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+        else
+            printf "${RED}FAIL${NC}     missing BurdettieOS\n"; echo "plutil|roundtrip-bin-xml|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+        fi
+    else
+        printf "${RED}FAIL${NC}     exit=$rc\n"; echo "plutil|roundtrip-bin-xml|FAIL|$rc|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 9. plutil -type ───────────────────────────────────────
+    printf "  %-35s " "plutil -type Name (string)"
+    out=$($PLUTIL -type Name /tmp/pltest.plist 2>&1)
+    if echo "$out" | grep -qi "string"; then
+        printf "${GREEN}PASS${NC}     Type is string\n"; echo "plutil|type-string|PASS|0|string" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | head -c 40)\n"; echo "plutil|type-string|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 10. plutil -type Tags (array) ─────────────────────────
+    printf "  %-35s " "plutil -type Tags (array)"
+    out=$($PLUTIL -type Tags /tmp/pltest.plist 2>&1)
+    if echo "$out" | grep -qi "array"; then
+        printf "${GREEN}PASS${NC}     Type is array\n"; echo "plutil|type-array|PASS|0|array" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | head -c 40)\n"; echo "plutil|type-array|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 11. plutil -type nested (Settings.Theme) ──────────────
+    printf "  %-35s " "plutil -type Settings.Theme"
+    out=$($PLUTIL -type Settings.Theme /tmp/pltest.plist 2>&1)
+    if echo "$out" | grep -qi "string"; then
+        printf "${GREEN}PASS${NC}     Type is string\n"; echo "plutil|type-nested|PASS|0|string" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | head -c 40)\n"; echo "plutil|type-nested|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 12. plutil -insert new key ────────────────────────────
+    printf "  %-35s " "plutil -insert NewKey"
+    cp /tmp/pltest.plist /tmp/pltest_ins.plist
+    $PLUTIL -insert NewKey -string "hello" /tmp/pltest_ins.plist 2>/dev/null
+    rc=$?
+    if [ "$rc" -eq 0 ]; then
+        out=$($PLUTIL -p /tmp/pltest_ins.plist 2>&1)
+        if echo "$out" | grep -q '"hello"'; then
+            printf "${GREEN}PASS${NC}     inserted\n"; echo "plutil|insert|PASS|0|inserted" >> "$RESULTS_FILE"; ((PASS++)) || true
+        else
+            printf "${RED}FAIL${NC}     key not found after insert\n"; echo "plutil|insert|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+        fi
+    else
+        printf "${RED}FAIL${NC}     exit=$rc\n"; echo "plutil|insert|FAIL|$rc|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 13. plutil -insert nested key ─────────────────────────
+    printf "  %-35s " "plutil -insert Settings.Debug"
+    cp /tmp/pltest.plist /tmp/pltest_ins2.plist
+    $PLUTIL -insert Settings.Debug -bool YES /tmp/pltest_ins2.plist 2>/dev/null
+    rc=$?
+    if [ "$rc" -eq 0 ]; then
+        out=$($PLUTIL -type Settings.Debug /tmp/pltest_ins2.plist 2>&1)
+        if echo "$out" | grep -qi "bool"; then
+            printf "${GREEN}PASS${NC}     nested insert\n"; echo "plutil|insert-nested|PASS|0|inserted" >> "$RESULTS_FILE"; ((PASS++)) || true
+        else
+            printf "${RED}FAIL${NC}     nested key not found\n"; echo "plutil|insert-nested|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+        fi
+    else
+        printf "${RED}FAIL${NC}     exit=$rc\n"; echo "plutil|insert-nested|FAIL|$rc|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 14. plutil -replace ───────────────────────────────────
+    printf "  %-35s " "plutil -replace Version"
+    cp /tmp/pltest.plist /tmp/pltest_rep.plist
+    $PLUTIL -replace Version -integer 2 /tmp/pltest_rep.plist 2>/dev/null
+    rc=$?
+    if [ "$rc" -eq 0 ]; then
+        out=$($PLUTIL -extract Version raw /tmp/pltest_rep.plist 2>&1)
+        if echo "$out" | grep -q "^2$"; then
+            printf "${GREEN}PASS${NC}     replaced to 2\n"; echo "plutil|replace|PASS|0|replaced" >> "$RESULTS_FILE"; ((PASS++)) || true
+        else
+            printf "${RED}FAIL${NC}     got: $(echo "$out" | head -c 30)\n"; echo "plutil|replace|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+        fi
+    else
+        printf "${RED}FAIL${NC}     exit=$rc\n"; echo "plutil|replace|FAIL|$rc|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 15. plutil -remove ────────────────────────────────────
+    printf "  %-35s " "plutil -remove Score"
+    cp /tmp/pltest.plist /tmp/pltest_rm.plist
+    $PLUTIL -remove Score /tmp/pltest_rm.plist 2>/dev/null
+    rc=$?
+    if [ "$rc" -eq 0 ]; then
+        $PLUTIL -type Score /tmp/pltest_rm.plist >/dev/null 2>&1
+        local rm_rc=$?
+        if [ "$rm_rc" -ne 0 ]; then
+            printf "${GREEN}PASS${NC}     removed\n"; echo "plutil|remove|PASS|0|removed" >> "$RESULTS_FILE"; ((PASS++)) || true
+        else
+            printf "${RED}FAIL${NC}     key still exists\n"; echo "plutil|remove|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+        fi
+    else
+        printf "${RED}FAIL${NC}     exit=$rc\n"; echo "plutil|remove|FAIL|$rc|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 16. plutil -extract raw ───────────────────────────────
+    printf "  %-35s " "plutil -extract Name raw"
+    out=$($PLUTIL -extract Name raw /tmp/pltest.plist 2>&1)
+    if echo "$out" | grep -q "BurdettieOS"; then
+        printf "${GREEN}PASS${NC}     BurdettieOS\n"; echo "plutil|extract-raw|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | head -c 40)\n"; echo "plutil|extract-raw|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 17. plutil -extract json ──────────────────────────────
+    printf "  %-35s " "plutil -extract Settings json"
+    out=$($PLUTIL -extract Settings json -o - /tmp/pltest.plist 2>&1)
+    if echo "$out" | grep -q '"Theme"' && echo "$out" | grep -q '"dark"'; then
+        printf "${GREEN}PASS${NC}     JSON extracted\n"; echo "plutil|extract-json|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | head -c 60)\n"; echo "plutil|extract-json|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 18. plutil -create xml1 ───────────────────────────────
+    printf "  %-35s " "plutil -create xml1"
+    $PLUTIL -create xml1 /tmp/pltest_new.plist 2>/dev/null
+    rc=$?
+    if [ "$rc" -eq 0 ] && [ -f /tmp/pltest_new.plist ]; then
+        out=$($PLUTIL -lint /tmp/pltest_new.plist 2>&1)
+        if echo "$out" | grep -q "OK"; then
+            printf "${GREEN}PASS${NC}     created valid xml1\n"; echo "plutil|create-xml1|PASS|0|created" >> "$RESULTS_FILE"; ((PASS++)) || true
+        else
+            printf "${RED}FAIL${NC}     created but invalid\n"; echo "plutil|create-xml1|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+        fi
+    else
+        printf "${RED}FAIL${NC}     exit=$rc\n"; echo "plutil|create-xml1|FAIL|$rc|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 19. plutil -create json ───────────────────────────────
+    printf "  %-35s " "plutil -create json"
+    $PLUTIL -create json /tmp/pltest_new.json 2>/dev/null
+    rc=$?
+    if [ "$rc" -eq 0 ] && [ -f /tmp/pltest_new.json ]; then
+        if grep -q "{}" /tmp/pltest_new.json; then
+            printf "${GREEN}PASS${NC}     empty JSON object\n"; echo "plutil|create-json|PASS|0|created" >> "$RESULTS_FILE"; ((PASS++)) || true
+        else
+            printf "${RED}FAIL${NC}     not empty JSON\n"; echo "plutil|create-json|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+        fi
+    else
+        printf "${RED}FAIL${NC}     exit=$rc\n"; echo "plutil|create-json|FAIL|$rc|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 20. plutil default (lint) ─────────────────────────────
+    printf "  %-35s " "plutil default=lint"
+    out=$($PLUTIL /tmp/pltest.plist 2>&1)
+    if echo "$out" | grep -q "OK"; then
+        printf "${GREEN}PASS${NC}     default lint OK\n"; echo "plutil|default-lint|PASS|0|OK" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | head -c 40)\n"; echo "plutil|default-lint|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 21. plutil -insert duplicate key fails ────────────────
+    printf "  %-35s " "plutil -insert duplicate fails"
+    cp /tmp/pltest.plist /tmp/pltest_dup.plist
+    $PLUTIL -insert Name -string "dupe" /tmp/pltest_dup.plist >/dev/null 2>&1
+    rc=$?
+    if [ "$rc" -ne 0 ]; then
+        printf "${GREEN}PASS${NC}     rejected duplicate\n"; echo "plutil|insert-dup|PASS|1|rejected" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     should reject duplicate\n"; echo "plutil|insert-dup|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 22. plutil -replace nonexistent fails ─────────────────
+    printf "  %-35s " "plutil -replace nonexistent fails"
+    cp /tmp/pltest.plist /tmp/pltest_nokey.plist
+    $PLUTIL -replace NoSuchKey -string "x" /tmp/pltest_nokey.plist >/dev/null 2>&1
+    rc=$?
+    if [ "$rc" -ne 0 ]; then
+        printf "${GREEN}PASS${NC}     rejected\n"; echo "plutil|replace-nokey|PASS|1|rejected" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     should reject\n"; echo "plutil|replace-nokey|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 23. plutil -remove nonexistent fails ──────────────────
+    printf "  %-35s " "plutil -remove nonexistent fails"
+    cp /tmp/pltest.plist /tmp/pltest_rmnone.plist
+    $PLUTIL -remove NoSuchKey /tmp/pltest_rmnone.plist >/dev/null 2>&1
+    rc=$?
+    if [ "$rc" -ne 0 ]; then
+        printf "${GREEN}PASS${NC}     rejected\n"; echo "plutil|remove-nokey|PASS|1|rejected" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     should reject\n"; echo "plutil|remove-nokey|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 24. plutil -extract array element ─────────────────────
+    printf "  %-35s " "plutil -extract Tags.0 raw"
+    out=$($PLUTIL -extract Tags.0 raw /tmp/pltest.plist 2>&1)
+    if echo "$out" | grep -q "macho"; then
+        printf "${GREEN}PASS${NC}     Tags[0]=macho\n"; echo "plutil|extract-arr-idx|PASS|0|matched" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | head -c 30)\n"; echo "plutil|extract-arr-idx|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 25. plutil -extract bool ──────────────────────────────
+    printf "  %-35s " "plutil -extract Enabled raw"
+    out=$($PLUTIL -extract Enabled raw /tmp/pltest.plist 2>&1)
+    if echo "$out" | grep -q "true"; then
+        printf "${GREEN}PASS${NC}     Enabled=true\n"; echo "plutil|extract-bool|PASS|0|true" >> "$RESULTS_FILE"; ((PASS++)) || true
+    else
+        printf "${RED}FAIL${NC}     got: $(echo "$out" | head -c 30)\n"; echo "plutil|extract-bool|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 26. plutil SystemVersion.plist lint ───────────────────
+    printf "  %-35s " "plutil lint SystemVersion.plist"
+    if [ -f /System/Library/CoreServices/SystemVersion.plist ]; then
+        out=$($PLUTIL -lint /System/Library/CoreServices/SystemVersion.plist 2>&1)
+        if echo "$out" | grep -q "OK"; then
+            printf "${GREEN}PASS${NC}     system plist OK\n"; echo "plutil|lint-sysver|PASS|0|OK" >> "$RESULTS_FILE"; ((PASS++)) || true
+        else
+            printf "${RED}FAIL${NC}     got: $(echo "$out" | head -c 60)\n"; echo "plutil|lint-sysver|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+        fi
+    else
+        printf "${YELLOW}SKIP${NC}     no SystemVersion.plist\n"
+    fi
+
+    # ── 27. plutil -convert json -r readable ──────────────────
+    printf "  %-35s " "plutil -convert json -r readable"
+    cp /tmp/pltest.plist /tmp/pltest_readable.plist
+    $PLUTIL -convert json -r -o /tmp/pltest_readable.json /tmp/pltest_readable.plist 2>/dev/null
+    rc=$?
+    if [ "$rc" -eq 0 ] && [ -f /tmp/pltest_readable.json ]; then
+        # Readable JSON should have indentation
+        if grep -q "^  " /tmp/pltest_readable.json; then
+            printf "${GREEN}PASS${NC}     indented JSON\n"; echo "plutil|convert-json-r|PASS|0|readable" >> "$RESULTS_FILE"; ((PASS++)) || true
+        else
+            printf "${RED}FAIL${NC}     no indentation\n"; echo "plutil|convert-json-r|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+        fi
+    else
+        printf "${RED}FAIL${NC}     exit=$rc\n"; echo "plutil|convert-json-r|FAIL|$rc|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── 28. plutil -insert -array then -insert element ────────
+    printf "  %-35s " "plutil insert array + element"
+    cp /tmp/pltest.plist /tmp/pltest_arr.plist
+    $PLUTIL -insert Items -array /tmp/pltest_arr.plist 2>/dev/null
+    $PLUTIL -insert Items.0 -string "first" /tmp/pltest_arr.plist 2>/dev/null
+    rc=$?
+    if [ "$rc" -eq 0 ]; then
+        out=$($PLUTIL -extract Items.0 raw /tmp/pltest_arr.plist 2>&1)
+        if echo "$out" | grep -q "first"; then
+            printf "${GREEN}PASS${NC}     array element inserted\n"; echo "plutil|insert-arr-elem|PASS|0|inserted" >> "$RESULTS_FILE"; ((PASS++)) || true
+        else
+            printf "${RED}FAIL${NC}     got: $(echo "$out" | head -c 30)\n"; echo "plutil|insert-arr-elem|FAIL|0|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+        fi
+    else
+        printf "${RED}FAIL${NC}     exit=$rc\n"; echo "plutil|insert-arr-elem|FAIL|$rc|" >> "$RESULTS_FILE"; ((FAIL++)) || true
+    fi
+
+    # ── Clean up ──────────────────────────────────────────────
+    rm -f /tmp/pltest*.plist /tmp/pltest*.json
+}
+
 # ── Main ────────────────────────────────────────────────────────────
 
 echo "================================================================"
@@ -4946,6 +5333,7 @@ case "$CATEGORY" in
     regex)       test_regex_suite ;;
     filetools)   test_filetools_suite ;;
     stdio)       test_stdio_suite ;;
+    plutil)      test_plutil_suite ;;
     all)
         test_xcode_tc
         test_xcode_dev
@@ -4962,8 +5350,9 @@ case "$CATEGORY" in
         test_regex_suite
         test_filetools_suite
         test_stdio_suite
+        test_plutil_suite
         ;;
-    *) echo "Unknown category: $CATEGORY (try: all, xcode-tc, xcode-dev, system, functional, complex, advanced, stress, integration, toolchain, pipeline, devops, rune, regex, filetools, stdio)"; exit 1 ;;
+    *) echo "Unknown category: $CATEGORY (try: all, xcode-tc, xcode-dev, system, functional, complex, advanced, stress, integration, toolchain, pipeline, devops, rune, regex, filetools, stdio, plutil)"; exit 1 ;;
 esac
 
 echo ""

@@ -8,15 +8,15 @@ use ab_glyph::{Font as AbFont, FontVec, ScaleFont};
 use super::unicode::{is_combining_mark, is_zero_width, normalize_nfc};
 
 /// Embedded DejaVu Sans Regular — the default system font.
-const DEJAVU_SANS: &[u8] = include_bytes!("../fonts/DejaVuSans.ttf");
+pub(crate) const DEJAVU_SANS: &[u8] = include_bytes!("../fonts/DejaVuSans.ttf");
 /// Embedded DejaVu Sans Bold.
-const DEJAVU_SANS_BOLD: &[u8] = include_bytes!("../fonts/DejaVuSans-Bold.ttf");
+pub(crate) const DEJAVU_SANS_BOLD: &[u8] = include_bytes!("../fonts/DejaVuSans-Bold.ttf");
 /// Embedded DejaVu Sans Mono.
-const DEJAVU_SANS_MONO: &[u8] = include_bytes!("../fonts/DejaVuSansMono.ttf");
+pub(crate) const DEJAVU_SANS_MONO: &[u8] = include_bytes!("../fonts/DejaVuSansMono.ttf");
 /// Embedded DejaVu Sans Oblique (italic).
-const DEJAVU_SANS_OBLIQUE: &[u8] = include_bytes!("../fonts/DejaVuSans-Oblique.ttf");
+pub(crate) const DEJAVU_SANS_OBLIQUE: &[u8] = include_bytes!("../fonts/DejaVuSans-Oblique.ttf");
 /// Embedded DejaVu Sans Bold Oblique (bold italic).
-const DEJAVU_SANS_BOLD_OBLIQUE: &[u8] = include_bytes!("../fonts/DejaVuSans-BoldOblique.ttf");
+pub(crate) const DEJAVU_SANS_BOLD_OBLIQUE: &[u8] = include_bytes!("../fonts/DejaVuSans-BoldOblique.ttf");
 
 /// A loaded font face backed by `ab_glyph::FontVec`.
 pub struct FontFace {

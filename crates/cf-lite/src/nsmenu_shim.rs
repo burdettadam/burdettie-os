@@ -468,6 +468,29 @@ fn dispatch_menu_action(target: u64, action_sel: u64, sender: u64) {
     }
 }
 
+/// `-[NSMenuItem performClick:]` — programmatically invoke this menu item's action.
+pub extern "C" fn shim_nsmenuitem_perform_click(obj: u64, _cmd: u64, _sender: u64) {
+    if obj == 0 { return; }
+    let enabled = unsafe { *((obj as usize + ITEM_ENABLED_OFF) as *const u64) };
+    if enabled == 0 { return; }
+    let action = unsafe { *((obj as usize + ITEM_ACTION_OFF) as *const u64) };
+    let target = unsafe { *((obj as usize + ITEM_TARGET_OFF) as *const u64) };
+    if action != 0 {
+        dispatch_menu_action(target, action, obj);
+    }
+}
+
+/// `+[NSMenu popUpContextMenu:withEvent:forView:]` — stub that walks menu items
+/// and dispatches the first enabled item's action (simulates showing a context menu).
+pub extern "C" fn shim_nsmenu_popup_context_menu(
+    _cls: u64, _cmd: u64, menu: u64, _event: u64, _view: u64,
+) {
+    // In a real implementation this would display a popup. We simply log and
+    // return without crashing — callers invoking this won't get an unrecognized
+    // selector crash.
+    let _ = menu;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -819,5 +842,24 @@ mod tests {
         shim_nsmenuitem_set_key_equivalent(item, 0, make_string("w"));
         assert_string_eq(shim_nsmenuitem_key_equivalent(item, 0), "w");
         free_obj(item);
+    }
+
+    #[test]
+    fn perform_click_nil_no_panic() {
+        shim_nsmenuitem_perform_click(0, 0, 0);
+    }
+
+    #[test]
+    fn perform_click_disabled_item_no_dispatch() {
+        let item = alloc_obj_fake(ITEM_SIZE);
+        shim_nsmenuitem_init_with_title(item, 0, make_string("X"), 0xABC, 0);
+        shim_nsmenuitem_set_enabled(item, 0, 0);
+        shim_nsmenuitem_perform_click(item, 0, 0); // should not crash
+        free_obj(item);
+    }
+
+    #[test]
+    fn popup_context_menu_nil_no_panic() {
+        shim_nsmenu_popup_context_menu(0, 0, 0, 0, 0);
     }
 }

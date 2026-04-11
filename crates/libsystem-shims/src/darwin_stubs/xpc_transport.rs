@@ -45,6 +45,10 @@ pub struct Connection {
     pub object_handle: u64,
     /// Queued messages awaiting delivery (before resume).
     pending_messages: Vec<u64>,
+    /// Opaque context pointer for the guest.
+    context: u64,
+    /// Leaked service name C string for `xpc_connection_get_name`.
+    service_name_cstr: u64,
 }
 
 // ── Global connection table ────────────────────────────────────
@@ -94,6 +98,8 @@ pub fn create_connection(name_ptr: u64, _queue: u64, _flags: u64) -> u64 {
         is_listener: false,
         object_handle: obj_handle,
         pending_messages: Vec::new(),
+        context: 0,
+        service_name_cstr: 0,
     };
 
     log::debug!(
@@ -210,6 +216,55 @@ pub fn get_pid(handle: u64) -> i32 {
     unsafe { libc::getpid() }
 }
 
+/// Get the service name as a C string pointer (for xpc_connection_get_name).
+/// Returns a leaked CString pointer, or 0 if no name.
+pub fn get_service_name_ptr(handle: u64) -> u64 {
+    if let Some(id) = conn_id_for_handle(handle) {
+        with_conns(|t| {
+            if let Some(c) = t.get_mut(&id) {
+                // Return cached pointer if already created
+                if c.service_name_cstr != 0 {
+                    return c.service_name_cstr;
+                }
+                if let Some(ref name) = c.service_name {
+                    if let Ok(cstr) = std::ffi::CString::new(name.as_str()) {
+                        let ptr = cstr.into_raw() as u64;
+                        c.service_name_cstr = ptr;
+                        return ptr;
+                    }
+                }
+                0
+            } else {
+                0
+            }
+        })
+    } else {
+        0
+    }
+}
+
+/// Set an opaque context pointer on a connection.
+pub fn set_context(handle: u64, ctx: u64) {
+    if let Some(id) = conn_id_for_handle(handle) {
+        with_conns(|t| {
+            if let Some(c) = t.get_mut(&id) {
+                c.context = ctx;
+            }
+        });
+    }
+}
+
+/// Get the opaque context pointer from a connection.
+pub fn get_context(handle: u64) -> u64 {
+    if let Some(id) = conn_id_for_handle(handle) {
+        with_conns(|t| {
+            t.get(&id).map(|c| c.context).unwrap_or(0)
+        })
+    } else {
+        0
+    }
+}
+
 /// Send a message (fire-and-forget).
 ///
 /// Routes through Unix domain socket if a listener exists, otherwise
@@ -253,18 +308,26 @@ pub fn send_message(handle: u64, message: u64) {
 
 /// Send a message with a reply handler.
 ///
-/// Tries socket transport if a listener exists, otherwise falls back to
-/// loopback (delivers XPC_ERROR_CONNECTION_INTERRUPTED to the handler).
+/// Tries pipe handlers first, then socket transport, then loopback fallback.
 pub fn send_message_with_reply(handle: u64, message: u64, _queue: u64, reply_handler: u64) {
     if reply_handler == 0 { return; }
 
-    // Try socket transport for a real reply
     if let Some(id) = conn_id_for_handle(handle) {
         let service = with_conns(|t| {
             t.get(&id).and_then(|c| c.service_name.clone())
         });
 
         if let Some(ref name) = service {
+            // Try pipe handler first (in-process routing)
+            if super::xpc_pipe::has_pipe_handler(name) {
+                let reply = super::xpc_pipe::route_to_handler(name, message);
+                if reply != 0 {
+                    invoke_block_1(reply_handler, reply);
+                    return;
+                }
+            }
+
+            // Try socket transport
             if let Some(reply) = socket_transport::try_send_with_reply(name, message) {
                 invoke_block_1(reply_handler, reply);
                 return;
@@ -279,7 +342,7 @@ pub fn send_message_with_reply(handle: u64, message: u64, _queue: u64, reply_han
 
 /// Send a message synchronously, returning the reply.
 ///
-/// Tries socket transport for a real reply, otherwise returns an error.
+/// Tries pipe handlers first, then socket transport, then returns error.
 pub fn send_message_with_reply_sync(handle: u64, message: u64) -> u64 {
     if let Some(id) = conn_id_for_handle(handle) {
         let service = with_conns(|t| {
@@ -287,6 +350,15 @@ pub fn send_message_with_reply_sync(handle: u64, message: u64) -> u64 {
         });
 
         if let Some(ref name) = service {
+            // Try pipe handler first (in-process routing)
+            if super::xpc_pipe::has_pipe_handler(name) {
+                let reply = super::xpc_pipe::route_to_handler(name, message);
+                if reply != 0 {
+                    return reply;
+                }
+            }
+
+            // Try socket transport
             if let Some(reply) = socket_transport::try_send_with_reply(name, message) {
                 return reply;
             }

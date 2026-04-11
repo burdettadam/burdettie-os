@@ -114,6 +114,10 @@ impl FoundationShims {
         register::register_nsnotification_class(rt);
     }
 
+    pub fn register_nsdistributednotificationcenter_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsdistributednotificationcenter_class(rt);
+    }
+
     pub fn register_nsvalue_class(rt: &mut objc_runtime::ObjcRuntime) {
         register::register_nsvalue_class(rt);
     }

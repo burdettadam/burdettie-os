@@ -30,4 +30,9 @@ fn main() {
         // the C++ unwind ABI (__cxa_throw etc.)
         println!("cargo:rustc-link-lib=stdc++");
     }
+
+    // Link GNUstep's libobjc2 when the feature is enabled.
+    if std::env::var("CARGO_FEATURE_LIBOBJC2").is_ok() {
+        println!("cargo:rustc-link-lib=objc");
+    }
 }

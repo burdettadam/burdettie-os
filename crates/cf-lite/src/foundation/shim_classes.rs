@@ -26,6 +26,7 @@ pub(super) fn install_class_symbols(table: &mut ShimTable) {
     register_class!(table, "NSCharacterSet", nsobj::nscharacterset_class_addr(), nsobj::nscharacterset_metaclass_addr());
     register_class!(table, "NSNotificationCenter", nsobj::nsnotificationcenter_class_addr(), nsobj::nsnotificationcenter_metaclass_addr());
     register_class!(table, "NSNotification", nsobj::nsnotification_class_addr(), nsobj::nsnotification_metaclass_addr());
+    register_class!(table, "NSDistributedNotificationCenter", nsobj::nsdistributednotificationcenter_class_addr(), nsobj::nsdistributednotificationcenter_metaclass_addr());
     register_class!(table, "NSValue", nsobj::nsvalue_class_addr(), nsobj::nsvalue_metaclass_addr());
     register_class!(table, "NSUUID", nsobj::nsuuid_class_addr(), nsobj::nsuuid_metaclass_addr());
     register_class!(table, "NSLocale", nsobj::nslocale_class_addr(), nsobj::nslocale_metaclass_addr());
@@ -64,6 +65,7 @@ pub(super) fn install_class_symbols(table: &mut ShimTable) {
     register_class!(table, "NSScreen", nsobj::nsscreen_class_addr(), nsobj::nsscreen_metaclass_addr());
     register_class!(table, "NSColor", nsobj::nscolor_class_addr(), nsobj::nscolor_metaclass_addr());
     register_class!(table, "NSFont", nsobj::nsfont_class_addr(), nsobj::nsfont_metaclass_addr());
+    register_class!(table, "NSFontManager", nsobj::nsfontmanager_class_addr(), nsobj::nsfontmanager_metaclass_addr());
     register_class!(table, "NSImage", nsobj::nsimage_class_addr(), nsobj::nsimage_metaclass_addr());
 
     // ── AppKit Phase C7 class data symbols ──────────────────────────
@@ -82,6 +84,11 @@ pub(super) fn install_class_symbols(table: &mut ShimTable) {
     register_class!(table, "CATransaction", nsobj::catransaction_class_addr(), nsobj::catransaction_metaclass_addr());
     register_class!(table, "CADisplayLink", nsobj::cadisplaylink_class_addr(), nsobj::cadisplaylink_metaclass_addr());
     register_class!(table, "CAMediaTimingFunction", nsobj::camediatimingfunction_class_addr(), nsobj::camediatimingfunction_metaclass_addr());
+
+    // ── TextKit class data symbols ──────────────────────────────────
+    register_class!(table, "NSTextStorage", nsobj::nstextstorage_class_addr(), nsobj::nstextstorage_metaclass_addr());
+    register_class!(table, "NSLayoutManager", nsobj::nslayoutmanager_class_addr(), nsobj::nslayoutmanager_metaclass_addr());
+    register_class!(table, "NSTextContainer", nsobj::nstextcontainer_class_addr(), nsobj::nstextcontainer_metaclass_addr());
 
     // ── DVT framework classes (Xcode helper) ────────────────────────
     register_class!(table, "DVTSystemPrerequisitesPaths", nsobj::dvtsystemprerequisitespaths_class_addr(), nsobj::dvtsystemprerequisitespaths_metaclass_addr());

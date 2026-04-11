@@ -1,9 +1,9 @@
-//! CoreAnimation stub shims: CALayer, CATransaction, CADisplayLink.
+//! CoreAnimation shims: CALayer, CATransaction, CADisplayLink.
 //!
 //! Modern Cocoa apps expect layer-backed views (`wantsLayer = YES`).
-//! These stubs provide the minimum surface so guest code that accesses
-//! `view.layer`, creates `CATransaction` groups, or queries
-//! `CADisplayLink` does not crash.
+//! CALayer now provides a real sublayer tree and stores per-layer
+//! visual properties (opacity, cornerRadius, borderWidth, etc.)
+//! that the `layer_compositor` module composites via tiny-skia.
 //!
 //! ## CALayer object layout (48 bytes)
 //!
@@ -14,6 +14,10 @@
 //!   offset 32: bounds_h            (f64)
 //!   offset 40: background_color    (u64 — CGColorRef, or 0)
 //!
+//! Extended properties (opacity, hidden, cornerRadius, borderWidth,
+//! borderColor, masksToBounds, contents, contentsScale) are stored
+//! in the external `LAYER_PROPS` map to keep the 48-byte layout stable.
+//!
 //! ## CATransaction — class-only, no instance layout.
 //! ## CADisplayLink (24 bytes)
 //!
@@ -21,12 +25,165 @@
 //!   offset  8: target              (u64)
 //!   offset 16: selector            (u64)
 
+use std::collections::HashMap;
+use std::sync::Mutex;
+
 const BOUNDS_X_OFF: usize = 8;
 const BOUNDS_Y_OFF: usize = 16;
 const BOUNDS_W_OFF: usize = 24;
 const BOUNDS_H_OFF: usize = 32;
 const BG_COLOR_OFF: usize = 40;
 const LAYER_SIZE: usize = 48;
+
+// ── Extended property storage ──────────────────────────────────
+
+/// Extended per-layer properties that don't fit in the 48-byte object.
+#[derive(Clone, Debug)]
+pub(crate) struct LayerProps {
+    pub opacity: f32,
+    pub hidden: bool,
+    pub corner_radius: f64,
+    pub border_width: f64,
+    pub border_color: u64,     // CGColorRef handle
+    pub shadow_opacity: f32,
+    pub masks_to_bounds: bool,
+    pub contents: u64,         // CGImageRef handle
+    pub contents_scale: f64,
+    pub needs_display: bool,
+    /// CATransform3D stored as a 4×4 column-major matrix.  Only the 2D affine
+    /// subset (m11, m12, m21, m22, m41, m42) is applied during compositing.
+    pub transform: [f64; 16],
+    pub sublayer_transform: [f64; 16],
+}
+
+impl Default for LayerProps {
+    fn default() -> Self {
+        Self {
+            opacity: 1.0,
+            hidden: false,
+            corner_radius: 0.0,
+            border_width: 0.0,
+            border_color: 0,
+            shadow_opacity: 0.0,
+            masks_to_bounds: false,
+            contents: 0,
+            contents_scale: 1.0,
+            needs_display: false,
+            transform: IDENTITY_TRANSFORM,
+            sublayer_transform: IDENTITY_TRANSFORM,
+        }
+    }
+}
+
+/// 4×4 identity matrix in column-major order.
+const IDENTITY_TRANSFORM: [f64; 16] = [
+    1.0, 0.0, 0.0, 0.0,
+    0.0, 1.0, 0.0, 0.0,
+    0.0, 0.0, 1.0, 0.0,
+    0.0, 0.0, 0.0, 1.0,
+];
+
+/// Check whether a 4×4 matrix is the identity.
+pub(crate) fn is_identity_transform(m: &[f64; 16]) -> bool {
+    m == &IDENTITY_TRANSFORM
+}
+
+static LAYER_PROPS: Mutex<Option<HashMap<u64, LayerProps>>> = Mutex::new(None);
+
+fn with_props<R>(layer: u64, f: impl FnOnce(&LayerProps) -> R) -> R {
+    let guard = LAYER_PROPS.lock().unwrap_or_else(|e| e.into_inner());
+    let default = LayerProps::default();
+    let props = guard.as_ref().and_then(|m| m.get(&layer)).unwrap_or(&default);
+    f(props)
+}
+
+fn with_props_mut<R>(layer: u64, f: impl FnOnce(&mut LayerProps) -> R) -> R {
+    let mut guard = LAYER_PROPS.lock().unwrap_or_else(|e| e.into_inner());
+    let map = guard.get_or_insert_with(HashMap::new);
+    let props = map.entry(layer).or_default();
+    f(props)
+}
+
+/// Get a snapshot of all layer props for a given layer.
+pub(crate) fn get_layer_props(layer: u64) -> LayerProps {
+    with_props(layer, |p| p.clone())
+}
+
+// ── Sublayer tree ──────────────────────────────────────────────
+
+/// sublayer children: parent → ordered Vec<child>
+static LAYER_CHILDREN: Mutex<Option<HashMap<u64, Vec<u64>>>> = Mutex::new(None);
+/// sublayer parent: child → parent
+static LAYER_PARENT: Mutex<Option<HashMap<u64, u64>>> = Mutex::new(None);
+
+/// Get the children of a layer.
+pub(crate) fn layer_children(layer: u64) -> Vec<u64> {
+    if layer == 0 { return vec![]; }
+    let guard = LAYER_CHILDREN.lock().unwrap_or_else(|e| e.into_inner());
+    guard.as_ref().and_then(|m| m.get(&layer)).cloned().unwrap_or_default()
+}
+
+/// Get the superlayer of a layer.
+pub(crate) fn layer_superlayer(layer: u64) -> u64 {
+    if layer == 0 { return 0; }
+    let guard = LAYER_PARENT.lock().unwrap_or_else(|e| e.into_inner());
+    guard.as_ref().and_then(|m| m.get(&layer)).copied().unwrap_or(0)
+}
+
+fn add_sublayer_internal(parent: u64, child: u64) {
+    if parent == 0 || child == 0 || parent == child { return; }
+
+    // Remove child from its old parent first.
+    remove_from_superlayer_internal(child);
+
+    // Add to new parent's children list.
+    {
+        let mut guard = LAYER_CHILDREN.lock().unwrap_or_else(|e| e.into_inner());
+        let map = guard.get_or_insert_with(HashMap::new);
+        map.entry(parent).or_default().push(child);
+    }
+
+    // Record parent link.
+    {
+        let mut guard = LAYER_PARENT.lock().unwrap_or_else(|e| e.into_inner());
+        let map = guard.get_or_insert_with(HashMap::new);
+        map.insert(child, parent);
+    }
+}
+
+fn remove_from_superlayer_internal(child: u64) {
+    if child == 0 { return; }
+
+    let old_parent = {
+        let mut guard = LAYER_PARENT.lock().unwrap_or_else(|e| e.into_inner());
+        guard.as_mut().and_then(|m| m.remove(&child)).unwrap_or(0)
+    };
+
+    if old_parent != 0 {
+        let mut guard = LAYER_CHILDREN.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(map) = guard.as_mut() {
+            if let Some(children) = map.get_mut(&old_parent) {
+                children.retain(|&c| c != child);
+            }
+        }
+    }
+}
+
+/// Reset all CALayer extended state (for runtime reuse between guest runs).
+pub(crate) fn reset_layer_state() {
+    {
+        let mut guard = LAYER_PROPS.lock().unwrap_or_else(|e| e.into_inner());
+        *guard = None;
+    }
+    {
+        let mut guard = LAYER_CHILDREN.lock().unwrap_or_else(|e| e.into_inner());
+        *guard = None;
+    }
+    {
+        let mut guard = LAYER_PARENT.lock().unwrap_or_else(|e| e.into_inner());
+        *guard = None;
+    }
+}
 
 const DISPLAYLINK_TARGET_OFF: usize = 8;
 const DISPLAYLINK_SEL_OFF: usize = 16;
@@ -123,11 +280,17 @@ pub extern "C" fn shim_calayer_set_background_color(obj: u64, _cmd: u64, color: 
     unsafe { *((obj as usize + BG_COLOR_OFF) as *mut u64) = color; }
 }
 
-/// `-[CALayer setNeedsDisplay]` — no-op stub.
-pub extern "C" fn shim_calayer_set_needs_display(_obj: u64, _cmd: u64) {}
+/// `-[CALayer setNeedsDisplay]`
+pub extern "C" fn shim_calayer_set_needs_display(obj: u64, _cmd: u64) {
+    if obj == 0 { return; }
+    with_props_mut(obj, |p| p.needs_display = true);
+}
 
-/// `-[CALayer displayIfNeeded]` — no-op stub.
-pub extern "C" fn shim_calayer_display_if_needed(_obj: u64, _cmd: u64) {}
+/// `-[CALayer displayIfNeeded]`
+pub extern "C" fn shim_calayer_display_if_needed(obj: u64, _cmd: u64) {
+    if obj == 0 { return; }
+    with_props_mut(obj, |p| p.needs_display = false);
+}
 
 /// `-[CALayer setNeedsLayout]` — no-op stub.
 pub extern "C" fn shim_calayer_set_needs_layout(_obj: u64, _cmd: u64) {}
@@ -135,88 +298,173 @@ pub extern "C" fn shim_calayer_set_needs_layout(_obj: u64, _cmd: u64) {}
 /// `-[CALayer layoutIfNeeded]` — no-op stub.
 pub extern "C" fn shim_calayer_layout_if_needed(_obj: u64, _cmd: u64) {}
 
-/// `-[CALayer addSublayer:]` — no-op stub.
-pub extern "C" fn shim_calayer_add_sublayer(_obj: u64, _cmd: u64, _layer: u64) {}
-
-/// `-[CALayer removeFromSuperlayer]` — no-op stub.
-pub extern "C" fn shim_calayer_remove_from_superlayer(_obj: u64, _cmd: u64) {}
-
-/// `-[CALayer sublayers]` — returns empty array.
-pub extern "C" fn shim_calayer_sublayers(_obj: u64, _cmd: u64) -> u64 {
-    crate::nsarray::make_nsarray(&[])
+/// `-[CALayer addSublayer:]`
+pub extern "C" fn shim_calayer_add_sublayer(obj: u64, _cmd: u64, layer: u64) {
+    add_sublayer_internal(obj, layer);
 }
 
-/// `-[CALayer isHidden]` — returns NO.
-pub extern "C" fn shim_calayer_is_hidden(_obj: u64, _cmd: u64) -> u8 {
-    0
+/// `-[CALayer removeFromSuperlayer]`
+pub extern "C" fn shim_calayer_remove_from_superlayer(obj: u64, _cmd: u64) {
+    remove_from_superlayer_internal(obj);
 }
 
-/// `-[CALayer setHidden:]` — no-op stub.
-pub extern "C" fn shim_calayer_set_hidden(_obj: u64, _cmd: u64, _hidden: u8) {}
-
-/// `-[CALayer opacity]` — returns 1.0.
-pub extern "C" fn shim_calayer_opacity(_obj: u64, _cmd: u64) -> f32 {
-    1.0
+/// `-[CALayer sublayers]` — returns an NSArray of child layers.
+pub extern "C" fn shim_calayer_sublayers(obj: u64, _cmd: u64) -> u64 {
+    let children = layer_children(obj);
+    crate::nsarray::make_nsarray(&children)
 }
 
-/// `-[CALayer setOpacity:]` — no-op stub.
-pub extern "C" fn shim_calayer_set_opacity(_obj: u64, _cmd: u64, _opacity: f32) {}
-
-/// `-[CALayer cornerRadius]` — returns 0.
-pub extern "C" fn shim_calayer_corner_radius(_obj: u64, _cmd: u64) -> f64 {
-    0.0
+/// `-[CALayer isHidden]`
+pub extern "C" fn shim_calayer_is_hidden(obj: u64, _cmd: u64) -> u8 {
+    if obj == 0 { return 0; }
+    u8::from(with_props(obj, |p| p.hidden))
 }
 
-/// `-[CALayer setCornerRadius:]` — no-op stub.
-pub extern "C" fn shim_calayer_set_corner_radius(_obj: u64, _cmd: u64, _r: f64) {}
-
-/// `-[CALayer borderWidth]` — returns 0.
-pub extern "C" fn shim_calayer_border_width(_obj: u64, _cmd: u64) -> f64 {
-    0.0
+/// `-[CALayer setHidden:]`
+pub extern "C" fn shim_calayer_set_hidden(obj: u64, _cmd: u64, hidden: u8) {
+    if obj == 0 { return; }
+    with_props_mut(obj, |p| p.hidden = hidden != 0);
 }
 
-/// `-[CALayer setBorderWidth:]` — no-op stub.
-pub extern "C" fn shim_calayer_set_border_width(_obj: u64, _cmd: u64, _w: f64) {}
-
-/// `-[CALayer borderColor]` — returns 0 (NULL).
-pub extern "C" fn shim_calayer_border_color(_obj: u64, _cmd: u64) -> u64 {
-    0
+/// `-[CALayer opacity]`
+pub extern "C" fn shim_calayer_opacity(obj: u64, _cmd: u64) -> f32 {
+    if obj == 0 { return 1.0; }
+    with_props(obj, |p| p.opacity)
 }
 
-/// `-[CALayer setBorderColor:]` — no-op stub.
-pub extern "C" fn shim_calayer_set_border_color(_obj: u64, _cmd: u64, _color: u64) {}
-
-/// `-[CALayer shadowOpacity]` — returns 0.
-pub extern "C" fn shim_calayer_shadow_opacity(_obj: u64, _cmd: u64) -> f32 {
-    0.0
+/// `-[CALayer setOpacity:]`
+pub extern "C" fn shim_calayer_set_opacity(obj: u64, _cmd: u64, opacity: f32) {
+    if obj == 0 { return; }
+    with_props_mut(obj, |p| p.opacity = opacity);
 }
 
-/// `-[CALayer setShadowOpacity:]` — no-op stub.
-pub extern "C" fn shim_calayer_set_shadow_opacity(_obj: u64, _cmd: u64, _opacity: f32) {}
-
-/// `-[CALayer contents]` — returns nil.
-pub extern "C" fn shim_calayer_contents(_obj: u64, _cmd: u64) -> u64 {
-    0
+/// `-[CALayer cornerRadius]`
+pub extern "C" fn shim_calayer_corner_radius(obj: u64, _cmd: u64) -> f64 {
+    if obj == 0 { return 0.0; }
+    with_props(obj, |p| p.corner_radius)
 }
 
-/// `-[CALayer setContents:]` — no-op stub.
-pub extern "C" fn shim_calayer_set_contents(_obj: u64, _cmd: u64, _contents: u64) {}
-
-/// `-[CALayer contentsScale]` — returns 1.0.
-pub extern "C" fn shim_calayer_contents_scale(_obj: u64, _cmd: u64) -> f64 {
-    1.0
+/// `-[CALayer setCornerRadius:]`
+pub extern "C" fn shim_calayer_set_corner_radius(obj: u64, _cmd: u64, r: f64) {
+    if obj == 0 { return; }
+    with_props_mut(obj, |p| p.corner_radius = r);
 }
 
-/// `-[CALayer setContentsScale:]` — no-op stub.
-pub extern "C" fn shim_calayer_set_contents_scale(_obj: u64, _cmd: u64, _scale: f64) {}
-
-/// `-[CALayer masksToBounds]` — returns NO.
-pub extern "C" fn shim_calayer_masks_to_bounds(_obj: u64, _cmd: u64) -> u8 {
-    0
+/// `-[CALayer borderWidth]`
+pub extern "C" fn shim_calayer_border_width(obj: u64, _cmd: u64) -> f64 {
+    if obj == 0 { return 0.0; }
+    with_props(obj, |p| p.border_width)
 }
 
-/// `-[CALayer setMasksToBounds:]` — no-op stub.
-pub extern "C" fn shim_calayer_set_masks_to_bounds(_obj: u64, _cmd: u64, _flag: u8) {}
+/// `-[CALayer setBorderWidth:]`
+pub extern "C" fn shim_calayer_set_border_width(obj: u64, _cmd: u64, w: f64) {
+    if obj == 0 { return; }
+    with_props_mut(obj, |p| p.border_width = w);
+}
+
+/// `-[CALayer borderColor]`
+pub extern "C" fn shim_calayer_border_color(obj: u64, _cmd: u64) -> u64 {
+    if obj == 0 { return 0; }
+    with_props(obj, |p| p.border_color)
+}
+
+/// `-[CALayer setBorderColor:]`
+pub extern "C" fn shim_calayer_set_border_color(obj: u64, _cmd: u64, color: u64) {
+    if obj == 0 { return; }
+    with_props_mut(obj, |p| p.border_color = color);
+}
+
+/// `-[CALayer shadowOpacity]`
+pub extern "C" fn shim_calayer_shadow_opacity(obj: u64, _cmd: u64) -> f32 {
+    if obj == 0 { return 0.0; }
+    with_props(obj, |p| p.shadow_opacity)
+}
+
+/// `-[CALayer setShadowOpacity:]`
+pub extern "C" fn shim_calayer_set_shadow_opacity(obj: u64, _cmd: u64, opacity: f32) {
+    if obj == 0 { return; }
+    with_props_mut(obj, |p| p.shadow_opacity = opacity);
+}
+
+/// `-[CALayer contents]`
+pub extern "C" fn shim_calayer_contents(obj: u64, _cmd: u64) -> u64 {
+    if obj == 0 { return 0; }
+    with_props(obj, |p| p.contents)
+}
+
+/// `-[CALayer setContents:]`
+pub extern "C" fn shim_calayer_set_contents(obj: u64, _cmd: u64, contents: u64) {
+    if obj == 0 { return; }
+    with_props_mut(obj, |p| p.contents = contents);
+}
+
+/// `-[CALayer contentsScale]`
+pub extern "C" fn shim_calayer_contents_scale(obj: u64, _cmd: u64) -> f64 {
+    if obj == 0 { return 1.0; }
+    with_props(obj, |p| p.contents_scale)
+}
+
+/// `-[CALayer setContentsScale:]`
+pub extern "C" fn shim_calayer_set_contents_scale(obj: u64, _cmd: u64, scale: f64) {
+    if obj == 0 { return; }
+    with_props_mut(obj, |p| p.contents_scale = scale);
+}
+
+/// `-[CALayer transform]` — returns CATransform3D (16 f64 values, 128 bytes).
+/// On ARM64 this is returned via x8 indirect-result pointer.
+pub extern "C" fn shim_calayer_transform(obj: u64, _cmd: u64) -> [f64; 16] {
+    if obj == 0 { return IDENTITY_TRANSFORM; }
+    with_props(obj, |p| p.transform)
+}
+
+/// `-[CALayer setTransform:]`
+pub extern "C" fn shim_calayer_set_transform(
+    obj: u64, _cmd: u64,
+    m11: f64, m12: f64, m13: f64, m14: f64,
+    m21: f64, m22: f64, m23: f64, m24: f64,
+    m31: f64, m32: f64, m33: f64, m34: f64,
+    m41: f64, m42: f64, m43: f64, m44: f64,
+) {
+    if obj == 0 { return; }
+    let t = [m11, m12, m13, m14, m21, m22, m23, m24, m31, m32, m33, m34, m41, m42, m43, m44];
+    with_props_mut(obj, |p| p.transform = t);
+}
+
+/// `-[CALayer sublayerTransform]`
+pub extern "C" fn shim_calayer_sublayer_transform(obj: u64, _cmd: u64) -> [f64; 16] {
+    if obj == 0 { return IDENTITY_TRANSFORM; }
+    with_props(obj, |p| p.sublayer_transform)
+}
+
+/// `-[CALayer setSublayerTransform:]`
+pub extern "C" fn shim_calayer_set_sublayer_transform(
+    obj: u64, _cmd: u64,
+    m11: f64, m12: f64, m13: f64, m14: f64,
+    m21: f64, m22: f64, m23: f64, m24: f64,
+    m31: f64, m32: f64, m33: f64, m34: f64,
+    m41: f64, m42: f64, m43: f64, m44: f64,
+) {
+    if obj == 0 { return; }
+    let t = [m11, m12, m13, m14, m21, m22, m23, m24, m31, m32, m33, m34, m41, m42, m43, m44];
+    with_props_mut(obj, |p| p.sublayer_transform = t);
+}
+
+/// `-[CALayer masksToBounds]`
+pub extern "C" fn shim_calayer_masks_to_bounds(obj: u64, _cmd: u64) -> u8 {
+    if obj == 0 { return 0; }
+    u8::from(with_props(obj, |p| p.masks_to_bounds))
+}
+
+/// `-[CALayer setMasksToBounds:]`
+pub extern "C" fn shim_calayer_set_masks_to_bounds(obj: u64, _cmd: u64, flag: u8) {
+    if obj == 0 { return; }
+    with_props_mut(obj, |p| p.masks_to_bounds = flag != 0);
+}
+
+/// `-[CALayer superlayer]`
+pub extern "C" fn shim_calayer_superlayer(obj: u64, _cmd: u64) -> u64 {
+    layer_superlayer(obj)
+}
 
 // ── CATransaction ──────────────────────────────────────────────
 
@@ -356,17 +604,150 @@ mod tests {
     }
 
     #[test]
-    fn layer_opacity_default() {
+    fn layer_opacity_roundtrip() {
         let layer = alloc_layer();
         assert!((shim_calayer_opacity(layer, 0) - 1.0).abs() < f32::EPSILON);
+        shim_calayer_set_opacity(layer, 0, 0.5);
+        assert!((shim_calayer_opacity(layer, 0) - 0.5).abs() < f32::EPSILON);
         free_obj(layer);
     }
 
     #[test]
-    fn layer_contents_scale_default() {
+    fn layer_hidden_roundtrip() {
+        let layer = alloc_layer();
+        assert_eq!(shim_calayer_is_hidden(layer, 0), 0);
+        shim_calayer_set_hidden(layer, 0, 1);
+        assert_eq!(shim_calayer_is_hidden(layer, 0), 1);
+        shim_calayer_set_hidden(layer, 0, 0);
+        assert_eq!(shim_calayer_is_hidden(layer, 0), 0);
+        free_obj(layer);
+    }
+
+    #[test]
+    fn layer_corner_radius_roundtrip() {
+        let layer = alloc_layer();
+        assert!((shim_calayer_corner_radius(layer, 0)).abs() < f64::EPSILON);
+        shim_calayer_set_corner_radius(layer, 0, 12.0);
+        assert!((shim_calayer_corner_radius(layer, 0) - 12.0).abs() < f64::EPSILON);
+        free_obj(layer);
+    }
+
+    #[test]
+    fn layer_border_roundtrip() {
+        let layer = alloc_layer();
+        assert!((shim_calayer_border_width(layer, 0)).abs() < f64::EPSILON);
+        shim_calayer_set_border_width(layer, 0, 2.0);
+        assert!((shim_calayer_border_width(layer, 0) - 2.0).abs() < f64::EPSILON);
+        assert_eq!(shim_calayer_border_color(layer, 0), 0);
+        shim_calayer_set_border_color(layer, 0, 0xBEEF);
+        assert_eq!(shim_calayer_border_color(layer, 0), 0xBEEF);
+        free_obj(layer);
+    }
+
+    #[test]
+    fn layer_masks_to_bounds_roundtrip() {
+        let layer = alloc_layer();
+        assert_eq!(shim_calayer_masks_to_bounds(layer, 0), 0);
+        shim_calayer_set_masks_to_bounds(layer, 0, 1);
+        assert_eq!(shim_calayer_masks_to_bounds(layer, 0), 1);
+        free_obj(layer);
+    }
+
+    #[test]
+    fn layer_contents_roundtrip() {
+        let layer = alloc_layer();
+        assert_eq!(shim_calayer_contents(layer, 0), 0);
+        shim_calayer_set_contents(layer, 0, 0xDEAD);
+        assert_eq!(shim_calayer_contents(layer, 0), 0xDEAD);
+        free_obj(layer);
+    }
+
+    #[test]
+    fn layer_contents_scale_roundtrip() {
         let layer = alloc_layer();
         assert!((shim_calayer_contents_scale(layer, 0) - 1.0).abs() < f64::EPSILON);
+        shim_calayer_set_contents_scale(layer, 0, 2.0);
+        assert!((shim_calayer_contents_scale(layer, 0) - 2.0).abs() < f64::EPSILON);
         free_obj(layer);
+    }
+
+    // --- Sublayer tree ---
+
+    #[test]
+    fn add_sublayer_builds_tree() {
+        let parent = alloc_layer();
+        let child1 = alloc_layer();
+        let child2 = alloc_layer();
+
+        shim_calayer_add_sublayer(parent, 0, child1);
+        shim_calayer_add_sublayer(parent, 0, child2);
+
+        let children = layer_children(parent);
+        assert_eq!(children.len(), 2);
+        assert_eq!(children[0], child1);
+        assert_eq!(children[1], child2);
+        assert_eq!(layer_superlayer(child1), parent);
+        assert_eq!(layer_superlayer(child2), parent);
+
+        // sublayers shim returns NSArray
+        let arr = shim_calayer_sublayers(parent, 0);
+        assert_ne!(arr, 0);
+
+        // Clean up
+        remove_from_superlayer_internal(child1);
+        remove_from_superlayer_internal(child2);
+        free_obj(parent);
+        free_obj(child1);
+        free_obj(child2);
+    }
+
+    #[test]
+    fn remove_from_superlayer_works() {
+        let parent = alloc_layer();
+        let child = alloc_layer();
+
+        shim_calayer_add_sublayer(parent, 0, child);
+        assert_eq!(layer_children(parent).len(), 1);
+
+        shim_calayer_remove_from_superlayer(child, 0);
+        assert_eq!(layer_children(parent).len(), 0);
+        assert_eq!(layer_superlayer(child), 0);
+
+        free_obj(parent);
+        free_obj(child);
+    }
+
+    #[test]
+    fn add_sublayer_reparents() {
+        let parent1 = alloc_layer();
+        let parent2 = alloc_layer();
+        let child = alloc_layer();
+
+        shim_calayer_add_sublayer(parent1, 0, child);
+        assert_eq!(layer_superlayer(child), parent1);
+
+        // Adding to a new parent removes from old parent.
+        shim_calayer_add_sublayer(parent2, 0, child);
+        assert_eq!(layer_children(parent1).len(), 0);
+        assert_eq!(layer_children(parent2).len(), 1);
+        assert_eq!(layer_superlayer(child), parent2);
+
+        remove_from_superlayer_internal(child);
+        free_obj(parent1);
+        free_obj(parent2);
+        free_obj(child);
+    }
+
+    #[test]
+    fn superlayer_shim() {
+        let parent = alloc_layer();
+        let child = alloc_layer();
+        assert_eq!(shim_calayer_superlayer(child, 0), 0);
+        shim_calayer_add_sublayer(parent, 0, child);
+        assert_eq!(shim_calayer_superlayer(child, 0), parent);
+        remove_from_superlayer_internal(child);
+        free_obj(parent);
+        free_obj(child);
     }
 
     // --- CATransaction ---

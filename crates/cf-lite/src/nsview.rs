@@ -150,6 +150,25 @@ fn snapshot_subviews(view: u64) -> Vec<u64> {
     children
 }
 
+/// Public accessor for the accessibility bridge.
+pub(crate) fn snapshot_subviews_pub(view: u64) -> Vec<u64> {
+    snapshot_subviews(view)
+}
+
+/// Public accessor: get view frame as CGRect.
+pub(crate) fn view_frame(view: u64) -> crate::cg_types::CGRect {
+    crate::cg_types::CGRect {
+        origin: crate::cg_types::CGPoint {
+            x: read_f64(view, FRAME_X_OFF),
+            y: read_f64(view, FRAME_Y_OFF),
+        },
+        size: crate::cg_types::CGSize {
+            width: read_f64(view, FRAME_W_OFF),
+            height: read_f64(view, FRAME_H_OFF),
+        },
+    }
+}
+
 fn write_subviews(view: u64, children: &[u64]) -> bool {
     if view == 0 {
         return false;
@@ -828,23 +847,138 @@ pub(crate) fn display_view_recursive(view: u64, cg_ctx: u64) {
     let w = read_f64(view, FRAME_W_OFF);
     let h = read_f64(view, FRAME_H_OFF);
 
-    // Push the CGContext as the current NSGraphicsContext for this view's draw cycle.
-    let prev_ctx = crate::nsgraphicscontext::push_current_context(cg_ctx);
+    // Check the view's backing CALayer for visual properties.
+    let layer = if read_u64(view, FLAGS_OFF) & FLAG_WANTS_LAYER != 0 {
+        view_layer_or_create(view)
+    } else {
+        0
+    };
 
-    // Call drawRect: via ObjC dispatch so guest subclass overrides are honored.
-    call_draw_rect(view, x, y, w, h);
+    let props = crate::calayer::get_layer_props(layer);
+
+    // If the layer is hidden, skip this view and all its children.
+    if layer != 0 && props.hidden {
+        return;
+    }
+
+    let needs_offscreen = layer != 0 && crate::layer_compositor::layer_needs_compositing(layer);
+
+    if needs_offscreen {
+        // Render this view into an offscreen CG context, then composite
+        // the result onto the window surface with layer effects.
+        let vw = w.max(1.0) as u32;
+        let vh = h.max(1.0) as u32;
+        let offscreen_ctx = cg_shims::bridge::context_create(vw, vh);
+
+        // Draw layer backgroundColor into the offscreen buffer.
+        let bg_color = crate::calayer::shim_calayer_background_color(layer, 0);
+        if bg_color != 0 {
+            cg_shims::bridge::with_context(offscreen_ctx, |c| {
+                let color = cg_shims::bridge::color_get(bg_color);
+                if let Some(col) = color {
+                    c.surface.clear(graphics_core::Color::new(col.r, col.g, col.b, col.a));
+                }
+            });
+        }
+
+        // Render layer contents (CGImage) into the offscreen buffer if set.
+        if props.contents != 0 {
+            cg_shims::bridge::with_context(offscreen_ctx, |c| {
+                let sw = c.surface.width();
+                let sh = c.surface.height();
+                crate::layer_compositor::render_layer_contents(
+                    c.surface.pixels_mut(), sw, sh,
+                    0, 0, vw, vh,
+                    props.contents,
+                );
+            });
+        }
+
+        // Push offscreen context so drawRect: renders into it.
+        let prev_ctx = crate::nsgraphicscontext::push_current_context(offscreen_ctx);
+        call_draw_rect(view, 0.0, 0.0, w, h);
+
+        // Recursively display subviews into the offscreen buffer.
+        for child in snapshot_subviews(view) {
+            display_view_recursive(child, offscreen_ctx);
+        }
+        crate::nsgraphicscontext::pop_current_context(prev_ctx);
+
+        // Extract the offscreen pixels and composite them onto the window surface.
+        let offscreen_pixels: Option<Vec<u32>> = cg_shims::bridge::with_context(offscreen_ctx, |c| {
+            c.surface.pixels().to_vec()
+        });
+
+        if let Some(src_pixels) = offscreen_pixels {
+            // Get the window surface pixels and composite the offscreen result.
+            cg_shims::bridge::with_context(cg_ctx, |c| {
+                let dst_w = c.surface.width();
+                let dst_h = c.surface.height();
+                #[allow(clippy::cast_possible_truncation)]
+                crate::layer_compositor::composite_layer(
+                    &src_pixels, vw, vh,
+                    c.surface.pixels_mut(), dst_w, dst_h,
+                    x as i32, y as i32,
+                    &props,
+                );
+            });
+        }
+
+        cg_shims::bridge::context_release(offscreen_ctx);
+    } else {
+        // Standard path: paint directly into the shared CGContext (painter's algorithm).
+
+        // Draw layer backgroundColor if present.
+        if layer != 0 {
+            let bg_color = crate::calayer::shim_calayer_background_color(layer, 0);
+            if bg_color != 0 {
+                cg_shims::bridge::with_context(cg_ctx, |c| {
+                    let dst_w = c.surface.width();
+                    let dst_h = c.surface.height();
+                    #[allow(clippy::cast_possible_truncation)]
+                    crate::layer_compositor::draw_layer_background(
+                        c.surface.pixels_mut(), dst_w, dst_h,
+                        x as i32, y as i32,
+                        w.max(0.0) as u32, h.max(0.0) as u32,
+                        bg_color, &props,
+                    );
+                });
+            }
+
+            // Render layer contents (CGImage) directly onto the window surface.
+            if props.contents != 0 {
+                cg_shims::bridge::with_context(cg_ctx, |c| {
+                    let dst_w = c.surface.width();
+                    let dst_h = c.surface.height();
+                    #[allow(clippy::cast_possible_truncation)]
+                    crate::layer_compositor::render_layer_contents(
+                        c.surface.pixels_mut(), dst_w, dst_h,
+                        x as i32, y as i32,
+                        w.max(0.0) as u32, h.max(0.0) as u32,
+                        props.contents,
+                    );
+                });
+            }
+        }
+
+        // Push the CGContext as the current NSGraphicsContext for this view's draw cycle.
+        let prev_ctx = crate::nsgraphicscontext::push_current_context(cg_ctx);
+
+        // Call drawRect: via ObjC dispatch so guest subclass overrides are honored.
+        call_draw_rect(view, x, y, w, h);
+
+        // Recursively display subviews.
+        for child in snapshot_subviews(view) {
+            display_view_recursive(child, cg_ctx);
+        }
+
+        crate::nsgraphicscontext::pop_current_context(prev_ctx);
+    }
 
     // Clear the needs-display flag.
     let mut flags = read_u64(view, FLAGS_OFF);
     flags &= !FLAG_NEEDS_DISPLAY;
     write_u64(view, FLAGS_OFF, flags);
-
-    // Recursively display subviews.
-    for child in snapshot_subviews(view) {
-        display_view_recursive(child, cg_ctx);
-    }
-
-    crate::nsgraphicscontext::pop_current_context(prev_ctx);
 }
 
 /// Call `-[view drawRect:rect]` through ObjC dispatch so guest overrides work.

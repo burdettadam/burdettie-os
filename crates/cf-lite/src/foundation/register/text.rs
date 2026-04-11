@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use objc_runtime::ClassInfo;
 
 use super::me;
-use crate::{nsattributedstring, nscharacterset, nsnotificationcenter, nsobj, nspredicate, nsregularexpression};
+use crate::{nsattributedstring, nscharacterset, nsdistributednotificationcenter, nsnotificationcenter, nsobj, nspredicate, nsregularexpression};
 
 /// Register `NSCharacterSet` with character membership methods.
 pub fn register_nscharacterset_class(rt: &mut objc_runtime::ObjcRuntime) {
@@ -186,6 +186,56 @@ pub fn register_nsnotification_class(rt: &mut objc_runtime::ObjcRuntime) {
     };
     rt.register_synthetic_class(info);
     rt.register_metaclass_addr(metaclass_addr, "NSNotification");
+}
+
+/// Register `NSDistributedNotificationCenter`.
+pub fn register_nsdistributednotificationcenter_class(rt: &mut objc_runtime::ObjcRuntime) {
+    let class_addr = nsobj::nsdistributednotificationcenter_class_addr();
+    let metaclass_addr = nsobj::nsdistributednotificationcenter_metaclass_addr();
+
+    let info = ClassInfo {
+        name: "NSDistributedNotificationCenter".to_string(),
+        mapped_addr: class_addr,
+        methods: vec![
+            me("postNotificationName:object:",
+                nsdistributednotificationcenter::shim_nsdistributed_post_name_object as *const () as u64, "v@:@@"),
+            me("postNotificationName:object:userInfo:",
+                nsdistributednotificationcenter::shim_nsdistributed_post_name_object_userinfo as *const () as u64, "v@:@@@"),
+            me("postNotificationName:object:userInfo:deliverImmediately:",
+                nsdistributednotificationcenter::shim_nsdistributed_post_name_object_userinfo_deliver as *const () as u64, "v@:@@@B"),
+            me("postNotificationName:object:userInfo:options:",
+                nsdistributednotificationcenter::shim_nsdistributed_post_name_object_userinfo_options as *const () as u64, "v@:@@@Q"),
+            me("addObserver:selector:name:object:",
+                nsdistributednotificationcenter::shim_nsdistributed_add_observer as *const () as u64, "v@:@:@@"),
+            me("addObserver:selector:name:object:suspensionBehavior:",
+                nsdistributednotificationcenter::shim_nsdistributed_add_observer_suspension as *const () as u64, "v@:@:@@Q"),
+            me("removeObserver:",
+                nsdistributednotificationcenter::shim_nsdistributed_remove_observer as *const () as u64, "v@:@"),
+            me("removeObserver:name:object:",
+                nsdistributednotificationcenter::shim_nsdistributed_remove_observer_name_object as *const () as u64, "v@:@@@"),
+            me("setSuspended:",
+                nsdistributednotificationcenter::shim_nsdistributed_set_suspended as *const () as u64, "v@:B"),
+            me("suspended",
+                nsdistributednotificationcenter::shim_nsdistributed_suspended as *const () as u64, "B@:"),
+        ],
+        class_methods: vec![
+            me("defaultCenter",
+                nsdistributednotificationcenter::shim_nsdistributed_default_center as *const () as u64, "@@:"),
+            me("notificationCenterForType:",
+                nsdistributednotificationcenter::shim_nsdistributed_center_for_type as *const () as u64, "@@:@"),
+        ],
+        ivars: vec![],
+        properties: vec![],
+        protocol_names: Vec::new(),
+        instance_size: 16,
+        is_root: false,
+        is_meta: false,
+        superclass_addr: Some(nsobj::nsnotificationcenter_class_addr()),
+        method_index: HashMap::new(),
+        class_method_index: HashMap::new(),
+    };
+    rt.register_synthetic_class(info);
+    rt.register_metaclass_addr(metaclass_addr, "NSDistributedNotificationCenter");
 }
 
 /// Register `NSRegularExpression`.

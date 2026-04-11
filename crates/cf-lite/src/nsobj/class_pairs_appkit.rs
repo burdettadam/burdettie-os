@@ -89,6 +89,13 @@ define_class_pair!(child NSIMAGE_CLASS_DATA, NSIMAGE_METACLASS_DATA, NSIMAGE_INI
     parent_class: nsobject_class_addr,
     parent_meta: nsobject_metaclass_addr);
 
+define_class_pair!(child NSFONTMANAGER_CLASS_DATA, NSFONTMANAGER_METACLASS_DATA, NSFONTMANAGER_INIT,
+    ensure: ensure_nsfontmanager_init,
+    class_addr: nsfontmanager_class_addr,
+    meta_addr: nsfontmanager_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
 // ── NSConstant* classes (compiler-embedded ObjC literals) ──────
 
 define_class_pair!(child NSCONSTANTDICTIONARY_CLASS_DATA, NSCONSTANTDICTIONARY_METACLASS_DATA, NSCONSTANTDICTIONARY_INIT,
@@ -372,6 +379,15 @@ define_class_pair!(child NSTABLEVIEW_CLASS_DATA, NSTABLEVIEW_METACLASS_DATA, NST
     parent_class: nsview_class_addr,
     parent_meta: nsview_metaclass_addr);
 
+// ── NSOutlineView (tree-view subclass of NSTableView) ─────────
+
+define_class_pair!(child NSOUTLINEVIEW_CLASS_DATA, NSOUTLINEVIEW_METACLASS_DATA, NSOUTLINEVIEW_INIT,
+    ensure: ensure_nsoutlineview_init,
+    class_addr: nsoutlineview_class_addr,
+    meta_addr: nsoutlineview_metaclass_addr,
+    parent_class: nstableview_class_addr,
+    parent_meta: nstableview_metaclass_addr);
+
 // ── CoreAnimation classes (CALayer, CATransaction, CADisplayLink) ──
 
 define_class_pair!(child CALAYER_CLASS_DATA, CALAYER_METACLASS_DATA, CALAYER_INIT,
@@ -494,3 +510,40 @@ define_class_pair!(child NSSTEPPER_CLASS_DATA, NSSTEPPER_METACLASS_DATA, NSSTEPP
     meta_addr: nsstepper_metaclass_addr,
     parent_class: nscontrol_class_addr,
     parent_meta: nscontrol_metaclass_addr);
+
+// ── TextKit classes ───────────────────────────────────────────
+
+define_class_pair!(child NSTEXTSTORAGE_CLASS_DATA, NSTEXTSTORAGE_METACLASS_DATA, NSTEXTSTORAGE_INIT,
+    ensure: ensure_nstextstorage_init,
+    class_addr: nstextstorage_class_addr,
+    meta_addr: nstextstorage_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSLAYOUTMANAGER_CLASS_DATA, NSLAYOUTMANAGER_METACLASS_DATA, NSLAYOUTMANAGER_INIT,
+    ensure: ensure_nslayoutmanager_init,
+    class_addr: nslayoutmanager_class_addr,
+    meta_addr: nslayoutmanager_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSTEXTCONTAINER_CLASS_DATA, NSTEXTCONTAINER_METACLASS_DATA, NSTEXTCONTAINER_INIT,
+    ensure: ensure_nstextcontainer_init,
+    class_addr: nstextcontainer_class_addr,
+    meta_addr: nstextcontainer_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSIMAGEREP_CLASS_DATA, NSIMAGEREP_METACLASS_DATA, NSIMAGEREP_INIT,
+    ensure: ensure_nsimagerep_init,
+    class_addr: nsimagerep_class_addr,
+    meta_addr: nsimagerep_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSBITMAPIMAGEREP_CLASS_DATA, NSBITMAPIMAGEREP_METACLASS_DATA, NSBITMAPIMAGEREP_INIT,
+    ensure: ensure_nsbitmapimagerep_init,
+    class_addr: nsbitmapimagerep_class_addr,
+    meta_addr: nsbitmapimagerep_metaclass_addr,
+    parent_class: nsimagerep_class_addr,
+    parent_meta: nsimagerep_metaclass_addr);

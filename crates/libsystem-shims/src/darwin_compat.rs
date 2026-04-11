@@ -266,6 +266,7 @@ impl DarwinCompatShims {
             // ── BSD number parsing ──────────────────────────────────
             register_shims!(table,
                 ("_expand_number", shim_expand_number as *const () as u64, "expand_number compat"),
+                ("_strtonum", shim_strtonum as *const () as u64, "strtonum compat"),
             );
 
             // ── arc4random legacy ───────────────────────────────────
@@ -1916,6 +1917,68 @@ extern "C" fn shim_expand_number(
             -1
         }
     }
+}
+
+// ── strtonum (BSD number parser with range check) ───────────────────
+
+/// `long long strtonum(const char *nptr, long long minval, long long maxval,
+///                     const char **errstr)`
+///
+/// Parse a string as a number within [minval, maxval].
+/// On error, *errstr is set to a static error message. On success, *errstr
+/// is set to NULL (if errstr is non-null).
+#[cfg(not(target_os = "macos"))]
+extern "C" fn shim_strtonum(
+    nptr: *const libc::c_char,
+    minval: libc::c_longlong,
+    maxval: libc::c_longlong,
+    errstr: *mut *const libc::c_char,
+) -> libc::c_longlong {
+    static INVALID: &[u8] = b"invalid\0";
+    static TOO_SMALL: &[u8] = b"too small\0";
+    static TOO_LARGE: &[u8] = b"too large\0";
+
+    let set_err = |msg: &[u8]| {
+        if !errstr.is_null() {
+            unsafe { *errstr = msg.as_ptr() as *const libc::c_char };
+        }
+    };
+
+    if nptr.is_null() || minval > maxval {
+        set_err(INVALID);
+        return 0;
+    }
+
+    let s = unsafe { std::ffi::CStr::from_ptr(nptr) };
+    let s = match s.to_str() {
+        Ok(s) => s.trim(),
+        Err(_) => {
+            set_err(INVALID);
+            return 0;
+        }
+    };
+
+    let val: libc::c_longlong = match s.parse() {
+        Ok(v) => v,
+        Err(_) => {
+            set_err(INVALID);
+            return 0;
+        }
+    };
+
+    if val < minval {
+        set_err(TOO_SMALL);
+        return 0;
+    }
+    if val > maxval {
+        set_err(TOO_LARGE);
+        return 0;
+    }
+
+    if !errstr.is_null() {
+        unsafe { *errstr = std::ptr::null() };
+    }
+    val
 }
 
 // ── arc4random legacy ───────────────────────────────────────────────

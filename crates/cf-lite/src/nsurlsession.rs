@@ -178,21 +178,112 @@ pub extern "C" fn shim_nsurlsession_finish_tasks(_obj: u64, _cmd: u64) {
 }
 
 /// `-[NSURLSession uploadTaskWithRequest:fromData:]`
-pub extern "C" fn shim_nsurlsession_upload_task_with_request(obj: u64, _cmd: u64, _request: u64, _data: u64) -> u64 {
+///
+/// Creates an upload task: sets the HTTP body on the request and marks the
+/// task type as upload.  On `resume`, the existing HTTP engine reads the body
+/// from the request and sends it as a POST/PUT payload.
+pub extern "C" fn shim_nsurlsession_upload_task_with_request(obj: u64, _cmd: u64, request: u64, data: u64) -> u64 {
     if obj == 0 { return 0; }
-    0 // stub — upload tasks not yet implemented
+    // Attach the body data to the request so resume picks it up.
+    if request != 0 && data != 0 {
+        nsurlrequest::shim_nsmutableurlrequest_set_http_body(request, 0, data);
+    }
+    let task = alloc_data_task_for_session(request, obj);
+    if task != 0 {
+        unsafe {
+            *(task as *mut u64) = nsobj::nsurlsessionuploadtask_class_addr();
+            *((task as usize + TASK_TYPE_OFF) as *mut u64) = 1; // upload
+        }
+    }
+    task
+}
+
+/// `-[NSURLSession uploadTaskWithRequest:fromData:completionHandler:]`
+pub extern "C" fn shim_nsurlsession_upload_task_with_request_completion(
+    obj: u64, _cmd: u64, request: u64, data: u64, block: u64,
+) -> u64 {
+    if obj == 0 { return 0; }
+    if request != 0 && data != 0 {
+        nsurlrequest::shim_nsmutableurlrequest_set_http_body(request, 0, data);
+    }
+    let task = alloc_data_task_for_session(request, obj);
+    if task != 0 {
+        unsafe {
+            *(task as *mut u64) = nsobj::nsurlsessionuploadtask_class_addr();
+            *((task as usize + TASK_TYPE_OFF) as *mut u64) = 1;
+        }
+        if block != 0 {
+            unsafe { *((task as usize + TASK_BLOCK_OFF) as *mut u64) = block; }
+        }
+    }
+    task
 }
 
 /// `-[NSURLSession downloadTaskWithRequest:]`
-pub extern "C" fn shim_nsurlsession_download_task_with_request(obj: u64, _cmd: u64, _request: u64) -> u64 {
+///
+/// Creates a download task.  On `resume`, the response body is written to a
+/// temporary file and the completion handler receives a file URL.
+pub extern "C" fn shim_nsurlsession_download_task_with_request(obj: u64, _cmd: u64, request: u64) -> u64 {
     if obj == 0 { return 0; }
-    0 // stub — download tasks not yet implemented
+    let task = alloc_data_task_for_session(request, obj);
+    if task != 0 {
+        unsafe {
+            *(task as *mut u64) = nsobj::nsurlsessiondownloadtask_class_addr();
+            *((task as usize + TASK_TYPE_OFF) as *mut u64) = 2; // download
+        }
+    }
+    task
 }
 
 /// `-[NSURLSession downloadTaskWithURL:]`
-pub extern "C" fn shim_nsurlsession_download_task_with_url(obj: u64, _cmd: u64, _url: u64) -> u64 {
+pub extern "C" fn shim_nsurlsession_download_task_with_url(obj: u64, _cmd: u64, url: u64) -> u64 {
     if obj == 0 { return 0; }
-    0 // stub — download tasks not yet implemented
+    let req = crate::nsurlrequest::shim_nsurlrequest_with_url(0, 0, url);
+    let task = alloc_data_task_for_session(req, obj);
+    if task != 0 {
+        unsafe {
+            *(task as *mut u64) = nsobj::nsurlsessiondownloadtask_class_addr();
+            *((task as usize + TASK_TYPE_OFF) as *mut u64) = 2;
+        }
+    }
+    task
+}
+
+/// `-[NSURLSession downloadTaskWithRequest:completionHandler:]`
+pub extern "C" fn shim_nsurlsession_download_task_with_request_completion(
+    obj: u64, _cmd: u64, request: u64, block: u64,
+) -> u64 {
+    if obj == 0 { return 0; }
+    let task = alloc_data_task_for_session(request, obj);
+    if task != 0 {
+        unsafe {
+            *(task as *mut u64) = nsobj::nsurlsessiondownloadtask_class_addr();
+            *((task as usize + TASK_TYPE_OFF) as *mut u64) = 2;
+        }
+        if block != 0 {
+            unsafe { *((task as usize + TASK_BLOCK_OFF) as *mut u64) = block; }
+        }
+    }
+    task
+}
+
+/// `-[NSURLSession downloadTaskWithURL:completionHandler:]`
+pub extern "C" fn shim_nsurlsession_download_task_with_url_completion(
+    obj: u64, _cmd: u64, url: u64, block: u64,
+) -> u64 {
+    if obj == 0 { return 0; }
+    let req = crate::nsurlrequest::shim_nsurlrequest_with_url(0, 0, url);
+    let task = alloc_data_task_for_session(req, obj);
+    if task != 0 {
+        unsafe {
+            *(task as *mut u64) = nsobj::nsurlsessiondownloadtask_class_addr();
+            *((task as usize + TASK_TYPE_OFF) as *mut u64) = 2;
+        }
+        if block != 0 {
+            unsafe { *((task as usize + TASK_BLOCK_OFF) as *mut u64) = block; }
+        }
+    }
+    task
 }
 
 /// `-[NSURLSession resetWithCompletionHandler:]`
@@ -231,7 +322,8 @@ const TASK_REQUEST_OFF: usize = 8;
 const TASK_STATE_OFF: usize = 16;
 const TASK_BLOCK_OFF: usize = 24;
 const TASK_SESSION_OFF: usize = 32;
-const TASK_SIZE: usize = 40;
+const TASK_TYPE_OFF: usize = 40;   // 0=data, 1=upload, 2=download
+const TASK_SIZE: usize = 48;
 
 fn alloc_data_task(request: u64) -> u64 {
     let obj = crate::pal_alloc().calloc(1, TASK_SIZE) as u64;
@@ -284,7 +376,9 @@ pub extern "C" fn shim_nsurlsession_data_task_with_request_completion(
 /// `-[NSURLSessionDataTask resume]`
 ///
 /// Performs a synchronous HTTP/HTTPS request using ureq and dispatches the
-/// completionHandler block with (NSData, NSHTTPURLResponse, NSError).
+/// completionHandler block with:
+///   - data/upload tasks: `(NSData, NSHTTPURLResponse, NSError)`
+///   - download tasks:    `(NSURL, NSHTTPURLResponse, NSError)`
 /// Falls back to a 200-stub response if no URL is available.
 pub extern "C" fn shim_nsurlsessiondatatask_resume(obj: u64, _cmd: u64) {
     if obj == 0 { return; }
@@ -292,11 +386,9 @@ pub extern "C" fn shim_nsurlsessiondatatask_resume(obj: u64, _cmd: u64) {
 
     let block = unsafe { *((obj as usize + TASK_BLOCK_OFF) as *const u64) };
     let request = unsafe { *((obj as usize + TASK_REQUEST_OFF) as *const u64) };
+    let task_type = unsafe { *((obj as usize + TASK_TYPE_OFF) as *const u64) };
 
     if block == 0 {
-        // Without a completion handler, this shim has no surface to deliver
-        // network results back to guest code. Avoid doing synchronous I/O on a
-        // fire-and-forget task and just advance it to the completed state.
         unsafe { *((obj as usize + TASK_STATE_OFF) as *mut u64) = 3; }
         return;
     }
@@ -336,8 +428,22 @@ pub extern "C" fn shim_nsurlsessiondatatask_resume(obj: u64, _cmd: u64) {
         None
     };
 
+    if task_type == 2 {
+        // ── Download task: write body to temp file, fire completion with file URL ──
+        resume_download_task(obj, block, url_ns, &url_str, &method, body_bytes.as_deref());
+    } else {
+        // ── Data/upload task: fire completion with NSData ──
+        resume_data_task(obj, block, url_ns, &url_str, &method, body_bytes.as_deref());
+    }
+}
+
+/// Resume for data and upload tasks — fires completion with `(NSData, NSHTTPURLResponse, NSError)`.
+fn resume_data_task(
+    obj: u64, block: u64, url_ns: u64,
+    url_str: &Option<String>, method: &str, body: Option<&[u8]>,
+) {
     let (data_obj, response_obj, error_obj) = if let Some(ref url) = url_str {
-        match perform_http_request(url, &method, body_bytes.as_deref()) {
+        match perform_http_request(url, method, body) {
             Ok((status, body)) => {
                 let ns_data = crate::nsdata::make_nsdata(&body);
                 let ns_resp = nsurlrequest::make_http_response(url_ns, status as i64, 0, body.len() as i64);
@@ -345,32 +451,84 @@ pub extern "C" fn shim_nsurlsessiondatatask_resume(obj: u64, _cmd: u64) {
             }
             Err(e) => {
                 log::warn!("NSURLSessionDataTask HTTP error for {url}: {e}");
-                let err_msg = format!("{e}");
-                let ns_err = make_nsstring(&err_msg);
                 let ns_err_obj = crate::nserror::make_nserror("NSURLErrorDomain", -1004);
-                let _ = ns_err;
                 (0u64, 0u64, ns_err_obj)
             }
         }
     } else {
-        // No URL — return stub 200 so callers that don't check the error still work.
         log::debug!("NSURLSessionDataTask resume — no URL, returning stub 200");
         let ns_resp = nsurlrequest::make_http_response(url_ns, 200, 0, -1);
         (0u64, ns_resp, 0u64)
     };
 
-    unsafe { *((obj as usize + TASK_STATE_OFF) as *mut u64) = 3; } // completed
+    unsafe { *((obj as usize + TASK_STATE_OFF) as *mut u64) = 3; }
 
-    if block != 0 {
-        // Block invoke fn is at offset 16; signature: void(^)(NSData*, NSURLResponse*, NSError*)
-        let invoke_ptr = unsafe { *((block as usize + 16) as *const u64) };
-        if invoke_ptr != 0 {
-            let invoke: extern "C" fn(u64, u64, u64, u64) =
-                unsafe { std::mem::transmute(invoke_ptr) };
-            invoke(block, data_obj, response_obj, error_obj);
-        }
+    let invoke_ptr = unsafe { *((block as usize + 16) as *const u64) };
+    if invoke_ptr != 0 {
+        let invoke: extern "C" fn(u64, u64, u64, u64) =
+            unsafe { std::mem::transmute(invoke_ptr) };
+        invoke(block, data_obj, response_obj, error_obj);
     }
 }
+
+/// Resume for download tasks — writes body to a temp file, fires completion
+/// with `(NSURL, NSHTTPURLResponse, NSError)`.
+fn resume_download_task(
+    obj: u64, block: u64, url_ns: u64,
+    url_str: &Option<String>, method: &str, body: Option<&[u8]>,
+) {
+    let (file_url, response_obj, error_obj) = if let Some(ref url) = url_str {
+        match perform_http_request(url, method, body) {
+            Ok((status, body_bytes)) => {
+                let ns_resp = nsurlrequest::make_http_response(url_ns, status as i64, 0, body_bytes.len() as i64);
+                // Write body to a temporary file.
+                let file_url = write_download_to_temp(&body_bytes);
+                (file_url, ns_resp, 0u64)
+            }
+            Err(e) => {
+                log::warn!("NSURLSessionDownloadTask HTTP error for {url}: {e}");
+                let ns_err_obj = crate::nserror::make_nserror("NSURLErrorDomain", -1004);
+                (0u64, 0u64, ns_err_obj)
+            }
+        }
+    } else {
+        log::debug!("NSURLSessionDownloadTask resume — no URL, returning stub 200");
+        let ns_resp = nsurlrequest::make_http_response(url_ns, 200, 0, 0);
+        let file_url = write_download_to_temp(b"");
+        (file_url, ns_resp, 0u64)
+    };
+
+    unsafe { *((obj as usize + TASK_STATE_OFF) as *mut u64) = 3; }
+
+    let invoke_ptr = unsafe { *((block as usize + 16) as *const u64) };
+    if invoke_ptr != 0 {
+        let invoke: extern "C" fn(u64, u64, u64, u64) =
+            unsafe { std::mem::transmute(invoke_ptr) };
+        invoke(block, file_url, response_obj, error_obj);
+    }
+}
+
+/// Write bytes to a uniquely-named temp file and return an NSURL file URL.
+fn write_download_to_temp(data: &[u8]) -> u64 {
+    use std::io::Write;
+    let dir = std::env::temp_dir();
+    let name = format!("burdettie-download-{}", std::process::id() as u64 * 1_000_000 + DOWNLOAD_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed));
+    let path = dir.join(name);
+    match std::fs::File::create(&path) {
+        Ok(mut f) => {
+            let _ = f.write_all(data);
+        }
+        Err(e) => {
+            log::warn!("Failed to write download temp file: {e}");
+            return 0;
+        }
+    }
+    let path_str = path.to_string_lossy();
+    let ns_path = make_nsstring(&path_str);
+    nsurl::shim_nsurl_file_url_with_path(0, 0, ns_path)
+}
+
+static DOWNLOAD_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 /// Perform a synchronous HTTP/HTTPS request and return (status_code, body_bytes).
 fn perform_http_request(url: &str, method: &str, body: Option<&[u8]>) -> Result<(i32, Vec<u8>), String> {
@@ -449,13 +607,19 @@ pub extern "C" fn shim_nsurlsessiondatatask_task_id(obj: u64, _cmd: u64) -> u64 
 pub extern "C" fn shim_nsurlsessiondatatask_description(obj: u64, _cmd: u64) -> u64 {
     if obj == 0 { return 0; }
     let state = unsafe { *((obj as usize + TASK_STATE_OFF) as *const u64) };
+    let task_type = unsafe { *((obj as usize + TASK_TYPE_OFF) as *const u64) };
     let state_str = match state {
         0 => "suspended",
         1 => "running",
         2 => "canceling",
         _ => "completed",
     };
-    make_nsstring(&format!("<NSURLSessionDataTask: {state_str}>"))
+    let type_name = match task_type {
+        1 => "NSURLSessionUploadTask",
+        2 => "NSURLSessionDownloadTask",
+        _ => "NSURLSessionDataTask",
+    };
+    make_nsstring(&format!("<{type_name}: {state_str}>"))
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -836,7 +1000,7 @@ mod tests {
         free_obj(s);
     }
 
-    // ── upload/download task stubs ───────────────────────────
+    // ── upload/download task creation ──────────────────────────
 
     #[test]
     fn upload_task_nil_session() {
@@ -844,10 +1008,57 @@ mod tests {
     }
 
     #[test]
-    fn upload_task_returns_nil_stub() {
+    fn upload_task_creates_valid_task() {
         let s = shim_nsurlsession_shared(nsobj::nsurlsession_class_addr(), 0);
-        let result = shim_nsurlsession_upload_task_with_request(s, 0, 0, 0);
-        assert_eq!(result, 0);
+        let req = crate::nsurlrequest::shim_nsurlrequest_with_url(0, 0, 0);
+        let body = crate::nsdata::make_nsdata(b"hello upload");
+        let task = shim_nsurlsession_upload_task_with_request(s, 0, req, body);
+        assert_ne!(task, 0);
+        // isa is NSURLSessionUploadTask
+        assert_eq!(read_field(task, 0), nsobj::nsurlsessionuploadtask_class_addr());
+        // task type = 1 (upload)
+        assert_eq!(read_field(task, TASK_TYPE_OFF), 1);
+        // state = suspended
+        assert_eq!(read_field(task, TASK_STATE_OFF), 0);
+        // request stored
+        assert_eq!(read_field(task, TASK_REQUEST_OFF), req);
+        // session stored
+        assert_eq!(read_field(task, TASK_SESSION_OFF), s);
+        free_obj(task);
+        free_obj(s);
+    }
+
+    #[test]
+    fn upload_task_sets_body_on_request() {
+        let s = shim_nsurlsession_shared(nsobj::nsurlsession_class_addr(), 0);
+        let req = crate::nsurlrequest::shim_nsurlrequest_with_url(0, 0, 0);
+        let body = crate::nsdata::make_nsdata(b"payload");
+        let task = shim_nsurlsession_upload_task_with_request(s, 0, req, body);
+        assert_ne!(task, 0);
+        // Body should now be set on the request
+        let got_body = crate::nsurlrequest::shim_nsurlrequest_http_body(req, 0);
+        assert_eq!(got_body, body);
+        free_obj(task);
+        free_obj(s);
+    }
+
+    #[test]
+    fn upload_task_completion_nil_session() {
+        assert_eq!(shim_nsurlsession_upload_task_with_request_completion(0, 0, 0, 0, 0), 0);
+    }
+
+    #[test]
+    fn upload_task_completion_stores_block() {
+        let s = shim_nsurlsession_shared(nsobj::nsurlsession_class_addr(), 0);
+        let req = crate::nsurlrequest::shim_nsurlrequest_with_url(0, 0, 0);
+        let body = crate::nsdata::make_nsdata(b"data");
+        let fake_block: u64 = 0xBEEF;
+        let task = shim_nsurlsession_upload_task_with_request_completion(s, 0, req, body, fake_block);
+        assert_ne!(task, 0);
+        assert_eq!(read_field(task, TASK_BLOCK_OFF), fake_block);
+        assert_eq!(read_field(task, TASK_TYPE_OFF), 1);
+        assert_eq!(read_field(task, 0), nsobj::nsurlsessionuploadtask_class_addr());
+        free_obj(task);
         free_obj(s);
     }
 
@@ -857,9 +1068,16 @@ mod tests {
     }
 
     #[test]
-    fn download_task_with_request_returns_nil_stub() {
+    fn download_task_with_request_creates_valid_task() {
         let s = shim_nsurlsession_shared(nsobj::nsurlsession_class_addr(), 0);
-        assert_eq!(shim_nsurlsession_download_task_with_request(s, 0, 0), 0);
+        let req = crate::nsurlrequest::shim_nsurlrequest_with_url(0, 0, 0);
+        let task = shim_nsurlsession_download_task_with_request(s, 0, req);
+        assert_ne!(task, 0);
+        assert_eq!(read_field(task, 0), nsobj::nsurlsessiondownloadtask_class_addr());
+        assert_eq!(read_field(task, TASK_TYPE_OFF), 2);
+        assert_eq!(read_field(task, TASK_STATE_OFF), 0);
+        assert_eq!(read_field(task, TASK_REQUEST_OFF), req);
+        free_obj(task);
         free_obj(s);
     }
 
@@ -869,9 +1087,156 @@ mod tests {
     }
 
     #[test]
-    fn download_task_with_url_returns_nil_stub() {
+    fn download_task_with_url_creates_valid_task() {
         let s = shim_nsurlsession_shared(nsobj::nsurlsession_class_addr(), 0);
-        assert_eq!(shim_nsurlsession_download_task_with_url(s, 0, 0), 0);
+        let url = make_string("http://example.com/file.zip");
+        let task = shim_nsurlsession_download_task_with_url(s, 0, url);
+        assert_ne!(task, 0);
+        assert_eq!(read_field(task, 0), nsobj::nsurlsessiondownloadtask_class_addr());
+        assert_eq!(read_field(task, TASK_TYPE_OFF), 2);
+        assert_ne!(read_field(task, TASK_REQUEST_OFF), 0); // auto-created request
+        free_obj(task);
+        free_obj(s);
+    }
+
+    #[test]
+    fn download_task_with_request_completion_nil_session() {
+        assert_eq!(shim_nsurlsession_download_task_with_request_completion(0, 0, 0, 0), 0);
+    }
+
+    #[test]
+    fn download_task_with_request_completion_stores_block() {
+        let s = shim_nsurlsession_shared(nsobj::nsurlsession_class_addr(), 0);
+        let req = crate::nsurlrequest::shim_nsurlrequest_with_url(0, 0, 0);
+        let fake_block: u64 = 0xDEAD;
+        let task = shim_nsurlsession_download_task_with_request_completion(s, 0, req, fake_block);
+        assert_ne!(task, 0);
+        assert_eq!(read_field(task, TASK_BLOCK_OFF), fake_block);
+        assert_eq!(read_field(task, TASK_TYPE_OFF), 2);
+        free_obj(task);
+        free_obj(s);
+    }
+
+    #[test]
+    fn download_task_with_url_completion_nil_session() {
+        assert_eq!(shim_nsurlsession_download_task_with_url_completion(0, 0, 0, 0), 0);
+    }
+
+    #[test]
+    fn download_task_with_url_completion_stores_block() {
+        let s = shim_nsurlsession_shared(nsobj::nsurlsession_class_addr(), 0);
+        let url = make_string("http://example.com/data.bin");
+        let fake_block: u64 = 0xFACE;
+        let task = shim_nsurlsession_download_task_with_url_completion(s, 0, url, fake_block);
+        assert_ne!(task, 0);
+        assert_eq!(read_field(task, TASK_BLOCK_OFF), fake_block);
+        assert_eq!(read_field(task, TASK_TYPE_OFF), 2);
+        assert_eq!(read_field(task, 0), nsobj::nsurlsessiondownloadtask_class_addr());
+        free_obj(task);
+        free_obj(s);
+    }
+
+    // ── upload/download resume without completion handler ─────
+
+    #[test]
+    fn upload_task_resume_without_handler_marks_completed() {
+        let s = shim_nsurlsession_shared(nsobj::nsurlsession_class_addr(), 0);
+        let req = crate::nsurlrequest::shim_nsurlrequest_with_url(0, 0, 0);
+        let body = crate::nsdata::make_nsdata(b"x");
+        let task = shim_nsurlsession_upload_task_with_request(s, 0, req, body);
+        shim_nsurlsessiondatatask_resume(task, 0);
+        assert_eq!(shim_nsurlsessiondatatask_state(task, 0), 3);
+        free_obj(task);
+        free_obj(s);
+    }
+
+    #[test]
+    fn download_task_resume_without_handler_marks_completed() {
+        let s = shim_nsurlsession_shared(nsobj::nsurlsession_class_addr(), 0);
+        let task = shim_nsurlsession_download_task_with_request(s, 0, 0);
+        shim_nsurlsessiondatatask_resume(task, 0);
+        assert_eq!(shim_nsurlsessiondatatask_state(task, 0), 3);
+        free_obj(task);
+        free_obj(s);
+    }
+
+    // ── write_download_to_temp ───────────────────────────────
+
+    #[test]
+    fn write_download_to_temp_creates_file() {
+        let url = write_download_to_temp(b"test download data");
+        assert_ne!(url, 0);
+        // Verify it's a file URL
+        let is_file = crate::nsurl::shim_nsurl_is_file_url(url, 0);
+        assert_ne!(is_file, 0);
+        // Extract the path and verify the file exists with correct content
+        let path_ns = crate::nsurl::shim_nsurl_path(url, 0);
+        assert_ne!(path_ns, 0);
+        let path_str = crate::cfstring::extract_cfstring_cstr(path_ns)
+            .expect("path should be extractable");
+        let contents = std::fs::read(path_str).expect("temp file should exist");
+        assert_eq!(contents, b"test download data");
+        // Cleanup
+        let _ = std::fs::remove_file(path_str);
+    }
+
+    #[test]
+    fn write_download_to_temp_empty_data() {
+        let url = write_download_to_temp(b"");
+        assert_ne!(url, 0);
+        let path_ns = crate::nsurl::shim_nsurl_path(url, 0);
+        let path_str = crate::cfstring::extract_cfstring_cstr(path_ns)
+            .expect("path should be extractable");
+        let contents = std::fs::read(path_str).expect("temp file should exist");
+        assert!(contents.is_empty());
+        let _ = std::fs::remove_file(path_str);
+    }
+
+    // ── description reflects task type ───────────────────────
+
+    #[test]
+    fn upload_task_description() {
+        let s = shim_nsurlsession_shared(nsobj::nsurlsession_class_addr(), 0);
+        let req = crate::nsurlrequest::shim_nsurlrequest_with_url(0, 0, 0);
+        let body = crate::nsdata::make_nsdata(b"x");
+        let task = shim_nsurlsession_upload_task_with_request(s, 0, req, body);
+        let desc = shim_nsurlsessiondatatask_description(task, 0);
+        assert_string_eq(desc, "<NSURLSessionUploadTask: suspended>");
+        free_obj(task);
+        free_obj(s);
+    }
+
+    #[test]
+    fn download_task_description() {
+        let s = shim_nsurlsession_shared(nsobj::nsurlsession_class_addr(), 0);
+        let task = shim_nsurlsession_download_task_with_request(s, 0, 0);
+        let desc = shim_nsurlsessiondatatask_description(task, 0);
+        assert_string_eq(desc, "<NSURLSessionDownloadTask: suspended>");
+        free_obj(task);
+        free_obj(s);
+    }
+
+    // ── task lifecycle (cancel/suspend) works on upload/download ──
+
+    #[test]
+    fn upload_task_cancel() {
+        let s = shim_nsurlsession_shared(nsobj::nsurlsession_class_addr(), 0);
+        let req = crate::nsurlrequest::shim_nsurlrequest_with_url(0, 0, 0);
+        let task = shim_nsurlsession_upload_task_with_request(s, 0, req, 0);
+        shim_nsurlsessiondatatask_cancel(task, 0);
+        assert_eq!(shim_nsurlsessiondatatask_state(task, 0), 2);
+        free_obj(task);
+        free_obj(s);
+    }
+
+    #[test]
+    fn download_task_suspend() {
+        let s = shim_nsurlsession_shared(nsobj::nsurlsession_class_addr(), 0);
+        let task = shim_nsurlsession_download_task_with_url(s, 0, 0);
+        write_field(task, TASK_STATE_OFF, 1); // running
+        shim_nsurlsessiondatatask_suspend(task, 0);
+        assert_eq!(shim_nsurlsessiondatatask_state(task, 0), 0);
+        free_obj(task);
         free_obj(s);
     }
 

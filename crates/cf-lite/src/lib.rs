@@ -77,6 +77,7 @@ pub(crate) mod nsmutabledict;
 pub(crate) mod nsmutableset;
 pub(crate) mod nsmutablestring;
 pub(crate) mod nsnotificationcenter;
+pub(crate) mod nsdistributednotificationcenter;
 pub(crate) mod nskeyvalueobserving;
 pub(crate) mod nskeyvaluecoding;
 pub(crate) mod nsmethodsignature;
@@ -141,14 +142,18 @@ pub(crate) mod nsapplication;
 pub(crate) mod nsappearance;
 pub(crate) mod nsbutton;
 pub(crate) mod calayer;
+pub(crate) mod layer_compositor;
 pub(crate) mod nscolor;
 pub(crate) mod nscolorwell;
 pub(crate) mod nscombobox;
 pub(crate) mod nscontrol;
 pub(crate) mod nsevent;
 pub(crate) mod nsfont;
+pub(crate) mod nsfontmanager;
 pub(crate) mod nsgraphicscontext;
 pub(crate) mod nsimage;
+pub(crate) mod nsimagerep;
+pub(crate) mod nsbitmapimagerep;
 pub(crate) mod nsimageview;
 pub(crate) mod nsmenu_shim;
 pub(crate) mod nsnib;
@@ -179,6 +184,7 @@ pub(crate) mod nstraitcollection;
 pub(crate) mod nsanimationcontext;
 pub(crate) mod nsbezierpath;
 pub(crate) mod nstableview;
+pub(crate) mod nsoutlineview;
 pub(crate) mod nsundomanager;
 pub(crate) mod nsclipview;
 pub(crate) mod nstextview;
@@ -188,9 +194,16 @@ pub(crate) mod nstrackingarea;
 pub(crate) mod nscursor;
 pub(crate) mod nscolorpanel;
 pub(crate) mod nsstepper;
+pub(crate) mod nstextstorage;
+pub(crate) mod nslayoutmanager;
+pub(crate) mod nstextcontainer;
 
 // GUI bridge: connects AppKit shims to a real windowing backend
 pub mod gui_bridge;
+
+// Accessibility: NSAccessibility protocol + AccessKit bridge
+pub mod accessibility_bridge;
+pub(crate) mod nsaccessibility;
 
 // Framework stubs (CoreData, AVFoundation, CoreLocation, CoreBluetooth)
 pub(crate) mod coredata_stubs;
@@ -218,9 +231,11 @@ pub fn reset_runtime_state_for_reuse() {
     nsapplication::reset_runtime_state_for_reuse();
     nskeyvalueobserving::clear_all_observers();
     nsnotificationcenter::clear_all_observers();
+    nsdistributednotificationcenter::clear_all_distributed_observers();
     nsrunloop::reset_runtime_state_for_reuse();
     layout_solver::reset_global_state();
     nsview::reset_layout_priority_state();
+    calayer::reset_layer_state();
 }
 
 /// Install the platform provider for Foundation shims.

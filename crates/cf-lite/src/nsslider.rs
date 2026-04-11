@@ -8,8 +8,8 @@
 //!   offset 24: max_value_bits       (u64 — raw f64 bits)
 //!   offset 32: flags                (u64 — bit 0: continuous,
 //!                                          bit 1: vertical_orientation)
-//!   offset 40: reserved / padding   (u64)
-//!   offset 48: reserved / padding   (u64)
+//!   offset 40: target_ptr           (u64 — target object, or 0)
+//!   offset 48: action_sel           (u64 — SEL addr, or 0)
 //!   offset 56: reserved / padding   (u64)
 //!
 //! Total: 64 bytes.
@@ -18,6 +18,8 @@ const CURRENT_VALUE_OFF: usize = 8;
 const MIN_VALUE_OFF: usize = 16;
 const MAX_VALUE_OFF: usize = 24;
 const FLAGS_OFF: usize = 32;
+const TARGET_OFF: usize = 40;
+const ACTION_OFF: usize = 48;
 pub(crate) const SLIDER_SIZE: usize = 64;
 
 const FLAG_CONTINUOUS: u64 = 1 << 0;
@@ -161,6 +163,64 @@ pub extern "C" fn shim_nsslider_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64, w
     });
 }
 
+/// `-[NSSlider target]`
+pub extern "C" fn shim_nsslider_target(obj: u64, _cmd: u64) -> u64 {
+    read_u64(obj, TARGET_OFF)
+}
+
+/// `-[NSSlider setTarget:]`
+pub extern "C" fn shim_nsslider_set_target(obj: u64, _cmd: u64, tgt: u64) {
+    write_u64(obj, TARGET_OFF, tgt);
+}
+
+/// `-[NSSlider action]`
+pub extern "C" fn shim_nsslider_action(obj: u64, _cmd: u64) -> u64 {
+    read_u64(obj, ACTION_OFF)
+}
+
+/// `-[NSSlider setAction:]`
+pub extern "C" fn shim_nsslider_set_action(obj: u64, _cmd: u64, sel: u64) {
+    write_u64(obj, ACTION_OFF, sel);
+}
+
+/// `-[NSSlider mouseDown:]` — track mouse position, update value, fire action.
+pub extern "C" fn shim_nsslider_mouse_down(obj: u64, _cmd: u64, event: u64) {
+    if obj == 0 || event == 0 { return; }
+
+    let (loc_x, loc_y) = crate::nsevent::event_location_in_window(event);
+    let frame = crate::nsview::view_frame(obj);
+
+    let flags = read_flags(obj);
+    let is_vertical = flags & FLAG_VERTICAL != 0;
+    let min = read_f64(obj, MIN_VALUE_OFF);
+    let max = read_f64(obj, MAX_VALUE_OFF);
+
+    // Compute ratio from click position within frame.
+    let ratio = if is_vertical {
+        let local_y = loc_y - frame.origin.y;
+        1.0 - (local_y / frame.size.height).clamp(0.0, 1.0)
+    } else {
+        let local_x = loc_x - frame.origin.x;
+        (local_x / frame.size.width).clamp(0.0, 1.0)
+    };
+
+    let new_value = min + ratio * (max - min);
+    write_f64(obj, CURRENT_VALUE_OFF, new_value);
+
+    // Fire target/action.
+    fire_action(obj);
+
+    crate::nsview::shim_nsview_set_needs_display(obj, 0, 1);
+}
+
+fn fire_action(obj: u64) {
+    let action = read_u64(obj, ACTION_OFF);
+    let target = read_u64(obj, TARGET_OFF);
+    if action == 0 { return; }
+    let nsapp = crate::nsapplication::nsapp_global_addr();
+    crate::nsapplication::shim_nsapplication_send_action_to_from(nsapp, 0, action, target, obj);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -178,6 +238,11 @@ mod tests {
         shim_nsslider_set_continuous(0, 0, 1);
         assert_eq!(shim_nsslider_orientation(0, 0), 0);
         shim_nsslider_set_orientation(0, 0, 1);
+        assert_eq!(shim_nsslider_target(0, 0), 0);
+        shim_nsslider_set_target(0, 0, 0x1234);
+        assert_eq!(shim_nsslider_action(0, 0), 0);
+        shim_nsslider_set_action(0, 0, 0x5678);
+        shim_nsslider_mouse_down(0, 0, 0);
     }
 
     #[test]
@@ -266,6 +331,28 @@ mod tests {
         shim_nsslider_set_orientation(slider, 0, 0);
         assert_eq!(shim_nsslider_is_continuous(slider, 0), 0);
         assert_eq!(shim_nsslider_orientation(slider, 0), 0);
+        free_obj(slider);
+    }
+
+    #[test]
+    fn target_action_round_trip() {
+        let slider = alloc_obj_fake(SLIDER_SIZE);
+        shim_nsslider_set_target(slider, 0, 0xABCD);
+        shim_nsslider_set_action(slider, 0, 0xEF01);
+        assert_eq!(shim_nsslider_target(slider, 0), 0xABCD);
+        assert_eq!(shim_nsslider_action(slider, 0), 0xEF01);
+        free_obj(slider);
+    }
+
+    #[test]
+    fn target_action_do_not_clobber_value() {
+        let slider = alloc_obj_fake(SLIDER_SIZE);
+        shim_nsslider_set_double_value(slider, 0, 42.0);
+        shim_nsslider_set_target(slider, 0, 0x1111);
+        shim_nsslider_set_action(slider, 0, 0x2222);
+        assert_eq!(shim_nsslider_double_value(slider, 0), 42.0);
+        assert_eq!(shim_nsslider_target(slider, 0), 0x1111);
+        assert_eq!(shim_nsslider_action(slider, 0), 0x2222);
         free_obj(slider);
     }
 }

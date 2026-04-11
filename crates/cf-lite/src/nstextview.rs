@@ -9,6 +9,10 @@
 
 use crate::nsobj;
 
+const TEXT_PADDING_X: f64 = 4.0;
+const TEXT_PADDING_Y: f64 = 2.0;
+const DEFAULT_FONT_SIZE: f64 = 14.0;
+
 fn read_u64(obj: u64, offset: usize) -> u64 {
     if obj == 0 { return 0; }
     unsafe { *((obj as *const u8).add(offset) as *const u64) }
@@ -67,21 +71,63 @@ pub extern "C" fn shim_nstextview_init_with_frame(
     // Default flags: editable + selectable + rich text.
     write_u64(ptr, FLAGS_OFF, FLAG_IS_EDITABLE | FLAG_IS_SELECTABLE | FLAG_IS_RICH_TEXT | FLAG_ALLOWS_UNDO);
 
-    // Empty string.
+    // Empty string (kept as mirror for callers of -[NSTextView string]).
     let empty = crate::cfstring::alloc_nsstring_from_cstr(b"\0".as_ptr() as *const _);
     write_u64(ptr, STRING_OFF, empty);
+
+    // Create a cosmic-text Editor for this view.
+    let text_width = (w - TEXT_PADDING_X * 2.0).max(1.0);
+    graphics_core::text_system::editor_create(ptr, "", DEFAULT_FONT_SIZE, text_width);
 
     ptr
 }
 
-/// `-[NSTextView string]`
+/// `-[NSTextView string]` — syncs from editor buffer before returning.
 pub extern "C" fn shim_nstextview_string(obj: u64, _cmd: u64) -> u64 {
+    if obj == 0 { return 0; }
+    // Sync STRING_OFF from editor text.
+    let text = graphics_core::text_system::editor_get_text(obj);
+    if !text.is_empty() {
+        let c_str = std::ffi::CString::new(text).unwrap_or_default();
+        let ns = crate::cfstring::alloc_nsstring_from_cstr(c_str.as_ptr());
+        write_u64(obj, STRING_OFF, ns);
+    }
     read_u64(obj, STRING_OFF)
 }
 
 /// `-[NSTextView setString:]`
 pub extern "C" fn shim_nstextview_set_string(obj: u64, _cmd: u64, str_obj: u64) {
     write_u64(obj, STRING_OFF, str_obj);
+    // Sync editor text from the NSString.
+    if str_obj != 0 {
+        let utf8 = crate::cfstring::shim_nsstring_utf8string(str_obj, 0);
+        if !utf8.is_null() {
+            if let Ok(s) = unsafe { std::ffi::CStr::from_ptr(utf8) }.to_str() {
+                graphics_core::text_system::editor_set_text(obj, s);
+            }
+        }
+    } else {
+        graphics_core::text_system::editor_set_text(obj, "");
+    }
+    crate::nstextstorage::sync_storage_from_view(obj);
+}
+
+/// `-[NSTextView textStorage]` — lazily creates and links an NSTextStorage.
+pub extern "C" fn shim_nstextview_text_storage(obj: u64, _cmd: u64) -> u64 {
+    if obj == 0 { return 0; }
+    // If already linked, return the existing storage.
+    if let Some(s) = crate::nstextstorage::storage_for_view(obj) {
+        // Sync storage string from editor before returning.
+        crate::nstextstorage::sync_storage_from_view(obj);
+        return s;
+    }
+    // Create a new NSTextStorage and link it.
+    let ts = crate::nstextstorage::shim_nstextstorage_alloc(0, 0);
+    let ts = crate::nstextstorage::shim_nstextstorage_init(ts, 0);
+    crate::nstextstorage::link_storage_to_view(ts, obj);
+    // Sync current editor text into storage.
+    crate::nstextstorage::sync_storage_from_view(obj);
+    ts
 }
 
 /// `-[NSTextView delegate]`
@@ -204,26 +250,12 @@ pub extern "C" fn shim_nstextview_insert_text(obj: u64, _cmd: u64, text: u64) {
     };
     if typed.is_empty() { return; }
 
-    // Get current text.
-    let string_ptr = read_u64(obj, STRING_OFF);
-    let current = if string_ptr != 0 {
-        let utf8 = crate::cfstring::shim_nsstring_utf8string(string_ptr, 0);
-        if utf8.is_null() {
-            String::new()
-        } else {
-            unsafe { std::ffi::CStr::from_ptr(utf8) }
-                .to_str()
-                .unwrap_or("")
-                .to_string()
-        }
-    } else {
-        String::new()
-    };
-
-    let new_str = format!("{}{}", current, typed);
-    let c_str = std::ffi::CString::new(new_str).unwrap_or_default();
-    let new_nsstring = crate::cfstring::alloc_nsstring_from_cstr(c_str.as_ptr());
-    write_u64(obj, STRING_OFF, new_nsstring);
+    // Insert each character through the editor at the cursor.
+    use graphics_core::text_system::Action;
+    for ch in typed.chars() {
+        graphics_core::text_system::editor_action(obj, Action::Insert(ch));
+    }
+    crate::nstextstorage::sync_storage_from_view(obj);
     crate::nsview::shim_nsview_set_needs_display(obj, 0, 1);
 }
 
@@ -237,35 +269,53 @@ pub extern "C" fn shim_nstextview_key_down(obj: u64, _cmd: u64, event: u64) {
         return;
     }
 
-    let key_code = crate::nsevent::shim_nsevent_key_code(event, 0);
+    use graphics_core::text_system::{Action, Motion};
 
-    if key_code == 51 {
-        // Backspace.
-        let string_ptr = read_u64(obj, STRING_OFF);
-        if string_ptr != 0 {
-            let utf8 = crate::cfstring::shim_nsstring_utf8string(string_ptr, 0);
-            if !utf8.is_null() {
-                let s = unsafe { std::ffi::CStr::from_ptr(utf8) }
-                    .to_str()
-                    .unwrap_or("");
-                if !s.is_empty() {
-                    let mut chars: Vec<char> = s.chars().collect();
-                    chars.pop();
-                    let new_str: String = chars.into_iter().collect();
-                    let c_str = std::ffi::CString::new(new_str).unwrap_or_default();
-                    let new_nsstring = crate::cfstring::alloc_nsstring_from_cstr(c_str.as_ptr());
-                    write_u64(obj, STRING_OFF, new_nsstring);
-                }
+    let key_code = crate::nsevent::shim_nsevent_key_code(event, 0);
+    let modifiers = crate::nsevent::shim_nsevent_modifier_flags(event, 0);
+    let shift = modifiers & 0x20000 != 0; // NSEventModifierFlagShift
+    let cmd = modifiers & 0x100000 != 0;  // NSEventModifierFlagCommand
+
+    let action = match key_code {
+        51 => Some(Action::Backspace),        // Delete/Backspace
+        117 => Some(Action::Delete),           // Forward Delete
+        36 => Some(Action::Enter),             // Return
+        123 => { // Left arrow
+            if cmd {
+                Some(Action::Motion(Motion::Home))
+            } else if shift {
+                Some(Action::Motion(Motion::LeftWord))
+            } else {
+                Some(Action::Motion(Motion::Left))
             }
         }
+        124 => { // Right arrow
+            if cmd {
+                Some(Action::Motion(Motion::End))
+            } else if shift {
+                Some(Action::Motion(Motion::RightWord))
+            } else {
+                Some(Action::Motion(Motion::Right))
+            }
+        }
+        125 => Some(Action::Motion(Motion::Down)),  // Down arrow
+        126 => Some(Action::Motion(Motion::Up)),     // Up arrow
+        _ => None,
+    };
+
+    if let Some(a) = action {
+        graphics_core::text_system::editor_action(obj, a);
+        crate::nstextstorage::sync_storage_from_view(obj);
         crate::nsview::shim_nsview_set_needs_display(obj, 0, 1);
         return;
     }
 
-    if key_code == 36 {
-        // Return — insert newline for text view (unlike text field).
-        let newline_str = crate::cfstring::alloc_nsstring_from_cstr(b"\n\0".as_ptr() as *const _);
-        shim_nstextview_insert_text(obj, 0, newline_str);
+    // Cmd+A → select all.
+    if cmd && key_code == 0 {
+        graphics_core::text_system::editor_action(obj, Action::Motion(Motion::BufferStart));
+        // No direct select-all action; move to end with selection would require
+        // a different approach. For now, skip.
+        crate::nsview::shim_nsview_set_needs_display(obj, 0, 1);
         return;
     }
 
@@ -276,6 +326,54 @@ pub extern "C" fn shim_nstextview_key_down(obj: u64, _cmd: u64, event: u64) {
     }
 }
 
+/// `-[NSTextView mouseDown:]` — set cursor from click position.
+pub extern "C" fn shim_nstextview_mouse_down(obj: u64, _cmd: u64, event: u64) {
+    if obj == 0 || event == 0 { return; }
+    let flags = read_u64(obj, FLAGS_OFF);
+    if flags & FLAG_IS_SELECTABLE == 0 {
+        return;
+    }
+
+    // Make this text view the first responder.
+    let window = crate::nsview::shim_nsview_window(obj, 0);
+    if window != 0 {
+        crate::nswindow::shim_nswindow_make_first_responder(window, 0, obj);
+    }
+
+    let (loc_x, loc_y) = crate::nsevent::event_location_in_window(event);
+    let frame = crate::nsview::view_frame(obj);
+    let click_x = (loc_x - frame.origin.x - TEXT_PADDING_X) as i32;
+    let click_y = (loc_y - frame.origin.y - TEXT_PADDING_Y) as i32;
+
+    let click_count = crate::nsevent::shim_nsevent_click_count(event, 0);
+    use graphics_core::text_system::Action;
+    let action = match click_count {
+        2 => Action::DoubleClick { x: click_x, y: click_y },
+        3 => Action::TripleClick { x: click_x, y: click_y },
+        _ => Action::Click { x: click_x, y: click_y },
+    };
+    graphics_core::text_system::editor_action(obj, action);
+    crate::nsview::shim_nsview_set_needs_display(obj, 0, 1);
+}
+
+/// `-[NSTextView mouseDragged:]` — extend selection.
+pub extern "C" fn shim_nstextview_mouse_dragged(obj: u64, _cmd: u64, event: u64) {
+    if obj == 0 || event == 0 { return; }
+    let flags = read_u64(obj, FLAGS_OFF);
+    if flags & FLAG_IS_SELECTABLE == 0 {
+        return;
+    }
+
+    let (loc_x, loc_y) = crate::nsevent::event_location_in_window(event);
+    let frame = crate::nsview::view_frame(obj);
+    let drag_x = (loc_x - frame.origin.x - TEXT_PADDING_X) as i32;
+    let drag_y = (loc_y - frame.origin.y - TEXT_PADDING_Y) as i32;
+
+    use graphics_core::text_system::Action;
+    graphics_core::text_system::editor_action(obj, Action::Drag { x: drag_x, y: drag_y });
+    crate::nsview::shim_nsview_set_needs_display(obj, 0, 1);
+}
+
 /// `-[NSTextView drawRect:]`
 pub extern "C" fn shim_nstextview_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64) {
     if obj == 0 { return; }
@@ -283,35 +381,41 @@ pub extern "C" fn shim_nstextview_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64,
     let cg_ctx = crate::nsgraphicscontext::current_cg_context_handle();
     if cg_ctx == 0 { return; }
 
+    // Update editor width in case view was resized.
+    let text_width = (w - TEXT_PADDING_X * 2.0).max(1.0);
+    graphics_core::text_system::editor_set_width(obj, text_width);
+
     // White background.
     cg_shims::bridge::with_context(cg_ctx, |c| {
         c.fill_color = graphics_core::Color::WHITE;
         c.fill_rect(x, y, w, h);
     });
 
-    // Draw text content.
-    let string_ptr = read_u64(obj, STRING_OFF);
-    if string_ptr != 0 {
-        let utf8 = crate::cfstring::shim_nsstring_utf8string(string_ptr, 0);
-        if !utf8.is_null() {
-            let text = unsafe { std::ffi::CStr::from_ptr(utf8) }
-                .to_str()
-                .unwrap_or("");
-            if !text.is_empty() {
-                // Simple line-by-line rendering.
-                let line_height = 16.0;
-                let mut text_y = y + line_height;
-                cg_shims::bridge::with_context(cg_ctx, |c| {
-                    c.fill_color = graphics_core::Color::BLACK;
-                    for line in text.split('\n') {
-                        if text_y > y + h { break; }
-                        c.draw_text(line, x + 4.0, text_y);
-                        text_y += line_height;
-                    }
-                });
-            }
-        }
-    }
+    // Check if this view is the window's first responder (for cursor drawing).
+    let window = crate::nsview::shim_nsview_window(obj, 0);
+    let is_first_responder = if window != 0 {
+        crate::nswindow::shim_nswindow_first_responder(window, 0) == obj
+    } else {
+        false
+    };
+
+    // Draw text + selection + cursor via the editor.
+    cg_shims::bridge::with_context(cg_ctx, |c| {
+        let sw = c.surface.width();
+        let sh = c.surface.height();
+        let sel_bg = graphics_core::Color::new(0.26, 0.52, 0.96, 0.3); // light blue selection
+        graphics_core::text_system::editor_draw(
+            obj,
+            c.surface.pixels_mut(),
+            sw,
+            sh,
+            x + TEXT_PADDING_X,
+            y + TEXT_PADDING_Y,
+            graphics_core::Color::BLACK,
+            sel_bg,
+            is_first_responder,
+        );
+    });
 }
 
 #[cfg(test)]
@@ -335,7 +439,16 @@ mod tests {
         let tv = shim_nstextview_init_with_frame(0, 0, 0.0, 0.0, 200.0, 100.0);
         let s = make_string("Hello World");
         shim_nstextview_set_string(tv, 0, s);
-        assert_eq!(shim_nstextview_string(tv, 0), s);
+        // After the editor rewrite, string returns a fresh NSString from the
+        // editor buffer, so check text content rather than pointer identity.
+        let got = shim_nstextview_string(tv, 0);
+        assert_ne!(got, 0);
+        let utf8 = crate::cfstring::shim_nsstring_utf8string(got, 0);
+        assert!(!utf8.is_null());
+        let text = unsafe { std::ffi::CStr::from_ptr(utf8) }
+            .to_str()
+            .unwrap();
+        assert_eq!(text, "Hello World");
         free_obj(tv);
     }
 
@@ -361,7 +474,51 @@ mod tests {
     fn nil_safety() {
         assert_eq!(shim_nstextview_string(0, 0), 0);
         assert_eq!(shim_nstextview_is_editable(0, 0), 0);
+        assert_eq!(shim_nstextview_text_storage(0, 0), 0);
         shim_nstextview_set_string(0, 0, 0);
         shim_nstextview_key_down(0, 0, 0);
+    }
+
+    #[test]
+    fn text_storage_creates_and_links() {
+        let tv = shim_nstextview_init_with_frame(0, 0, 0.0, 0.0, 200.0, 100.0);
+        let s = make_string("Live bridge");
+        shim_nstextview_set_string(tv, 0, s);
+
+        // First call creates the storage.
+        let ts = shim_nstextview_text_storage(tv, 0);
+        assert_ne!(ts, 0);
+        // Storage ISA should be NSTextStorage.
+        assert_eq!(read_u64(ts, 0), crate::nsobj::nstextstorage_class_addr());
+        // Storage string should match the editor text.
+        let s_ptr = crate::nstextstorage::shim_nstextstorage_string(ts, 0);
+        assert_ne!(s_ptr, 0);
+        let utf8 = crate::cfstring::shim_nsstring_utf8string(s_ptr, 0);
+        let text = unsafe { std::ffi::CStr::from_ptr(utf8) }.to_str().unwrap();
+        assert_eq!(text, "Live bridge");
+
+        // Second call returns the same storage.
+        let ts2 = shim_nstextview_text_storage(tv, 0);
+        assert_eq!(ts, ts2);
+
+        free_obj(tv);
+    }
+
+    #[test]
+    fn storage_mutation_reaches_editor() {
+        let tv = shim_nstextview_init_with_frame(0, 0, 0.0, 0.0, 200.0, 100.0);
+        // Force creation of linked storage.
+        let ts = shim_nstextview_text_storage(tv, 0);
+        assert_ne!(ts, 0);
+
+        // Mutate storage directly.
+        let new_s = make_string("From storage");
+        crate::nstextstorage::shim_nstextstorage_set_string(ts, 0, new_s);
+
+        // Editor should reflect the change.
+        let editor_text = graphics_core::text_system::editor_get_text(tv);
+        assert_eq!(editor_text, "From storage");
+
+        free_obj(tv);
     }
 }

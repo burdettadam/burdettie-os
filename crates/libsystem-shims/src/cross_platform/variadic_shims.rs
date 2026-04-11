@@ -67,6 +67,8 @@ impl VariadicShims {
                 ("_warnx",    shim_warnx    as *const () as u64, "warnx (Apple variadic ABI)"),
                 // ── syslog ──────────────────────────────────────
                 ("_syslog",   shim_syslog   as *const () as u64, "syslog (Apple variadic ABI)"),
+                // ── additional BSD err/warn variants ────────────
+                ("_warnc",    shim_warnc    as *const () as u64, "warnc (Apple variadic ABI)"),
                 // ── v-variant family (Apple va_list → Linux va_list) ──
                 ("_vfprintf",  shim_vfprintf  as *const () as u64, "vfprintf (Apple va_list→Linux)"),
                 ("_vprintf",   shim_vprintf   as *const () as u64, "vprintf (Apple va_list→Linux)"),
@@ -78,6 +80,13 @@ impl VariadicShims {
                 ("_vfscanf",   shim_vfscanf   as *const () as u64, "vfscanf (Apple va_list→Linux)"),
                 ("_vscanf",    shim_vscanf    as *const () as u64, "vscanf (Apple va_list→Linux)"),
                 ("_vsyslog",   shim_vsyslog   as *const () as u64, "vsyslog (Apple va_list→Linux)"),
+                // ── v-variant err/warn (Apple va_list → Linux va_list) ──
+                ("_vwarn",     shim_vwarn     as *const () as u64, "vwarn (Apple va_list→Linux)"),
+                ("_vwarnx",    shim_vwarnx    as *const () as u64, "vwarnx (Apple va_list→Linux)"),
+                ("_vwarnc",    shim_vwarnc    as *const () as u64, "vwarnc (Apple va_list→Linux)"),
+                ("_verr",      shim_verr      as *const () as u64, "verr (Apple va_list→Linux)"),
+                ("_verrx",     shim_verrx     as *const () as u64, "verrx (Apple va_list→Linux)"),
+                ("_verrc",     shim_verrc     as *const () as u64, "verrc (Apple va_list→Linux)"),
                 // ── fortified (_chk) variadic family ────────────
                 ("___snprintf_chk", shim_snprintf_chk as *const () as u64, "snprintf_chk (Apple variadic ABI)"),
                 ("___sprintf_chk",  shim_sprintf_chk  as *const () as u64, "sprintf_chk (Apple variadic ABI)"),
@@ -88,9 +97,14 @@ impl VariadicShims {
                 ("___vsprintf_chk",  shim_vsprintf_chk  as *const () as u64, "vsprintf_chk (Apple va_list→Linux)"),
                 ("___vfprintf_chk",  shim_vfprintf_chk  as *const () as u64, "vfprintf_chk (Apple va_list→Linux)"),
                 ("___vprintf_chk",   shim_vprintf_chk   as *const () as u64, "vprintf_chk (Apple va_list→Linux)"),
+                // ── LibreSSL BIO printf family (runtime-resolved) ───
+                ("_BIO_printf",   shim_bio_printf   as *const () as u64, "BIO_printf (Apple variadic ABI)"),
+                ("_BIO_vprintf",  shim_bio_vprintf  as *const () as u64, "BIO_vprintf (Apple va_list→Linux)"),
+                ("_BIO_snprintf", shim_bio_snprintf as *const () as u64, "BIO_snprintf (Apple variadic ABI)"),
+                ("_BIO_vsnprintf",shim_bio_vsnprintf as *const () as u64, "BIO_vsnprintf (Apple va_list→Linux)"),
             );
 
-            log::info!("VariadicShims: registered 33 Apple→Linux ABI shims");
+            log::info!("VariadicShims: registered 45 Apple→Linux ABI shims");
         }
     }
 }
@@ -773,6 +787,91 @@ mod inner {
                 v_func = sym vprintf_chk,
             )
         }
+
+        // ── LibreSSL BIO printf shims (runtime-resolved) ───
+        //
+        // BIO_printf/BIO_snprintf are variadic functions in LibreSSL.
+        // They must be shimmed for the same Apple → Linux variadic ABI
+        // reason as fprintf/printf.  Unlike glibc functions, BIO_vprintf
+        // and BIO_vsnprintf are resolved at runtime via dlsym since
+        // LibreSSL is a preloaded shared library.
+
+        /// `int BIO_printf(BIO *bio, const char *format, ...)`
+        ///   → `bio_vprintf_bridge(bio, format, &va_list)`
+        /// Named args: x0=bio, x1=format  ⇒ va_list in x2
+        #[unsafe(naked)]
+        pub extern "C" fn shim_bio_printf() -> libc::c_int {
+            core::arch::naked_asm!(
+                "stp  x29, x30, [sp, #-64]!",
+                "mov  x29, sp",
+                "add  x8, x29, #64",          // x8 = original SP (Apple varargs)
+                "str  x8, [sp, #16]",          // __stack
+                "stp  xzr, xzr, [sp, #24]",   // __gr_top, __vr_top
+                "str  xzr, [sp, #40]",         // __gr_offs=0, __vr_offs=0
+                "add  x2, sp, #16",            // x2 = &va_list
+                "bl   {v_func}",
+                "ldp  x29, x30, [sp], #64",
+                "ret",
+                v_func = sym bio_vprintf_bridge,
+            )
+        }
+
+        /// `int BIO_vprintf(BIO *bio, const char *format, va_list args)`
+        /// Apple: x2 = char* (Apple va_list)
+        /// Linux: x2 = __va_list* (pointer to 32-byte struct)
+        #[unsafe(naked)]
+        pub extern "C" fn shim_bio_vprintf() -> libc::c_int {
+            core::arch::naked_asm!(
+                "stp  x29, x30, [sp, #-64]!",
+                "mov  x29, sp",
+                "str  x2, [sp, #16]",          // __stack = Apple va_list
+                "stp  xzr, xzr, [sp, #24]",   // __gr_top = 0, __vr_top = 0
+                "str  xzr, [sp, #40]",         // __gr_offs = 0, __vr_offs = 0
+                "add  x2, sp, #16",            // x2 = &linux_va_list
+                "bl   {v_func}",
+                "ldp  x29, x30, [sp], #64",
+                "ret",
+                v_func = sym bio_vprintf_bridge,
+            )
+        }
+
+        /// `int BIO_snprintf(char *buf, size_t n, const char *format, ...)`
+        ///   → `bio_vsnprintf_bridge(buf, n, format, &va_list)`
+        /// Named args: x0=buf, x1=n, x2=format  ⇒ va_list in x3
+        #[unsafe(naked)]
+        pub extern "C" fn shim_bio_snprintf() -> libc::c_int {
+            core::arch::naked_asm!(
+                "stp  x29, x30, [sp, #-64]!",
+                "mov  x29, sp",
+                "add  x8, x29, #64",
+                "str  x8, [sp, #16]",
+                "stp  xzr, xzr, [sp, #24]",
+                "str  xzr, [sp, #40]",
+                "add  x3, sp, #16",
+                "bl   {v_func}",
+                "ldp  x29, x30, [sp], #64",
+                "ret",
+                v_func = sym bio_vsnprintf_bridge,
+            )
+        }
+
+        /// `int BIO_vsnprintf(char *buf, size_t n, const char *fmt, va_list args)`
+        /// Apple: x3 = Apple va_list
+        #[unsafe(naked)]
+        pub extern "C" fn shim_bio_vsnprintf() -> libc::c_int {
+            core::arch::naked_asm!(
+                "stp  x29, x30, [sp, #-64]!",
+                "mov  x29, sp",
+                "str  x3, [sp, #16]",
+                "stp  xzr, xzr, [sp, #24]",
+                "str  xzr, [sp, #40]",
+                "add  x3, sp, #16",
+                "bl   {v_func}",
+                "ldp  x29, x30, [sp], #64",
+                "ret",
+                v_func = sym bio_vsnprintf_bridge,
+            )
+        }
         //
         // These can't just forward to Linux's err/errx/warn/warnx
         // because those internally use `program_invocation_short_name`
@@ -871,6 +970,136 @@ mod inner {
                 "ldp  x29, x30, [sp], #64",
                 "ret",
                 inner = sym warnx_inner,
+            )
+        }
+
+        /// `void warnc(int code, const char *fmt, ...)`
+        /// Named args: x0=code, x1=fmt  ⇒ va_list in x2
+        #[unsafe(naked)]
+        pub extern "C" fn shim_warnc() {
+            core::arch::naked_asm!(
+                "stp  x29, x30, [sp, #-64]!",
+                "mov  x29, sp",
+                "add  x8, x29, #64",
+                "str  x8, [sp, #16]",
+                "stp  xzr, xzr, [sp, #24]",
+                "str  xzr, [sp, #40]",
+                "add  x2, sp, #16",
+                "bl   {inner}",
+                "ldp  x29, x30, [sp], #64",
+                "ret",
+                inner = sym warnc_inner,
+            )
+        }
+
+        // ── v-variant err/warn shims (Apple va_list → Linux va_list) ──
+        //
+        // On Apple ARM64, va_list is `char *` (pointer to stack args).
+        // These shims take the Apple va_list from the appropriate register,
+        // build a Linux va_list struct, and call our inner implementation.
+
+        /// `void vwarn(const char *fmt, va_list ap)`
+        /// Apple: x1 = Apple va_list
+        #[unsafe(naked)]
+        pub extern "C" fn shim_vwarn() {
+            core::arch::naked_asm!(
+                "stp  x29, x30, [sp, #-64]!",
+                "mov  x29, sp",
+                "str  x1, [sp, #16]",          // __stack = Apple va_list
+                "stp  xzr, xzr, [sp, #24]",
+                "str  xzr, [sp, #40]",
+                "add  x1, sp, #16",            // x1 = &linux_va_list
+                "bl   {inner}",
+                "ldp  x29, x30, [sp], #64",
+                "ret",
+                inner = sym warn_inner,
+            )
+        }
+
+        /// `void vwarnx(const char *fmt, va_list ap)`
+        /// Apple: x1 = Apple va_list
+        #[unsafe(naked)]
+        pub extern "C" fn shim_vwarnx() {
+            core::arch::naked_asm!(
+                "stp  x29, x30, [sp, #-64]!",
+                "mov  x29, sp",
+                "str  x1, [sp, #16]",
+                "stp  xzr, xzr, [sp, #24]",
+                "str  xzr, [sp, #40]",
+                "add  x1, sp, #16",
+                "bl   {inner}",
+                "ldp  x29, x30, [sp], #64",
+                "ret",
+                inner = sym warnx_inner,
+            )
+        }
+
+        /// `void vwarnc(int code, const char *fmt, va_list ap)`
+        /// Apple: x2 = Apple va_list
+        #[unsafe(naked)]
+        pub extern "C" fn shim_vwarnc() {
+            core::arch::naked_asm!(
+                "stp  x29, x30, [sp, #-64]!",
+                "mov  x29, sp",
+                "str  x2, [sp, #16]",
+                "stp  xzr, xzr, [sp, #24]",
+                "str  xzr, [sp, #40]",
+                "add  x2, sp, #16",
+                "bl   {inner}",
+                "ldp  x29, x30, [sp], #64",
+                "ret",
+                inner = sym warnc_inner,
+            )
+        }
+
+        /// `void verr(int eval, const char *fmt, va_list ap)`
+        /// Apple: x2 = Apple va_list
+        #[unsafe(naked)]
+        pub extern "C" fn shim_verr() -> ! {
+            core::arch::naked_asm!(
+                "stp  x29, x30, [sp, #-64]!",
+                "mov  x29, sp",
+                "str  x2, [sp, #16]",
+                "stp  xzr, xzr, [sp, #24]",
+                "str  xzr, [sp, #40]",
+                "add  x2, sp, #16",
+                "bl   {inner}",
+                "brk  #1",
+                inner = sym err_inner,
+            )
+        }
+
+        /// `void verrx(int eval, const char *fmt, va_list ap)`
+        /// Apple: x2 = Apple va_list
+        #[unsafe(naked)]
+        pub extern "C" fn shim_verrx() -> ! {
+            core::arch::naked_asm!(
+                "stp  x29, x30, [sp, #-64]!",
+                "mov  x29, sp",
+                "str  x2, [sp, #16]",
+                "stp  xzr, xzr, [sp, #24]",
+                "str  xzr, [sp, #40]",
+                "add  x2, sp, #16",
+                "bl   {inner}",
+                "brk  #1",
+                inner = sym errx_inner,
+            )
+        }
+
+        /// `void verrc(int eval, int code, const char *fmt, va_list ap)`
+        /// Apple: x3 = Apple va_list
+        #[unsafe(naked)]
+        pub extern "C" fn shim_verrc() -> ! {
+            core::arch::naked_asm!(
+                "stp  x29, x30, [sp, #-64]!",
+                "mov  x29, sp",
+                "str  x3, [sp, #16]",
+                "stp  xzr, xzr, [sp, #24]",
+                "str  xzr, [sp, #40]",
+                "add  x3, sp, #16",
+                "bl   {inner}",
+                "brk  #1",
+                inner = sym errc_inner,
             )
         }
 
@@ -1000,6 +1229,72 @@ mod inner {
                 }
                 fprintf(se, b"\n\0".as_ptr().cast());
             }
+        }
+
+        /// `warnc(code, fmt, ap)` — print "progname: <msg>: strerror(code)\n".
+        extern "C" fn warnc_inner(code: libc::c_int, fmt: *const libc::c_char, ap: *const u8) {
+            unsafe {
+                let se = host_stderr();
+                let pn = progname_cstr();
+                fprintf(se, b"%s: \0".as_ptr().cast(), pn);
+                if !fmt.is_null() {
+                    vfprintf(se, fmt, ap);
+                    fprintf(se, b": \0".as_ptr().cast());
+                }
+                let errno_str = libc::strerror(code);
+                fprintf(se, b"%s\n\0".as_ptr().cast(), errno_str);
+            }
+        }
+
+        // ── BIO printf bridge implementations ─────────────
+        //
+        // These are called by the naked asm shims above.
+        // They dlsym the BIO v-variant from preloaded LibreSSL at runtime.
+
+        /// Bridge: resolve `BIO_vprintf` via dlsym and call it.
+        extern "C" fn bio_vprintf_bridge(
+            bio: *mut libc::c_void,
+            fmt: *const libc::c_char,
+            ap: *const u8,
+        ) -> libc::c_int {
+            use std::sync::OnceLock;
+            static FN_PTR: OnceLock<usize> = OnceLock::new();
+            let addr = *FN_PTR.get_or_init(|| unsafe {
+                libc::dlsym(libc::RTLD_DEFAULT, b"BIO_vprintf\0".as_ptr().cast()) as usize
+            });
+            if addr == 0 {
+                return -1;
+            }
+            let func: extern "C" fn(
+                *mut libc::c_void,
+                *const libc::c_char,
+                *const u8,
+            ) -> libc::c_int = unsafe { std::mem::transmute(addr) };
+            func(bio, fmt, ap)
+        }
+
+        /// Bridge: resolve `BIO_vsnprintf` via dlsym and call it.
+        extern "C" fn bio_vsnprintf_bridge(
+            buf: *mut libc::c_char,
+            n: usize,
+            fmt: *const libc::c_char,
+            ap: *const u8,
+        ) -> libc::c_int {
+            use std::sync::OnceLock;
+            static FN_PTR: OnceLock<usize> = OnceLock::new();
+            let addr = *FN_PTR.get_or_init(|| unsafe {
+                libc::dlsym(libc::RTLD_DEFAULT, b"BIO_vsnprintf\0".as_ptr().cast()) as usize
+            });
+            if addr == 0 {
+                return -1;
+            }
+            let func: extern "C" fn(
+                *mut libc::c_char,
+                usize,
+                *const libc::c_char,
+                *const u8,
+            ) -> libc::c_int = unsafe { std::mem::transmute(addr) };
+            func(buf, n, fmt, ap)
         }
     }
 }

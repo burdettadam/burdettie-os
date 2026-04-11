@@ -8,6 +8,8 @@
 //!   offset 24: flags                (u64 — bit 0: tracking_mode [0=select-one, 1=select-any],
 //!                                           bit 1: momentary)
 //!   offset 32: titles_ptr           (u64 — pointer to Vec<u64> of NSString pointers)
+//!   offset 40: target_ptr           (u64 — target object, or 0)
+//!   offset 48: action_sel           (u64 — SEL addr, or 0)
 //!
 //! Total: 80 bytes.
 
@@ -257,6 +259,59 @@ pub extern "C" fn shim_nssegmentedcontrol_draw_rect(obj: u64, _cmd: u64, x: f64,
     }
 }
 
+// ── target / action ────────────────────────────────────────────
+
+const TARGET_OFF: usize = 40;
+const ACTION_OFF: usize = 48;
+
+/// `-[NSSegmentedControl target]`
+pub extern "C" fn shim_nssegmentedcontrol_target(obj: u64, _cmd: u64) -> u64 {
+    read_u64(obj, TARGET_OFF)
+}
+
+/// `-[NSSegmentedControl setTarget:]`
+pub extern "C" fn shim_nssegmentedcontrol_set_target(obj: u64, _cmd: u64, tgt: u64) {
+    write_u64(obj, TARGET_OFF, tgt);
+}
+
+/// `-[NSSegmentedControl action]`
+pub extern "C" fn shim_nssegmentedcontrol_action(obj: u64, _cmd: u64) -> u64 {
+    read_u64(obj, ACTION_OFF)
+}
+
+/// `-[NSSegmentedControl setAction:]`
+pub extern "C" fn shim_nssegmentedcontrol_set_action(obj: u64, _cmd: u64, sel: u64) {
+    write_u64(obj, ACTION_OFF, sel);
+}
+
+/// `-[NSSegmentedControl mouseDown:]` — select segment under click, fire action.
+pub extern "C" fn shim_nssegmentedcontrol_mouse_down(obj: u64, _cmd: u64, event: u64) {
+    if obj == 0 || event == 0 { return; }
+
+    let count = read_u64(obj, SEGMENT_COUNT_OFF) as usize;
+    if count == 0 { return; }
+
+    let (loc_x, _loc_y) = crate::nsevent::event_location_in_window(event);
+    let frame = crate::nsview::view_frame(obj);
+    let local_x = loc_x - frame.origin.x;
+    let seg_w = frame.size.width / count as f64;
+    let clicked_seg = (local_x / seg_w) as i64;
+
+    if clicked_seg >= 0 && (clicked_seg as usize) < count {
+        write_i64(obj, SELECTED_SEGMENT_OFF, clicked_seg);
+    }
+
+    // Fire target/action.
+    let action = read_u64(obj, ACTION_OFF);
+    let target = read_u64(obj, TARGET_OFF);
+    if action != 0 {
+        let nsapp = crate::nsapplication::nsapp_global_addr();
+        crate::nsapplication::shim_nsapplication_send_action_to_from(nsapp, 0, action, target, obj);
+    }
+
+    crate::nsview::shim_nsview_set_needs_display(obj, 0, 1);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -270,6 +325,11 @@ mod tests {
         assert_eq!(shim_nssegmentedcontrol_label_for_segment(0, 0, 0), 0);
         assert_eq!(shim_nssegmentedcontrol_tracking_mode(0, 0), 0);
         assert_eq!(shim_nssegmentedcontrol_is_momentary(0, 0), 0);
+        assert_eq!(shim_nssegmentedcontrol_target(0, 0), 0);
+        assert_eq!(shim_nssegmentedcontrol_action(0, 0), 0);
+        shim_nssegmentedcontrol_set_target(0, 0, 0x1234);
+        shim_nssegmentedcontrol_set_action(0, 0, 0x5678);
+        shim_nssegmentedcontrol_mouse_down(0, 0, 0);
     }
 
     #[test]
@@ -379,6 +439,16 @@ mod tests {
         assert_eq!(shim_nssegmentedcontrol_tracking_mode(seg, 0), 0);
         assert_eq!(shim_nssegmentedcontrol_is_momentary(seg, 0), 1);
         
+        free_obj(seg);
+    }
+
+    #[test]
+    fn target_action_round_trip() {
+        let seg = alloc_obj(SEGMENTED_CONTROL_SIZE, 0xDEAD);
+        shim_nssegmentedcontrol_set_target(seg, 0, 0xABCD);
+        shim_nssegmentedcontrol_set_action(seg, 0, 0xEF01);
+        assert_eq!(shim_nssegmentedcontrol_target(seg, 0), 0xABCD);
+        assert_eq!(shim_nssegmentedcontrol_action(seg, 0), 0xEF01);
         free_obj(seg);
     }
 }

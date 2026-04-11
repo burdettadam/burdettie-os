@@ -394,6 +394,7 @@ fn populate_foundation_runtime(objc_rt: &mut objc_runtime::ObjcRuntime) {
     cf_lite::FoundationShims::register_nscharacterset_class(objc_rt);
     cf_lite::FoundationShims::register_nsnotificationcenter_class(objc_rt);
     cf_lite::FoundationShims::register_nsnotification_class(objc_rt);
+    cf_lite::FoundationShims::register_nsdistributednotificationcenter_class(objc_rt);
     cf_lite::FoundationShims::register_nsvalue_class(objc_rt);
     cf_lite::FoundationShims::register_nsuuid_class(objc_rt);
     cf_lite::FoundationShims::register_nslocale_class(objc_rt);
@@ -437,7 +438,10 @@ fn populate_foundation_runtime(objc_rt: &mut objc_runtime::ObjcRuntime) {
     cf_lite::FoundationShims::register_nsscreen_class(objc_rt);
     cf_lite::FoundationShims::register_nscolor_class(objc_rt);
     cf_lite::FoundationShims::register_nsfont_class(objc_rt);
+    cf_lite::FoundationShims::register_nsfontmanager_class(objc_rt);
     cf_lite::FoundationShims::register_nsimage_class(objc_rt);
+    cf_lite::FoundationShims::register_nsimagerep_class(objc_rt);
+    cf_lite::FoundationShims::register_nsbitmapimagerep_class(objc_rt);
 
     // AppKit classes (Phase C7)
     cf_lite::FoundationShims::register_nsappearance_class(objc_rt);
@@ -520,6 +524,8 @@ fn populate_foundation_runtime(objc_rt: &mut objc_runtime::ObjcRuntime) {
     cf_lite::FoundationShims::register_nsurlsessionconfiguration_class(objc_rt);
     cf_lite::FoundationShims::register_nsurlsession_class(objc_rt);
     cf_lite::FoundationShims::register_nsurlsessiondatatask_class(objc_rt);
+    cf_lite::FoundationShims::register_nsurlsessionuploadtask_class(objc_rt);
+    cf_lite::FoundationShims::register_nsurlsessiondownloadtask_class(objc_rt);
     cf_lite::FoundationShims::register_nscoder_class(objc_rt);
     cf_lite::FoundationShims::register_nskeyedarchiver_class(objc_rt);
     cf_lite::FoundationShims::register_nskeyedunarchiver_class(objc_rt);
@@ -581,6 +587,7 @@ fn populate_foundation_runtime(objc_rt: &mut objc_runtime::ObjcRuntime) {
     cf_lite::FoundationShims::register_nstraitcollection_class(objc_rt);
     cf_lite::FoundationShims::register_nsanimationcontext_class(objc_rt);
     cf_lite::FoundationShims::register_nstableview_class(objc_rt);
+    cf_lite::FoundationShims::register_nsoutlineview_class(objc_rt);
     cf_lite::FoundationShims::register_nsundomanager_class(objc_rt);
     cf_lite::FoundationShims::register_nsview_safe_area_methods(objc_rt);
 
@@ -593,6 +600,11 @@ fn populate_foundation_runtime(objc_rt: &mut objc_runtime::ObjcRuntime) {
     // Phase C14 — Drawing (NSGraphicsContext, NSBezierPath)
     cf_lite::FoundationShims::register_nsgraphicscontext_class(objc_rt);
     cf_lite::FoundationShims::register_nsbezierpath_class(objc_rt);
+
+    // Phase C15 — TextKit (NSTextStorage, NSLayoutManager, NSTextContainer)
+    cf_lite::FoundationShims::register_nstextstorage_class(objc_rt);
+    cf_lite::FoundationShims::register_nslayoutmanager_class(objc_rt);
+    cf_lite::FoundationShims::register_nstextcontainer_class(objc_rt);
 
     // Register tagged pointer class table (NSNumber=2, NSString=3, NSDate=6).
     cf_lite::FoundationShims::register_tagged_classes(objc_rt);

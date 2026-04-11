@@ -392,10 +392,7 @@ impl StubResolver {
         if name.starts_with("sqlite3_") {
             return true;
         }
-        // FSEvents
-        if name.starts_with("FSEvent") {
-            return true;
-        }
+        // FSEvents — now handled by libsystem-shims fsevents stubs
         // Security framework constants (kSec*)
         if name.starts_with("kSec") {
             return true;
@@ -565,8 +562,11 @@ impl StubResolver {
         if name.starts_with("kMD") {
             return true;
         }
-        // IOKit
+        // IOKit (function/class names start "IO*", constants start "kIO*")
         if name.starts_with("IO") && name.len() > 2 && name.as_bytes()[2].is_ascii_uppercase() {
+            return true;
+        }
+        if name.starts_with("kIO") {
             return true;
         }
         // Security framework
@@ -579,6 +579,10 @@ impl StubResolver {
         }
         // SystemConfiguration
         if name.starts_with("SC") && name.len() > 2 && name.as_bytes()[2].is_ascii_uppercase() {
+            return true;
+        }
+        // SystemConfiguration data constants (kSCDynamicStore*, kSCProp*, kSCComp*, kSCEnt*, kSCVal*)
+        if name.starts_with("kSC") {
             return true;
         }
         // NSPasteboard constants
@@ -696,8 +700,7 @@ impl StubResolver {
             | "posix_spawn_file_actions_addinherit_np"
             | "posix_spawnp"
             | "wait" | "waitpid" | "wait4"
-            | "kill" | "raise"
-            | "sigprocmask" | "pthread_sigmask"
+            | "raise"
             | "alarm" | "setsid"
             | "getprogname" | "setprogname"
             | "confstr" | "getpagesize"
@@ -843,14 +846,22 @@ impl StubResolver {
             | "dispatch_source_create" | "dispatch_source_set_event_handler"
             | "dispatch_source_set_cancel_handler" | "dispatch_source_cancel"
             | "dispatch_source_set_timer"
+            | "dispatch_source_get_data" | "dispatch_source_get_handle"
+            | "dispatch_source_get_mask" | "dispatch_source_merge_data"
+            | "dispatch_source_set_event_handler_f" | "dispatch_source_set_cancel_handler_f"
+            | "dispatch_source_set_registration_handler"
             | "dispatch_resume" | "dispatch_suspend"
             | "dispatch_release" | "dispatch_retain"
             | "dispatch_set_target_queue"
             | "dispatch_queue_get_label"
             | "dispatch_get_specific" | "dispatch_queue_set_specific"
+            | "dispatch_queue_get_specific"
             | "dispatch_async_f" | "dispatch_sync_f"
-            | "dispatch_io_create" | "dispatch_io_read" | "dispatch_io_close"
+            | "dispatch_io_create" | "dispatch_io_create_with_path"
+            | "dispatch_io_read" | "dispatch_io_write" | "dispatch_io_close"
             | "dispatch_io_set_high_water" | "dispatch_io_set_low_water"
+            | "dispatch_io_set_interval" | "dispatch_io_get_descriptor"
+            | "dispatch_read" | "dispatch_write"
             | "dispatch_block_create" | "dispatch_block_create_with_qos_class"
             | "dispatch_queue_attr_make_with_qos_class"
             // Math
@@ -1152,10 +1163,6 @@ impl StubResolver {
             | "CFStringCreateMutable" | "CFStringAppend"
             | "CFRelease" | "CFRetain"
             | "CFAllocatorGetDefault"
-            | "CFNotificationCenterGetLocalCenter"
-            | "CFNotificationCenterAddObserver"
-            | "CFNotificationCenterRemoveObserver"
-            | "CFNotificationCenterPostNotification"
             | "CFReadStreamCreateWithFile" | "CFWriteStreamCreateWithFile"
             | "CFReadStreamOpen" | "CFReadStreamClose"
             | "CFWriteStreamOpen" | "CFWriteStreamClose"
@@ -1194,7 +1201,7 @@ impl StubResolver {
             // Signal extras
             | "sigemptyset" | "sigfillset"
             | "sigaddset" | "sigdelset" | "sigismember"
-            | "sigwait" | "sigtimedwait"
+            | "sigtimedwait"
             // Additional stdio
             | "popen"
             // Carbon / legacy Mac OS APIs (DeRez, Rez, sdef …)

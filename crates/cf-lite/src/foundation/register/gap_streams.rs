@@ -238,8 +238,11 @@ pub fn register_nsurlsession_class(rt: &mut objc_runtime::ObjcRuntime) {
             me("dataTaskWithRequest:", nsurlsession::shim_nsurlsession_data_task_with_request as *const () as u64, "@@:@"),
             me("dataTaskWithRequest:completionHandler:", nsurlsession::shim_nsurlsession_data_task_with_request_completion as *const () as u64, "@@:@@"),
             me("uploadTaskWithRequest:fromData:", nsurlsession::shim_nsurlsession_upload_task_with_request as *const () as u64, "@@:@@"),
+            me("uploadTaskWithRequest:fromData:completionHandler:", nsurlsession::shim_nsurlsession_upload_task_with_request_completion as *const () as u64, "@@:@@@?"),
             me("downloadTaskWithRequest:", nsurlsession::shim_nsurlsession_download_task_with_request as *const () as u64, "@@:@"),
             me("downloadTaskWithURL:", nsurlsession::shim_nsurlsession_download_task_with_url as *const () as u64, "@@:@"),
+            me("downloadTaskWithRequest:completionHandler:", nsurlsession::shim_nsurlsession_download_task_with_request_completion as *const () as u64, "@@:@@?"),
+            me("downloadTaskWithURL:completionHandler:", nsurlsession::shim_nsurlsession_download_task_with_url_completion as *const () as u64, "@@:@@?"),
             me("resetWithCompletionHandler:", nsurlsession::shim_nsurlsession_reset_with_completion_handler as *const () as u64, "v@:@?"),
             me("getAllTasksWithCompletionHandler:", nsurlsession::shim_nsurlsession_all_tasks_with_completion_handler as *const () as u64, "v@:@?"),
             me("invalidateAndCancel", nsurlsession::shim_nsurlsession_invalidate as *const () as u64, "v@:"),
@@ -280,12 +283,64 @@ pub fn register_nsurlsessiondatatask_class(rt: &mut objc_runtime::ObjcRuntime) {
         ],
         class_methods: vec![],
         ivars: vec![], properties: vec![], protocol_names: Vec::new(),
-        instance_size: 40, is_root: false, is_meta: false,
+        instance_size: 48, is_root: false, is_meta: false,
         superclass_addr: Some(nsobj::nsobject_class_addr()),
         method_index: HashMap::new(), class_method_index: HashMap::new(),
     };
     rt.register_synthetic_class(info);
     rt.register_metaclass_addr(metaclass_addr, "NSURLSessionDataTask");
+}
+
+/// Register `NSURLSessionUploadTask` — upload task (subclass of data task).
+pub fn register_nsurlsessionuploadtask_class(rt: &mut objc_runtime::ObjcRuntime) {
+    let class_addr = nsobj::nsurlsessionuploadtask_class_addr();
+    let metaclass_addr = nsobj::nsurlsessionuploadtask_metaclass_addr();
+    let info = ClassInfo {
+        name: "NSURLSessionUploadTask".to_string(),
+        mapped_addr: class_addr,
+        methods: vec![
+            me("resume", nsurlsession::shim_nsurlsessiondatatask_resume as *const () as u64, "v@:"),
+            me("cancel", nsurlsession::shim_nsurlsessiondatatask_cancel as *const () as u64, "v@:"),
+            me("suspend", nsurlsession::shim_nsurlsessiondatatask_suspend as *const () as u64, "v@:"),
+            me("state", nsurlsession::shim_nsurlsessiondatatask_state as *const () as u64, "q@:"),
+            me("originalRequest", nsurlsession::shim_nsurlsessiondatatask_original_request as *const () as u64, "@@:"),
+            me("taskIdentifier", nsurlsession::shim_nsurlsessiondatatask_task_id as *const () as u64, "Q@:"),
+            me("description", nsurlsession::shim_nsurlsessiondatatask_description as *const () as u64, "@@:"),
+        ],
+        class_methods: vec![],
+        ivars: vec![], properties: vec![], protocol_names: Vec::new(),
+        instance_size: 48, is_root: false, is_meta: false,
+        superclass_addr: Some(nsobj::nsurlsessiondatatask_class_addr()),
+        method_index: HashMap::new(), class_method_index: HashMap::new(),
+    };
+    rt.register_synthetic_class(info);
+    rt.register_metaclass_addr(metaclass_addr, "NSURLSessionUploadTask");
+}
+
+/// Register `NSURLSessionDownloadTask` — download task (writes response to temp file).
+pub fn register_nsurlsessiondownloadtask_class(rt: &mut objc_runtime::ObjcRuntime) {
+    let class_addr = nsobj::nsurlsessiondownloadtask_class_addr();
+    let metaclass_addr = nsobj::nsurlsessiondownloadtask_metaclass_addr();
+    let info = ClassInfo {
+        name: "NSURLSessionDownloadTask".to_string(),
+        mapped_addr: class_addr,
+        methods: vec![
+            me("resume", nsurlsession::shim_nsurlsessiondatatask_resume as *const () as u64, "v@:"),
+            me("cancel", nsurlsession::shim_nsurlsessiondatatask_cancel as *const () as u64, "v@:"),
+            me("suspend", nsurlsession::shim_nsurlsessiondatatask_suspend as *const () as u64, "v@:"),
+            me("state", nsurlsession::shim_nsurlsessiondatatask_state as *const () as u64, "q@:"),
+            me("originalRequest", nsurlsession::shim_nsurlsessiondatatask_original_request as *const () as u64, "@@:"),
+            me("taskIdentifier", nsurlsession::shim_nsurlsessiondatatask_task_id as *const () as u64, "Q@:"),
+            me("description", nsurlsession::shim_nsurlsessiondatatask_description as *const () as u64, "@@:"),
+        ],
+        class_methods: vec![],
+        ivars: vec![], properties: vec![], protocol_names: Vec::new(),
+        instance_size: 48, is_root: false, is_meta: false,
+        superclass_addr: Some(nsobj::nsobject_class_addr()),
+        method_index: HashMap::new(), class_method_index: HashMap::new(),
+    };
+    rt.register_synthetic_class(info);
+    rt.register_metaclass_addr(metaclass_addr, "NSURLSessionDownloadTask");
 }
 
 /// Register `NSKeyedArchiver` — binary archiver (plist-backed).

@@ -198,6 +198,36 @@ pub extern "C" fn shim_nstabview_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64, 
     }
 }
 
+/// `-[NSTabView mouseDown:]` — select tab under click.
+pub extern "C" fn shim_nstabview_mouse_down(obj: u64, _cmd: u64, event: u64) {
+    if obj == 0 || event == 0 { return; }
+
+    let (loc_x, loc_y) = crate::nsevent::event_location_in_window(event);
+    let frame = crate::nsview::view_frame(obj);
+    let local_y = loc_y - frame.origin.y;
+
+    // Tab bar is 28px tall at the top.
+    let tab_height = 28.0;
+    if local_y >= tab_height { return; } // Click in content area, not tab bar.
+
+    let items = {
+        let guard = TAB_ITEMS.lock().unwrap();
+        guard.as_ref().and_then(|m| m.get(&obj)).cloned().unwrap_or_default()
+    };
+    let count = items.len();
+    if count == 0 { return; }
+
+    let local_x = loc_x - frame.origin.x;
+    let tab_w = frame.size.width / count as f64;
+    let clicked_tab = (local_x / tab_w) as i64;
+
+    if clicked_tab >= 0 && (clicked_tab as usize) < count {
+        shim_nstabview_select_tab_view_item_at_index(obj, 0, clicked_tab);
+    }
+
+    crate::nsview::shim_nsview_set_needs_display(obj, 0, 1);
+}
+
 use std::sync::Mutex;
 static TAB_ITEMS: Mutex<Option<std::collections::HashMap<u64, Vec<u64>>>> = Mutex::new(None);
 
@@ -215,6 +245,7 @@ mod tests {
         assert_eq!(shim_nstabview_selected_tab_view_item(0, 0), 0);
         shim_nstabview_add_tab_view_item(0, 0, 0x1234);
         shim_nstabview_remove_tab_view_item(0, 0, 0x1234);
+        shim_nstabview_mouse_down(0, 0, 0);
     }
 
     #[test]

@@ -52,6 +52,19 @@ pub fn has_pipe_handler(name: &str) -> bool {
     with_pipes(|t| t.contains_key(name))
 }
 
+/// Route a message directly to a pipe handler by service name.
+///
+/// Returns the reply handle (0 if no handler or handler returned 0).
+/// Used by `xpc_transport` to route sync/async replies through pipe
+/// handlers before falling back to socket transport.
+pub fn route_to_handler(name: &str, request: u64) -> u64 {
+    let handler = with_pipes(|t| t.get(name).copied());
+    match handler {
+        Some(h) => h(request),
+        None => 0,
+    }
+}
+
 /// Create a pipe object.
 ///
 /// Returns a dictionary-backed handle with the pipe name and flags stored.

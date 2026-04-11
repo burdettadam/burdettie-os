@@ -7,7 +7,7 @@
 //!   - ZLIB: `flate2` (miniz_oxide backend, pure Rust)
 //!   - LZ4:  `lz4_flex` (pure Rust LZ4 block codec)
 //!   - LZMA: `lzma-rs` (pure Rust LZMA/XZ decoder, encode unsupported)
-//!   - LZFSE: not yet supported (returns 0)
+//!   - LZFSE: `lzfse_rust` (pure Rust LZFSE encoder/decoder)
 
 use crate::table::ShimTable;
 
@@ -121,7 +121,17 @@ fn lz4_decode(src: &[u8], max_output: usize) -> Option<Vec<u8>> {
     lz4_flex::block::decompress(src, max_output).ok()
 }
 
-// ── LZMA via lzma-rs (real LZMA decompression) ──────────────────────────────
+// ── LZMA via lzma-rs (real LZMA compression/decompression) ──────────────────
+
+fn lzma_encode(src: &[u8]) -> Vec<u8> {
+    use std::io::BufReader;
+    let mut out = Vec::new();
+    if lzma_rs::lzma_compress(&mut BufReader::new(src), &mut out).is_ok() {
+        out
+    } else {
+        Vec::new()
+    }
+}
 
 fn lzma_decode(src: &[u8]) -> Option<Vec<u8>> {
     use std::io::BufReader;
@@ -140,6 +150,36 @@ fn lzma_decode(src: &[u8]) -> Option<Vec<u8>> {
     }
 
     None
+}
+
+// ── LZFSE via lzfse_rust (real Apple LZFSE compression) ──────────────────────
+
+fn lzfse_encode(src: &[u8]) -> Vec<u8> {
+    if src.is_empty() {
+        return Vec::new();
+    }
+    let mut dst = Vec::new();
+    match lzfse_rust::encode_bytes(src, &mut dst) {
+        Ok(_) => dst,
+        Err(e) => {
+            log::debug!("lzfse_encode: {e}");
+            Vec::new()
+        }
+    }
+}
+
+fn lzfse_decode(src: &[u8]) -> Option<Vec<u8>> {
+    if src.is_empty() {
+        return Some(Vec::new());
+    }
+    let mut dst = Vec::new();
+    match lzfse_rust::decode_bytes(src, &mut dst) {
+        Ok(_) => Some(dst),
+        Err(e) => {
+            log::debug!("lzfse_decode: {e}");
+            None
+        }
+    }
 }
 
 // ── One-shot shims ───────────────────────────────────────────────────────────
@@ -161,10 +201,8 @@ pub extern "C" fn shim_compression_encode_buffer(
     let encoded = match algo {
         COMPRESSION_ZLIB => zlib_encode(src_slice),
         COMPRESSION_LZ4 | COMPRESSION_LZ4_RAW => lz4_encode(src_slice),
-        COMPRESSION_LZMA => {
-            log::debug!("compression_encode_buffer: LZMA encode not supported");
-            return 0;
-        }
+        COMPRESSION_LZMA => lzma_encode(src_slice),
+        COMPRESSION_LZFSE => lzfse_encode(src_slice),
         _ => {
             log::debug!("compression_encode_buffer: unsupported algo 0x{:x}", algo);
             return 0;
@@ -205,6 +243,10 @@ pub extern "C" fn shim_compression_decode_buffer(
             None => return 0,
         },
         COMPRESSION_LZMA => match lzma_decode(src_slice) {
+            Some(d) => d,
+            None => return 0,
+        },
+        COMPRESSION_LZFSE => match lzfse_decode(src_slice) {
             Some(d) => d,
             None => return 0,
         },
@@ -265,7 +307,7 @@ pub extern "C" fn shim_compression_stream_init(
         return COMPRESSION_STATUS_ERROR;
     }
     match algo {
-        COMPRESSION_ZLIB | COMPRESSION_LZ4 | COMPRESSION_LZ4_RAW | COMPRESSION_LZMA => {}
+        COMPRESSION_ZLIB | COMPRESSION_LZ4 | COMPRESSION_LZ4_RAW | COMPRESSION_LZMA | COMPRESSION_LZFSE => {}
         _ => {
             log::debug!("compression_stream_init: unsupported algo 0x{:x}", algo);
             return COMPRESSION_STATUS_ERROR;
@@ -330,7 +372,8 @@ pub extern "C" fn shim_compression_stream_process(stream: u64, flags: i32) -> i3
         match state.algo {
             COMPRESSION_ZLIB => zlib_encode(&state.buffer),
             COMPRESSION_LZ4 | COMPRESSION_LZ4_RAW => lz4_encode(&state.buffer),
-            COMPRESSION_LZMA => return COMPRESSION_STATUS_ERROR, // encode not supported
+            COMPRESSION_LZFSE => lzfse_encode(&state.buffer),
+            COMPRESSION_LZMA => lzma_encode(&state.buffer),
             _ => return COMPRESSION_STATUS_ERROR,
         }
     } else {
@@ -344,6 +387,10 @@ pub extern "C" fn shim_compression_stream_process(stream: u64, flags: i32) -> i3
                 None => return COMPRESSION_STATUS_ERROR,
             },
             COMPRESSION_LZMA => match lzma_decode(&state.buffer) {
+                Some(d) => d,
+                None => return COMPRESSION_STATUS_ERROR,
+            },
+            COMPRESSION_LZFSE => match lzfse_decode(&state.buffer) {
                 Some(d) => d,
                 None => return COMPRESSION_STATUS_ERROR,
             },
@@ -432,7 +479,7 @@ mod tests {
             src.as_ptr() as u64,
             src.len(),
             0,
-            COMPRESSION_LZMA,
+            0x999, // truly unsupported algo
         );
         assert_eq!(result, 0);
     }
@@ -579,5 +626,138 @@ mod tests {
             COMPRESSION_ZLIB,
         );
         assert_eq!(result, 0);
+    }
+
+    #[test]
+    fn test_lzfse_encode_decode_roundtrip() {
+        let input = b"hello world LZFSE roundtrip test data";
+        let encoded = lzfse_encode(input);
+        assert!(!encoded.is_empty(), "lzfse encode should produce output");
+        let decoded = lzfse_decode(&encoded).expect("lzfse decode failed");
+        assert_eq!(&decoded, &input[..]);
+    }
+
+    #[test]
+    fn test_lzfse_encode_large() {
+        let input: Vec<u8> = (0..50_000).map(|i| (i % 251) as u8).collect();
+        let encoded = lzfse_encode(&input);
+        assert!(!encoded.is_empty());
+        assert!(encoded.len() < input.len(), "should compress patterned data");
+        let decoded = lzfse_decode(&encoded).expect("lzfse decode large failed");
+        assert_eq!(decoded, input);
+    }
+
+    #[test]
+    fn test_oneshot_lzfse_via_shims() {
+        let input = b"The quick brown fox jumps over the lazy dog - LZFSE";
+        let mut encoded = vec![0u8; 1024];
+        let enc_len = shim_compression_encode_buffer(
+            encoded.as_mut_ptr() as u64,
+            encoded.len(),
+            input.as_ptr() as u64,
+            input.len(),
+            0,
+            COMPRESSION_LZFSE,
+        );
+        assert!(enc_len > 0, "lzfse encode should succeed");
+
+        let mut decoded = vec![0u8; 1024];
+        let dec_len = shim_compression_decode_buffer(
+            decoded.as_mut_ptr() as u64,
+            decoded.len(),
+            encoded.as_ptr() as u64,
+            enc_len,
+            0,
+            COMPRESSION_LZFSE,
+        );
+        assert_eq!(dec_len, input.len());
+        assert_eq!(&decoded[..dec_len], &input[..]);
+    }
+
+    #[test]
+    fn test_lzma_encode_decode_roundtrip() {
+        let input = b"LZMA roundtrip test data with enough bytes to compress";
+        let encoded = lzma_encode(input);
+        assert!(!encoded.is_empty(), "lzma encode should produce output");
+        let decoded = lzma_decode(&encoded).expect("lzma decode failed");
+        assert_eq!(&decoded, &input[..]);
+    }
+
+    #[test]
+    fn test_oneshot_lzma_via_shims() {
+        let input = b"Testing LZMA encode/decode through the shim API layer";
+        let mut encoded = vec![0u8; 4096];
+        let enc_len = shim_compression_encode_buffer(
+            encoded.as_mut_ptr() as u64,
+            encoded.len(),
+            input.as_ptr() as u64,
+            input.len(),
+            0,
+            COMPRESSION_LZMA,
+        );
+        assert!(enc_len > 0, "lzma encode should succeed");
+
+        let mut decoded = vec![0u8; 4096];
+        let dec_len = shim_compression_decode_buffer(
+            decoded.as_mut_ptr() as u64,
+            decoded.len(),
+            encoded.as_ptr() as u64,
+            enc_len,
+            0,
+            COMPRESSION_LZMA,
+        );
+        assert_eq!(dec_len, input.len());
+        assert_eq!(&decoded[..dec_len], &input[..]);
+    }
+
+    #[test]
+    fn test_lzfse_empty_roundtrip() {
+        let encoded = lzfse_encode(b"");
+        assert!(encoded.is_empty());
+    }
+
+    #[test]
+    fn test_stream_lzfse_roundtrip() {
+        #[repr(C)]
+        struct FakeStream {
+            src_ptr: u64,
+            src_size: u64,
+            dst_ptr: u64,
+            dst_size: u64,
+            state: u64,
+        }
+
+        let input = b"Stream LZFSE encode test data.";
+        let mut encoded = vec![0u8; 4096];
+
+        // Encode
+        let mut stream = FakeStream { src_ptr: 0, src_size: 0, dst_ptr: 0, dst_size: 0, state: 0 };
+        let s = &mut stream as *mut FakeStream as u64;
+        assert_eq!(shim_compression_stream_init(s, COMPRESSION_STREAM_ENCODE, COMPRESSION_LZFSE), COMPRESSION_STATUS_OK);
+        stream.src_ptr = input.as_ptr() as u64;
+        stream.src_size = input.len() as u64;
+        stream.dst_ptr = encoded.as_mut_ptr() as u64;
+        stream.dst_size = encoded.len() as u64;
+        let ret = shim_compression_stream_process(s, COMPRESSION_STREAM_FINALIZE);
+        assert_eq!(ret, COMPRESSION_STATUS_END);
+        let enc_len = encoded.len() - stream.dst_size as usize;
+        assert!(enc_len > 0);
+        shim_compression_stream_destroy(s);
+
+        // Decode
+        let mut decoded = vec![0u8; 4096];
+        let mut stream2 = FakeStream { src_ptr: 0, src_size: 0, dst_ptr: 0, dst_size: 0, state: 0 };
+        let s2 = &mut stream2 as *mut FakeStream as u64;
+        assert_eq!(shim_compression_stream_init(s2, COMPRESSION_STREAM_DECODE, COMPRESSION_LZFSE), COMPRESSION_STATUS_OK);
+        stream2.src_ptr = encoded.as_ptr() as u64;
+        stream2.src_size = enc_len as u64;
+        stream2.dst_ptr = decoded.as_mut_ptr() as u64;
+        stream2.dst_size = decoded.len() as u64;
+        let ret = shim_compression_stream_process(s2, COMPRESSION_STREAM_FINALIZE);
+        assert_eq!(ret, COMPRESSION_STATUS_END);
+        let dec_len = decoded.len() - stream2.dst_size as usize;
+        assert_eq!(dec_len, input.len());
+        assert_eq!(&decoded[..dec_len], &input[..]);
+        shim_compression_stream_destroy(s2);
     }
 }

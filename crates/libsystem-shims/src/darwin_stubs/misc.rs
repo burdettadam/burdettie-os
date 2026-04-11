@@ -84,10 +84,7 @@ impl MiscStubs {
             ("_CATransform3DIdentity", &CA_IDENTITY_TRANSFORM as *const _ as u64, "CATransform3DIdentity (stub data)"),
         );
 
-        // ── AudioToolbox (1 symbol) ─────────────────────────────────
-        register_shims!(table,
-            ("_AudioServicesPlaySystemSound", shim_void1_stub as *const () as u64, "AudioServicesPlaySystemSound (stub → void)"),
-        );
+        // AudioServicesPlaySystemSound moved to core_audio.rs
 
         // ── UserNotifications (2 symbols) ───────────────────────────
         register_shims!(table,

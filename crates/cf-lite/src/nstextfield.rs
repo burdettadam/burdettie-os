@@ -275,10 +275,24 @@ pub extern "C" fn shim_nstextfield_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64
                     graphics_core::Color::new(0.6, 0.6, 0.6, 1.0)
                 };
                 cg_shims::bridge::with_context(cg_ctx, |c| {
-                    c.fill_color = text_color;
-                    // Draw text with 4px inset, vertically centered.
-                    let text_y = y + (h * 0.7);  // baseline roughly at 70% from top
-                    c.draw_text(text, x + 4.0, text_y);
+                    let font_size = c.font_size.max(12.0);
+                    let sw = c.surface.width();
+                    let sh = c.surface.height();
+                    // Vertically center: place text top at y + (h - font_size) / 2
+                    let text_top = y + ((h - font_size * 1.2) / 2.0).max(0.0);
+                    let advance = graphics_core::text_system::draw_shaped_text(
+                        c.surface.pixels_mut(),
+                        sw,
+                        sh,
+                        text,
+                        x + 4.0,
+                        text_top,
+                        font_size,
+                        "System",
+                        text_color,
+                        None, // single-line, no wrap
+                    );
+                    c.text_x = x + 4.0 + advance;
 
                     // Draw a blinking cursor after the text if editing.
                     if is_editing {
@@ -356,11 +370,13 @@ pub extern "C" fn shim_nstextfield_key_down(obj: u64, _cmd: u64, event: u64) {
         }
         // Request redraw.
         crate::nsview::shim_nsview_set_needs_display(obj, 0, 1);
+        notify_text_did_change(obj);
         return;
     }
 
     if key_code == 36 {
-        // Return key — fire the action.
+        // Return key — notify delegate, then fire action.
+        notify_text_did_end_editing(obj);
         let target = read_u64(obj, TARGET_OFF);
         let action = read_u64(obj, ACTION_OFF);
         if target != 0 && action != 0 {
@@ -408,6 +424,50 @@ pub extern "C" fn shim_nstextfield_key_down(obj: u64, _cmd: u64, event: u64) {
 
     // Request redraw.
     crate::nsview::shim_nsview_set_needs_display(obj, 0, 1);
+
+    // Notify delegate: controlTextDidChange:
+    notify_text_did_change(obj);
+}
+
+/// `-[NSTextField mouseDown:]` — make this text field the first responder.
+pub extern "C" fn shim_nstextfield_mouse_down(obj: u64, _cmd: u64, event: u64) {
+    if obj == 0 { return; }
+
+    let flags = read_u64(obj, FLAGS_OFF);
+    if flags & FLAG_IS_EDITABLE == 0 && flags & FLAG_IS_SELECTABLE == 0 {
+        return;
+    }
+
+    let window = read_u64(obj, 16); // WINDOW_OFF from nsview
+    if window != 0 {
+        crate::nswindow::shim_nswindow_make_first_responder(window, 0, obj);
+    }
+    crate::nsview::shim_nsview_set_needs_display(obj, 0, 1);
+    let _ = event; // consumed
+}
+
+/// Dispatch `controlTextDidChange:` to the delegate (if any).
+fn notify_text_did_change(obj: u64) {
+    // NSTextField inherits NSControl, whose delegate field sits at the same
+    // position as NSView's window+8, but our shim wires the delegate via
+    // the `delegate` selector.  For simplicity, use the target as the
+    // delegate receiver — many real apps set delegate == target.
+    let delegate = read_u64(obj, TARGET_OFF);
+    if delegate != 0 {
+        let _ = crate::nsapplication::dispatch_selector_named_to_target(
+            delegate, "controlTextDidChange:", obj,
+        );
+    }
+}
+
+/// Dispatch `controlTextDidEndEditing:` to the delegate (if any).
+fn notify_text_did_end_editing(obj: u64) {
+    let delegate = read_u64(obj, TARGET_OFF);
+    if delegate != 0 {
+        let _ = crate::nsapplication::dispatch_selector_named_to_target(
+            delegate, "controlTextDidEndEditing:", obj,
+        );
+    }
 }
 
 #[cfg(test)]
@@ -435,6 +495,7 @@ mod tests {
         shim_nstextfield_set_target(0, 0, 0x1234);
         assert_eq!(shim_nstextfield_action(0, 0), 0);
         shim_nstextfield_set_action(0, 0, 0x1234);
+        shim_nstextfield_mouse_down(0, 0, 0);
     }
 
     #[test]

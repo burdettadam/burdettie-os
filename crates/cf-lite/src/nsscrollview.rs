@@ -112,12 +112,29 @@ pub extern "C" fn shim_nsscrollview_set_draws_background(obj: u64, _cmd: u64, va
     set_flag(obj, FLAG_DRAWS_BACKGROUND, val);
 }
 
-/// `-[NSScrollView contentSize]` — stub, returns 0 (CGSize would need struct return).
+/// `-[NSScrollView contentSize]` — returns available content area width as u64.
+///
+/// Real AppKit returns CGSize (struct), but struct return is not yet supported.
+/// We compute frame width minus scroller width as a best-effort scalar.
 pub extern "C" fn shim_nsscrollview_content_size(obj: u64, _cmd: u64) -> u64 {
     if obj == 0 {
         return 0;
     }
-    0
+    let frame = crate::nsview::view_frame(obj);
+    let flags = read_u64(obj, FLAGS_OFF);
+    let mut w = frame.size.width;
+    let mut _h = frame.size.height;
+    // Subtract scroller track widths (15px each, matching AppKit default).
+    if flags & FLAG_HAS_VERTICAL_SCROLLER != 0 {
+        w -= 15.0;
+    }
+    if flags & FLAG_HAS_HORIZONTAL_SCROLLER != 0 {
+        _h -= 15.0;
+    }
+    if w < 0.0 { w = 0.0; }
+    if _h < 0.0 { _h = 0.0; }
+    // Pack width as integer (callers needing full CGSize should use KVC).
+    w as u64
 }
 
 /// `-[NSScrollView tile]` — no-op stub.
@@ -249,9 +266,16 @@ mod tests {
     }
 
     #[test]
-    fn content_size_and_tile_stubs() {
+    fn content_size_uses_frame() {
         let sv = alloc_obj(SCROLL_VIEW_SIZE, 0xDEAD);
-        assert_eq!(shim_nsscrollview_content_size(sv, 0), 0);
+        // Give the scroll view a frame so contentSize is non-zero.
+        crate::nsview::shim_nsview_set_frame(sv, 0, 0.0, 0.0, 400.0, 300.0);
+        assert_eq!(shim_nsscrollview_content_size(sv, 0), 400);
+        // With vertical scroller: width shrinks by 15.
+        shim_nsscrollview_set_has_vertical_scroller(sv, 0, 1);
+        assert_eq!(shim_nsscrollview_content_size(sv, 0), 385);
+        shim_nsscrollview_set_has_vertical_scroller(sv, 0, 0);
+        assert_eq!(shim_nsscrollview_content_size(sv, 0), 400);
         shim_nsscrollview_tile(sv, 0); // should not panic
         free_obj(sv);
     }

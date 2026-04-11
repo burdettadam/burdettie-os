@@ -138,6 +138,7 @@ pub fn register_nstextfield_class(rt: &mut objc_runtime::ObjcRuntime) {
             me("drawRect:", nstextfield::shim_nstextfield_draw_rect as *const () as u64, "v@:{CGRect=dddd}"),
             me("acceptsFirstResponder", nstextfield::shim_nstextfield_accepts_first_responder as *const () as u64, "B@:"),
             me("keyDown:", nstextfield::shim_nstextfield_key_down as *const () as u64, "v@:@"),
+            me("mouseDown:", nstextfield::shim_nstextfield_mouse_down as *const () as u64, "v@:@"),
         ],
         class_methods: vec![
             me("labelWithString:", nstextfield::shim_nstextfield_label_with_string as *const () as u64, "@@:@"),

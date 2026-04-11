@@ -206,6 +206,20 @@ define_class_pair!(child NSURLSESSIONDATATASK_CLASS_DATA, NSURLSESSIONDATATASK_M
     parent_class: nsobject_class_addr,
     parent_meta: nsobject_metaclass_addr);
 
+define_class_pair!(child NSURLSESSIONUPLOADTASK_CLASS_DATA, NSURLSESSIONUPLOADTASK_METACLASS_DATA, NSURLSESSIONUPLOADTASK_INIT,
+    ensure: ensure_nsurlsessionuploadtask_init,
+    class_addr: nsurlsessionuploadtask_class_addr,
+    meta_addr: nsurlsessionuploadtask_metaclass_addr,
+    parent_class: nsurlsessiondatatask_class_addr,
+    parent_meta: nsurlsessiondatatask_metaclass_addr);
+
+define_class_pair!(child NSURLSESSIONDOWNLOADTASK_CLASS_DATA, NSURLSESSIONDOWNLOADTASK_METACLASS_DATA, NSURLSESSIONDOWNLOADTASK_INIT,
+    ensure: ensure_nsurlsessiondownloadtask_init,
+    class_addr: nsurlsessiondownloadtask_class_addr,
+    meta_addr: nsurlsessiondownloadtask_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
 // ── Gap-analysis Phase C11 ─────────────────────────────────────
 
 define_class_pair!(child NSCODER_CLASS_DATA, NSCODER_METACLASS_DATA, NSCODER_INIT,

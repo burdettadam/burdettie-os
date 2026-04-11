@@ -130,7 +130,29 @@ impl LifecycleShims {
             "pthread_mutex_trylock (macOS→Linux reinit)",
         );
 
-        log::debug!("LifecycleShims: registered 20 lifecycle shims");
+        // Signal mask shims — macOS sigset_t (4 bytes) vs Linux (128 bytes).
+        table.register(
+            "_pthread_sigmask",
+            shim_pthread_sigmask as *const () as u64,
+            "pthread_sigmask (sigset_t 4→128 byte translation)",
+        );
+        table.register(
+            "_sigprocmask",
+            shim_sigprocmask as *const () as u64,
+            "sigprocmask (sigset_t 4→128 byte translation)",
+        );
+        table.register(
+            "_sigwait",
+            shim_sigwait as *const () as u64,
+            "sigwait (sigset_t 4→128 byte translation)",
+        );
+        table.register(
+            "_kill",
+            shim_kill as *const () as u64,
+            "kill (diagnostic + signal translation)",
+        );
+
+        log::debug!("LifecycleShims: registered 24 lifecycle shims");
     }
 
     /// Run all registered atexit handlers in LIFO order.
@@ -537,6 +559,178 @@ unsafe fn strlen_real(s: *const u8) -> usize {
     unsafe { strlen(s) }
 }
 
+// ── Signal mask ABI translation (macOS sigset_t → Linux sigset_t) ───────────
+//
+// macOS `sigset_t` is `__uint32_t` (4 bytes): a simple bit mask where bit N
+// corresponds to signal N.
+//
+// Linux aarch64 `sigset_t` is 128 bytes (1024 bits), with each `unsigned long`
+// (8 bytes) holding 64 signal bits.
+//
+// When macOS guest code calls pthread_sigmask / sigprocmask / sigwait, it
+// passes a pointer to a 4-byte sigset.  Linux's implementation reads 128
+// bytes, which means it picks up garbage from the stack.  We translate by
+// widening the 4-byte mask into a zeroed 128-byte Linux sigset_t.
+//
+// Additionally, the `how` parameter values differ:
+//   macOS: SIG_BLOCK=1, SIG_UNBLOCK=2, SIG_SETMASK=3
+//   Linux: SIG_BLOCK=0, SIG_UNBLOCK=1, SIG_SETMASK=2
+
+/// Translate macOS `how` values (SIG_BLOCK=1, SIG_UNBLOCK=2, SIG_SETMASK=3)
+/// to Linux values (SIG_BLOCK=0, SIG_UNBLOCK=1, SIG_SETMASK=2).
+#[cfg(target_os = "linux")]
+fn translate_sigmask_how(darwin_how: i32) -> i32 {
+    match darwin_how {
+        1 => libc::SIG_BLOCK,    // macOS SIG_BLOCK=1 → Linux SIG_BLOCK=0
+        2 => libc::SIG_UNBLOCK,  // macOS SIG_UNBLOCK=2 → Linux SIG_UNBLOCK=1
+        3 => libc::SIG_SETMASK,  // macOS SIG_SETMASK=3 → Linux SIG_SETMASK=2
+        _ => darwin_how,
+    }
+}
+
+/// Convert a macOS 4-byte sigset_t pointer to a Linux 128-byte sigset_t.
+/// Returns a zeroed Linux sigset_t with the low 32 signal bits copied from
+/// the macOS mask.  Signal numbers are identical for the first 31 signals
+/// on both platforms (the signals nslookup cares about — SIGTERM, SIGINT, etc.).
+#[cfg(target_os = "linux")]
+fn darwin_sigset_to_linux(darwin_ptr: *const u32) -> libc::sigset_t {
+    let mut linux_set: libc::sigset_t = unsafe { std::mem::zeroed() };
+    unsafe { libc::sigemptyset(&mut linux_set) };
+    if darwin_ptr.is_null() {
+        return linux_set;
+    }
+    let mac_bits = unsafe { darwin_ptr.read_unaligned() };
+    // macOS sigset_t: bit (sig-1) = signal sig.  e.g. SIGTERM=15 → bit 14.
+    for sig in 1..32 {
+        if mac_bits & (1u32 << (sig - 1)) != 0 {
+            let linux_sig = translate_darwin_signal(sig as i32);
+            unsafe { libc::sigaddset(&mut linux_set, linux_sig) };
+        }
+    }
+    linux_set
+}
+
+/// Convert a Linux sigset_t back to a macOS 4-byte sigset_t.
+/// Only the first 31 signals are representable.
+#[cfg(target_os = "linux")]
+fn linux_sigset_to_darwin(linux_set: &libc::sigset_t) -> u32 {
+    let mut mac_bits: u32 = 0;
+    for sig in 1..32i32 {
+        let linux_sig = translate_darwin_signal(sig);
+        if unsafe { libc::sigismember(linux_set, linux_sig) } == 1 {
+            mac_bits |= 1u32 << (sig as u32 - 1);
+        }
+    }
+    mac_bits
+}
+
+/// `int pthread_sigmask(int how, const sigset_t *set, sigset_t *oldset)`
+///
+/// Translates macOS 4-byte sigset_t to Linux 128-byte sigset_t.
+#[cfg(target_os = "linux")]
+extern "C" fn shim_pthread_sigmask(how: i32, set: *const u32, oldset: *mut u32) -> i32 {
+    let linux_how = translate_sigmask_how(how);
+    let linux_set = if set.is_null() {
+        None
+    } else {
+        Some(darwin_sigset_to_linux(set))
+    };
+    let mut linux_oldset: libc::sigset_t = unsafe { std::mem::zeroed() };
+    let old_ptr = if oldset.is_null() { std::ptr::null_mut() } else { &mut linux_oldset };
+
+    let ret = unsafe {
+        libc::pthread_sigmask(
+            linux_how,
+            linux_set.as_ref().map_or(std::ptr::null(), |s| s as *const _),
+            old_ptr,
+        )
+    };
+
+    // Write back the old signal mask in macOS format.
+    if !oldset.is_null() && ret == 0 {
+        unsafe { oldset.write_unaligned(linux_sigset_to_darwin(&linux_oldset)) };
+    }
+
+    let how_name = match how { 1 => "BLOCK", 2 => "UNBLOCK", 3 => "SETMASK", _ => "?" };
+    log::trace!("pthread_sigmask({how_name}, mac_set={:?}) → {ret}",
+        if set.is_null() { None } else { Some(unsafe { set.read_unaligned() }) });
+    ret
+}
+
+#[cfg(target_os = "macos")]
+extern "C" fn shim_pthread_sigmask(_how: i32, _set: *const u32, _oldset: *mut u32) -> i32 {
+    0
+}
+
+/// `int sigprocmask(int how, const sigset_t *set, sigset_t *oldset)`
+///
+/// Same translation as pthread_sigmask.
+#[cfg(target_os = "linux")]
+extern "C" fn shim_sigprocmask(how: i32, set: *const u32, oldset: *mut u32) -> i32 {
+    let linux_how = translate_sigmask_how(how);
+    let linux_set = if set.is_null() {
+        None
+    } else {
+        Some(darwin_sigset_to_linux(set))
+    };
+    let mut linux_oldset: libc::sigset_t = unsafe { std::mem::zeroed() };
+    let old_ptr = if oldset.is_null() { std::ptr::null_mut() } else { &mut linux_oldset };
+
+    let ret = unsafe {
+        libc::sigprocmask(
+            linux_how,
+            linux_set.as_ref().map_or(std::ptr::null(), |s| s as *const _),
+            old_ptr,
+        )
+    };
+
+    if !oldset.is_null() && ret == 0 {
+        unsafe { oldset.write_unaligned(linux_sigset_to_darwin(&linux_oldset)) };
+    }
+
+    log::debug!("sigprocmask(how={how}) → {ret}");
+    ret
+}
+
+#[cfg(target_os = "macos")]
+extern "C" fn shim_sigprocmask(_how: i32, _set: *const u32, _oldset: *mut u32) -> i32 {
+    0
+}
+
+/// `int sigwait(const sigset_t *set, int *sig)`
+///
+/// Translates macOS 4-byte sigset_t to Linux 128-byte sigset_t, then
+/// calls the real sigwait.
+#[cfg(target_os = "linux")]
+extern "C" fn shim_sigwait(set: *const u32, sig: *mut i32) -> i32 {
+    let linux_set = darwin_sigset_to_linux(set);
+    let mac_mask = if set.is_null() { 0 } else { unsafe { set.read_unaligned() } };
+    log::trace!("sigwait: waiting (mac_mask={mac_mask:#x})");
+    let ret = unsafe { libc::sigwait(&linux_set, sig) };
+    if ret == 0 && !sig.is_null() {
+        let caught = unsafe { *sig };
+        log::debug!("sigwait: caught signal {caught}");
+    }
+    ret
+}
+
+#[cfg(target_os = "macos")]
+extern "C" fn shim_sigwait(_set: *const u32, _sig: *mut i32) -> i32 {
+    0
+}
+
+/// `int kill(pid_t pid, int sig)`
+///
+/// Diagnostic wrapper that logs the call and translates macOS signal numbers
+/// to Linux signal numbers before calling the real kill(2).
+extern "C" fn shim_kill(pid: i32, sig: i32) -> i32 {
+    let linux_sig = translate_darwin_signal(sig);
+    log::debug!("kill(pid={pid}, sig={sig} → linux {linux_sig})");
+    unsafe {
+        libc::kill(pid, linux_sig)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -560,7 +754,7 @@ mod tests {
         assert!(table.resolve("___deregister_frame").is_some());
         assert!(table.resolve("_abort").is_some());
         assert!(table.resolve("_strlen").is_some());
-        assert_eq!(table.len(), 20);
+        assert_eq!(table.len(), 24);
     }
 
     #[test]

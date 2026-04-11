@@ -14,6 +14,8 @@ struct ImageInfo {
     file_path: Option<String>,
     width: f64,
     height: f64,
+    /// CGImage handle (from cg-shims bridge). 0 = no pixel data.
+    cg_handle: u64,
 }
 
 static IMAGE_STORE: Mutex<Option<HashMap<u64, ImageInfo>>> = Mutex::new(None);
@@ -32,7 +34,7 @@ pub extern "C" fn shim_nsimage_image_named(_cls: u64, _cmd: u64, _name: u64) -> 
     0
 }
 
-/// `-[NSImage initWithContentsOfFile:]` — records the file path and returns self.
+/// `-[NSImage initWithContentsOfFile:]` — decodes the image and stores a CGImage handle.
 pub extern "C" fn shim_nsimage_init_with_contents_of_file(
     obj: u64,
     _cmd: u64,
@@ -42,30 +44,65 @@ pub extern "C" fn shim_nsimage_init_with_contents_of_file(
     let path_str = crate::cfstring::extract_cfstring_cstr(path_ptr).map(|s| s.to_string());
     log::debug!("NSImage initWithContentsOfFile: {:?}", path_str);
 
+    let (w, h, cg_handle) = if let Some(ref path) = path_str {
+        if let Some(img) = graphics_core::ImageBuffer::from_file(std::path::Path::new(path)) {
+            let w = img.width() as f64;
+            let h = img.height() as f64;
+            let handle = cg_shims::bridge::image_create_from_buffer(img);
+            (w, h, handle)
+        } else {
+            (0.0, 0.0, 0)
+        }
+    } else {
+        (0.0, 0.0, 0)
+    };
+
     let mut guard = store();
     let map = ensure_store(&mut guard);
     map.insert(
         obj,
         ImageInfo {
             file_path: path_str,
-            width: 0.0,
-            height: 0.0,
+            width: w,
+            height: h,
+            cg_handle,
         },
     );
     obj
 }
 
-/// `-[NSImage initWithData:]` — records allocation, returns self.
-pub extern "C" fn shim_nsimage_init_with_data(obj: u64, _cmd: u64, _data: u64) -> u64 {
-    log::debug!("NSImage initWithData: (stub)");
+/// `-[NSImage initWithData:]` — decodes image data and stores a CGImage handle.
+pub extern "C" fn shim_nsimage_init_with_data(obj: u64, _cmd: u64, data_ptr: u64) -> u64 {
+    log::debug!("NSImage initWithData:");
+
+    let (w, h, cg_handle) = if data_ptr != 0 && data_ptr % 8 == 0 {
+        // Try to read NSData bytes (only if pointer is aligned, i.e. plausibly valid).
+        let bytes = crate::nsdata::nsdata_bytes_slice(data_ptr);
+        if !bytes.is_empty() {
+            if let Some(img) = graphics_core::ImageBuffer::from_encoded(bytes) {
+                let w = img.width() as f64;
+                let h = img.height() as f64;
+                let handle = cg_shims::bridge::image_create_from_buffer(img);
+                (w, h, handle)
+            } else {
+                (0.0, 0.0, 0)
+            }
+        } else {
+            (0.0, 0.0, 0)
+        }
+    } else {
+        (0.0, 0.0, 0)
+    };
+
     let mut guard = store();
     let map = ensure_store(&mut guard);
     map.insert(
         obj,
         ImageInfo {
             file_path: None,
-            width: 0.0,
-            height: 0.0,
+            width: w,
+            height: h,
+            cg_handle,
         },
     );
     obj
@@ -97,6 +134,7 @@ pub extern "C" fn shim_nsimage_set_size(obj: u64, _cmd: u64, w: f64, h: f64) {
                 file_path: None,
                 width: w,
                 height: h,
+                cg_handle: 0,
             },
         );
     }
@@ -109,20 +147,23 @@ pub extern "C" fn shim_nsimage_name(_obj: u64, _cmd: u64) -> u64 {
 
 /// Get a CGImage handle for an NSImage (for NSImageView rendering).
 /// Returns 0 if no pixel data is available.
-pub fn image_to_cg_handle(_image: u64) -> u64 {
-    // TODO: when NSImage gains real pixel data (from initWithContentsOfFile:
-    // with the imaging feature), create a CGImage from the decoded pixels.
-    0
+pub fn image_to_cg_handle(image: u64) -> u64 {
+    let guard = store();
+    guard
+        .as_ref()
+        .and_then(|map| map.get(&image))
+        .map(|info| info.cg_handle)
+        .unwrap_or(0)
 }
 
-/// `-[NSImage drawInRect:fromRect:operation:fraction:]` — no-op stub.
+/// `-[NSImage drawInRect:fromRect:operation:fraction:]` — renders image into current CG context.
 pub extern "C" fn shim_nsimage_draw_in_rect(
-    _obj: u64,
+    obj: u64,
     _cmd: u64,
-    _dx: f64,
-    _dy: f64,
-    _dw: f64,
-    _dh: f64,
+    dx: f64,
+    dy: f64,
+    dw: f64,
+    dh: f64,
     _sx: f64,
     _sy: f64,
     _sw: f64,
@@ -130,14 +171,26 @@ pub extern "C" fn shim_nsimage_draw_in_rect(
     _op: u64,
     _fraction: f64,
 ) {
-    log::debug!("NSImage drawInRect:fromRect:operation:fraction: (stub)");
+    if obj == 0 { return; }
+    let cg_handle = image_to_cg_handle(obj);
+    if cg_handle == 0 {
+        log::debug!("NSImage drawInRect: no CGImage handle, skipping");
+        return;
+    }
+    let cg_ctx = crate::nsgraphicscontext::current_cg_context_handle();
+    if cg_ctx == 0 { return; }
+    cg_shims::bridge::draw_image_in_context(cg_ctx, cg_handle, dx, dy, dw, dh);
 }
 
 /// Remove the metadata entry for an NSImage (cleanup helper).
 pub fn nsimage_remove(obj: u64) {
     let mut guard = store();
     if let Some(map) = guard.as_mut() {
-        map.remove(&obj);
+        if let Some(info) = map.remove(&obj) {
+            if info.cg_handle != 0 {
+                cg_shims::bridge::image_release(info.cg_handle);
+            }
+        }
     }
 }
 

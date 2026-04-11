@@ -4,8 +4,8 @@ use std::collections::HashMap;
 use objc_runtime::ClassInfo;
 use super::me;
 use crate::{
-    nsapplication, nscolor, nsevent, nsfont, nsimage,
-    nslayoutconstraint, nsobj, nsresponder, nsrunloop, nsscreen,
+    nsaccessibility, nsapplication, nsbitmapimagerep, nscolor, nsevent, nsfont, nsfontmanager,
+    nsimage, nsimagerep, nslayoutconstraint, nsobj, nsresponder, nsrunloop, nsscreen,
     nstrackingarea, nsview, nswindow, nsworkspace,
 };
 
@@ -245,6 +245,14 @@ pub fn register_nsview_class(rt: &mut objc_runtime::ObjcRuntime) {
             me("convertPoint:toView:", nsview::shim_nsview_convert_point_to_view as *const () as u64, "{CGPoint=dd}@:{CGPoint=dd}@"),
             me("convertRect:fromView:", nsview::shim_nsview_convert_rect_from_view as *const () as u64, "{CGRect={CGPoint=dd}{CGSize=dd}}@:{CGRect={CGPoint=dd}{CGSize=dd}}@"),
             me("convertRect:toView:", nsview::shim_nsview_convert_rect_to_view as *const () as u64, "{CGRect={CGPoint=dd}{CGSize=dd}}@:{CGRect={CGPoint=dd}{CGSize=dd}}@"),
+            // NSAccessibility protocol
+            me("accessibilityRole", nsaccessibility::shim_accessibility_role as *const () as u64, "@@:"),
+            me("accessibilityRoleDescription", nsaccessibility::shim_accessibility_role_description as *const () as u64, "@@:"),
+            me("accessibilityLabel", nsaccessibility::shim_accessibility_label as *const () as u64, "@@:"),
+            me("accessibilityValue", nsaccessibility::shim_accessibility_value as *const () as u64, "@@:"),
+            me("isAccessibilityElement", nsaccessibility::shim_is_accessibility_element as *const () as u64, "B@:"),
+            me("accessibilityChildren", nsaccessibility::shim_accessibility_children as *const () as u64, "@@:"),
+            me("accessibilityParent", nsaccessibility::shim_accessibility_parent as *const () as u64, "@@:"),
         ],
         class_methods: vec![],
         ivars: vec![], properties: vec![], protocol_names: Vec::new(),
@@ -489,5 +497,100 @@ pub fn register_nsimage_class(rt: &mut objc_runtime::ObjcRuntime) {
     };
     rt.register_synthetic_class(info);
     rt.register_metaclass_addr(metaclass_addr, "NSImage");
+}
+
+/// Register `NSImageRep` — abstract image representation base class.
+pub fn register_nsimagerep_class(rt: &mut objc_runtime::ObjcRuntime) {
+    let class_addr = nsobj::nsimagerep_class_addr();
+    let metaclass_addr = nsobj::nsimagerep_metaclass_addr();
+    let info = ClassInfo {
+        name: "NSImageRep".to_string(),
+        mapped_addr: class_addr,
+        methods: vec![
+            me("init", nsimagerep::shim_nsimagerep_init as *const () as u64, "@@:"),
+            me("pixelsWide", nsimagerep::shim_nsimagerep_pixels_wide as *const () as u64, "q@:"),
+            me("setPixelsWide:", nsimagerep::shim_nsimagerep_set_pixels_wide as *const () as u64, "v@:q"),
+            me("pixelsHigh", nsimagerep::shim_nsimagerep_pixels_high as *const () as u64, "q@:"),
+            me("setPixelsHigh:", nsimagerep::shim_nsimagerep_set_pixels_high as *const () as u64, "v@:q"),
+            me("size", nsimagerep::shim_nsimagerep_size as *const () as u64, "{CGSize=dd}@:"),
+            me("setSize:", nsimagerep::shim_nsimagerep_set_size as *const () as u64, "v@:{CGSize=dd}"),
+        ],
+        class_methods: vec![
+            me("alloc", nsimagerep::shim_nsimagerep_alloc as *const () as u64, "@@:"),
+        ],
+        ivars: vec![], properties: vec![], protocol_names: Vec::new(),
+        instance_size: nsimagerep::IMAGE_REP_SIZE as u32, is_root: false, is_meta: false,
+        superclass_addr: Some(nsobj::nsobject_class_addr()),
+        method_index: HashMap::new(), class_method_index: HashMap::new(),
+    };
+    rt.register_synthetic_class(info);
+    rt.register_metaclass_addr(metaclass_addr, "NSImageRep");
+}
+
+/// Register `NSBitmapImageRep` — concrete bitmap image representation.
+pub fn register_nsbitmapimagerep_class(rt: &mut objc_runtime::ObjcRuntime) {
+    let class_addr = nsobj::nsbitmapimagerep_class_addr();
+    let metaclass_addr = nsobj::nsbitmapimagerep_metaclass_addr();
+    let info = ClassInfo {
+        name: "NSBitmapImageRep".to_string(),
+        mapped_addr: class_addr,
+        methods: vec![
+            me("initWithBitmapDataPlanes:pixelsWide:pixelsHigh:bitsPerSample:samplesPerPixel:hasAlpha:isPlanar:colorSpaceName:bytesPerRow:bitsPerPixel:",
+                nsbitmapimagerep::shim_nsbitmapimagerep_init_planes as *const () as u64,
+                "@@:^*qqqqBB@qq"),
+            me("initWithCGImage:", nsbitmapimagerep::shim_nsbitmapimagerep_init_with_cgimage as *const () as u64, "@@:@"),
+            me("initWithData:", nsbitmapimagerep::shim_nsbitmapimagerep_init_with_data as *const () as u64, "@@:@"),
+            me("bitmapData", nsbitmapimagerep::shim_nsbitmapimagerep_bitmap_data as *const () as u64, "^v@:"),
+            me("CGImage", nsbitmapimagerep::shim_nsbitmapimagerep_cgimage as *const () as u64, "@@:"),
+            me("bitsPerSample", nsbitmapimagerep::shim_nsbitmapimagerep_bits_per_sample as *const () as u64, "q@:"),
+            me("samplesPerPixel", nsbitmapimagerep::shim_nsbitmapimagerep_samples_per_pixel as *const () as u64, "q@:"),
+            me("hasAlpha", nsbitmapimagerep::shim_nsbitmapimagerep_has_alpha as *const () as u64, "B@:"),
+            me("isPlanar", nsbitmapimagerep::shim_nsbitmapimagerep_is_planar as *const () as u64, "B@:"),
+            me("bytesPerRow", nsbitmapimagerep::shim_nsbitmapimagerep_bytes_per_row as *const () as u64, "q@:"),
+            me("bitsPerPixel", nsbitmapimagerep::shim_nsbitmapimagerep_bits_per_pixel as *const () as u64, "q@:"),
+            me("colorSpaceName", nsbitmapimagerep::shim_nsbitmapimagerep_color_space_name as *const () as u64, "@@:"),
+            me("representationUsingType:properties:", nsbitmapimagerep::shim_nsbitmapimagerep_representation as *const () as u64, "@@:Q@"),
+            me("TIFFRepresentation", nsbitmapimagerep::shim_nsbitmapimagerep_tiff as *const () as u64, "@@:"),
+        ],
+        class_methods: vec![
+            me("alloc", nsbitmapimagerep::shim_nsbitmapimagerep_alloc as *const () as u64, "@@:"),
+        ],
+        ivars: vec![], properties: vec![], protocol_names: Vec::new(),
+        instance_size: nsbitmapimagerep::BITMAP_REP_SIZE as u32, is_root: false, is_meta: false,
+        superclass_addr: Some(nsobj::nsimagerep_class_addr()),
+        method_index: HashMap::new(), class_method_index: HashMap::new(),
+    };
+    rt.register_synthetic_class(info);
+    rt.register_metaclass_addr(metaclass_addr, "NSBitmapImageRep");
+}
+
+/// Register `NSFontManager` — font discovery and enumeration.
+pub fn register_nsfontmanager_class(rt: &mut objc_runtime::ObjcRuntime) {
+    let class_addr = nsobj::nsfontmanager_class_addr();
+    let metaclass_addr = nsobj::nsfontmanager_metaclass_addr();
+    let info = ClassInfo {
+        name: "NSFontManager".to_string(),
+        mapped_addr: class_addr,
+        methods: vec![
+            me("availableFontFamilies", nsfontmanager::shim_nsfontmanager_available_font_families as *const () as u64, "@@:"),
+            me("availableFonts", nsfontmanager::shim_nsfontmanager_available_fonts as *const () as u64, "@@:"),
+            me("availableMembersOfFontFamily:", nsfontmanager::shim_nsfontmanager_available_members as *const () as u64, "@@:@"),
+            me("fontWithFamily:traits:weight:size:", nsfontmanager::shim_nsfontmanager_font_with_family as *const () as u64, "@@:@QQd"),
+            me("convertFont:", nsfontmanager::shim_nsfontmanager_convert_font as *const () as u64, "@@:@"),
+            me("convertFont:toHaveTrait:", nsfontmanager::shim_nsfontmanager_convert_font_to_trait as *const () as u64, "@@:@Q"),
+            me("convertFont:toSize:", nsfontmanager::shim_nsfontmanager_convert_font_to_size as *const () as u64, "@@:@d"),
+            me("setSelectedFont:isMultiple:", nsfontmanager::shim_nsfontmanager_set_selected_font as *const () as u64, "v@:@c"),
+        ],
+        class_methods: vec![
+            me("sharedFontManager", nsfontmanager::shim_nsfontmanager_shared as *const () as u64, "@@:"),
+            me("setFontManagerFactory:", nsfontmanager::shim_nsfontmanager_set_factory as *const () as u64, "v@:#"),
+        ],
+        ivars: vec![], properties: vec![], protocol_names: Vec::new(),
+        instance_size: 8, is_root: false, is_meta: false,
+        superclass_addr: Some(nsobj::nsobject_class_addr()),
+        method_index: HashMap::new(), class_method_index: HashMap::new(),
+    };
+    rt.register_synthetic_class(info);
+    rt.register_metaclass_addr(metaclass_addr, "NSFontManager");
 }
 
