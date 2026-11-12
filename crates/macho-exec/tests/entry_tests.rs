@@ -17,7 +17,7 @@ fn synthetic_unixthread_entry(
         macho_types::EntryPoint::Main { entry_offset, .. } => {
             let text = image.segment("__TEXT").expect("fixture should map __TEXT");
             macho_types::EntryPoint::UnixThread {
-                entry_address: text.vmaddr + *entry_offset as u64,
+                entry_address: text.vmaddr + *entry_offset,
             }
         }
         macho_types::EntryPoint::UnixThread { entry_address } => {
@@ -376,12 +376,9 @@ fn interpreted_overhead_report() {
         let resolver = default_stub_resolver();
         let _ = apply_chained_fixups(&image, &parsed, &data, &resolver);
 
-        let entry = match parsed.entry.as_ref() {
-            Some(e) => e,
-            None => {
-                eprintln!("│ {name:<19} │ NO ENTRY    │              │");
-                continue;
-            }
+        let Some(entry) = parsed.entry.as_ref() else {
+            eprintln!("│ {name:<19} │ NO ENTRY    │              │");
+            continue;
         };
 
         let segments: Vec<(u64, *mut u8, usize, bool)> = image
@@ -392,7 +389,7 @@ fn interpreted_overhead_report() {
 
         let entry_addr = match entry {
             macho_types::EntryPoint::Main { entry_offset, .. } => {
-                image.text_base().unwrap() as u64 + *entry_offset as u64
+                image.text_base().unwrap() as u64 + *entry_offset
             }
             _ => continue,
         };

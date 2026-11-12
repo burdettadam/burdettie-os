@@ -19,12 +19,34 @@ impl MemoryObjectType {
         }
     }
 
+    /// Parse a canonical stored object type name, returning `None` for unknown values.
+    #[allow(clippy::should_implement_trait)] // Retain the existing Option-returning API alongside FromStr.
     pub fn from_str(value: &str) -> Option<Self> {
+        value.parse().ok()
+    }
+}
+
+/// An unrecognized memory object type name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ParseMemoryObjectTypeError;
+
+impl std::fmt::Display for ParseMemoryObjectTypeError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("unrecognized memory object type")
+    }
+}
+
+impl std::error::Error for ParseMemoryObjectTypeError {}
+
+impl std::str::FromStr for MemoryObjectType {
+    type Err = ParseMemoryObjectTypeError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
-            "durable_memory" => Some(Self::DurableMemory),
-            "generated_summary" => Some(Self::GeneratedSummary),
-            "repo_fact" => Some(Self::RepoFact),
-            _ => None,
+            "durable_memory" => Ok(Self::DurableMemory),
+            "generated_summary" => Ok(Self::GeneratedSummary),
+            "repo_fact" => Ok(Self::RepoFact),
+            _ => Err(ParseMemoryObjectTypeError),
         }
     }
 }

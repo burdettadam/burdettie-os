@@ -34,7 +34,10 @@ impl Clock for LinuxClock {
         unsafe { libc::gettimeofday(&mut tv, std::ptr::null_mut()) };
         let mut tm: libc::tm = unsafe { std::mem::zeroed() };
         unsafe { libc::localtime_r(&tv.tv_sec, &mut tm) };
-        tm.tm_gmtoff as i64
+        // `tm_gmtoff` is a C long, so this also widens it on 32-bit Linux.
+        #[allow(clippy::unnecessary_cast)]
+        let gmtoff = tm.tm_gmtoff as i64;
+        gmtoff
     }
 
     fn timezone_name(&self) -> String {
@@ -73,6 +76,9 @@ impl Clock for LinuxClock {
     fn localtime(&self, unix_sec: i64) -> CalendarComponents {
         let mut tm: libc::tm = unsafe { std::mem::zeroed() };
         unsafe { libc::localtime_r(&unix_sec, &mut tm) };
+        // `tm_gmtoff` is a C long, so this also widens it on 32-bit Linux.
+        #[allow(clippy::unnecessary_cast)]
+        let gmtoff = tm.tm_gmtoff as i64;
         CalendarComponents {
             sec: tm.tm_sec,
             min: tm.tm_min,
@@ -83,7 +89,7 @@ impl Clock for LinuxClock {
             wday: tm.tm_wday,
             yday: tm.tm_yday,
             isdst: tm.tm_isdst,
-            gmtoff: tm.tm_gmtoff as i64,
+            gmtoff,
         }
     }
 

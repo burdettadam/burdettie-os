@@ -10,8 +10,8 @@ pub use ids::{
     VersionId,
 };
 pub use model::{
-    ContextPack, Hit, MemoryChunk, MemoryObject, MemoryObjectType, Query, Scope, SyncSummary,
-    Visibility,
+    ContextPack, Hit, MemoryChunk, MemoryObject, MemoryObjectType, ParseMemoryObjectTypeError,
+    Query, Scope, SyncSummary, Visibility,
 };
 pub use provenance::{Provenance, SourceClass};
 pub use traits::{Embedder, MemoryStore, SemanticIndex, TierPlanner, VectorCodec};

@@ -268,8 +268,6 @@ fn stub_function_entry(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     #[cfg(target_arch = "aarch64")]
     fn bl_decode_roundtrip() {
