@@ -315,7 +315,7 @@ impl RealAmfi {
         };
 
         // Trust cache lookup by computed CDHash
-        let trust_cache_hit = self.registry.as_ref().map_or(false, |reg| {
+        let trust_cache_hit = self.registry.as_ref().is_some_and(|reg| {
             let hash = cd_hash_result
                 .computed_hash()
                 .unwrap_or(cs_info.cd_hash.as_str());
@@ -391,7 +391,7 @@ impl RealAmfi {
                     );
 
                     // Check if signer team ID / identity is in our trust registry
-                    let team_trusted = self.registry.as_ref().map_or(false, |reg| {
+                    let team_trusted = self.registry.as_ref().is_some_and(|reg| {
                         reg.is_team_id_trusted(&cs_info.team_id)
                             || reg.is_identity_trusted(&cs_info.identity)
                     });
@@ -632,7 +632,7 @@ impl RealQuarantine {
         use std::ffi::CString;
         let c_path = CString::new(path.to_str()?).ok()?;
         // SAFETY: attribute name is a valid null-terminated C string literal.
-        let attr_name = b"com.apple.quarantine\0".as_ptr() as *const libc::c_char;
+        let attr_name = c"com.apple.quarantine".as_ptr();
 
         // First call: get the size
         let size =

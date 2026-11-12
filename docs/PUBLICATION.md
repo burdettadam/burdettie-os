@@ -74,3 +74,22 @@ additional limitations around cached references and old clones in its
 Record the commit, host architecture, toolchain, fixture build command, and test
 command with compatibility results. Keep failures, skipped checks, and external
 input requirements visible so a reviewer can reproduce the same scope.
+
+## Outstanding validation gates
+
+Source cleanup and a working quick start do not establish a fully passing CI
+baseline. Two broader gates remain open:
+
+- **Font dependency maintenance.** `cargo deny check advisories` reports
+  [RUSTSEC-2026-0192](https://rustsec.org/advisories/RUSTSEC-2026-0192.html) for
+  the unmaintained `ttf-parser` dependency. The advisory remains unsuppressed;
+  the font stack needs a migration to maintained parsing dependencies.
+- **Strict portability lints.** The Docker development job reaches existing
+  `macho-parse` Clippy warnings under `-D warnings`, and the portable test targets
+  also have existing `platform-core` lint debt. These checks need to pass before
+  claiming a clean strict-lint baseline; a successful image build does not mean
+  its later test steps ran.
+
+Use the [CI workflow](../.github/workflows/ci.yml), [dependency policy](../deny.toml),
+and recorded job results to distinguish successful demonstrations from the
+remaining repository-wide checks.

@@ -16,7 +16,7 @@ use crate::SecurityVerdict;
 ///
 /// Applied at the gate level — each gate can use a different mode.
 /// `TrustPolicyBuilder::with_enforcement_mode()` applies the same mode to all gates.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum EnforcementMode {
     /// All checks disabled — every binary is unconditionally allowed.
@@ -35,13 +35,8 @@ pub enum EnforcementMode {
     /// Full enforcement — check failures deny execution.
     ///
     /// This is the production setting. Matches Apple macOS default behavior.
+    #[default]
     Enforcing,
-}
-
-impl Default for EnforcementMode {
-    fn default() -> Self {
-        Self::Enforcing
-    }
 }
 
 impl EnforcementMode {
