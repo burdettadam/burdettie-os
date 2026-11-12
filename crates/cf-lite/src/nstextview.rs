@@ -90,7 +90,7 @@ pub extern "C" fn shim_nstextview_init_with_frame(
     );
 
     // Empty string (kept as mirror for callers of -[NSTextView string]).
-    let empty = crate::cfstring::alloc_nsstring_from_cstr(b"\0".as_ptr() as *const _);
+    let empty = crate::cfstring::alloc_nsstring_from_cstr(c"".as_ptr());
     write_u64(ptr, STRING_OFF, empty);
 
     // Create a cosmic-text Editor for this view.
@@ -315,9 +315,8 @@ pub extern "C" fn shim_nstextview_insert_text(obj: u64, _cmd: u64, text: u64) {
     if utf8.is_null() {
         return;
     }
-    let typed = match unsafe { std::ffi::CStr::from_ptr(utf8) }.to_str() {
-        Ok(s) => s,
-        Err(_) => return,
+    let Ok(typed) = unsafe { std::ffi::CStr::from_ptr(utf8) }.to_str() else {
+        return;
     };
     if typed.is_empty() {
         return;

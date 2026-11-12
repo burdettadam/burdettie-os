@@ -615,10 +615,8 @@ pub extern "C" fn shim_nsmenu_perform_key_equivalent(obj: u64, _cmd: u64, event:
 
         // Check submenu first (recursive)
         let submenu = unsafe { *((item as usize + ITEM_SUBMENU_OFF) as *const u64) };
-        if submenu != 0 {
-            if shim_nsmenu_perform_key_equivalent(submenu, _cmd, event) != 0 {
-                return 1;
-            }
+        if submenu != 0 && shim_nsmenu_perform_key_equivalent(submenu, _cmd, event) != 0 {
+            return 1;
         }
 
         // Check this item's key equivalent

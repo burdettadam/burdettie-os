@@ -267,8 +267,7 @@ pub extern "C" fn shim_nsarray_object_at_index(obj: u64, _cmd: u64, index: u64) 
     if elems == 0 {
         return 0;
     }
-    let val = unsafe { *((elems as usize + index as usize * 8) as *const u64) };
-    val
+    unsafe { *((elems as usize + index as usize * 8) as *const u64) }
 }
 
 /// `-[NSArray firstObject]` — returns the first element or nil.

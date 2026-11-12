@@ -82,7 +82,7 @@ fn get_flag(obj: u64, flag: u64) -> u8 {
 // ── Instance method shims ──────────────────────────────────────
 
 fn resolve_archived_image(candidate: u64) -> u64 {
-    if candidate == 0 || candidate % 8 != 0 {
+    if candidate == 0 || !candidate.is_multiple_of(8) {
         return 0;
     }
 
@@ -228,7 +228,7 @@ pub extern "C" fn shim_nsbutton_title(obj: u64, _cmd: u64) -> u64 {
         return ptr;
     }
     // Return empty string if none set
-    crate::cfstring::shim_cf_string_create_with_cstring(0, b"\0".as_ptr().cast(), 0)
+    crate::cfstring::shim_cf_string_create_with_cstring(0, c"".as_ptr(), 0)
 }
 
 /// `-[NSButton setTitle:]`

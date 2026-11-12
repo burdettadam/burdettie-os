@@ -327,7 +327,7 @@ mod tests {
     fn test_leading() {
         let font = shim_nsfont_system_font_of_size(0, 0, 13.0);
         let lead = shim_nsfont_leading(font, 0);
-        assert!(lead >= 0.0 && lead < 2.0);
+        assert!((0.0..2.0).contains(&lead));
         free_obj(font);
     }
 

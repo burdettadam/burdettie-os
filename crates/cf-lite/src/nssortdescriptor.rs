@@ -28,7 +28,7 @@ fn resolve_isa(rt: &objc_runtime::ObjcRuntime, obj: u64) -> Option<u64> {
     }
     if obj & (1u64 << 63) != 0 {
         rt.tagged_class_for_pointer(obj)
-    } else if obj % 8 == 0 {
+    } else if obj.is_multiple_of(8) {
         Some(unsafe { *(obj as *const u64) } & 0x007ffffffffffff8)
     } else {
         None

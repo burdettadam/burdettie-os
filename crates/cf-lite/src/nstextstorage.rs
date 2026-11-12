@@ -107,9 +107,8 @@ fn views_for_storage(storage: u64) -> Vec<u64> {
 /// Sync the storage's backing NSString from the editor text of `view`.
 /// Called by NSTextView after internal edits (insertText, keyDown, etc.).
 pub fn sync_storage_from_view(view: u64) {
-    let storage = match storage_for_view(view) {
-        Some(s) => s,
-        None => return,
+    let Some(storage) = storage_for_view(view) else {
+        return;
     };
     let text = graphics_core::text_system::editor_get_text(view);
     let c_str = std::ffi::CString::new(text).unwrap_or_default();
@@ -131,9 +130,8 @@ fn sync_views_from_storage(storage: u64) {
     if utf8.is_null() {
         return;
     }
-    let text = match unsafe { std::ffi::CStr::from_ptr(utf8) }.to_str() {
-        Ok(t) => t,
-        Err(_) => return,
+    let Ok(text) = unsafe { std::ffi::CStr::from_ptr(utf8) }.to_str() else {
+        return;
     };
     for view in views {
         graphics_core::text_system::editor_set_text(view, text);
@@ -161,7 +159,7 @@ pub extern "C" fn shim_nstextstorage_init(obj: u64, _cmd: u64) -> u64 {
         return 0;
     }
     // Create empty backing string.
-    let empty = crate::cfstring::alloc_nsstring_from_cstr(b"\0".as_ptr() as *const _);
+    let empty = crate::cfstring::alloc_nsstring_from_cstr(c"".as_ptr());
     write_u64(obj, STRING_OFF, empty);
     obj
 }

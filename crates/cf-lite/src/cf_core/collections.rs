@@ -408,8 +408,8 @@ pub fn kcf_type_array_callbacks_addr() -> u64 {
 
 // ── CFNumber C functions ───────────────────────────────────────────
 
-/// CFNumber type constants — subset of `CFNumberType` enum.
-/// kCFNumberSInt8Type = 1, ..., kCFNumberDoubleType = 13, kCFNumberNSIntegerType = 15.
+// CFNumber type constants — subset of `CFNumberType` enum.
+// kCFNumberSInt8Type = 1, ..., kCFNumberDoubleType = 13, kCFNumberNSIntegerType = 15.
 
 /// `CFNumberRef CFNumberCreate(CFAllocatorRef, CFNumberType, const void *valuePtr)`
 pub extern "C" fn shim_cf_number_create(_alloc: u64, the_type: i32, value_ptr: *const u8) -> u64 {
@@ -617,7 +617,7 @@ pub extern "C" fn shim_cf_string_create_with_bytes_no_copy(
     }
     if bytes.is_null() {
         return if num_bytes == 0 {
-            crate::cfstring::shim_cf_string_create_with_cstring(0, b"\0".as_ptr().cast(), 0)
+            crate::cfstring::shim_cf_string_create_with_cstring(0, c"".as_ptr(), 0)
         } else {
             0
         };
@@ -672,7 +672,7 @@ pub extern "C" fn shim_cf_string_create_with_characters(
     num_chars: i64,
 ) -> u64 {
     if chars.is_null() || num_chars <= 0 {
-        return crate::cfstring::shim_cf_string_create_with_cstring(0, b"\0".as_ptr().cast(), 0);
+        return crate::cfstring::shim_cf_string_create_with_cstring(0, c"".as_ptr(), 0);
     }
     let slice = unsafe { std::slice::from_raw_parts(chars, num_chars as usize) };
     let s = String::from_utf16_lossy(slice);
@@ -967,16 +967,13 @@ pub extern "C" fn shim_cf_string_get_bytes(
         return 0;
     }
     let parts = crate::cfstring::cfstring_parts(string);
-    let (bytes, total_len) = match parts {
-        Some((b, len)) => (b, len),
-        None => {
-            if used_buf_len != 0 {
-                unsafe {
-                    *(used_buf_len as *mut i64) = 0;
-                }
+    let Some((bytes, total_len)) = parts else {
+        if used_buf_len != 0 {
+            unsafe {
+                *(used_buf_len as *mut i64) = 0;
             }
-            return 0;
         }
+        return 0;
     };
 
     let start = range_loc as usize;

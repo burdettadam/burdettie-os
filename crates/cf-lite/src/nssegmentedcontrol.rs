@@ -187,7 +187,7 @@ pub extern "C" fn shim_nssegmentedcontrol_set_label_for_segment(
 
 /// `-[NSSegmentedControl trackingMode]`
 pub extern "C" fn shim_nssegmentedcontrol_tracking_mode(obj: u64, _cmd: u64) -> u64 {
-    (read_flags(obj) & FLAG_TRACKING_MODE) as u64
+    read_flags(obj) & FLAG_TRACKING_MODE
 }
 
 /// `-[NSSegmentedControl setTrackingMode:]`

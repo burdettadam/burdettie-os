@@ -251,9 +251,7 @@ pub extern "C" fn shim_mutable_attrstr_replace_chars(
     let mut result = String::with_capacity(old_cstr.len());
     // Build prefix + replacement + suffix
     for (i, ch) in old_cstr.char_indices() {
-        if i < loc {
-            result.push(ch);
-        } else if i >= loc + len {
+        if i < loc || i >= loc + len {
             result.push(ch);
         }
         // characters in [loc, loc+len) are skipped
