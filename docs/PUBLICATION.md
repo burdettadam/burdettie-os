@@ -75,27 +75,47 @@ Record the commit, host architecture, toolchain, fixture build command, and test
 command with compatibility results. Keep failures, skipped checks, and external
 input requirements visible so a reviewer can reproduce the same scope.
 
-## Outstanding validation gates
+## Validation status
 
-Source cleanup and a working quick start do not establish a fully passing CI
-baseline. Three broader gates remain open:
+The runtime, parser, and text-rendering fixes have local regression coverage.
+The following checks passed on Linux x86_64 with Rust 1.93.0 on 2026-11-12:
+
+| Check | Result and scope |
+| --- | --- |
+| Portable library suites | 344 tests passed across the 11 packages selected by the Docker development job. |
+| Malformed Mach-O metadata | 20 integration tests passed, covering bounded export-trie traversal, invalid variable-length integers, address arithmetic, and architecture-specific thread entry points. |
+| Objective-C superclass repair | 5 focused tests passed, covering mapped class records, synthetic handles, replacement, removal, and overlays. |
+| Foundation class storage | 7 focused tests passed, including pointer alignment, storage layout, and child/metaclass hierarchy reads. |
+| ARM64 interpreter library | 500 tests passed, including 22 atomic-instruction regressions and a string-read address-overflow regression. |
+| GPU text-layout and glyph-cache feature | 253 library tests passed with `cargo test --locked -p graphics-core --lib --features gpu`. This exercises layout, rasterization, and atlas logic without a physical GPU. |
+| Strict portable Clippy | The exact command from [`docker/Dockerfile.dev`](../docker/Dockerfile.dev) passed locally with `-D warnings` and the existing CI lint allowances. The Docker image itself was not executed in this check. |
+| ARM64 interpreter Clippy | `arm64-translate --all-targets --target aarch64-unknown-linux-gnu` passed with the CI warning policy. This cross-compilation check does not execute ARM64 code. |
+
+Foundation class storage now has the alignment required by its pointer fields,
+and superclass repair reads only class records explicitly registered as mapped
+storage. The previously crashing `interp_cf_bridging` fixture now completes
+locally with exit code 0: one test passed, with the other 39 cases filtered out.
+Its variadic `printf` output still contains incorrect values through the x86_64
+FFI fallback. Formatted output and the complete native ARM64 interpreter suite
+require further validation.
+
+Byte and halfword LSE/SWP operations retain a non-atomic fallback, limiting their
+use for guest-thread synchronization.
+
+The interpreter's x86_64 test build still emits warnings for ARM64 JIT code.
+The Clippy results above cover the listed packages and targets; workspace-wide
+strict lint validation remains open.
+
+Two broader gates remain open:
 
 - **Font dependency maintenance.** `cargo deny check advisories` reports
   [RUSTSEC-2026-0192](https://rustsec.org/advisories/RUSTSEC-2026-0192.html) for
   the unmaintained `ttf-parser` dependency. The advisory remains unsuppressed;
   the font stack needs a migration to maintained parsing dependencies.
-- **Strict portability lints.** The Docker development job reaches existing
-  `macho-parse` Clippy warnings under `-D warnings`, and the portable test targets
-  also have existing `platform-core` lint debt. The macOS ARM64 job also reports
-  existing `arm64-translate` Clippy warnings. These checks need to pass before
-  claiming a clean strict-lint baseline; a successful image build does not mean
-  its later test steps ran.
-- **Linux ARM64 interpreter execution.** The native image and interpreter test
-  binary compile successfully, but the first of 40 discovered tests,
-  `interp_cf_bridging`, aborts on a misaligned pointer dereference in
-  `repair_superclass_addrs`. No completed suite summary is produced, and the
-  remaining 39 cases are not reached. This runtime path needs repair and further
-  validation before claiming a passing interpreter suite.
+- **Native CI after the fixes.** The macOS ARM64 workspace build, strict lints,
+  and tests, the Docker development job, and the complete Linux ARM64
+  interpreter suite need fresh CI results. Passing local portable tests does
+  not establish that these platform-specific jobs pass.
 
 Use the [CI workflow](../.github/workflows/ci.yml), [dependency policy](../deny.toml),
 and recorded job results to distinguish successful demonstrations from the
