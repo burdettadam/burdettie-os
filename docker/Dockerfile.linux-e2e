@@ -1,6 +1,6 @@
 # docker/Dockerfile.linux-e2e — Full runtime on Linux ARM64.
 #
-# Builds the ENTIRE workspace on Linux including objc-runtime, cf-lite,
+# Builds the portable workspace and runtime crates on Linux, including objc-runtime, cf-lite,
 # libsystem-shims, platform-linux, arm64-translate, and macho-runtime.
 # The ARM64 interpreter is the execution engine (no macOS assembly
 # trampolines needed). Mach-O fixtures compiled on macOS are included
@@ -21,11 +21,11 @@ RUN rustup component add clippy
 WORKDIR /workspace
 COPY . .
 
-# Build the full workspace (all crates including runtime stack).
+# Build the portable workspace, excluding Darwin-only packages.
 # On ARM64 Linux this uses platform-linux for the PAL layer.
 RUN cargo build --locked --workspace --exclude hello-darwin \
     --exclude control-gallery --exclude foundation-explorer \
-    --exclude window-backend-darwin
+    --exclude window-backend-darwin --exclude platform-darwin-host
 
 # Build test binaries for the interpreted test suite.
 RUN cargo test --locked --no-run -p macho-runtime --test interpreted_objc_tests

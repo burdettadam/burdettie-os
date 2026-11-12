@@ -86,7 +86,8 @@ baseline. Two broader gates remain open:
   the font stack needs a migration to maintained parsing dependencies.
 - **Strict portability lints.** The Docker development job reaches existing
   `macho-parse` Clippy warnings under `-D warnings`, and the portable test targets
-  also have existing `platform-core` lint debt. These checks need to pass before
+  also have existing `platform-core` lint debt. The macOS ARM64 job also reports
+  existing `arm64-translate` Clippy warnings. These checks need to pass before
   claiming a clean strict-lint baseline; a successful image build does not mean
   its later test steps ran.
 
