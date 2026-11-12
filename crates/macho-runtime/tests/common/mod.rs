@@ -126,9 +126,8 @@ impl IsolatedResult {
 /// Call this from a `#[test] fn __subprocess_runner()` in any test file
 /// that needs crash isolation.
 pub fn subprocess_entry_point() {
-    let path_str = match std::env::var("__RUNTIME_FIXTURE_PATH") {
-        Ok(p) => p,
-        Err(_) => return,
+    let Ok(path_str) = std::env::var("__RUNTIME_FIXTURE_PATH") else {
+        return;
     };
     let path = Path::new(&path_str);
     let config = RuntimeConfig::permissive(path);

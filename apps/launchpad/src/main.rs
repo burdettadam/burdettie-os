@@ -1101,7 +1101,7 @@ fn slot_button_text(entry: &AppEntry) -> String {
 
 fn slot_name(name: &str) -> String {
     let parts: Vec<String> = name
-        .split(|ch| matches!(ch, ' ' | '_' | '-'))
+        .split([' ', '_', '-'])
         .filter(|part| !part.is_empty())
         .map(|part| part.to_ascii_uppercase())
         .collect();
@@ -1180,7 +1180,7 @@ fn time_ago_text(time: SystemTime) -> String {
 
 fn monogram(name: &str) -> String {
     let mut letters: Vec<char> = name
-        .split(|ch| matches!(ch, ' ' | '_' | '-'))
+        .split([' ', '_', '-'])
         .filter_map(|part| part.chars().find(|ch| ch.is_ascii_alphanumeric()))
         .map(|ch| ch.to_ascii_uppercase())
         .collect();
@@ -1232,16 +1232,16 @@ fn set_button_palette(button: &mut Button, background: Color, text: Color) {
     button.set_title_color(text);
 }
 
-fn filtered_entries<'a>(apps: &'a [AppEntry], filter: FilterMode) -> Vec<&'a AppEntry> {
+fn filtered_entries(apps: &[AppEntry], filter: FilterMode) -> Vec<&AppEntry> {
     apps.iter().filter(|entry| filter.matches(entry)).collect()
 }
 
-fn page_entries<'a>(
-    apps: &'a [AppEntry],
+fn page_entries(
+    apps: &[AppEntry],
     filter: FilterMode,
     current_page: usize,
     page_size: usize,
-) -> Vec<&'a AppEntry> {
+) -> Vec<&AppEntry> {
     let filtered = filtered_entries(apps, filter);
     let page_start = current_page * page_size;
     filtered
@@ -1251,19 +1251,19 @@ fn page_entries<'a>(
         .collect()
 }
 
-fn catalog_entry<'a>(
-    apps: &'a [AppEntry],
+fn catalog_entry(
+    apps: &[AppEntry],
     filter: FilterMode,
     current_page: usize,
     page_size: usize,
     slot: usize,
-) -> Option<&'a AppEntry> {
+) -> Option<&AppEntry> {
     let filtered = filtered_entries(apps, filter);
     let page_start = current_page * page_size;
     filtered.get(page_start + slot).copied()
 }
 
-fn quick_launch_entry<'a>(apps: &'a [AppEntry], spec: QuickLaunchSpec) -> Option<&'a AppEntry> {
+fn quick_launch_entry(apps: &[AppEntry], spec: QuickLaunchSpec) -> Option<&AppEntry> {
     apps.iter().find(|entry| entry.name == spec.app_name)
 }
 
