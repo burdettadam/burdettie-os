@@ -6,7 +6,7 @@ Burdettie-OS explores what it takes to run software built for macOS through an i
 
 This is an experimental systems project. Compatibility depends on the binary, CPU architecture, platform backend, and APIs it uses. The implementation is a user-space runtime; the host operating system still provides the kernel, memory management, files, and display services.
 
-[Quick start](#quick-start) · [Architecture](#architecture) · [Engineering highlights](#engineering-highlights) · [Documentation](#documentation)
+[Quick start](#quick-start) · [Architecture](#architecture) · [Engineering highlights](#engineering-highlights) · [Validation](#validation) · [Documentation](#documentation)
 
 ## Start here
 
@@ -92,6 +92,12 @@ Treat locally imported guest software as a separate development input. Imported 
 | Semantic memory and services | `burdettie-domain-map`, `burdettie-memory-core`, `burdettie-memory-index`, `burdettie-services`, `burdettie-log-pipeline` | Explore domain modeling, memory indexing, service integration, and logging. |
 
 The [feature reference](docs/FEATURES.md) provides the detailed subsystem inventory. The [roadmap](docs/roadmap.md) records the intended direction and target matrix.
+
+## Validation
+
+The [CI workflow](.github/workflows/ci.yml) builds the project's own Mach-O fixtures and checks the documented quick start, language bindings, portable libraries, and interpreted execution. In the [recorded run for `31e52c9`](https://github.com/burdettadam/burdettie-os/actions/runs/43291406943), the macOS ARM64 quick start, C/Swift interop, Docker checks, and all 40 Linux ARM64 interpreter fixtures passed.
+
+That run also exposed strict-lint failures in the broader macOS build-and-test job. The `ttf-parser` maintenance advisory remains visible in the dependency checks. Follow-up source fixes and their local regression results are recorded in the [validation status](docs/PUBLICATION.md#validation-status), with native CI distinguished from local checks. These results describe the tested fixtures and revision; framework and application coverage remains incremental.
 
 ## Scope and limitations
 
