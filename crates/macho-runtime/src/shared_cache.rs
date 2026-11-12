@@ -169,9 +169,8 @@ impl SharedCacheLoader {
                 }
             });
 
-            let file_offset = match file_offset {
-                Some(off) => off,
-                None => continue, // skip unmappable images
+            let Some(file_offset) = file_offset else {
+                continue; // skip unmappable images
             };
 
             // Read the Mach-O header to get the header+load commands size.

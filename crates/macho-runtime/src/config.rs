@@ -151,11 +151,13 @@ mod tests {
 
     #[test]
     fn shim_set_clone() {
-        let mut original = ShimSet::default();
-        original.objc = false;
+        let original = ShimSet {
+            objc: false,
+            ..ShimSet::default()
+        };
         let cloned = original.clone();
-        assert_eq!(cloned.objc, false);
-        assert_eq!(cloned.process, true);
+        assert!(!cloned.objc);
+        assert!(cloned.process);
     }
 
     #[test]
@@ -168,9 +170,11 @@ mod tests {
 
     #[test]
     fn shim_set_selective_disable() {
-        let mut s = ShimSet::default();
-        s.dispatch = false;
-        s.foundation = false;
+        let s = ShimSet {
+            dispatch: false,
+            foundation: false,
+            ..ShimSet::default()
+        };
         assert!(!s.dispatch);
         assert!(!s.foundation);
         assert!(s.process);
