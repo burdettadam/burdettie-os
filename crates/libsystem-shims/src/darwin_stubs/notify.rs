@@ -158,16 +158,13 @@ pub extern "C" fn shim_notify_register_dispatch(
     queue: u64,
     handler: u64,
 ) -> u32 {
-    let name_str = match extract_name(name) {
-        Some(n) => n,
-        None => {
-            if !out_token.is_null() {
-                unsafe {
-                    *out_token = 0;
-                }
+    let Some(name_str) = extract_name(name) else {
+        if !out_token.is_null() {
+            unsafe {
+                *out_token = 0;
             }
-            return NOTIFY_STATUS_OK;
         }
+        return NOTIFY_STATUS_OK;
     };
 
     let token = alloc_token();
@@ -204,16 +201,13 @@ pub extern "C" fn shim_notify_register_dispatch(
 /// Registers a poll-only token. `notify_check` can later test if the
 /// notification was posted since the last check.
 pub extern "C" fn shim_notify_register_check(name: u64, out_token: *mut i32) -> u32 {
-    let name_str = match extract_name(name) {
-        Some(n) => n,
-        None => {
-            if !out_token.is_null() {
-                unsafe {
-                    *out_token = 0;
-                }
+    let Some(name_str) = extract_name(name) else {
+        if !out_token.is_null() {
+            unsafe {
+                *out_token = 0;
             }
-            return NOTIFY_STATUS_OK;
         }
+        return NOTIFY_STATUS_OK;
     };
 
     let token = alloc_token();
@@ -304,9 +298,8 @@ pub extern "C" fn shim_notify_set_state(token: i32, state: u64) -> u32 {
 /// Posts a notification by name. All dispatch-registered handlers for this
 /// name are submitted to their respective queues. State is preserved.
 pub extern "C" fn shim_notify_post(name: u64) -> u32 {
-    let name_str = match extract_name(name) {
-        Some(n) => n,
-        None => return NOTIFY_STATUS_OK,
+    let Some(name_str) = extract_name(name) else {
+        return NOTIFY_STATUS_OK;
     };
 
     log::debug!("notify_post(\"{}\")", name_str);
@@ -508,9 +501,6 @@ mod tests {
 
     #[test]
     fn post_fires_dispatch_handlers() {
-        use std::sync::atomic::{AtomicI32, Ordering};
-        use std::sync::Arc;
-
         // We can't easily test the full block dispatch path from unit tests
         // because it requires a real Block ABI layout. Instead, verify that
         // notify_post with a handler=0 dispatch registration doesn't crash.

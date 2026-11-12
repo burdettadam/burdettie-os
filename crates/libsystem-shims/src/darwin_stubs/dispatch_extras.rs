@@ -393,7 +393,7 @@ pub extern "C" fn shim_dispatch_block_wait(block: u64, timeout: u64) -> u64 {
         } else {
             std::time::Duration::ZERO
         };
-        let (d, result) = wrapper.completed_cv.wait_timeout(done, dur).unwrap();
+        let (d, _result) = wrapper.completed_cv.wait_timeout(done, dur).unwrap();
         done = d;
         if *done {
             0
@@ -469,9 +469,10 @@ pub extern "C" fn shim_dispatch_block_perform(flags: u64, block: u64) {
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 
-static QUEUE_SPECIFIC_DATA: OnceLock<Mutex<HashMap<(u64, u64), (u64, u64)>>> = OnceLock::new();
+type QueueSpecificData = HashMap<(u64, u64), (u64, u64)>;
+static QUEUE_SPECIFIC_DATA: OnceLock<Mutex<QueueSpecificData>> = OnceLock::new();
 
-fn specific_data() -> &'static Mutex<HashMap<(u64, u64), (u64, u64)>> {
+fn specific_data() -> &'static Mutex<QueueSpecificData> {
     QUEUE_SPECIFIC_DATA.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
@@ -945,7 +946,6 @@ mod tests {
     #[test]
     fn dispatch_async_f_runs_on_thread() {
         use std::sync::atomic::{AtomicBool, Ordering};
-        use std::sync::Arc;
 
         static DONE: AtomicBool = AtomicBool::new(false);
 

@@ -375,7 +375,7 @@ fn sha1_compress(state: &mut [u32; 5], block: &[u8; 64]) {
 
     let [mut a, mut b, mut c, mut d, mut e] = *state;
 
-    for i in 0..80 {
+    for (i, &word) in w.iter().enumerate() {
         let (f, k) = match i {
             0..=19 => ((b & c) | ((!b) & d), 0x5a827999u32),
             20..=39 => (b ^ c ^ d, 0x6ed9eba1u32),
@@ -387,7 +387,7 @@ fn sha1_compress(state: &mut [u32; 5], block: &[u8; 64]) {
             .wrapping_add(f)
             .wrapping_add(e)
             .wrapping_add(k)
-            .wrapping_add(w[i]);
+            .wrapping_add(word);
         e = d;
         d = c;
         c = b.rotate_left(30);

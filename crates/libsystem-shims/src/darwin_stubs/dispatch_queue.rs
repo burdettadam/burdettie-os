@@ -123,9 +123,10 @@ fn serial_worker_loop(q: &QueueInner) {
 // ── Global queue registry ──────────────────────────────────────────
 
 static NEXT_HANDLE: AtomicU64 = AtomicU64::new(0x00D1_0000_0001);
-static QUEUE_REGISTRY: OnceLock<Mutex<Vec<(u64, Arc<QueueInner>)>>> = OnceLock::new();
+type QueueEntries = Vec<(u64, Arc<QueueInner>)>;
+static QUEUE_REGISTRY: OnceLock<Mutex<QueueEntries>> = OnceLock::new();
 
-fn registry() -> &'static Mutex<Vec<(u64, Arc<QueueInner>)>> {
+fn registry() -> &'static Mutex<QueueEntries> {
     QUEUE_REGISTRY.get_or_init(|| Mutex::new(Vec::new()))
 }
 

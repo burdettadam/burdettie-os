@@ -673,9 +673,8 @@ pub extern "C" fn shim_ct_font_copy_full_name(font: u64) -> u64 {
 
 /// Allocate a minimal CFString-like object: [isa:8][flags:8][cstr_ptr:8][len:8].
 fn alloc_cfstring(s: &str) -> u64 {
-    let cstr = match std::ffi::CString::new(s) {
-        Ok(c) => c,
-        Err(_) => return 0,
+    let Ok(cstr) = std::ffi::CString::new(s) else {
+        return 0;
     };
     let len = s.len();
     let obj = unsafe { libc::calloc(1, 32) as u64 };
@@ -873,17 +872,16 @@ pub extern "C" fn shim_ct_line_create(attr_str: u64) -> u64 {
 
     // Build a single CTRun for the entire line text.
     let mut run_handles = Vec::new();
-    let runs_cfarray;
-    if !text.is_empty() {
+    let runs_cfarray = if !text.is_empty() {
         let (rh, run) = build_run(&text, &font_name, font_size, 0);
         with_run_registry(|map| {
             map.insert(rh, run);
         });
         run_handles.push(rh);
-        runs_cfarray = make_cfarray_of_handles(&run_handles);
+        make_cfarray_of_handles(&run_handles)
     } else {
-        runs_cfarray = make_cfarray_of_handles(&[]);
-    }
+        make_cfarray_of_handles(&[])
+    };
 
     with_line_registry(|map| {
         map.insert(
@@ -1303,8 +1301,7 @@ pub extern "C" fn shim_ct_line_get_typo_bounds(
     }
 
     // Measure text width
-    let width =
-        measure_text_real(&text, &font_name, fs).unwrap_or_else(|| text.len() as f64 * fs * 0.6);
+    let width = measure_text_real(&text, &font_name, fs).unwrap_or(text.len() as f64 * fs * 0.6);
     width.to_bits()
 }
 
@@ -1320,8 +1317,7 @@ pub extern "C" fn shim_ct_line_get_bounds(sret: u64, line: u64, _options: u64) {
     let (text, font_name, font_size) = data.unwrap_or((String::new(), "System".into(), 12.0));
     let fs = if font_size > 0.0 { font_size } else { 12.0 };
 
-    let width =
-        measure_text_real(&text, &font_name, fs).unwrap_or_else(|| text.len() as f64 * fs * 0.6);
+    let width = measure_text_real(&text, &font_name, fs).unwrap_or(text.len() as f64 * fs * 0.6);
 
     let (asc, desc) = if let Some(m) = get_real_metrics(&font_name, fs) {
         (m.ascent, m.descent.abs())
@@ -1351,7 +1347,7 @@ pub extern "C" fn shim_ct_line_get_offset(line: u64, idx: i64, _secondary: u64) 
     if let Some((text, font_name, font_size)) = data {
         let prefix: String = text.chars().take(idx as usize).collect();
         let offset = measure_text_real(&prefix, &font_name, font_size)
-            .unwrap_or_else(|| prefix.len() as f64 * font_size * 0.6);
+            .unwrap_or(prefix.len() as f64 * font_size * 0.6);
         return offset.to_bits();
     }
     0.0_f64.to_bits()
@@ -1498,17 +1494,16 @@ pub extern "C" fn shim_ct_framesetter_create_frame(
 
         // Build runs for this line
         let mut run_handles = Vec::new();
-        let runs_cfarray;
-        if !line_text.is_empty() {
+        let runs_cfarray = if !line_text.is_empty() {
             let (rh, run) = build_run(line_text, &font_name, font_size, char_offset);
             with_run_registry(|map| {
                 map.insert(rh, run);
             });
             run_handles.push(rh);
-            runs_cfarray = make_cfarray_of_handles(&run_handles);
+            make_cfarray_of_handles(&run_handles)
         } else {
-            runs_cfarray = make_cfarray_of_handles(&[]);
-        }
+            make_cfarray_of_handles(&[])
+        };
 
         with_line_registry(|map| {
             map.insert(
@@ -1572,7 +1567,7 @@ pub extern "C" fn shim_ct_framesetter_suggest_size(
     let (text, font_name, font_size) = data.unwrap_or((String::new(), "System".into(), 12.0));
 
     let width = measure_text_real(&text, &font_name, font_size)
-        .unwrap_or_else(|| text.len() as f64 * font_size * 0.6);
+        .unwrap_or(text.len() as f64 * font_size * 0.6);
     let height = if let Some(m) = get_real_metrics(&font_name, font_size) {
         m.ascent + m.descent.abs() + m.leading
     } else {

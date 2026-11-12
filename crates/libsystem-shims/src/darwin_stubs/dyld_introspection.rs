@@ -349,7 +349,7 @@ mod tests {
         }
 
         // Register callback — no images yet, counter stays 0.
-        shim_dyld_register_func_for_add_image(callback as u64);
+        shim_dyld_register_func_for_add_image(callback as *const () as u64);
         assert_eq!(COUNTER.load(Ordering::SeqCst), 0);
 
         // Register an image — callback fires once.

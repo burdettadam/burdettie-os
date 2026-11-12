@@ -624,10 +624,9 @@ fn get_primary_interface() -> Option<String> {
 
 /// Get IPv4 addresses for an interface from /proc/net/fib_trie or ip command.
 fn get_ipv4_addresses(iface: &str) -> Vec<String> {
-    let mut addrs = Vec::new();
-
     #[cfg(target_os = "linux")]
     {
+        let mut addrs = Vec::new();
         // Read from /sys/class/net/{iface}/.. is not available for IPs,
         // fall back to parsing /proc/net/fib_trie
         if let Ok(output) = std::process::Command::new("ip")
@@ -647,36 +646,45 @@ fn get_ipv4_addresses(iface: &str) -> Vec<String> {
                 }
             }
         }
-        let _ = iface; // suppress unused warning when not linux
+        addrs
     }
 
-    addrs
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = iface;
+        Vec::new()
+    }
 }
 
 /// Get IPv6 addresses for an interface.
 fn get_ipv6_addresses(iface: &str) -> Vec<String> {
-    let mut addrs = Vec::new();
-
     #[cfg(target_os = "linux")]
-    if let Ok(output) = std::process::Command::new("ip")
-        .args(["-6", "addr", "show", iface])
-        .output()
     {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        for line in stdout.lines() {
-            let trimmed = line.trim();
-            if trimmed.starts_with("inet6 ") {
-                if let Some(addr_cidr) = trimmed.split_whitespace().nth(1) {
-                    if let Some(addr) = addr_cidr.split('/').next() {
-                        addrs.push(addr.to_string());
+        let mut addrs = Vec::new();
+        if let Ok(output) = std::process::Command::new("ip")
+            .args(["-6", "addr", "show", iface])
+            .output()
+        {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for line in stdout.lines() {
+                let trimmed = line.trim();
+                if trimmed.starts_with("inet6 ") {
+                    if let Some(addr_cidr) = trimmed.split_whitespace().nth(1) {
+                        if let Some(addr) = addr_cidr.split('/').next() {
+                            addrs.push(addr.to_string());
+                        }
                     }
                 }
             }
         }
+        addrs
     }
 
-    let _ = iface;
-    addrs
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = iface;
+        Vec::new()
+    }
 }
 
 /// Get the default gateway IP.
@@ -1070,9 +1078,8 @@ fn check_reachability(hostname: &str) -> u32 {
         None => hostname.to_string(),
     };
 
-    let cstr = match std::ffi::CString::new(resolve_hostname.as_str()) {
-        Ok(c) => c,
-        Err(_) => return 0,
+    let Ok(cstr) = std::ffi::CString::new(resolve_hostname.as_str()) else {
+        return 0;
     };
 
     let mut hints: libc::addrinfo = unsafe { std::mem::zeroed() };
@@ -1370,9 +1377,8 @@ pub extern "C" fn shim_sc_preferences_create(_alloc: u64, _name: u64, _prefs_id:
 
 /// `SCPreferencesGetValue(prefs, key) -> CFPropertyListRef`
 pub extern "C" fn shim_sc_preferences_get_value(prefs: u64, key: u64) -> u64 {
-    let key_str = match extract_key_string(key) {
-        Some(k) => k,
-        None => return 0,
+    let Some(key_str) = extract_key_string(key) else {
+        return 0;
     };
 
     let guard = prefs_store();
@@ -1388,9 +1394,8 @@ pub extern "C" fn shim_sc_preferences_get_value(prefs: u64, key: u64) -> u64 {
 
 /// `SCPreferencesSetValue(prefs, key, value) -> Boolean`
 pub extern "C" fn shim_sc_preferences_set_value(prefs: u64, key: u64, value: u64) -> u8 {
-    let key_str = match extract_key_string(key) {
-        Some(k) => k,
-        None => return 0,
+    let Some(key_str) = extract_key_string(key) else {
+        return 0;
     };
 
     let mut guard = prefs_store();
@@ -1777,12 +1782,12 @@ mod tests {
     #[test]
     fn test_get_dns_servers_reads_resolv_conf() {
         let servers = get_dns_servers();
-        // Should find at least one DNS server on any system
-        // (CI containers always have a resolv.conf)
-        assert!(
-            !servers.is_empty() || true,
-            "DNS servers may be empty on some systems"
-        );
+        // Systems without resolver configuration may have no DNS servers.
+        // Any returned address must be a complete, nonempty token.
+        for server in servers {
+            assert!(!server.is_empty());
+            assert!(!server.chars().any(char::is_whitespace));
+        }
     }
 
     #[test]

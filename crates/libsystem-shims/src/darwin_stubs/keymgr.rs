@@ -31,7 +31,7 @@ thread_local! {
     static THREAD_STORE: std::cell::RefCell<HashMap<u32, u64>> =
         std::cell::RefCell::new(HashMap::new());
     static EH_GLOBALS_FALLBACK: std::cell::RefCell<Option<Box<EhGlobalsFallback>>> =
-        std::cell::RefCell::new(None);
+        const { std::cell::RefCell::new(None) };
 }
 
 /// `_keymgr_global[3]` — legacy data symbols (initialized to zero).

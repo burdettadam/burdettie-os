@@ -49,13 +49,11 @@ unsafe fn cstr_from_guest(ptr: u64) -> Option<String> {
 // ── shim functions ──────────────────────────────────────────────────
 
 pub extern "C" fn shim_copyfile(from: u64, to: u64, state: u64, flags: u32) -> i32 {
-    let src = match unsafe { cstr_from_guest(from) } {
-        Some(s) => s,
-        None => return -1,
+    let Some(src) = (unsafe { cstr_from_guest(from) }) else {
+        return -1;
     };
-    let dst = match unsafe { cstr_from_guest(to) } {
-        Some(s) => s,
-        None => return -1,
+    let Some(dst) = (unsafe { cstr_from_guest(to) }) else {
+        return -1;
     };
 
     // COPYFILE_EXCL — fail if destination already exists
@@ -162,10 +160,7 @@ pub extern "C" fn shim_copyfile_state_get(state: u64, flag: u32, dst: u64) -> i3
         return -1;
     }
     let reg = state_registry().lock().unwrap();
-    let s = match reg.get(&state) {
-        Some(s) => s,
-        None => return -1,
-    };
+    let Some(s) = reg.get(&state) else { return -1 };
     match flag {
         COPYFILE_STATE_COPIED => {
             unsafe { *(dst as *mut u64) = s.bytes_copied };
@@ -183,9 +178,8 @@ pub extern "C" fn shim_copyfile_state_set(_state: u64, _flag: u32, _src: u64) ->
 // ── removefile shims ────────────────────────────────────────────────
 
 pub extern "C" fn shim_removefile(path: u64, _state: u64, flags: u32) -> i32 {
-    let p = match unsafe { cstr_from_guest(path) } {
-        Some(s) => s,
-        None => return -1,
+    let Some(p) = (unsafe { cstr_from_guest(path) }) else {
+        return -1;
     };
     let path = std::path::Path::new(&p);
 

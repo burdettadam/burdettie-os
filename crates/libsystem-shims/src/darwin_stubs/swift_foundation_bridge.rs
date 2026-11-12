@@ -374,10 +374,13 @@ mod tests {
     #[test]
     fn test_bridge_shims_are_non_null_fn_ptrs() {
         // Smoke-test that shim functions are real addresses (not zero).
-        assert_ne!(shim_bridge_dictionary_from_nsdictionary as u64, 0);
-        assert_ne!(shim_bridge_array_from_nsarray as u64, 0);
-        assert_ne!(shim_bridge_string_from_nsstring as u64, 0);
-        assert_ne!(shim_bridge_data_from_nsdata as u64, 0);
-        assert_ne!(shim_force_bridge_dictionary as u64, 0);
+        assert_ne!(
+            shim_bridge_dictionary_from_nsdictionary as *const () as u64,
+            0
+        );
+        assert_ne!(shim_bridge_array_from_nsarray as *const () as u64, 0);
+        assert_ne!(shim_bridge_string_from_nsstring as *const () as u64, 0);
+        assert_ne!(shim_bridge_data_from_nsdata as *const () as u64, 0);
+        assert_ne!(shim_force_bridge_dictionary as *const () as u64, 0);
     }
 }
