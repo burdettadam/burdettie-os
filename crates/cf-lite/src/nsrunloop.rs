@@ -294,11 +294,19 @@ fn notify_observers(activity: u64) {
 // ── Pending timer queue ────────────────────────────────────────────────────
 
 struct PendingTimer {
+    id: u64,          // Queue entry identity, preserved independently of its timer address
     timer: u64,       // NSTimer object address
     fire_at: Instant, // when to fire
 }
 
 static PENDING_TIMERS: OnceLock<Mutex<Vec<PendingTimer>>> = OnceLock::new();
+static NEXT_TIMER_ID: AtomicU64 = AtomicU64::new(1);
+
+// Serialize callbacks without locking the queue across guest code. Concurrent
+// or nested dispatch passes defer until a later run-loop iteration. Timer
+// storage must remain live through its fire call; clearing the queue during
+// runtime reset is not a callback-join or deallocation barrier.
+static TIMER_DISPATCH: Mutex<()> = Mutex::new(());
 
 fn pending_timers() -> &'static Mutex<Vec<PendingTimer>> {
     PENDING_TIMERS.get_or_init(|| Mutex::new(Vec::new()))
@@ -452,7 +460,7 @@ fn has_fd_sources() -> bool {
     !guard.is_empty()
 }
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 static FD_POLLER_RUNNING: AtomicBool = AtomicBool::new(false);
 
@@ -654,34 +662,56 @@ pub fn run_loop_blocking(deadline: Option<Instant>, single_pass: bool) -> i32 {
 
 /// Fire all timers whose `fire_at` is ≤ now, keeping repeating timers.
 fn fire_due_timers() {
+    let _dispatch = match TIMER_DISPATCH.try_lock() {
+        Ok(guard) => guard,
+        Err(std::sync::TryLockError::Poisoned(error)) => error.into_inner(),
+        Err(std::sync::TryLockError::WouldBlock) => return,
+    };
     let now = Instant::now();
-    let mut guard = pending_timers().lock().unwrap_or_else(|e| e.into_inner());
-    let mut i = 0;
-    while i < guard.len() {
-        if guard[i].fire_at <= now {
-            let timer = guard[i].timer;
+    let due_ids: Vec<u64> = {
+        let guard = pending_timers().lock().unwrap_or_else(|e| e.into_inner());
+        guard
+            .iter()
+            .filter(|pending| pending.fire_at <= now)
+            .map(|pending| pending.id)
+            .collect()
+    };
+
+    // Snapshot entry identities, not timer addresses: callbacks may clear the
+    // queue or enqueue another entry for the same timer. Newly queued entries
+    // wait for the next pass, and existing entries retain insertion order.
+    for id in due_ids {
+        let (timer, interval_bits, flags) = {
+            let mut guard = pending_timers().lock().unwrap_or_else(|e| e.into_inner());
+            let Some(index) = guard.iter().position(|pending| pending.id == id) else {
+                continue;
+            };
+            let timer = guard[index].timer;
             // Read interval and repeats flag from NSTimer layout
             // [0]=isa [1]=interval_bits [2]=block_ptr [3]=flags
             let interval_bits = unsafe { *((timer as *const u64).add(1)) };
             let flags = unsafe { *((timer as *const u64).add(3)) };
             let flag_valid: u64 = 1;
-            let flag_repeats: u64 = 2;
             if flags & flag_valid == 0 {
-                guard.remove(i);
+                guard.remove(index);
                 continue;
             }
-            // Call the timer's fire shim directly
-            crate::nstimer::shim_nstimer_fire(timer, 0);
-            let repeats = flags & flag_repeats != 0;
-            if repeats {
-                let interval = f64::from_bits(interval_bits);
-                guard[i].fire_at = now + std::time::Duration::from_secs_f64(interval.max(0.001));
-                i += 1;
-            } else {
-                guard.remove(i);
-            }
+            (timer, interval_bits, flags)
+        };
+
+        // The queue lock is released so the callback can schedule or reset timers.
+        crate::nstimer::shim_nstimer_fire(timer, 0);
+
+        let mut guard = pending_timers().lock().unwrap_or_else(|e| e.into_inner());
+        let Some(index) = guard.iter().position(|pending| pending.id == id) else {
+            continue;
+        };
+        let flag_repeats: u64 = 2;
+        if flags & flag_repeats != 0 {
+            let interval = f64::from_bits(interval_bits);
+            guard[index].fire_at = now + Duration::from_secs_f64(interval.max(0.001));
         } else {
-            i += 1;
+            guard.remove(index);
         }
     }
 }
@@ -868,7 +898,11 @@ pub extern "C" fn shim_nsrunloop_add_timer_for_mode(_obj: u64, _cmd: u64, timer:
     let interval = f64::from_bits(interval_bits);
     let fire_at = Instant::now() + std::time::Duration::from_secs_f64(interval.max(0.0));
     let mut guard = pending_timers().lock().unwrap_or_else(|e| e.into_inner());
-    guard.push(PendingTimer { timer, fire_at });
+    guard.push(PendingTimer {
+        id: NEXT_TIMER_ID.fetch_add(1, Ordering::Relaxed),
+        timer,
+        fire_at,
+    });
     drop(guard);
     // Wake the run loop so it picks up the new timer promptly.
     wakeup();
@@ -924,9 +958,12 @@ pub(crate) mod test_support {
     }
 
     pub(crate) fn unschedule_timer(timer: u64) {
-        // fire_due_timers keeps this mutex locked throughout every timer
-        // dereference and callback. Once removal completes, that consumer
-        // cannot retain this timer's raw address past the lock release.
+        // Test cleanup must call this outside a timer callback. Wait for active
+        // dispatch before removing the entry so no callback can retain this raw
+        // address when the test subsequently frees its timer allocation.
+        let _dispatch = super::TIMER_DISPATCH
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         super::pending_timers()
             .lock()
             .unwrap_or_else(|e| e.into_inner())
@@ -938,6 +975,212 @@ pub(crate) mod test_support {
 mod tests {
     use super::test_support::lock_runloop_state;
     use super::*;
+
+    static TIMER_CALLBACK_EVENTS: Mutex<Vec<u64>> = Mutex::new(Vec::new());
+
+    extern "C" fn record_timer_callback(_block: u64, timer: u64) {
+        TIMER_CALLBACK_EVENTS
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .push(timer);
+    }
+
+    extern "C" fn enqueue_timer_callback(block: u64, timer: u64) {
+        record_timer_callback(block, timer);
+        let next_timer = unsafe { *((block as *const u64).add(3)) };
+        shim_nsrunloop_add_timer_for_mode(0, 0, next_timer, 0);
+        // A nested pass must defer while the outer callback is still running.
+        fire_due_timers();
+    }
+
+    extern "C" fn reset_and_reenqueue_timer_callback(block: u64, timer: u64) {
+        record_timer_callback(block, timer);
+        reset_runtime_state_for_reuse();
+        // The new queue entry has a different deadline from the old repeating
+        // entry, even though it refers to the same still-live timer object.
+        unsafe {
+            *((timer as *mut u64).add(1)) = 10.0_f64.to_bits();
+        }
+        shim_nsrunloop_add_timer_for_mode(0, 0, timer, 0);
+    }
+
+    extern "C" fn invalidate_timer_callback(block: u64, timer: u64) {
+        record_timer_callback(block, timer);
+        crate::nstimer::shim_nstimer_invalidate(timer, 0);
+        let later_timer = unsafe { *((block as *const u64).add(3)) };
+        crate::nstimer::shim_nstimer_invalidate(later_timer, 0);
+    }
+
+    fn with_bounded_timer_dispatch(test_name: &'static str, body: fn()) {
+        crate::shim_test_helpers::with_isolated_test_process(test_name, move || {
+            let (sender, receiver) = std::sync::mpsc::channel();
+            let worker = std::thread::spawn(move || {
+                let _guard = lock_runloop_state();
+                reset_runtime_state_for_reuse();
+                body();
+                reset_runtime_state_for_reuse();
+                sender.send(()).expect("report timer dispatch completion");
+            });
+
+            // On timeout, fail this isolated child without joining a deadlocked
+            // worker. Its process exits, so the parent test cannot hang in CI.
+            receiver
+                .recv_timeout(Duration::from_secs(5))
+                .expect("timer dispatch must complete without deadlocking");
+            worker.join().expect("timer dispatch worker panicked");
+        });
+    }
+
+    #[test]
+    fn timer_callback_can_enqueue_without_deadlock() {
+        with_bounded_timer_dispatch(
+            "nsrunloop::tests::timer_callback_can_enqueue_without_deadlock",
+            || {
+                let record_block = [0, 0, record_timer_callback as *const () as u64, 0];
+                let next = crate::nstimer::shim_nstimer_timer_with_block(
+                    0,
+                    0,
+                    0.0,
+                    0,
+                    record_block.as_ptr() as u64,
+                );
+                let enqueue_block = [0, 0, enqueue_timer_callback as *const () as u64, next];
+                let first = crate::nstimer::shim_nstimer_timer_with_block(
+                    0,
+                    0,
+                    0.0,
+                    0,
+                    enqueue_block.as_ptr() as u64,
+                );
+                let second = crate::nstimer::shim_nstimer_timer_with_block(
+                    0,
+                    0,
+                    0.0,
+                    0,
+                    record_block.as_ptr() as u64,
+                );
+                assert!(first != 0 && second != 0 && next != 0);
+                shim_nsrunloop_add_timer_for_mode(0, 0, first, 0);
+                shim_nsrunloop_add_timer_for_mode(0, 0, second, 0);
+
+                fire_due_timers();
+                assert_eq!(*TIMER_CALLBACK_EVENTS.lock().unwrap(), [first, second]);
+                {
+                    let queue = pending_timers().lock().unwrap();
+                    assert_eq!(queue.len(), 1);
+                    assert_eq!(queue[0].timer, next);
+                }
+
+                fire_due_timers();
+                assert_eq!(
+                    *TIMER_CALLBACK_EVENTS.lock().unwrap(),
+                    [first, second, next]
+                );
+                assert!(pending_timers().lock().unwrap().is_empty());
+                for timer in [first, second, next] {
+                    test_support::unschedule_timer(timer);
+                    crate::shim_test_helpers::free_obj(timer);
+                }
+            },
+        );
+    }
+
+    #[test]
+    fn timer_callback_reset_does_not_resurrect_old_entries() {
+        with_bounded_timer_dispatch(
+            "nsrunloop::tests::timer_callback_reset_does_not_resurrect_old_entries",
+            || {
+                let reset_block = [
+                    0,
+                    0,
+                    reset_and_reenqueue_timer_callback as *const () as u64,
+                    0,
+                ];
+                let resetter = crate::nstimer::shim_nstimer_timer_with_block(
+                    0,
+                    0,
+                    0.0,
+                    1,
+                    reset_block.as_ptr() as u64,
+                );
+                let record_block = [0, 0, record_timer_callback as *const () as u64, 0];
+                let discarded = crate::nstimer::shim_nstimer_timer_with_block(
+                    0,
+                    0,
+                    0.0,
+                    0,
+                    record_block.as_ptr() as u64,
+                );
+                assert!(resetter != 0 && discarded != 0);
+                shim_nsrunloop_add_timer_for_mode(0, 0, resetter, 0);
+                shim_nsrunloop_add_timer_for_mode(0, 0, discarded, 0);
+
+                let minimum_new_deadline = Instant::now() + Duration::from_secs(9);
+                fire_due_timers();
+                assert_eq!(*TIMER_CALLBACK_EVENTS.lock().unwrap(), [resetter]);
+                {
+                    let queue = pending_timers().lock().unwrap();
+                    assert_eq!(queue.len(), 1);
+                    assert_eq!(queue[0].timer, resetter);
+                    assert!(queue[0].fire_at >= minimum_new_deadline);
+                }
+                for timer in [resetter, discarded] {
+                    test_support::unschedule_timer(timer);
+                    crate::shim_test_helpers::free_obj(timer);
+                }
+            },
+        );
+    }
+
+    #[test]
+    fn timer_callback_invalidation_preserves_repeat_policy() {
+        with_bounded_timer_dispatch(
+            "nsrunloop::tests::timer_callback_invalidation_preserves_repeat_policy",
+            || {
+                let record_block = [0, 0, record_timer_callback as *const () as u64, 0];
+                let later = crate::nstimer::shim_nstimer_timer_with_block(
+                    0,
+                    0,
+                    0.0,
+                    0,
+                    record_block.as_ptr() as u64,
+                );
+                let invalidate_block = [0, 0, invalidate_timer_callback as *const () as u64, later];
+                let repeating = crate::nstimer::shim_nstimer_timer_with_block(
+                    0,
+                    0,
+                    0.0,
+                    1,
+                    invalidate_block.as_ptr() as u64,
+                );
+                assert!(repeating != 0 && later != 0);
+                shim_nsrunloop_add_timer_for_mode(0, 0, repeating, 0);
+                shim_nsrunloop_add_timer_for_mode(0, 0, later, 0);
+
+                let minimum_repeat_deadline = Instant::now() + Duration::from_millis(1);
+                fire_due_timers();
+                assert_eq!(*TIMER_CALLBACK_EVENTS.lock().unwrap(), [repeating]);
+                assert_eq!(crate::nstimer::shim_nstimer_is_valid(repeating, 0), 0);
+                assert_eq!(crate::nstimer::shim_nstimer_is_valid(later, 0), 0);
+                {
+                    let mut queue = pending_timers().lock().unwrap();
+                    assert_eq!(queue.len(), 1);
+                    assert_eq!(queue[0].timer, repeating);
+                    assert!(queue[0].fire_at >= minimum_repeat_deadline);
+                    // Make the preserved repeat entry due without a timing-sensitive sleep.
+                    queue[0].fire_at = Instant::now();
+                }
+
+                fire_due_timers();
+                assert_eq!(*TIMER_CALLBACK_EVENTS.lock().unwrap(), [repeating]);
+                assert!(pending_timers().lock().unwrap().is_empty());
+                for timer in [repeating, later] {
+                    test_support::unschedule_timer(timer);
+                    crate::shim_test_helpers::free_obj(timer);
+                }
+            },
+        );
+    }
 
     #[test]
     fn current_run_loop_returns_nonzero() {

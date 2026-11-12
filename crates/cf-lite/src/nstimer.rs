@@ -128,6 +128,9 @@ pub extern "C" fn shim_nstimer_fire(obj: u64, _cmd: u64) {
                     unsafe { std::ffi::CStr::from_ptr(sel_ptr as *const std::ffi::c_char) };
                 if let Ok(name) = sel_name.to_str() {
                     if let Some(imp) = rt.msg_lookup(isa, name) {
+                        // Guest callbacks may register classes or selectors, which
+                        // requires the runtime write lock. Keep only the copied IMP.
+                        drop(guard);
                         let f: extern "C" fn(u64, u64, u64) = unsafe { std::mem::transmute(imp) };
                         f(target, sel_ptr, obj);
                     }
@@ -270,6 +273,70 @@ mod tests {
         );
         unschedule_timer(t);
         free_obj(t);
+    }
+
+    #[test]
+    fn target_callback_can_mutate_runtime() {
+        with_isolated_test_process("nstimer::tests::target_callback_can_mutate_runtime", || {
+            extern "C" fn callback(target: u64, selector: u64, timer: u64) {
+                let mut guard = objc_runtime::OBJC_RUNTIME
+                    .write()
+                    .unwrap_or_else(|e| e.into_inner());
+                if let Some(runtime) = guard.as_mut() {
+                    runtime.intern_selector("timerCallbackDidMutate");
+                }
+                write_field(target, 8, selector);
+                write_field(target, 16, timer);
+            }
+
+            // A blocked callback must fail this child test instead of hanging
+            // the full suite. Its allocations stay owned by the worker until
+            // dispatch completes; on timeout the child process exits.
+            let (completed, completion) = std::sync::mpsc::channel();
+            let worker = std::thread::spawn(move || {
+                let mut runtime = objc_runtime::ObjcRuntime::new();
+                crate::FoundationShims::register_nsobject_class(&mut runtime);
+                let class = nsobj::nsobject_class_addr();
+                assert!(runtime.add_method_to_class(
+                    class,
+                    objc_runtime::MethodEntry {
+                        selector: "timerDidFire:".into(),
+                        imp: callback as *const () as u64,
+                        type_encoding: "v@:@".into(),
+                    },
+                ));
+                *objc_runtime::OBJC_RUNTIME
+                    .write()
+                    .unwrap_or_else(|e| e.into_inner()) = Some(runtime);
+
+                let target = alloc_obj(24, class);
+                let timer = alloc_nstimer(0.0, 0, false);
+                assert_ne!(timer, 0);
+                let selector = c"timerDidFire:".as_ptr() as u64;
+                write_field(timer, TARGET_OFF, target);
+                write_field(timer, SELECTOR_OFF, selector);
+
+                shim_nstimer_fire(timer, 0);
+
+                assert_eq!(read_field(target, 8), selector);
+                assert_eq!(read_field(target, 16), timer);
+                assert_eq!(shim_nstimer_is_valid(timer, 0), 0);
+                assert!(objc_runtime::OBJC_RUNTIME
+                    .read()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .as_ref()
+                    .unwrap()
+                    .selector_ptr("timerCallbackDidMutate")
+                    .is_some());
+                free_obj(timer);
+                free_obj(target);
+                completed.send(()).unwrap();
+            });
+            completion
+                .recv_timeout(std::time::Duration::from_secs(5))
+                .expect("timer target callback must complete without a runtime lock deadlock");
+            worker.join().unwrap();
+        });
     }
 
     #[test]
