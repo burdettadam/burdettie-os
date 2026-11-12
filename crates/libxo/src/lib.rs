@@ -99,9 +99,7 @@ fn default_fp() -> *mut libc::FILE {
     // We open with fdopen so we get buffered I/O.
     use std::sync::OnceLock;
     static FP: OnceLock<usize> = OnceLock::new();
-    let ptr = *FP.get_or_init(|| unsafe {
-        libc::fdopen(1, b"w\0".as_ptr() as *const libc::c_char) as usize
-    });
+    let ptr = *FP.get_or_init(|| unsafe { libc::fdopen(1, c"w".as_ptr()) as usize });
     ptr as *mut libc::FILE
 }
 
@@ -135,16 +133,14 @@ pub unsafe fn xo_emit_text(
     }
 
     let fmt_cstr = unsafe { std::ffi::CStr::from_ptr(xo_fmt) };
-    let fmt_str = match fmt_cstr.to_str() {
-        Ok(s) => s,
-        Err(_) => return -1,
+    let Ok(fmt_str) = fmt_cstr.to_str() else {
+        return -1;
     };
 
     let rewritten = format::rewrite_to_printf(fmt_str);
 
-    let c_fmt = match std::ffi::CString::new(rewritten) {
-        Ok(c) => c,
-        Err(_) => return -1,
+    let Ok(c_fmt) = std::ffi::CString::new(rewritten) else {
+        return -1;
     };
 
     unsafe { vfprintf(fp, c_fmt.as_ptr(), ap) }

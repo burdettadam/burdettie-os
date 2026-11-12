@@ -7,9 +7,10 @@
 use crate::KeyCode;
 
 /// Available keyboard layouts.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum KeyboardLayout {
     /// Standard US QWERTY (default — passthrough).
+    #[default]
     Qwerty,
     /// Colemak layout.
     Colemak,
@@ -72,12 +73,6 @@ impl KeyboardLayout {
             Self::Colemak => remap_keycode_colemak(key),
             Self::Dvorak => remap_keycode_dvorak(key),
         }
-    }
-}
-
-impl Default for KeyboardLayout {
-    fn default() -> Self {
-        Self::Qwerty
     }
 }
 

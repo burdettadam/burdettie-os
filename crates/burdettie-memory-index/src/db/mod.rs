@@ -569,9 +569,8 @@ pub fn delete_object(conn: &Connection, object_id: &str) -> Result<(bool, u64), 
         )
         .optional()?;
 
-    let (obj_type, rel_path) = match meta {
-        Some(m) => m,
-        None => return Ok((false, 0)),
+    let Some((obj_type, rel_path)) = meta else {
+        return Ok((false, 0));
     };
 
     conn.execute(

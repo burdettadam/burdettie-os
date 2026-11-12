@@ -65,7 +65,7 @@ impl RewriteConfig {
     /// Check if a hostname is in the passthrough list.
     pub fn is_passthrough(&self, hostname: &str) -> bool {
         let host_lower = hostname.to_ascii_lowercase();
-        self.passthrough.iter().any(|p| host_lower == *p)
+        self.passthrough.contains(&host_lower)
     }
 }
 
