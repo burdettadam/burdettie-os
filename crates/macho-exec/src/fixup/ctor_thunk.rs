@@ -30,7 +30,7 @@
 //! [28] <real_address: u64>          ; 8 bytes of data
 //! ```
 
-#[cfg(target_arch = "aarch64")]
+#[cfg(all(target_arch = "aarch64", not(target_os = "macos")))]
 use std::sync::Mutex;
 
 /// Size of one thunk entry (instructions + data, aligned to 8).
@@ -38,7 +38,7 @@ use std::sync::Mutex;
 const THUNK_SIZE: usize = 40; // 36 rounded up to 8-byte alignment
 
 /// Number of thunks per 4 KiB page.
-#[cfg(target_arch = "aarch64")]
+#[cfg(all(target_arch = "aarch64", not(target_os = "macos")))]
 const THUNKS_PER_PAGE: usize = 4096 / THUNK_SIZE; // 102
 
 /// Machine code template for the thunk (7 instructions = 28 bytes).
@@ -53,21 +53,21 @@ static THUNK_TEMPLATE: [u32; 7] = [
     0xD65F_03C0, // RET
 ];
 
-#[cfg(target_arch = "aarch64")]
+#[cfg(all(target_arch = "aarch64", not(target_os = "macos")))]
 struct ThunkPage {
     base: *mut u8,
     used: usize,
 }
 
 // SAFETY: ThunkPage pointers are to mmap'd memory that outlives the process.
-#[cfg(target_arch = "aarch64")]
+#[cfg(all(target_arch = "aarch64", not(target_os = "macos")))]
 unsafe impl Send for ThunkPage {}
 
-#[cfg(target_arch = "aarch64")]
+#[cfg(all(target_arch = "aarch64", not(target_os = "macos")))]
 static THUNK_PAGES: Mutex<Vec<ThunkPage>> = Mutex::new(Vec::new());
 
 /// Allocate a new executable page for thunks.
-#[cfg(target_arch = "aarch64")]
+#[cfg(all(target_arch = "aarch64", not(target_os = "macos")))]
 fn alloc_page() -> Option<ThunkPage> {
     let page = unsafe {
         libc::mmap(
@@ -92,7 +92,7 @@ fn alloc_page() -> Option<ThunkPage> {
 /// Generate a constructor/destructor wrapper thunk that preserves x0.
 ///
 /// Returns the address of the thunk, or `None` if allocation fails.
-#[cfg(target_arch = "aarch64")]
+#[cfg(all(target_arch = "aarch64", not(target_os = "macos")))]
 pub fn wrap_ctor(real_addr: u64) -> Option<u64> {
     let mut pages = THUNK_PAGES.lock().ok()?;
 
@@ -130,7 +130,6 @@ pub fn wrap_ctor(real_addr: u64) -> Option<u64> {
     page.used += 1;
     let thunk_addr = thunk_ptr as u64;
     let slot_idx = page.used - 1;
-    drop(page); // release mutable borrow before accessing pages
     let page_idx = pages.len() - 1;
     log::trace!(
         "ctor_thunk: wrapped {real_addr:#x} at thunk {thunk_addr:#x} (page {page_idx}, slot {slot_idx})",
@@ -170,12 +169,6 @@ fn has_ctor_dtor_marker(s: &str) -> bool {
         }
     }
     false
-}
-
-/// On non-aarch64 platforms, this is a no-op.
-#[cfg(not(target_arch = "aarch64"))]
-pub fn wrap_ctor(_real_addr: u64) -> Option<u64> {
-    None
 }
 
 #[cfg(test)]

@@ -609,6 +609,10 @@ pub fn patch_tlv_thunks(image: &MappedImage, parsed: &ParsedMachO) -> usize {
 mod tests {
     use super::*;
 
+    // Each test replaces the process-wide registry and must retain its entries
+    // until its lookups, destructor callbacks, and cleanup are complete.
+    static TLV_TEST_LOCK: Mutex<()> = Mutex::new(());
+
     fn cleanup_test_key(pkey: libc::pthread_key_t) {
         unsafe {
             let block = libc::pthread_getspecific(pkey);
@@ -624,6 +628,10 @@ mod tests {
 
     #[test]
     fn tlv_get_addr_returns_distinct_offsets() {
+        let _registry_guard = TLV_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+
         // Set up a mock TLV with two descriptors sharing the same key
         let mut pkey: libc::pthread_key_t = 0;
         unsafe {
@@ -672,6 +680,10 @@ mod tests {
 
     #[test]
     fn tlv_get_addr_copies_template() {
+        let _registry_guard = TLV_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+
         let mut pkey: libc::pthread_key_t = 0;
         unsafe {
             libc::pthread_key_create(&mut pkey, Some(tlv_block_destructor));
@@ -714,6 +726,10 @@ mod tests {
 
     #[test]
     fn tlv_get_addr_ignores_guest_key_field() {
+        let _registry_guard = TLV_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+
         let mut pkey: libc::pthread_key_t = 0;
         unsafe {
             libc::pthread_key_create(&mut pkey, Some(tlv_block_destructor));
@@ -747,6 +763,10 @@ mod tests {
 
     #[test]
     fn tlv_get_addr_copies_template_with_gap() {
+        let _registry_guard = TLV_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+
         let mut pkey: libc::pthread_key_t = 0;
         unsafe {
             libc::pthread_key_create(&mut pkey, Some(tlv_block_destructor));
@@ -783,6 +803,10 @@ mod tests {
 
     #[test]
     fn tlv_atexit_runs_destructors_before_block_free() {
+        let _registry_guard = TLV_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+
         static DTOR_VALUES: Mutex<Vec<u8>> = Mutex::new(Vec::new());
 
         extern "C" fn record_byte(arg: *mut u8) {
@@ -840,6 +864,10 @@ mod tests {
 
     #[test]
     fn tlv_atexit_accepts_null_arg_for_single_live_block() {
+        let _registry_guard = TLV_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+
         static NULL_ARG_CALLS: Mutex<usize> = Mutex::new(0);
 
         extern "C" fn record_null(arg: *mut u8) {
