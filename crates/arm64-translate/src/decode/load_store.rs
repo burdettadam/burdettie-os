@@ -761,24 +761,25 @@ fn decode_fp_load_store_reg(raw: u32, size: u32, opc: u32, rn: u8, rt: u8) -> In
 ///
 /// All instructions in this group have bits[29:24] = 001000.
 /// Discriminated by:
-/// - bit[23] = o2  (acquire variant for LDAXR/STLXR; always 1 for LDAR/STLR)
+/// - bit[23] = o2  (0=exclusive, 1=non-exclusive or CAS)
 /// - bit[22] = L   (1=load, 0=store)
-/// - bit[21] = (0=exclusive, 1=CAS)
-/// - bit[15] = o0  (0=exclusive, 1=non-exclusive acquire-release: LDAR/STLR)
+/// - bit[21] = o1  (0=single register, 1=pair or CAS)
+/// - bit[15] = o0  (acquire/release ordering for exclusive operations)
 fn decode_exclusive_group(raw: u32) -> Instruction {
     let size = (raw >> 30) & 0x3; // 00=byte, 01=half, 10=word, 11=dword
-    let o2 = (raw >> 23) & 1; // acquire marker
+    let o2 = (raw >> 23) & 1;
     let l = (raw >> 22) & 1; // 1=load, 0=store
-    let o1 = (raw >> 21) & 1; // 0=exclusive, 1=CAS
+    let o1 = (raw >> 21) & 1;
     let rs = ((raw >> 16) & 0x1F) as u8; // exclusive status or CAS compare reg
-    let o0 = (raw >> 15) & 1; // 0=exclusive, 1=LDAR/STLR
+    let o0 = (raw >> 15) & 1;
     let rn = ((raw >> 5) & 0x1F) as u8;
     let rt = (raw & 0x1F) as u8;
-    let sf = size == 0b11 || size == 0b10; // 64-bit (dword) or 32-bit (word)
+    let sf = size == 0b11;
 
-    // CAS variants (bit[21]=1): CAS, CASA, CASAL, CASL
-    if o1 == 1 {
-        let acquire = o2 == 1;
+    // Single-register CAS variants. Pair and byte/halfword CAS encodings are
+    // not represented by Instruction::Cas, so do not silently widen them.
+    if o2 == 1 && o1 == 1 && size >= 0b10 {
+        let acquire = l == 1;
         let release = o0 == 1;
         return Instruction::Cas {
             sf,
@@ -790,8 +791,15 @@ fn decode_exclusive_group(raw: u32) -> Instruction {
         };
     }
 
-    // LDAR / STLR: bit[15]=1 (o0=1), bit[21]=0, bit[23]=1 (o2=1)
-    if o0 == 1 {
+    if o1 == 1 {
+        return Instruction::Unknown { raw };
+    }
+
+    // LDAR / STLR: non-exclusive (o2=1), ordered (o0=1).
+    if o2 == 1 {
+        if o0 == 0 {
+            return Instruction::Unknown { raw };
+        }
         return match (size, l) {
             (0b11, 1) | (0b10, 1) => Instruction::Ldar { sf, rt, rn },
             (0b11, 0) | (0b10, 0) => Instruction::Stlr { sf, rt, rn },
@@ -803,9 +811,9 @@ fn decode_exclusive_group(raw: u32) -> Instruction {
         };
     }
 
-    // LDXR / LDAXR: L=1, o0=0 (bit[15]=0)
+    // LDXR / LDAXR: exclusive (o2=0), L=1, o0 selects acquire ordering.
     if l == 1 {
-        let acquire = o2 == 1; // LDAXR
+        let acquire = o0 == 1;
         return match size {
             0b11 | 0b10 => Instruction::LoadExclusive {
                 sf,
@@ -819,9 +827,9 @@ fn decode_exclusive_group(raw: u32) -> Instruction {
         };
     }
 
-    // STXR / STLXR: L=0, o0=0 (bit[15]=0)
+    // STXR / STLXR: exclusive (o2=0), L=0, o0 selects release ordering.
     {
-        let release = o2 == 1; // STLXR
+        let release = o0 == 1;
         match size {
             0b11 | 0b10 => Instruction::StoreExclusive {
                 sf,
@@ -867,7 +875,7 @@ fn decode_lse_atomics(raw: u32) -> Option<Instruction> {
     // SWP: opc = 1000
     if opc == 0b1000 {
         return Some(Instruction::Swp {
-            size: size as u8,
+            size: 1 << size,
             acquire,
             release,
             rs,
@@ -880,7 +888,7 @@ fn decode_lse_atomics(raw: u32) -> Option<Instruction> {
     if opc < 8 {
         // opc 0:LDADD, 1:LDCLR, 2:LDEOR, 3:LDSET, 4:LDSMAX, 5:LDSMIN, 6:LDUMAX, 7:LDUMIN
         return Some(Instruction::LseLoad {
-            size: size as u8,
+            size: 1 << size,
             acquire,
             release,
             op: opc,
@@ -1255,9 +1263,8 @@ mod tests {
 
     #[test]
     fn test_decode_ldaxr_64() {
-        // LDAXR X0, [X1]: sf=1,o2=1,L=1,Rs=31,o0=0,Rt2=31,Rn=1,Rt=0
-        // = 0xC8DF7C20
-        let insn = decode(0xC8DF7C20, 0x1000);
+        // LDAXR X0, [X1]: size=3,o2=0,L=1,Rs=31,o0=1,Rt2=31,Rn=1,Rt=0
+        let insn = decode(0xC85FFC20, 0x1000);
         assert!(matches!(
             insn,
             Instruction::LoadExclusive {
@@ -1274,5 +1281,72 @@ mod tests {
         // CLREX = 0xD503305F (system instruction group)
         let insn = decode(0xD503305F, 0x1000);
         assert!(matches!(insn, Instruction::Clrex));
+    }
+
+    #[test]
+    fn atomic_regression_exclusive_word_and_doubleword_widths() {
+        // LDAR, STLR, LDXR, STXR, and CAS in their 32-bit encodings.
+        for raw in [
+            0x88DF_FC20,
+            0x889F_FC41,
+            0x885F_7C20,
+            0x8801_7C40,
+            0x88A0_7C41,
+        ] {
+            for expected_sf in [false, true] {
+                let raw = raw | (u32::from(expected_sf) << 30);
+                let decoded_sf = match decode(raw, 0x1000) {
+                    Instruction::Ldar { sf, .. }
+                    | Instruction::Stlr { sf, .. }
+                    | Instruction::LoadExclusive { sf, .. }
+                    | Instruction::StoreExclusive { sf, .. }
+                    | Instruction::Cas { sf, .. } => sf,
+                    other => panic!("unexpected instruction {other:?}"),
+                };
+                assert_eq!(decoded_sf, expected_sf, "encoding {raw:#010x}");
+            }
+        }
+    }
+
+    #[test]
+    fn atomic_regression_lse_sizes_are_byte_widths() {
+        for size_bits in 0..4 {
+            for op in [0, 8] {
+                // LDADD or SWP with source W1/X1, result W0/X0, base X2.
+                let raw = 0x3821_0040 | (size_bits << 30) | (op << 12);
+                let size = match decode(raw, 0x1000) {
+                    Instruction::LseLoad { size, .. } | Instruction::Swp { size, .. } => size,
+                    other => panic!("unexpected instruction {other:?}"),
+                };
+                assert_eq!(size, 1 << size_bits, "encoding {raw:#010x}");
+            }
+        }
+    }
+
+    #[test]
+    fn atomic_regression_cas_ordering_flags() {
+        for sf in [false, true] {
+            for acquire in [false, true] {
+                for release in [false, true] {
+                    let raw = 0x88A0_7C41
+                        | (u32::from(sf) << 30)
+                        | (u32::from(acquire) << 22)
+                        | (u32::from(release) << 15);
+                    assert!(matches!(decode(raw, 0x1000), Instruction::Cas {
+                        sf: actual_sf, acquire: actual_acquire, release: actual_release,
+                        rs: 0, rt: 1, rn: 2,
+                    } if actual_sf == sf && actual_acquire == acquire && actual_release == release));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn atomic_regression_unsupported_exclusive_widths_are_not_widened() {
+        // CASB, CASH, LDXP W0/W1, and LDXP X0/X1 are not represented by
+        // the single-register, word/doubleword Instruction::Cas variant.
+        for raw in [0x08A0_7C41, 0x48A0_7C41, 0x887F_0440, 0xC87F_0440] {
+            assert!(matches!(decode(raw, 0x1000), Instruction::Unknown { .. }));
+        }
     }
 }
