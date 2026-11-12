@@ -14,7 +14,6 @@
 use crate::cfstring;
 use crate::nsnotificationcenter::make_nsnotification;
 use crate::nsobj;
-use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 
 // ── Suspension behavior constants ──────────────────────────────────

@@ -15,7 +15,7 @@
 //!
 //! Total: 80 bytes.
 
-use crate::cg_types::{CGPoint, CGRect, CGSize};
+use crate::cg_types::{CGPoint, CGRect};
 
 use std::collections::HashMap;
 use std::sync::Mutex;

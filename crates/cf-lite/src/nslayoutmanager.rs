@@ -10,7 +10,7 @@
 //!   [8..16):  text_storage_ptr  (weak ref)
 //!   [16..24): text_container_ptr (first container)
 
-use crate::cg_types::{CGPoint, CGRect, CGSize};
+use crate::cg_types::CGRect;
 
 const SIZE: usize = 24;
 const TEXT_STORAGE_OFF: usize = 8;

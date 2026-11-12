@@ -28,6 +28,8 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
+use crate::cg_types::CATransform3D;
+
 const BOUNDS_X_OFF: usize = 8;
 const BOUNDS_Y_OFF: usize = 16;
 const BOUNDS_W_OFF: usize = 24;
@@ -516,79 +518,39 @@ pub extern "C" fn shim_calayer_set_contents_scale(obj: u64, _cmd: u64, scale: f6
 
 /// `-[CALayer transform]` — returns CATransform3D (16 f64 values, 128 bytes).
 /// On ARM64 this is returned via x8 indirect-result pointer.
-pub extern "C" fn shim_calayer_transform(obj: u64, _cmd: u64) -> [f64; 16] {
+pub extern "C" fn shim_calayer_transform(obj: u64, _cmd: u64) -> CATransform3D {
     if obj == 0 {
-        return IDENTITY_TRANSFORM;
+        return IDENTITY_TRANSFORM.into();
     }
-    with_props(obj, |p| p.transform)
+    with_props(obj, |p| p.transform.into())
 }
 
 /// `-[CALayer setTransform:]`
-pub extern "C" fn shim_calayer_set_transform(
-    obj: u64,
-    _cmd: u64,
-    m11: f64,
-    m12: f64,
-    m13: f64,
-    m14: f64,
-    m21: f64,
-    m22: f64,
-    m23: f64,
-    m24: f64,
-    m31: f64,
-    m32: f64,
-    m33: f64,
-    m34: f64,
-    m41: f64,
-    m42: f64,
-    m43: f64,
-    m44: f64,
-) {
+pub extern "C" fn shim_calayer_set_transform(obj: u64, _cmd: u64, transform: CATransform3D) {
     if obj == 0 {
         return;
     }
-    let t = [
-        m11, m12, m13, m14, m21, m22, m23, m24, m31, m32, m33, m34, m41, m42, m43, m44,
-    ];
-    with_props_mut(obj, |p| p.transform = t);
+    with_props_mut(obj, |p| p.transform = transform.into());
 }
 
 /// `-[CALayer sublayerTransform]`
-pub extern "C" fn shim_calayer_sublayer_transform(obj: u64, _cmd: u64) -> [f64; 16] {
+pub extern "C" fn shim_calayer_sublayer_transform(obj: u64, _cmd: u64) -> CATransform3D {
     if obj == 0 {
-        return IDENTITY_TRANSFORM;
+        return IDENTITY_TRANSFORM.into();
     }
-    with_props(obj, |p| p.sublayer_transform)
+    with_props(obj, |p| p.sublayer_transform.into())
 }
 
 /// `-[CALayer setSublayerTransform:]`
 pub extern "C" fn shim_calayer_set_sublayer_transform(
     obj: u64,
     _cmd: u64,
-    m11: f64,
-    m12: f64,
-    m13: f64,
-    m14: f64,
-    m21: f64,
-    m22: f64,
-    m23: f64,
-    m24: f64,
-    m31: f64,
-    m32: f64,
-    m33: f64,
-    m34: f64,
-    m41: f64,
-    m42: f64,
-    m43: f64,
-    m44: f64,
+    transform: CATransform3D,
 ) {
     if obj == 0 {
         return;
     }
-    let t = [
-        m11, m12, m13, m14, m21, m22, m23, m24, m31, m32, m33, m34, m41, m42, m43, m44,
-    ];
-    with_props_mut(obj, |p| p.sublayer_transform = t);
+    with_props_mut(obj, |p| p.sublayer_transform = transform.into());
 }
 
 /// `-[CALayer masksToBounds]`
@@ -861,6 +823,65 @@ mod tests {
         assert!((shim_calayer_bounds(0, 0)).abs() < f64::EPSILON);
         shim_calayer_set_bounds(0, 0, 1.0, 2.0, 3.0, 4.0);
         assert_eq!(shim_calayer_background_color(0, 0), 0);
+    }
+
+    #[test]
+    fn layer_transform_aggregate_roundtrip() {
+        let layer = alloc_layer();
+        let transform = CATransform3D {
+            m11: 1.0,
+            m12: 2.0,
+            m13: 3.0,
+            m14: 4.0,
+            m21: 5.0,
+            m22: 6.0,
+            m23: 7.0,
+            m24: 8.0,
+            m31: 9.0,
+            m32: 10.0,
+            m33: 11.0,
+            m34: 12.0,
+            m41: 13.0,
+            m42: 14.0,
+            m43: 15.0,
+            m44: 16.0,
+        };
+        let values = [
+            1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0,
+        ];
+        let set: extern "C" fn(u64, u64, CATransform3D) = shim_calayer_set_transform;
+        let get: extern "C" fn(u64, u64) -> CATransform3D = shim_calayer_transform;
+        let set_sublayer: extern "C" fn(u64, u64, CATransform3D) =
+            shim_calayer_set_sublayer_transform;
+        let get_sublayer: extern "C" fn(u64, u64) -> CATransform3D =
+            shim_calayer_sublayer_transform;
+
+        // Check the named-field order against the compositor's existing matrix layout.
+        set(layer, 0, transform);
+        assert_eq!(get_layer_props(layer).transform, values);
+        assert_eq!(get(layer, 0), transform);
+        let sublayer_values = values.map(|value| -value);
+        let sublayer_transform = CATransform3D::from(sublayer_values);
+        set_sublayer(layer, 0, sublayer_transform);
+        assert_eq!(get_layer_props(layer).sublayer_transform, sublayer_values);
+        assert_eq!(get_sublayer(layer, 0), sublayer_transform);
+        assert_eq!(get(layer, 0), transform);
+
+        // Do not leave transform state behind if another test reuses the allocation.
+        with_props_mut(layer, |props| {
+            props.transform = IDENTITY_TRANSFORM;
+            props.sublayer_transform = IDENTITY_TRANSFORM;
+        });
+        free_obj(layer);
+    }
+
+    #[test]
+    fn nil_transform_aggregates_preserve_identity() {
+        let identity = CATransform3D::from(IDENTITY_TRANSFORM);
+        shim_calayer_set_transform(0, 0, CATransform3D::from([2.0; 16]));
+        shim_calayer_set_sublayer_transform(0, 0, CATransform3D::from([3.0; 16]));
+        assert_eq!(shim_calayer_transform(0, 0), identity);
+        assert_eq!(shim_calayer_sublayer_transform(0, 0), identity);
     }
 
     #[test]

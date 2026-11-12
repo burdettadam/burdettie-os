@@ -273,12 +273,7 @@ fn decode_plist_object(unarchiver: u64, uid: usize, value: &plist::Value) -> u64
         plist::Value::Data(bytes) => crate::nsdata::make_nsdata(bytes),
 
         // Leaf date
-        plist::Value::Date(d) => {
-            // plist::Date is seconds since 2001-01-01 (same as NSDate reference date)
-            let ti = d.to_xml_format().parse::<f64>().unwrap_or(0.0);
-            // plist Date can provide seconds via conversion
-            crate::nsdate::alloc_nsdate(date_to_ti(d))
-        }
+        plist::Value::Date(d) => crate::nsdate::alloc_nsdate(date_to_ti(d)),
 
         // UID reference (shouldn't appear at top level, but handle gracefully)
         plist::Value::Uid(u) => decode_uid(unarchiver, u.get() as usize),
@@ -331,7 +326,6 @@ fn decode_plist_object(unarchiver: u64, uid: usize, value: &plist::Value) -> u64
 fn date_to_ti(d: &plist::Date) -> f64 {
     // plist dates are XML date strings; convert to NSTimeInterval.
     // Apple reference date: 2001-01-01T00:00:00Z = Unix 978307200
-    use std::time::SystemTime;
     let xml = d.to_xml_format();
     // Try parsing ISO 8601
     if let Ok(secs_unix) = parse_iso8601_to_unix(&xml) {

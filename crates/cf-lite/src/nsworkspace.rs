@@ -394,9 +394,13 @@ where
     };
 
     for root in roots {
-        let mut candidates = vec![root.join(app_name), root.join(&app_bundle_name)];
+        let candidates = vec![root.join(app_name), root.join(&app_bundle_name)];
         #[cfg(windows)]
-        candidates.push(root.join(&executable_name));
+        let candidates = {
+            let mut candidates = candidates;
+            candidates.push(root.join(&executable_name));
+            candidates
+        };
 
         for candidate in candidates {
             if candidate.exists() {

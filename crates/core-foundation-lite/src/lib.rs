@@ -21,9 +21,11 @@
 //! # ABI Layout
 //!
 //! On ARM64:
-//! - Structs ≤16 bytes (`CGPoint`, `CGSize`, `NSRange`) are returned in x0/x1
-//! - Structs >16 bytes (`CGRect`, `NSEdgeInsets`) use x8 as the indirect
-//!   result pointer, handled by the `objc_msgSend` trampoline
+//! - `CGPoint` and `CGSize` are homogeneous floating-point aggregates returned
+//!   in d0/d1.
+//! - `CGRect` and `NSEdgeInsets` are four-element homogeneous floating-point
+//!   aggregates returned in d0–d3, despite their 32-byte size.
+//! - `NSRange` is an integer aggregate returned in x0/x1.
 
 mod types;
 
