@@ -14,7 +14,7 @@
 #   docker run --rm -it darwin-runtime-linux bash
 #   cargo test -p macho-runtime --test interpreted_objc_tests -- --test-threads=1
 
-FROM rust:bookworm
+FROM rust:1.93.0-bookworm
 
 RUN rustup component add clippy
 
@@ -23,16 +23,15 @@ COPY . .
 
 # Build the full workspace (all crates including runtime stack).
 # On ARM64 Linux this uses platform-linux for the PAL layer.
-RUN cargo build --workspace --exclude hello-darwin \
+RUN cargo build --locked --workspace --exclude hello-darwin \
     --exclude control-gallery --exclude foundation-explorer \
-    --exclude window-backend-darwin \
-    2>&1 | tail -5
+    --exclude window-backend-darwin
 
 # Build test binaries for the interpreted test suite.
-RUN cargo test --no-run -p macho-runtime --test interpreted_objc_tests 2>&1 | tail -5
+RUN cargo test --locked --no-run -p macho-runtime --test interpreted_objc_tests
 
 # Default: run the interpreted fixture tests (single-threaded for ObjC
 # runtime global state safety).
-CMD ["cargo", "test", "-p", "macho-runtime", \
+CMD ["cargo", "test", "--locked", "-p", "macho-runtime", \
      "--test", "interpreted_objc_tests", \
      "--", "--test-threads=1"]

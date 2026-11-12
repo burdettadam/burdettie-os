@@ -1,6 +1,6 @@
 //! Apple CFNetwork.framework — real DNS + benign HTTP stubs.
 //!
-//! CFHost DNS resolution is backed by hickory-resolver (pure-Rust DNS).
+//! CFHost DNS resolution uses the host system resolver through libc::getaddrinfo.
 //! CFHTTPMessage and other HTTP APIs remain safe stubs since NSURLSession
 //! already provides real HTTP via ureq.
 
@@ -51,7 +51,7 @@ impl CfNetworkStubs {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
 
-        // ── CFHost (real DNS resolution via hickory-resolver) ───
+        // ── CFHost (DNS resolution via the host system resolver) ───
         register_shims!(
             table,
             (

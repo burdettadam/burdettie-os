@@ -275,7 +275,9 @@ This is the single largest compatibility gap in the entire project.
 
 ## Build Note
 
-The workspace uses `CARGO_TARGET_DIR=/tmp/burdettieOS-target/`. Binaries are at `/tmp/burdettieOS-target/release/`, NOT `target/release/`.
+Cargo uses `target/` by default, so release binaries are in `target/release/`.
+A local `CARGO_TARGET_DIR` override changes that location; consult the
+`target_directory` field from `cargo metadata --no-deps --format-version=1`.
 
 ## What's Left for Full Xcode CLI Support
 

@@ -1,68 +1,80 @@
-# Contributing to burdettieOS
+# Contributing to Burdettie-OS
 
-Thank you for your interest in contributing!
+Burdettie-OS is an experimental systems project. Useful contributions include
+small compatibility fixes, focused tests, fixture sources, and documentation
+that explains supported behavior and its limits.
 
-## Reporting Bugs
+## Reporting bugs
 
 Open a GitHub issue with:
-- Operating system and Rust toolchain version (`rustc --version`)
-- The Mach-O binary or fixture that triggers the issue (or a minimal reproducer)
-- Steps to reproduce and expected vs. actual output
 
-## Development Setup
+- The repository commit, host operating system, CPU architecture, and `rustc --version`.
+- Commands to reproduce the problem and the expected and actual behavior.
+- A minimal fixture source or a description of the affected binary's dependencies.
+
+Use project-owned or redistributable test inputs. Keep imported application
+bundles, extracted platform libraries, credentials, and private local logs out
+of public issues. Report vulnerabilities through the [security policy](.github/SECURITY.md).
+
+## Native development setup
+
+The native fixture workflow uses Apple Silicon, macOS 13 or later, and Xcode
+Command Line Tools. Rust is pinned to **1.93.0** in
+[rust-toolchain.toml](rust-toolchain.toml); use that toolchain when reproducing
+build results.
 
 ```sh
-# Requires Rust 1.82+ (see rust-toolchain.toml)
-git clone https://github.com/burdettadam/burdettie-os
-cd burdettieOS
+git clone https://github.com/burdettadam/burdettie-os.git
+cd burdettie-os
 
-# Build everything
-cargo build --workspace
+# Build the workspace and compile local fixtures from their C/Objective-C sources.
+cargo build --workspace --locked
+./scripts/build_fixtures.sh
 
-# Run the full test suite
-cargo test --workspace
-
-# Lint (must be zero warnings)
-cargo clippy --all-targets -- -D warnings
-
-# Format
-cargo fmt --all
+# Run checks after the fixtures are available.
+cargo test --workspace --locked
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
 ```
 
-Fixture binaries under `fixtures/*/app` are pre-built ARM64 Mach-O binaries
-committed to the repo. To rebuild them you need an Apple Silicon Mac with Xcode
-installed and can run `scripts/build_fixtures.sh`.
+The strict Clippy command may expose existing warnings; include the exact
+command and outcome in your change report. The repository's
+[CI workflow](.github/workflows/ci.yml) is the reference for CI-specific lint
+allowances and platform jobs. See the [build guide](docs/BUILD.md) for the Linux
+and Docker workflows. Native execution, interpretation, GUI tests, and fixture
+compilation have different platform requirements.
 
-## Pull Requests
+Fixture source, expectations, and small parser test inputs belong in version
+control. Locally compiled applications, object files, Swift build caches, and
+imported compatibility inputs are generated or external artifacts; see the
+[source and artifact policy](docs/PUBLICATION.md).
 
-1. Fork the repo and create a branch from `main`.
-2. Make your changes. Keep each PR focused — one logical change per PR.
-3. Ensure `cargo test --workspace` and `cargo clippy --all-targets` pass with
-   zero failures or warnings.
-4. Run `cargo fmt --all` before pushing.
-5. Update any relevant documentation in `docs/`.
-6. Describe **what** changed and **why** in your PR description.
+## Pull requests
 
-## Code Style
+1. Create a focused branch from `main`.
+2. Add or update a small reproducible test or fixture when changing runtime behavior.
+3. Run the checks relevant to the affected crates and platform. Report failures,
+   skipped checks, and any external inputs needed to reproduce the result.
+4. Format Rust changes with `cargo fmt --all`.
+5. Update documentation when behavior or setup changes.
+6. Explain the problem, the implementation, and the resulting behavior in the PR.
 
-- Follow Rust idioms. The lints in the workspace `Cargo.toml` `[lints]` section
-  are enforced by CI — fix all warnings before submitting.
-- Do not add `#[allow(clippy::...)]` suppressions without a comment explaining
-  why the lint does not apply.
-- Unsafe code requires a `// SAFETY:` comment explaining the invariant.
+## Code style
 
-## Crate Guidelines
+- Follow the workspace lint configuration in `Cargo.toml`.
+- Explain any lint suppression instead of adding a broad allowance.
+- Give each unsafe block a `// SAFETY:` comment describing the invariant that
+  makes the operation valid.
+- Keep shared runtime logic separate from platform-specific implementations.
 
-The workspace is layered — lower-level crates must not depend on higher-level
-ones. See [docs/CRATE_MAP.md](docs/CRATE_MAP.md) for the dependency graph.
-
-Adding a new crate requires updating:
-- `Cargo.toml` (workspace members)
-- `docs/CRATE_MAP.md`
-- `docs/CAPABILITIES.md` if it adds user-facing capability
+The workspace is layered: lower-level crates should not depend on higher-level
+ones. When adding a crate, update `Cargo.toml` and the relevant architecture
+references in `docs/`. The [crate map](docs/CRATE_MAP.md) is a useful starting
+point; `Cargo.toml` is the current workspace inventory.
 
 ## License
 
 By submitting a pull request you agree that your contribution will be licensed
 under the terms of both the [MIT](LICENSE-MIT) and
-[Apache 2.0](LICENSE-APACHE) licenses, at the recipient's option.
+[Apache 2.0](LICENSE-APACHE) licenses, at the recipient's option. Preserve separate
+license notices for third-party components.

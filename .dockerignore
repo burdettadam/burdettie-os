@@ -11,8 +11,6 @@ swift/
 examples/
 .DS_Store
 typescript/
-corpus/
-fixtures/
 Formula/
 packaging/
 [ ]2
@@ -28,3 +26,20 @@ imports/
 **/__pycache__/
 .env
 .env.*
+
+# Imported software is mounted explicitly for local experiments.
+docker/xcode-tools/*
+!docker/xcode-tools/README.md
+!docker/xcode-tools/.gitkeep
+docker/*-linux-arm64
+docker/apple-libcxx/*.so*
+
+# Local compiler/debug output and private writing state
+**/*.dSYM
+**/*.bak
+book/00-start-here/author-journal.md
+.cargo/config
+.cargo/config.toml
+nohup.out
+typescript
+rust_out.s

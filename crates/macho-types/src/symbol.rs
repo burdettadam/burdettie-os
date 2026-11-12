@@ -52,7 +52,7 @@ impl Symbol {
     /// The dylib ordinal from n_desc (two-level namespace).
     /// Ordinal 0 = self, -1 = main executable, -2 = flat lookup, -3 = weak lookup.
     pub fn library_ordinal(&self) -> i16 {
-        ((self.desc >> 8) & 0xFF) as i8 as i16
+        i16::from(((self.desc >> 8) & 0xFF) as i8)
     }
 
     /// True if this is a stab debugging symbol (n_type has high bits set).

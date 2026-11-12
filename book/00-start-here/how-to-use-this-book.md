@@ -25,7 +25,6 @@ book/
     book-brief.md                    ← Master context document for AI sessions
     how-to-use-this-book.md          ← You are here
     ai-collaboration-principles.md   ← How to use AI effectively on this book
-    author-journal.md                ← Craft ledger and development tracking
 
   01-concept/
     premise-and-logline.md           ← Core idea, logline, Egri's dramatic premise
@@ -69,7 +68,7 @@ book/
     blueprint/
       chapter-blueprint.md           ← Chapter → source file mapping
 
-  05-drafting/            ← Chapter drafts (when writing begins)
+  05-drafting/            ← Technical chapter and appendix drafts
   06-revision/            ← Structural revision, consistency checks
   07-polish-and-publish/  ← Blurb, pitch, paratext
 ```
@@ -78,13 +77,10 @@ book/
 
 ## Current Status
 
-**Phase: 00–04 filled.** All Grimoire planning templates have been created
-and filled with project-specific content. The next steps are:
-
-1. Fill scene cards (04-plot-and-structure/scene-design/) with detailed
-   dramatic structure for each of 75 scenes
-2. Begin drafting chapters (05-drafting/) using filled scene cards as context
-3. Use the entity registry to maintain cross-reference consistency
+Planning documents and technical chapter drafts are present. Begin with the
+[chapter index](../README.md) when reading the engineering narrative. Drafts and
+planning notes may describe older revisions; the repository README and current
+source are the reference for building and running the project.
 
 ---
 
@@ -110,12 +106,12 @@ detailed guidance on collaboration modes.
 
 | Phase | Files | Status |
 |-------|-------|--------|
-| 00 - Start Here | 4 files | Filled |
+| 00 - Start Here | 3 files | Planning notes |
 | 01 - Concept | 7 files (3 + 3 collision) | Filled |
 | 02 - Characters | 8 files | Filled |
 | 03 - World Building | 7 files | Filled |
 | 04 - Plot & Structure | 8 files | Filled (scene cards unfilled) |
-| 05 - Drafting | — | Empty (next phase) |
+| 05 - Drafting | 10 chapters + 2 appendices | Drafts |
 | 06 - Revision | — | Empty |
 | 07 - Polish | — | Empty |
 

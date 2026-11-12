@@ -1,0 +1,26 @@
+title = "Burdettie-OS secret scanning"
+
+[extend]
+useDefault = true
+
+# This test generates an RSA key at runtime and checks the PEM delimiters.
+# The source contains C string comparisons, not a private key payload.
+[[rules]]
+id = "private-key"
+[[rules.allowlists]]
+description = "PEM marker assertions in the LibreSSL round-trip test"
+condition = "AND"
+paths = ['''^libressl-bundle/test\.sh$''']
+regexTarget = "match"
+regexes = ['''-----BEGIN RSA PRIVATE KEY-----"\)\) \{''']
+
+# Deliberately fake input for testing a guest tool's secret-search behavior.
+# Restrict the exception to this exact value and this one test source.
+[[rules]]
+id = "generic-api-key"
+[[rules.allowlists]]
+description = "Synthetic credential-search fixture"
+condition = "AND"
+paths = ['''^scripts/test_xcode_tools_docker\.sh$''']
+regexTarget = "secret"
+regexes = ['''^sk-12345secret$''']

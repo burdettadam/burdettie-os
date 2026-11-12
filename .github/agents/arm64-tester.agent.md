@@ -153,5 +153,6 @@ enc_b(8)
 
 ## Build
 
-Target dir: `/tmp/burdettieOS-target` (native SSD).
+Cargo writes to `target/` by default. If `CARGO_TARGET_DIR` is set, use the
+`target_directory` reported by `cargo metadata --no-deps --format-version=1`.
 Run: `cargo test -p arm64-translate`

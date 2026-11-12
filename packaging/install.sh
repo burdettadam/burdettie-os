@@ -13,6 +13,7 @@
 #   lib/pkgconfig/darwin-runtime.pc
 #   include/darwin_runtime.h
 #   bin/{runtime-shell,macho-inspect,hello-darwin,control-gallery,foundation-explorer}
+#   share/doc/darwin-runtime/{LICENSE-MIT,LICENSE-APACHE,LICENSE-DejaVu.txt}
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -48,6 +49,11 @@ BUILD_DIR="$ROOT/target/$BUILD_PROFILE"
 DYLIB_SRC="$BUILD_DIR/libdarwin_runtime_ffi.dylib"
 HEADER_SRC="$ROOT/crates/darwin-runtime-ffi/include/darwin_runtime.h"
 PC_TEMPLATE="$ROOT/packaging/darwin-runtime.pc.in"
+LICENSE_SOURCES=(
+    "$ROOT/LICENSE-MIT"
+    "$ROOT/LICENSE-APACHE"
+    "$ROOT/crates/graphics-core/fonts/LICENSE-DejaVu.txt"
+)
 
 BINARIES=(runtime-shell macho-inspect hello-darwin control-gallery foundation-explorer)
 
@@ -55,12 +61,15 @@ BINARIES=(runtime-shell macho-inspect hello-darwin control-gallery foundation-ex
 DYLIB_DST="$PREFIX/lib/libdarwin_runtime_ffi.dylib"
 HEADER_DST="$PREFIX/include/darwin_runtime.h"
 PC_DST="$PREFIX/lib/pkgconfig/darwin-runtime.pc"
+LICENSE_DIR="$PREFIX/share/doc/darwin-runtime"
 
 # ── Uninstall ───────────────────────────────────────────────────────
 if $UNINSTALL; then
     echo "▶ Uninstalling darwin-runtime from $PREFIX"
     removed=0
-    for f in "$DYLIB_DST" "$HEADER_DST" "$PC_DST"; do
+    for f in "$DYLIB_DST" "$HEADER_DST" "$PC_DST" \
+             "$LICENSE_DIR/LICENSE-MIT" "$LICENSE_DIR/LICENSE-APACHE" \
+             "$LICENSE_DIR/LICENSE-DejaVu.txt"; do
         if [ -f "$f" ]; then
             if $DRY_RUN; then echo "  would remove: $f"
             else rm -f "$f"; echo "  ✓ removed $f"; fi
@@ -90,7 +99,7 @@ if [ ! -f "$DYLIB_SRC" ]; then
 fi
 
 # ── Verify artifacts exist ──────────────────────────────────────────
-for f in "$DYLIB_SRC" "$HEADER_SRC" "$PC_TEMPLATE"; do
+for f in "$DYLIB_SRC" "$HEADER_SRC" "$PC_TEMPLATE" "${LICENSE_SOURCES[@]}"; do
     if [ ! -f "$f" ]; then
         echo "ERROR: Required file not found: $f"
         exit 1
@@ -132,6 +141,11 @@ for bin_name in "${BINARIES[@]}"; do
     fi
 done
 
+# Project and embedded-font license notices
+for license_source in "${LICENSE_SOURCES[@]}"; do
+    install_file "$license_source" "$LICENSE_DIR/$(basename "$license_source")"
+done
+
 # ── Summary ─────────────────────────────────────────────────────────
 echo ""
 if $DRY_RUN; then
@@ -141,6 +155,7 @@ else
     echo "  Library: $DYLIB_DST"
     echo "  Header:  $HEADER_DST"
     echo "  PkgCfg:  $PC_DST"
+    echo "  Notices: $LICENSE_DIR"
     echo ""
     echo "Test with:"
     echo "  pkg-config --cflags --libs darwin-runtime"

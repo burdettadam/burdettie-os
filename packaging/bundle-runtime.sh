@@ -14,6 +14,10 @@
 #   │   ├── simple_cli/app
 #   │   ├── return42/app
 #   │   └── ...
+#   ├── licenses/
+#   │   ├── LICENSE-MIT
+#   │   ├── LICENSE-APACHE
+#   │   └── LICENSE-DejaVu.txt
 #   └── docs/
 #       ├── README.md
 #       ├── architecture.md
@@ -49,12 +53,25 @@ for arg in "$@"; do
     esac
 done
 
+LICENSE_SOURCES=(
+    "$ROOT/LICENSE-MIT"
+    "$ROOT/LICENSE-APACHE"
+    "$ROOT/crates/graphics-core/fonts/LICENSE-DejaVu.txt"
+)
+for license_source in "${LICENSE_SOURCES[@]}"; do
+    if [ ! -f "$license_source" ]; then
+        echo "ERROR: Required license notice not found: $license_source"
+        exit 1
+    fi
+done
+
 echo "▶ Bundling runtime into: $OUTPUT_DIR"
 
 # ── Clean output directory ─────────────────────────────────────────
 rm -rf "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR/bin" "$OUTPUT_DIR/lib" "$OUTPUT_DIR/include" \
-         "$OUTPUT_DIR/lib/pkgconfig" "$OUTPUT_DIR/fixtures" "$OUTPUT_DIR/docs"
+         "$OUTPUT_DIR/lib/pkgconfig" "$OUTPUT_DIR/fixtures" "$OUTPUT_DIR/docs" \
+         "$OUTPUT_DIR/licenses"
 
 # ── Copy binaries ──────────────────────────────────────────────────
 bin_count=0
@@ -126,6 +143,10 @@ for doc in "$ROOT/docs"/*.md "$ROOT/README.md"; do
     fi
 done
 echo "  ✓ docs/ ($doc_count files)"
+
+# ── Copy project and embedded-font license notices ─────────────────
+cp "${LICENSE_SOURCES[@]}" "$OUTPUT_DIR/licenses/"
+echo "  ✓ licenses/ (project and DejaVu notices)"
 
 # ── Copy demos.json and banner.txt ─────────────────────────────────
 mkdir -p "$OUTPUT_DIR/config"

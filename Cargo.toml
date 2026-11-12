@@ -62,7 +62,7 @@ members = [
 version       = "0.1.0"
 edition       = "2021"
 license       = "MIT OR Apache-2.0"
-rust-version  = "1.82"
+rust-version  = "1.93"
 repository    = "https://github.com/burdettadam/burdettie-os"
 homepage      = "https://github.com/burdettadam/burdettie-os"
 documentation = "https://github.com/burdettadam/burdettie-os/tree/main/docs"
@@ -135,8 +135,8 @@ tempfile  = "3"
 toml      = "0.8"
 ureq      = { version = "3", features = ["rustls"] }
 plist     = "1"
-quick-xml = "0.37"
-rusqlite  = { version = "0.35", features = ["bundled"] }
+quick-xml = "0.41"
+rusqlite  = { version = "0.41", features = ["bundled", "fallible_uint"] }
 cassowary = "0.3.0"
 tiny-skia = "0.11"
 cosmic-text = "0.18"
@@ -145,7 +145,6 @@ flate2    = "1"
 lz4_flex  = "0.11"
 ring      = "0.17"
 x509-parser = "0.16"
-hickory-resolver = { version = "0.25", features = ["https-ring", "webpki-roots"] }
 lzma-rs   = "0.3"
 lzfse_rust = "0.2"
 tiny_http = "0.12"

@@ -38,4 +38,5 @@ Run: `cargo test -p cf-lite -- <module>::tests`
 
 ## Build
 
-Target dir is `/tmp/burdettieOS-target` (native SSD, configured in `.cargo/config.toml`).
+Cargo writes to `target/` by default. For a custom build location, use
+`CARGO_TARGET_DIR` and resolve the directory through `cargo metadata`.

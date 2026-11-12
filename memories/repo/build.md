@@ -1,1 +1,1 @@
-- Workspace Cargo artifacts go to /tmp/burdettieOS-target via .cargo/config.toml; Docker stages must copy runtime binaries from /tmp/burdettieOS-target/release, not /workspace/target/release.
+- Cargo uses the workspace `target/` directory by default. Local builds may override it with `CARGO_TARGET_DIR`; resolve the effective location from `cargo metadata`. Docker stages set their build directory explicitly and must copy artifacts from the same location.

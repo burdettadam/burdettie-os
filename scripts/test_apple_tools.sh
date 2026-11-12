@@ -7,7 +7,10 @@
 
 set -euo pipefail
 
-LOADER="/tmp/burdettieOS-target/release/macho-inspect"
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+CARGO_ARTIFACT_DIR=$(cd "$PROJECT_ROOT" && cargo metadata --locked --no-deps --format-version=1 \
+  | python3 -c 'import json, sys; print(json.load(sys.stdin)["target_directory"])')
+LOADER="${CARGO_ARTIFACT_DIR}/release/macho-inspect"
 XCODE_TC="/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin"
 XCODE_DEV="/Applications/Xcode.app/Contents/Developer/usr/bin"
 TMPFILE=$(mktemp /tmp/loader_test.XXXXXX)

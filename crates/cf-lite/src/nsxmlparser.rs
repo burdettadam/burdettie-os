@@ -124,11 +124,31 @@ enum TokenKind {
 /// processing instructions, and entity resolution.
 fn tokenize_xml(xml: &str) -> Vec<XmlToken> {
     let mut reader = Reader::from_str(xml);
-    reader.config_mut().trim_text(true);
     let mut tokens = Vec::new();
+    let mut raw_text = String::new();
 
     loop {
-        match reader.read_event() {
+        let event = reader.read_event();
+        // quick-xml emits entity references separately from text. Reassemble
+        // each text run before trimming and unescaping so spaces around an
+        // entity and references such as &amp;lt; retain their original meaning.
+        if !matches!(&event, Ok(Event::Text(_) | Event::GeneralRef(_))) && !raw_text.is_empty() {
+            let text = quick_xml::escape::unescape(
+                raw_text.trim_matches(|c| matches!(c, ' ' | '\t' | '\r' | '\n')),
+            )
+            .map(|text| text.into_owned())
+            .unwrap_or_default();
+            raw_text.clear();
+            if !text.is_empty() {
+                tokens.push(XmlToken {
+                    kind: TokenKind::Characters,
+                    name: String::new(),
+                    text,
+                    attrs: vec![],
+                });
+            }
+        }
+        match event {
             Ok(Event::Start(ref e)) => {
                 let name = String::from_utf8_lossy(e.name().as_ref()).to_string();
                 let attrs = extract_attrs(e);
@@ -165,15 +185,12 @@ fn tokenize_xml(xml: &str) -> Vec<XmlToken> {
                 });
             }
             Ok(Event::Text(ref e)) => {
-                let text = e.unescape().map(|s| s.to_string()).unwrap_or_default();
-                if !text.is_empty() {
-                    tokens.push(XmlToken {
-                        kind: TokenKind::Characters,
-                        name: String::new(),
-                        text,
-                        attrs: vec![],
-                    });
-                }
+                raw_text.push_str(&e.decode().unwrap_or_default());
+            }
+            Ok(Event::GeneralRef(ref e)) => {
+                raw_text.push('&');
+                raw_text.push_str(&e.decode().unwrap_or_default());
+                raw_text.push(';');
             }
             Ok(Event::CData(ref e)) => {
                 let text = String::from_utf8_lossy(e.as_ref()).to_string();
@@ -435,6 +452,38 @@ pub extern "C" fn shim_nsxmlparser_description(obj: u64, _cmd: u64) -> u64 {
 mod tests {
     use super::*;
     use crate::shim_test_helpers::*;
+
+    #[test]
+    fn tokenizer_preserves_entity_text_and_attributes() {
+        let tokens = tokenize_xml(
+            "<root label=\"Alice &amp; Bob\"> Alice &amp; Bob &#65; &#x1F600; &amp;lt; </root>",
+        );
+        assert_eq!(
+            tokens[0].attrs,
+            vec![("label".into(), "Alice & Bob".into())]
+        );
+        let text: String = tokens
+            .iter()
+            .filter(|token| matches!(token.kind, TokenKind::Characters))
+            .map(|token| token.text.as_str())
+            .collect();
+        assert_eq!(text, "Alice & Bob A 😀 &lt;");
+    }
+
+    #[test]
+    fn tokenizer_keeps_cdata_literal_and_element_boundaries() {
+        let tokens = tokenize_xml("<root> left <child/> right <![CDATA[ &amp; literal ]]></root>");
+        let text: Vec<&str> = tokens
+            .iter()
+            .filter(|token| matches!(token.kind, TokenKind::Characters))
+            .map(|token| token.text.as_str())
+            .collect();
+        assert_eq!(text, vec!["left", "right", " &amp; literal "]);
+        assert_eq!(
+            tokens.iter().filter(|token| token.name == "child").count(),
+            2
+        );
+    }
 
     #[test]
     fn alloc_sets_correct_isa() {

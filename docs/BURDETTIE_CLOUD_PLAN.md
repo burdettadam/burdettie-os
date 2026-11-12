@@ -470,7 +470,7 @@ during development).
 | JSON | `serde_json` (existing) | MIT/Apache-2.0 | Already in workspace |
 | TLS certs | `x509-parser` (existing) | MIT/Apache-2.0 | Already in workspace |
 | OCSP | `x509-ocsp` | MIT/Apache-2.0 | OCSP request/response parsing |
-| DNS | `hickory-resolver` (existing) | MIT/Apache-2.0 | Already in workspace |
+| DNS | System resolver through `libc` (existing) | MIT/Apache-2.0 (`libc` crate) | Current CFHost path uses `getaddrinfo`; a dedicated DNS client remains an optional future choice |
 | Time | `chrono` or `time` | MIT/Apache-2.0 | Log timestamps |
 
 Almost everything needed is already in the workspace. Only `tiny_http` and 

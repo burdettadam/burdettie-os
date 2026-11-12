@@ -20,7 +20,8 @@ set -euo pipefail
 # ── Configuration ──────────────────────────────────────────────────
 
 LIBRESSL_VERSION="3.3.6"
-LIBRESSL_SHA256="87b1bbe36e9eec8d1bb2f4e033a91db69e555966"  # SHA-1 of tarball (for integrity)
+# Published in https://ftp.openbsd.org/pub/OpenBSD/LibreSSL/SHA256
+LIBRESSL_SHA256="3f28849365e1190db2baf9014ff9686012c25b1ca6df8b3a085f789e24fe4b9a"
 LIBRESSL_URL="https://ftp.openbsd.org/pub/OpenBSD/LibreSSL/libressl-${LIBRESSL_VERSION}.tar.gz"
 
 # Cross-compile target
@@ -37,7 +38,7 @@ OUT_DIR="${SCRIPT_DIR}/lib"
 
 # ── Preflight ──────────────────────────────────────────────────────
 
-for cmd in cmake zig; do
+for cmd in cmake zig shasum; do
     if ! command -v "$cmd" &>/dev/null; then
         echo "error: $cmd not found. Install with: brew install $cmd" >&2
         exit 1
@@ -57,6 +58,8 @@ if [[ ! -f "${TARBALL}" ]]; then
 else
     echo "Using cached tarball: ${TARBALL}"
 fi
+
+printf '%s  %s\n' "$LIBRESSL_SHA256" "$TARBALL" | shasum -a 256 -c -
 
 # ── Extract ────────────────────────────────────────────────────────
 

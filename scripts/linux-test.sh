@@ -24,7 +24,9 @@ cd "$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
 TARGET="aarch64-unknown-linux-gnu"
 # Use glibc 2.36 to match Debian bookworm
 GLIBC="2.36"
-BINARY="/tmp/burdettieOS-target/${TARGET}/release/macho-inspect"
+CARGO_ARTIFACT_DIR=$(cargo metadata --locked --no-deps --format-version=1 \
+  | python3 -c 'import json, sys; print(json.load(sys.stdin)["target_directory"])')
+BINARY="${CARGO_ARTIFACT_DIR}/${TARGET}/release/macho-inspect"
 IMAGE="burdettie-os"
 SKIP_BUILD=false
 SHELL_MODE=false
@@ -41,7 +43,7 @@ done
 # ── Cross-compile ──────────────────────────────────────────────────
 if [ "$SKIP_BUILD" = false ]; then
   echo "▸ Cross-compiling macho-inspect for ${TARGET}..."
-  time cargo zigbuild --release --target "${TARGET}.${GLIBC}" -p macho-inspect 2>&1 \
+  time cargo zigbuild --locked --release --target "${TARGET}.${GLIBC}" -p macho-inspect 2>&1 \
     | grep -v "^$" | tail -3
   echo "▸ Binary: $(ls -lh "$BINARY" | awk '{print $5}')"
 fi

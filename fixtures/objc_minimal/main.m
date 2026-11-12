@@ -5,6 +5,7 @@
 // and objc_msgSend dispatch.
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <objc/runtime.h>
 #include <objc/message.h>
 

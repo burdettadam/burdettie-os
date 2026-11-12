@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - **macOS** (ARM64 / Apple Silicon) — required for full integration tests
-- **Rust** stable toolchain (1.82+) — managed via `rust-toolchain.toml`
+- **Rust 1.93.0** — pinned in [`rust-toolchain.toml`](../rust-toolchain.toml)
 - **Xcode Command Line Tools** — `xcode-select --install`
 - **Docker** (optional) — for containerized builds of cross-platform crates
 
@@ -11,7 +11,7 @@
 
 ```bash
 # Clone and build
-git clone <repo-url> burdettie-os
+git clone https://github.com/burdettadam/burdettie-os.git
 cd burdettie-os
 
 # Full pipeline: format → clippy → build → fixtures → test
@@ -26,8 +26,8 @@ cd burdettie-os
 
 ## Project Structure
 
-The workspace contains 44 members (41 crates + 3 GUI apps) organized into layers.
-See [CRATE_MAP.md](CRATE_MAP.md) for the full breakdown.
+The workspace is organized into layers. See [Cargo.toml](../Cargo.toml) for the
+current members and [CRATE_MAP.md](CRATE_MAP.md) for architectural context.
 
 | Layer | Key Crates | Platform |
 |-------|--------|----------|
@@ -51,16 +51,16 @@ cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 
 # Build all crates
-cargo build --workspace
+cargo build --workspace --locked
 
 # Build release
-cargo build --workspace --release
+cargo build --workspace --release --locked
+
+# Build test fixtures (C/ObjC sources → binaries) before running tests
+./scripts/build_fixtures.sh
 
 # Run all tests
-cargo test --workspace
-
-# Build test fixtures (C/ObjC sources → binaries)
-./scripts/build_fixtures.sh
+cargo test --workspace --locked
 ```
 
 ### Packaging
@@ -83,7 +83,7 @@ dist/
 ├── fixtures/
 │   ├── simple_cli/app
 │   ├── return42/app
-│   └── ... (58+ fixture binaries)
+│   └── ... (locally built fixture binaries)
 └── docs/
     ├── README.md
     ├── architecture.md
@@ -163,8 +163,8 @@ GitHub Actions runs on every push/PR to `main`:
 1. **Check formatting** — `cargo fmt --check`
 2. **Clippy** — zero-warning policy with `-D warnings`
 3. **Build** — debug and release profiles
-4. **Test** — full workspace test suite
-5. **Fixture rebuild** — recompiles C/ObjC test fixtures
+4. **Fixture rebuild** — compiles C/ObjC test fixtures from source
+5. **Test** — full workspace test suite with the generated fixtures available
 6. **Bundle** — creates distributable package
 7. **Artifact upload** — 14-day retention on bundle
 
@@ -172,8 +172,10 @@ A separate Docker job validates that the cross-platform crates build on Linux.
 
 ## Test Fixtures
 
-Test fixtures are pre-compiled ARM64 macOS binaries in `fixtures/`. Source files
-(`.c`, `.m`) are in each fixture directory. To rebuild:
+Fixture sources (`.c`, `.m`, and assembly) live in `fixtures/`. Compile the
+Mach-O executables and libraries locally on macOS; generated outputs are not
+part of the public source checkout. Small malformed inputs used by parser tests
+are retained. To build the native fixture set:
 
 ```bash
 ./scripts/build_fixtures.sh
@@ -184,8 +186,9 @@ Foundation framework usage, weak linking, TLV, constructors, and more.
 
 ## Troubleshooting
 
-**Build fails on Linux**: Only the cross-platform crates compile on Linux.
-Use the Docker dev image or build per-crate with `-p <crate-name>`.
+**Build fails on Linux**: Use the Docker dev image or the documented per-crate
+workflow. Runtime and GUI builds have additional native dependencies, and native
+macOS fixture compilation requires Xcode Command Line Tools.
 
 **Missing fixtures**: Run `./scripts/build_fixtures.sh`. Requires Xcode CLT.
 

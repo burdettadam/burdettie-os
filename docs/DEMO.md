@@ -6,17 +6,20 @@ scorecard to GUI applications.
 ## Prerequisites
 
 - **macOS 13+** (Ventura or later) on Apple Silicon
-- **Rust stable** (1.82+) via `rustup`
+- **Rust 1.93.0** as pinned in [`rust-toolchain.toml`](../rust-toolchain.toml)
 - **Xcode Command Line Tools** (`xcode-select --install`)
 
 ## Quick Start (Development)
 
 ```bash
 # Build everything
-cargo build --workspace
+cargo build --workspace --locked
+
+# Build the source fixtures used by the shell demos and scorecard
+./scripts/build_fixtures.sh
 
 # Run the interactive shell
-cargo run -p runtime-shell
+cargo run --locked -p runtime-shell
 
 # Inside the shell:
 darwin> help          # list commands
@@ -35,7 +38,7 @@ darwin> exit
 ### Option A: DMG Disk Image
 
 ```bash
-# Full pipeline: format → clippy → build → test → fixtures → bundle
+# Build pipeline: format → clippy → build → fixtures → test
 ./packaging/build.sh --release
 
 # Bundle into dist/
@@ -103,7 +106,7 @@ darwin-runtime/
 │   ├── hello-darwin            # GUI: lifecycle demo
 │   ├── control-gallery         # GUI: widget exercise
 │   └── foundation-explorer     # GUI: class browser
-├── fixtures/                   # 62 test binaries
+├── fixtures/                   # locally built test binaries
 │   ├── simple_cli/app
 │   ├── return42/app
 │   └── ...
@@ -122,15 +125,7 @@ darwin-runtime/
 
 1. VM boots → auto-login → desktop appears
 2. `runtime-shell` launches in a terminal window
-3. Boot banner displays runtime stats:
-   ```
-   ╔═══════════════════════════════════════════════════╗
-   ║  burdettie-os Runtime Environment v0.1       ║
-   ║  Compatibility: 62/62 (100%)                      ║
-   ║  Foundation classes: 40 | Shim functions: 59      ║
-   ║  Type 'help' for commands, 'gui' for GUI demos    ║
-   ╚═══════════════════════════════════════════════════╝
-   ```
+3. The boot banner displays the runtime version, host, available demos, and session policy.
 4. User can run CLI demos, view scorecard, or launch GUI apps
 
 ## Shell Commands
@@ -161,13 +156,15 @@ clear button. Demonstrates the full text input → button action → label
 update pipeline.
 
 ### foundation-explorer
-Introspection browser for the 40 registered Foundation classes. Scrollable
+Introspection browser for registered Foundation classes. Scrollable
 class list with 12 visible rows, "Show" buttons to display method names,
 and Prev/Next pagination.
 
 ## Compatibility Score
 
-The runtime currently passes **62/62** fixture binaries through all stages:
+Run `score` to measure the fixture set built in your checkout. Report the commit,
+host, and fixture build command with the result; historical totals are not a
+compatibility guarantee. The scorecard reports these stages:
 
 | Stage | Description |
 |---|---|

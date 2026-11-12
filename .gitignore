@@ -61,3 +61,23 @@ __pycache__/
 /fixtures/fat_binary/app_arm64
 /fixtures/fat_binary/app_x86_64
 /fixtures/framework_style/MyFramework.framework/
+
+# Named fixture outputs and corpus programs (sources remain tracked)
+/fixtures/dispatch_test/dispatch_test
+/fixtures/objc_category/objc_category
+/fixtures/objc_minimal/objc_minimal
+/fixtures/process_info/process_info
+/corpus/*/app
+*.dSYM/
+
+# Locally compiled container inputs; Docker builds these from source
+/docker/*-linux-arm64
+/docker/apple-libcxx/*.so*
+
+# Machine-specific Cargo settings
+/.cargo/config
+/.cargo/config.toml
+
+# Private writing notes and editor backups
+/book/00-start-here/author-journal.md
+*.bak

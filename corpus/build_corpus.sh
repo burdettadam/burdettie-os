@@ -1,90 +1,31 @@
-#!/bin/bash
-# Build all corpus programs for arm64 macOS
-# Each program is compiled as a standalone ObjC binary linked against Foundation
-
+#!/usr/bin/env bash
+# Rebuild every authored corpus program for ARM64 macOS.
 set -euo pipefail
+export LC_ALL=C
 
-CORPUS_DIR="$(cd "$(dirname "$0")" && pwd)"
-ARCH="arm64"
-
-COMMON_FLAGS=(
-    -arch "$ARCH"
-    -framework Foundation
-    -fno-objc-arc
-    -O0
-    -g
-)
-
-PROGRAMS=(
-    word_counter
-    json_formatter
-    file_lister
-    string_processor
-    config_reader
-    date_calculator
-    path_resolver
-    collection_pipeline
-    error_reporter
-    runtime_info
-    todo_manager
-    text_analyzer
-    json_query
-    plist_converter
-    regex_search
-    event_bus
-    predicate_filter
-    sort_util
-    cache_bench
-    uuid_registry
-    attr_string
-    kv_store
-    data_buffer
-    scanner_parse
-    ordered_collections
-    # Phase C9
-    byte_format
-    host_info
-    pipe_io
-    progress_track
-    url_builder
-    # Phase C10
-    stream_io
-    xml_parse
-    url_session
-    archive_data
-    # Xcode CLI / subprocess
-    subprocess_capture
-    xcrun_query
-)
-
-BUILT=0
-FAILED=0
-
-for prog in "${PROGRAMS[@]}"; do
-    src="$CORPUS_DIR/$prog/main.m"
-    out="$CORPUS_DIR/$prog/app"
-    
-    if [ ! -f "$src" ]; then
-        echo "SKIP: $prog (no main.m)"
-        continue
-    fi
-    
-    echo -n "Building $prog... "
-    if cc "${COMMON_FLAGS[@]}" "$src" -o "$out" 2>/dev/null; then
-        echo "OK"
-        BUILT=$((BUILT + 1))
-    else
-        echo "FAILED"
-        # Retry with verbose output
-        cc "${COMMON_FLAGS[@]}" "$src" -o "$out" 2>&1 | head -5
-        FAILED=$((FAILED + 1))
-    fi
-done
-
-echo ""
-echo "Built: $BUILT / $((BUILT + FAILED))"
-if [ $FAILED -gt 0 ]; then
-    echo "Failed: $FAILED"
+if [[ "$(uname -s)" != "Darwin" ]]; then
+    echo "error: build_corpus.sh requires macOS and the Xcode command-line tools" >&2
     exit 1
 fi
-echo "All corpus binaries compiled successfully."
+
+CORPUS_DIR="$(cd "$(dirname "$0")" && pwd)"
+CC="$(xcrun --sdk macosx --find clang)"
+SDK="$(xcrun --sdk macosx --show-sdk-path)"
+COMMON_FLAGS=(-isysroot "$SDK" -arch arm64 -framework Foundation -fno-objc-arc -fblocks -O0 -g)
+BUILT=0
+
+# Source discovery keeps new programs in the build without maintaining a
+# second, easily stale list. Shell glob ordering is stable under LC_ALL=C.
+for source in "$CORPUS_DIR"/*/main.m; do
+    [[ -f "$source" ]] || continue
+    dir="$(dirname "$source")"
+    echo "Building $(basename "$dir")"
+    "$CC" "${COMMON_FLAGS[@]}" "$source" -o "$dir/app"
+    BUILT=$((BUILT + 1))
+done
+
+if [[ "$BUILT" -eq 0 ]]; then
+    echo "error: no corpus sources found" >&2
+    exit 1
+fi
+printf 'Built all %s corpus programs.\n' "$BUILT"

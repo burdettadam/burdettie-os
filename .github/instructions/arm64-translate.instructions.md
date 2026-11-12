@@ -82,5 +82,6 @@ For instructions not covered by helpers, use raw hex values with the ARM64 encod
 
 ## Build
 
-Target dir is `/tmp/burdettieOS-target` (native SSD, configured in `.cargo/config.toml`).
+Cargo writes to `target/` by default. For a custom build location, use
+`CARGO_TARGET_DIR` and resolve the directory through `cargo metadata`.
 Run: `cargo test -p arm64-translate`

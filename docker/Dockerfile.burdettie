@@ -2,10 +2,11 @@
 #
 # This builds the full darwin-loader runtime stack for Linux, installs the
 # runtime host binaries for the requested Docker target architecture, and
-# optionally stages extracted Xcode/macOS CLI tools for compatibility testing.
+# supports read-only mounts of local Xcode/macOS tools for compatibility testing.
 #
-# Optional imported-tool staging (run on macOS first if needed):
+# Optional local imports (run on macOS first if needed):
 #   ./scripts/extract_xcode_tools.sh
+#   docker run --rm --mount type=bind,src="$PWD/docker/xcode-tools",dst=/opt/xcode-tools,readonly burdettie-os
 #
 # Build (from repo root, host-native by default):
 #   docker build -f docker/Dockerfile.burdettie -t burdettie-os .
@@ -30,8 +31,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 ARG LIBRESSL_VERSION=3.3.6
+# Published in https://ftp.openbsd.org/pub/OpenBSD/LibreSSL/SHA256
+ARG LIBRESSL_SHA256=3f28849365e1190db2baf9014ff9686012c25b1ca6df8b3a085f789e24fe4b9a
 RUN cd /tmp \
     && wget -q "https://ftp.openbsd.org/pub/OpenBSD/LibreSSL/libressl-${LIBRESSL_VERSION}.tar.gz" \
+    && echo "${LIBRESSL_SHA256}  libressl-${LIBRESSL_VERSION}.tar.gz" | sha256sum -c - \
     && tar xzf "libressl-${LIBRESSL_VERSION}.tar.gz" \
     && mkdir build && cd build \
     && cmake "../libressl-${LIBRESSL_VERSION}" \
@@ -42,24 +46,12 @@ RUN cd /tmp \
         -DCMAKE_INSTALL_PREFIX=/opt/libressl \
     && make -j"$(nproc)" \
     && make install \
-    && strip --strip-debug /opt/libressl/lib/*.so*
-
-# Build native Rust replacements for foundational Xcode CLI entrypoints.
-# This avoids depending on the host toolchain while still installing /usr/bin
-# shims that guest processes can execute inside the runtime image.
-FROM rust:1.82-bookworm AS xcode-tools-builder
-
-WORKDIR /workspace
-
-COPY crates/burdettie-xcode-tools/Cargo.toml /workspace/crates/burdettie-xcode-tools/Cargo.toml
-COPY crates/burdettie-xcode-tools/src /workspace/crates/burdettie-xcode-tools/src
-
-RUN printf '[workspace]\nresolver = "2"\nmembers = ["crates/burdettie-xcode-tools"]\n\n[workspace.package]\nversion = "0.1.0"\nedition = "2021"\nlicense = "MIT OR Apache-2.0"\n\n[workspace.dependencies]\ntempfile = "3"\n\n[workspace.lints.rust]\n\n[workspace.lints.clippy]\n' > /workspace/Cargo.toml \
-    && cargo build --release -p burdettie-xcode-tools --bins
+    && strip --strip-debug /opt/libressl/lib/*.so* \
+    && install -Dm644 "../libressl-${LIBRESSL_VERSION}/COPYING" /opt/libressl/share/doc/COPYING
 
 # Build target-arch runtime binaries inside Docker so the image follows the
 # requested platform instead of copying tracked ARM64 executables.
-FROM rust:1.94-bookworm AS runtime-binaries-builder
+FROM rust:1.93-bookworm AS runtime-binaries-builder
 
 WORKDIR /workspace
 
@@ -80,13 +72,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY . /workspace
 
-RUN cargo build --release -p burdettie-plutil -p launchpad \
-    && cargo build --release --features gui -p macho-inspect
+RUN cargo build --locked --release -p burdettie-plutil -p launchpad -p burdettie-xcode-tools --bins \
+    && cargo build --locked --release --features gui -p macho-inspect
 
-FROM busybox:1.36 AS apple-libcxx-arm64
+# Build the alternate-string-layout library from pinned LLVM source on ARM64.
+# Other architectures retain the system libc++ behavior used previously.
+FROM debian:bookworm-slim AS apple-libcxx-builder
 
-RUN mkdir -p /out
-COPY docker/apple-libcxx/libc++.so.1.0 /out/libc++.so.1.0
+ARG TARGETARCH
+COPY docker/apple-libcxx/build.sh /tmp/build-apple-libcxx.sh
+RUN mkdir -p /out \
+    && if [ "${TARGETARCH}" = "arm64" ]; then \
+        apt-get update \
+        && apt-get install -y --no-install-recommends ca-certificates git clang cmake ninja-build python3 \
+        && bash /tmp/build-apple-libcxx.sh /out \
+        && rm -rf /var/lib/apt/lists/*; \
+    fi
 
 # ── Runtime image ──────────────────────────────────────────────────
 
@@ -133,6 +134,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=libressl-builder /opt/libressl/lib/libcrypto.so /opt/libressl/lib/
 COPY --from=libressl-builder /opt/libressl/lib/libssl.so    /opt/libressl/lib/
 COPY --from=libressl-builder /opt/libressl/lib/libtls.so    /opt/libressl/lib/
+COPY --from=libressl-builder /opt/libressl/share/doc/COPYING /opt/libressl/share/doc/COPYING
 
 # Install LibreSSL config — OPENSSLDIR is compiled as /opt/libressl/etc/ssl.
 # The openssl CLI needs openssl.cnf for operations like `req`, `ca`, `x509`.
@@ -141,6 +143,10 @@ RUN mkdir -p /opt/libressl/etc/ssl/certs
 
 # System identity
 RUN echo "burdettie-os 1.0" > /etc/burdettie-release
+
+# Preserve notices for the project and the fonts embedded in Rust binaries.
+COPY LICENSE-MIT LICENSE-APACHE /usr/share/doc/burdettie-os/
+COPY crates/graphics-core/fonts/LICENSE-DejaVu.txt /usr/share/doc/burdettie-os/LICENSE-DejaVu.txt
 
 # Provide SystemVersion.plist so sw_vers and other tools can read macOS version info
 RUN mkdir -p /System/Library/CoreServices && \
@@ -164,52 +170,47 @@ RUN mkdir -p /System/Library/CoreServices && \
 </plist>\n' > /System/Library/CoreServices/SystemVersion.plist
 
 # Install target-arch runtime binaries built in the stage above.
-# The workspace target dir is configured in .cargo/config.toml.
+# Cargo uses its standard /workspace/target directory.
 # macho-inspect carries the `gui` feature so guest AppKit windows can run
 # against the Linux Xvfb/VNC stack shipped in this image.
-COPY --from=runtime-binaries-builder /tmp/burdettieOS-target/release/macho-inspect /usr/local/bin/macho-inspect
+COPY --from=runtime-binaries-builder /workspace/target/release/macho-inspect /usr/local/bin/macho-inspect
 RUN chmod +x /usr/local/bin/macho-inspect
 
 # Install burdettie-plutil — native Rust replacement for macOS plutil.
 # The macOS plutil is a Swift binary needing 273+ Foundation stubs;
 # this native implementation handles all plist operations directly.
-COPY --from=runtime-binaries-builder /tmp/burdettieOS-target/release/plutil /usr/local/bin/plutil
+COPY --from=runtime-binaries-builder /workspace/target/release/plutil /usr/local/bin/plutil
 RUN chmod +x /usr/local/bin/plutil
 
 # Install the native home-screen launcher built for the target Docker arch.
-COPY --from=runtime-binaries-builder /tmp/burdettieOS-target/release/launchpad /usr/local/bin/launchpad
+COPY --from=runtime-binaries-builder /workspace/target/release/launchpad /usr/local/bin/launchpad
 RUN chmod +x /usr/local/bin/launchpad
 
 # Install native Rust replacements for the foundational Xcode CLI surface.
-COPY --from=xcode-tools-builder /workspace/target/release/xcrun /usr/local/bin/xcrun
-COPY --from=xcode-tools-builder /workspace/target/release/xcode-select /usr/local/bin/xcode-select
+COPY --from=runtime-binaries-builder /workspace/target/release/xcrun /usr/local/bin/xcrun
+COPY --from=runtime-binaries-builder /workspace/target/release/xcode-select /usr/local/bin/xcode-select
 RUN chmod +x /usr/local/bin/xcrun /usr/local/bin/xcode-select \
     && ln -sf /usr/local/bin/xcrun /usr/bin/xcrun \
     && ln -sf /usr/local/bin/xcode-select /usr/bin/xcode-select \
     && mkdir -p /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin \
     && mkdir -p /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
 
-# Stage optional Mach-O tool binaries extracted from a macOS host.
-# The tracked docker/xcode-tools placeholder keeps the base image buildable even
-# when no imported tools have been staged yet.
+# Copy only the tracked staging instructions. .dockerignore excludes locally
+# extracted Mach-O tools; mount those read-only at /opt/xcode-tools when needed.
 COPY docker/xcode-tools/ /opt/xcode-tools/
 RUN mkdir -p /opt/imported-artifacts
 
-# Install the Apple-ABI libc++ shim only for architectures that have a staged
-# target-arch build. The checked-in shim is currently ARM64-only; leaving it
-# absent on other targets is safer than preloading a wrong-arch ELF.
-COPY --from=apple-libcxx-arm64 /out/libc++.so.1.0 /tmp/apple-libcxx/libc++.so.1.0
-
-# Replace system libc++ with the Apple-ABI version so C++ code uses the correct
-# string layout when the target-arch shim is available.
+# Copy the source-built library and its upstream license notices. The ARM64
+# image preserves the existing guest string ABI; other targets have no custom
+# library to preload. This never copies a developer's prebuilt .so from the repo.
+COPY --from=apple-libcxx-builder /out/ /opt/apple-libcxx/
 RUN set -eux; \
     if [ "${TARGETARCH}" = "arm64" ]; then \
-        install -Dm755 /tmp/apple-libcxx/libc++.so.1.0 /opt/apple-libcxx/libc++.so.1.0; \
+        test -f /opt/apple-libcxx/libc++.so.1.0; \
         ln -sf /opt/apple-libcxx/libc++.so.1.0 /usr/lib/aarch64-linux-gnu/libc++.so.1; \
     else \
-        echo "Skipping Apple-ABI libc++ shim for TARGETARCH=${TARGETARCH}; no target-arch build is staged."; \
-    fi; \
-    rm -rf /tmp/apple-libcxx
+        echo "Using system libc++ for TARGETARCH=${TARGETARCH}."; \
+    fi
 
 # Install test runner and GUI launcher.
 COPY scripts/test_xcode_tools_docker.sh /usr/local/bin/test-xcode-tools

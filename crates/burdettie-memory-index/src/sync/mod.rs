@@ -609,7 +609,7 @@ mod tests {
         );
         write_file(
             &temp.path().join("memories/build.md"),
-            "- workspace cargo artifacts go to /tmp/burdettieOS-target\n- docker stages must copy from /tmp not /workspace/target\n",
+            "- workspace cargo artifacts go to target by default\n- docker stages copy release binaries from /workspace/target/release\n",
         );
 
         let index = SemanticMemoryIndex::new(temp.path())

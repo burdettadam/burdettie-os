@@ -70,13 +70,13 @@ darwin> gui
 darwin> gui hello-darwin
 ```
 
-The scorecard describes the fixture set available in your checkout. The GUI demos include a control gallery, a Foundation explorer, a launcher, and a file explorer. See the [demo guide](docs/DEMO.md) for their setup and expected behavior.
+The scorecard describes the fixture set available in your checkout. The shell lists the hello-darwin, control-gallery, and foundation-explorer demos; the workspace also includes launcher and file-explorer applications. See the [demo guide](docs/DEMO.md) for setup and expected behavior.
 
 ### Docker and Linux
 
-The repository also contains Linux runtime and browser-viewer development workflows in [`docker/Dockerfile.burdettie`](docker/Dockerfile.burdettie) and [`scripts/docker-gui.sh`](scripts/docker-gui.sh). The Dockerfile currently requires a prebuilt ARM64 library at `docker/apple-libcxx/libc++.so.1.0`. Its provenance and reproducible build path are part of the release review; use the native fixture walkthrough above as the starting point.
+The repository also contains Linux runtime and browser-viewer development workflows in [`docker/Dockerfile.burdettie`](docker/Dockerfile.burdettie) and [`scripts/docker-gui.sh`](scripts/docker-gui.sh). The image builds its Rust binaries and LibreSSL from source. The ARM64 lane also builds an alternate-layout libc++ from a pinned LLVM release; its [build recipe, ABI smoke test, and upstream notices](docker/apple-libcxx/README.md) are included.
 
-Treat locally imported guest software as a separate development input. It should not be included in a shared runtime image or source archive.
+Treat locally imported guest software as a separate development input. Imported tools are excluded from the default build context and can be mounted read-only for [local compatibility experiments](docker/xcode-tools/README.md). Use the native fixture walkthrough above as the first reproducible demonstration; guest compatibility still depends on the selected platform and interfaces.
 
 ## Architecture
 
@@ -91,7 +91,7 @@ Treat locally imported guest software as a separate development input. It should
 | Embedding | `darwin-runtime-ffi`, `swift/`, `examples/` | Expose the runtime through a C ABI and language bindings. |
 | Semantic memory and services | `burdettie-domain-map`, `burdettie-memory-core`, `burdettie-memory-index`, `burdettie-services`, `burdettie-log-pipeline` | Explore domain modeling, memory indexing, service integration, and logging. |
 
-The [feature reference](docs/FEATURES.md) provides the detailed subsystem inventory. The [roadmap](docs/ROADMAP.md) records the intended direction and target matrix.
+The [feature reference](docs/FEATURES.md) provides the detailed subsystem inventory. The [roadmap](docs/roadmap.md) records the intended direction and target matrix.
 
 ## Scope and limitations
 
@@ -104,7 +104,7 @@ The [feature reference](docs/FEATURES.md) provides the detailed subsystem invent
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community expectations. Keep changes focused, add a small reproducible fixture when extending compatibility, and document unsupported behavior as carefully as supported behavior.
 
-Source files, fixture generators, and documented expectations belong in version control. Build outputs, local observations, private memory state, credentials, imported application bundles, and extracted third-party binaries should remain outside the public repository. Existing committed copies require a separate history review; adding an ignore rule does not remove them.
+Source files, fixture generators, and documented expectations belong in version control. Build outputs, local observations, private memory state, credentials, imported application bundles, and extracted third-party binaries should remain outside the public repository. Existing committed copies require a separate history review; adding an ignore rule does not remove them. See the [source and artifact policy](docs/PUBLICATION.md) for the publication boundary.
 
 ## Documentation
 
@@ -112,9 +112,9 @@ Source files, fixture generators, and documented expectations belong in version 
 | --- | --- |
 | [Demo guide](docs/DEMO.md) | Showcase workflows and packaging. |
 | [Feature reference](docs/FEATURES.md) | Detailed runtime and tooling capabilities. |
-| [Roadmap](docs/ROADMAP.md) | Planned work and target-platform direction. |
+| [Roadmap](docs/roadmap.md) | Planned work and target-platform direction. |
 | [FFI guide](docs/FFI_GUIDE.md) | Embedding, API examples, memory ownership, and thread-safety notes. |
-| [Book source](book/) | Longer-form project documentation. |
+| [Technical manuscript](book/README.md) | Draft chapters explaining the loader, runtime, interpreter, and GUI. |
 | [Changelog](CHANGELOG.md) | Recorded project changes. |
 
 ## License
