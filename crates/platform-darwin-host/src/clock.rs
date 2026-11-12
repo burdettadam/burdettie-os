@@ -29,7 +29,7 @@ impl Clock for DarwinClock {
         unsafe { libc::gettimeofday(&mut tv, std::ptr::null_mut()) };
         let mut tm: libc::tm = unsafe { std::mem::zeroed() };
         unsafe { libc::localtime_r(&tv.tv_sec, &mut tm) };
-        tm.tm_gmtoff as i64
+        tm.tm_gmtoff
     }
 
     fn timezone_name(&self) -> String {
@@ -77,7 +77,7 @@ impl Clock for DarwinClock {
             wday: tm.tm_wday,
             yday: tm.tm_yday,
             isdst: tm.tm_isdst,
-            gmtoff: tm.tm_gmtoff as i64,
+            gmtoff: tm.tm_gmtoff,
         }
     }
 
