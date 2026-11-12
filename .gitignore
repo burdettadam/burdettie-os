@@ -50,3 +50,14 @@ __pycache__/
 .env.*
 !.env.example
 !.env.sample
+
+# Local terminal captures and compiler exploration output
+/nohup.out
+/typescript
+/rust_out.s
+
+# Additional outputs created by scripts/build_fixtures.sh
+/fixtures/return42/return42
+/fixtures/fat_binary/app_arm64
+/fixtures/fat_binary/app_x86_64
+/fixtures/framework_style/MyFramework.framework/
