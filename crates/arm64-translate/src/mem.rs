@@ -6,58 +6,104 @@
 
 use std::collections::BTreeMap;
 
-/// Check if the memory page containing `addr` is mapped in the process.
-/// Uses `mincore()` on macOS/Linux — it returns ENOMEM for unmapped pages.
+fn access_last_byte(addr: u64, size: usize) -> Option<u64> {
+    addr.checked_add(u64::try_from(size.checked_sub(1)?).ok()?)
+}
+
+/// Check that every host page covering an access is mapped.
+///
+/// This is a mapping check, not a permission or lifetime guarantee. Host
+/// passthrough remains limited to trusted pointers whose access is valid.
 #[cfg(unix)]
-fn is_page_mapped(addr: u64) -> bool {
-    let page_size = 0x4000u64; // 16 KB on arm64 macOS (safe default)
-    let page_start = addr & !(page_size - 1);
-    let mut vec: u8 = 0;
-    // SAFETY: mincore checks page residency; it won't fault even on
-    // unmapped addresses — it returns -1 with errno=ENOMEM instead.
-    #[cfg(target_os = "linux")]
-    let ret = unsafe {
-        libc::mincore(
-            page_start as *mut libc::c_void,
-            page_size as usize,
-            (&mut vec as *mut u8).cast::<libc::c_uchar>(),
-        )
+fn is_host_range_mapped(addr: u64, size: usize) -> bool {
+    static PAGE_SIZE: std::sync::OnceLock<Option<u64>> = std::sync::OnceLock::new();
+    let Some(page_size) = *PAGE_SIZE.get_or_init(|| {
+        // SAFETY: sysconf reads a process-wide configuration value.
+        u64::try_from(unsafe { libc::sysconf(libc::_SC_PAGESIZE) })
+            .ok()
+            .filter(|&size| size != 0)
+    }) else {
+        return false;
     };
+    // Darwin can round the query to a user-map page but report residency at a
+    // smaller kernel granule. Reserve 16 bytes below for up to a 64 KiB page
+    // reported in 4 KiB units; reject unsupported granules conservatively.
     #[cfg(not(target_os = "linux"))]
-    let ret = unsafe {
-        libc::mincore(
-            page_start as *mut libc::c_void,
-            page_size as usize,
-            (&mut vec as *mut u8).cast::<libc::c_char>(),
-        )
+    if !(4096..=65536).contains(&page_size) || !page_size.is_power_of_two() {
+        return false;
+    }
+    let Some(last_addr) = access_last_byte(addr, size) else {
+        return false;
     };
-    ret == 0
+    let mut page = addr - addr % page_size;
+    let last_page = last_addr - last_addr % page_size;
+
+    loop {
+        #[cfg(target_os = "linux")]
+        let mut residency = [0_u8; 1];
+        #[cfg(not(target_os = "linux"))]
+        let mut residency = [0_u8; 16];
+        // SAFETY: The address is aligned to the actual host page size. A
+        // one-byte length produces one residency byte on Linux. Darwin's
+        // mixed-granule reporting fits in the larger buffer described above.
+        // A fixed 16 KiB length with a one-byte buffer overwrites the stack on
+        // Linux with 4 KiB pages. mincore does not dereference the queried
+        // address; an unmapped page produces an error instead.
+        let ret =
+            unsafe { libc::mincore(page as *mut libc::c_void, 1, residency.as_mut_ptr().cast()) };
+        if ret != 0 {
+            return false;
+        }
+        if page == last_page {
+            return true;
+        }
+        // last_addr was checked above, and another page remains before it.
+        page += page_size;
+    }
 }
 
 #[cfg(windows)]
-fn is_page_mapped(addr: u64) -> bool {
+fn is_host_range_mapped(addr: u64, size: usize) -> bool {
     use windows_sys::Win32::System::Memory::{
         VirtualQuery, MEMORY_BASIC_INFORMATION, MEM_COMMIT, PAGE_GUARD, PAGE_NOACCESS,
     };
 
-    let mut info = std::mem::MaybeUninit::<MEMORY_BASIC_INFORMATION>::uninit();
-    let queried = unsafe {
-        VirtualQuery(
-            addr as *const std::ffi::c_void,
-            info.as_mut_ptr(),
-            std::mem::size_of::<MEMORY_BASIC_INFORMATION>(),
-        )
-    };
-    if queried == 0 {
+    let Some(end) = u64::try_from(size)
+        .ok()
+        .and_then(|size| addr.checked_add(size))
+    else {
         return false;
+    };
+    let mut cursor = addr;
+    while cursor < end {
+        let mut info = std::mem::MaybeUninit::<MEMORY_BASIC_INFORMATION>::uninit();
+        let queried = unsafe {
+            VirtualQuery(
+                cursor as *const std::ffi::c_void,
+                info.as_mut_ptr(),
+                std::mem::size_of::<MEMORY_BASIC_INFORMATION>(),
+            )
+        };
+        if queried == 0 {
+            return false;
+        }
+        let info = unsafe { info.assume_init() };
+        if info.State != MEM_COMMIT || (info.Protect & (PAGE_NOACCESS | PAGE_GUARD)) != 0 {
+            return false;
+        }
+        let Some(region_end) = (info.BaseAddress as u64).checked_add(info.RegionSize as u64) else {
+            return false;
+        };
+        if region_end <= cursor {
+            return false;
+        }
+        cursor = region_end;
     }
-
-    let info = unsafe { info.assume_init() };
-    info.State == MEM_COMMIT && (info.Protect & (PAGE_NOACCESS | PAGE_GUARD)) == 0
+    size != 0
 }
 
 #[cfg(not(any(unix, windows)))]
-fn is_page_mapped(_addr: u64) -> bool {
+fn is_host_range_mapped(_addr: u64, _size: usize) -> bool {
     false
 }
 
@@ -159,27 +205,50 @@ impl Memory {
     /// Translate a guest address to a host pointer using only mapped regions
     /// (ignoring host_passthrough). Used for instruction fetch.
     fn translate_strict(&self, addr: u64, size: usize) -> Option<*const u8> {
+        access_last_byte(addr, size)?;
         if let Some((&region_start, region)) = self.regions.range(..=addr).next_back() {
-            let offset = (addr - region_start) as usize;
-            if offset + size <= region.size {
+            let offset = usize::try_from(addr - region_start).ok()?;
+            if offset <= region.size && size <= region.size - offset {
                 return Some(unsafe { region.base.add(offset) as *const u8 });
             }
         }
         None
     }
 
+    /// Host fallback may only cover addresses outside all guest regions.
+    fn permits_host_access(&self, addr: u64, size: usize) -> bool {
+        if !self.host_passthrough || addr < 0x1000 {
+            return false;
+        }
+        let Some(last) = access_last_byte(addr, size) else {
+            return false;
+        };
+        if usize::try_from(addr).is_err() || usize::try_from(last).is_err() {
+            return false;
+        }
+        // The caller already checked a region containing the starting address.
+        // Also reject accesses that begin outside but cross into a later guest
+        // region, so passthrough cannot bypass that region's protections.
+        if self.regions.range(addr..=last).next().is_some() {
+            return false;
+        }
+        is_host_range_mapped(addr, size)
+    }
+
     /// Translate a guest address to a host pointer for reading.
     fn translate(&self, addr: u64, size: usize) -> Option<*const u8> {
+        access_last_byte(addr, size)?;
         // Find the region containing addr (the largest key <= addr).
         if let Some((&region_start, region)) = self.regions.range(..=addr).next_back() {
-            let offset = (addr - region_start) as usize;
-            if offset + size <= region.size {
-                return Some(unsafe { region.base.add(offset) as *const u8 });
+            let offset = usize::try_from(addr - region_start).ok()?;
+            if offset < region.size {
+                return (size <= region.size - offset)
+                    .then(|| unsafe { region.base.add(offset) as *const u8 });
             }
         }
         // Host passthrough: treat the address as a direct host pointer,
         // but only if the page is actually mapped (to avoid SIGSEGV).
-        if self.host_passthrough && addr >= 0x1000 && is_page_mapped(addr) {
+        if self.permits_host_access(addr, size) {
             return Some(addr as *const u8);
         }
         None
@@ -187,17 +256,19 @@ impl Memory {
 
     /// Translate a guest address to a host pointer for writing.
     fn translate_mut(&self, addr: u64, size: usize) -> Option<*mut u8> {
+        access_last_byte(addr, size)?;
         if let Some((&region_start, region)) = self.regions.range(..=addr).next_back() {
-            if region.writable {
-                let offset = (addr - region_start) as usize;
-                if offset + size <= region.size {
-                    return Some(unsafe { region.base.add(offset) });
-                }
+            let offset = usize::try_from(addr - region_start).ok()?;
+            if offset < region.size {
+                // Host passthrough must not bypass an image's protection or
+                // allow an access to run past the registered region boundary.
+                return (region.writable && size <= region.size - offset)
+                    .then(|| unsafe { region.base.add(offset) });
             }
         }
         // Host passthrough: treat the address as a direct host pointer,
         // but only if the page is actually mapped (to avoid SIGSEGV).
-        if self.host_passthrough && addr >= 0x1000 && is_page_mapped(addr) {
+        if self.permits_host_access(addr, size) {
             return Some(addr as *mut u8);
         }
         None
@@ -492,6 +563,97 @@ unsafe impl Sync for Memory {}
 #[cfg(test)]
 mod tests {
     use crate::test_helpers::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn host_passthrough_reads_and_writes_live_storage() {
+        let mut storage = Box::new([0xAAAA_u64, 0x1234, 0xBBBB]);
+        let addr = unsafe { storage.as_mut_ptr().add(1) } as u64;
+        // SAFETY: No external image regions are supplied; Memory owns its stack.
+        let mut mem = unsafe { super::Memory::from_segments(&[]) };
+        mem.host_passthrough = true;
+        assert_eq!(mem.read_u64(addr), Some(0x1234));
+        assert!(mem.write_u64(addr, 0x5678));
+        assert_eq!(mem.read_u64(addr), Some(0x5678));
+        assert_eq!(*storage, [0xAAAA, 0x5678, 0xBBBB]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn host_passthrough_checks_every_page_of_an_access() {
+        // Leave the second page unmapped so a read crossing the boundary must
+        // be rejected before a raw pointer is dereferenced.
+        let page_size =
+            usize::try_from(unsafe { libc::sysconf(libc::_SC_PAGESIZE) }).expect("host page size");
+        assert!(page_size >= 8);
+        let allocation = unsafe {
+            libc::mmap(
+                std::ptr::null_mut(),
+                page_size * 2,
+                libc::PROT_READ | libc::PROT_WRITE,
+                libc::MAP_PRIVATE | libc::MAP_ANON,
+                -1,
+                0,
+            )
+        };
+        assert_ne!(allocation, libc::MAP_FAILED);
+        let first_page = allocation.cast::<u8>();
+        assert_eq!(
+            unsafe { libc::munmap(first_page.add(page_size).cast(), page_size) },
+            0
+        );
+        // SAFETY: The first page remains mapped and writable.
+        unsafe { first_page.add(page_size - 4).cast::<u32>().write(0x1234) };
+        let mut mem = unsafe { super::Memory::from_segments(&[]) };
+        mem.host_passthrough = true;
+        let addr = first_page as u64 + (page_size - 4) as u64;
+        assert_eq!(mem.read_u32(addr), Some(0x1234));
+        assert_eq!(mem.read_u64(addr), None);
+        assert!(!mem.write_u64(addr, 0));
+        assert_eq!(unsafe { libc::munmap(allocation, page_size) }, 0);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn host_page_probe_rejects_overflowing_or_empty_ranges() {
+        assert!(!super::is_host_range_mapped(u64::MAX - 3, 8));
+        assert!(!super::is_host_range_mapped(0x1000, 0));
+        let mut mem = unsafe { super::Memory::from_segments(&[]) };
+        mem.host_passthrough = true;
+        assert_eq!(mem.read_u64(u64::MAX - 3), None);
+        assert!(!mem.write_u64(u64::MAX - 3, 0));
+    }
+
+    #[test]
+    fn host_passthrough_preserves_registered_region_bounds_and_protection() {
+        let mut storage = [0x1234_u64, 0x5678, 0x9ABC];
+        let base = storage.as_mut_ptr().cast::<u8>();
+        let addr = base as u64 + 8;
+        // Only the middle word belongs to this read-only guest region, even
+        // though the host allocation makes both neighboring words accessible.
+        let mut mem = unsafe { super::Memory::from_segments(&[(addr, base.add(8), 8, false)]) };
+        mem.host_passthrough = true;
+        assert_eq!(mem.read_u64(addr), Some(0x5678));
+        assert!(!mem.write_u64(addr, 0));
+        assert_eq!(mem.read_u64(addr - 4), None);
+        assert!(!mem.write_u64(addr - 4, 0));
+        assert_eq!(mem.read_u64(addr + 4), None);
+        assert!(!mem.write_u64(addr + 4, 0));
+        assert_eq!(storage, [0x1234, 0x5678, 0x9ABC]);
+    }
+
+    #[test]
+    fn registered_region_rejects_guest_address_wraparound() {
+        let mut storage = [0x1234_u64];
+        let base = storage.as_mut_ptr().cast::<u8>();
+        let addr = u64::MAX - 3;
+        // SAFETY: The host allocation remains live and has eight bytes.
+        let mem = unsafe { super::Memory::from_segments(&[(addr, base, 8, true)]) };
+        assert_eq!(mem.read_u64(addr), None);
+        assert!(!mem.write_u64(addr, 0));
+        assert_eq!(mem.read_u32_mapped(u64::MAX - 1), None);
+        assert_eq!(storage, [0x1234]);
+    }
 
     #[test]
     fn test_write_read_u8() {

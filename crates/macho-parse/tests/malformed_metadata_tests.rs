@@ -262,3 +262,20 @@ fn unixthread_rejects_wrong_flavor_and_truncated_state() {
     data[44..48].copy_from_slice(&u32::MAX.to_le_bytes());
     assert!(macho_parse::parse(&data).is_err());
 }
+
+#[test]
+fn export_trie_bounds_shared_unterminated_reexport_names() {
+    let mut bytes = Vec::new();
+    // Empty edge labels keep prefix allocation tiny while both branches at
+    // every level repeatedly reach the same malformed re-export terminal.
+    for depth in 0..14 {
+        let next = (depth + 1) * 8;
+        let offset = [0x80 | (next & 0x7f) as u8, (next >> 7) as u8];
+        bytes.extend([0, 2, 0, offset[0], offset[1], 0, offset[0], offset[1]]);
+    }
+    // 258 terminal bytes: flags, ordinal, and an unterminated 256-byte name.
+    bytes.extend([0x82, 0x02, 8, 1]);
+    bytes.extend([b'A'; 256]);
+    bytes.push(0); // child count lies outside the terminal record
+    assert!(parse_export_trie(&bytes).is_empty());
+}

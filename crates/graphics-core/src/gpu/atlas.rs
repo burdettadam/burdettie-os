@@ -75,19 +75,16 @@ impl GlyphAtlas {
             return None;
         }
 
-        // Advance cursor
-        if self.cursor_x + gw + 1 > ATLAS_SIZE {
-            self.cursor_x = 1;
-            self.cursor_y += self.row_height + 1;
-            self.row_height = 0;
-        }
-        if self.cursor_y + gh + 1 > ATLAS_SIZE {
+        // Try the placement without reserving it. A failed row wrap must
+        // leave the current row available for a smaller subsequent glyph.
+        let (ox, oy, row_height) = if self.cursor_x + gw + 1 > ATLAS_SIZE {
+            (1, self.cursor_y + self.row_height + 1, 0)
+        } else {
+            (self.cursor_x, self.cursor_y, self.row_height)
+        };
+        if oy + gh + 1 > ATLAS_SIZE {
             return None; // Atlas full
         }
-        self.row_height = self.row_height.max(gh);
-
-        let ox = self.cursor_x;
-        let oy = self.cursor_y;
 
         // Rasterize into atlas
         outlined.draw(|x, y, c| {
@@ -99,6 +96,8 @@ impl GlyphAtlas {
         });
 
         self.cursor_x = ox + gw + 1;
+        self.cursor_y = oy;
+        self.row_height = row_height.max(gh);
 
         let u0 = ox as f32 / ATLAS_SIZE as f32;
         let v0 = oy as f32 / ATLAS_SIZE as f32;
@@ -225,5 +224,36 @@ mod tests {
             .unwrap();
         assert_eq!((actual.u0, actual.v0), (expected.u0, expected.v0));
         assert_eq!(bitmap(&atlas, actual), bitmap(&expected_atlas, expected));
+    }
+
+    #[test]
+    fn rejected_row_wrap_preserves_space_for_smaller_glyphs() {
+        let fm = FontManager::new();
+        let glyph_id = fm.system().inner().glyph_id('A').0 as u32;
+        let mut reference = GlyphAtlas::new();
+        let expected = *reference
+            .rasterize_glyph(fm.system(), glyph_id, 24.0)
+            .unwrap();
+
+        // The last row has exactly enough room left for the small glyph. A
+        // larger glyph must wrap, but there is no space for another row.
+        let mut atlas = GlyphAtlas::new();
+        atlas.cursor_x = ATLAS_SIZE - expected.width as u32 - 1;
+        atlas.cursor_y = ATLAS_SIZE - expected.height as u32 - 1;
+        atlas.row_height = expected.height as u32;
+        let remaining_slot = (atlas.cursor_x, atlas.cursor_y);
+
+        assert!(atlas.rasterize_glyph(fm.system(), glyph_id, 48.0).is_none());
+        let actual = *atlas
+            .rasterize_glyph(fm.system(), glyph_id, 24.0)
+            .expect("rejecting a row wrap must preserve the remaining slot");
+        assert_eq!(
+            (actual.u0, actual.v0),
+            (
+                remaining_slot.0 as f32 / ATLAS_SIZE as f32,
+                remaining_slot.1 as f32 / ATLAS_SIZE as f32,
+            )
+        );
+        assert_eq!(bitmap(&atlas, actual), bitmap(&reference, expected));
     }
 }

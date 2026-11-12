@@ -53,19 +53,29 @@ impl ExportedSymbol {
     }
 }
 
-fn read_cstring<'a>(data: &'a [u8], pos: &mut usize) -> Option<&'a [u8]> {
+fn read_cstring<'a>(data: &'a [u8], pos: &mut usize, scan_budget: &mut usize) -> Option<&'a [u8]> {
     let remaining = data.get(*pos..)?;
-    let length = remaining.iter().position(|&byte| byte == 0)?;
+    let scan = &remaining[..remaining.len().min(*scan_budget)];
+    let length = scan.iter().position(|&byte| byte == 0);
+    // Charge failed scans too: a shared unterminated name must not be
+    // rescanned once per path through a compact DAG.
+    *scan_budget -= length.map_or(scan.len(), |length| length + 1);
+    let length = length?;
     *pos += length + 1;
     Some(&remaining[..length])
 }
 
-fn parse_terminal(data: &[u8], name: String, name_budget: &mut usize) -> Option<ExportedSymbol> {
+fn parse_terminal(
+    data: &[u8],
+    name: String,
+    name_budget: &mut usize,
+    scan_budget: &mut usize,
+) -> Option<ExportedSymbol> {
     let mut pos = 0;
     let flags = read_uleb128(data, &mut pos)?;
     if flags & EXPORT_SYMBOL_FLAGS_REEXPORT != 0 {
         let ordinal = read_uleb128(data, &mut pos)?;
-        let reexport_name = read_cstring(data, &mut pos)?;
+        let reexport_name = read_cstring(data, &mut pos, scan_budget)?;
         // Lossy UTF-8 can expand each invalid byte into three bytes.
         *name_budget = name_budget.checked_sub(reexport_name.len().checked_mul(3)?)?;
         let reexport_name = String::from_utf8_lossy(reexport_name).into_owned();
@@ -101,6 +111,8 @@ fn parse_terminal(data: &[u8], name: String, name_budget: &mut usize) -> Option<
 /// from expanding into unbounded output, the walk schedules at most four times
 /// the input length (and at most one million nodes). Decoded prefix and symbol
 /// names share a byte budget of 64 times the input length, capped at 64 MiB.
+/// C-string scanning has a separate byte budget with the same limits, including
+/// failed scans, so malformed shared nodes cannot cause quadratic rescanning.
 /// If a budget is exhausted, symbols successfully parsed so far are returned.
 pub fn parse_export_trie(trie_data: &[u8]) -> Vec<ExportedSymbol> {
     enum StackEntry {
@@ -112,6 +124,7 @@ pub fn parse_export_trie(trie_data: &[u8]) -> Vec<ExportedSymbol> {
     let max_nodes = trie_data.len().saturating_mul(4).min(1_000_000);
     let mut remaining_nodes = max_nodes.saturating_sub(1);
     let mut remaining_name_bytes = trie_data.len().saturating_mul(64).min(64 * 1024 * 1024);
+    let mut remaining_scan_bytes = remaining_name_bytes;
     let mut active = std::collections::HashSet::new();
     let mut stack = vec![StackEntry::Visit {
         offset: 0,
@@ -126,6 +139,10 @@ pub fn parse_export_trie(trie_data: &[u8]) -> Vec<ExportedSymbol> {
                 continue;
             }
         };
+        if remaining_scan_bytes == 0 {
+            log::debug!("export trie input-scan budget exhausted");
+            break;
+        }
         if offset >= trie_data.len() || !active.insert(offset) {
             continue;
         }
@@ -149,8 +166,12 @@ pub fn parse_export_trie(trie_data: &[u8]) -> Vec<ExportedSymbol> {
                 break;
             };
             remaining_name_bytes = budget;
-            let Some(symbol) = parse_terminal(terminal, prefix.clone(), &mut remaining_name_bytes)
-            else {
+            let Some(symbol) = parse_terminal(
+                terminal,
+                prefix.clone(),
+                &mut remaining_name_bytes,
+                &mut remaining_scan_bytes,
+            ) else {
                 continue;
             };
             results.push(symbol);
@@ -166,7 +187,8 @@ pub fn parse_export_trie(trie_data: &[u8]) -> Vec<ExportedSymbol> {
         };
         pos += 1;
         for _ in 0..child_count {
-            let Some(edge_label) = read_cstring(trie_data, &mut pos) else {
+            let Some(edge_label) = read_cstring(trie_data, &mut pos, &mut remaining_scan_bytes)
+            else {
                 break;
             };
             let Some(child_offset) =
@@ -336,21 +358,56 @@ mod tests {
     fn read_cstring_simple() {
         let data = b"hello\0world\0";
         let mut pos = 0;
-        assert_eq!(read_cstring(data, &mut pos), Some(b"hello".as_slice()));
+        let mut budget = data.len();
+        assert_eq!(
+            read_cstring(data, &mut pos, &mut budget),
+            Some(b"hello".as_slice())
+        );
         assert_eq!(pos, 6); // past the NUL
-        assert_eq!(read_cstring(data, &mut pos), Some(b"world".as_slice()));
+        assert_eq!(
+            read_cstring(data, &mut pos, &mut budget),
+            Some(b"world".as_slice())
+        );
     }
 
     #[test]
     fn read_cstring_empty_string() {
         let data = b"\0rest";
         let mut pos = 0;
-        assert_eq!(read_cstring(data, &mut pos), Some(b"".as_slice()));
+        let mut budget = data.len();
+        assert_eq!(
+            read_cstring(data, &mut pos, &mut budget),
+            Some(b"".as_slice())
+        );
         assert_eq!(pos, 1);
     }
 
     #[test]
     fn parse_export_trie_empty() {
         assert!(parse_export_trie(&[]).is_empty());
+    }
+
+    #[test]
+    fn cstring_scan_stops_before_a_nul_beyond_its_budget() {
+        let mut pos = 0;
+        let mut budget = 3;
+        assert_eq!(read_cstring(b"long_name\0", &mut pos, &mut budget), None);
+        assert_eq!(budget, 0);
+        assert_eq!(pos, 0);
+        assert_eq!(read_cstring(b"\0", &mut pos, &mut budget), None);
+    }
+
+    #[test]
+    fn cstring_scan_charges_only_bytes_examined() {
+        let mut pos = 0;
+        let mut budget = 9;
+        assert_eq!(
+            read_cstring(b"ok\0tail", &mut pos, &mut budget),
+            Some(b"ok".as_slice())
+        );
+        assert_eq!(budget, 6);
+        assert_eq!(pos, 3);
+        assert_eq!(read_cstring(b"ok\0tail", &mut pos, &mut budget), None);
+        assert_eq!(budget, 2);
     }
 }
