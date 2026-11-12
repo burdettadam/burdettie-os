@@ -11,7 +11,7 @@ pub(crate) const UNWIND_HAS_LSDA: u32 = 0x4000_0000;
 pub(crate) const UNWIND_PERSONALITY_MASK: u32 = 0x3000_0000;
 pub(crate) const UNWIND_PERSONALITY_SHIFT: u32 = 28;
 
-pub(crate) const UNWIND_ARM64_FRAMELESS_STACK_SIZE_MASK: u32 = 0x00FFF_000;
+pub(crate) const UNWIND_ARM64_FRAMELESS_STACK_SIZE_MASK: u32 = 0x00FF_F000;
 
 /// Register-pair bit flags in the low 12 bits of a FRAME-mode encoding.
 pub(crate) const FRAME_REG_PAIRS: &[(u32, u8, u8)] = &[

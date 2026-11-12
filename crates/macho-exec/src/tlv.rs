@@ -246,19 +246,13 @@ unsafe extern "C" fn tlv_get_addr(desc: *mut TlvDescriptor) -> *mut u8 {
     let descriptor_addr = desc as usize;
 
     let guard = TLV_IMAGE_REGISTRY.lock().unwrap_or_else(|e| e.into_inner());
-    let registry = match guard.as_ref() {
-        Some(r) => r,
-        None => {
-            log::error!("tlv_get_addr: registry not initialized");
-            return std::ptr::null_mut();
-        }
+    let Some(registry) = guard.as_ref() else {
+        log::error!("tlv_get_addr: registry not initialized");
+        return std::ptr::null_mut();
     };
-    let info = match registry.descriptors.get(&descriptor_addr).cloned() {
-        Some(i) => i,
-        None => {
-            log::error!("tlv_get_addr: unknown descriptor {descriptor_addr:#x}");
-            return std::ptr::null_mut();
-        }
+    let Some(info) = registry.descriptors.get(&descriptor_addr).cloned() else {
+        log::error!("tlv_get_addr: unknown descriptor {descriptor_addr:#x}");
+        return std::ptr::null_mut();
     };
     let info_ptr = Arc::as_ptr(&info) as usize;
     let snapshot = registry.image_snapshots.get(&info_ptr).cloned();
@@ -327,17 +321,14 @@ unsafe extern "C" fn tlv_get_addr(desc: *mut TlvDescriptor) -> *mut u8 {
             if chunk.data.is_empty() {
                 continue;
             }
-            let chunk_end = match chunk.offset.checked_add(chunk_len) {
-                Some(end) => end,
-                None => {
-                    log::error!(
-                        "tlv_get_addr: template chunk overflow descriptor={descriptor_addr:#x} image={info_ptr:#x} index={index} offset={} len={}",
-                        chunk.offset,
-                        chunk_len
-                    );
-                    unsafe { libc::free(block as *mut libc::c_void) };
-                    return std::ptr::null_mut();
-                }
+            let Some(chunk_end) = chunk.offset.checked_add(chunk_len) else {
+                log::error!(
+                    "tlv_get_addr: template chunk overflow descriptor={descriptor_addr:#x} image={info_ptr:#x} index={index} offset={} len={}",
+                    chunk.offset,
+                    chunk_len
+                );
+                unsafe { libc::free(block as *mut libc::c_void) };
+                return std::ptr::null_mut();
             };
             if chunk_end > total_size {
                 log::error!(
@@ -471,9 +462,8 @@ pub fn patch_tlv_thunks(image: &MappedImage, parsed: &ParsedMachO) -> usize {
         .sections
         .iter()
         .find(|s| s.section_type_name() == SectionType::ThreadLocalVariables);
-    let thread_vars = match thread_vars {
-        Some(tv) => tv,
-        None => return 0, // No TLVs in this image
+    let Some(thread_vars) = thread_vars else {
+        return 0; // No TLVs in this image
     };
 
     let tlv_sections: Vec<_> = parsed
@@ -486,9 +476,8 @@ pub fn patch_tlv_thunks(image: &MappedImage, parsed: &ParsedMachO) -> usize {
             )
         })
         .collect();
-    let block_base_addr = match tlv_sections.iter().map(|s| s.addr).min() {
-        Some(addr) => addr,
-        None => return 0,
+    let Some(block_base_addr) = tlv_sections.iter().map(|s| s.addr).min() else {
+        return 0;
     };
     let block_end_addr = tlv_sections
         .iter()
@@ -530,7 +519,7 @@ pub fn patch_tlv_thunks(image: &MappedImage, parsed: &ParsedMachO) -> usize {
             // Diagnostic: dump first 32 bytes of template as u64 values
             {
                 let mut hex = String::new();
-                for (_i, chunk) in src.chunks(8).take(4).enumerate() {
+                for chunk in src.chunks(8).take(4) {
                     let val = u64::from_le_bytes(chunk.try_into().unwrap_or([0u8;8]));
                     hex.push_str(&format!(" {val:#018x}"));
                 }
@@ -574,14 +563,11 @@ pub fn patch_tlv_thunks(image: &MappedImage, parsed: &ParsedMachO) -> usize {
         .segments
         .iter()
         .find(|s| tv_section_addr >= s.vmaddr && tv_section_addr < s.vmaddr + s.size as u64);
-    let seg = match seg {
-        Some(s) => s,
-        None => {
-            log::error!(
-                "patch_tlv_thunks: cannot find segment for __thread_vars at {tv_section_addr:#x}"
-            );
-            return 0;
-        }
+    let Some(seg) = seg else {
+        log::error!(
+            "patch_tlv_thunks: cannot find segment for __thread_vars at {tv_section_addr:#x}"
+        );
+        return 0;
     };
 
     let section_offset_in_seg = (tv_section_addr - seg.vmaddr) as usize;

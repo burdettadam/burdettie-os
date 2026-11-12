@@ -291,6 +291,9 @@ fn parse_regular_page(
     }
 }
 
+// Keep the page bounds and shared encoding, personality, and LSDA tables
+// explicit at the call site, matching the compact-unwind section layout.
+#[allow(clippy::too_many_arguments)]
 fn parse_compressed_page(
     data: &[u8],
     page_off: usize,
