@@ -80,6 +80,7 @@ pub fn layout_horizontal(
 mod tests {
     use super::*;
     use graphics_core::Color;
+    use ui_view::layout::ViewId;
 
     #[test]
     fn stack_vertical_fill_equally() {

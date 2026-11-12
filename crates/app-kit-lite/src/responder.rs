@@ -168,16 +168,13 @@ mod tests {
         }
     }
 
+    type EventFlags = [Rc<Cell<bool>>; 4];
+
     /// Build a chain A → B → C. Returns (A, flags_a, flags_b, flags_c) where
     /// each flags tuple is (key_down, key_up, mouse_down, mouse_up).
     fn build_chain(
         b_handles_key_down: bool,
-    ) -> (
-        TestResponder,
-        [Rc<Cell<bool>>; 4],
-        [Rc<Cell<bool>>; 4],
-        [Rc<Cell<bool>>; 4],
-    ) {
+    ) -> (TestResponder, EventFlags, EventFlags, EventFlags) {
         let c_kd = Rc::new(Cell::new(false));
         let c_ku = Rc::new(Cell::new(false));
         let c_md = Rc::new(Cell::new(false));
