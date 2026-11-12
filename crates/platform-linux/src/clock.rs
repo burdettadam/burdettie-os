@@ -11,7 +11,8 @@ impl Clock for LinuxClock {
             tv_usec: 0,
         };
         unsafe { libc::gettimeofday(&mut tv, std::ptr::null_mut()) };
-        #[allow(clippy::cast_possible_truncation)]
+        // libc uses i64 microseconds on 64-bit Linux but i32 on Apple hosts.
+        #[allow(clippy::cast_possible_truncation, clippy::unnecessary_cast)]
         (tv.tv_sec, tv.tv_usec as i32)
     }
 

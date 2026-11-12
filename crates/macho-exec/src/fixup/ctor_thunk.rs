@@ -196,6 +196,6 @@ mod tests {
     #[test]
     fn thunk_template_size() {
         assert_eq!(THUNK_TEMPLATE.len() * 4, 28);
-        assert!(THUNK_SIZE >= 28 + 8); // instructions + address
+        const { assert!(THUNK_SIZE >= 28 + 8) }; // instructions + address
     }
 }

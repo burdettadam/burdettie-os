@@ -22,6 +22,9 @@ pub fn default_unwind() -> Arc<dyn UnwindRegistry> {
     Arc::new(platform_core::unwind::NoopUnwindRegistry)
 }
 
+// Each integration crate compiles this module separately; security tests do not
+// resolve symbols, while the entry, mapping, and registry tests use this helper.
+#[allow(dead_code)]
 pub fn default_stub_resolver() -> StubResolver {
     #[cfg(target_os = "macos")]
     let host: Arc<dyn platform_core::symbols::HostSymbolResolver> =

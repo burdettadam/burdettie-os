@@ -95,7 +95,7 @@ The [feature reference](docs/FEATURES.md) provides the detailed subsystem invent
 
 ## Validation
 
-The [CI workflow](.github/workflows/ci.yml) builds the project's own Mach-O fixtures and checks the documented quick start, language bindings, portable libraries, and interpreted execution. In the [recorded run for `31e52c9`](https://github.com/burdettadam/burdettie-os/actions/runs/43291406943), the macOS ARM64 quick start, C/Swift interop, Docker checks, and all 40 Linux ARM64 interpreter fixtures passed.
+The [CI workflow](.github/workflows/ci.yml) builds the project's own Mach-O fixtures and checks the documented quick start, language bindings, portable libraries, and interpreted execution. In the [recorded run for `dd08ad9`](https://github.com/burdettadam/burdettie-os/actions/runs/43311827892), the macOS ARM64 quick start, C/Swift interop, Docker checks, and all 40 Linux ARM64 interpreter fixtures passed.
 
 That run also exposed strict-lint failures in the broader macOS build-and-test job. The `ttf-parser` maintenance advisory remains visible in the dependency checks. Follow-up source fixes and their local regression results are recorded in the [validation status](docs/PUBLICATION.md#validation-status), with native CI distinguished from local checks. These results describe the tested fixtures and revision; framework and application coverage remains incremental.
 

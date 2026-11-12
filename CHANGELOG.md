@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   printable bytes in a heap address cannot be returned as string contents.
 - Use the host page size and correctly sized residency buffers for memory checks;
   reject overflowing ranges and C-string address arithmetic.
+- Convert Darwin monotonic clock ticks to nanoseconds with the host timebase,
+  using wide intermediate arithmetic to avoid conversion overflow.
 - Correct ARM64 atomic decoding, widths, signed comparisons, alignment checks,
   acquire/release flags, and exclusive-monitor handling.
 - Bound malformed Mach-O export-trie traversal and integer/range parsing, while

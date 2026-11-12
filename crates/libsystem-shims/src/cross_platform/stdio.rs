@@ -1063,11 +1063,10 @@ extern "C" fn shim_bio_dump_indent_fp(
     func(real_fp, s, len, indent)
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "macos"), not(target_arch = "aarch64")))]
 mod tests {
     use super::*;
 
-    #[cfg(all(not(target_os = "macos"), not(target_arch = "aarch64")))]
     #[test]
     fn install_registers_non_aarch64_vfprintf_wrappers() {
         let mut table = ShimTable::new();

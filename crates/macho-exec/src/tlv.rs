@@ -35,13 +35,6 @@ mod tls {
     pub fn set_specific(key: TlvKey, value: *mut u8) -> i32 {
         unsafe { libc::pthread_setspecific(key, value as *mut libc::c_void) }
     }
-
-    #[cfg(test)]
-    pub fn delete_key(key: TlvKey) {
-        unsafe {
-            libc::pthread_key_delete(key);
-        }
-    }
 }
 
 #[cfg(windows)]
@@ -99,16 +92,6 @@ mod tls {
         });
         0
     }
-
-    #[cfg(test)]
-    pub fn delete_key(key: TlvKey) {
-        let block = BLOCKS.with(|blocks| blocks.borrow_mut().blocks.remove(&key));
-        if let Some(block) = block {
-            unsafe {
-                super::tlv_block_destructor(block.cast());
-            }
-        }
-    }
 }
 
 #[cfg(not(any(unix, windows)))]
@@ -126,9 +109,6 @@ mod tls {
     pub fn set_specific(_key: TlvKey, _value: *mut u8) -> i32 {
         0
     }
-
-    #[cfg(test)]
-    pub fn delete_key(_key: TlvKey) {}
 }
 
 /// TLV descriptor layout matching the Mach-O ABI (3 pointers, 24 bytes on arm64).

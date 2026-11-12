@@ -78,12 +78,7 @@ fn ehtype_vtable_plus_2() -> *const c_void {
     use std::sync::OnceLock;
     static VTABLE: OnceLock<usize> = OnceLock::new();
     let addr = *VTABLE.get_or_init(|| {
-        let sym = unsafe {
-            libc::dlsym(
-                libc::RTLD_DEFAULT as *mut c_void,
-                c"objc_ehtype_vtable".as_ptr(),
-            )
-        };
+        let sym = unsafe { libc::dlsym(libc::RTLD_DEFAULT, c"objc_ehtype_vtable".as_ptr()) };
         if sym.is_null() {
             log::warn!("objc_ehtype_vtable not found — @catch type matching may fail");
             0
@@ -110,7 +105,7 @@ fn ensure_foundation_loaded() {
 #[cfg(target_os = "macos")]
 fn resolve_host_symbol(name: *const libc::c_char) -> *mut c_void {
     ensure_foundation_loaded();
-    unsafe { libc::dlsym(libc::RTLD_DEFAULT as *mut c_void, name.cast()) }
+    unsafe { libc::dlsym(libc::RTLD_DEFAULT, name.cast()) }
 }
 
 #[cfg(target_os = "macos")]

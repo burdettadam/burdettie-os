@@ -78,9 +78,9 @@ input requirements visible so a reviewer can reproduce the same scope.
 ## Validation status
 
 Validation is recorded by revision and execution environment. The latest completed
-native run recorded here is [CI run 43291406943](https://github.com/burdettadam/burdettie-os/actions/runs/43291406943)
+native run recorded here is [CI run 43311827892](https://github.com/burdettadam/burdettie-os/actions/runs/43311827892)
 on 2026-11-12, for source commit
-[`31e52c9`](https://github.com/burdettadam/burdettie-os/commit/31e52c91ae89bf62fbaac4051c4a6fb4abbdbe2c).
+[`dd08ad9`](https://github.com/burdettadam/burdettie-os/commit/dd08ad9248b46406f065c3a885798b90c45dc13d).
 Follow-up fixes have separate local coverage and need another native CI run.
 
 ### Recorded native CI
@@ -91,13 +91,17 @@ Follow-up fixes have separate local coverage and need another native CI run.
 | README quick start, macOS ARM64 | Passed. Built the workspace, compiled the C fixture, inspected its JSON metadata, and verified guest output and exit code 0. |
 | Linux ARM64 interpreter | All 40 end-to-end fixtures passed, including the previously aborting Foundation bridging case. |
 | Docker development checks | Passed the container's strict lint checks and all 344 tests across its 11 selected portable library packages. |
-| C and Swift embedding | Passed the FFI tests, installed-library C client, Swift package/tests, and Swift client build. |
-| Full macOS build-and-test job | Stopped at strict Clippy: 12 diagnostics in unused architecture-specific Mach-O helpers. Follow-up source corrections are covered locally; the later build, test, GPU-feature, and bundle steps still need a new native run. |
+| C and Swift embedding | Passed 35 Rust FFI tests, 6 C client checks, and 15 Swift tests, plus the installed-library C client and Swift client build. |
+| Full macOS build-and-test job | Stopped at strict Clippy with 8 diagnostics in native-only paths. Follow-up source corrections have been reviewed; the later debug/release build, workspace test, GPU-feature, and bundle steps still need a new native run. |
 | Dependency checks | `cargo audit` passed with maintenance warnings. `cargo deny` passed bans, licenses, and sources, but failed the `ttf-parser` maintenance advisory described below. |
 
 The [PR](https://github.com/burdettadam/burdettie-os/pull/1) and its checks record
 subsequent revisions. A passing quick start or selected fixture set does not
 establish that every workspace test or guest application passes.
+
+The strict Clippy step uses `--keep-going` to collect independent failures without
+changing the warning policy. Targets blocked by a failed dependency can still
+reveal further diagnostics after that dependency is repaired.
 
 ### Local regression coverage
 
@@ -118,6 +122,7 @@ individual suites; focused regressions may also belong to a larger suite.
 | Complete Foundation library | All 3,020 tests passed in two consecutive runs with default parallel execution and no ignored tests. Coverage includes pointer-backed CFString decoding, timer callback reentrancy, repaired test objects, and process/global-state isolation. The focused timer, NSView, and responder runs passed 57, 66, and 37 tests respectively. |
 | Shared-cache storage | The existing missing-cache error-path regression passed after restricting the owned-memory fallback to non-Unix hosts. |
 | UI and service follow-ups | 69 `app-kit-lite`, 244 `ui-controls`, and 39 `burdettie-services` tests passed. |
+| Darwin clock conversion arithmetic | Four unit tests extracted unchanged from the source passed on Linux: identity, non-unit scaling/truncation, intermediate overflow, and saturation. This does not compile the Darwin crate or execute Mach APIs. The added native sample-bracketing test still needs macOS CI. |
 
 The exact portable Clippy command from
 [`docker/Dockerfile.dev`](../docker/Dockerfile.dev) passed locally as well as in the
