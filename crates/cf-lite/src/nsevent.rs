@@ -71,7 +71,9 @@ pub(crate) fn event_dispatch_selector(obj: u64) -> Option<&'static str> {
         LEFT_MOUSE_UP_TYPE | OTHER_MOUSE_UP_TYPE => Some("mouseUp:"),
         RIGHT_MOUSE_UP_TYPE => Some("rightMouseUp:"),
         MOUSE_MOVED_TYPE => Some("mouseMoved:"),
-        LEFT_MOUSE_DRAGGED_TYPE | RIGHT_MOUSE_DRAGGED_TYPE | OTHER_MOUSE_DRAGGED_TYPE => Some("mouseDragged:"),
+        LEFT_MOUSE_DRAGGED_TYPE | RIGHT_MOUSE_DRAGGED_TYPE | OTHER_MOUSE_DRAGGED_TYPE => {
+            Some("mouseDragged:")
+        }
         SCROLL_WHEEL_TYPE => Some("scrollWheel:"),
         _ => None,
     }
@@ -86,7 +88,9 @@ pub(crate) fn event_targets_first_responder(obj: u64) -> bool {
 
 /// `-[NSEvent type]`
 pub extern "C" fn shim_nsevent_type(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + EVENT_TYPE_OFF) as *const u64) }
 }
 
@@ -97,13 +101,17 @@ pub(crate) fn event_type_raw(obj: u64) -> u64 {
 
 /// `-[NSEvent locationInWindow]` — returns x coordinate as f64 stub.
 pub extern "C" fn shim_nsevent_location_in_window(obj: u64, _cmd: u64) -> f64 {
-    if obj == 0 { return 0.0; }
+    if obj == 0 {
+        return 0.0;
+    }
     unsafe { *((obj as usize + LOCATION_X_OFF) as *const f64) }
 }
 
 /// Internal: get both (x, y) of locationInWindow.
 pub(crate) fn event_location_in_window(obj: u64) -> (f64, f64) {
-    if obj == 0 { return (0.0, 0.0); }
+    if obj == 0 {
+        return (0.0, 0.0);
+    }
     let x = unsafe { *((obj as usize + LOCATION_X_OFF) as *const f64) };
     let y = unsafe { *((obj as usize + 24) as *const f64) };
     (x, y)
@@ -111,19 +119,25 @@ pub(crate) fn event_location_in_window(obj: u64) -> (f64, f64) {
 
 /// `-[NSEvent modifierFlags]`
 pub extern "C" fn shim_nsevent_modifier_flags(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + MODIFIER_FLAGS_OFF) as *const u64) }
 }
 
 /// `-[NSEvent keyCode]`
 pub extern "C" fn shim_nsevent_key_code(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + KEY_CODE_OFF) as *const u64) }
 }
 
 /// `-[NSEvent characters]`
 pub extern "C" fn shim_nsevent_characters(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + CHARACTERS_OFF) as *const u64) }
 }
 
@@ -205,7 +219,8 @@ pub(crate) fn alloc_key_event(
 ///
 /// Simplified: takes type + location CGPoint (x, y) + modifierFlags. Other args are ignored.
 pub extern "C" fn shim_nsevent_mouse_event_with_type(
-    _cls: u64, _cmd: u64,
+    _cls: u64,
+    _cmd: u64,
     event_type: u64,
     location_x: f64,
     location_y: f64,
@@ -222,7 +237,8 @@ pub extern "C" fn shim_nsevent_mouse_event_with_type(
 
 /// `+[NSEvent keyEventWithType:location:modifierFlags:timestamp:windowNumber:context:characters:charactersIgnoringModifiers:isARepeat:keyCode:]`
 pub extern "C" fn shim_nsevent_key_event_with_type(
-    _cls: u64, _cmd: u64,
+    _cls: u64,
+    _cmd: u64,
     event_type: u64,
     _location_x: f64,
     _location_y: f64,
@@ -240,7 +256,8 @@ pub extern "C" fn shim_nsevent_key_event_with_type(
 
 /// `+[NSEvent otherEventWithType:location:modifierFlags:timestamp:windowNumber:context:subtype:data1:data2:]`
 pub extern "C" fn shim_nsevent_other_event_with_type(
-    _cls: u64, _cmd: u64,
+    _cls: u64,
+    _cmd: u64,
     event_type: u64,
     location_x: f64,
     location_y: f64,
@@ -297,13 +314,17 @@ pub extern "C" fn shim_nsevent_button_number(_obj: u64, _cmd: u64) -> i64 {
 
 /// `-[NSEvent scrollingDeltaX]`
 pub extern "C" fn shim_nsevent_scrolling_delta_x(obj: u64, _cmd: u64) -> f64 {
-    if obj == 0 { return 0.0; }
+    if obj == 0 {
+        return 0.0;
+    }
     unsafe { *((obj as usize + SCROLLING_DX_OFF) as *const f64) }
 }
 
 /// `-[NSEvent scrollingDeltaY]`
 pub extern "C" fn shim_nsevent_scrolling_delta_y(obj: u64, _cmd: u64) -> f64 {
-    if obj == 0 { return 0.0; }
+    if obj == 0 {
+        return 0.0;
+    }
     unsafe { *((obj as usize + SCROLLING_DY_OFF) as *const f64) }
 }
 
@@ -319,18 +340,18 @@ pub extern "C" fn shim_nsevent_delta_y(obj: u64, _cmd: u64) -> f64 {
 
 /// Internal: read scroll deltas from an event.
 pub(crate) fn event_scroll_deltas(obj: u64) -> (f64, f64) {
-    (shim_nsevent_scrolling_delta_x(obj, 0), shim_nsevent_scrolling_delta_y(obj, 0))
+    (
+        shim_nsevent_scrolling_delta_x(obj, 0),
+        shim_nsevent_scrolling_delta_y(obj, 0),
+    )
 }
 
 /// Allocate a scroll wheel event with delta values.
-pub(crate) fn alloc_scroll_event(
-    dx: f64,
-    dy: f64,
-    modifier_flags: u64,
-    window: u64,
-) -> u64 {
+pub(crate) fn alloc_scroll_event(dx: f64, dy: f64, modifier_flags: u64, window: u64) -> u64 {
     let obj = alloc_event(SCROLL_WHEEL_TYPE);
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *((obj as usize + MODIFIER_FLAGS_OFF) as *mut u64) = modifier_flags;
         *((obj as usize + WINDOW_OFF) as *mut u64) = window;
@@ -559,7 +580,18 @@ mod tests {
     #[test]
     fn factory_mouse_event_creates_valid() {
         let evt = shim_nsevent_mouse_event_with_type(
-            0, 0, LEFT_MOUSE_DOWN_TYPE, 50.0, 75.0, 0, 0.0, 0, 0, 0, 1, 1.0,
+            0,
+            0,
+            LEFT_MOUSE_DOWN_TYPE,
+            50.0,
+            75.0,
+            0,
+            0.0,
+            0,
+            0,
+            0,
+            1,
+            1.0,
         );
         assert_ne!(evt, 0);
         assert_eq!(shim_nsevent_type(evt, 0), LEFT_MOUSE_DOWN_TYPE);
@@ -570,7 +602,19 @@ mod tests {
     fn factory_key_event_creates_valid() {
         let chars = make_string("b");
         let evt = shim_nsevent_key_event_with_type(
-            0, 0, KEY_DOWN_TYPE, 0.0, 0.0, 0, 0.0, 0, 0, chars, 0, 0, 11,
+            0,
+            0,
+            KEY_DOWN_TYPE,
+            0.0,
+            0.0,
+            0,
+            0.0,
+            0,
+            0,
+            chars,
+            0,
+            0,
+            11,
         );
         assert_ne!(evt, 0);
         assert_eq!(shim_nsevent_type(evt, 0), KEY_DOWN_TYPE);
@@ -624,14 +668,20 @@ mod tests {
     #[test]
     fn delta_x_matches_scrolling_delta_x() {
         let evt = alloc_scroll_event(4.0, 5.0, 0, 0);
-        assert!((shim_nsevent_delta_x(evt, 0) - shim_nsevent_scrolling_delta_x(evt, 0)).abs() < f64::EPSILON);
+        assert!(
+            (shim_nsevent_delta_x(evt, 0) - shim_nsevent_scrolling_delta_x(evt, 0)).abs()
+                < f64::EPSILON
+        );
         free_obj(evt);
     }
 
     #[test]
     fn delta_y_matches_scrolling_delta_y() {
         let evt = alloc_scroll_event(4.0, 5.0, 0, 0);
-        assert!((shim_nsevent_delta_y(evt, 0) - shim_nsevent_scrolling_delta_y(evt, 0)).abs() < f64::EPSILON);
+        assert!(
+            (shim_nsevent_delta_y(evt, 0) - shim_nsevent_scrolling_delta_y(evt, 0)).abs()
+                < f64::EPSILON
+        );
         free_obj(evt);
     }
 

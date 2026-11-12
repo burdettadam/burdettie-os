@@ -1,0 +1,2 @@
+- Builtin ObjC backend now supports selector interning, selector name lookup, class_add_method, class_replace_method, and class_get_method_implementation by plumbing through existing ObjcRuntime tables instead of returning stub values.
+- Backend-level selector name lookup cannot return a borrow tied to the global runtime lock guard; caching stable leaked selector strings avoids the lifetime trap while keeping the API shape.

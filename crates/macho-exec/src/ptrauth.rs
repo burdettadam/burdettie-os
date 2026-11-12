@@ -26,6 +26,8 @@
 
 use std::sync::OnceLock;
 
+use macho_types::header::CpuType;
+
 /// Strip PAC bits from a pointer, returning just the raw virtual address.
 ///
 /// On ARM64 hardware with 48-bit VAs, PAC occupies bits 47-62.
@@ -183,7 +185,9 @@ pub fn has_hardware_pac() -> bool {
 
 fn _detect_pac() -> bool {
     #[cfg(all(target_arch = "aarch64", target_os = "macos"))]
-    { return true; }
+    {
+        return true;
+    }
 
     #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
     {
@@ -301,9 +305,9 @@ unsafe fn pac_sign_raw(value: u64, _key: PacKey, _modifier: u64) -> u64 {
 /// branch-register instruction (BRAA, BRAB, BLRAA, BLRAB, or Z/RET forms).
 #[inline]
 fn is_pac_branch(insn: u32) -> bool {
-    let group = (insn >> 25) & 0x7F;  // bits[31:25]
-    let op2 = (insn >> 16) & 0x1F;    // bits[20:16]
-    let auth = (insn >> 10) & 0x3;    // bits[11:10]
+    let group = (insn >> 25) & 0x7F; // bits[31:25]
+    let op2 = (insn >> 16) & 0x1F; // bits[20:16]
+    let auth = (insn >> 10) & 0x3; // bits[11:10]
     group == 0b1101011 && op2 == 0b11111 && auth >= 2
 }
 
@@ -334,7 +338,11 @@ fn depac_branch(insn: u32) -> u32 {
 ///
 /// Must be called AFTER fixups are applied and BEFORE `protect()` makes
 /// text segments read-only.
-pub fn strip_pac_branches(image: &crate::MappedImage) {
+pub fn strip_pac_branches(image: &crate::MappedImage, cpu_type: CpuType) {
+    if !should_strip_pac_branches(cpu_type) {
+        return;
+    }
+
     // Always strip PAC even on PAC hardware: the guest binary's signed
     // pointers cannot cross into host code (glibc qsort, libssl, etc.)
     // which uses plain BLR branches.
@@ -350,13 +358,17 @@ pub fn strip_pac_branches(image: &crate::MappedImage) {
             let insn = unsafe { base.add(i).read_unaligned() };
             if is_pac_branch(insn) {
                 let fixed = depac_branch(insn);
-                unsafe { base.add(i).write_unaligned(fixed); }
+                unsafe {
+                    base.add(i).write_unaligned(fixed);
+                }
                 patched += 1;
             } else if is_pac_data_insn(insn) {
                 // NOP out PACIA/PACIB/PACDA/PACDB/AUTIA/AUTIB/AUTDA/AUTDB
                 // and HINT-space variants (PACIASP, AUTIASP, etc.) so the
                 // binary never signs or authenticates pointers.
-                unsafe { base.add(i).write_unaligned(NOP); }
+                unsafe {
+                    base.add(i).write_unaligned(NOP);
+                }
                 patched += 1;
             }
         }
@@ -364,6 +376,11 @@ pub fn strip_pac_branches(image: &crate::MappedImage) {
     if patched > 0 {
         log::info!("strip_pac_branches: patched {patched} PAC instructions (branches + data)");
     }
+}
+
+#[inline]
+fn should_strip_pac_branches(cpu_type: CpuType) -> bool {
+    matches!(cpu_type, CpuType::Arm64)
 }
 
 /// ARM64 NOP instruction.
@@ -391,9 +408,16 @@ fn is_pac_data_insn(insn: u32) -> bool {
     //   PACIBSP    = HINT #27  = 0xD503_237F
     //   AUTIASP    = HINT #29  = 0xD503_23BF
     //   AUTIBSP    = HINT #31  = 0xD503_23FF
-    matches!(insn,
-        0xD503_211F | 0xD503_215F | 0xD503_219F | 0xD503_21DF
-        | 0xD503_233F | 0xD503_237F | 0xD503_23BF | 0xD503_23FF
+    matches!(
+        insn,
+        0xD503_211F
+            | 0xD503_215F
+            | 0xD503_219F
+            | 0xD503_21DF
+            | 0xD503_233F
+            | 0xD503_237F
+            | 0xD503_23BF
+            | 0xD503_23FF
     )
 }
 
@@ -463,5 +487,13 @@ mod tests {
         assert_eq!(meta.key, PacKey::DA);
         assert!(!meta.addr_diversity);
         assert_eq!(meta.diversity, 0xABCD);
+    }
+
+    #[test]
+    fn strip_pac_branches_only_runs_for_arm64_images() {
+        assert!(should_strip_pac_branches(CpuType::Arm64));
+        assert!(!should_strip_pac_branches(CpuType::X86_64));
+        assert!(!should_strip_pac_branches(CpuType::Arm));
+        assert!(!should_strip_pac_branches(CpuType::X86));
     }
 }

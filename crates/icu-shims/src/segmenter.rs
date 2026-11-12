@@ -1,9 +1,9 @@
 //! Real word/line break iteration backed by icu_segmenter.
 
-use icu_segmenter::{WordSegmenter, WordSegmenterBorrowed};
 use icu_segmenter::options::WordBreakInvariantOptions;
-use libsystem_shims::table::ShimTable;
+use icu_segmenter::{WordSegmenter, WordSegmenterBorrowed};
 use libsystem_shims::register_shims;
+use libsystem_shims::table::ShimTable;
 
 /// Create a word segmenter from compiled data.
 /// With compiled_data, creation is essentially pointer setup to baked-in statics.
@@ -12,12 +12,33 @@ fn word_segmenter() -> WordSegmenterBorrowed<'static> {
 }
 
 pub fn install(table: &mut ShimTable) {
-    register_shims!(table,
-        ("_ubrk_open", shim_ubrk_open as *const () as u64, "ubrk_open (icu4x → real segmenter)"),
-        ("_ubrk_close", shim_ubrk_close as *const () as u64, "ubrk_close (icu4x)"),
-        ("_ubrk_setText", shim_ubrk_set_text as *const () as u64, "ubrk_setText (icu4x)"),
-        ("_ubrk_first", shim_ubrk_first as *const () as u64, "ubrk_first (icu4x → 0)"),
-        ("_ubrk_next", shim_ubrk_next as *const () as u64, "ubrk_next (icu4x → real breaks)")
+    register_shims!(
+        table,
+        (
+            "_ubrk_open",
+            shim_ubrk_open as *const () as u64,
+            "ubrk_open (icu4x → real segmenter)"
+        ),
+        (
+            "_ubrk_close",
+            shim_ubrk_close as *const () as u64,
+            "ubrk_close (icu4x)"
+        ),
+        (
+            "_ubrk_setText",
+            shim_ubrk_set_text as *const () as u64,
+            "ubrk_setText (icu4x)"
+        ),
+        (
+            "_ubrk_first",
+            shim_ubrk_first as *const () as u64,
+            "ubrk_first (icu4x → 0)"
+        ),
+        (
+            "_ubrk_next",
+            shim_ubrk_next as *const () as u64,
+            "ubrk_next (icu4x → real breaks)"
+        )
     );
 }
 
@@ -37,10 +58,16 @@ const UBRK_DONE: i32 = -1;
 
 /// ubrk_open(type, locale, text, textLength, status) → UBreakIterator*
 pub extern "C" fn shim_ubrk_open(
-    _type: i32, _locale: u64, text: *const u16, text_len: i32, status: *mut i32,
+    _type: i32,
+    _locale: u64,
+    text: *const u16,
+    text_len: i32,
+    status: *mut i32,
 ) -> u64 {
     if !status.is_null() {
-        unsafe { *status = 0; }
+        unsafe {
+            *status = 0;
+        }
     }
 
     let segmenter = word_segmenter();
@@ -51,13 +78,20 @@ pub extern "C" fn shim_ubrk_open(
         } else {
             unsafe { std::slice::from_raw_parts(text, text_len as usize) }
         };
-        segmenter.segment_utf16(slice).collect::<Vec<usize>>()
-            .iter().map(|&p| p as i32).collect()
+        segmenter
+            .segment_utf16(slice)
+            .collect::<Vec<usize>>()
+            .iter()
+            .map(|&p| p as i32)
+            .collect()
     } else {
         vec![]
     };
 
-    let state = Box::new(BreakIterState { positions, cursor: 0 });
+    let state = Box::new(BreakIterState {
+        positions,
+        cursor: 0,
+    });
     Box::into_raw(state) as u64
 }
 
@@ -71,13 +105,15 @@ pub extern "C" fn shim_ubrk_close(bi: u64) {
 }
 
 /// ubrk_setText(bi, text, textLength, status)
-pub extern "C" fn shim_ubrk_set_text(
-    bi: u64, text: *const u16, text_len: i32, status: *mut i32,
-) {
+pub extern "C" fn shim_ubrk_set_text(bi: u64, text: *const u16, text_len: i32, status: *mut i32) {
     if !status.is_null() {
-        unsafe { *status = 0; }
+        unsafe {
+            *status = 0;
+        }
     }
-    if bi == 0 { return; }
+    if bi == 0 {
+        return;
+    }
 
     let segmenter = word_segmenter();
     let state = unsafe { &mut *(bi as *mut BreakIterState) };
@@ -88,8 +124,12 @@ pub extern "C" fn shim_ubrk_set_text(
         } else {
             unsafe { std::slice::from_raw_parts(text, text_len as usize) }
         };
-        state.positions = segmenter.segment_utf16(slice).collect::<Vec<usize>>()
-            .iter().map(|&p| p as i32).collect();
+        state.positions = segmenter
+            .segment_utf16(slice)
+            .collect::<Vec<usize>>()
+            .iter()
+            .map(|&p| p as i32)
+            .collect();
     } else {
         state.positions.clear();
     }
@@ -107,7 +147,9 @@ pub extern "C" fn shim_ubrk_first(bi: u64) -> i32 {
 
 /// ubrk_next(bi) → int32_t (next break position or UBRK_DONE)
 pub extern "C" fn shim_ubrk_next(bi: u64) -> i32 {
-    if bi == 0 { return UBRK_DONE; }
+    if bi == 0 {
+        return UBRK_DONE;
+    }
 
     let state = unsafe { &mut *(bi as *mut BreakIterState) };
     if state.cursor < state.positions.len() {
@@ -123,7 +165,9 @@ unsafe fn read_u16_until_null<'a>(ptr: *const u16) -> &'a [u16] {
     let mut len = 0;
     while *ptr.add(len) != 0 {
         len += 1;
-        if len > 1_000_000 { break; }
+        if len > 1_000_000 {
+            break;
+        }
     }
     std::slice::from_raw_parts(ptr, len)
 }
@@ -152,7 +196,9 @@ mod tests {
         let mut breaks = vec![];
         loop {
             let pos = shim_ubrk_next(bi);
-            if pos == UBRK_DONE { break; }
+            if pos == UBRK_DONE {
+                break;
+            }
             breaks.push(pos);
         }
         // Word segmenter should find breaks (at least at word boundaries)

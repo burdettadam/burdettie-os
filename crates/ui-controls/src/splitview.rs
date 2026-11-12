@@ -168,11 +168,7 @@ impl SplitView {
         renderer.fill_rect(self.divider_rect(), self.divider_color);
 
         // Border
-        renderer.stroke_rect(
-            self.view.frame,
-            Color::new(0.7, 0.7, 0.7, 1.0),
-            1.0,
-        );
+        renderer.stroke_rect(self.view.frame, Color::new(0.7, 0.7, 0.7, 1.0), 1.0);
     }
 
     fn clamp_position(&self, pos: f64) -> f64 {
@@ -191,7 +187,10 @@ mod tests {
 
     #[test]
     fn split_horizontal_basic() {
-        let sv = SplitView::new(Rect::new(0.0, 0.0, 400.0, 300.0), SplitOrientation::Horizontal);
+        let sv = SplitView::new(
+            Rect::new(0.0, 0.0, 400.0, 300.0),
+            SplitOrientation::Horizontal,
+        );
         assert_eq!(sv.orientation(), SplitOrientation::Horizontal);
         // Default: half
         assert!((sv.divider_position() - 200.0).abs() < 0.01);
@@ -199,13 +198,19 @@ mod tests {
 
     #[test]
     fn split_vertical_basic() {
-        let sv = SplitView::new(Rect::new(0.0, 0.0, 400.0, 300.0), SplitOrientation::Vertical);
+        let sv = SplitView::new(
+            Rect::new(0.0, 0.0, 400.0, 300.0),
+            SplitOrientation::Vertical,
+        );
         assert!((sv.divider_position() - 150.0).abs() < 0.01);
     }
 
     #[test]
     fn split_pane_frames_horizontal() {
-        let mut sv = SplitView::new(Rect::new(0.0, 0.0, 400.0, 300.0), SplitOrientation::Horizontal);
+        let mut sv = SplitView::new(
+            Rect::new(0.0, 0.0, 400.0, 300.0),
+            SplitOrientation::Horizontal,
+        );
         sv.set_divider_position(150.0);
 
         let first = sv.first_pane_frame();
@@ -219,7 +224,10 @@ mod tests {
 
     #[test]
     fn split_pane_frames_vertical() {
-        let mut sv = SplitView::new(Rect::new(0.0, 0.0, 400.0, 300.0), SplitOrientation::Vertical);
+        let mut sv = SplitView::new(
+            Rect::new(0.0, 0.0, 400.0, 300.0),
+            SplitOrientation::Vertical,
+        );
         sv.set_divider_position(100.0);
 
         let first = sv.first_pane_frame();
@@ -232,7 +240,10 @@ mod tests {
 
     #[test]
     fn split_divider_clamp() {
-        let mut sv = SplitView::new(Rect::new(0.0, 0.0, 400.0, 300.0), SplitOrientation::Horizontal);
+        let mut sv = SplitView::new(
+            Rect::new(0.0, 0.0, 400.0, 300.0),
+            SplitOrientation::Horizontal,
+        );
         // Try to push past max
         sv.set_divider_position(999.0);
         assert!(sv.divider_position() <= 400.0 - sv.divider_thickness() - 50.0);
@@ -243,7 +254,10 @@ mod tests {
 
     #[test]
     fn split_hit_test_divider() {
-        let mut sv = SplitView::new(Rect::new(0.0, 0.0, 400.0, 300.0), SplitOrientation::Horizontal);
+        let mut sv = SplitView::new(
+            Rect::new(0.0, 0.0, 400.0, 300.0),
+            SplitOrientation::Horizontal,
+        );
         sv.set_divider_position(200.0);
 
         assert!(sv.hit_test_divider(Point::new(202.0, 150.0)));
@@ -253,7 +267,10 @@ mod tests {
 
     #[test]
     fn split_min_sizes() {
-        let mut sv = SplitView::new(Rect::new(0.0, 0.0, 200.0, 100.0), SplitOrientation::Horizontal);
+        let mut sv = SplitView::new(
+            Rect::new(0.0, 0.0, 200.0, 100.0),
+            SplitOrientation::Horizontal,
+        );
         sv.set_min_sizes(80.0, 80.0);
         // Setting to 50 should clamp to 80
         sv.set_divider_position(50.0);
@@ -262,7 +279,10 @@ mod tests {
 
     #[test]
     fn split_draw_does_not_panic() {
-        let mut sv = SplitView::new(Rect::new(0.0, 0.0, 400.0, 300.0), SplitOrientation::Horizontal);
+        let mut sv = SplitView::new(
+            Rect::new(0.0, 0.0, 400.0, 300.0),
+            SplitOrientation::Horizontal,
+        );
         sv.view_mut().background_color = Color::WHITE;
         let mut surface = graphics_core::Surface::new(400, 300);
         let mut renderer = graphics_core::SoftwareRenderer::new(&mut surface);

@@ -1,0 +1,139 @@
+{
+  "$schema": "./imported-artifacts.schema.json",
+  "schema_version": 1,
+  "workflow": "docker-first",
+  "generated_at": "2026-04-11T12:00:00Z",
+  "source_host": {
+    "capture_kind": "wormhole-transfer",
+    "machine_name": "mac-staging-host",
+    "macos_version": "15.4",
+    "macos_build": "24E214",
+    "xcode_version": "26.4",
+    "xcode_build": "17E192"
+  },
+  "notes": "Example manifest for Docker or Compose-mounted macOS artifact overlays.",
+  "artifacts": [
+    {
+      "id": "xcode-tools-26_4",
+      "kind": "tool-set",
+      "label": "Xcode developer and toolchain binaries",
+      "source": {
+        "host_path": "/Applications/Xcode.app/Contents/Developer",
+        "extracted_at": "2026-04-11T11:40:00Z",
+        "transfer_method": "wormhole",
+        "tooling": "scripts/extract_xcode_tools.sh"
+      },
+      "storage": {
+        "overlay_path": "imports/xcode-tools-26_4",
+        "container_path": "/opt/xcode-tools",
+        "read_only": true
+      },
+      "integrity": {
+        "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "size_bytes": 734003200,
+        "architectures": ["arm64"]
+      },
+      "classification": {
+        "tier": "validation-only",
+        "dependency_class": "mixed",
+        "scoreable_in_docker": false,
+        "reason": "Tool corpus is useful for validation, but it does not itself represent scored app compatibility."
+      },
+      "entries": [
+        {
+          "relative_path": "xcode-dev/xcrun",
+          "role": "xcode-tool",
+          "executable": true
+        },
+        {
+          "relative_path": "xcode-dev/xcodebuild",
+          "role": "xcode-tool",
+          "executable": true
+        },
+        {
+          "relative_path": "xcode-tc/clang",
+          "role": "xcode-tool",
+          "executable": true
+        }
+      ]
+    },
+    {
+      "id": "apple-stickies-app",
+      "kind": "app-bundle",
+      "label": "Apple Stickies.app imported corpus target",
+      "source": {
+        "host_path": "/System/Applications/Stickies.app",
+        "extracted_at": "2026-04-11T11:55:00Z",
+        "transfer_method": "wormhole",
+        "tooling": "manual bundle export"
+      },
+      "storage": {
+        "overlay_path": "imports/apps/Stickies.app",
+        "container_path": "/opt/imported-artifacts/apps/Stickies.app",
+        "read_only": true
+      },
+      "integrity": {
+        "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "size_bytes": 5242880,
+        "architectures": ["arm64"]
+      },
+      "classification": {
+        "tier": "tier-b",
+        "dependency_class": "public-surface",
+        "scoreable_in_docker": true,
+        "reason": "Chosen as the next Docker-scored app target because it is text-heavy and menu-heavy without forcing the broader TextEdit.app document stack."
+      },
+      "entries": [
+        {
+          "relative_path": "Contents/MacOS/Stickies",
+          "role": "main-executable",
+          "executable": true
+        },
+        {
+          "relative_path": "Contents/Info.plist",
+          "role": "resource",
+          "executable": false
+        }
+      ]
+    },
+    {
+      "id": "wezterm-app",
+      "kind": "app-bundle",
+      "label": "WezTerm.app imported open-source terminal target",
+      "source": {
+        "host_path": "/Applications/WezTerm.app",
+        "extracted_at": "2026-04-11T12:05:00Z",
+        "transfer_method": "manual-copy",
+        "tooling": "manual bundle export"
+      },
+      "storage": {
+        "overlay_path": "imports/apps/WezTerm.app",
+        "container_path": "/opt/imported-artifacts/apps/WezTerm.app",
+        "read_only": true
+      },
+      "integrity": {
+        "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "size_bytes": 26214400,
+        "architectures": ["arm64"]
+      },
+      "classification": {
+        "tier": "validation-only",
+        "dependency_class": "mixed",
+        "scoreable_in_docker": false,
+        "reason": "Open-source terminal example for the imported-app lane. Keep it as a launcher-visible validation target until layered rendering and PTY coverage are proven in Docker."
+      },
+      "entries": [
+        {
+          "relative_path": "Contents/MacOS/wezterm-gui",
+          "role": "main-executable",
+          "executable": true
+        },
+        {
+          "relative_path": "Contents/Info.plist",
+          "role": "resource",
+          "executable": false
+        }
+      ]
+    }
+  ]
+}

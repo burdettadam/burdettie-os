@@ -3,8 +3,7 @@
 use std::ffi::CString;
 
 use crate::cfstring::{
-    cfstring_parts, extract_cfstring_cstr, shim_cf_string_create_with_cstring,
-    CF_STRING_FLAGS_UTF8,
+    cfstring_parts, extract_cfstring_cstr, shim_cf_string_create_with_cstring, CF_STRING_FLAGS_UTF8,
 };
 use crate::nscharacterset;
 
@@ -51,10 +50,7 @@ pub extern "C" fn shim_nsstring_string_by_adding_percent_encoding(
 /// `-[NSString stringByRemovingPercentEncoding]`
 ///
 /// Decodes percent-encoded sequences (`%XX`) back to their byte values.
-pub extern "C" fn shim_nsstring_string_by_removing_percent_encoding(
-    obj: u64,
-    _cmd: u64,
-) -> u64 {
+pub extern "C" fn shim_nsstring_string_by_removing_percent_encoding(obj: u64, _cmd: u64) -> u64 {
     if obj == 0 {
         return 0;
     }
@@ -67,10 +63,7 @@ pub extern "C" fn shim_nsstring_string_by_removing_percent_encoding(
     let mut i = 0;
     while i < bytes.len() {
         if bytes[i] == b'%' && i + 2 < bytes.len() {
-            if let (Some(hi), Some(lo)) = (
-                hex_digit(bytes[i + 1]),
-                hex_digit(bytes[i + 2]),
-            ) {
+            if let (Some(hi), Some(lo)) = (hex_digit(bytes[i + 1]), hex_digit(bytes[i + 2])) {
                 decoded.push(hi << 4 | lo);
                 i += 3;
                 continue;
@@ -198,8 +191,13 @@ mod tests {
         let s = make_string("hello world&foo=bar");
         let result = shim_nsstring_string_by_adding_percent_encoding(s, 0, 0);
         assert_ne!(result, 0);
-        let encoded = crate::cfstring::extract_cfstring_cstr(result).unwrap().to_string();
-        assert!(encoded.contains("%20"), "space should be encoded: {encoded}");
+        let encoded = crate::cfstring::extract_cfstring_cstr(result)
+            .unwrap()
+            .to_string();
+        assert!(
+            encoded.contains("%20"),
+            "space should be encoded: {encoded}"
+        );
         assert!(encoded.contains("%26"), "& should be encoded: {encoded}");
         assert!(encoded.contains("%3D"), "= should be encoded: {encoded}");
         free_obj(s);
@@ -262,7 +260,10 @@ mod tests {
 
     #[test]
     fn init_with_bytes_nil_returns_zero() {
-        assert_eq!(shim_nsstring_init_with_bytes_length_encoding(0, 0, 0, 0, 4), 0);
+        assert_eq!(
+            shim_nsstring_init_with_bytes_length_encoding(0, 0, 0, 0, 4),
+            0
+        );
     }
 
     #[test]
@@ -270,7 +271,11 @@ mod tests {
         let obj = alloc_obj(32, crate::nsobj::nsstring_class_addr());
         let data = b"hello bytes";
         let result = shim_nsstring_init_with_bytes_length_encoding(
-            obj, 0, data.as_ptr() as u64, data.len() as u64, 4,
+            obj,
+            0,
+            data.as_ptr() as u64,
+            data.len() as u64,
+            4,
         );
         assert_eq!(result, obj);
         assert_string_eq(result, "hello bytes");
@@ -312,7 +317,10 @@ mod tests {
 
     #[test]
     fn max_length_of_bytes_nil_returns_zero() {
-        assert_eq!(shim_nsstring_maximum_length_of_bytes_using_encoding(0, 0, 4), 0);
+        assert_eq!(
+            shim_nsstring_maximum_length_of_bytes_using_encoding(0, 0, 4),
+            0
+        );
     }
 
     #[test]

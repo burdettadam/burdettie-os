@@ -25,30 +25,46 @@ pub(crate) const ANIMATION_CONTEXT_SIZE: usize = 40;
 const DEFAULT_DURATION: f64 = 0.25;
 
 fn read_u64(obj: u64, offset: usize) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + offset) as *const u64) }
 }
 
 fn write_u64(obj: u64, offset: usize, value: u64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as usize + offset) as *mut u64) = value; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + offset) as *mut u64) = value;
+    }
 }
 
 fn read_f64(obj: u64, offset: usize) -> f64 {
-    if obj == 0 { return 0.0; }
+    if obj == 0 {
+        return 0.0;
+    }
     unsafe { *((obj as usize + offset) as *const f64) }
 }
 
 fn write_f64(obj: u64, offset: usize, value: f64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as usize + offset) as *mut f64) = value; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + offset) as *mut f64) = value;
+    }
 }
 
 /// Allocate a new NSAnimationContext with default values.
 fn alloc_context() -> u64 {
     let obj = crate::pal_alloc().calloc(1, ANIMATION_CONTEXT_SIZE) as u64;
-    if obj == 0 { return 0; }
-    unsafe { *(obj as *mut u64) = crate::nsobj::nsanimationcontext_class_addr(); }
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *(obj as *mut u64) = crate::nsobj::nsanimationcontext_class_addr();
+    }
     write_f64(obj, DURATION_OFF, DEFAULT_DURATION);
     obj
 }
@@ -68,9 +84,7 @@ fn pop_context() -> u64 {
 }
 
 fn current_context() -> u64 {
-    CONTEXT_STACK.with(|stack| {
-        stack.borrow().last().copied().unwrap_or(0)
-    })
+    CONTEXT_STACK.with(|stack| stack.borrow().last().copied().unwrap_or(0))
 }
 
 // ── Class method shims ──────────────────────────────────────────
@@ -84,7 +98,9 @@ pub extern "C" fn shim_nsanimationcontext_begin_grouping(_cls: u64, _cmd: u64) {
 /// `+[NSAnimationContext endGrouping]`
 pub extern "C" fn shim_nsanimationcontext_end_grouping(_cls: u64, _cmd: u64) {
     let ctx = pop_context();
-    if ctx == 0 { return; }
+    if ctx == 0 {
+        return;
+    }
     // Fire completion handler synchronously (no real animation to wait for)
     let handler = read_u64(ctx, COMPLETION_HANDLER_OFF);
     if handler != 0 {
@@ -98,7 +114,9 @@ pub extern "C" fn shim_nsanimationcontext_end_grouping(_cls: u64, _cmd: u64) {
 /// `+[NSAnimationContext currentContext]`
 pub extern "C" fn shim_nsanimationcontext_current_context(_cls: u64, _cmd: u64) -> u64 {
     let ctx = current_context();
-    if ctx != 0 { return ctx; }
+    if ctx != 0 {
+        return ctx;
+    }
     // If no explicit grouping, return a default context
     let ctx = alloc_context();
     push_context(ctx);
@@ -113,7 +131,10 @@ pub extern "C" fn shim_nsanimationcontext_current_context(_cls: u64, _cmd: u64) 
 /// Since we can't invoke blocks in the shim (no real Blocks ABI), we
 /// create a context, push/pop grouping, and record the handler.
 pub extern "C" fn shim_nsanimationcontext_run_animation_group(
-    _cls: u64, _cmd: u64, _changes: u64, _completion: u64,
+    _cls: u64,
+    _cmd: u64,
+    _changes: u64,
+    _completion: u64,
 ) {
     shim_nsanimationcontext_begin_grouping(0, 0);
     let ctx = current_context();
@@ -151,12 +172,18 @@ pub extern "C" fn shim_nsanimationcontext_completion_handler(obj: u64, _cmd: u64
 }
 
 /// `-[NSAnimationContext setCompletionHandler:]`
-pub extern "C" fn shim_nsanimationcontext_set_completion_handler(obj: u64, _cmd: u64, handler: u64) {
+pub extern "C" fn shim_nsanimationcontext_set_completion_handler(
+    obj: u64,
+    _cmd: u64,
+    handler: u64,
+) {
     write_u64(obj, COMPLETION_HANDLER_OFF, handler);
 }
 
 /// `-[NSAnimationContext timingFunction]` — always nil (not implemented).
-pub extern "C" fn shim_nsanimationcontext_timing_function(_obj: u64, _cmd: u64) -> u64 { 0 }
+pub extern "C" fn shim_nsanimationcontext_timing_function(_obj: u64, _cmd: u64) -> u64 {
+    0
+}
 
 /// `-[NSAnimationContext setTimingFunction:]` — no-op.
 pub extern "C" fn shim_nsanimationcontext_set_timing_function(_obj: u64, _cmd: u64, _tf: u64) {}

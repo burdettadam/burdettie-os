@@ -8,20 +8,57 @@ use std::collections::BTreeMap;
 
 /// Check if the memory page containing `addr` is mapped in the process.
 /// Uses `mincore()` on macOS/Linux — it returns ENOMEM for unmapped pages.
+#[cfg(unix)]
 fn is_page_mapped(addr: u64) -> bool {
     let page_size = 0x4000u64; // 16 KB on arm64 macOS (safe default)
     let page_start = addr & !(page_size - 1);
     let mut vec: u8 = 0;
     // SAFETY: mincore checks page residency; it won't fault even on
     // unmapped addresses — it returns -1 with errno=ENOMEM instead.
+    #[cfg(target_os = "linux")]
     let ret = unsafe {
         libc::mincore(
             page_start as *mut libc::c_void,
             page_size as usize,
-            &mut vec as *mut u8 as *mut libc::c_char,
+            (&mut vec as *mut u8).cast::<libc::c_uchar>(),
+        )
+    };
+    #[cfg(not(target_os = "linux"))]
+    let ret = unsafe {
+        libc::mincore(
+            page_start as *mut libc::c_void,
+            page_size as usize,
+            (&mut vec as *mut u8).cast::<libc::c_char>(),
         )
     };
     ret == 0
+}
+
+#[cfg(windows)]
+fn is_page_mapped(addr: u64) -> bool {
+    use windows_sys::Win32::System::Memory::{
+        VirtualQuery, MEMORY_BASIC_INFORMATION, MEM_COMMIT, PAGE_GUARD, PAGE_NOACCESS,
+    };
+
+    let mut info = std::mem::MaybeUninit::<MEMORY_BASIC_INFORMATION>::uninit();
+    let queried = unsafe {
+        VirtualQuery(
+            addr as *const std::ffi::c_void,
+            info.as_mut_ptr(),
+            std::mem::size_of::<MEMORY_BASIC_INFORMATION>(),
+        )
+    };
+    if queried == 0 {
+        return false;
+    }
+
+    let info = unsafe { info.assume_init() };
+    info.State == MEM_COMMIT && (info.Protect & (PAGE_NOACCESS | PAGE_GUARD)) == 0
+}
+
+#[cfg(not(any(unix, windows)))]
+fn is_page_mapped(_addr: u64) -> bool {
+    false
 }
 
 /// A memory region accessible to the interpreter.
@@ -41,7 +78,7 @@ struct Region {
 /// Memory model: maps guest (ARM64 virtual) addresses to host memory.
 ///
 /// Backed by the MappedImage segments plus an interpreter-owned stack.
-/// The stack is `mmap`'d at a real virtual address so that guest and host
+/// The stack is allocated at a real virtual address so that guest and host
 /// pointers are identical — no address translation is needed at FFI boundaries.
 /// When `host_passthrough` is enabled, reads/writes to addresses outside
 /// mapped regions are forwarded directly to host memory. This is correct
@@ -50,12 +87,10 @@ struct Region {
 pub struct Memory {
     /// Regions sorted by guest_start for binary search.
     regions: BTreeMap<u64, Region>,
-    /// mmap'd stack allocation (host pointer == guest address).
-    stack_ptr: *mut u8,
-    /// Size of the mmap'd stack.
-    stack_size: usize,
     /// Top of the stack (highest address).
     stack_top: u64,
+    /// Owned stack storage. `u128` keeps the base at least 16-byte aligned.
+    _stack_storage: Box<[u128]>,
     /// When true, unmapped addresses are treated as direct host pointers.
     pub host_passthrough: bool,
 }
@@ -63,16 +98,6 @@ pub struct Memory {
 // SAFETY: Memory owns its stack and holds raw pointers into MappedImage
 // segments that outlive it (the caller ensures this).
 unsafe impl Send for Memory {}
-
-impl Drop for Memory {
-    fn drop(&mut self) {
-        if !self.stack_ptr.is_null() {
-            unsafe {
-                libc::munmap(self.stack_ptr as *mut libc::c_void, self.stack_size);
-            }
-        }
-    }
-}
 
 /// Default interpreter stack size: 1 MB.
 const DEFAULT_STACK_SIZE: usize = 1024 * 1024;
@@ -98,37 +123,28 @@ impl Memory {
             );
         }
 
-        // mmap the interpreter stack at a real virtual address.
+        // Allocate the interpreter stack at a real host virtual address.
         // guest_start == base as u64, so guest pointers ARE host pointers.
-        let stack_ptr = libc::mmap(
-            std::ptr::null_mut(),
-            DEFAULT_STACK_SIZE,
-            libc::PROT_READ | libc::PROT_WRITE,
-            libc::MAP_PRIVATE | libc::MAP_ANON,
-            -1,
-            0,
-        ) as *mut u8;
-        assert!(
-            stack_ptr != libc::MAP_FAILED as *mut u8,
-            "mmap failed for interpreter stack"
-        );
+        let stack_words = DEFAULT_STACK_SIZE / std::mem::size_of::<u128>();
+        let mut stack_storage = vec![0_u128; stack_words].into_boxed_slice();
+        let stack_ptr = stack_storage.as_mut_ptr().cast::<u8>();
+        let stack_size = stack_storage.len() * std::mem::size_of::<u128>();
         let stack_guest_start = stack_ptr as u64;
-        let stack_top = stack_guest_start + DEFAULT_STACK_SIZE as u64;
+        let stack_top = stack_guest_start + stack_size as u64;
         regions.insert(
             stack_guest_start,
             Region {
                 base: stack_ptr,
                 guest_start: stack_guest_start,
-                size: DEFAULT_STACK_SIZE,
+                size: stack_size,
                 writable: true,
             },
         );
 
         Self {
             regions,
-            stack_ptr,
-            stack_size: DEFAULT_STACK_SIZE,
             stack_top,
+            _stack_storage: stack_storage,
             host_passthrough: false,
         }
     }
@@ -196,9 +212,7 @@ impl Memory {
     /// Read a u16 (little-endian) from guest memory.
     pub fn read_u16(&self, addr: u64) -> Option<u16> {
         let ptr = self.translate(addr, 2)?;
-        Some(u16::from_le_bytes(unsafe {
-            *(ptr as *const [u8; 2])
-        }))
+        Some(u16::from_le_bytes(unsafe { *(ptr as *const [u8; 2]) }))
     }
 
     /// Read a u32 from mapped regions only (no host passthrough).
@@ -206,33 +220,25 @@ impl Memory {
     /// bytes from host memory.
     pub fn read_u32_mapped(&self, addr: u64) -> Option<u32> {
         let ptr = self.translate_strict(addr, 4)?;
-        Some(u32::from_le_bytes(unsafe {
-            *(ptr as *const [u8; 4])
-        }))
+        Some(u32::from_le_bytes(unsafe { *(ptr as *const [u8; 4]) }))
     }
 
     /// Read a u32 (little-endian) from guest memory.
     pub fn read_u32(&self, addr: u64) -> Option<u32> {
         let ptr = self.translate(addr, 4)?;
-        Some(u32::from_le_bytes(unsafe {
-            *(ptr as *const [u8; 4])
-        }))
+        Some(u32::from_le_bytes(unsafe { *(ptr as *const [u8; 4]) }))
     }
 
     /// Read a u64 (little-endian) from guest memory.
     pub fn read_u64(&self, addr: u64) -> Option<u64> {
         let ptr = self.translate(addr, 8)?;
-        Some(u64::from_le_bytes(unsafe {
-            *(ptr as *const [u8; 8])
-        }))
+        Some(u64::from_le_bytes(unsafe { *(ptr as *const [u8; 8]) }))
     }
 
     /// Read a u128 (little-endian) from guest memory (for Q register loads).
     pub fn read_u128(&self, addr: u64) -> Option<u128> {
         let ptr = self.translate(addr, 16)?;
-        Some(u128::from_le_bytes(unsafe {
-            *(ptr as *const [u8; 16])
-        }))
+        Some(u128::from_le_bytes(unsafe { *(ptr as *const [u8; 16]) }))
     }
 
     /// Write a u8 to guest memory.

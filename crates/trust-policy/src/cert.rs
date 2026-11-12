@@ -338,10 +338,7 @@ fn find_oid_values(data: &[u8], target_oid: &[u8]) -> Vec<String> {
 /// and chain-to-root checking via fingerprints, but does NOT verify the
 /// actual cryptographic signature (RSA/ECDSA). With `crypto`, it does
 /// full signature verification.
-pub fn verify_cms_signature(
-    cms_der: &[u8],
-    _cd_data: &[u8],
-) -> CmsVerificationResult {
+pub fn verify_cms_signature(cms_der: &[u8], _cd_data: &[u8]) -> CmsVerificationResult {
     // Extract certificates from the CMS blob
     let cert_ders = extract_certificates_from_cms(cms_der);
     if cert_ders.is_empty() {

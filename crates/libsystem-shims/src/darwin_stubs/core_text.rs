@@ -34,8 +34,8 @@ fn new_handle() -> u64 {
 #[repr(C)]
 pub struct FontMetricsResult {
     pub ascent: f64,
-    pub descent: f64,   // negative
-    pub leading: f64,   // line_gap
+    pub descent: f64, // negative
+    pub leading: f64, // line_gap
     pub x_height: f64,
     pub cap_height: f64,
     pub advance_width: f64, // average char advance
@@ -52,7 +52,9 @@ pub fn set_ct_font_metrics_callback(f: FontMetricsFn) {
 
 fn get_real_metrics(name: &str, size: f64) -> Option<FontMetricsResult> {
     let cb = CT_FONT_METRICS_CB.load(Ordering::Relaxed);
-    if cb == 0 { return None; }
+    if cb == 0 {
+        return None;
+    }
     let f: FontMetricsFn = unsafe { std::mem::transmute(cb) };
     Some(f(name.as_ptr(), name.len(), size))
 }
@@ -82,9 +84,17 @@ pub fn set_ct_text_measure_callback(f: TextMeasureFn) {
 
 fn measure_text_real(text: &str, font_name: &str, size: f64) -> Option<f64> {
     let cb = CT_TEXT_MEASURE_CB.load(Ordering::Relaxed);
-    if cb == 0 { return None; }
+    if cb == 0 {
+        return None;
+    }
     let f: TextMeasureFn = unsafe { std::mem::transmute(cb) };
-    Some(f(text.as_ptr(), text.len(), font_name.as_ptr(), font_name.len(), size))
+    Some(f(
+        text.as_ptr(),
+        text.len(),
+        font_name.as_ptr(),
+        font_name.len(),
+        size,
+    ))
 }
 
 /// Char advance callback: `fn(ch: u32, font_name_ptr, font_name_len, size) -> f64`.
@@ -98,7 +108,9 @@ pub fn set_ct_char_advance_callback(f: CharAdvanceFn) {
 
 fn char_advance_real(ch: u32, font_name: &str, size: f64) -> Option<f64> {
     let cb = CT_CHAR_ADVANCE_CB.load(Ordering::Relaxed);
-    if cb == 0 { return None; }
+    if cb == 0 {
+        return None;
+    }
     let f: CharAdvanceFn = unsafe { std::mem::transmute(cb) };
     Some(f(ch, font_name.as_ptr(), font_name.len(), size))
 }
@@ -111,7 +123,7 @@ struct CtFont {
     name: String,
     size: f64,
     ascent: f64,
-    descent: f64,    // positive value (magnitude)
+    descent: f64, // positive value (magnitude)
     leading: f64,
     x_height: f64,
     cap_height: f64,
@@ -171,98 +183,351 @@ pub struct CoreTextStubs;
 impl CoreTextStubs {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
-        register_shims!(table,
+        register_shims!(
+            table,
             // -- CTFontManager --
-            ("_CTFontManagerCopyAvailableFontFamilyNames", shim_ct_font_manager_copy_family_names as *const () as u64, "CTFontManagerCopyAvailableFontFamilyNames (real → CFArray)"),
-            ("_CTFontManagerCopyAvailablePostScriptNames", shim_ct_font_manager_copy_family_names as *const () as u64, "CTFontManagerCopyAvailablePostScriptNames (real → CFArray)"),
-
+            (
+                "_CTFontManagerCopyAvailableFontFamilyNames",
+                shim_ct_font_manager_copy_family_names as *const () as u64,
+                "CTFontManagerCopyAvailableFontFamilyNames (real → CFArray)"
+            ),
+            (
+                "_CTFontManagerCopyAvailablePostScriptNames",
+                shim_ct_font_manager_copy_family_names as *const () as u64,
+                "CTFontManagerCopyAvailablePostScriptNames (real → CFArray)"
+            ),
             // -- CTFont creation --
-            ("_CTFontCreateWithName", shim_ct_font_create_with_name as *const () as u64, "CTFontCreateWithName (handle-based)"),
-            ("_CTFontCopyFullName", shim_ct_font_copy_full_name as *const () as u64, "CTFontCopyFullName (stub → NULL)"),
-            ("_CTFontGetGlyphCount", shim_ct_zero_stub as *const () as u64, "CTFontGetGlyphCount (stub → 0)"),
-
+            (
+                "_CTFontCreateWithName",
+                shim_ct_font_create_with_name as *const () as u64,
+                "CTFontCreateWithName (handle-based)"
+            ),
+            (
+                "_CTFontCopyFullName",
+                shim_ct_font_copy_full_name as *const () as u64,
+                "CTFontCopyFullName (stub → NULL)"
+            ),
+            (
+                "_CTFontGetGlyphCount",
+                shim_ct_zero_stub as *const () as u64,
+                "CTFontGetGlyphCount (stub → 0)"
+            ),
             // -- CTFont metrics --
-            ("_CTFontGetAscent", shim_ct_font_get_ascent as *const () as u64, "CTFontGetAscent"),
-            ("_CTFontGetDescent", shim_ct_font_get_descent as *const () as u64, "CTFontGetDescent"),
-            ("_CTFontGetLeading", shim_ct_font_get_leading as *const () as u64, "CTFontGetLeading"),
-            ("_CTFontGetXHeight", shim_ct_font_get_x_height as *const () as u64, "CTFontGetXHeight"),
-            ("_CTFontGetCapHeight", shim_ct_font_get_cap_height as *const () as u64, "CTFontGetCapHeight"),
-            ("_CTFontGetUnitsPerEm", shim_ct_font_get_units_per_em as *const () as u64, "CTFontGetUnitsPerEm"),
-            ("_CTFontGetSize", shim_ct_font_get_size as *const () as u64, "CTFontGetSize"),
-            ("_CTFontGetBoundingBox", shim_ct_font_get_bounding_box as *const () as u64, "CTFontGetBoundingBox"),
-
+            (
+                "_CTFontGetAscent",
+                shim_ct_font_get_ascent as *const () as u64,
+                "CTFontGetAscent"
+            ),
+            (
+                "_CTFontGetDescent",
+                shim_ct_font_get_descent as *const () as u64,
+                "CTFontGetDescent"
+            ),
+            (
+                "_CTFontGetLeading",
+                shim_ct_font_get_leading as *const () as u64,
+                "CTFontGetLeading"
+            ),
+            (
+                "_CTFontGetXHeight",
+                shim_ct_font_get_x_height as *const () as u64,
+                "CTFontGetXHeight"
+            ),
+            (
+                "_CTFontGetCapHeight",
+                shim_ct_font_get_cap_height as *const () as u64,
+                "CTFontGetCapHeight"
+            ),
+            (
+                "_CTFontGetUnitsPerEm",
+                shim_ct_font_get_units_per_em as *const () as u64,
+                "CTFontGetUnitsPerEm"
+            ),
+            (
+                "_CTFontGetSize",
+                shim_ct_font_get_size as *const () as u64,
+                "CTFontGetSize"
+            ),
+            (
+                "_CTFontGetBoundingBox",
+                shim_ct_font_get_bounding_box as *const () as u64,
+                "CTFontGetBoundingBox"
+            ),
             // -- CTFontDescriptor --
-            ("_CTFontDescriptorCreateWithAttributes", shim_ct_descriptor_create as *const () as u64, "CTFontDescriptorCreateWithAttributes"),
-            ("_CTFontDescriptorCreateMatchingFontDescriptor", shim_ct_descriptor_match as *const () as u64, "CTFontDescriptorCreateMatchingFontDescriptor"),
-            ("_CTFontDescriptorCopyAttribute", shim_ct_descriptor_copy_attr as *const () as u64, "CTFontDescriptorCopyAttribute"),
-
+            (
+                "_CTFontDescriptorCreateWithAttributes",
+                shim_ct_descriptor_create as *const () as u64,
+                "CTFontDescriptorCreateWithAttributes"
+            ),
+            (
+                "_CTFontDescriptorCreateMatchingFontDescriptor",
+                shim_ct_descriptor_match as *const () as u64,
+                "CTFontDescriptorCreateMatchingFontDescriptor"
+            ),
+            (
+                "_CTFontDescriptorCopyAttribute",
+                shim_ct_descriptor_copy_attr as *const () as u64,
+                "CTFontDescriptorCopyAttribute"
+            ),
             // -- CTParagraphStyle --
-            ("_CTParagraphStyleCreate", shim_ct_paragraph_style_create as *const () as u64, "CTParagraphStyleCreate"),
-            ("_CTParagraphStyleGetValueForSpecifier", shim_ct_paragraph_style_get_value as *const () as u64, "CTParagraphStyleGetValueForSpecifier"),
-
+            (
+                "_CTParagraphStyleCreate",
+                shim_ct_paragraph_style_create as *const () as u64,
+                "CTParagraphStyleCreate"
+            ),
+            (
+                "_CTParagraphStyleGetValueForSpecifier",
+                shim_ct_paragraph_style_get_value as *const () as u64,
+                "CTParagraphStyleGetValueForSpecifier"
+            ),
             // -- CTLine --
-            ("_CTLineCreateWithAttributedString", shim_ct_line_create as *const () as u64, "CTLineCreateWithAttributedString (handle-based)"),
-
+            (
+                "_CTLineCreateWithAttributedString",
+                shim_ct_line_create as *const () as u64,
+                "CTLineCreateWithAttributedString (handle-based)"
+            ),
             // -- CTRun --
-            ("_CTRunGetGlyphCount", shim_ct_run_get_glyph_count as *const () as u64, "CTRunGetGlyphCount (real → character count)"),
-            ("_CTRunGetPositions", shim_ct_run_get_positions as *const () as u64, "CTRunGetPositions (real → cursor positions)"),
-            ("_CTRunGetGlyphs", shim_ct_run_get_glyphs as *const () as u64, "CTRunGetGlyphs (real → glyph indices)"),
-            ("_CTRunGetStringRange", shim_ct_run_get_string_range as *const () as u64, "CTRunGetStringRange (real → {location, length})"),
-            ("_CTRunGetAdvances", shim_ct_run_get_advances as *const () as u64, "CTRunGetAdvances (real → per-glyph advances)"),
-            ("_CTRunGetAttributes", shim_ct_run_get_attributes as *const () as u64, "CTRunGetAttributes (real → attribute dict)"),
-            ("_CTRunGetStringIndices", shim_ct_run_get_glyphs as *const () as u64, "CTRunGetStringIndices (no-op)"),
-            ("_CTRunGetStatus", shim_ct_zero_stub as *const () as u64, "CTRunGetStatus (stub → 0)"),
-            ("_CTRunGetTypographicBounds", shim_ct_run_get_typo_bounds as *const () as u64, "CTRunGetTypographicBounds (real → width/ascent/descent/leading)"),
-
+            (
+                "_CTRunGetGlyphCount",
+                shim_ct_run_get_glyph_count as *const () as u64,
+                "CTRunGetGlyphCount (real → character count)"
+            ),
+            (
+                "_CTRunGetPositions",
+                shim_ct_run_get_positions as *const () as u64,
+                "CTRunGetPositions (real → cursor positions)"
+            ),
+            (
+                "_CTRunGetGlyphs",
+                shim_ct_run_get_glyphs as *const () as u64,
+                "CTRunGetGlyphs (real → glyph indices)"
+            ),
+            (
+                "_CTRunGetStringRange",
+                shim_ct_run_get_string_range as *const () as u64,
+                "CTRunGetStringRange (real → {location, length})"
+            ),
+            (
+                "_CTRunGetAdvances",
+                shim_ct_run_get_advances as *const () as u64,
+                "CTRunGetAdvances (real → per-glyph advances)"
+            ),
+            (
+                "_CTRunGetAttributes",
+                shim_ct_run_get_attributes as *const () as u64,
+                "CTRunGetAttributes (real → attribute dict)"
+            ),
+            (
+                "_CTRunGetStringIndices",
+                shim_ct_run_get_glyphs as *const () as u64,
+                "CTRunGetStringIndices (no-op)"
+            ),
+            (
+                "_CTRunGetStatus",
+                shim_ct_zero_stub as *const () as u64,
+                "CTRunGetStatus (stub → 0)"
+            ),
+            (
+                "_CTRunGetTypographicBounds",
+                shim_ct_run_get_typo_bounds as *const () as u64,
+                "CTRunGetTypographicBounds (real → width/ascent/descent/leading)"
+            ),
             // -- CTLine extended --
-            ("_CTLineDraw", shim_ct_line_draw as *const () as u64, "CTLineDraw (no-op)"),
-            ("_CTLineGetGlyphRuns", shim_ct_line_get_glyph_runs as *const () as u64, "CTLineGetGlyphRuns (real → CFArray of CTRun)"),
-            ("_CTLineGetGlyphCount", shim_ct_line_get_glyph_count as *const () as u64, "CTLineGetGlyphCount (real → text len)"),
-            ("_CTLineGetStringRange", shim_ct_line_get_string_range as *const () as u64, "CTLineGetStringRange (sret → {0,0})"),
-            ("_CTLineGetTypographicBounds", shim_ct_line_get_typo_bounds as *const () as u64, "CTLineGetTypographicBounds (stub)"),
-            ("_CTLineGetBoundsWithOptions", shim_ct_line_get_bounds as *const () as u64, "CTLineGetBoundsWithOptions (sret → zero)"),
-            ("_CTLineGetOffsetForStringIndex", shim_ct_line_get_offset as *const () as u64, "CTLineGetOffsetForStringIndex (stub → 0.0)"),
-            ("_CTLineGetStringIndexForPosition", shim_ct_zero_stub as *const () as u64, "CTLineGetStringIndexForPosition (stub → 0)"),
-            ("_CTLineCreateTruncatedLine", shim_ct_line_create_truncated as *const () as u64, "CTLineCreateTruncatedLine (stub → same)"),
-            ("_CTLineCreateJustifiedLine", shim_ct_line_create_truncated as *const () as u64, "CTLineCreateJustifiedLine (stub → same)"),
-
+            (
+                "_CTLineDraw",
+                shim_ct_line_draw as *const () as u64,
+                "CTLineDraw (no-op)"
+            ),
+            (
+                "_CTLineGetGlyphRuns",
+                shim_ct_line_get_glyph_runs as *const () as u64,
+                "CTLineGetGlyphRuns (real → CFArray of CTRun)"
+            ),
+            (
+                "_CTLineGetGlyphCount",
+                shim_ct_line_get_glyph_count as *const () as u64,
+                "CTLineGetGlyphCount (real → text len)"
+            ),
+            (
+                "_CTLineGetStringRange",
+                shim_ct_line_get_string_range as *const () as u64,
+                "CTLineGetStringRange (sret → {0,0})"
+            ),
+            (
+                "_CTLineGetTypographicBounds",
+                shim_ct_line_get_typo_bounds as *const () as u64,
+                "CTLineGetTypographicBounds (stub)"
+            ),
+            (
+                "_CTLineGetBoundsWithOptions",
+                shim_ct_line_get_bounds as *const () as u64,
+                "CTLineGetBoundsWithOptions (sret → zero)"
+            ),
+            (
+                "_CTLineGetOffsetForStringIndex",
+                shim_ct_line_get_offset as *const () as u64,
+                "CTLineGetOffsetForStringIndex (stub → 0.0)"
+            ),
+            (
+                "_CTLineGetStringIndexForPosition",
+                shim_ct_zero_stub as *const () as u64,
+                "CTLineGetStringIndexForPosition (stub → 0)"
+            ),
+            (
+                "_CTLineCreateTruncatedLine",
+                shim_ct_line_create_truncated as *const () as u64,
+                "CTLineCreateTruncatedLine (stub → same)"
+            ),
+            (
+                "_CTLineCreateJustifiedLine",
+                shim_ct_line_create_truncated as *const () as u64,
+                "CTLineCreateJustifiedLine (stub → same)"
+            ),
             // -- CTFramesetter --
-            ("_CTFramesetterCreateWithAttributedString", shim_ct_framesetter_create as *const () as u64, "CTFramesetterCreateWithAttributedString (handle)"),
-            ("_CTFramesetterCreateFrame", shim_ct_framesetter_create_frame as *const () as u64, "CTFramesetterCreateFrame (handle)"),
-            ("_CTFramesetterSuggestFrameSizeWithConstraints", shim_ct_framesetter_suggest_size as *const () as u64, "CTFramesetterSuggestFrameSizeWithConstraints (sret)"),
-
+            (
+                "_CTFramesetterCreateWithAttributedString",
+                shim_ct_framesetter_create as *const () as u64,
+                "CTFramesetterCreateWithAttributedString (handle)"
+            ),
+            (
+                "_CTFramesetterCreateFrame",
+                shim_ct_framesetter_create_frame as *const () as u64,
+                "CTFramesetterCreateFrame (handle)"
+            ),
+            (
+                "_CTFramesetterSuggestFrameSizeWithConstraints",
+                shim_ct_framesetter_suggest_size as *const () as u64,
+                "CTFramesetterSuggestFrameSizeWithConstraints (sret)"
+            ),
             // -- CTFrame --
-            ("_CTFrameDraw", shim_ct_frame_draw as *const () as u64, "CTFrameDraw (no-op)"),
-            ("_CTFrameGetLines", shim_ct_frame_get_lines as *const () as u64, "CTFrameGetLines (real → CFArray of CTLine)"),
-            ("_CTFrameGetLineOrigins", shim_ct_frame_get_line_origins as *const () as u64, "CTFrameGetLineOrigins (no-op)"),
-            ("_CTFrameGetPath", shim_ct_null_stub as *const () as u64, "CTFrameGetPath (stub → NULL)"),
-            ("_CTFrameGetVisibleStringRange", shim_ct_frame_get_visible_range as *const () as u64, "CTFrameGetVisibleStringRange (sret → {0,0})"),
-
+            (
+                "_CTFrameDraw",
+                shim_ct_frame_draw as *const () as u64,
+                "CTFrameDraw (no-op)"
+            ),
+            (
+                "_CTFrameGetLines",
+                shim_ct_frame_get_lines as *const () as u64,
+                "CTFrameGetLines (real → CFArray of CTLine)"
+            ),
+            (
+                "_CTFrameGetLineOrigins",
+                shim_ct_frame_get_line_origins as *const () as u64,
+                "CTFrameGetLineOrigins (no-op)"
+            ),
+            (
+                "_CTFrameGetPath",
+                shim_ct_null_stub as *const () as u64,
+                "CTFrameGetPath (stub → NULL)"
+            ),
+            (
+                "_CTFrameGetVisibleStringRange",
+                shim_ct_frame_get_visible_range as *const () as u64,
+                "CTFrameGetVisibleStringRange (sret → {0,0})"
+            ),
             // -- CTFont extended --
-            ("_CTFontCreateWithFontDescriptor", shim_ct_font_create_with_descriptor as *const () as u64, "CTFontCreateWithFontDescriptor (handle)"),
-            ("_CTFontCreateCopyWithAttributes", shim_ct_font_create_copy as *const () as u64, "CTFontCreateCopyWithAttributes (handle)"),
-            ("_CTFontCreateCopyWithSymbolicTraits", shim_ct_font_create_copy_traits as *const () as u64, "CTFontCreateCopyWithSymbolicTraits (handle)"),
-            ("_CTFontCopyFamilyName", shim_ct_font_copy_family_name as *const () as u64, "CTFontCopyFamilyName (real → CFString)"),
-            ("_CTFontCopyPostScriptName", shim_ct_font_copy_postscript_name as *const () as u64, "CTFontCopyPostScriptName (real → CFString)"),
-            ("_CTFontCopyDisplayName", shim_ct_font_copy_display_name as *const () as u64, "CTFontCopyDisplayName (real → CFString)"),
-            ("_CTFontGetGlyphsForCharacters", shim_ct_font_get_glyphs_for_chars as *const () as u64, "CTFontGetGlyphsForCharacters (stub → identity map)"),
-            ("_CTFontGetAdvancesForGlyphs", shim_ct_font_get_advances as *const () as u64, "CTFontGetAdvancesForGlyphs (stub → size*0.6)"),
-            ("_CTFontGetSymbolicTraits", shim_ct_zero_stub as *const () as u64, "CTFontGetSymbolicTraits (stub → 0)"),
-            ("_CTFontCopyCharacterSet", shim_ct_null_stub as *const () as u64, "CTFontCopyCharacterSet (stub → NULL)"),
-            ("_CTFontCopyTraits", shim_ct_null_stub as *const () as u64, "CTFontCopyTraits (stub → NULL)"),
-            ("_CTFontGetMatrix", shim_ct_font_get_matrix as *const () as u64, "CTFontGetMatrix (sret → identity)"),
-            ("_CTFontGetUnderlinePosition", shim_ct_font_get_underline_pos as *const () as u64, "CTFontGetUnderlinePosition"),
-            ("_CTFontGetUnderlineThickness", shim_ct_font_get_underline_thickness as *const () as u64, "CTFontGetUnderlineThickness"),
-
+            (
+                "_CTFontCreateWithFontDescriptor",
+                shim_ct_font_create_with_descriptor as *const () as u64,
+                "CTFontCreateWithFontDescriptor (handle)"
+            ),
+            (
+                "_CTFontCreateCopyWithAttributes",
+                shim_ct_font_create_copy as *const () as u64,
+                "CTFontCreateCopyWithAttributes (handle)"
+            ),
+            (
+                "_CTFontCreateCopyWithSymbolicTraits",
+                shim_ct_font_create_copy_traits as *const () as u64,
+                "CTFontCreateCopyWithSymbolicTraits (handle)"
+            ),
+            (
+                "_CTFontCopyFamilyName",
+                shim_ct_font_copy_family_name as *const () as u64,
+                "CTFontCopyFamilyName (real → CFString)"
+            ),
+            (
+                "_CTFontCopyPostScriptName",
+                shim_ct_font_copy_postscript_name as *const () as u64,
+                "CTFontCopyPostScriptName (real → CFString)"
+            ),
+            (
+                "_CTFontCopyDisplayName",
+                shim_ct_font_copy_display_name as *const () as u64,
+                "CTFontCopyDisplayName (real → CFString)"
+            ),
+            (
+                "_CTFontGetGlyphsForCharacters",
+                shim_ct_font_get_glyphs_for_chars as *const () as u64,
+                "CTFontGetGlyphsForCharacters (stub → identity map)"
+            ),
+            (
+                "_CTFontGetAdvancesForGlyphs",
+                shim_ct_font_get_advances as *const () as u64,
+                "CTFontGetAdvancesForGlyphs (stub → size*0.6)"
+            ),
+            (
+                "_CTFontGetSymbolicTraits",
+                shim_ct_zero_stub as *const () as u64,
+                "CTFontGetSymbolicTraits (stub → 0)"
+            ),
+            (
+                "_CTFontCopyCharacterSet",
+                shim_ct_null_stub as *const () as u64,
+                "CTFontCopyCharacterSet (stub → NULL)"
+            ),
+            (
+                "_CTFontCopyTraits",
+                shim_ct_null_stub as *const () as u64,
+                "CTFontCopyTraits (stub → NULL)"
+            ),
+            (
+                "_CTFontGetMatrix",
+                shim_ct_font_get_matrix as *const () as u64,
+                "CTFontGetMatrix (sret → identity)"
+            ),
+            (
+                "_CTFontGetUnderlinePosition",
+                shim_ct_font_get_underline_pos as *const () as u64,
+                "CTFontGetUnderlinePosition"
+            ),
+            (
+                "_CTFontGetUnderlineThickness",
+                shim_ct_font_get_underline_thickness as *const () as u64,
+                "CTFontGetUnderlineThickness"
+            ),
             // -- CTFontManager extended --
-            ("_CTFontManagerRegisterFontsForURL", shim_ct_bool_true as *const () as u64, "CTFontManagerRegisterFontsForURL (stub → true)"),
-            ("_CTFontManagerRegisterFontsForURLs", shim_ct_bool_true as *const () as u64, "CTFontManagerRegisterFontsForURLs (stub → true)"),
-
+            (
+                "_CTFontManagerRegisterFontsForURL",
+                shim_ct_bool_true as *const () as u64,
+                "CTFontManagerRegisterFontsForURL (stub → true)"
+            ),
+            (
+                "_CTFontManagerRegisterFontsForURLs",
+                shim_ct_bool_true as *const () as u64,
+                "CTFontManagerRegisterFontsForURLs (stub → true)"
+            ),
             // -- CTStringAttributes constants (these are data symbols) --
-            ("_kCTFontAttributeName", &KCTFONT_ATTR_NAME as *const u64 as u64, "kCTFontAttributeName"),
-            ("_kCTForegroundColorAttributeName", &KCTFOREGROUND_COLOR_ATTR as *const u64 as u64, "kCTForegroundColorAttributeName"),
-            ("_kCTParagraphStyleAttributeName", &KCTPARAGRAPH_STYLE_ATTR as *const u64 as u64, "kCTParagraphStyleAttributeName"),
-            ("_kCTForegroundColorFromContextAttributeName", &KCTFG_FROM_CTX_ATTR as *const u64 as u64, "kCTForegroundColorFromContextAttributeName")
+            (
+                "_kCTFontAttributeName",
+                &KCTFONT_ATTR_NAME as *const u64 as u64,
+                "kCTFontAttributeName"
+            ),
+            (
+                "_kCTForegroundColorAttributeName",
+                &KCTFOREGROUND_COLOR_ATTR as *const u64 as u64,
+                "kCTForegroundColorAttributeName"
+            ),
+            (
+                "_kCTParagraphStyleAttributeName",
+                &KCTPARAGRAPH_STYLE_ATTR as *const u64 as u64,
+                "kCTParagraphStyleAttributeName"
+            ),
+            (
+                "_kCTForegroundColorFromContextAttributeName",
+                &KCTFG_FROM_CTX_ATTR as *const u64 as u64,
+                "kCTForegroundColorFromContextAttributeName"
+            )
         );
         log::debug!("CoreTextStubs: registered {} shims", 21 + 41);
     }
@@ -272,8 +537,12 @@ impl CoreTextStubs {
 // Generic null / zero stubs (kept for manager + glyph-count)
 // ---------------------------------------------------------------------------
 
-pub extern "C" fn shim_ct_null_stub(_arg0: u64, _arg1: u64, _arg2: u64) -> u64 { 0 }
-pub extern "C" fn shim_ct_zero_stub(_arg0: u64) -> u64 { 0 }
+pub extern "C" fn shim_ct_null_stub(_arg0: u64, _arg1: u64, _arg2: u64) -> u64 {
+    0
+}
+pub extern "C" fn shim_ct_zero_stub(_arg0: u64) -> u64 {
+    0
+}
 
 /// CTFontManagerCopyAvailableFontFamilyNames() → CFArrayRef.
 ///
@@ -290,19 +559,31 @@ pub extern "C" fn shim_ct_font_manager_copy_family_names() -> u64 {
             let mut ptrs = vec![std::ptr::null_mut::<u8>(); count];
             let actual = cb(ptrs.as_mut_ptr(), count);
             let array = unsafe { libc::calloc(1, 24) as u64 };
-            if array == 0 { return 0; }
+            if array == 0 {
+                return 0;
+            }
             let items = unsafe { libc::calloc(actual, 8) as *mut u64 };
-            if items.is_null() { return array; }
+            if items.is_null() {
+                return array;
+            }
             for (i, p) in ptrs.iter().take(actual).enumerate() {
                 let str_obj = if p.is_null() {
                     0
                 } else {
                     let c_str = *p as *const std::ffi::c_char;
-                    let obj = alloc_cfstring(unsafe { std::ffi::CStr::from_ptr(c_str) }.to_str().unwrap_or(""));
-                    unsafe { libc::free(*p as *mut std::ffi::c_void); }
+                    let obj = alloc_cfstring(
+                        unsafe { std::ffi::CStr::from_ptr(c_str) }
+                            .to_str()
+                            .unwrap_or(""),
+                    );
+                    unsafe {
+                        libc::free(*p as *mut std::ffi::c_void);
+                    }
                     obj
                 };
-                unsafe { items.add(i).write(str_obj); }
+                unsafe {
+                    items.add(i).write(str_obj);
+                }
             }
             unsafe {
                 *((array as usize + 8) as *mut u64) = actual as u64;
@@ -314,20 +595,34 @@ pub extern "C" fn shim_ct_font_manager_copy_family_names() -> u64 {
 
     // Fallback: hardcoded embedded font names.
     static FAMILY_NAMES: &[&str] = &[
-        "System", "System-Bold", "Monospace", "System-Italic", "System-BoldItalic",
-        "DejaVu Sans", "DejaVu Sans Mono", "Helvetica", "Courier", "Times",
+        "System",
+        "System-Bold",
+        "Monospace",
+        "System-Italic",
+        "System-BoldItalic",
+        "DejaVu Sans",
+        "DejaVu Sans Mono",
+        "Helvetica",
+        "Courier",
+        "Times",
     ];
 
     let count = FAMILY_NAMES.len();
     let array = unsafe { libc::calloc(1, 24) as u64 };
-    if array == 0 { return 0; }
+    if array == 0 {
+        return 0;
+    }
 
     let items = unsafe { libc::calloc(count, 8) as *mut u64 };
-    if items.is_null() { return array; }
+    if items.is_null() {
+        return array;
+    }
 
     for (i, name) in FAMILY_NAMES.iter().enumerate() {
         let str_obj = alloc_cfstring(name);
-        unsafe { items.add(i).write(str_obj); }
+        unsafe {
+            items.add(i).write(str_obj);
+        }
     }
     unsafe {
         *((array as usize + 8) as *mut u64) = count as u64;
@@ -345,7 +640,11 @@ pub extern "C" fn shim_ct_font_manager_copy_family_names() -> u64 {
 /// `name` is treated as a C-string pointer.  If NULL we default to "Helvetica".
 /// `size` arrives as a raw f64 in a float register — the caller passes it via
 /// the second integer-register slot so we receive the bit pattern in `size_bits`.
-pub extern "C" fn shim_ct_font_create_with_name(name_ptr: u64, size_bits: u64, _matrix: u64) -> u64 {
+pub extern "C" fn shim_ct_font_create_with_name(
+    name_ptr: u64,
+    size_bits: u64,
+    _matrix: u64,
+) -> u64 {
     let name = if name_ptr == 0 {
         "Helvetica".to_string()
     } else {
@@ -451,14 +750,18 @@ pub extern "C" fn shim_ct_font_get_bounding_box(font: u64, rect_out: u64) -> u64
     if rect_out == 0 {
         return 0;
     }
-    let (x, y, w, h) = lookup_font(font, |f| {
-        (
-            0.0_f64,
-            -f.descent,
-            f.size * 0.6 * f.units_per_em as f64,
-            f.ascent + f.descent,
-        )
-    }, (0.0, 0.0, 0.0, 0.0));
+    let (x, y, w, h) = lookup_font(
+        font,
+        |f| {
+            (
+                0.0_f64,
+                -f.descent,
+                f.size * 0.6 * f.units_per_em as f64,
+                f.ascent + f.descent,
+            )
+        },
+        (0.0, 0.0, 0.0, 0.0),
+    );
 
     let ptr = rect_out as *mut f64;
     unsafe {
@@ -494,7 +797,12 @@ pub extern "C" fn shim_ct_paragraph_style_create(_settings: u64, _count: usize) 
     new_handle()
 }
 
-pub extern "C" fn shim_ct_paragraph_style_get_value(_style: u64, _spec: u32, _value_size: usize, _value_out: u64) -> u8 {
+pub extern "C" fn shim_ct_paragraph_style_get_value(
+    _style: u64,
+    _spec: u32,
+    _value_size: usize,
+    _value_out: u64,
+) -> u8 {
     0 // false — value not available
 }
 
@@ -506,8 +814,8 @@ struct CtLine {
     text: String,
     font_name: String,
     font_size: f64,
-    run_handles: Vec<u64>,      // CTRun handles for this line
-    runs_cfarray: u64,          // cached CFArray for CTLineGetGlyphRuns
+    run_handles: Vec<u64>, // CTRun handles for this line
+    runs_cfarray: u64,     // cached CFArray for CTLineGetGlyphRuns
 }
 
 static LINE_REGISTRY: Mutex<Option<HashMap<u64, CtLine>>> = Mutex::new(None);
@@ -538,7 +846,9 @@ pub extern "C" fn shim_ct_line_create(attr_str: u64) -> u64 {
         if string_ptr != 0 {
             let buf_ptr = unsafe { *((string_ptr as usize + 16) as *const u64) };
             if buf_ptr > 0x1000 {
-                if let Ok(cstr) = unsafe { std::ffi::CStr::from_ptr(buf_ptr as *const std::ffi::c_char) }.to_str() {
+                if let Ok(cstr) =
+                    unsafe { std::ffi::CStr::from_ptr(buf_ptr as *const std::ffi::c_char) }.to_str()
+                {
                     text = cstr.to_string();
                 }
             }
@@ -550,9 +860,8 @@ pub extern "C" fn shim_ct_line_create(attr_str: u64) -> u64 {
             if attrs_ptr > 0x1000 {
                 let dict_ptr = unsafe { *((attrs_ptr as usize + 16) as *const u64) };
                 if dict_ptr > 0x1000 {
-                    let info = with_registry(|map| {
-                        map.values().next().map(|f| (f.name.clone(), f.size))
-                    });
+                    let info =
+                        with_registry(|map| map.values().next().map(|f| (f.name.clone(), f.size)));
                     if let Some((name, size)) = info {
                         font_name = name;
                         font_size = size;
@@ -567,7 +876,9 @@ pub extern "C" fn shim_ct_line_create(attr_str: u64) -> u64 {
     let runs_cfarray;
     if !text.is_empty() {
         let (rh, run) = build_run(&text, &font_name, font_size, 0);
-        with_run_registry(|map| { map.insert(rh, run); });
+        with_run_registry(|map| {
+            map.insert(rh, run);
+        });
         run_handles.push(rh);
         runs_cfarray = make_cfarray_of_handles(&run_handles);
     } else {
@@ -575,7 +886,16 @@ pub extern "C" fn shim_ct_line_create(attr_str: u64) -> u64 {
     }
 
     with_line_registry(|map| {
-        map.insert(handle, CtLine { text, font_name, font_size, run_handles, runs_cfarray });
+        map.insert(
+            handle,
+            CtLine {
+                text,
+                font_name,
+                font_size,
+                run_handles,
+                runs_cfarray,
+            },
+        );
     });
     handle
 }
@@ -584,13 +904,19 @@ pub extern "C" fn shim_ct_line_create(attr_str: u64) -> u64 {
 /// Layout: [isa:8][count:8][items_ptr:8].
 fn make_cfarray_of_handles(handles: &[u64]) -> u64 {
     let array = unsafe { libc::calloc(1, 24) as u64 };
-    if array == 0 { return 0; }
+    if array == 0 {
+        return 0;
+    }
     let count = handles.len();
     let items = if count > 0 {
         let p = unsafe { libc::calloc(count, 8) as *mut u64 };
-        if p.is_null() { return array; }
+        if p.is_null() {
+            return array;
+        }
         for (i, &h) in handles.iter().enumerate() {
-            unsafe { p.add(i).write(h); }
+            unsafe {
+                p.add(i).write(h);
+            }
         }
         p as u64
     } else {
@@ -608,12 +934,12 @@ fn make_cfarray_of_handles(handles: &[u64]) -> u64 {
 // ---------------------------------------------------------------------------
 
 struct CtRun {
-    text: String,            // the substring for this run
+    text: String, // the substring for this run
     font_name: String,
     font_size: f64,
-    location: i64,           // start offset in the parent string
-    glyphs: Vec<u16>,        // one glyph per character (identity-mapped)
-    advances: Vec<f64>,      // per-glyph advance width
+    location: i64,              // start offset in the parent string
+    glyphs: Vec<u16>,           // one glyph per character (identity-mapped)
+    advances: Vec<f64>,         // per-glyph advance width
     positions: Vec<(f64, f64)>, // per-glyph (x, y) positions
     total_width: f64,
     ascent: f64,
@@ -648,8 +974,7 @@ fn build_run(text: &str, font_name: &str, font_size: f64, location: i64) -> (u64
         let glyph = *ch as u16;
         glyphs.push(glyph);
 
-        let adv = char_advance_real(*ch as u32, font_name, font_size)
-            .unwrap_or(font_size * 0.6);
+        let adv = char_advance_real(*ch as u32, font_name, font_size).unwrap_or(font_size * 0.6);
         advances.push(adv);
         positions.push((x_cursor, 0.0));
         x_cursor += adv;
@@ -676,13 +1001,18 @@ fn build_run(text: &str, font_name: &str, font_size: f64, location: i64) -> (u64
 // ---------------------------------------------------------------------------
 
 pub extern "C" fn shim_ct_run_get_glyph_count(run: u64) -> i64 {
-    with_run_registry(|map| {
-        map.get(&run).map(|r| r.glyphs.len() as i64).unwrap_or(0)
-    })
+    with_run_registry(|map| map.get(&run).map(|r| r.glyphs.len() as i64).unwrap_or(0))
 }
 
-pub extern "C" fn shim_ct_run_get_positions(run: u64, range_loc: i64, range_len: i64, positions: u64) {
-    if positions == 0 { return; }
+pub extern "C" fn shim_ct_run_get_positions(
+    run: u64,
+    range_loc: i64,
+    range_len: i64,
+    positions: u64,
+) {
+    if positions == 0 {
+        return;
+    }
     with_run_registry(|map| {
         if let Some(r) = map.get(&run) {
             let (start, count) = resolve_range(range_loc, range_len, r.positions.len());
@@ -699,12 +1029,16 @@ pub extern "C" fn shim_ct_run_get_positions(run: u64, range_loc: i64, range_len:
 }
 
 pub extern "C" fn shim_ct_run_get_glyphs(run: u64, range_loc: i64, range_len: i64, glyphs: u64) {
-    if glyphs == 0 { return; }
+    if glyphs == 0 {
+        return;
+    }
     with_run_registry(|map| {
         if let Some(r) = map.get(&run) {
             let (start, count) = resolve_range(range_loc, range_len, r.glyphs.len());
             for i in 0..count {
-                unsafe { *((glyphs as *mut u16).add(i)) = r.glyphs[start + i]; }
+                unsafe {
+                    *((glyphs as *mut u16).add(i)) = r.glyphs[start + i];
+                }
             }
         }
     });
@@ -712,7 +1046,9 @@ pub extern "C" fn shim_ct_run_get_glyphs(run: u64, range_loc: i64, range_len: i6
 
 /// CTRunGetStringRange(run) → CFRange (sret: {location, length}).
 pub extern "C" fn shim_ct_run_get_string_range(sret: u64, run: u64) {
-    if sret == 0 { return; }
+    if sret == 0 {
+        return;
+    }
     with_run_registry(|map| {
         if let Some(r) = map.get(&run) {
             unsafe {
@@ -728,8 +1064,15 @@ pub extern "C" fn shim_ct_run_get_string_range(sret: u64, run: u64) {
     });
 }
 
-pub extern "C" fn shim_ct_run_get_advances(run: u64, range_loc: i64, range_len: i64, advances: u64) {
-    if advances == 0 { return; }
+pub extern "C" fn shim_ct_run_get_advances(
+    run: u64,
+    range_loc: i64,
+    range_len: i64,
+    advances: u64,
+) {
+    if advances == 0 {
+        return;
+    }
     with_run_registry(|map| {
         if let Some(r) = map.get(&run) {
             let (start, count) = resolve_range(range_loc, range_len, r.advances.len());
@@ -781,20 +1124,50 @@ pub extern "C" fn shim_ct_run_get_attributes(run: u64) -> u64 {
 }
 
 /// CTRunGetTypographicBounds(run, range, ascent_out, descent_out, leading_out) → f64 width.
-pub extern "C" fn shim_ct_run_get_typo_bounds(run: u64, range_loc: i64, range_len: i64,
-    ascent: u64, descent: u64, leading: u64) -> u64 {
+pub extern "C" fn shim_ct_run_get_typo_bounds(
+    run: u64,
+    range_loc: i64,
+    range_len: i64,
+    ascent: u64,
+    descent: u64,
+    leading: u64,
+) -> u64 {
     with_run_registry(|map| {
         if let Some(r) = map.get(&run) {
             let (start, count) = resolve_range(range_loc, range_len, r.advances.len());
             let width: f64 = r.advances[start..start + count].iter().sum();
-            if ascent != 0 { unsafe { *(ascent as *mut f64) = r.ascent; } }
-            if descent != 0 { unsafe { *(descent as *mut f64) = r.descent; } }
-            if leading != 0 { unsafe { *(leading as *mut f64) = r.leading; } }
+            if ascent != 0 {
+                unsafe {
+                    *(ascent as *mut f64) = r.ascent;
+                }
+            }
+            if descent != 0 {
+                unsafe {
+                    *(descent as *mut f64) = r.descent;
+                }
+            }
+            if leading != 0 {
+                unsafe {
+                    *(leading as *mut f64) = r.leading;
+                }
+            }
             width.to_bits()
         } else {
-            if ascent != 0 { unsafe { *(ascent as *mut f64) = 0.0; } }
-            if descent != 0 { unsafe { *(descent as *mut f64) = 0.0; } }
-            if leading != 0 { unsafe { *(leading as *mut f64) = 0.0; } }
+            if ascent != 0 {
+                unsafe {
+                    *(ascent as *mut f64) = 0.0;
+                }
+            }
+            if descent != 0 {
+                unsafe {
+                    *(descent as *mut f64) = 0.0;
+                }
+            }
+            if leading != 0 {
+                unsafe {
+                    *(leading as *mut f64) = 0.0;
+                }
+            }
             0.0_f64.to_bits()
         }
     })
@@ -807,7 +1180,11 @@ fn resolve_range(loc: i64, len: i64, total: usize) -> (usize, usize) {
         (0, total)
     } else {
         let start = loc.max(0) as usize;
-        let count = if len <= 0 { total.saturating_sub(start) } else { len as usize };
+        let count = if len <= 0 {
+            total.saturating_sub(start)
+        } else {
+            len as usize
+        };
         let count = count.min(total.saturating_sub(start));
         (start, count)
     }
@@ -823,7 +1200,8 @@ fn resolve_range(loc: i64, len: i64, total: usize) -> (usize, usize) {
 /// Passes font name to the callback for proper font resolution.
 pub extern "C" fn shim_ct_line_draw(line: u64, context: u64) {
     let line_data = with_line_registry(|map| {
-        map.get(&line).map(|l| (l.text.clone(), l.font_name.clone(), l.font_size))
+        map.get(&line)
+            .map(|l| (l.text.clone(), l.font_name.clone(), l.font_size))
     });
     if let Some((text, font_name, font_size)) = line_data {
         if !text.is_empty() && context != 0 {
@@ -832,7 +1210,14 @@ pub extern "C" fn shim_ct_line_draw(line: u64, context: u64) {
                 // Call: fn(ctx, text_ptr, text_len, font_name_ptr, font_name_len, font_size)
                 let f: extern "C" fn(u64, *const u8, usize, *const u8, usize, f64) =
                     unsafe { std::mem::transmute(cb) };
-                f(context, text.as_ptr(), text.len(), font_name.as_ptr(), font_name.len(), font_size);
+                f(
+                    context,
+                    text.as_ptr(),
+                    text.len(),
+                    font_name.as_ptr(),
+                    font_name.len(),
+                    font_size,
+                );
             }
         }
     }
@@ -851,10 +1236,10 @@ pub fn set_ct_line_draw_callback(f: extern "C" fn(u64, *const u8, usize, *const 
 
 /// CTLineGetStringRange(line) → CFRange (sret).
 pub extern "C" fn shim_ct_line_get_string_range(sret: u64, line: u64) {
-    if sret == 0 { return; }
-    let len = with_line_registry(|map| {
-        map.get(&line).map(|l| l.text.len() as i64).unwrap_or(0)
-    });
+    if sret == 0 {
+        return;
+    }
+    let len = with_line_registry(|map| map.get(&line).map(|l| l.text.len() as i64).unwrap_or(0));
     unsafe {
         *(sret as *mut i64) = 0;
         *((sret as usize + 8) as *mut i64) = len;
@@ -863,49 +1248,80 @@ pub extern "C" fn shim_ct_line_get_string_range(sret: u64, line: u64) {
 
 /// CTLineGetGlyphRuns(line) → CFArrayRef of CTRunRef handles.
 pub extern "C" fn shim_ct_line_get_glyph_runs(line: u64) -> u64 {
-    with_line_registry(|map| {
-        map.get(&line).map(|l| l.runs_cfarray).unwrap_or(0)
-    })
+    with_line_registry(|map| map.get(&line).map(|l| l.runs_cfarray).unwrap_or(0))
 }
 
 /// CTLineGetTypographicBounds(line, ascent_out, descent_out, leading_out) → f64 width.
 ///
 /// Uses real text measurement when the callback is available.
-pub extern "C" fn shim_ct_line_get_typo_bounds(line: u64, ascent: u64, descent: u64, leading: u64) -> u64 {
+pub extern "C" fn shim_ct_line_get_typo_bounds(
+    line: u64,
+    ascent: u64,
+    descent: u64,
+    leading: u64,
+) -> u64 {
     let data = with_line_registry(|map| {
-        map.get(&line).map(|l| (l.text.clone(), l.font_name.clone(), l.font_size))
+        map.get(&line)
+            .map(|l| (l.text.clone(), l.font_name.clone(), l.font_size))
     });
     let (text, font_name, font_size) = data.unwrap_or((String::new(), "System".into(), 12.0));
     let fs = if font_size > 0.0 { font_size } else { 12.0 };
 
     // Get metrics for ascent/descent/leading
     if let Some(m) = get_real_metrics(&font_name, fs) {
-        if ascent != 0 { unsafe { *(ascent as *mut f64) = m.ascent; } }
-        if descent != 0 { unsafe { *(descent as *mut f64) = m.descent.abs(); } }
-        if leading != 0 { unsafe { *(leading as *mut f64) = m.leading; } }
+        if ascent != 0 {
+            unsafe {
+                *(ascent as *mut f64) = m.ascent;
+            }
+        }
+        if descent != 0 {
+            unsafe {
+                *(descent as *mut f64) = m.descent.abs();
+            }
+        }
+        if leading != 0 {
+            unsafe {
+                *(leading as *mut f64) = m.leading;
+            }
+        }
     } else {
-        if ascent != 0 { unsafe { *(ascent as *mut f64) = fs * 0.8; } }
-        if descent != 0 { unsafe { *(descent as *mut f64) = fs * 0.2; } }
-        if leading != 0 { unsafe { *(leading as *mut f64) = fs * 0.1; } }
+        if ascent != 0 {
+            unsafe {
+                *(ascent as *mut f64) = fs * 0.8;
+            }
+        }
+        if descent != 0 {
+            unsafe {
+                *(descent as *mut f64) = fs * 0.2;
+            }
+        }
+        if leading != 0 {
+            unsafe {
+                *(leading as *mut f64) = fs * 0.1;
+            }
+        }
     }
 
     // Measure text width
-    let width = measure_text_real(&text, &font_name, fs)
-        .unwrap_or_else(|| text.len() as f64 * fs * 0.6);
+    let width =
+        measure_text_real(&text, &font_name, fs).unwrap_or_else(|| text.len() as f64 * fs * 0.6);
     width.to_bits()
 }
 
 /// CTLineGetBoundsWithOptions(line, options) → CGRect (sret, 32 bytes via x8).
 pub extern "C" fn shim_ct_line_get_bounds(sret: u64, line: u64, _options: u64) {
-    if sret == 0 { return; }
+    if sret == 0 {
+        return;
+    }
     let data = with_line_registry(|map| {
-        map.get(&line).map(|l| (l.text.clone(), l.font_name.clone(), l.font_size))
+        map.get(&line)
+            .map(|l| (l.text.clone(), l.font_name.clone(), l.font_size))
     });
     let (text, font_name, font_size) = data.unwrap_or((String::new(), "System".into(), 12.0));
     let fs = if font_size > 0.0 { font_size } else { 12.0 };
 
-    let width = measure_text_real(&text, &font_name, fs)
-        .unwrap_or_else(|| text.len() as f64 * fs * 0.6);
+    let width =
+        measure_text_real(&text, &font_name, fs).unwrap_or_else(|| text.len() as f64 * fs * 0.6);
 
     let (asc, desc) = if let Some(m) = get_real_metrics(&font_name, fs) {
         (m.ascent, m.descent.abs())
@@ -915,9 +1331,9 @@ pub extern "C" fn shim_ct_line_get_bounds(sret: u64, line: u64, _options: u64) {
 
     unsafe {
         let p = sret as *mut f64;
-        *p = 0.0;           // x
-        *p.add(1) = -desc;  // y (below baseline)
-        *p.add(2) = width;  // width
+        *p = 0.0; // x
+        *p.add(1) = -desc; // y (below baseline)
+        *p.add(2) = width; // width
         *p.add(3) = asc + desc; // height
     }
 }
@@ -925,9 +1341,12 @@ pub extern "C" fn shim_ct_line_get_bounds(sret: u64, line: u64, _options: u64) {
 /// CTLineGetOffsetForStringIndex(line, index, secondary_offset_out) → f64.
 pub extern "C" fn shim_ct_line_get_offset(line: u64, idx: i64, _secondary: u64) -> u64 {
     // Measure text from start up to idx
-    if idx <= 0 { return 0.0_f64.to_bits(); }
+    if idx <= 0 {
+        return 0.0_f64.to_bits();
+    }
     let data = with_line_registry(|map| {
-        map.get(&line).map(|l| (l.text.clone(), l.font_name.clone(), l.font_size))
+        map.get(&line)
+            .map(|l| (l.text.clone(), l.font_name.clone(), l.font_size))
     });
     if let Some((text, font_name, font_size)) = data {
         let prefix: String = text.chars().take(idx as usize).collect();
@@ -941,13 +1360,24 @@ pub extern "C" fn shim_ct_line_get_offset(line: u64, idx: i64, _secondary: u64) 
 /// CTLineGetGlyphCount(line) → CFIndex.
 pub extern "C" fn shim_ct_line_get_glyph_count(line: u64) -> i64 {
     with_line_registry(|map| {
-        map.get(&line).map(|l| l.text.chars().count() as i64).unwrap_or(0)
+        map.get(&line)
+            .map(|l| l.text.chars().count() as i64)
+            .unwrap_or(0)
     })
 }
 
 /// CTLineCreateTruncatedLine / CTLineCreateJustifiedLine — returns the same line.
-pub extern "C" fn shim_ct_line_create_truncated(line: u64, _width: u64, _type: u32, _token: u64) -> u64 {
-    if line != 0 { line } else { new_handle() }
+pub extern "C" fn shim_ct_line_create_truncated(
+    line: u64,
+    _width: u64,
+    _type: u32,
+    _token: u64,
+) -> u64 {
+    if line != 0 {
+        line
+    } else {
+        new_handle()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -981,21 +1411,28 @@ pub extern "C" fn shim_ct_framesetter_create(attr_str: u64) -> u64 {
         if string_ptr != 0 {
             let buf_ptr = unsafe { *((string_ptr as usize + 16) as *const u64) };
             if buf_ptr > 0x1000 {
-                if let Ok(cstr) = unsafe { std::ffi::CStr::from_ptr(buf_ptr as *const std::ffi::c_char) }.to_str() {
+                if let Ok(cstr) =
+                    unsafe { std::ffi::CStr::from_ptr(buf_ptr as *const std::ffi::c_char) }.to_str()
+                {
                     text = cstr.to_string();
                 }
             }
         }
-        let info = with_registry(|map| {
-            map.values().next().map(|f| (f.name.clone(), f.size))
-        });
+        let info = with_registry(|map| map.values().next().map(|f| (f.name.clone(), f.size)));
         if let Some((name, size)) = info {
             font_name = name;
             font_size = size;
         }
     }
     with_framesetter_registry(|map| {
-        map.insert(handle, CtFramesetter { text, font_name, font_size });
+        map.insert(
+            handle,
+            CtFramesetter {
+                text,
+                font_name,
+                font_size,
+            },
+        );
     });
     handle
 }
@@ -1005,9 +1442,9 @@ pub extern "C" fn shim_ct_framesetter_create(attr_str: u64) -> u64 {
 // ---------------------------------------------------------------------------
 
 struct CtFrame {
-    line_handles: Vec<u64>,     // CTLine handles
+    line_handles: Vec<u64>,        // CTLine handles
     line_origins: Vec<(f64, f64)>, // (x, y) origin for each line
-    lines_cfarray: u64,         // cached CFArray
+    lines_cfarray: u64,            // cached CFArray
     text: String,
     font_name: String,
     font_size: f64,
@@ -1026,11 +1463,16 @@ fn with_frame_registry<R>(f: impl FnOnce(&mut HashMap<u64, CtFrame>) -> R) -> R 
 /// Performs simple line-breaking: splits text on newlines and produces one
 /// CTLine per visual line. Each CTLine has its own CTRun with glyph data.
 pub extern "C" fn shim_ct_framesetter_create_frame(
-    framesetter: u64, _range_loc: i64, _range_len: i64, _path: u64, _attrs: u64
+    framesetter: u64,
+    _range_loc: i64,
+    _range_len: i64,
+    _path: u64,
+    _attrs: u64,
 ) -> u64 {
     let handle = new_handle();
     let data = with_framesetter_registry(|map| {
-        map.get(&framesetter).map(|f| (f.text.clone(), f.font_name.clone(), f.font_size))
+        map.get(&framesetter)
+            .map(|f| (f.text.clone(), f.font_name.clone(), f.font_size))
     });
     let (text, font_name, font_size) = data.unwrap_or((String::new(), "System".into(), 12.0));
 
@@ -1059,7 +1501,9 @@ pub extern "C" fn shim_ct_framesetter_create_frame(
         let runs_cfarray;
         if !line_text.is_empty() {
             let (rh, run) = build_run(line_text, &font_name, font_size, char_offset);
-            with_run_registry(|map| { map.insert(rh, run); });
+            with_run_registry(|map| {
+                map.insert(rh, run);
+            });
             run_handles.push(rh);
             runs_cfarray = make_cfarray_of_handles(&run_handles);
         } else {
@@ -1067,13 +1511,16 @@ pub extern "C" fn shim_ct_framesetter_create_frame(
         }
 
         with_line_registry(|map| {
-            map.insert(line_handle, CtLine {
-                text: line_text.to_string(),
-                font_name: font_name.clone(),
-                font_size,
-                run_handles,
-                runs_cfarray,
-            });
+            map.insert(
+                line_handle,
+                CtLine {
+                    text: line_text.to_string(),
+                    font_name: font_name.clone(),
+                    font_size,
+                    run_handles,
+                    runs_cfarray,
+                },
+            );
         });
 
         line_handles.push(line_handle);
@@ -1087,14 +1534,17 @@ pub extern "C" fn shim_ct_framesetter_create_frame(
     let lines_cfarray = make_cfarray_of_handles(&line_handles);
 
     with_frame_registry(|map| {
-        map.insert(handle, CtFrame {
-            line_handles,
-            line_origins,
-            lines_cfarray,
-            text,
-            font_name,
-            font_size,
-        });
+        map.insert(
+            handle,
+            CtFrame {
+                line_handles,
+                line_origins,
+                lines_cfarray,
+                text,
+                font_name,
+                font_size,
+            },
+        );
     });
     handle
 }
@@ -1103,12 +1553,21 @@ pub extern "C" fn shim_ct_framesetter_create_frame(
 ///
 /// Measures the text and returns a real suggested size based on font metrics.
 pub extern "C" fn shim_ct_framesetter_suggest_size(
-    sret: u64, fs: u64, _range_loc: i64, _range_len: i64, _attrs: u64,
-    _cw: f64, _ch: f64, _fit_range: u64,
+    sret: u64,
+    fs: u64,
+    _range_loc: i64,
+    _range_len: i64,
+    _attrs: u64,
+    _cw: f64,
+    _ch: f64,
+    _fit_range: u64,
 ) {
-    if sret == 0 { return; }
+    if sret == 0 {
+        return;
+    }
     let data = with_framesetter_registry(|map| {
-        map.get(&fs).map(|f| (f.text.clone(), f.font_name.clone(), f.font_size))
+        map.get(&fs)
+            .map(|f| (f.text.clone(), f.font_name.clone(), f.font_size))
     });
     let (text, font_name, font_size) = data.unwrap_or((String::new(), "System".into(), 12.0));
 
@@ -1128,9 +1587,13 @@ pub extern "C" fn shim_ct_framesetter_suggest_size(
 
 /// CTFrameDraw(frame, context) — draws all lines via CTLineDraw.
 pub extern "C" fn shim_ct_frame_draw(frame: u64, context: u64) {
-    if context == 0 { return; }
+    if context == 0 {
+        return;
+    }
     let line_handles = with_frame_registry(|map| {
-        map.get(&frame).map(|f| f.line_handles.clone()).unwrap_or_default()
+        map.get(&frame)
+            .map(|f| f.line_handles.clone())
+            .unwrap_or_default()
     });
     for lh in line_handles {
         shim_ct_line_draw(lh, context);
@@ -1139,15 +1602,18 @@ pub extern "C" fn shim_ct_frame_draw(frame: u64, context: u64) {
 
 /// CTFrameGetLines(frame) → CFArrayRef of CTLineRef handles.
 pub extern "C" fn shim_ct_frame_get_lines(frame: u64) -> u64 {
-    with_frame_registry(|map| {
-        map.get(&frame).map(|f| f.lines_cfarray).unwrap_or(0)
-    })
+    with_frame_registry(|map| map.get(&frame).map(|f| f.lines_cfarray).unwrap_or(0))
 }
 
 pub extern "C" fn shim_ct_frame_get_line_origins(
-    frame: u64, range_loc: i64, range_len: i64, origins: u64
+    frame: u64,
+    range_loc: i64,
+    range_len: i64,
+    origins: u64,
 ) {
-    if origins == 0 { return; }
+    if origins == 0 {
+        return;
+    }
     with_frame_registry(|map| {
         if let Some(f) = map.get(&frame) {
             let (start, count) = resolve_range(range_loc, range_len, f.line_origins.len());
@@ -1165,10 +1631,10 @@ pub extern "C" fn shim_ct_frame_get_line_origins(
 
 /// CTFrameGetVisibleStringRange(frame) → CFRange (sret).
 pub extern "C" fn shim_ct_frame_get_visible_range(sret: u64, frame: u64) {
-    if sret == 0 { return; }
-    let len = with_frame_registry(|map| {
-        map.get(&frame).map(|f| f.text.len() as i64).unwrap_or(0)
-    });
+    if sret == 0 {
+        return;
+    }
+    let len = with_frame_registry(|map| map.get(&frame).map(|f| f.text.len() as i64).unwrap_or(0));
     unsafe {
         *(sret as *mut i64) = 0;
         *((sret as usize + 8) as *mut i64) = len;
@@ -1180,16 +1646,27 @@ pub extern "C" fn shim_ct_frame_get_visible_range(sret: u64, frame: u64) {
 // ---------------------------------------------------------------------------
 
 /// CTFontCreateWithFontDescriptor(descriptor, size, matrix) → CTFont.
-pub extern "C" fn shim_ct_font_create_with_descriptor(_desc: u64, size_bits: u64, _matrix: u64) -> u64 {
+pub extern "C" fn shim_ct_font_create_with_descriptor(
+    _desc: u64,
+    size_bits: u64,
+    _matrix: u64,
+) -> u64 {
     let size = f64::from_bits(size_bits);
     let size = if size <= 0.0 { 12.0 } else { size };
     let handle = new_handle();
-    with_registry(|map| { map.insert(handle, CtFont::new("System".into(), size)); });
+    with_registry(|map| {
+        map.insert(handle, CtFont::new("System".into(), size));
+    });
     handle
 }
 
 /// CTFontCreateCopyWithAttributes(font, size, matrix, attrs) → CTFont.
-pub extern "C" fn shim_ct_font_create_copy(font: u64, size_bits: u64, _matrix: u64, _attrs: u64) -> u64 {
+pub extern "C" fn shim_ct_font_create_copy(
+    font: u64,
+    size_bits: u64,
+    _matrix: u64,
+    _attrs: u64,
+) -> u64 {
     let size = f64::from_bits(size_bits);
     let actual_size = if size <= 0.0 {
         lookup_font(font, |f| f.size, 12.0)
@@ -1197,13 +1674,19 @@ pub extern "C" fn shim_ct_font_create_copy(font: u64, size_bits: u64, _matrix: u
         size
     };
     let handle = new_handle();
-    with_registry(|map| { map.insert(handle, CtFont::new("System".into(), actual_size)); });
+    with_registry(|map| {
+        map.insert(handle, CtFont::new("System".into(), actual_size));
+    });
     handle
 }
 
 /// CTFontCreateCopyWithSymbolicTraits(font, size, matrix, desired, mask) → CTFont.
 pub extern "C" fn shim_ct_font_create_copy_traits(
-    font: u64, size_bits: u64, _matrix: u64, _desired: u32, _mask: u32
+    font: u64,
+    size_bits: u64,
+    _matrix: u64,
+    _desired: u32,
+    _mask: u32,
 ) -> u64 {
     shim_ct_font_create_copy(font, size_bits, 0, 0)
 }
@@ -1211,9 +1694,14 @@ pub extern "C" fn shim_ct_font_create_copy_traits(
 /// CTFontGetGlyphsForCharacters(font, chars, glyphs, count) → bool.
 /// Simplified: map each character code to itself as a "glyph index".
 pub extern "C" fn shim_ct_font_get_glyphs_for_chars(
-    _font: u64, chars: u64, glyphs: u64, count: i64,
+    _font: u64,
+    chars: u64,
+    glyphs: u64,
+    count: i64,
 ) -> u8 {
-    if chars == 0 || glyphs == 0 || count <= 0 { return 0; }
+    if chars == 0 || glyphs == 0 || count <= 0 {
+        return 0;
+    }
     let c = count as usize;
     unsafe {
         let src = chars as *const u16;
@@ -1230,14 +1718,18 @@ pub extern "C" fn shim_ct_font_get_glyphs_for_chars(
 /// Uses real per-character advance widths when the char advance callback is available.
 /// Falls back to `avg_advance` from the font registry otherwise.
 pub extern "C" fn shim_ct_font_get_advances(
-    font: u64, _orientation: u32, glyphs: u64, advances: u64, count: i64,
+    font: u64,
+    _orientation: u32,
+    glyphs: u64,
+    advances: u64,
+    count: i64,
 ) -> u64 {
     let c = count.max(0) as usize;
     let (font_name, font_size, fallback_advance) = with_registry(|map| {
-        map.get(&font).map_or(
-            ("System".to_string(), 12.0, 7.2),
-            |f| (f.name.clone(), f.size, f.avg_advance),
-        )
+        map.get(&font)
+            .map_or(("System".to_string(), 12.0, 7.2), |f| {
+                (f.name.clone(), f.size, f.avg_advance)
+            })
     });
 
     let mut total = 0.0_f64;
@@ -1245,8 +1737,7 @@ pub extern "C" fn shim_ct_font_get_advances(
         let advance = if glyphs != 0 {
             let glyph_code = unsafe { *(glyphs as *const u16).add(i) } as u32;
             // Try real char advance if callback available
-            char_advance_real(glyph_code, &font_name, font_size)
-                .unwrap_or(fallback_advance)
+            char_advance_real(glyph_code, &font_name, font_size).unwrap_or(fallback_advance)
         } else {
             fallback_advance
         };
@@ -1268,9 +1759,12 @@ pub extern "C" fn shim_ct_font_get_matrix(sret: u64, _font: u64) {
     if sret != 0 {
         unsafe {
             let p = sret as *mut f64;
-            *p = 1.0; *p.add(1) = 0.0;
-            *p.add(2) = 0.0; *p.add(3) = 1.0;
-            *p.add(4) = 0.0; *p.add(5) = 0.0;
+            *p = 1.0;
+            *p.add(1) = 0.0;
+            *p.add(2) = 0.0;
+            *p.add(3) = 1.0;
+            *p.add(4) = 0.0;
+            *p.add(5) = 0.0;
         }
     }
 }
@@ -1287,7 +1781,9 @@ pub extern "C" fn shim_ct_font_get_underline_thickness(font: u64) -> u64 {
     v.to_bits()
 }
 
-pub extern "C" fn shim_ct_bool_true(_a: u64, _b: u64, _c: u64) -> u8 { 1 }
+pub extern "C" fn shim_ct_bool_true(_a: u64, _b: u64, _c: u64) -> u8 {
+    1
+}
 
 // ---------------------------------------------------------------------------
 // Data symbol sentinels for CoreText attribute name keys
@@ -1321,9 +1817,18 @@ mod tests {
         let descent = f64::from_bits(shim_ct_font_get_descent(h));
         let leading = f64::from_bits(shim_ct_font_get_leading(h));
 
-        assert!((ascent - 16.0).abs() < 1e-9, "ascent should be 16.0, got {ascent}");
-        assert!((descent - 4.0).abs() < 1e-9, "descent should be 4.0, got {descent}");
-        assert!((leading - 2.0).abs() < 1e-9, "leading should be 2.0, got {leading}");
+        assert!(
+            (ascent - 16.0).abs() < 1e-9,
+            "ascent should be 16.0, got {ascent}"
+        );
+        assert!(
+            (descent - 4.0).abs() < 1e-9,
+            "descent should be 4.0, got {descent}"
+        );
+        assert!(
+            (leading - 2.0).abs() < 1e-9,
+            "leading should be 2.0, got {leading}"
+        );
     }
 
     #[test]
@@ -1374,7 +1879,10 @@ mod tests {
         let arr = shim_ct_font_manager_copy_family_names();
         assert_ne!(arr, 0, "should return non-null CFArray");
         let count = unsafe { *((arr as usize + 8) as *const u64) };
-        assert!(count >= 5, "should have at least 5 font family names, got {count}");
+        assert!(
+            count >= 5,
+            "should have at least 5 font family names, got {count}"
+        );
     }
 
     // ── Font name tests ─────────────────────────────────────────
@@ -1423,7 +1931,10 @@ mod tests {
         // Copy with size=0 should preserve the original size
         let h2 = shim_ct_font_create_copy(h1, f64::to_bits(0.0), 0, 0);
         let s2 = f64::from_bits(shim_ct_font_get_size(h2));
-        assert!((s2 - 16.0).abs() < 1e-9, "copy should preserve size, got {s2}");
+        assert!(
+            (s2 - 16.0).abs() < 1e-9,
+            "copy should preserve size, got {s2}"
+        );
     }
 
     #[test]
@@ -1431,7 +1942,10 @@ mod tests {
         let h1 = shim_ct_font_create_with_name(0, f64::to_bits(16.0), 0);
         let h2 = shim_ct_font_create_copy(h1, f64::to_bits(24.0), 0, 0);
         let s2 = f64::from_bits(shim_ct_font_get_size(h2));
-        assert!((s2 - 24.0).abs() < 1e-9, "copy should use new size 24, got {s2}");
+        assert!(
+            (s2 - 24.0).abs() < 1e-9,
+            "copy should use new size 24, got {s2}"
+        );
     }
 
     #[test]
@@ -1500,11 +2014,18 @@ mod tests {
         let glyphs: [u16; 3] = [65, 66, 67]; // A, B, C
         let mut advances = [0.0_f64; 6]; // 3 CGSize = 6 f64
         let total = f64::from_bits(shim_ct_font_get_advances(
-            h, 0, glyphs.as_ptr() as u64, advances.as_mut_ptr() as u64, 3
+            h,
+            0,
+            glyphs.as_ptr() as u64,
+            advances.as_mut_ptr() as u64,
+            3,
         ));
         assert!(total > 0.0, "total advance should be positive: {total}");
         assert!(advances[0] > 0.0, "first advance width should be positive");
-        assert!((advances[1] - 0.0).abs() < 1e-9, "first advance height should be 0");
+        assert!(
+            (advances[1] - 0.0).abs() < 1e-9,
+            "first advance height should be 0"
+        );
     }
 
     #[test]
@@ -1513,7 +2034,10 @@ mod tests {
         let chars: [u16; 3] = [0x41, 0x42, 0x43]; // A, B, C
         let mut glyphs = [0u16; 3];
         let ok = shim_ct_font_get_glyphs_for_chars(
-            h, chars.as_ptr() as u64, glyphs.as_mut_ptr() as u64, 3
+            h,
+            chars.as_ptr() as u64,
+            glyphs.as_mut_ptr() as u64,
+            3,
         );
         assert_eq!(ok, 1, "should return true");
         // Identity mapping: glyph = char code
@@ -1548,11 +2072,17 @@ mod tests {
         let mut desc = 0.0_f64;
         let mut lead = 0.0_f64;
         let width_bits = shim_ct_line_get_typo_bounds(
-            h, &mut asc as *mut f64 as u64, &mut desc as *mut f64 as u64, &mut lead as *mut f64 as u64,
+            h,
+            &mut asc as *mut f64 as u64,
+            &mut desc as *mut f64 as u64,
+            &mut lead as *mut f64 as u64,
         );
         let width = f64::from_bits(width_bits);
         // Empty text → width should be 0
-        assert!((width - 0.0).abs() < 1e-9, "empty line width should be 0, got {width}");
+        assert!(
+            (width - 0.0).abs() < 1e-9,
+            "empty line width should be 0, got {width}"
+        );
         assert!(asc > 0.0, "ascent should be positive even for empty line");
     }
 
@@ -1597,9 +2127,15 @@ mod tests {
         assert_eq!(run.glyphs[1], 'B' as u16);
         assert_eq!(run.glyphs[2], 'C' as u16);
         // Positions should be monotonically increasing
-        assert!((run.positions[0].0 - 0.0).abs() < 1e-9, "first position x=0");
+        assert!(
+            (run.positions[0].0 - 0.0).abs() < 1e-9,
+            "first position x=0"
+        );
         assert!(run.positions[1].0 > 0.0, "second position x > 0");
-        assert!(run.positions[2].0 > run.positions[1].0, "third position > second");
+        assert!(
+            run.positions[2].0 > run.positions[1].0,
+            "third position > second"
+        );
         assert!(run.total_width > 0.0, "total width > 0");
         assert!(run.ascent > 0.0);
         assert!(run.descent > 0.0);
@@ -1608,7 +2144,9 @@ mod tests {
     #[test]
     fn test_run_registry_glyph_count() {
         let (h, run) = build_run("Hello", "System", 14.0, 5);
-        with_run_registry(|map| { map.insert(h, run); });
+        with_run_registry(|map| {
+            map.insert(h, run);
+        });
         let count = shim_ct_run_get_glyph_count(h);
         assert_eq!(count, 5);
     }
@@ -1616,7 +2154,9 @@ mod tests {
     #[test]
     fn test_run_get_string_range_real() {
         let (h, run) = build_run("Test", "System", 12.0, 10);
-        with_run_registry(|map| { map.insert(h, run); });
+        with_run_registry(|map| {
+            map.insert(h, run);
+        });
         let mut range = [0i64; 2];
         shim_ct_run_get_string_range(range.as_mut_ptr() as u64, h);
         assert_eq!(range[0], 10, "location should be 10");
@@ -1626,7 +2166,9 @@ mod tests {
     #[test]
     fn test_run_get_glyphs_real() {
         let (h, run) = build_run("XY", "System", 12.0, 0);
-        with_run_registry(|map| { map.insert(h, run); });
+        with_run_registry(|map| {
+            map.insert(h, run);
+        });
         let mut glyphs = [0u16; 2];
         shim_ct_run_get_glyphs(h, 0, 0, glyphs.as_mut_ptr() as u64);
         assert_eq!(glyphs[0], 'X' as u16);
@@ -1636,7 +2178,9 @@ mod tests {
     #[test]
     fn test_run_get_positions_real() {
         let (h, run) = build_run("AB", "System", 12.0, 0);
-        with_run_registry(|map| { map.insert(h, run); });
+        with_run_registry(|map| {
+            map.insert(h, run);
+        });
         let mut positions = [0.0_f64; 4]; // 2 CGPoints
         shim_ct_run_get_positions(h, 0, 0, positions.as_mut_ptr() as u64);
         assert!((positions[0] - 0.0).abs() < 1e-9, "first x = 0");
@@ -1647,7 +2191,9 @@ mod tests {
     #[test]
     fn test_run_get_advances_real() {
         let (h, run) = build_run("AB", "System", 12.0, 0);
-        with_run_registry(|map| { map.insert(h, run); });
+        with_run_registry(|map| {
+            map.insert(h, run);
+        });
         let mut advances = [0.0_f64; 4]; // 2 CGSize
         shim_ct_run_get_advances(h, 0, 0, advances.as_mut_ptr() as u64);
         assert!(advances[0] > 0.0, "first advance width > 0");
@@ -1657,12 +2203,16 @@ mod tests {
     #[test]
     fn test_run_get_typo_bounds_real() {
         let (h, run) = build_run("Hello", "System", 16.0, 0);
-        with_run_registry(|map| { map.insert(h, run); });
+        with_run_registry(|map| {
+            map.insert(h, run);
+        });
         let mut asc = 0.0_f64;
         let mut desc = 0.0_f64;
         let mut lead = 0.0_f64;
         let width = f64::from_bits(shim_ct_run_get_typo_bounds(
-            h, 0, 0,
+            h,
+            0,
+            0,
             &mut asc as *mut f64 as u64,
             &mut desc as *mut f64 as u64,
             &mut lead as *mut f64 as u64,
@@ -1675,7 +2225,9 @@ mod tests {
     #[test]
     fn test_run_get_attributes_returns_dict() {
         let (h, run) = build_run("X", "Helvetica", 12.0, 0);
-        with_run_registry(|map| { map.insert(h, run); });
+        with_run_registry(|map| {
+            map.insert(h, run);
+        });
         let dict = shim_ct_run_get_attributes(h);
         assert_ne!(dict, 0, "attributes should return non-null dict");
         let count = unsafe { *((dict as usize + 8) as *const u64) };
@@ -1795,21 +2347,36 @@ mod tests {
         let mut table = ShimTable::new();
         CoreTextStubs::install(&mut table);
         let expected = [
-            "_CTFontCreateWithName", "_CTFontCopyFullName", "_CTFontGetAscent",
-            "_CTFontGetDescent", "_CTFontGetLeading", "_CTFontGetSize",
-            "_CTFontGetBoundingBox", "_CTFontGetGlyphsForCharacters",
-            "_CTFontGetAdvancesForGlyphs", "_CTFontCopyFamilyName",
-            "_CTFontCopyPostScriptName", "_CTFontCopyDisplayName",
-            "_CTLineCreateWithAttributedString", "_CTLineDraw",
-            "_CTLineGetGlyphRuns", "_CTLineGetGlyphCount",
-            "_CTLineGetStringRange", "_CTLineGetTypographicBounds",
-            "_CTLineGetBoundsWithOptions", "_CTLineGetOffsetForStringIndex",
-            "_CTRunGetGlyphCount", "_CTRunGetPositions", "_CTRunGetGlyphs",
-            "_CTRunGetStringRange", "_CTRunGetTypographicBounds",
+            "_CTFontCreateWithName",
+            "_CTFontCopyFullName",
+            "_CTFontGetAscent",
+            "_CTFontGetDescent",
+            "_CTFontGetLeading",
+            "_CTFontGetSize",
+            "_CTFontGetBoundingBox",
+            "_CTFontGetGlyphsForCharacters",
+            "_CTFontGetAdvancesForGlyphs",
+            "_CTFontCopyFamilyName",
+            "_CTFontCopyPostScriptName",
+            "_CTFontCopyDisplayName",
+            "_CTLineCreateWithAttributedString",
+            "_CTLineDraw",
+            "_CTLineGetGlyphRuns",
+            "_CTLineGetGlyphCount",
+            "_CTLineGetStringRange",
+            "_CTLineGetTypographicBounds",
+            "_CTLineGetBoundsWithOptions",
+            "_CTLineGetOffsetForStringIndex",
+            "_CTRunGetGlyphCount",
+            "_CTRunGetPositions",
+            "_CTRunGetGlyphs",
+            "_CTRunGetStringRange",
+            "_CTRunGetTypographicBounds",
             "_CTFramesetterCreateWithAttributedString",
             "_CTFramesetterCreateFrame",
             "_CTFramesetterSuggestFrameSizeWithConstraints",
-            "_CTFrameDraw", "_CTFrameGetLines",
+            "_CTFrameDraw",
+            "_CTFrameGetLines",
             "_CTFontDescriptorCreateWithAttributes",
             "_CTParagraphStyleCreate",
             "_CTFontManagerCopyAvailableFontFamilyNames",

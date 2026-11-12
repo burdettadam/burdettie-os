@@ -23,6 +23,26 @@ use std::sync::Mutex;
 const DATA_OFF: usize = 8;
 const SECURE_OFF: usize = 16;
 
+#[cfg(windows)]
+fn host_read(fd: i32, buf: *mut libc::c_void, count: usize) -> isize {
+    unsafe { libc::read(fd, buf, count.min(u32::MAX as usize) as u32) as isize }
+}
+
+#[cfg(not(windows))]
+fn host_read(fd: i32, buf: *mut libc::c_void, count: usize) -> isize {
+    unsafe { libc::read(fd, buf, count) as isize }
+}
+
+#[cfg(windows)]
+fn host_write(fd: i32, buf: *const libc::c_void, count: usize) -> isize {
+    unsafe { libc::write(fd, buf, count.min(u32::MAX as usize) as u32) as isize }
+}
+
+#[cfg(not(windows))]
+fn host_write(fd: i32, buf: *const libc::c_void, count: usize) -> isize {
+    unsafe { libc::write(fd, buf, count) as isize }
+}
+
 // ═══════════════════════════════════════════════════════════════
 // Apple Keyed Archive Format Decoder
 // ═══════════════════════════════════════════════════════════════
@@ -50,8 +70,7 @@ struct AppleArchiveContext {
 }
 
 /// Global map: unarchiver address → Apple archive context.
-static APPLE_ARCHIVE_CTX: Mutex<Option<HashMap<u64, AppleArchiveContext>>> =
-    Mutex::new(None);
+static APPLE_ARCHIVE_CTX: Mutex<Option<HashMap<u64, AppleArchiveContext>>> = Mutex::new(None);
 
 // ── NIB connection wiring ──────────────────────────────────────
 
@@ -59,9 +78,17 @@ static APPLE_ARCHIVE_CTX: Mutex<Option<HashMap<u64, AppleArchiveContext>>> =
 #[derive(Debug, Clone)]
 pub enum NibConnection {
     /// IBOutlet: call `setValue:forKey:` on source with label as key, destination as value.
-    Outlet { source: u64, destination: u64, label: String },
+    Outlet {
+        source: u64,
+        destination: u64,
+        label: String,
+    },
     /// IBAction: call `setTarget:` + `setAction:` on source (the control).
-    Action { source: u64, destination: u64, label: String },
+    Action {
+        source: u64,
+        destination: u64,
+        label: String,
+    },
 }
 
 /// Accumulated NIB connections from the most recent unarchive pass.
@@ -85,7 +112,7 @@ fn is_apple_keyed_archive(dict: &plist::Dictionary) -> bool {
         dict.get("$archiver").and_then(|v| v.as_string()),
         Some("NSKeyedArchiver")
     ) && dict.contains_key("$objects")
-      && dict.contains_key("$top")
+        && dict.contains_key("$top")
 }
 
 /// Decode the root object from an Apple keyed archive.
@@ -95,13 +122,25 @@ fn decode_apple_archive(data_bytes: &[u8], unarchiver: u64) -> u64 {
     let Ok(value) = plist::Value::from_reader(std::io::Cursor::new(data_bytes)) else {
         return 0;
     };
-    let Some(dict) = value.into_dictionary() else { return 0; };
-    if !is_apple_keyed_archive(&dict) { return 0; }
+    let Some(dict) = value.into_dictionary() else {
+        return 0;
+    };
+    if !is_apple_keyed_archive(&dict) {
+        return 0;
+    }
 
-    let Some(objects_val) = dict.get("$objects") else { return 0; };
-    let Some(objects_array) = objects_val.as_array() else { return 0; };
-    let Some(top_val) = dict.get("$top") else { return 0; };
-    let Some(top_dict) = top_val.as_dictionary() else { return 0; };
+    let Some(objects_val) = dict.get("$objects") else {
+        return 0;
+    };
+    let Some(objects_array) = objects_val.as_array() else {
+        return 0;
+    };
+    let Some(top_val) = dict.get("$top") else {
+        return 0;
+    };
+    let Some(top_dict) = top_val.as_dictionary() else {
+        return 0;
+    };
 
     let objects: Vec<plist::Value> = objects_array.clone();
 
@@ -119,7 +158,8 @@ fn decode_apple_archive(data_bytes: &[u8], unarchiver: u64) -> u64 {
     }
 
     // Resolve the root — typically "$top" has a "root" key with a CF$UID
-    let root_uid = top_dict.get("root")
+    let root_uid = top_dict
+        .get("root")
         .and_then(|v| v.as_uid())
         .map(|u| u.get() as usize);
 
@@ -132,7 +172,9 @@ fn decode_apple_archive(data_bytes: &[u8], unarchiver: u64) -> u64 {
         for (_key, val) in top_dict {
             if let Some(uid) = val.as_uid() {
                 result = decode_uid(unarchiver, uid.get() as usize);
-                if result != 0 { break; }
+                if result != 0 {
+                    break;
+                }
             }
         }
         result
@@ -141,7 +183,9 @@ fn decode_apple_archive(data_bytes: &[u8], unarchiver: u64) -> u64 {
     // Clean up context
     {
         let mut guard = APPLE_ARCHIVE_CTX.lock().unwrap_or_else(|e| e.into_inner());
-        if let Some(map) = guard.as_mut() { map.remove(&unarchiver); }
+        if let Some(map) = guard.as_mut() {
+            map.remove(&unarchiver);
+        }
     }
 
     result
@@ -150,7 +194,9 @@ fn decode_apple_archive(data_bytes: &[u8], unarchiver: u64) -> u64 {
 /// Decode a single UID from the `$objects` array.
 fn decode_uid(unarchiver: u64, uid: usize) -> u64 {
     // UID 0 is always $null
-    if uid == 0 { return 0; }
+    if uid == 0 {
+        return 0;
+    }
 
     // Check cache first
     {
@@ -167,9 +213,15 @@ fn decode_uid(unarchiver: u64, uid: usize) -> u64 {
     // Get the raw plist value for this UID
     let obj_value = {
         let guard = APPLE_ARCHIVE_CTX.lock().unwrap_or_else(|e| e.into_inner());
-        let Some(map) = guard.as_ref() else { return 0; };
-        let Some(ctx) = map.get(&unarchiver) else { return 0; };
-        if uid >= ctx.objects.len() { return 0; }
+        let Some(map) = guard.as_ref() else {
+            return 0;
+        };
+        let Some(ctx) = map.get(&unarchiver) else {
+            return 0;
+        };
+        if uid >= ctx.objects.len() {
+            return 0;
+        }
         ctx.objects[uid].clone()
     };
 
@@ -223,9 +275,7 @@ fn decode_plist_object(unarchiver: u64, uid: usize, value: &plist::Value) -> u64
         // Leaf date
         plist::Value::Date(d) => {
             // plist::Date is seconds since 2001-01-01 (same as NSDate reference date)
-            let ti = d.to_xml_format()
-                .parse::<f64>()
-                .unwrap_or(0.0);
+            let ti = d.to_xml_format().parse::<f64>().unwrap_or(0.0);
             // plist Date can provide seconds via conversion
             crate::nsdate::alloc_nsdate(date_to_ti(d))
         }
@@ -235,7 +285,8 @@ fn decode_plist_object(unarchiver: u64, uid: usize, value: &plist::Value) -> u64
 
         // Array of values
         plist::Value::Array(items) => {
-            let decoded: Vec<u64> = items.iter()
+            let decoded: Vec<u64> = items
+                .iter()
                 .map(|item| {
                     if let Some(uid) = item.as_uid() {
                         decode_uid(unarchiver, uid.get() as usize)
@@ -294,12 +345,18 @@ fn parse_iso8601_to_unix(s: &str) -> Result<f64, ()> {
     // Simple ISO 8601 parser for "YYYY-MM-DDTHH:MM:SSZ" format
     // plist dates are always in this format
     let parts: Vec<&str> = s.split('T').collect();
-    if parts.len() != 2 { return Err(()); }
+    if parts.len() != 2 {
+        return Err(());
+    }
     let date_parts: Vec<&str> = parts[0].split('-').collect();
-    if date_parts.len() != 3 { return Err(()); }
+    if date_parts.len() != 3 {
+        return Err(());
+    }
     let time_str = parts[1].trim_end_matches('Z');
     let time_parts: Vec<&str> = time_str.split(':').collect();
-    if time_parts.len() != 3 { return Err(()); }
+    if time_parts.len() != 3 {
+        return Err(());
+    }
 
     let year: i64 = date_parts[0].parse().map_err(|_| ())?;
     let month: i64 = date_parts[1].parse().map_err(|_| ())?;
@@ -313,7 +370,20 @@ fn parse_iso8601_to_unix(s: &str) -> Result<f64, ()> {
     for y in 1970..year {
         days += if is_leap(y) { 366 } else { 365 };
     }
-    let month_days = [31, if is_leap(year) { 29 } else { 28 }, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    let month_days = [
+        31,
+        if is_leap(year) { 29 } else { 28 },
+        31,
+        30,
+        31,
+        30,
+        31,
+        31,
+        30,
+        31,
+        30,
+        31,
+    ];
     for m in 0..(month - 1) as usize {
         days += month_days[m];
     }
@@ -329,49 +399,71 @@ fn is_leap(y: i64) -> bool {
 /// Decode an NSCoding object from a dict with `$class` key.
 fn decode_coded_object(unarchiver: u64, uid: usize, dict: &plist::Dictionary) -> u64 {
     // Resolve class name: $class → UID → class descriptor dict → $classname
-    let class_uid = dict.get("$class")
+    let class_uid = dict
+        .get("$class")
         .and_then(|v| v.as_uid())
         .map(|u| u.get() as usize);
-    let Some(class_uid) = class_uid else { return 0; };
+    let Some(class_uid) = class_uid else {
+        return 0;
+    };
 
     let class_name = {
         let guard = APPLE_ARCHIVE_CTX.lock().unwrap_or_else(|e| e.into_inner());
-        let Some(map) = guard.as_ref() else { return 0; };
-        let Some(ctx) = map.get(&unarchiver) else { return 0; };
-        if class_uid >= ctx.objects.len() { return 0; }
-        ctx.objects[class_uid].as_dictionary()
+        let Some(map) = guard.as_ref() else {
+            return 0;
+        };
+        let Some(ctx) = map.get(&unarchiver) else {
+            return 0;
+        };
+        if class_uid >= ctx.objects.len() {
+            return 0;
+        }
+        ctx.objects[class_uid]
+            .as_dictionary()
             .and_then(|d| d.get("$classname"))
             .and_then(|v| v.as_string())
             .map(|s| s.to_string())
     };
-    let Some(class_name) = class_name else { return 0; };
+    let Some(class_name) = class_name else {
+        return 0;
+    };
 
-    log::debug!("Apple archive: decoding class '{}' at UID {}", class_name, uid);
+    log::debug!(
+        "Apple archive: decoding class '{}' at UID {}",
+        class_name,
+        uid
+    );
 
     // Short-circuit Foundation types
     match class_name.as_str() {
-        "NSString" | "NSMutableString" | "__NSCFString" | "__NSCFConstantString" =>
-            return decode_foundation_string(unarchiver, dict),
-        "NSArray" | "NSMutableArray" | "__NSArrayI" | "__NSArrayM" | "__NSArray0" =>
-            return decode_foundation_array(unarchiver, dict),
-        "NSDictionary" | "NSMutableDictionary" | "__NSDictionaryI" | "__NSDictionaryM"
-            | "__NSSingleEntryDictionaryI" | "__NSDictionary0" =>
-            return decode_foundation_dictionary(unarchiver, dict),
-        "NSData" | "NSMutableData" | "__NSCFData" | "_NSInlineData" | "NSConcreteData" =>
-            return decode_foundation_data(dict),
-        "NSNumber" | "__NSCFNumber" | "NSConstantIntegerNumber" | "NSConstantDoubleNumber" =>
-            return decode_foundation_number(dict),
-        "NSDate" | "__NSDate" | "__NSTaggedDate" =>
-            return decode_foundation_date(dict),
-        "NSURL" =>
-            return decode_foundation_url(unarchiver, dict),
-        "NSSet" | "NSMutableSet" | "__NSSetI" | "__NSSetM" =>
-            return decode_foundation_set(unarchiver, dict),
-        "NSValue" | "NSConcreteValue" =>
-            return decode_foundation_value(dict),
+        "NSString" | "NSMutableString" | "__NSCFString" | "__NSCFConstantString" => {
+            return decode_foundation_string(unarchiver, dict);
+        }
+        "NSArray" | "NSMutableArray" | "__NSArrayI" | "__NSArrayM" | "__NSArray0" => {
+            return decode_foundation_array(unarchiver, dict);
+        }
+        "NSDictionary"
+        | "NSMutableDictionary"
+        | "__NSDictionaryI"
+        | "__NSDictionaryM"
+        | "__NSSingleEntryDictionaryI"
+        | "__NSDictionary0" => return decode_foundation_dictionary(unarchiver, dict),
+        "NSData" | "NSMutableData" | "__NSCFData" | "_NSInlineData" | "NSConcreteData" => {
+            return decode_foundation_data(dict);
+        }
+        "NSNumber" | "__NSCFNumber" | "NSConstantIntegerNumber" | "NSConstantDoubleNumber" => {
+            return decode_foundation_number(dict);
+        }
+        "NSDate" | "__NSDate" | "__NSTaggedDate" => return decode_foundation_date(dict),
+        "NSURL" => return decode_foundation_url(unarchiver, dict),
+        "NSSet" | "NSMutableSet" | "__NSSetI" | "__NSSetM" => {
+            return decode_foundation_set(unarchiver, dict);
+        }
+        "NSValue" | "NSConcreteValue" => return decode_foundation_value(dict),
         // NIB connection records — decode and store, return a placeholder.
-        "NSNibOutletConnector" | "NSNibControlConnector" =>
-            return decode_nib_connector(unarchiver, dict, &class_name),
+        "NSNibOutletConnector" | "NSNibControlConnector" => {
+            return decode_nib_connector(unarchiver, dict, &class_name);
+        }
         _ => {}
     }
 
@@ -388,15 +480,18 @@ fn decode_coded_object(unarchiver: u64, uid: usize, dict: &plist::Dictionary) ->
 ///   - `NSDestination` (UID → the target object)
 ///   - `NSLabel`       (UID → string: outlet name or action selector)
 fn decode_nib_connector(unarchiver: u64, dict: &plist::Dictionary, class_name: &str) -> u64 {
-    let source = dict.get("NSSource")
+    let source = dict
+        .get("NSSource")
         .and_then(|v| v.as_uid())
         .map(|u| decode_uid(unarchiver, u.get() as usize))
         .unwrap_or(0);
-    let destination = dict.get("NSDestination")
+    let destination = dict
+        .get("NSDestination")
         .and_then(|v| v.as_uid())
         .map(|u| decode_uid(unarchiver, u.get() as usize))
         .unwrap_or(0);
-    let label = dict.get("NSLabel")
+    let label = dict
+        .get("NSLabel")
         .and_then(|v| v.as_uid())
         .map(|u| decode_uid(unarchiver, u.get() as usize))
         .unwrap_or(0);
@@ -408,9 +503,17 @@ fn decode_nib_connector(unarchiver: u64, dict: &plist::Dictionary, class_name: &
 
     if source != 0 && destination != 0 && !label_str.is_empty() {
         let conn = if class_name == "NSNibOutletConnector" {
-            NibConnection::Outlet { source, destination, label: label_str.to_string() }
+            NibConnection::Outlet {
+                source,
+                destination,
+                label: label_str.to_string(),
+            }
         } else {
-            NibConnection::Action { source, destination, label: label_str.to_string() }
+            NibConnection::Action {
+                source,
+                destination,
+                label: label_str.to_string(),
+            }
         };
         log::debug!("NIB connector: {:?}", conn);
         push_nib_connection(conn);
@@ -447,7 +550,8 @@ fn decode_foundation_array(unarchiver: u64, dict: &plist::Dictionary) -> u64 {
     };
     match ns_objects {
         plist::Value::Array(items) => {
-            let decoded: Vec<u64> = items.iter()
+            let decoded: Vec<u64> = items
+                .iter()
                 .map(|item| {
                     if let Some(uid) = item.as_uid() {
                         decode_uid(unarchiver, uid.get() as usize)
@@ -471,18 +575,24 @@ fn decode_foundation_dictionary(unarchiver: u64, dict: &plist::Dictionary) -> u6
         _ => return crate::nsdictionary::make_nsdictionary(&[], &[]),
     };
 
-    let keys: Vec<u64> = keys_raw.iter()
+    let keys: Vec<u64> = keys_raw
+        .iter()
         .map(|item| {
             if let Some(uid) = item.as_uid() {
                 decode_uid(unarchiver, uid.get() as usize)
-            } else { 0 }
+            } else {
+                0
+            }
         })
         .collect();
-    let vals: Vec<u64> = vals_raw.iter()
+    let vals: Vec<u64> = vals_raw
+        .iter()
         .map(|item| {
             if let Some(uid) = item.as_uid() {
                 decode_uid(unarchiver, uid.get() as usize)
-            } else { 0 }
+            } else {
+                0
+            }
         })
         .collect();
 
@@ -553,15 +663,22 @@ fn decode_foundation_date(dict: &plist::Dictionary) -> u64 {
 
 fn decode_foundation_url(unarchiver: u64, dict: &plist::Dictionary) -> u64 {
     // NS.relative → UID of the URL string
-    let relative = dict.get("NS.relative")
+    let relative = dict
+        .get("NS.relative")
         .and_then(|v| v.as_uid())
         .map(|u| decode_uid(unarchiver, u.get() as usize))
         .unwrap_or(0);
-    if relative == 0 { return 0; }
+    if relative == 0 {
+        return 0;
+    }
     // Allocate NSURL via initWithString:
     let url_obj = crate::pal_alloc().calloc(1, 32) as u64;
-    if url_obj == 0 { return 0; }
-    unsafe { *(url_obj as *mut u64) = nsobj::nsurl_class_addr(); }
+    if url_obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *(url_obj as *mut u64) = nsobj::nsurl_class_addr();
+    }
     crate::nsurl::shim_nsurl_init_with_string(url_obj, 0, relative)
 }
 
@@ -569,11 +686,14 @@ fn decode_foundation_set(unarchiver: u64, dict: &plist::Dictionary) -> u64 {
     let Some(plist::Value::Array(items)) = dict.get("NS.objects") else {
         return crate::nsset::shim_nsset_set(0, 0);
     };
-    let decoded: Vec<u64> = items.iter()
+    let decoded: Vec<u64> = items
+        .iter()
         .map(|item| {
             if let Some(uid) = item.as_uid() {
                 decode_uid(unarchiver, uid.get() as usize)
-            } else { 0 }
+            } else {
+                0
+            }
         })
         .collect();
     // Build array then set from array
@@ -586,8 +706,12 @@ fn decode_foundation_value(dict: &plist::Dictionary) -> u64 {
     if let Some(s) = dict.get("NS.pointval").and_then(|v| v.as_string()) {
         // "{x, y}" format
         let obj = crate::pal_alloc().calloc(1, 64) as u64;
-        if obj == 0 { return 0; }
-        unsafe { *(obj as *mut u64) = nsobj::nsvalue_class_addr(); }
+        if obj == 0 {
+            return 0;
+        }
+        unsafe {
+            *(obj as *mut u64) = nsobj::nsvalue_class_addr();
+        }
         // Parse point and store
         if let Some((x, y)) = parse_point_string(s) {
             unsafe {
@@ -599,8 +723,12 @@ fn decode_foundation_value(dict: &plist::Dictionary) -> u64 {
     }
     if let Some(s) = dict.get("NS.rectval").and_then(|v| v.as_string()) {
         let obj = crate::pal_alloc().calloc(1, 64) as u64;
-        if obj == 0 { return 0; }
-        unsafe { *(obj as *mut u64) = nsobj::nsvalue_class_addr(); }
+        if obj == 0 {
+            return 0;
+        }
+        unsafe {
+            *(obj as *mut u64) = nsobj::nsvalue_class_addr();
+        }
         if let Some((x, y, w, h)) = parse_rect_string(s) {
             unsafe {
                 *((obj as usize + 8) as *mut f64) = x;
@@ -647,9 +775,125 @@ fn parse_rect_string(s: &str) -> Option<(f64, f64, f64, f64)> {
     None
 }
 
+fn rect_from_value_object(obj: u64) -> Option<(f64, f64, f64, f64)> {
+    if obj == 0 {
+        return None;
+    }
+
+    if let Some(s) = cfstring::extract_cfstring_cstr(obj) {
+        return parse_rect_string(s);
+    }
+
+    let isa = unsafe { *(obj as *const u64) };
+    if isa != nsobj::nsvalue_class_addr() {
+        return None;
+    }
+
+    Some(unsafe {
+        (
+            *((obj as usize + 8) as *const f64),
+            *((obj as usize + 16) as *const f64),
+            *((obj as usize + 24) as *const f64),
+            *((obj as usize + 32) as *const f64),
+        )
+    })
+}
+
+pub(crate) fn decode_object_for_any_key(coder: u64, keys: &[&str]) -> u64 {
+    if coder == 0 {
+        return 0;
+    }
+
+    for key in keys {
+        let key_obj = make_nsstring(key);
+        let value = shim_nskeyedunarchiver_decode_object_for_key(coder, 0, key_obj);
+        if value != 0 {
+            return value;
+        }
+    }
+    0
+}
+
+pub(crate) fn decode_string_for_any_key(coder: u64, keys: &[&str]) -> Option<String> {
+    if coder == 0 {
+        return None;
+    }
+
+    for key in keys {
+        let key_obj = make_nsstring(key);
+        let value = shim_nskeyedunarchiver_decode_object_for_key(coder, 0, key_obj);
+        if value == 0 {
+            continue;
+        }
+        if let Some(s) = cfstring::extract_cfstring_cstr(value) {
+            return Some(s.to_string());
+        }
+    }
+    None
+}
+
+pub(crate) fn contains_value_for_any_key(coder: u64, keys: &[&str]) -> bool {
+    if coder == 0 {
+        return false;
+    }
+
+    keys.iter().any(|key| {
+        let key_obj = make_nsstring(key);
+        shim_nskeyedunarchiver_contains_value_for_key(coder, 0, key_obj) != 0
+    })
+}
+
+pub(crate) fn decode_integer_for_any_key(coder: u64, keys: &[&str]) -> Option<i64> {
+    if !contains_value_for_any_key(coder, keys) {
+        return None;
+    }
+
+    for key in keys {
+        let key_obj = make_nsstring(key);
+        if shim_nskeyedunarchiver_contains_value_for_key(coder, 0, key_obj) != 0 {
+            return Some(shim_nskeyedunarchiver_decode_integer_for_key(
+                coder, 0, key_obj,
+            ));
+        }
+    }
+    None
+}
+
+pub(crate) fn decode_bool_for_any_key(coder: u64, keys: &[&str]) -> Option<bool> {
+    if !contains_value_for_any_key(coder, keys) {
+        return None;
+    }
+
+    for key in keys {
+        let key_obj = make_nsstring(key);
+        if shim_nskeyedunarchiver_contains_value_for_key(coder, 0, key_obj) != 0 {
+            return Some(shim_nskeyedunarchiver_decode_bool_for_key(coder, 0, key_obj) != 0);
+        }
+    }
+    None
+}
+
+pub(crate) fn decode_rect_for_any_key(coder: u64, keys: &[&str]) -> Option<(f64, f64, f64, f64)> {
+    if coder == 0 {
+        return None;
+    }
+
+    for key in keys {
+        let key_obj = make_nsstring(key);
+        let value = shim_nskeyedunarchiver_decode_object_for_key(coder, 0, key_obj);
+        if let Some(rect) = rect_from_value_object(value) {
+            return Some(rect);
+        }
+    }
+    None
+}
+
 /// Decode an object via ObjC runtime dispatch (for custom/guest classes).
 fn decode_coded_object_via_runtime(
-    unarchiver: u64, uid: usize, dict: &plist::Dictionary, class_name: &str,
+    unarchiver: u64,
+    uid: usize,
+    dict: &plist::Dictionary,
+    class_name: &str,
 ) -> u64 {
     let class_name_c = std::ffi::CString::new(class_name).unwrap_or_default();
     let cls = get_class_by_name(class_name_c.as_ptr());
@@ -666,10 +910,16 @@ fn decode_coded_object_via_runtime(
         f(cls, csel.as_ptr() as u64)
     } else {
         let obj = crate::pal_alloc().calloc(1, 128) as u64;
-        if obj != 0 { unsafe { *(obj as *mut u64) = cls; } }
+        if obj != 0 {
+            unsafe {
+                *(obj as *mut u64) = cls;
+            }
+        }
         obj
     };
-    if instance == 0 { return 0; }
+    if instance == 0 {
+        return 0;
+    }
 
     // Push this UID as current object for decode method dispatch
     {
@@ -682,32 +932,48 @@ fn decode_coded_object_via_runtime(
     }
 
     // Also populate the flat ARCHIVER_STORE as fallback for decode methods
-    // that use the old path
-    {
-        let mut guard = ARCHIVER_STORE.lock().unwrap_or_else(|e| e.into_inner());
-        let store = guard.get_or_insert_with(HashMap::new);
-        let entries = store.entry(unarchiver).or_default();
-        for (k, v) in dict {
-            if k == "$class" { continue; }
-            // Resolve UID values to Foundation objects for flat store
+    // that use the old path. Decode nested UIDs before taking the store mutex:
+    // storyboard/nib graphs recurse through this path heavily.
+    let decoded_entries: Vec<(String, u64)> = dict
+        .iter()
+        .filter_map(|(k, v)| {
+            if k == "$class" {
+                return None;
+            }
             let foundation_val = if let Some(uid_ref) = v.as_uid() {
                 decode_uid(unarchiver, uid_ref.get() as usize)
             } else {
                 decode_plist_object(unarchiver, uid, v)
             };
-            entries.insert(k.clone(), foundation_val);
+            Some((k.clone(), foundation_val))
+        })
+        .collect();
+
+    {
+        let mut guard = ARCHIVER_STORE.lock().unwrap_or_else(|e| e.into_inner());
+        let store = guard.get_or_insert_with(HashMap::new);
+        let entries = store.entry(unarchiver).or_default();
+        for (key, value) in decoded_entries {
+            entries.insert(key, value);
         }
     }
 
     // Call initWithCoder:
     let init_imp = lookup_imp(instance, "initWithCoder:");
     let result = if init_imp != 0 {
-        log::debug!("Apple archive: calling initWithCoder: on '{}' instance {:#x}", class_name, instance);
+        log::debug!(
+            "Apple archive: calling initWithCoder: on '{}' instance {:#x}",
+            class_name,
+            instance
+        );
         let csel = std::ffi::CString::new("initWithCoder:").unwrap();
         let f: extern "C" fn(u64, u64, u64) -> u64 = unsafe { std::mem::transmute(init_imp) };
         f(instance, csel.as_ptr() as u64, unarchiver)
     } else {
-        log::debug!("Apple archive: '{}' has no initWithCoder:, returning raw instance", class_name);
+        log::debug!(
+            "Apple archive: '{}' has no initWithCoder:, returning raw instance",
+            class_name
+        );
         instance
     };
 
@@ -724,7 +990,9 @@ fn decode_coded_object_via_runtime(
     // Clean up flat store entry
     {
         let mut guard = ARCHIVER_STORE.lock().unwrap_or_else(|e| e.into_inner());
-        if let Some(m) = guard.as_mut() { m.remove(&unarchiver); }
+        if let Some(m) = guard.as_mut() {
+            m.remove(&unarchiver);
+        }
     }
 
     result
@@ -745,7 +1013,11 @@ fn apple_decode_key(unarchiver: u64, key: &str) -> Option<u64> {
     let val = dict.get(key)?;
     // Drop the lock before recursing
     let uid_ref = val.as_uid().map(|u| u.get() as usize);
-    let inline_val = if uid_ref.is_none() { Some(val.clone()) } else { None };
+    let inline_val = if uid_ref.is_none() {
+        Some(val.clone())
+    } else {
+        None
+    };
     drop(guard);
 
     if let Some(uid_val) = uid_ref {
@@ -767,19 +1039,66 @@ fn apple_decode_key(unarchiver: u64, key: &str) -> Option<u64> {
 /// is not registered in our runtime's table.  Returns 0 in standalone
 /// test builds where the ObjC runtime is not linked.
 pub(crate) fn lookup_imp(obj: u64, sel_str: &str) -> u64 {
-    let Ok(csel) = std::ffi::CString::new(sel_str) else { return 0; };
+    if let Some(imp) = runtime_lookup_imp(obj, sel_str) {
+        return imp;
+    }
+
+    let Ok(csel) = std::ffi::CString::new(sel_str) else {
+        return 0;
+    };
     let sel_val = csel.as_ptr() as u64;
 
-    // Resolve objc_has_method and objc_msg_lookup_imp via dlsym
-    let has_sym = unsafe { libc::dlsym(libc::RTLD_DEFAULT, b"objc_has_method\0".as_ptr().cast()) };
-    if has_sym.is_null() { return 0; }
+    let Some(has_sym) = crate::pal_symbols().resolve("objc_has_method") else {
+        return 0;
+    };
     let has_fn: extern "C" fn(u64, u64) -> u8 = unsafe { std::mem::transmute(has_sym) };
-    if has_fn(obj, sel_val) == 0 { return 0; }
+    if has_fn(obj, sel_val) == 0 {
+        return 0;
+    }
 
-    let lookup_sym = unsafe { libc::dlsym(libc::RTLD_DEFAULT, b"objc_msg_lookup_imp\0".as_ptr().cast()) };
-    if lookup_sym.is_null() { return 0; }
+    let Some(lookup_sym) = crate::pal_symbols().resolve("objc_msg_lookup_imp") else {
+        return 0;
+    };
     let lookup_fn: extern "C" fn(u64, u64) -> u64 = unsafe { std::mem::transmute(lookup_sym) };
     lookup_fn(obj, sel_val)
+}
+
+fn runtime_lookup_imp(obj: u64, sel_str: &str) -> Option<u64> {
+    if obj == 0 {
+        return None;
+    }
+
+    let guard = objc_runtime::OBJC_RUNTIME
+        .read()
+        .unwrap_or_else(|e| e.into_inner());
+    let rt = guard.as_ref()?;
+
+    if let Some(dispatch_isa) = rt.dispatch_isa_for_receiver(obj) {
+        return rt.msg_lookup(dispatch_isa, sel_str);
+    }
+
+    let raw_isa = unsafe { *(obj as *const u64) };
+    let isa = if rt.is_known_isa(raw_isa) {
+        raw_isa
+    } else {
+        normalize_runtime_isa(raw_isa)
+    };
+    rt.msg_lookup(isa, sel_str)
+}
+
+fn normalize_runtime_isa(raw_isa: u64) -> u64 {
+    #[cfg(target_arch = "aarch64")]
+    {
+        raw_isa & 0x007f_ffff_ffff_fff8
+    }
+    #[cfg(target_arch = "x86_64")]
+    {
+        raw_isa & 0x0000_7fff_ffff_fff8
+    }
+    #[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
+    {
+        raw_isa
+    }
 }
 
 // ── Runtime helpers resolved via dlsym ─────────────────────────────────────
@@ -790,18 +1109,54 @@ pub(crate) fn lookup_imp(obj: u64, sel_str: &str) -> u64 {
 
 /// Call `class_getName(cls)` if available, returning the C string pointer.
 fn get_class_name_cstr(cls: u64) -> *const std::ffi::c_char {
-    let sym = unsafe { libc::dlsym(libc::RTLD_DEFAULT, b"shim_class_get_name\0".as_ptr().cast()) };
-    if sym.is_null() { return std::ptr::null(); }
+    if let Some(name) = runtime_class_name_cstr(cls) {
+        return name;
+    }
+
+    let Some(sym) = crate::pal_symbols().resolve("shim_class_get_name") else {
+        return std::ptr::null();
+    };
     let f: extern "C" fn(u64) -> *const std::ffi::c_char = unsafe { std::mem::transmute(sym) };
     f(cls)
 }
 
+fn runtime_class_name_cstr(cls: u64) -> Option<*const std::ffi::c_char> {
+    let name = {
+        let guard = objc_runtime::OBJC_RUNTIME
+            .read()
+            .unwrap_or_else(|e| e.into_inner());
+        let rt = guard.as_ref()?;
+        rt.class_name_for_isa(cls).map(ToOwned::to_owned)?
+    };
+
+    let cstring = std::ffi::CString::new(name).ok()?;
+    Some(Box::leak(cstring.into_boxed_c_str()).as_ptr())
+}
+
 /// Call `objc_getClass(name)` if available, returning the class address.
 fn get_class_by_name(name: *const std::ffi::c_char) -> u64 {
-    let sym = unsafe { libc::dlsym(libc::RTLD_DEFAULT, b"shim_objc_get_class\0".as_ptr().cast()) };
-    if sym.is_null() { return 0; }
+    if let Some(cls) = runtime_class_by_name(name) {
+        return cls;
+    }
+
+    let Some(sym) = crate::pal_symbols().resolve("shim_objc_get_class") else {
+        return 0;
+    };
     let f: extern "C" fn(*const std::ffi::c_char) -> u64 = unsafe { std::mem::transmute(sym) };
     f(name)
+}
+
+fn runtime_class_by_name(name: *const std::ffi::c_char) -> Option<u64> {
+    if name.is_null() {
+        return None;
+    }
+    let class_name = unsafe { std::ffi::CStr::from_ptr(name) }.to_str().ok()?;
+
+    let guard = objc_runtime::OBJC_RUNTIME
+        .read()
+        .unwrap_or_else(|e| e.into_inner());
+    let rt = guard.as_ref()?;
+    rt.get_class(class_name).map(|class| class.mapped_addr)
 }
 
 // ── Global encode/decode store ─────────────────────────────────────────────
@@ -809,8 +1164,7 @@ fn get_class_by_name(name: *const std::ffi::c_char) -> u64 {
 // Maps archiver/unarchiver object address → (key string → encoded object u64).
 // Integer/bool primitives are wrapped as NSNumber before storage.
 
-static ARCHIVER_STORE: Mutex<Option<HashMap<u64, HashMap<String, u64>>>> =
-    Mutex::new(None);
+static ARCHIVER_STORE: Mutex<Option<HashMap<u64, HashMap<String, u64>>>> = Mutex::new(None);
 
 // ── NSCoder abstract base stubs ────────────────────────────────────────────
 
@@ -828,7 +1182,9 @@ pub extern "C" fn shim_nscoder_description(_obj: u64, _cmd: u64) -> u64 {
 fn store_encode(archiver: u64, key: &str, value: u64) {
     let mut guard = ARCHIVER_STORE.lock().unwrap_or_else(|e| e.into_inner());
     let map = guard.get_or_insert_with(HashMap::new);
-    map.entry(archiver).or_default().insert(key.to_string(), value);
+    map.entry(archiver)
+        .or_default()
+        .insert(key.to_string(), value);
 }
 
 fn store_decode(archiver: u64, key: &str) -> u64 {
@@ -858,8 +1214,12 @@ fn make_nsstring(s: &str) -> u64 {
 
 fn alloc_archiver() -> u64 {
     let obj = crate::pal_alloc().calloc(1, 24) as u64;
-    if obj == 0 { return 0; }
-    unsafe { *(obj as *mut u64) = nsobj::nskeyedarchiver_class_addr(); }
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *(obj as *mut u64) = nsobj::nskeyedarchiver_class_addr();
+    }
     obj
 }
 
@@ -870,8 +1230,12 @@ pub extern "C" fn shim_nskeyedarchiver_alloc(_cls: u64, _cmd: u64) -> u64 {
 
 /// `-[NSKeyedArchiver initRequiringSecureCoding:]`
 pub extern "C" fn shim_nskeyedarchiver_init_secure(obj: u64, _cmd: u64, secure: u8) -> u64 {
-    if obj == 0 { return 0; }
-    unsafe { *((obj as usize + SECURE_OFF) as *mut u8) = secure; }
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *((obj as usize + SECURE_OFF) as *mut u8) = secure;
+    }
     obj
 }
 
@@ -886,10 +1250,16 @@ pub extern "C" fn shim_nskeyedarchiver_init_secure(obj: u64, _cmd: u64, secure: 
 /// For plain plist types (NSString, NSNumber, …) that do not implement
 /// `encodeWithCoder:`, we fall back to direct plist serialisation.
 pub extern "C" fn shim_nskeyedarchiver_archived_data(
-    _cls: u64, _cmd: u64, root: u64, _secure: u8, error_out: u64,
+    _cls: u64,
+    _cmd: u64,
+    root: u64,
+    _secure: u8,
+    error_out: u64,
 ) -> u64 {
     if error_out != 0 {
-        unsafe { *(error_out as *mut u64) = 0; }
+        unsafe {
+            *(error_out as *mut u64) = 0;
+        }
     }
     if root == 0 {
         return crate::nsdata::shim_nsdata_data(0, 0);
@@ -907,7 +1277,8 @@ pub extern "C" fn shim_nskeyedarchiver_archived_data(
 
             // Collect encoded pairs into an NSDictionary
             let dict = crate::nsmutabledict::shim_nsmutabledict_dictionary(
-                crate::nsobj::nsmutabledictionary_class_addr(), 0,
+                crate::nsobj::nsmutabledictionary_class_addr(),
+                0,
             );
             if dict != 0 {
                 // Store the class name by looking up class_getName via dlsym
@@ -915,9 +1286,8 @@ pub extern "C" fn shim_nskeyedarchiver_archived_data(
                 let class_name_cstr = get_class_name_cstr(isa);
                 if !class_name_cstr.is_null() {
                     let class_key = make_nsstring("$class");
-                    let class_val = cfstring::shim_cf_string_create_with_cstring(
-                        0, class_name_cstr, 0,
-                    );
+                    let class_val =
+                        cfstring::shim_cf_string_create_with_cstring(0, class_name_cstr, 0);
                     crate::nsmutabledict::shim_nsmutabledict_set_object_for_key(
                         dict, 0, class_val, class_key,
                     );
@@ -939,12 +1309,15 @@ pub extern "C" fn shim_nskeyedarchiver_archived_data(
                 // Clean up archiver's store entry
                 {
                     let mut guard = ARCHIVER_STORE.lock().unwrap_or_else(|e| e.into_inner());
-                    if let Some(m) = guard.as_mut() { m.remove(&archiver); }
+                    if let Some(m) = guard.as_mut() {
+                        m.remove(&archiver);
+                    }
                 }
 
                 // Serialise to plist data
                 let plist_data = crate::nspropertylistserialization::shim_plist_data_with_object(
-                    0, 0, dict, 200 /* binary */, 0, 0,
+                    0, 0, dict, 200, /* binary */
+                    0, 0,
                 );
                 if plist_data != 0 {
                     return plist_data;
@@ -954,7 +1327,10 @@ pub extern "C" fn shim_nskeyedarchiver_archived_data(
     }
 
     // Fallback: attempt plist serialization of the root directly
-    let plist_data = crate::nspropertylistserialization::shim_plist_data_with_object(0, 0, root, 200 /* binary */, 0, 0);
+    let plist_data = crate::nspropertylistserialization::shim_plist_data_with_object(
+        0, 0, root, 200, /* binary */
+        0, 0,
+    );
     if plist_data != 0 {
         return plist_data;
     }
@@ -964,7 +1340,9 @@ pub extern "C" fn shim_nskeyedarchiver_archived_data(
 
 /// `+[NSKeyedArchiver archivedDataWithRootObject:]`  (deprecated but common)
 pub extern "C" fn shim_nskeyedarchiver_archived_data_legacy(
-    _cls: u64, _cmd: u64, root: u64,
+    _cls: u64,
+    _cmd: u64,
+    root: u64,
 ) -> u64 {
     shim_nskeyedarchiver_archived_data(0, 0, root, 0, 0)
 }
@@ -975,40 +1353,67 @@ pub extern "C" fn shim_nskeyedarchiver_archived_data_legacy(
 /// the root object's encoded key-value pairs as a flat plist-style byte blob,
 /// then writes them to the file.  Returns YES on success.
 pub extern "C" fn shim_nskeyedarchiver_archive_root_to_file(
-    _cls: u64, _cmd: u64, root: u64, path: u64,
+    _cls: u64,
+    _cmd: u64,
+    root: u64,
+    path: u64,
 ) -> u8 {
     let data = shim_nskeyedarchiver_archived_data(0, 0, root, 0, 0);
-    if data == 0 { return 0; }
-    let Some(p) = cfstring::extract_cfstring_cstr(path) else { return 0; };
+    if data == 0 {
+        return 0;
+    }
+    let Some(p) = cfstring::extract_cfstring_cstr(path) else {
+        return 0;
+    };
     let c_path = std::ffi::CString::new(p).unwrap_or_default();
-    let fd = unsafe { libc::open(c_path.as_ptr(), libc::O_WRONLY | libc::O_CREAT | libc::O_TRUNC, 0o644) };
-    if fd < 0 { return 0; }
+    let fd = unsafe {
+        libc::open(
+            c_path.as_ptr(),
+            libc::O_WRONLY | libc::O_CREAT | libc::O_TRUNC,
+            0o644,
+        )
+    };
+    if fd < 0 {
+        return 0;
+    }
     let len = crate::nsdata::shim_nsdata_length(data, 0);
     let bytes = crate::nsdata::shim_nsdata_bytes(data, 0);
     let mut written = 0usize;
     if len > 0 && bytes != 0 {
-        let rc = unsafe { libc::write(fd, bytes as *const libc::c_void, len as usize) };
-        if rc > 0 { written = rc as usize; }
+        let rc = host_write(fd, bytes as *const libc::c_void, len as usize);
+        if rc > 0 {
+            written = rc as usize;
+        }
     }
-    unsafe { libc::close(fd); }
+    unsafe {
+        libc::close(fd);
+    }
     u8::from(written == len as usize)
 }
 
 /// `-[NSKeyedArchiver encodedData]`
 pub extern "C" fn shim_nskeyedarchiver_encoded_data(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + DATA_OFF) as *const u64) }
 }
 
 /// `-[NSKeyedArchiver setRequiresSecureCoding:]`
 pub extern "C" fn shim_nskeyedarchiver_set_requires_secure(obj: u64, _cmd: u64, val: u8) {
-    if obj == 0 { return; }
-    unsafe { *((obj as usize + SECURE_OFF) as *mut u8) = val; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + SECURE_OFF) as *mut u8) = val;
+    }
 }
 
 /// `-[NSKeyedArchiver requiresSecureCoding]`
 pub extern "C" fn shim_nskeyedarchiver_requires_secure(obj: u64, _cmd: u64) -> u8 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + SECURE_OFF) as *const u8) }
 }
 
@@ -1029,73 +1434,111 @@ pub extern "C" fn shim_nskeyedarchiver_finish_encoding(_obj: u64, _cmd: u64) {
 
 /// `-[NSKeyedArchiver encodeObject:forKey:]`
 pub extern "C" fn shim_nskeyedarchiver_encode_object_for_key(
-    obj: u64, _cmd: u64, value: u64, key: u64,
+    obj: u64,
+    _cmd: u64,
+    value: u64,
+    key: u64,
 ) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     store_encode(obj, &key_string(key), value);
 }
 
 /// `-[NSKeyedArchiver encodeInteger:forKey:]`
 pub extern "C" fn shim_nskeyedarchiver_encode_integer_for_key(
-    obj: u64, _cmd: u64, value: i64, key: u64,
+    obj: u64,
+    _cmd: u64,
+    value: i64,
+    key: u64,
 ) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let ns = crate::nsnumber::shim_nsnumber_number_with_integer(0, 0, value);
     store_encode(obj, &key_string(key), ns);
 }
 
 /// `-[NSKeyedArchiver encodeBool:forKey:]`
 pub extern "C" fn shim_nskeyedarchiver_encode_bool_for_key(
-    obj: u64, _cmd: u64, value: u8, key: u64,
+    obj: u64,
+    _cmd: u64,
+    value: u8,
+    key: u64,
 ) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let ns = crate::nsnumber::shim_nsnumber_number_with_bool(0, 0, value);
     store_encode(obj, &key_string(key), ns);
 }
 
 /// `-[NSKeyedArchiver encodeDouble:forKey:]`
 pub extern "C" fn shim_nskeyedarchiver_encode_double_for_key(
-    obj: u64, _cmd: u64, value: f64, key: u64,
+    obj: u64,
+    _cmd: u64,
+    value: f64,
+    key: u64,
 ) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let ns = crate::nsnumber::shim_nsnumber_number_with_double(0, 0, value);
     store_encode(obj, &key_string(key), ns);
 }
 
 /// `-[NSKeyedArchiver encodeFloat:forKey:]`
 pub extern "C" fn shim_nskeyedarchiver_encode_float_for_key(
-    obj: u64, _cmd: u64, value: f32, key: u64,
+    obj: u64,
+    _cmd: u64,
+    value: f32,
+    key: u64,
 ) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let ns = crate::nsnumber::shim_nsnumber_number_with_double(0, 0, value as f64);
     store_encode(obj, &key_string(key), ns);
 }
 
 /// `-[NSKeyedArchiver encodeInt:forKey:]`
 pub extern "C" fn shim_nskeyedarchiver_encode_int_for_key(
-    obj: u64, _cmd: u64, value: i32, key: u64,
+    obj: u64,
+    _cmd: u64,
+    value: i32,
+    key: u64,
 ) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let ns = crate::nsnumber::shim_nsnumber_number_with_integer(0, 0, value as i64);
     store_encode(obj, &key_string(key), ns);
 }
 
 /// `-[NSKeyedArchiver encodeInt32:forKey:]`
 pub extern "C" fn shim_nskeyedarchiver_encode_int32_for_key(
-    obj: u64, _cmd: u64, value: i32, key: u64,
+    obj: u64,
+    _cmd: u64,
+    value: i32,
+    key: u64,
 ) {
     shim_nskeyedarchiver_encode_int_for_key(obj, _cmd, value, key);
 }
 
 /// `-[NSKeyedArchiver encodeInt64:forKey:]`
 pub extern "C" fn shim_nskeyedarchiver_encode_int64_for_key(
-    obj: u64, _cmd: u64, value: i64, key: u64,
+    obj: u64,
+    _cmd: u64,
+    value: i64,
+    key: u64,
 ) {
     shim_nskeyedarchiver_encode_integer_for_key(obj, _cmd, value, key);
 }
 
 pub extern "C" fn shim_nskeyedarchiver_description(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     make_nsstring("<NSKeyedArchiver>")
 }
 
@@ -1105,8 +1548,12 @@ pub extern "C" fn shim_nskeyedarchiver_description(obj: u64, _cmd: u64) -> u64 {
 
 fn alloc_unarchiver() -> u64 {
     let obj = crate::pal_alloc().calloc(1, 24) as u64;
-    if obj == 0 { return 0; }
-    unsafe { *(obj as *mut u64) = nsobj::nskeyedunarchiver_class_addr(); }
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *(obj as *mut u64) = nsobj::nskeyedunarchiver_class_addr();
+    }
     obj
 }
 
@@ -1116,23 +1563,42 @@ pub extern "C" fn shim_nskeyedunarchiver_alloc(_cls: u64, _cmd: u64) -> u64 {
 }
 
 /// `-[NSKeyedUnarchiver initForReadingFromData:error:]`
-pub extern "C" fn shim_nskeyedunarchiver_init_from_data(obj: u64, _cmd: u64, data: u64, error_out: u64) -> u64 {
-    if obj == 0 { return 0; }
-    if error_out != 0 {
-        unsafe { *(error_out as *mut u64) = 0; }
+pub extern "C" fn shim_nskeyedunarchiver_init_from_data(
+    obj: u64,
+    _cmd: u64,
+    data: u64,
+    error_out: u64,
+) -> u64 {
+    if obj == 0 {
+        return 0;
     }
-    unsafe { *((obj as usize + DATA_OFF) as *mut u64) = data; }
+    if error_out != 0 {
+        unsafe {
+            *(error_out as *mut u64) = 0;
+        }
+    }
+    unsafe {
+        *((obj as usize + DATA_OFF) as *mut u64) = data;
+    }
     obj
 }
 
 /// `+[NSKeyedUnarchiver unarchivedObjectOfClass:fromData:error:]`
 pub extern "C" fn shim_nskeyedunarchiver_unarchived_object(
-    _cls: u64, _cmd: u64, _allowedclass: u64, data: u64, error_out: u64,
+    _cls: u64,
+    _cmd: u64,
+    _allowedclass: u64,
+    data: u64,
+    error_out: u64,
 ) -> u64 {
     if error_out != 0 {
-        unsafe { *(error_out as *mut u64) = 0; }
+        unsafe {
+            *(error_out as *mut u64) = 0;
+        }
     }
-    if data == 0 { return 0; }
+    if data == 0 {
+        return 0;
+    }
 
     // Get raw bytes to check for Apple keyed archive format
     let len = crate::nsdata::shim_nsdata_length(data, 0) as usize;
@@ -1146,7 +1612,9 @@ pub extern "C" fn shim_nskeyedunarchiver_unarchived_object(
                 if is_apple_keyed_archive(dict) {
                     let unarchiver = alloc_unarchiver();
                     if unarchiver != 0 {
-                        unsafe { *((unarchiver as usize + DATA_OFF) as *mut u64) = data; }
+                        unsafe {
+                            *((unarchiver as usize + DATA_OFF) as *mut u64) = data;
+                        }
                         // Apple format is authoritative — return result even if 0 (null root)
                         return decode_apple_archive(raw_bytes, unarchiver);
                     }
@@ -1157,7 +1625,9 @@ pub extern "C" fn shim_nskeyedunarchiver_unarchived_object(
 
     // Fall back to existing flat format decoder
     let dict = crate::nspropertylistserialization::shim_plist_with_data(0, 0, data, 0, 0, 0);
-    if dict == 0 { return 0; }
+    if dict == 0 {
+        return 0;
+    }
 
     // Check if the result is a dictionary (NSCoding archive) — if not, return it as-is
     let isa = unsafe { *(dict as *const u64) };
@@ -1178,14 +1648,20 @@ pub extern "C" fn shim_nskeyedunarchiver_unarchived_object(
     }
 
     // Get the class name and look up the class
-    let Some(class_name) = cfstring::extract_cfstring_cstr(class_val) else { return dict; };
+    let Some(class_name) = cfstring::extract_cfstring_cstr(class_val) else {
+        return dict;
+    };
     let class_name_c = std::ffi::CString::new(class_name).unwrap_or_default();
 
     let cls = get_class_by_name(class_name_c.as_ptr());
     if cls == 0 {
         return dict;
     }
-    log::debug!("NSKeyedUnarchiver: restoring class '{}' (cls={:#x})", class_name, cls);
+    log::debug!(
+        "NSKeyedUnarchiver: restoring class '{}' (cls={:#x})",
+        class_name,
+        cls
+    );
 
     // Allocate an instance of the class
     let alloc_imp = lookup_imp(cls, "alloc");
@@ -1197,15 +1673,25 @@ pub extern "C" fn shim_nskeyedunarchiver_unarchived_object(
         // Manual alloc: read instance_size from ClassInfo isn't directly accessible,
         // so use a reasonable default (128 bytes covers most Foundation objects)
         let obj = crate::pal_alloc().calloc(1, 128) as u64;
-        if obj != 0 { unsafe { *(obj as *mut u64) = cls; } }
+        if obj != 0 {
+            unsafe {
+                *(obj as *mut u64) = cls;
+            }
+        }
         obj
     };
-    if instance == 0 { return dict; }
+    if instance == 0 {
+        return dict;
+    }
 
     // Create a temporary unarchiver and populate its store from the dict
     let unarchiver = alloc_unarchiver();
-    if unarchiver == 0 { return dict; }
-    unsafe { *((unarchiver as usize + DATA_OFF) as *mut u64) = data; }
+    if unarchiver == 0 {
+        return dict;
+    }
+    unsafe {
+        *((unarchiver as usize + DATA_OFF) as *mut u64) = data;
+    }
 
     // Populate the unarchiver's ARCHIVER_STORE from the NSDictionary entries
     {
@@ -1216,7 +1702,9 @@ pub extern "C" fn shim_nskeyedunarchiver_unarchived_object(
                 let k = crate::nsarray::shim_nsarray_object_at_index(all_keys, 0, i);
                 // Skip the "$class" meta-key (compare by string content, not pointer)
                 if let Some(ks) = cfstring::extract_cfstring_cstr(k) {
-                    if ks == "$class" { continue; }
+                    if ks == "$class" {
+                        continue;
+                    }
                     let v = crate::nsdictionary::shim_nsdictionary_object_for_key(dict, 0, k);
                     store_encode(unarchiver, ks, v);
                 }
@@ -1227,12 +1715,18 @@ pub extern "C" fn shim_nskeyedunarchiver_unarchived_object(
     // Call initWithCoder: on the instance
     let init_imp = lookup_imp(instance, "initWithCoder:");
     let result = if init_imp != 0 {
-        log::debug!("NSKeyedUnarchiver: calling initWithCoder: on instance {:#x}", instance);
+        log::debug!(
+            "NSKeyedUnarchiver: calling initWithCoder: on instance {:#x}",
+            instance
+        );
         let csel = std::ffi::CString::new("initWithCoder:").unwrap();
         let f: extern "C" fn(u64, u64, u64) -> u64 = unsafe { std::mem::transmute(init_imp) };
         f(instance, csel.as_ptr() as u64, unarchiver)
     } else {
-        log::debug!("NSKeyedUnarchiver: '{}' has no initWithCoder:, returning raw instance", class_name);
+        log::debug!(
+            "NSKeyedUnarchiver: '{}' has no initWithCoder:, returning raw instance",
+            class_name
+        );
         instance
     };
     log::debug!("NSKeyedUnarchiver: result={:#x}", result);
@@ -1240,55 +1734,80 @@ pub extern "C" fn shim_nskeyedunarchiver_unarchived_object(
     // Clean up unarchiver store
     {
         let mut guard = ARCHIVER_STORE.lock().unwrap_or_else(|e| e.into_inner());
-        if let Some(m) = guard.as_mut() { m.remove(&unarchiver); }
+        if let Some(m) = guard.as_mut() {
+            m.remove(&unarchiver);
+        }
     }
 
     result
 }
 
 /// `+[NSKeyedUnarchiver unarchiveObjectWithData:]` (deprecated but common)
-pub extern "C" fn shim_nskeyedunarchiver_unarchive_legacy(
-    _cls: u64, _cmd: u64, data: u64,
-) -> u64 {
+pub extern "C" fn shim_nskeyedunarchiver_unarchive_legacy(_cls: u64, _cmd: u64, data: u64) -> u64 {
     shim_nskeyedunarchiver_unarchived_object(0, 0, 0, data, 0)
 }
 
 /// `+[NSKeyedUnarchiver unarchiveObjectWithFile:]` — reads file into NSData, then unarchives.
 pub extern "C" fn shim_nskeyedunarchiver_unarchive_from_file(
-    _cls: u64, _cmd: u64, path: u64,
+    _cls: u64,
+    _cmd: u64,
+    path: u64,
 ) -> u64 {
-    if path == 0 { return 0; }
-    let Some(p) = cfstring::extract_cfstring_cstr(path) else { return 0; };
+    if path == 0 {
+        return 0;
+    }
+    let Some(p) = cfstring::extract_cfstring_cstr(path) else {
+        return 0;
+    };
     let c_path = std::ffi::CString::new(p).unwrap_or_default();
     let fd = unsafe { libc::open(c_path.as_ptr(), libc::O_RDONLY) };
-    if fd < 0 { return 0; }
+    if fd < 0 {
+        return 0;
+    }
     let mut result = Vec::new();
     let mut buf = [0u8; 4096];
     loop {
-        let n = unsafe { libc::read(fd, buf.as_mut_ptr().cast(), buf.len()) };
-        if n <= 0 { break; }
+        let n = host_read(fd, buf.as_mut_ptr().cast(), buf.len());
+        if n <= 0 {
+            break;
+        }
         result.extend_from_slice(&buf[..n as usize]);
     }
-    unsafe { libc::close(fd); }
-    if result.is_empty() { return 0; }
+    unsafe {
+        libc::close(fd);
+    }
+    if result.is_empty() {
+        return 0;
+    }
     let data = crate::nsdata::make_nsdata(&result);
     shim_nskeyedunarchiver_unarchived_object(0, 0, 0, data, 0)
 }
 
 /// `-[NSKeyedUnarchiver setRequiresSecureCoding:]`
 pub extern "C" fn shim_nskeyedunarchiver_set_requires_secure(obj: u64, _cmd: u64, val: u8) {
-    if obj == 0 { return; }
-    unsafe { *((obj as usize + SECURE_OFF) as *mut u8) = val; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + SECURE_OFF) as *mut u8) = val;
+    }
 }
 
 /// `-[NSKeyedUnarchiver requiresSecureCoding]`
 pub extern "C" fn shim_nskeyedunarchiver_requires_secure(obj: u64, _cmd: u64) -> u8 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + SECURE_OFF) as *const u8) }
 }
 
 /// `-[NSKeyedUnarchiver setDecodingFailurePolicy:]` — no-op stub.
-pub extern "C" fn shim_nskeyedunarchiver_set_decoding_failure_policy(_obj: u64, _cmd: u64, _policy: i64) {}
+pub extern "C" fn shim_nskeyedunarchiver_set_decoding_failure_policy(
+    _obj: u64,
+    _cmd: u64,
+    _policy: i64,
+) {
+}
 
 /// `-[NSKeyedUnarchiver decodingFailurePolicy]` — returns 0 (NSDecodingFailureRaiseException).
 pub extern "C" fn shim_nskeyedunarchiver_decoding_failure_policy(_obj: u64, _cmd: u64) -> i64 {
@@ -1304,9 +1823,13 @@ pub extern "C" fn shim_nskeyedunarchiver_finish_decoding(_obj: u64, _cmd: u64) {
 
 /// `-[NSKeyedUnarchiver decodeObjectForKey:]`
 pub extern "C" fn shim_nskeyedunarchiver_decode_object_for_key(
-    obj: u64, _cmd: u64, key: u64,
+    obj: u64,
+    _cmd: u64,
+    key: u64,
 ) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     // Try Apple archive context first
     let k = key_string(key);
     if let Some(result) = apple_decode_key(obj, &k) {
@@ -1318,68 +1841,106 @@ pub extern "C" fn shim_nskeyedunarchiver_decode_object_for_key(
 
 /// `-[NSKeyedUnarchiver decodeIntegerForKey:]`
 pub extern "C" fn shim_nskeyedunarchiver_decode_integer_for_key(
-    obj: u64, _cmd: u64, key: u64,
+    obj: u64,
+    _cmd: u64,
+    key: u64,
 ) -> i64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let k = key_string(key);
-    let ns = if let Some(v) = apple_decode_key(obj, &k) { v } else { store_decode(obj, &k) };
-    if ns == 0 { return 0; }
+    let ns = if let Some(v) = apple_decode_key(obj, &k) {
+        v
+    } else {
+        store_decode(obj, &k)
+    };
+    if ns == 0 {
+        return 0;
+    }
     crate::nsnumber::shim_nsnumber_integer_value(ns, 0)
 }
 
 /// `-[NSKeyedUnarchiver decodeBoolForKey:]`
-pub extern "C" fn shim_nskeyedunarchiver_decode_bool_for_key(
-    obj: u64, _cmd: u64, key: u64,
-) -> u8 {
-    if obj == 0 { return 0; }
+pub extern "C" fn shim_nskeyedunarchiver_decode_bool_for_key(obj: u64, _cmd: u64, key: u64) -> u8 {
+    if obj == 0 {
+        return 0;
+    }
     let k = key_string(key);
-    let ns = if let Some(v) = apple_decode_key(obj, &k) { v } else { store_decode(obj, &k) };
-    if ns == 0 { return 0; }
+    let ns = if let Some(v) = apple_decode_key(obj, &k) {
+        v
+    } else {
+        store_decode(obj, &k)
+    };
+    if ns == 0 {
+        return 0;
+    }
     crate::nsnumber::shim_nsnumber_bool_value(ns, 0)
 }
 
 /// `-[NSKeyedUnarchiver decodeDoubleForKey:]`
 pub extern "C" fn shim_nskeyedunarchiver_decode_double_for_key(
-    obj: u64, _cmd: u64, key: u64,
+    obj: u64,
+    _cmd: u64,
+    key: u64,
 ) -> f64 {
-    if obj == 0 { return 0.0; }
+    if obj == 0 {
+        return 0.0;
+    }
     let k = key_string(key);
-    let ns = if let Some(v) = apple_decode_key(obj, &k) { v } else { store_decode(obj, &k) };
-    if ns == 0 { return 0.0; }
+    let ns = if let Some(v) = apple_decode_key(obj, &k) {
+        v
+    } else {
+        store_decode(obj, &k)
+    };
+    if ns == 0 {
+        return 0.0;
+    }
     crate::nsnumber::shim_nsnumber_double_value(ns, 0)
 }
 
 /// `-[NSKeyedUnarchiver decodeFloatForKey:]`
 pub extern "C" fn shim_nskeyedunarchiver_decode_float_for_key(
-    obj: u64, _cmd: u64, key: u64,
+    obj: u64,
+    _cmd: u64,
+    key: u64,
 ) -> f32 {
     shim_nskeyedunarchiver_decode_double_for_key(obj, _cmd, key) as f32
 }
 
 /// `-[NSKeyedUnarchiver decodeInt32ForKey:]`
 pub extern "C" fn shim_nskeyedunarchiver_decode_int32_for_key(
-    obj: u64, _cmd: u64, key: u64,
+    obj: u64,
+    _cmd: u64,
+    key: u64,
 ) -> i32 {
     shim_nskeyedunarchiver_decode_integer_for_key(obj, _cmd, key) as i32
 }
 
 /// `-[NSKeyedUnarchiver decodeInt64ForKey:]`
 pub extern "C" fn shim_nskeyedunarchiver_decode_int64_for_key(
-    obj: u64, _cmd: u64, key: u64,
+    obj: u64,
+    _cmd: u64,
+    key: u64,
 ) -> i64 {
     shim_nskeyedunarchiver_decode_integer_for_key(obj, _cmd, key)
 }
 
 pub extern "C" fn shim_nskeyedunarchiver_description(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     make_nsstring("<NSKeyedUnarchiver>")
 }
 
 /// `-[NSKeyedUnarchiver containsValueForKey:]`
 pub extern "C" fn shim_nskeyedunarchiver_contains_value_for_key(
-    obj: u64, _cmd: u64, key: u64,
+    obj: u64,
+    _cmd: u64,
+    key: u64,
 ) -> u8 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let k = key_string(key);
     // Check Apple archive context first
     {
@@ -1405,7 +1966,10 @@ pub extern "C" fn shim_nskeyedunarchiver_contains_value_for_key(
 
 /// `-[NSKeyedUnarchiver decodeObjectOfClass:forKey:]` — same as `decodeObjectForKey:`.
 pub extern "C" fn shim_nskeyedunarchiver_decode_object_of_class_for_key(
-    obj: u64, _cmd: u64, _cls: u64, key: u64,
+    obj: u64,
+    _cmd: u64,
+    _cls: u64,
+    key: u64,
 ) -> u64 {
     shim_nskeyedunarchiver_decode_object_for_key(obj, 0, key)
 }
@@ -1414,9 +1978,15 @@ pub extern "C" fn shim_nskeyedunarchiver_decode_object_of_class_for_key(
 
 /// `-[NSKeyedArchiver encodeBytes:length:forKey:]`
 pub extern "C" fn shim_nskeyedarchiver_encode_bytes_for_key(
-    obj: u64, _cmd: u64, bytes: u64, length: u64, key: u64,
+    obj: u64,
+    _cmd: u64,
+    bytes: u64,
+    length: u64,
+    key: u64,
 ) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let data = if bytes != 0 && length > 0 {
         let slice = unsafe { std::slice::from_raw_parts(bytes as *const u8, length as usize) };
         crate::nsdata::make_nsdata(slice)
@@ -1428,19 +1998,34 @@ pub extern "C" fn shim_nskeyedarchiver_encode_bytes_for_key(
 
 /// `-[NSKeyedUnarchiver decodeBytesForKey:returnedLength:]`
 pub extern "C" fn shim_nskeyedunarchiver_decode_bytes_for_key(
-    obj: u64, _cmd: u64, key: u64, length_out: *mut u64,
+    obj: u64,
+    _cmd: u64,
+    key: u64,
+    length_out: *mut u64,
 ) -> u64 {
     if obj == 0 {
-        if !length_out.is_null() { unsafe { *length_out = 0; } }
+        if !length_out.is_null() {
+            unsafe {
+                *length_out = 0;
+            }
+        }
         return 0;
     }
     let data = store_decode(obj, &key_string(key));
     if data == 0 {
-        if !length_out.is_null() { unsafe { *length_out = 0; } }
+        if !length_out.is_null() {
+            unsafe {
+                *length_out = 0;
+            }
+        }
         return 0;
     }
     let len = crate::nsdata::shim_nsdata_length(data, 0);
-    if !length_out.is_null() { unsafe { *length_out = len; } }
+    if !length_out.is_null() {
+        unsafe {
+            *length_out = len;
+        }
+    }
     crate::nsdata::shim_nsdata_bytes(data, 0)
 }
 
@@ -1732,7 +2317,10 @@ mod tests {
         let key = make_string("nonexistent");
 
         assert_eq!(shim_nskeyedunarchiver_decode_object_for_key(obj, 0, key), 0);
-        assert_eq!(shim_nskeyedunarchiver_decode_integer_for_key(obj, 0, key), 0);
+        assert_eq!(
+            shim_nskeyedunarchiver_decode_integer_for_key(obj, 0, key),
+            0
+        );
         assert_eq!(shim_nskeyedunarchiver_decode_bool_for_key(obj, 0, key), 0);
         assert!((shim_nskeyedunarchiver_decode_double_for_key(obj, 0, key)).abs() < 1e-10);
         assert!((shim_nskeyedunarchiver_decode_float_for_key(obj, 0, key)).abs() < 1e-5);
@@ -1773,7 +2361,12 @@ mod tests {
     fn unarchiver_init_from_data_clears_error() {
         let obj = alloc_obj(UNARCHIVER_SIZE, unarchiver_isa());
         let mut error_out: u64 = 0xBAD;
-        let ret = shim_nskeyedunarchiver_init_from_data(obj, 0, 0xBEEF, &mut error_out as *mut u64 as u64);
+        let ret = shim_nskeyedunarchiver_init_from_data(
+            obj,
+            0,
+            0xBEEF,
+            &mut error_out as *mut u64 as u64,
+        );
         assert_eq!(ret, obj);
         assert_eq!(error_out, 0);
         free_obj(obj);
@@ -1980,9 +2573,18 @@ mod tests {
         shim_nskeyedarchiver_encode_integer_for_key(archiver, 0, 30, k2);
         shim_nskeyedarchiver_encode_bool_for_key(archiver, 0, 1, k3);
 
-        assert_eq!(shim_nskeyedunarchiver_decode_object_for_key(archiver, 0, k1), v1);
-        assert_eq!(shim_nskeyedunarchiver_decode_integer_for_key(archiver, 0, k2), 30);
-        assert_eq!(shim_nskeyedunarchiver_decode_bool_for_key(archiver, 0, k3), 1);
+        assert_eq!(
+            shim_nskeyedunarchiver_decode_object_for_key(archiver, 0, k1),
+            v1
+        );
+        assert_eq!(
+            shim_nskeyedunarchiver_decode_integer_for_key(archiver, 0, k2),
+            30
+        );
+        assert_eq!(
+            shim_nskeyedunarchiver_decode_bool_for_key(archiver, 0, k3),
+            1
+        );
 
         clear_store(archiver);
         free_obj(archiver);
@@ -1996,10 +2598,16 @@ mod tests {
         let key = make_string("val");
 
         shim_nskeyedarchiver_encode_integer_for_key(archiver, 0, 1, key);
-        assert_eq!(shim_nskeyedunarchiver_decode_integer_for_key(archiver, 0, key), 1);
+        assert_eq!(
+            shim_nskeyedunarchiver_decode_integer_for_key(archiver, 0, key),
+            1
+        );
 
         shim_nskeyedarchiver_encode_integer_for_key(archiver, 0, 2, key);
-        assert_eq!(shim_nskeyedunarchiver_decode_integer_for_key(archiver, 0, key), 2);
+        assert_eq!(
+            shim_nskeyedunarchiver_decode_integer_for_key(archiver, 0, key),
+            2
+        );
 
         clear_store(archiver);
         free_obj(archiver);
@@ -2016,7 +2624,7 @@ mod tests {
     fn archiver_set_output_format_noop() {
         let obj = alloc_obj(ARCHIVER_SIZE, archiver_isa());
         shim_nskeyedarchiver_set_output_format(obj, 0, 100); // XML
-        // getter always returns 200 (stub)
+                                                             // getter always returns 200 (stub)
         assert_eq!(shim_nskeyedarchiver_output_format(obj, 0), 200);
         free_obj(obj);
     }
@@ -2054,11 +2662,20 @@ mod tests {
     /// Helper: build an Apple keyed archive as binary plist bytes.
     fn build_apple_archive(objects: Vec<plist::Value>, root_uid: u64) -> Vec<u8> {
         let mut top = plist::Dictionary::new();
-        top.insert("root".to_string(), plist::Value::Uid(plist::Uid::new(root_uid)));
+        top.insert(
+            "root".to_string(),
+            plist::Value::Uid(plist::Uid::new(root_uid)),
+        );
 
         let mut archive = plist::Dictionary::new();
-        archive.insert("$archiver".to_string(), plist::Value::String("NSKeyedArchiver".to_string()));
-        archive.insert("$version".to_string(), plist::Value::Integer(100_000.into()));
+        archive.insert(
+            "$archiver".to_string(),
+            plist::Value::String("NSKeyedArchiver".to_string()),
+        );
+        archive.insert(
+            "$version".to_string(),
+            plist::Value::Integer(100_000.into()),
+        );
         archive.insert("$top".to_string(), plist::Value::Dictionary(top));
         archive.insert("$objects".to_string(), plist::Value::Array(objects));
 
@@ -2154,14 +2771,23 @@ mod tests {
         // $objects[3] = class descriptor
         let mut obj_dict = plist::Dictionary::new();
         obj_dict.insert("$class".to_string(), plist::Value::Uid(plist::Uid::new(3)));
-        obj_dict.insert("NS.string".to_string(), plist::Value::Uid(plist::Uid::new(2)));
+        obj_dict.insert(
+            "NS.string".to_string(),
+            plist::Value::Uid(plist::Uid::new(2)),
+        );
 
         let mut class_desc = plist::Dictionary::new();
-        class_desc.insert("$classname".to_string(), plist::Value::String("NSString".to_string()));
-        class_desc.insert("$classes".to_string(), plist::Value::Array(vec![
+        class_desc.insert(
+            "$classname".to_string(),
             plist::Value::String("NSString".to_string()),
-            plist::Value::String("NSObject".to_string()),
-        ]));
+        );
+        class_desc.insert(
+            "$classes".to_string(),
+            plist::Value::Array(vec![
+                plist::Value::String("NSString".to_string()),
+                plist::Value::String("NSObject".to_string()),
+            ]),
+        );
 
         let objects = vec![
             plist::Value::String("$null".to_string()),
@@ -2180,17 +2806,26 @@ mod tests {
         // NSArray: {$class: UID(4), NS.objects: [UID(2), UID(3)]}
         let mut obj_dict = plist::Dictionary::new();
         obj_dict.insert("$class".to_string(), plist::Value::Uid(plist::Uid::new(4)));
-        obj_dict.insert("NS.objects".to_string(), plist::Value::Array(vec![
-            plist::Value::Uid(plist::Uid::new(2)),
-            plist::Value::Uid(plist::Uid::new(3)),
-        ]));
+        obj_dict.insert(
+            "NS.objects".to_string(),
+            plist::Value::Array(vec![
+                plist::Value::Uid(plist::Uid::new(2)),
+                plist::Value::Uid(plist::Uid::new(3)),
+            ]),
+        );
 
         let mut class_desc = plist::Dictionary::new();
-        class_desc.insert("$classname".to_string(), plist::Value::String("NSArray".to_string()));
-        class_desc.insert("$classes".to_string(), plist::Value::Array(vec![
+        class_desc.insert(
+            "$classname".to_string(),
             plist::Value::String("NSArray".to_string()),
-            plist::Value::String("NSObject".to_string()),
-        ]));
+        );
+        class_desc.insert(
+            "$classes".to_string(),
+            plist::Value::Array(vec![
+                plist::Value::String("NSArray".to_string()),
+                plist::Value::String("NSObject".to_string()),
+            ]),
+        );
 
         let objects = vec![
             plist::Value::String("$null".to_string()),
@@ -2214,19 +2849,27 @@ mod tests {
         // NSDictionary: {$class: UID(5), NS.keys: [UID(2)], NS.objects: [UID(3)]}
         let mut obj_dict = plist::Dictionary::new();
         obj_dict.insert("$class".to_string(), plist::Value::Uid(plist::Uid::new(5)));
-        obj_dict.insert("NS.keys".to_string(), plist::Value::Array(vec![
-            plist::Value::Uid(plist::Uid::new(2)),
-        ]));
-        obj_dict.insert("NS.objects".to_string(), plist::Value::Array(vec![
-            plist::Value::Uid(plist::Uid::new(3)),
-        ]));
+        obj_dict.insert(
+            "NS.keys".to_string(),
+            plist::Value::Array(vec![plist::Value::Uid(plist::Uid::new(2))]),
+        );
+        obj_dict.insert(
+            "NS.objects".to_string(),
+            plist::Value::Array(vec![plist::Value::Uid(plist::Uid::new(3))]),
+        );
 
         let mut class_desc = plist::Dictionary::new();
-        class_desc.insert("$classname".to_string(), plist::Value::String("NSDictionary".to_string()));
-        class_desc.insert("$classes".to_string(), plist::Value::Array(vec![
+        class_desc.insert(
+            "$classname".to_string(),
             plist::Value::String("NSDictionary".to_string()),
-            plist::Value::String("NSObject".to_string()),
-        ]));
+        );
+        class_desc.insert(
+            "$classes".to_string(),
+            plist::Value::Array(vec![
+                plist::Value::String("NSDictionary".to_string()),
+                plist::Value::String("NSObject".to_string()),
+            ]),
+        );
 
         let objects = vec![
             plist::Value::String("$null".to_string()),
@@ -2249,11 +2892,17 @@ mod tests {
         obj_dict.insert("NS.data".to_string(), plist::Value::Data(vec![1, 2, 3]));
 
         let mut class_desc = plist::Dictionary::new();
-        class_desc.insert("$classname".to_string(), plist::Value::String("NSData".to_string()));
-        class_desc.insert("$classes".to_string(), plist::Value::Array(vec![
+        class_desc.insert(
+            "$classname".to_string(),
             plist::Value::String("NSData".to_string()),
-            plist::Value::String("NSObject".to_string()),
-        ]));
+        );
+        class_desc.insert(
+            "$classes".to_string(),
+            plist::Value::Array(vec![
+                plist::Value::String("NSData".to_string()),
+                plist::Value::String("NSObject".to_string()),
+            ]),
+        );
 
         let objects = vec![
             plist::Value::String("$null".to_string()),
@@ -2273,12 +2922,18 @@ mod tests {
         obj_dict.insert("NS.intval".to_string(), plist::Value::Integer(42.into()));
 
         let mut class_desc = plist::Dictionary::new();
-        class_desc.insert("$classname".to_string(), plist::Value::String("NSNumber".to_string()));
-        class_desc.insert("$classes".to_string(), plist::Value::Array(vec![
+        class_desc.insert(
+            "$classname".to_string(),
             plist::Value::String("NSNumber".to_string()),
-            plist::Value::String("NSValue".to_string()),
-            plist::Value::String("NSObject".to_string()),
-        ]));
+        );
+        class_desc.insert(
+            "$classes".to_string(),
+            plist::Value::Array(vec![
+                plist::Value::String("NSNumber".to_string()),
+                plist::Value::String("NSValue".to_string()),
+                plist::Value::String("NSObject".to_string()),
+            ]),
+        );
 
         let objects = vec![
             plist::Value::String("$null".to_string()),
@@ -2298,10 +2953,14 @@ mod tests {
         obj_dict.insert("NS.dblval".to_string(), plist::Value::Real(2.718));
 
         let mut class_desc = plist::Dictionary::new();
-        class_desc.insert("$classname".to_string(), plist::Value::String("NSNumber".to_string()));
-        class_desc.insert("$classes".to_string(), plist::Value::Array(vec![
+        class_desc.insert(
+            "$classname".to_string(),
             plist::Value::String("NSNumber".to_string()),
-        ]));
+        );
+        class_desc.insert(
+            "$classes".to_string(),
+            plist::Value::Array(vec![plist::Value::String("NSNumber".to_string())]),
+        );
 
         let objects = vec![
             plist::Value::String("$null".to_string()),
@@ -2322,11 +2981,17 @@ mod tests {
         obj_dict.insert("NS.time".to_string(), plist::Value::Real(694224000.0)); // 2023-01-05
 
         let mut class_desc = plist::Dictionary::new();
-        class_desc.insert("$classname".to_string(), plist::Value::String("NSDate".to_string()));
-        class_desc.insert("$classes".to_string(), plist::Value::Array(vec![
+        class_desc.insert(
+            "$classname".to_string(),
             plist::Value::String("NSDate".to_string()),
-            plist::Value::String("NSObject".to_string()),
-        ]));
+        );
+        class_desc.insert(
+            "$classes".to_string(),
+            plist::Value::Array(vec![
+                plist::Value::String("NSDate".to_string()),
+                plist::Value::String("NSObject".to_string()),
+            ]),
+        );
 
         let objects = vec![
             plist::Value::String("$null".to_string()),
@@ -2344,48 +3009,71 @@ mod tests {
         // $objects: $null, array_dict, NSString_dict, "a", NSString_class, NSMutableString_dict, "b", NSMutableString_class
         let mut str_a_dict = plist::Dictionary::new();
         str_a_dict.insert("$class".to_string(), plist::Value::Uid(plist::Uid::new(4)));
-        str_a_dict.insert("NS.string".to_string(), plist::Value::Uid(plist::Uid::new(3)));
+        str_a_dict.insert(
+            "NS.string".to_string(),
+            plist::Value::Uid(plist::Uid::new(3)),
+        );
 
         let mut str_b_dict = plist::Dictionary::new();
         str_b_dict.insert("$class".to_string(), plist::Value::Uid(plist::Uid::new(7)));
-        str_b_dict.insert("NS.string".to_string(), plist::Value::Uid(plist::Uid::new(6)));
+        str_b_dict.insert(
+            "NS.string".to_string(),
+            plist::Value::Uid(plist::Uid::new(6)),
+        );
 
         let mut nsstring_class = plist::Dictionary::new();
-        nsstring_class.insert("$classname".to_string(), plist::Value::String("NSString".to_string()));
-        nsstring_class.insert("$classes".to_string(), plist::Value::Array(vec![
+        nsstring_class.insert(
+            "$classname".to_string(),
             plist::Value::String("NSString".to_string()),
-        ]));
+        );
+        nsstring_class.insert(
+            "$classes".to_string(),
+            plist::Value::Array(vec![plist::Value::String("NSString".to_string())]),
+        );
 
         let mut nsmutstring_class = plist::Dictionary::new();
-        nsmutstring_class.insert("$classname".to_string(), plist::Value::String("NSMutableString".to_string()));
-        nsmutstring_class.insert("$classes".to_string(), plist::Value::Array(vec![
+        nsmutstring_class.insert(
+            "$classname".to_string(),
             plist::Value::String("NSMutableString".to_string()),
-            plist::Value::String("NSString".to_string()),
-        ]));
+        );
+        nsmutstring_class.insert(
+            "$classes".to_string(),
+            plist::Value::Array(vec![
+                plist::Value::String("NSMutableString".to_string()),
+                plist::Value::String("NSString".to_string()),
+            ]),
+        );
 
         let mut array_dict = plist::Dictionary::new();
         array_dict.insert("$class".to_string(), plist::Value::Uid(plist::Uid::new(8)));
-        array_dict.insert("NS.objects".to_string(), plist::Value::Array(vec![
-            plist::Value::Uid(plist::Uid::new(2)), // str_a_dict
-            plist::Value::Uid(plist::Uid::new(5)), // str_b_dict
-        ]));
+        array_dict.insert(
+            "NS.objects".to_string(),
+            plist::Value::Array(vec![
+                plist::Value::Uid(plist::Uid::new(2)), // str_a_dict
+                plist::Value::Uid(plist::Uid::new(5)), // str_b_dict
+            ]),
+        );
 
         let mut nsarray_class = plist::Dictionary::new();
-        nsarray_class.insert("$classname".to_string(), plist::Value::String("NSArray".to_string()));
-        nsarray_class.insert("$classes".to_string(), plist::Value::Array(vec![
+        nsarray_class.insert(
+            "$classname".to_string(),
             plist::Value::String("NSArray".to_string()),
-        ]));
+        );
+        nsarray_class.insert(
+            "$classes".to_string(),
+            plist::Value::Array(vec![plist::Value::String("NSArray".to_string())]),
+        );
 
         let objects = vec![
-            plist::Value::String("$null".to_string()),    // 0
-            plist::Value::Dictionary(array_dict),          // 1 - root
-            plist::Value::Dictionary(str_a_dict),          // 2
-            plist::Value::String("a".to_string()),         // 3
-            plist::Value::Dictionary(nsstring_class),      // 4
-            plist::Value::Dictionary(str_b_dict),          // 5
-            plist::Value::String("b".to_string()),         // 6
-            plist::Value::Dictionary(nsmutstring_class),   // 7
-            plist::Value::Dictionary(nsarray_class),       // 8
+            plist::Value::String("$null".to_string()),   // 0
+            plist::Value::Dictionary(array_dict),        // 1 - root
+            plist::Value::Dictionary(str_a_dict),        // 2
+            plist::Value::String("a".to_string()),       // 3
+            plist::Value::Dictionary(nsstring_class),    // 4
+            plist::Value::Dictionary(str_b_dict),        // 5
+            plist::Value::String("b".to_string()),       // 6
+            plist::Value::Dictionary(nsmutstring_class), // 7
+            plist::Value::Dictionary(nsarray_class),     // 8
         ];
         let bytes = build_apple_archive(objects, 1);
         let result = unarchive_bytes(&bytes);
@@ -2412,10 +3100,16 @@ mod tests {
         // NSString with NS.bytes instead of NS.string
         let mut obj_dict = plist::Dictionary::new();
         obj_dict.insert("$class".to_string(), plist::Value::Uid(plist::Uid::new(2)));
-        obj_dict.insert("NS.bytes".to_string(), plist::Value::Data(b"utf8text".to_vec()));
+        obj_dict.insert(
+            "NS.bytes".to_string(),
+            plist::Value::Data(b"utf8text".to_vec()),
+        );
 
         let mut class_desc = plist::Dictionary::new();
-        class_desc.insert("$classname".to_string(), plist::Value::String("NSString".to_string()));
+        class_desc.insert(
+            "$classname".to_string(),
+            plist::Value::String("NSString".to_string()),
+        );
         class_desc.insert("$classes".to_string(), plist::Value::Array(vec![]));
 
         let objects = vec![
@@ -2433,13 +3127,19 @@ mod tests {
     fn apple_archive_nsset_coded() {
         let mut obj_dict = plist::Dictionary::new();
         obj_dict.insert("$class".to_string(), plist::Value::Uid(plist::Uid::new(4)));
-        obj_dict.insert("NS.objects".to_string(), plist::Value::Array(vec![
-            plist::Value::Uid(plist::Uid::new(2)),
-            plist::Value::Uid(plist::Uid::new(3)),
-        ]));
+        obj_dict.insert(
+            "NS.objects".to_string(),
+            plist::Value::Array(vec![
+                plist::Value::Uid(plist::Uid::new(2)),
+                plist::Value::Uid(plist::Uid::new(3)),
+            ]),
+        );
 
         let mut class_desc = plist::Dictionary::new();
-        class_desc.insert("$classname".to_string(), plist::Value::String("NSSet".to_string()));
+        class_desc.insert(
+            "$classname".to_string(),
+            plist::Value::String("NSSet".to_string()),
+        );
         class_desc.insert("$classes".to_string(), plist::Value::Array(vec![]));
 
         let objects = vec![
@@ -2460,13 +3160,19 @@ mod tests {
         // Same UID referenced twice → should only decode once (cache hit)
         let mut array_dict = plist::Dictionary::new();
         array_dict.insert("$class".to_string(), plist::Value::Uid(plist::Uid::new(3)));
-        array_dict.insert("NS.objects".to_string(), plist::Value::Array(vec![
-            plist::Value::Uid(plist::Uid::new(2)),
-            plist::Value::Uid(plist::Uid::new(2)), // same UID again
-        ]));
+        array_dict.insert(
+            "NS.objects".to_string(),
+            plist::Value::Array(vec![
+                plist::Value::Uid(plist::Uid::new(2)),
+                plist::Value::Uid(plist::Uid::new(2)), // same UID again
+            ]),
+        );
 
         let mut class_desc = plist::Dictionary::new();
-        class_desc.insert("$classname".to_string(), plist::Value::String("NSArray".to_string()));
+        class_desc.insert(
+            "$classname".to_string(),
+            plist::Value::String("NSArray".to_string()),
+        );
         class_desc.insert("$classes".to_string(), plist::Value::Array(vec![]));
 
         let objects = vec![
@@ -2502,7 +3208,11 @@ mod tests {
         let conns = drain_nib_connections();
         assert_eq!(conns.len(), 1);
         match &conns[0] {
-            NibConnection::Outlet { source, destination, label } => {
+            NibConnection::Outlet {
+                source,
+                destination,
+                label,
+            } => {
                 assert_eq!(*source, 0x1000);
                 assert_eq!(*destination, 0x2000);
                 assert_eq!(label, "myOutlet");
@@ -2523,7 +3233,11 @@ mod tests {
         let conns = drain_nib_connections();
         assert_eq!(conns.len(), 1);
         match &conns[0] {
-            NibConnection::Action { source, destination, label } => {
+            NibConnection::Action {
+                source,
+                destination,
+                label,
+            } => {
                 assert_eq!(*source, 0x3000);
                 assert_eq!(*destination, 0x4000);
                 assert_eq!(label, "buttonClicked:");

@@ -104,11 +104,7 @@ pub extern "C" fn shim_nsarray_sorted_array_using_comparator(
 /// Returns a new NSArray sorted by sending the given selector to each pair.
 /// The selector must return NSComparisonResult (e.g., `compare:`).
 /// For string elements, we compare via extracted UTF-8 representations.
-pub extern "C" fn shim_nsarray_sorted_array_using_selector(
-    obj: u64,
-    _cmd: u64,
-    sel: u64,
-) -> u64 {
+pub extern "C" fn shim_nsarray_sorted_array_using_selector(obj: u64, _cmd: u64, sel: u64) -> u64 {
     if obj == 0 {
         return 0;
     }
@@ -124,8 +120,7 @@ pub extern "C" fn shim_nsarray_sorted_array_using_selector(
         // Attempt ObjC dispatch: [a compare:b]
         let imp = objc_runtime::shims::dispatch::lookup::objc_msg_lookup_imp(*a, sel);
         if imp != 0 {
-            let f: extern "C" fn(u64, u64, u64) -> i64 =
-                unsafe { std::mem::transmute(imp) };
+            let f: extern "C" fn(u64, u64, u64) -> i64 = unsafe { std::mem::transmute(imp) };
             let result = f(*a, sel, *b);
             return match result {
                 r if r < 0 => std::cmp::Ordering::Less,
@@ -207,15 +202,23 @@ pub extern "C" fn shim_nsarray_index_of_object_passing_test(
 
 /// `-[NSArray isEqualToArray:]`
 pub extern "C" fn shim_nsarray_is_equal_to_array(obj: u64, _cmd: u64, other: u64) -> u8 {
-    if obj == other { return 1; }
-    if obj == 0 || other == 0 { return 0; }
+    if obj == other {
+        return 1;
+    }
+    if obj == 0 || other == 0 {
+        return 0;
+    }
     let count_a = shim_nsarray_count(obj, 0);
     let count_b = shim_nsarray_count(other, 0);
-    if count_a != count_b { return 0; }
+    if count_a != count_b {
+        return 0;
+    }
     for i in 0..count_a {
         let a = shim_nsarray_object_at_index(obj, 0, i);
         let b = shim_nsarray_object_at_index(other, 0, i);
-        if a == b { continue; }
+        if a == b {
+            continue;
+        }
         // Try string comparison
         let a_s = cfstring::extract_cfstring_cstr(a);
         let b_s = cfstring::extract_cfstring_cstr(b);
@@ -229,7 +232,9 @@ pub extern "C" fn shim_nsarray_is_equal_to_array(obj: u64, _cmd: u64, other: u64
 
 /// `-[NSArray arrayByAddingObject:]` — returns new array with element appended.
 pub extern "C" fn shim_nsarray_array_by_adding_object(obj: u64, _cmd: u64, element: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let count = shim_nsarray_count(obj, 0) as usize;
     let elems = unsafe { *((obj as usize + NSARRAY_ELEMS_OFF) as *const u64) };
     let mut items = Vec::with_capacity(count + 1);
@@ -249,12 +254,19 @@ pub extern "C" fn shim_nsarray_subarray_with_range(
     location: u64,
     length: u64,
 ) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let count = shim_nsarray_count(obj, 0);
     let loc = location as usize;
     let len = length as usize;
     if loc + len > count as usize {
-        log::warn!("subarrayWithRange: range {},{} out of bounds for count={}", loc, len, count);
+        log::warn!(
+            "subarrayWithRange: range {},{} out of bounds for count={}",
+            loc,
+            len,
+            count
+        );
         return 0;
     }
     let elems = unsafe { *((obj as usize + NSARRAY_ELEMS_OFF) as *const u64) };
@@ -270,17 +282,25 @@ pub extern "C" fn shim_nsarray_subarray_with_range(
 /// Calls the predicate's stored closure (offset 16 in our NSPredicate layout)
 /// on each element and collects those that pass.
 pub extern "C" fn shim_nsarray_filtered_using_predicate(
-    obj: u64, _cmd: u64, predicate: u64,
+    obj: u64,
+    _cmd: u64,
+    predicate: u64,
 ) -> u64 {
-    if obj == 0 || predicate == 0 { return make_nsarray(&[]); }
+    if obj == 0 || predicate == 0 {
+        return make_nsarray(&[]);
+    }
 
     let count = shim_nsarray_count(obj, 0) as usize;
     let elems = unsafe { *((obj as usize + NSARRAY_ELEMS_OFF) as *const u64) };
-    if count == 0 || elems == 0 { return make_nsarray(&[]); }
+    if count == 0 || elems == 0 {
+        return make_nsarray(&[]);
+    }
 
     // Our NSPredicate stores a closure at offset 16
     let fn_ptr = unsafe { *((predicate + 16) as *const u64) };
-    if fn_ptr == 0 { return make_nsarray(&[]); }
+    if fn_ptr == 0 {
+        return make_nsarray(&[]);
+    }
 
     let predicate_fn: &(dyn Fn(u64) -> bool + Send + Sync) =
         unsafe { &*(fn_ptr as *const Box<dyn Fn(u64) -> bool + Send + Sync>) };
@@ -348,10 +368,10 @@ pub extern "C" fn shim_nsarray_components_joined_by_string(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::shim_test_helpers::*;
     use crate::nsarray::{
         make_nsarray, shim_nsarray_count, shim_nsarray_object_at_index, NSARRAY_ELEMS_OFF,
     };
+    use crate::shim_test_helpers::*;
 
     #[test]
     fn nil_enumerate_is_noop() {
@@ -383,12 +403,21 @@ mod tests {
         let arr = make_nsarray(&[0xAA, 0xBB]);
         let copy = shim_nsarray_mutable_copy(arr, 0);
         assert_ne!(copy, 0);
-        assert_eq!(read_field(copy, 0), crate::nsobj::nsmutablearray_class_addr());
+        assert_eq!(
+            read_field(copy, 0),
+            crate::nsobj::nsmutablearray_class_addr()
+        );
         assert_eq!(crate::nsarray::shim_nsarray_count(copy, 0), 2);
-        assert_eq!(crate::nsarray::shim_nsarray_object_at_index(copy, 0, 1), 0xBB);
+        assert_eq!(
+            crate::nsarray::shim_nsarray_object_at_index(copy, 0, 1),
+            0xBB
+        );
         free_buf(read_field(arr, NSARRAY_ELEMS_OFF));
         free_obj(arr);
-        free_buf(read_field(copy, crate::nsmutablearray::NSMUTABLEARRAY_ELEMS_OFF));
+        free_buf(read_field(
+            copy,
+            crate::nsmutablearray::NSMUTABLEARRAY_ELEMS_OFF,
+        ));
         free_obj(copy);
     }
 
@@ -418,9 +447,15 @@ mod tests {
         assert_ne!(copy, 0);
         assert_eq!(read_field(copy, 0), crate::nsobj::nsarray_class_addr());
         assert_eq!(crate::nsarray::shim_nsarray_count(copy, 0), 2);
-        assert_eq!(crate::nsarray::shim_nsarray_object_at_index(copy, 0, 0), 0xAA);
+        assert_eq!(
+            crate::nsarray::shim_nsarray_object_at_index(copy, 0, 0),
+            0xAA
+        );
 
-        free_buf(read_field(arr, crate::nsmutablearray::NSMUTABLEARRAY_ELEMS_OFF));
+        free_buf(read_field(
+            arr,
+            crate::nsmutablearray::NSMUTABLEARRAY_ELEMS_OFF,
+        ));
         free_obj(arr);
         free_buf(read_field(copy, NSARRAY_ELEMS_OFF));
         free_obj(copy);

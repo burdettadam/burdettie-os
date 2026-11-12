@@ -1,0 +1,41 @@
+services:
+  burdettie-gui-demo:
+    image: ${BURDETTIE_DOCKER_IMAGE:-burdettie-os}
+    # Docker selects the host architecture by default. To force the ARM64
+    # reference lane for this service, set DOCKER_DEFAULT_PLATFORM=linux/arm64
+    # before invoking docker compose.
+    working_dir: /workspace
+    environment:
+      RUST_LOG: ${RUST_LOG:-info}
+      DARWIN_LOADER_ROOT: ${DARWIN_LOADER_ROOT:-/workspace}
+      BURDETTIE_GUI_DISPLAY: ${BURDETTIE_GUI_DISPLAY:-:99}
+      BURDETTIE_GUI_SCREEN: ${BURDETTIE_GUI_SCREEN:-1440x900x24}
+      BURDETTIE_GUI_ENABLE_VNC: ${BURDETTIE_GUI_ENABLE_VNC:-1}
+      BURDETTIE_GUI_ENABLE_NOVNC: ${BURDETTIE_GUI_ENABLE_NOVNC:-1}
+      BURDETTIE_GUI_HOLD_OPEN: ${BURDETTIE_GUI_HOLD_OPEN:-1}
+      BURDETTIE_GUI_MODE: ${BURDETTIE_GUI_MODE:-home}
+      BURDETTIE_GUI_WAIT_SECS: ${BURDETTIE_GUI_WAIT_SECS:-10}
+      BURDETTIE_GUI_VNC_PORT: 5900
+      BURDETTIE_GUI_NOVNC_PORT: 6080
+      BURDETTIE_GUEST_APP: ${BURDETTIE_GUEST_APP:-/workspace/fixtures/cocoa_draw/app}
+    ports:
+      - "${BURDETTIE_GUI_HOST_VNC_PORT:-5900}:5900"
+      - "${BURDETTIE_GUI_HOST_NOVNC_PORT:-6080}:6080"
+    volumes:
+      - ${BURDETTIE_WORKSPACE:-..}:/workspace
+    command:
+      - burdettie-gui
+      - burdettie-gui-session
+    # Default mode is the persistent Burdettie home screen. To run a guest app
+    # instead, set BURDETTIE_GUI_MODE=guest and optionally override:
+    # BURDETTIE_GUEST_APP=/opt/imported-artifacts/apps/Stickies.app/Contents/MacOS/Stickies
+    # BURDETTIE_GUEST_APP=/opt/imported-artifacts/apps/WezTerm.app/Contents/MacOS/wezterm-gui
+
+    # Optional imported-artifact overlay mounts for the external Compose lane.
+    # Keep them read-only when enabled.
+    # volumes:
+    #   - ${BURDETTIE_WORKSPACE:-..}:/workspace
+    #   - ${BURDETTIE_IMPORTED_MANIFEST:-./imported-artifacts.example.json}:/opt/imported-artifacts/manifest.json:ro
+    #   - ${BURDETTIE_IMPORTED_APPS_DIR:-../imports/apps}:/opt/imported-artifacts/apps:ro
+    #   - ${BURDETTIE_IMPORTED_FRAMEWORKS_DIR:-../imports/frameworks}:/opt/imported-artifacts/frameworks:ro
+    #   - ${BURDETTIE_IMPORTED_SDKS_DIR:-../imports/sdks}:/opt/imported-artifacts/sdks:ro

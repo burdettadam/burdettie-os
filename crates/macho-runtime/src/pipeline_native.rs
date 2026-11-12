@@ -3,12 +3,16 @@
 use std::path::Path;
 
 use libsystem_shims::ShimConfig;
-use macho_exec::{call_constructors, ImageRegistry, StubResolver, DataSymbolStore};
+use macho_exec::{call_constructors, DataSymbolStore, ImageRegistry, StubResolver};
 use macho_objc::extract_initializers;
 
 use crate::config::RuntimeConfig;
 use crate::context::RuntimeContext;
 use crate::error::RuntimeError;
+use crate::platform_adapters::{
+    ProviderAllocator, ProviderHasher, ProviderHostSymbols, ProviderThreading,
+    ProviderUnwindRegistry,
+};
 use crate::resolver::CompositeResolver;
 use crate::tracer::{EventKind, RuntimeTracer};
 use crate::RuntimeResult;
@@ -25,46 +29,44 @@ pub(super) fn run_native(
         .clone()
         .unwrap_or_else(RuntimeTracer::disabled);
 
-    // Initialize platform hasher for code signature verification
-    #[cfg(target_os = "macos")]
-    macho_parse::set_platform_hasher(std::sync::Arc::new(platform_darwin_host::DarwinHasher));
-    #[cfg(target_os = "linux")]
-    macho_parse::set_platform_hasher(std::sync::Arc::new(platform_linux::LinuxHasher));
+    // Initialize platform hasher for code signature verification.
+    macho_parse::set_platform_hasher(std::sync::Arc::new(ProviderHasher::new(
+        config.platform.clone(),
+    )));
 
     // 1–2. Read + parse — fast path returns cached Arc<[u8]> + Arc<ParsedMachO>
     // without any file I/O or realpath syscalls on iterations after the first.
-    let (main_data, arc_parsed) =
-        if let Some(cached) = crate::parse_cache::lookup(binary_path) {
-            cached
+    let (main_data, arc_parsed) = if let Some(cached) = crate::parse_cache::lookup(binary_path) {
+        cached
+    } else {
+        // Slow path: read file and parse, then populate cache.
+        let data = config
+            .platform
+            .fs()
+            .read(binary_path)
+            .map_err(|e| RuntimeError::Io {
+                path: binary_path.to_path_buf(),
+                source: e,
+            })?;
+        let parsed_result = macho_parse::parse_auto(&data, macho_types::CpuType::Arm64)?;
+        let main_data: std::sync::Arc<[u8]> = if macho_parse::is_fat(&data) {
+            let slice = macho_parse::fat_slice_for_cpu(&data, macho_types::CpuType::Arm64)?;
+            std::sync::Arc::from(slice)
         } else {
-            // Slow path: read file and parse, then populate cache.
-            let data = config
-                .platform
-                .fs()
-                .read(binary_path)
-                .map_err(|e| RuntimeError::Io {
-                    path: binary_path.to_path_buf(),
-                    source: e,
-                })?;
-            let parsed_result = macho_parse::parse_auto(&data, macho_types::CpuType::Arm64)?;
-            let main_data: std::sync::Arc<[u8]> = if macho_parse::is_fat(&data) {
-                let slice =
-                    macho_parse::fat_slice_for_cpu(&data, macho_types::CpuType::Arm64)?;
-                std::sync::Arc::from(slice)
-            } else {
-                std::sync::Arc::from(data)
-            };
-            let arc_parsed = std::sync::Arc::new(parsed_result);
-            let canonical =
-                binary_path.canonicalize().unwrap_or_else(|_| binary_path.to_path_buf());
-            crate::parse_cache::insert_both(
-                binary_path,
-                canonical,
-                main_data.clone(),
-                arc_parsed.clone(),
-            );
-            (main_data, arc_parsed)
+            std::sync::Arc::from(data)
         };
+        let arc_parsed = std::sync::Arc::new(parsed_result);
+        let canonical = binary_path
+            .canonicalize()
+            .unwrap_or_else(|_| binary_path.to_path_buf());
+        crate::parse_cache::insert_both(
+            binary_path,
+            canonical,
+            main_data.clone(),
+            arc_parsed.clone(),
+        );
+        (main_data, arc_parsed)
+    };
     tracer.record(
         EventKind::Pipeline,
         format!(
@@ -166,35 +168,21 @@ pub(super) fn run_native(
 
     // 5. Build composite resolver: shims → host fallback
     let host_setup_start = Instant::now();
-    #[cfg(target_os = "macos")]
     let host_symbols: std::sync::Arc<dyn platform_core::symbols::HostSymbolResolver> =
-        std::sync::Arc::new(platform_darwin_host::DarwinSymbolResolver::new());
-    #[cfg(target_os = "linux")]
-    let host_symbols: std::sync::Arc<dyn platform_core::symbols::HostSymbolResolver> =
-        std::sync::Arc::new(platform_linux::LinuxSymbolResolver::new());
+        std::sync::Arc::new(ProviderHostSymbols::new(config.platform.clone()));
 
     // Install host symbol resolver for objc-runtime exception bridge
     objc_runtime::set_host_symbols(host_symbols.clone());
 
     // Install platform allocator for objc-runtime object memory
-    #[cfg(target_os = "macos")]
-    objc_runtime::set_allocator(
-        std::sync::Arc::new(platform_darwin_host::DarwinAllocator),
-    );
-    #[cfg(target_os = "linux")]
-    objc_runtime::set_allocator(
-        std::sync::Arc::new(platform_linux::LinuxAllocator),
-    );
+    objc_runtime::set_allocator(std::sync::Arc::new(ProviderAllocator::new(
+        config.platform.clone(),
+    )));
 
     // Install platform threading for objc-runtime @synchronized
-    #[cfg(target_os = "macos")]
-    objc_runtime::set_threading(
-        std::sync::Arc::new(platform_darwin_host::PosixThreading),
-    );
-    #[cfg(target_os = "linux")]
-    objc_runtime::set_threading(
-        std::sync::Arc::new(platform_linux::LinuxThreading),
-    );
+    objc_runtime::set_threading(std::sync::Arc::new(ProviderThreading::new(
+        config.platform.clone(),
+    )));
     tracer.record_perf_timing("map_images", "host_setup_us", host_setup_start.elapsed());
 
     let stub_resolver_start = Instant::now();
@@ -231,7 +219,10 @@ pub(super) fn run_native(
                     );
                     tracer.record(
                         EventKind::Pipeline,
-                        format!("DYLD_INSERT_LIBRARIES: blocked by hardened runtime ({} libraries)", paths.len()),
+                        format!(
+                            "DYLD_INSERT_LIBRARIES: blocked by hardened runtime ({} libraries)",
+                            paths.len()
+                        ),
                     );
                     paths.clear();
                 }
@@ -241,16 +232,9 @@ pub(super) fn run_native(
     };
 
     // 6. Load dependencies + main binary into ImageRegistry
-    #[cfg(target_os = "macos")]
     let unwind_registry: std::sync::Arc<dyn platform_core::unwind::UnwindRegistry> =
-        std::sync::Arc::new(platform_darwin_host::DarwinUnwindRegistry);
-    #[cfg(target_os = "linux")]
-    let unwind_registry: std::sync::Arc<dyn platform_core::unwind::UnwindRegistry> =
-        std::sync::Arc::new(platform_linux::LinuxUnwindRegistry::new());
-    let mut registry = ImageRegistry::new(
-        config.platform.memory(),
-        unwind_registry,
-    );
+        std::sync::Arc::new(ProviderUnwindRegistry::new(config.platform.clone()));
+    let mut registry = ImageRegistry::new(config.platform.memory(), unwind_registry);
     let binary_dir = binary_path.parent().unwrap_or(Path::new("."));
 
     // 5.6. Load insert libraries first (before normal deps).
@@ -259,7 +243,10 @@ pub(super) fn run_native(
             loader::load_insert_libraries(&insert_lib_paths, &mut registry, config.platform.fs());
         tracer.record(
             EventKind::Pipeline,
-            format!("DYLD_INSERT_LIBRARIES: loaded {insert_count}/{} libraries", insert_lib_paths.len()),
+            format!(
+                "DYLD_INSERT_LIBRARIES: loaded {insert_count}/{} libraries",
+                insert_lib_paths.len()
+            ),
         );
     }
 
@@ -271,8 +258,16 @@ pub(super) fn run_native(
     // Load the main binary last
     let main_load_start = Instant::now();
     let app_idx = registry.load_preparsed("__main__", arc_parsed, main_data)?;
-    tracer.record_perf_timing("map_images", "main_image_load_us", main_load_start.elapsed());
-    tracer.record_perf_counter("map_images", "mapped_images_total", registry.images().len() as u64);
+    tracer.record_perf_timing(
+        "map_images",
+        "main_image_load_us",
+        main_load_start.elapsed(),
+    );
+    tracer.record_perf_counter(
+        "map_images",
+        "mapped_images_total",
+        registry.images().len() as u64,
+    );
     for loaded in registry.images() {
         tracer.record(
             EventKind::ImageLoad,
@@ -297,7 +292,7 @@ pub(super) fn run_native(
 
     // 7.3. Patch TLV thunks before protect() makes __DATA read-only
     for loaded in registry.images() {
-        macho_exec::patch_tlv_thunks(&loaded.image, &loaded.parsed, &loaded.data);
+        macho_exec::patch_tlv_thunks(&loaded.image, &loaded.parsed);
     }
 
     // 7.5. Register ObjC metadata (phases A–E)
@@ -385,8 +380,7 @@ pub(super) fn run_native(
             .map(|(k, v)| format!("{k}={v}"))
             .collect(),
     };
-    let entry_result =
-        macho_exec::call_entry_with_args(&app.image, entry, Some(&entry_args))?;
+    let entry_result = macho_exec::call_entry_with_args(&app.image, entry, Some(&entry_args))?;
     tracer.record(
         EventKind::Pipeline,
         format!("entry point returned exit_code={}", entry_result.exit_code,),

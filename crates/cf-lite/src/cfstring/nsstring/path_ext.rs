@@ -3,11 +3,11 @@
 use std::ffi::CString;
 use std::path::{Component, Path, PathBuf};
 
+use super::basic::{shim_nsstring_is_equal_to_string, shim_nsstring_string_with_format_inner};
+use super::search::{NSRange, NS_NOT_FOUND};
 use crate::cfstring::{
     alloc_nsstring_from_cstr, extract_cfstring_cstr, shim_cf_string_create_with_cstring,
 };
-use super::search::{NSRange, NS_NOT_FOUND};
-use super::basic::{shim_nsstring_is_equal_to_string, shim_nsstring_string_with_format_inner};
 
 fn normalize_path_string(path: &str, resolve_symlinks: bool) -> String {
     if resolve_symlinks {
@@ -97,7 +97,11 @@ fn normalize_path_string(path: &str, resolve_symlinks: bool) -> String {
     };
 
     if normalized.is_empty() {
-        normalized = if saw_root { "/".to_string() } else { ".".to_string() };
+        normalized = if saw_root {
+            "/".to_string()
+        } else {
+            ".".to_string()
+        };
     }
 
     normalized
@@ -153,9 +157,9 @@ pub extern "C" fn shim_nsstring_string_by_deleting_last_path_component(obj: u64,
         "/"
     } else {
         match trimmed.rfind('/') {
-        Some(0) => "/",
-        Some(pos) => &trimmed[..pos],
-        None => "",
+            Some(0) => "/",
+            Some(pos) => &trimmed[..pos],
+            None => "",
         }
     };
     let cstr = CString::new(result).unwrap_or_default();
@@ -204,10 +208,7 @@ pub extern "C" fn shim_nsstring_is_absolute_path(obj: u64, _sel: u64) -> u8 {
 }
 
 /// `-[NSString stringByResolvingSymlinksInPath]`
-pub extern "C" fn shim_nsstring_string_by_resolving_symlinks_in_path(
-    obj: u64,
-    _sel: u64,
-) -> u64 {
+pub extern "C" fn shim_nsstring_string_by_resolving_symlinks_in_path(obj: u64, _sel: u64) -> u64 {
     let Some(s) = extract_cfstring_cstr(obj) else {
         return 0;
     };
@@ -326,7 +327,11 @@ pub extern "C" fn shim_nsstring_contains_string(obj: u64, _sel: u64, search: u64
     let Some(needle) = extract_cfstring_cstr(search) else {
         return 0;
     };
-    if s.contains(needle) { 1 } else { 0 }
+    if s.contains(needle) {
+        1
+    } else {
+        0
+    }
 }
 
 /// `-[NSString substringWithRange:]`
@@ -344,7 +349,12 @@ pub extern "C" fn shim_nsstring_substring_with_range(
     let loc = location as usize;
     let len = length as usize;
     if loc + len > s.len() {
-        log::warn!("substringWithRange: range {},{} out of bounds for len={}", loc, len, s.len());
+        log::warn!(
+            "substringWithRange: range {},{} out of bounds for len={}",
+            loc,
+            len,
+            s.len()
+        );
         return 0;
     }
     let sub = &s[loc..loc + len];
@@ -362,10 +372,19 @@ pub extern "C" fn shim_nsstring_character_at_index(obj: u64, _sel: u64, index: u
     let idx = index as usize;
     if idx < utf16.len() {
         let ch = utf16[idx];
-        eprintln!("[charAtIndex] idx={} → '{}' (0x{:x})", idx, char::from_u32(ch as u32).unwrap_or('?'), ch);
+        eprintln!(
+            "[charAtIndex] idx={} → '{}' (0x{:x})",
+            idx,
+            char::from_u32(ch as u32).unwrap_or('?'),
+            ch
+        );
         ch
     } else {
-        log::warn!("characterAtIndex: index {} out of bounds for len={}", idx, utf16.len());
+        log::warn!(
+            "characterAtIndex: index {} out of bounds for len={}",
+            idx,
+            utf16.len()
+        );
         0
     }
 }
@@ -398,13 +417,7 @@ pub extern "C" fn shim_nsstring_init_with_format_arguments(
     }
     let (a1, a2, a3) = if va_list != 0 {
         let ptr = va_list as *const u64;
-        unsafe {
-            (
-                *ptr,
-                *ptr.add(1),
-                *ptr.add(2),
-            )
-        }
+        unsafe { (*ptr, *ptr.add(1), *ptr.add(2)) }
     } else {
         (0, 0, 0)
     };
@@ -412,11 +425,7 @@ pub extern "C" fn shim_nsstring_init_with_format_arguments(
 }
 
 /// `-[NSString initWithString:]`
-pub extern "C" fn shim_nsstring_init_with_string(
-    _obj: u64,
-    _sel: u64,
-    other: u64,
-) -> u64 {
+pub extern "C" fn shim_nsstring_init_with_string(_obj: u64, _sel: u64, other: u64) -> u64 {
     if other == 0 {
         return 0;
     }
@@ -646,12 +655,11 @@ mod tests {
         free_obj(result);
     }
 
+    #[cfg(unix)]
     #[test]
     fn string_by_resolving_symlinks_in_path_canonicalizes_when_possible() {
-        let tempdir = std::env::temp_dir().join(format!(
-            "cf-lite-nsstring-path-ext-{}",
-            std::process::id()
-        ));
+        let tempdir =
+            std::env::temp_dir().join(format!("cf-lite-nsstring-path-ext-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&tempdir);
         std::fs::create_dir_all(tempdir.join("real")).expect("create temp tree");
         let link = tempdir.join("link");
@@ -672,7 +680,10 @@ mod tests {
         assert_eq!(shim_nsstring_path(0, 0), 0);
         assert_eq!(shim_nsstring_path_extension(0, 0), 0);
         assert_eq!(shim_nsstring_last_path_component(0, 0), 0);
-        assert_eq!(shim_nsstring_string_by_deleting_last_path_component(0, 0), 0);
+        assert_eq!(
+            shim_nsstring_string_by_deleting_last_path_component(0, 0),
+            0
+        );
         assert_eq!(shim_nsstring_string_by_deleting_path_extension(0, 0), 0);
         assert_eq!(shim_nsstring_string_by_resolving_symlinks_in_path(0, 0), 0);
         assert_eq!(shim_nsstring_string_by_standardizing_path(0, 0), 0);
@@ -734,9 +745,18 @@ mod tests {
         assert_ne!(arr, 0);
         assert_eq!(crate::nsarray::shim_nsarray_count(arr, 0), 4);
         assert_string_eq(crate::nsarray::shim_nsarray_object_at_index(arr, 0, 0), "/");
-        assert_string_eq(crate::nsarray::shim_nsarray_object_at_index(arr, 0, 1), "usr");
-        assert_string_eq(crate::nsarray::shim_nsarray_object_at_index(arr, 0, 2), "local");
-        assert_string_eq(crate::nsarray::shim_nsarray_object_at_index(arr, 0, 3), "bin");
+        assert_string_eq(
+            crate::nsarray::shim_nsarray_object_at_index(arr, 0, 1),
+            "usr",
+        );
+        assert_string_eq(
+            crate::nsarray::shim_nsarray_object_at_index(arr, 0, 2),
+            "local",
+        );
+        assert_string_eq(
+            crate::nsarray::shim_nsarray_object_at_index(arr, 0, 3),
+            "bin",
+        );
         free_obj(s);
     }
 
@@ -746,8 +766,14 @@ mod tests {
         let arr = shim_nsstring_path_components(s, 0);
         assert_ne!(arr, 0);
         assert_eq!(crate::nsarray::shim_nsarray_count(arr, 0), 2);
-        assert_string_eq(crate::nsarray::shim_nsarray_object_at_index(arr, 0, 0), "foo");
-        assert_string_eq(crate::nsarray::shim_nsarray_object_at_index(arr, 0, 1), "bar");
+        assert_string_eq(
+            crate::nsarray::shim_nsarray_object_at_index(arr, 0, 0),
+            "foo",
+        );
+        assert_string_eq(
+            crate::nsarray::shim_nsarray_object_at_index(arr, 0, 1),
+            "bar",
+        );
         free_obj(s);
     }
 

@@ -3,13 +3,30 @@
 
 mod common;
 
-use macho_exec::{apply_chained_fixups, call_entry, call_entry_interpreted, checked_entry, MappedImage};
+use macho_exec::{apply_chained_fixups, call_entry, call_entry_interpreted, MappedImage};
 use macho_map::MappingPlan;
 use macho_parse::parse;
 
-use common::{
-    default_mapper, default_stub_resolver, default_unwind, fixtures_dir, read_fixture,
-};
+use common::{default_mapper, default_stub_resolver, default_unwind, read_fixture};
+
+fn synthetic_unixthread_entry(
+    image: &MappedImage,
+    entry: &macho_types::EntryPoint,
+) -> macho_types::EntryPoint {
+    match entry {
+        macho_types::EntryPoint::Main { entry_offset, .. } => {
+            let text = image.segment("__TEXT").expect("fixture should map __TEXT");
+            macho_types::EntryPoint::UnixThread {
+                entry_address: text.vmaddr + *entry_offset as u64,
+            }
+        }
+        macho_types::EntryPoint::UnixThread { entry_address } => {
+            macho_types::EntryPoint::UnixThread {
+                entry_address: *entry_address,
+            }
+        }
+    }
+}
 
 // ── Controlled entry: execute return42 fixture ─────────────────────
 
@@ -58,6 +75,28 @@ fn controlled_entry_preserves_stack() {
         canary, stored_canary,
         "stack canary should be preserved after controlled entry"
     );
+}
+
+#[test]
+fn controlled_entry_return42_unixthread() {
+    let Some(data) = read_fixture("return42/return42") else {
+        return;
+    };
+    let parsed = parse(&data).unwrap();
+    let plan = MappingPlan::from_parsed(&parsed);
+
+    let image = MappedImage::map(&plan, &data, default_mapper(), default_unwind()).unwrap();
+    image.protect().unwrap();
+
+    let entry = parsed.entry.as_ref().expect("return42 should have LC_MAIN");
+    let unixthread_entry = synthetic_unixthread_entry(&image, entry);
+    let result = call_entry(&image, &unixthread_entry).unwrap();
+
+    assert_eq!(
+        result.exit_code, 42,
+        "synthetic LC_UNIXTHREAD entry should return 42"
+    );
+    assert!(result.entry_address > 0, "entry address should be non-zero");
 }
 
 // ── Controlled entry: execute simple_cli with printf stub ──────────
@@ -127,6 +166,28 @@ fn interpreted_entry_return42() {
     );
 }
 
+#[test]
+fn interpreted_entry_return42_unixthread() {
+    let Some(data) = read_fixture("return42/return42") else {
+        return;
+    };
+    let parsed = parse(&data).unwrap();
+    let plan = MappingPlan::from_parsed(&parsed);
+
+    let image = MappedImage::map(&plan, &data, default_mapper(), default_unwind()).unwrap();
+    let entry = parsed.entry.as_ref().expect("return42 should have LC_MAIN");
+    let unixthread_entry = synthetic_unixthread_entry(&image, entry);
+
+    let ffi = arm64_translate::FfiBridge::new();
+    let result = call_entry_interpreted(&image, &unixthread_entry, None, ffi, &[]).unwrap();
+
+    assert_eq!(
+        result.exit_code, 42,
+        "synthetic LC_UNIXTHREAD entry via interpreter should return 42, got {}",
+        result.exit_code
+    );
+}
+
 /// Execute simple_cli through the interpreter with auto-FFI stubbing.
 ///
 /// simple_cli calls printf("hello\n") then returns 0.
@@ -147,7 +208,10 @@ fn interpreted_entry_simple_cli() {
     let resolver = default_stub_resolver();
     let (_rebases, _binds) = apply_chained_fixups(&image, &parsed, &data, &resolver).unwrap();
 
-    let entry = parsed.entry.as_ref().expect("simple_cli should have LC_MAIN");
+    let entry = parsed
+        .entry
+        .as_ref()
+        .expect("simple_cli should have LC_MAIN");
 
     // No explicit FFI registration needed: the interpreter auto-detects
     // branches to unmapped addresses (e.g., the resolved host printf) and
@@ -212,12 +276,9 @@ fn interpreted_entry_constructor_test() {
 
         // Constructor signature: extern "C" fn() — no args, no return value.
         let mut interp = arm64_translate::interp::setup_for_main(
-            ctor_mem,
-            ctor_ffi,
-            ctor_addr,
-            0,   // argc = 0
-            0,   // argv = null
-            0,   // envp = null
+            ctor_mem, ctor_ffi, ctor_addr, 0, // argc = 0
+            0, // argv = null
+            0, // envp = null
         );
 
         let exit_reason = interp.run();
@@ -226,9 +287,7 @@ fn interpreted_entry_constructor_test() {
             | arm64_translate::ExitReason::ReturnedToHost { .. } => {
                 // Constructor returned normally — good.
             }
-            other => panic!(
-                "Constructor at {ctor_addr:#x} exited unexpectedly: {other:?}"
-            ),
+            other => panic!("Constructor at {ctor_addr:#x} exited unexpectedly: {other:?}"),
         }
     }
 
@@ -238,7 +297,10 @@ fn interpreted_entry_constructor_test() {
     );
 
     // Now run main.
-    let entry = parsed.entry.as_ref().expect("constructor_test should have LC_MAIN");
+    let entry = parsed
+        .entry
+        .as_ref()
+        .expect("constructor_test should have LC_MAIN");
     let result = call_entry_interpreted(&image, entry, None, ffi, &[]).unwrap();
 
     assert_eq!(
@@ -266,7 +328,10 @@ fn interpreted_entry_process_info() {
     let resolver = default_stub_resolver();
     let (_rebases, _binds) = apply_chained_fixups(&image, &parsed, &data, &resolver).unwrap();
 
-    let entry = parsed.entry.as_ref().expect("process_info should have LC_MAIN");
+    let entry = parsed
+        .entry
+        .as_ref()
+        .expect("process_info should have LC_MAIN");
     let ffi = arm64_translate::FfiBridge::new();
 
     let result = call_entry_interpreted(&image, entry, None, ffi, &[]).unwrap();
@@ -358,4 +423,3 @@ fn interpreted_overhead_report() {
     }
     eprintln!("└─────────────────────┴─────────────┴──────────────┘");
 }
-

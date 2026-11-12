@@ -48,7 +48,11 @@ fn json_value_to_foundation(val: &serde_json::Value) -> u64 {
             let mut vals = Vec::with_capacity(map.len());
             for (k, v) in map {
                 let c_key = std::ffi::CString::new(k.as_str()).unwrap_or_default();
-                keys.push(cfstring::shim_cf_string_create_with_cstring(0, c_key.as_ptr(), 0));
+                keys.push(cfstring::shim_cf_string_create_with_cstring(
+                    0,
+                    c_key.as_ptr(),
+                    0,
+                ));
                 vals.push(json_value_to_foundation(v));
             }
             nsdictionary::make_nsdictionary(&keys, &vals)
@@ -91,13 +95,16 @@ fn foundation_to_json_value(obj: u64) -> serde_json::Value {
     if isa == nsobj::nsnumber_class_addr() || isa == nsobj::nsconstantintegernumber_class_addr() {
         let (tag, raw) = nsnumber::read_number_pub(obj);
         return match tag {
-            2 => { // TAG_BOOL
+            2 => {
+                // TAG_BOOL
                 serde_json::Value::Bool(raw != 0)
             }
-            0 => { // TAG_INT
+            0 => {
+                // TAG_INT
                 serde_json::Value::Number(serde_json::Number::from(raw as i64))
             }
-            1 => { // TAG_DOUBLE
+            1 => {
+                // TAG_DOUBLE
                 let val = f64::from_bits(raw);
                 serde_json::Number::from_f64(val)
                     .map(serde_json::Value::Number)
@@ -160,12 +167,16 @@ pub extern "C" fn shim_json_object_with_data(
     _options: u64,
     error_out: u64,
 ) -> u64 {
-    if data == 0 { return 0; }
+    if data == 0 {
+        return 0;
+    }
 
     // Read NSData bytes
     let length = unsafe { *((data + 8) as *const u64) } as usize;
     let bytes_ptr = unsafe { *((data + 16) as *const u64) } as *const u8;
-    if bytes_ptr.is_null() || length == 0 { return 0; }
+    if bytes_ptr.is_null() || length == 0 {
+        return 0;
+    }
 
     let slice = unsafe { std::slice::from_raw_parts(bytes_ptr, length) };
 
@@ -177,7 +188,9 @@ pub extern "C" fn shim_json_object_with_data(
                     "NSCocoaErrorDomain",
                     3840, // NSPropertyListReadCorruptError
                 );
-                unsafe { *(error_out as *mut u64) = err; }
+                unsafe {
+                    *(error_out as *mut u64) = err;
+                }
                 log::debug!("NSJSONSerialization: parse error: {}", e);
             }
             0
@@ -193,7 +206,9 @@ pub extern "C" fn shim_data_with_json_object(
     options: u64,
     error_out: u64,
 ) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
 
     let val = foundation_to_json_value(obj);
 
@@ -204,16 +219,16 @@ pub extern "C" fn shim_data_with_json_object(
     };
 
     match json_bytes {
-        Ok(bytes) => {
-            crate::nsdata::make_nsdata(&bytes)
-        }
+        Ok(bytes) => crate::nsdata::make_nsdata(&bytes),
         Err(e) => {
             if error_out != 0 {
                 let err = crate::nserror::make_nserror(
                     "NSCocoaErrorDomain",
                     3840, // NSPropertyListWriteStreamError
                 );
-                unsafe { *(error_out as *mut u64) = err; }
+                unsafe {
+                    *(error_out as *mut u64) = err;
+                }
                 log::debug!("NSJSONSerialization: serialization error: {}", e);
             }
             0
@@ -223,7 +238,9 @@ pub extern "C" fn shim_data_with_json_object(
 
 /// `+[NSJSONSerialization isValidJSONObject:]`
 pub extern "C" fn shim_is_valid_json_object(_cls: u64, _cmd: u64, obj: u64) -> u8 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let isa = unsafe { *(obj as *const u64) };
     // Valid JSON root objects: NSArray or NSDictionary
     if isa == nsobj::nsarray_class_addr()

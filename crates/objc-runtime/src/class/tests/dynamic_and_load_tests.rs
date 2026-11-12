@@ -1,6 +1,6 @@
 use super::*;
 use std::collections::HashMap;
-use std::ffi::{CStr, c_char};
+use std::ffi::{c_char, CStr};
 
 // ── Dynamic class tests ────────────────────────────────────────────
 
@@ -108,11 +108,9 @@ fn clone_shares_selector_storage_safely() {
     let cloned_selector = cloned
         .selector_ptr("hello")
         .expect("cloned runtime should retain selector pointer after original drop");
-    let selector_name = unsafe {
-        CStr::from_ptr(cloned_selector as *const c_char)
-    }
-    .to_str()
-    .expect("shared selector pointer should stay valid");
+    let selector_name = unsafe { CStr::from_ptr(cloned_selector as *const c_char) }
+        .to_str()
+        .expect("shared selector pointer should stay valid");
 
     assert_eq!(selector_name, "hello");
     assert_eq!(

@@ -36,8 +36,16 @@ mod tests {
         let f = frames[&v];
         assert!(approx(f.width, 100.0), "width={}", f.width);
         assert!(approx(f.height, 50.0), "height={}", f.height);
-        assert!(approx(f.x + f.width / 2.0, 200.0), "cx={}", f.x + f.width / 2.0);
-        assert!(approx(f.y + f.height / 2.0, 150.0), "cy={}", f.y + f.height / 2.0);
+        assert!(
+            approx(f.x + f.width / 2.0, 200.0),
+            "cx={}",
+            f.x + f.width / 2.0
+        );
+        assert!(
+            approx(f.y + f.height / 2.0, 150.0),
+            "cy={}",
+            f.y + f.height / 2.0
+        );
     }
 
     #[test]
@@ -62,16 +70,63 @@ mod tests {
         let b = ViewId(2);
 
         // A: left-pinned, half width
-        engine.add_constraint(equal(a, LayoutAttribute::Left, SUPERVIEW, LayoutAttribute::Left, 0.0));
-        engine.add_constraint(equal(a, LayoutAttribute::Top, SUPERVIEW, LayoutAttribute::Top, 0.0));
-        engine.add_constraint(equal(a, LayoutAttribute::Bottom, SUPERVIEW, LayoutAttribute::Bottom, 0.0));
-        engine.add_constraint(LayoutConstraint::constant(a, LayoutAttribute::Width, LayoutRelation::Equal, 200.0));
+        engine.add_constraint(equal(
+            a,
+            LayoutAttribute::Left,
+            SUPERVIEW,
+            LayoutAttribute::Left,
+            0.0,
+        ));
+        engine.add_constraint(equal(
+            a,
+            LayoutAttribute::Top,
+            SUPERVIEW,
+            LayoutAttribute::Top,
+            0.0,
+        ));
+        engine.add_constraint(equal(
+            a,
+            LayoutAttribute::Bottom,
+            SUPERVIEW,
+            LayoutAttribute::Bottom,
+            0.0,
+        ));
+        engine.add_constraint(LayoutConstraint::constant(
+            a,
+            LayoutAttribute::Width,
+            LayoutRelation::Equal,
+            200.0,
+        ));
 
         // B: right of A, fills remaining
-        engine.add_constraint(equal(b, LayoutAttribute::Left, a, LayoutAttribute::Right, 0.0));
-        engine.add_constraint(equal(b, LayoutAttribute::Top, SUPERVIEW, LayoutAttribute::Top, 0.0));
-        engine.add_constraint(equal(b, LayoutAttribute::Right, SUPERVIEW, LayoutAttribute::Right, 0.0));
-        engine.add_constraint(equal(b, LayoutAttribute::Bottom, SUPERVIEW, LayoutAttribute::Bottom, 0.0));
+        engine.add_constraint(equal(
+            b,
+            LayoutAttribute::Left,
+            a,
+            LayoutAttribute::Right,
+            0.0,
+        ));
+        engine.add_constraint(equal(
+            b,
+            LayoutAttribute::Top,
+            SUPERVIEW,
+            LayoutAttribute::Top,
+            0.0,
+        ));
+        engine.add_constraint(equal(
+            b,
+            LayoutAttribute::Right,
+            SUPERVIEW,
+            LayoutAttribute::Right,
+            0.0,
+        ));
+        engine.add_constraint(equal(
+            b,
+            LayoutAttribute::Bottom,
+            SUPERVIEW,
+            LayoutAttribute::Bottom,
+            0.0,
+        ));
 
         let frames = engine.solve().unwrap();
         let fa = frames[&a];
@@ -90,8 +145,20 @@ mod tests {
         let v = ViewId(1);
 
         // Place at top-left
-        engine.add_constraint(equal(v, LayoutAttribute::Left, SUPERVIEW, LayoutAttribute::Left, 10.0));
-        engine.add_constraint(equal(v, LayoutAttribute::Top, SUPERVIEW, LayoutAttribute::Top, 10.0));
+        engine.add_constraint(equal(
+            v,
+            LayoutAttribute::Left,
+            SUPERVIEW,
+            LayoutAttribute::Left,
+            10.0,
+        ));
+        engine.add_constraint(equal(
+            v,
+            LayoutAttribute::Top,
+            SUPERVIEW,
+            LayoutAttribute::Top,
+            10.0,
+        ));
 
         // Intrinsic size: 80×20
         engine.add_constraints(intrinsic_size_constraints(
@@ -122,8 +189,16 @@ mod tests {
         // Resize container
         engine.set_container(Rect::new(0.0, 0.0, 800.0, 600.0));
         let frames = engine.solve().unwrap();
-        assert!(approx(frames[&v].width, 800.0), "width={}", frames[&v].width);
-        assert!(approx(frames[&v].height, 600.0), "height={}", frames[&v].height);
+        assert!(
+            approx(frames[&v].width, 800.0),
+            "width={}",
+            frames[&v].width
+        );
+        assert!(
+            approx(frames[&v].height, 600.0),
+            "height={}",
+            frames[&v].height
+        );
     }
 
     #[test]
@@ -134,25 +209,85 @@ mod tests {
         let c = ViewId(3);
 
         // All three have equal width and fill the container horizontally
-        engine.add_constraint(equal(a, LayoutAttribute::Left, SUPERVIEW, LayoutAttribute::Left, 0.0));
-        engine.add_constraint(equal(b, LayoutAttribute::Left, a, LayoutAttribute::Right, 0.0));
-        engine.add_constraint(equal(c, LayoutAttribute::Left, b, LayoutAttribute::Right, 0.0));
-        engine.add_constraint(equal(c, LayoutAttribute::Right, SUPERVIEW, LayoutAttribute::Right, 0.0));
+        engine.add_constraint(equal(
+            a,
+            LayoutAttribute::Left,
+            SUPERVIEW,
+            LayoutAttribute::Left,
+            0.0,
+        ));
+        engine.add_constraint(equal(
+            b,
+            LayoutAttribute::Left,
+            a,
+            LayoutAttribute::Right,
+            0.0,
+        ));
+        engine.add_constraint(equal(
+            c,
+            LayoutAttribute::Left,
+            b,
+            LayoutAttribute::Right,
+            0.0,
+        ));
+        engine.add_constraint(equal(
+            c,
+            LayoutAttribute::Right,
+            SUPERVIEW,
+            LayoutAttribute::Right,
+            0.0,
+        ));
 
         // Equal widths: b.width == a.width, c.width == a.width
-        engine.add_constraint(equal(b, LayoutAttribute::Width, a, LayoutAttribute::Width, 0.0));
-        engine.add_constraint(equal(c, LayoutAttribute::Width, a, LayoutAttribute::Width, 0.0));
+        engine.add_constraint(equal(
+            b,
+            LayoutAttribute::Width,
+            a,
+            LayoutAttribute::Width,
+            0.0,
+        ));
+        engine.add_constraint(equal(
+            c,
+            LayoutAttribute::Width,
+            a,
+            LayoutAttribute::Width,
+            0.0,
+        ));
 
         // All fill height
         for v in [a, b, c] {
-            engine.add_constraint(equal(v, LayoutAttribute::Top, SUPERVIEW, LayoutAttribute::Top, 0.0));
-            engine.add_constraint(equal(v, LayoutAttribute::Bottom, SUPERVIEW, LayoutAttribute::Bottom, 0.0));
+            engine.add_constraint(equal(
+                v,
+                LayoutAttribute::Top,
+                SUPERVIEW,
+                LayoutAttribute::Top,
+                0.0,
+            ));
+            engine.add_constraint(equal(
+                v,
+                LayoutAttribute::Bottom,
+                SUPERVIEW,
+                LayoutAttribute::Bottom,
+                0.0,
+            ));
         }
 
         let frames = engine.solve().unwrap();
-        assert!(approx(frames[&a].width, 100.0), "a.width={}", frames[&a].width);
-        assert!(approx(frames[&b].width, 100.0), "b.width={}", frames[&b].width);
-        assert!(approx(frames[&c].width, 100.0), "c.width={}", frames[&c].width);
+        assert!(
+            approx(frames[&a].width, 100.0),
+            "a.width={}",
+            frames[&a].width
+        );
+        assert!(
+            approx(frames[&b].width, 100.0),
+            "b.width={}",
+            frames[&b].width
+        );
+        assert!(
+            approx(frames[&c].width, 100.0),
+            "c.width={}",
+            frames[&c].width
+        );
         assert!(approx(frames[&a].x, 0.0));
         assert!(approx(frames[&b].x, 100.0), "b.x={}", frames[&b].x);
         assert!(approx(frames[&c].x, 200.0), "c.x={}", frames[&c].x);
@@ -164,13 +299,35 @@ mod tests {
         let v = ViewId(1);
 
         // Width = 200, height = 0.5 * width (2:1 aspect ratio)
-        engine.add_constraint(LayoutConstraint::constant(v, LayoutAttribute::Width, LayoutRelation::Equal, 200.0));
-        engine.add_constraint(LayoutConstraint::new(
-            v, LayoutAttribute::Height, LayoutRelation::Equal,
-            v, LayoutAttribute::Width, 0.5, 0.0,
+        engine.add_constraint(LayoutConstraint::constant(
+            v,
+            LayoutAttribute::Width,
+            LayoutRelation::Equal,
+            200.0,
         ));
-        engine.add_constraint(equal(v, LayoutAttribute::Left, SUPERVIEW, LayoutAttribute::Left, 0.0));
-        engine.add_constraint(equal(v, LayoutAttribute::Top, SUPERVIEW, LayoutAttribute::Top, 0.0));
+        engine.add_constraint(LayoutConstraint::new(
+            v,
+            LayoutAttribute::Height,
+            LayoutRelation::Equal,
+            v,
+            LayoutAttribute::Width,
+            0.5,
+            0.0,
+        ));
+        engine.add_constraint(equal(
+            v,
+            LayoutAttribute::Left,
+            SUPERVIEW,
+            LayoutAttribute::Left,
+            0.0,
+        ));
+        engine.add_constraint(equal(
+            v,
+            LayoutAttribute::Top,
+            SUPERVIEW,
+            LayoutAttribute::Top,
+            0.0,
+        ));
 
         let frames = engine.solve().unwrap();
         let f = frames[&v];
@@ -184,7 +341,10 @@ mod tests {
         let v = ViewId(10);
         for i in 0..5 {
             engine.add_constraint(LayoutConstraint::constant(
-                v, LayoutAttribute::Width, LayoutRelation::Equal, (i * 10) as f64,
+                v,
+                LayoutAttribute::Width,
+                LayoutRelation::Equal,
+                (i * 10) as f64,
             ));
         }
         assert_eq!(engine.constraint_count(), 5);
@@ -196,9 +356,24 @@ mod tests {
     fn layout_engine_constraint_count() {
         let mut engine = LayoutEngine::new(Rect::new(0.0, 0.0, 100.0, 100.0));
         let v = ViewId(1);
-        engine.add_constraint(LayoutConstraint::constant(v, LayoutAttribute::Left, LayoutRelation::Equal, 0.0));
-        engine.add_constraint(LayoutConstraint::constant(v, LayoutAttribute::Top, LayoutRelation::Equal, 0.0));
-        engine.add_constraint(LayoutConstraint::constant(v, LayoutAttribute::Width, LayoutRelation::Equal, 50.0));
+        engine.add_constraint(LayoutConstraint::constant(
+            v,
+            LayoutAttribute::Left,
+            LayoutRelation::Equal,
+            0.0,
+        ));
+        engine.add_constraint(LayoutConstraint::constant(
+            v,
+            LayoutAttribute::Top,
+            LayoutRelation::Equal,
+            0.0,
+        ));
+        engine.add_constraint(LayoutConstraint::constant(
+            v,
+            LayoutAttribute::Width,
+            LayoutRelation::Equal,
+            50.0,
+        ));
         assert_eq!(engine.constraint_count(), 3);
     }
 
@@ -230,8 +405,18 @@ mod tests {
         let v = ViewId(1);
 
         // Conflicting: width == 100 and width == 200, both required
-        engine.add_constraint(LayoutConstraint::constant(v, LayoutAttribute::Width, LayoutRelation::Equal, 100.0));
-        engine.add_constraint(LayoutConstraint::constant(v, LayoutAttribute::Width, LayoutRelation::Equal, 200.0));
+        engine.add_constraint(LayoutConstraint::constant(
+            v,
+            LayoutAttribute::Width,
+            LayoutRelation::Equal,
+            100.0,
+        ));
+        engine.add_constraint(LayoutConstraint::constant(
+            v,
+            LayoutAttribute::Width,
+            LayoutRelation::Equal,
+            200.0,
+        ));
 
         let result = engine.solve();
         assert!(result.is_err(), "should detect conflict");
@@ -251,7 +436,7 @@ mod tests {
         let f = frames[&v];
         assert!(approx(f.x, 16.0), "left={}", f.x);
         assert!(approx(f.y, 20.0), "top={}", f.y);
-        assert!(approx(f.width, 368.0), "width={}", f.width);   // 400 - 16 - 16
+        assert!(approx(f.width, 368.0), "width={}", f.width); // 400 - 16 - 16
         assert!(approx(f.height, 260.0), "height={}", f.height); // 300 - 20 - 20
     }
 
@@ -288,7 +473,12 @@ mod tests {
         // Safe area center Y = 44 + (800-44-34)/2 = 44 + 361 = 405
         let expected_cy = 44.0 + (800.0 - 44.0 - 34.0) / 2.0;
         let actual_cy = f.y + f.height / 2.0;
-        assert!(approx(actual_cy, expected_cy), "cy={} expected={}", actual_cy, expected_cy);
+        assert!(
+            approx(actual_cy, expected_cy),
+            "cy={} expected={}",
+            actual_cy,
+            expected_cy
+        );
     }
 
     #[test]
@@ -313,10 +503,18 @@ mod tests {
         let v = ViewId(1);
 
         engine.add_constraint(equal(
-            v, LayoutAttribute::Left, SAFE_AREA_GUIDE, LayoutAttribute::Left, 0.0,
+            v,
+            LayoutAttribute::Left,
+            SAFE_AREA_GUIDE,
+            LayoutAttribute::Left,
+            0.0,
         ));
         engine.add_constraint(equal(
-            v, LayoutAttribute::Top, SAFE_AREA_GUIDE, LayoutAttribute::Top, 0.0,
+            v,
+            LayoutAttribute::Top,
+            SAFE_AREA_GUIDE,
+            LayoutAttribute::Top,
+            0.0,
         ));
         engine.add_constraints(set_size(v, 80.0, 40.0));
 
@@ -337,10 +535,18 @@ mod tests {
         let v = ViewId(1);
 
         engine.add_constraint(equal(
-            v, LayoutAttribute::Left, LAYOUT_MARGINS_GUIDE, LayoutAttribute::Left, 0.0,
+            v,
+            LayoutAttribute::Left,
+            LAYOUT_MARGINS_GUIDE,
+            LayoutAttribute::Left,
+            0.0,
         ));
         engine.add_constraint(equal(
-            v, LayoutAttribute::Top, LAYOUT_MARGINS_GUIDE, LayoutAttribute::Top, 0.0,
+            v,
+            LayoutAttribute::Top,
+            LAYOUT_MARGINS_GUIDE,
+            LayoutAttribute::Top,
+            0.0,
         ));
         engine.add_constraints(set_size(v, 60.0, 30.0));
 
@@ -362,11 +568,26 @@ mod tests {
 
         // Set height = 100, aspect = 2.0 → width should be 200
         engine.add_constraint(LayoutConstraint::constant(
-            v, LayoutAttribute::Height, LayoutRelation::Equal, 100.0,
+            v,
+            LayoutAttribute::Height,
+            LayoutRelation::Equal,
+            100.0,
         ));
         engine.add_constraint(aspect_ratio(v, 2.0));
-        engine.add_constraint(equal(v, LayoutAttribute::Left, SUPERVIEW, LayoutAttribute::Left, 0.0));
-        engine.add_constraint(equal(v, LayoutAttribute::Top, SUPERVIEW, LayoutAttribute::Top, 0.0));
+        engine.add_constraint(equal(
+            v,
+            LayoutAttribute::Left,
+            SUPERVIEW,
+            LayoutAttribute::Left,
+            0.0,
+        ));
+        engine.add_constraint(equal(
+            v,
+            LayoutAttribute::Top,
+            SUPERVIEW,
+            LayoutAttribute::Top,
+            0.0,
+        ));
 
         let frames = engine.solve().unwrap();
         let f = frames[&v];
@@ -381,11 +602,26 @@ mod tests {
 
         // Set width = 300, aspect = 1.5 → height = 300 / 1.5 = 200
         engine.add_constraint(LayoutConstraint::constant(
-            v, LayoutAttribute::Width, LayoutRelation::Equal, 300.0,
+            v,
+            LayoutAttribute::Width,
+            LayoutRelation::Equal,
+            300.0,
         ));
         engine.add_constraint(aspect_ratio(v, 1.5));
-        engine.add_constraint(equal(v, LayoutAttribute::Left, SUPERVIEW, LayoutAttribute::Left, 0.0));
-        engine.add_constraint(equal(v, LayoutAttribute::Top, SUPERVIEW, LayoutAttribute::Top, 0.0));
+        engine.add_constraint(equal(
+            v,
+            LayoutAttribute::Left,
+            SUPERVIEW,
+            LayoutAttribute::Left,
+            0.0,
+        ));
+        engine.add_constraint(equal(
+            v,
+            LayoutAttribute::Top,
+            SUPERVIEW,
+            LayoutAttribute::Top,
+            0.0,
+        ));
 
         let frames = engine.solve().unwrap();
         let f = frames[&v];
@@ -402,8 +638,20 @@ mod tests {
         let mut engine = LayoutEngine::new(Rect::new(0.0, 0.0, 80.0, 80.0));
         let v = ViewId(1);
 
-        engine.add_constraint(equal(v, LayoutAttribute::Left, SUPERVIEW, LayoutAttribute::Left, 0.0));
-        engine.add_constraint(equal(v, LayoutAttribute::Top, SUPERVIEW, LayoutAttribute::Top, 0.0));
+        engine.add_constraint(equal(
+            v,
+            LayoutAttribute::Left,
+            SUPERVIEW,
+            LayoutAttribute::Left,
+            0.0,
+        ));
+        engine.add_constraint(equal(
+            v,
+            LayoutAttribute::Top,
+            SUPERVIEW,
+            LayoutAttribute::Top,
+            0.0,
+        ));
 
         // Intrinsic size 100×100 with HIGH compression resistance
         let priorities = LayoutPriorities {
@@ -431,15 +679,27 @@ mod tests {
         let mut engine = LayoutEngine::new(Rect::new(0.0, 0.0, 400.0, 300.0));
         let v = ViewId(1);
 
-        engine.add_constraint(equal(v, LayoutAttribute::Left, SUPERVIEW, LayoutAttribute::Left, 0.0));
-        engine.add_constraint(equal(v, LayoutAttribute::Top, SUPERVIEW, LayoutAttribute::Top, 0.0));
+        engine.add_constraint(equal(
+            v,
+            LayoutAttribute::Left,
+            SUPERVIEW,
+            LayoutAttribute::Left,
+            0.0,
+        ));
+        engine.add_constraint(equal(
+            v,
+            LayoutAttribute::Top,
+            SUPERVIEW,
+            LayoutAttribute::Top,
+            0.0,
+        ));
 
         // Intrinsic size 100×100 but LOW compression resistance + LOW hugging
         engine.add_constraints(intrinsic_size_constraints(
             v,
             IntrinsicSize::new(100.0, 100.0),
-            LayoutPriority::LOW,          // hugging
-            LayoutPriority::LOW,          // compression
+            LayoutPriority::LOW, // hugging
+            LayoutPriority::LOW, // compression
         ));
 
         // Now add a DEFAULT_HIGH constraint forcing width to 60
@@ -455,8 +715,16 @@ mod tests {
         let frames = engine.solve().unwrap();
         let f = frames[&v];
         // HIGH-priority size constraint wins over LOW compression resistance → shrinks toward 60
-        assert!(f.width < 80.0, "width={} should be < 80 (shrunk below intrinsic)", f.width);
-        assert!(f.height < 80.0, "height={} should be < 80 (shrunk below intrinsic)", f.height);
+        assert!(
+            f.width < 80.0,
+            "width={} should be < 80 (shrunk below intrinsic)",
+            f.width
+        );
+        assert!(
+            f.height < 80.0,
+            "height={} should be < 80 (shrunk below intrinsic)",
+            f.height
+        );
     }
 
     #[test]
@@ -466,7 +734,10 @@ mod tests {
         let v = ViewId(1);
 
         engine.add_constraint(LayoutConstraint::constant(
-            v, LayoutAttribute::Height, LayoutRelation::Equal, 100.0,
+            v,
+            LayoutAttribute::Height,
+            LayoutRelation::Equal,
+            100.0,
         ));
         engine.add_constraint(aspect_ratio(v, 2.0)); // width = 200
         engine.add_constraints(center_in(v, SUPERVIEW));
@@ -497,8 +768,20 @@ mod tests {
         let mut engine = LayoutEngine::new(Rect::new(0.0, 0.0, 400.0, 300.0));
         let v = ViewId(1);
 
-        engine.add_constraint(equal(v, LayoutAttribute::Left, SUPERVIEW, LayoutAttribute::Left, 0.0));
-        engine.add_constraint(equal(v, LayoutAttribute::Top, SUPERVIEW, LayoutAttribute::Top, 0.0));
+        engine.add_constraint(equal(
+            v,
+            LayoutAttribute::Left,
+            SUPERVIEW,
+            LayoutAttribute::Left,
+            0.0,
+        ));
+        engine.add_constraint(equal(
+            v,
+            LayoutAttribute::Top,
+            SUPERVIEW,
+            LayoutAttribute::Top,
+            0.0,
+        ));
 
         let priorities = LayoutPriorities {
             hugging_horizontal: LayoutPriority::HIGH,

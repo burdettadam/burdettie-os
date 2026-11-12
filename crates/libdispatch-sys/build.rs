@@ -23,7 +23,9 @@ fn main() {
             println!("cargo:warning=libdispatch not found via pkg-config or Swift toolchain; linker may fail");
         }
         other => {
-            println!("cargo:warning=libdispatch-sys: unsupported target OS '{other}', linking may fail");
+            println!(
+                "cargo:warning=libdispatch-sys: unsupported target OS '{other}', linking may fail"
+            );
             println!("cargo:rustc-link-lib=dispatch");
         }
     }

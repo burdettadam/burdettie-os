@@ -19,14 +19,22 @@ pub struct ForwardHandler {
 
 impl ForwardHandler {
     pub fn new(endpoint: String, auth_token: Option<String>, instance_id: String) -> Self {
-        Self { endpoint, auth_token, instance_id }
+        Self {
+            endpoint,
+            auth_token,
+            instance_id,
+        }
     }
 }
 
 impl Handler for ForwardHandler {
-    fn handle(&self, path: &str, method: &str, body: &[u8], request: &Request)
-        -> Option<HandlerResponse>
-    {
+    fn handle(
+        &self,
+        path: &str,
+        method: &str,
+        body: &[u8],
+        request: &Request,
+    ) -> Option<HandlerResponse> {
         // Don't forward admin or status requests
         if path.starts_with("/_burdettie/") {
             return None;
@@ -37,7 +45,10 @@ impl Handler for ForwardHandler {
         let forwarded = match self.forward(method, &url, body, request) {
             Ok(resp) => resp,
             Err(e) => {
-                log::warn!("burdettie-services: forward to {} failed: {e}", self.endpoint);
+                log::warn!(
+                    "burdettie-services: forward to {} failed: {e}",
+                    self.endpoint
+                );
                 return None; // Fall through to the next handler
             }
         };
@@ -104,7 +115,8 @@ impl ForwardHandler {
         };
 
         let status = response.status().as_u16();
-        let content_type = response.headers()
+        let content_type = response
+            .headers()
             .get("content-type")
             .and_then(|v| v.to_str().ok())
             .unwrap_or("application/octet-stream")
@@ -112,7 +124,11 @@ impl ForwardHandler {
 
         let resp_body = response.into_body().read_to_vec()?;
 
-        Ok(HandlerResponse::with_status(status, content_type, resp_body))
+        Ok(HandlerResponse::with_status(
+            status,
+            content_type,
+            resp_body,
+        ))
     }
 }
 
@@ -122,11 +138,7 @@ mod tests {
 
     #[test]
     fn skips_admin_paths() {
-        let handler = ForwardHandler::new(
-            "http://localhost:9999".into(),
-            None,
-            "test".into(),
-        );
+        let handler = ForwardHandler::new("http://localhost:9999".into(), None, "test".into());
         // ForwardHandler skips _burdettie paths
         assert!("/_burdettie/admin/requests".starts_with("/_burdettie/"));
         assert!("/_burdettie/status".starts_with("/_burdettie/"));

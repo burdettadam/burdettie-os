@@ -489,7 +489,10 @@ mod tests {
             }),
         });
         let out = plan.display();
-        assert!(out.contains("Security: all gates passed"), "output was: {out}");
+        assert!(
+            out.contains("Security: all gates passed"),
+            "output was: {out}"
+        );
         assert!(out.contains("Hardened runtime"), "output was: {out}");
     }
 }

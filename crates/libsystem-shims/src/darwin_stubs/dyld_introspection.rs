@@ -69,19 +69,64 @@ pub struct DyldIntrospectionStubs;
 impl DyldIntrospectionStubs {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
-        register_shims!(table,
-            ("__dyld_image_count", shim_dyld_image_count as *const () as u64, "_dyld_image_count (registry)"),
-            ("__dyld_get_image_header", shim_dyld_get_image_header as *const () as u64, "_dyld_get_image_header (registry)"),
-            ("__dyld_get_image_name", shim_dyld_get_image_name as *const () as u64, "_dyld_get_image_name (registry)"),
-            ("__dyld_get_image_vmaddr_slide", shim_dyld_get_image_vmaddr_slide as *const () as u64, "_dyld_get_image_vmaddr_slide (registry)"),
-            ("__dyld_register_func_for_add_image", shim_dyld_register_func_for_add_image as *const () as u64, "_dyld_register_func_for_add_image"),
-            ("_dyld_image_path_containing_address", shim_dyld_image_path_containing_address as *const () as u64, "dyld_image_path_containing_address"),
-            ("__NSGetExecutablePath", shim_nsgetexecutablepath as *const () as u64, "_NSGetExecutablePath"),
+        register_shims!(
+            table,
+            (
+                "__dyld_image_count",
+                shim_dyld_image_count as *const () as u64,
+                "_dyld_image_count (registry)"
+            ),
+            (
+                "__dyld_get_image_header",
+                shim_dyld_get_image_header as *const () as u64,
+                "_dyld_get_image_header (registry)"
+            ),
+            (
+                "__dyld_get_image_name",
+                shim_dyld_get_image_name as *const () as u64,
+                "_dyld_get_image_name (registry)"
+            ),
+            (
+                "__dyld_get_image_vmaddr_slide",
+                shim_dyld_get_image_vmaddr_slide as *const () as u64,
+                "_dyld_get_image_vmaddr_slide (registry)"
+            ),
+            (
+                "__dyld_register_func_for_add_image",
+                shim_dyld_register_func_for_add_image as *const () as u64,
+                "_dyld_register_func_for_add_image"
+            ),
+            (
+                "_dyld_image_path_containing_address",
+                shim_dyld_image_path_containing_address as *const () as u64,
+                "dyld_image_path_containing_address"
+            ),
+            (
+                "__NSGetExecutablePath",
+                shim_nsgetexecutablepath as *const () as u64,
+                "_NSGetExecutablePath"
+            ),
             // Shared cache introspection — Linux has no shared cache
-            ("__dyld_get_shared_cache_range", shim_dyld_get_shared_cache_range as *const () as u64, "_dyld_get_shared_cache_range (→ false)"),
-            ("_dyld_for_each_installed_shared_cache", shim_dyld_for_each_installed_shared_cache as *const () as u64, "dyld_for_each_installed_shared_cache (nop)"),
-            ("_dyld_shared_cache_for_each_file", shim_dyld_shared_cache_for_each_file as *const () as u64, "dyld_shared_cache_for_each_file (nop)"),
-            ("_dyld_shared_cache_file_path", shim_dyld_shared_cache_file_path as *const () as u64, "dyld_shared_cache_file_path (→ NULL)"),
+            (
+                "__dyld_get_shared_cache_range",
+                shim_dyld_get_shared_cache_range as *const () as u64,
+                "_dyld_get_shared_cache_range (→ false)"
+            ),
+            (
+                "_dyld_for_each_installed_shared_cache",
+                shim_dyld_for_each_installed_shared_cache as *const () as u64,
+                "dyld_for_each_installed_shared_cache (nop)"
+            ),
+            (
+                "_dyld_shared_cache_for_each_file",
+                shim_dyld_shared_cache_for_each_file as *const () as u64,
+                "dyld_shared_cache_for_each_file (nop)"
+            ),
+            (
+                "_dyld_shared_cache_file_path",
+                shim_dyld_shared_cache_file_path as *const () as u64,
+                "dyld_shared_cache_file_path (→ NULL)"
+            ),
         );
         log::debug!("DyldIntrospectionStubs: registered 11 stubs");
     }
@@ -159,10 +204,7 @@ extern "C" fn shim_dyld_image_path_containing_address(addr: u64) -> u64 {
             return info.name.as_ptr() as u64;
         }
     }
-    log::trace!(
-        "dyld_image_path_containing_address({:#x}): not found",
-        addr
-    );
+    log::trace!("dyld_image_path_containing_address({:#x}): not found", addr);
     0
 }
 
@@ -328,15 +370,11 @@ mod tests {
         let mut buf = [0u8; 256];
         let mut bufsize: u32 = buf.len() as u32;
 
-        let ret = shim_nsgetexecutablepath(
-            buf.as_mut_ptr() as u64,
-            &mut bufsize as *mut u32 as u64,
-        );
+        let ret =
+            shim_nsgetexecutablepath(buf.as_mut_ptr() as u64, &mut bufsize as *mut u32 as u64);
         assert_eq!(ret, 0);
 
-        let cstr = unsafe {
-            std::ffi::CStr::from_ptr(buf.as_ptr() as *const std::ffi::c_char)
-        };
+        let cstr = unsafe { std::ffi::CStr::from_ptr(buf.as_ptr() as *const std::ffi::c_char) };
         assert_eq!(cstr.to_str().unwrap(), "/usr/lib/myapp");
     }
 
@@ -349,10 +387,8 @@ mod tests {
         let mut buf = [0u8; 4];
         let mut bufsize: u32 = buf.len() as u32;
 
-        let ret = shim_nsgetexecutablepath(
-            buf.as_mut_ptr() as u64,
-            &mut bufsize as *mut u32 as u64,
-        );
+        let ret =
+            shim_nsgetexecutablepath(buf.as_mut_ptr() as u64, &mut bufsize as *mut u32 as u64);
         assert_eq!(ret, -1);
         // bufsize should now hold the required size (path + nul).
         assert_eq!(bufsize as usize, "/usr/lib/myapp".len() + 1);
@@ -366,15 +402,11 @@ mod tests {
         let mut buf = [0u8; 256];
         let mut bufsize: u32 = buf.len() as u32;
 
-        let ret = shim_nsgetexecutablepath(
-            buf.as_mut_ptr() as u64,
-            &mut bufsize as *mut u32 as u64,
-        );
+        let ret =
+            shim_nsgetexecutablepath(buf.as_mut_ptr() as u64, &mut bufsize as *mut u32 as u64);
         assert_eq!(ret, 0);
 
-        let cstr = unsafe {
-            std::ffi::CStr::from_ptr(buf.as_ptr() as *const std::ffi::c_char)
-        };
+        let cstr = unsafe { std::ffi::CStr::from_ptr(buf.as_ptr() as *const std::ffi::c_char) };
         assert_eq!(cstr.to_str().unwrap(), "/usr/bin/unknown");
     }
 }

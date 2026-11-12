@@ -21,7 +21,7 @@ Current capabilities:
 - 39 corpus tools pass (100%)
 - 67/72 Xcode CLI tools run on Linux/ARM64 via Docker (93% pass rate)
 - ARM64 interpreter with ~122 instruction variants and automatic host FFI fallback
-- GUI application framework with software-rendered windowing (macOS)
+- GUI application framework with software-rendered windowing (macOS + Linux display backends)
 - Interactive runtime shell with compatibility scorecard
 - Performance: typical loader overhead < 100µs per tool (3× faster than v0.1.0)
 
@@ -132,22 +132,46 @@ darwin> gui               # list GUI apps
 darwin> gui hello-darwin  # launch a GUI app
 ```
 
-### Run on Linux/ARM64 via Docker
+### Run in Docker
 
 ```bash
-# Cross-compile for Linux (requires: brew install zig, cargo install cargo-zigbuild)
-cargo zigbuild --release --target aarch64-unknown-linux-gnu.2.36 -p macho-inspect
-cp target/aarch64-unknown-linux-gnu/release/macho-inspect docker/macho-inspect-linux-arm64
+# Build the Docker image for the host CPU by default
+docker build -f docker/Dockerfile.burdettie -t burdettie-os .
 
-# Build the Docker image
+# Force the reference ARM64 lane when you want it explicitly
 docker build --platform linux/arm64 -f docker/Dockerfile.burdettie -t burdettie-os .
 
 # Run a tool (e.g., sw_vers)
-docker run --rm --platform linux/arm64 burdettie-os \
+docker run --rm burdettie-os \
   macho-inspect --exec /opt/xcode-tools/system/sw_vers
 
 # Run the full Xcode tool compatibility suite (67/72 pass)
-docker run --rm --platform linux/arm64 burdettie-os test-xcode-tools
+docker run --rm burdettie-os test-xcode-tools
+
+# Start the Burdettie home screen with a browser viewer on http://127.0.0.1:6080
+./scripts/docker-gui.sh
+
+# Drop into a GUI-capable shell instead
+./scripts/docker-gui.sh --shell
+
+# Run a guest Cocoa app against the Docker display stack instead of the home screen
+RUST_LOG=info BURDETTIE_GUI_MODE=guest BURDETTIE_GUEST_APP=/workspace/fixtures/cocoa_draw/app ./scripts/docker-gui.sh
+
+# Force the GUI helper onto the ARM64 reference lane when needed
+BURDETTIE_DOCKER_PLATFORM=linux/arm64 ./scripts/docker-gui.sh
+
+# Compose example: defaults to the Burdettie home screen
+docker compose -f docker/compose.burdettie-gui.example.yaml up
+
+# Switch the Compose service into guest-app mode
+BURDETTIE_GUI_MODE=guest \
+  BURDETTIE_GUEST_APP=/opt/imported-artifacts/apps/Stickies.app/Contents/MacOS/Stickies \
+  docker compose -f docker/compose.burdettie-gui.example.yaml up
+
+# Launch an imported open-source terminal bundle
+BURDETTIE_GUI_MODE=guest \
+  BURDETTIE_GUEST_APP=/opt/imported-artifacts/apps/WezTerm.app/Contents/MacOS/wezterm-gui \
+  docker compose -f docker/compose.burdettie-gui.example.yaml up
 ```
 
 Fast dev loop (~3s incremental):
@@ -155,6 +179,13 @@ Fast dev loop (~3s incremental):
 ```bash
 ./scripts/linux-test.sh  # zigbuild + volume-mount into running container
 ```
+
+The GUI Docker path uses Xvfb plus optional VNC/noVNC inside `docker/Dockerfile.burdettie`.
+The default session now opens the native Launchpad home screen so the viewer is not left on an empty
+desktop after a short-lived smoke app exits. Short-lived fixtures like `fixtures/cocoa_draw/app` are still
+useful in `BURDETTIE_GUI_MODE=guest`, and imported app bundles can use that same guest mode once staged.
+When `/opt/imported-artifacts/manifest.json` is mounted, or when local dev stages bundles under `imports/apps`,
+Launchpad now auto-discovers those imported GUI apps and lists them on the desktop rail.
 
 ### Package as a demo image
 
@@ -206,9 +237,9 @@ See [docs/FEATURES.md](docs/FEATURES.md) for the full feature reference and
 - Rust stable (see `rust-toolchain.toml`)
 - Xcode Command Line Tools (`xcode-select --install`)
 
-**Linux/ARM64 (Docker)**:
-- Docker with `--platform linux/arm64` support
-- For cross-compilation: `zig`, `cargo-zigbuild`, `rustup target add aarch64-unknown-linux-gnu`
+**Docker runtime image**:
+- Docker build/run support for your host CPU architecture
+- Optional: `--platform linux/arm64` or `BURDETTIE_DOCKER_PLATFORM=linux/arm64` for the ARM64 reference lane
 
 ## Use as a library
 

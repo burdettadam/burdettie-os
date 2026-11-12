@@ -85,7 +85,10 @@ pub fn rewrite_hostname(hostname: &str) -> Option<String> {
         return None;
     }
     if lookup_domain(hostname).is_some() {
-        log::info!("burdettie-domain-map: DNS rewrite {hostname} → {}", config.target_host);
+        log::info!(
+            "burdettie-domain-map: DNS rewrite {hostname} → {}",
+            config.target_host
+        );
         Some(config.target_host.clone())
     } else {
         None
@@ -184,15 +187,27 @@ mod tests {
 
     #[test]
     fn extract_host_from_url() {
-        assert_eq!(extract_host("https://xp.apple.com/report"), Some("xp.apple.com".into()));
-        assert_eq!(extract_host("http://mesu.apple.com:443/catalog"), Some("mesu.apple.com".into()));
-        assert_eq!(extract_host("https://foo.icloud.com/path"), Some("foo.icloud.com".into()));
+        assert_eq!(
+            extract_host("https://xp.apple.com/report"),
+            Some("xp.apple.com".into())
+        );
+        assert_eq!(
+            extract_host("http://mesu.apple.com:443/catalog"),
+            Some("mesu.apple.com".into())
+        );
+        assert_eq!(
+            extract_host("https://foo.icloud.com/path"),
+            Some("foo.icloud.com".into())
+        );
         assert_eq!(extract_host(""), None);
     }
 
     #[test]
     fn extract_path_from_url() {
-        assert_eq!(extract_path("https://xp.apple.com/report/2/xp_osx"), "/report/2/xp_osx");
+        assert_eq!(
+            extract_path("https://xp.apple.com/report/2/xp_osx"),
+            "/report/2/xp_osx"
+        );
         assert_eq!(extract_path("https://xp.apple.com"), "");
     }
 
@@ -227,7 +242,10 @@ mod tests {
         // Use a fresh OnceLock test by testing the components directly
         assert!(lookup_domain("xp.apple.com").is_some());
         let entry = lookup_domain("xp.apple.com").expect("known domain");
-        let result = format!("http://{}:{}{}/report/2", config.target_host, config.target_port, entry.burdettie_path);
+        let result = format!(
+            "http://{}:{}{}/report/2",
+            config.target_host, config.target_port, entry.burdettie_path
+        );
         assert_eq!(result, "http://127.0.0.1:9999/api/v1/telemetry/xp/report/2");
     }
 
@@ -260,10 +278,22 @@ mod tests {
     #[test]
     fn category_classification() {
         assert_eq!(category_for("xp.apple.com"), Some(Category::Telemetry));
-        assert_eq!(category_for("mesu.apple.com"), Some(Category::SoftwareUpdate));
-        assert_eq!(category_for("devimages-cdn.apple.com"), Some(Category::Xcode));
+        assert_eq!(
+            category_for("mesu.apple.com"),
+            Some(Category::SoftwareUpdate)
+        );
+        assert_eq!(
+            category_for("devimages-cdn.apple.com"),
+            Some(Category::Xcode)
+        );
         assert_eq!(category_for("ocsp.apple.com"), Some(Category::Certificate));
-        assert_eq!(category_for("albert.apple.com"), Some(Category::DeviceActivation));
-        assert_eq!(category_for("captive.apple.com"), Some(Category::Connectivity));
+        assert_eq!(
+            category_for("albert.apple.com"),
+            Some(Category::DeviceActivation)
+        );
+        assert_eq!(
+            category_for("captive.apple.com"),
+            Some(Category::Connectivity)
+        );
     }
 }

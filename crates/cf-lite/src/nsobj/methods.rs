@@ -123,11 +123,7 @@ pub extern "C" fn shim_nsobject_class_new(cls: u64, cmd: u64) -> u64 {
 
 /// `+[NSObject isSubclassOfClass:]` — returns YES if the receiver is
 /// a subclass of (or identical to) `target_cls`.
-pub extern "C" fn shim_nsobject_is_subclass_of_class(
-    cls: u64,
-    _cmd: u64,
-    target_cls: u64,
-) -> u8 {
+pub extern "C" fn shim_nsobject_is_subclass_of_class(cls: u64, _cmd: u64, target_cls: u64) -> u8 {
     if cls == 0 || target_cls == 0 {
         return 0;
     }
@@ -258,9 +254,8 @@ pub extern "C" fn shim_nsobject_does_not_recognize_selector(obj: u64, _cmd: u64,
     log::error!("{}", reason);
 
     // Build an NSException and throw it.
-    let name_str = crate::cfstring::alloc_nsstring_from_cstr(
-        c"NSInvalidArgumentException".as_ptr(),
-    );
+    let name_str =
+        crate::cfstring::alloc_nsstring_from_cstr(c"NSInvalidArgumentException".as_ptr());
     let reason_cstr = std::ffi::CString::new(reason).unwrap_or_default();
     let reason_str = crate::cfstring::alloc_nsstring_from_cstr(reason_cstr.as_ptr());
 
@@ -351,20 +346,12 @@ pub extern "C" fn shim_nsobject_class_superclass(cls: u64, _cmd: u64) -> u64 {
 }
 
 /// `+[NSObject resolveInstanceMethod:]` — default returns NO.
-pub extern "C" fn shim_nsobject_resolve_instance_method(
-    _cls: u64,
-    _cmd: u64,
-    _sel: u64,
-) -> u8 {
+pub extern "C" fn shim_nsobject_resolve_instance_method(_cls: u64, _cmd: u64, _sel: u64) -> u8 {
     0
 }
 
 /// `+[NSObject resolveClassMethod:]` — default returns NO.
-pub extern "C" fn shim_nsobject_resolve_class_method(
-    _cls: u64,
-    _cmd: u64,
-    _sel: u64,
-) -> u8 {
+pub extern "C" fn shim_nsobject_resolve_class_method(_cls: u64, _cmd: u64, _sel: u64) -> u8 {
     0
 }
 
@@ -389,7 +376,9 @@ fn perform_selector_dispatch(target: u64, sel: u64, arg: u64, has_arg: bool) -> 
         Err(e) => e.into_inner(),
     };
     let Some(rt) = guard.as_ref() else { return 0 };
-    let Some(imp) = rt.msg_lookup(isa, sel_name) else { return 0 };
+    let Some(imp) = rt.msg_lookup(isa, sel_name) else {
+        return 0;
+    };
     let sel_ptr = rt.selector_ptr(sel_name).unwrap_or(sel as usize) as u64;
     drop(guard);
 
@@ -442,11 +431,7 @@ pub extern "C" fn shim_nsobject_perform_selector_after_delay(
 ///
 /// Class method — cancels all pending performSelector:afterDelay: for the target.
 /// Since we use NSTimer, this is a best-effort cancellation of matching timers.
-pub extern "C" fn shim_nsobject_cancel_previous_perform(
-    _cls: u64,
-    _cmd: u64,
-    _target: u64,
-) {
+pub extern "C" fn shim_nsobject_cancel_previous_perform(_cls: u64, _cmd: u64, _target: u64) {
     // Best-effort: run loop timers will simply find invalidated timers and skip them.
     // A full implementation would walk PENDING_TIMERS and invalidate matching entries.
 }

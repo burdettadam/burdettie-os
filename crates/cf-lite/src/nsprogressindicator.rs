@@ -136,17 +136,32 @@ pub extern "C" fn shim_nsprogressindicator_start_animation(_obj: u64, _cmd: u64,
 pub extern "C" fn shim_nsprogressindicator_stop_animation(_obj: u64, _cmd: u64, _sender: u64) {}
 
 /// `-[NSProgressIndicator drawRect:]` — renders progress bar.
-pub extern "C" fn shim_nsprogressindicator_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64) {
-    if obj == 0 { return; }
+pub extern "C" fn shim_nsprogressindicator_draw_rect(
+    obj: u64,
+    _cmd: u64,
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
+) {
+    if obj == 0 {
+        return;
+    }
     let cg_ctx = crate::nsgraphicscontext::current_cg_context_handle();
-    if cg_ctx == 0 { return; }
+    if cg_ctx == 0 {
+        return;
+    }
 
     let min = read_f64(obj, MIN_VALUE_OFF);
     let max = read_f64(obj, MAX_VALUE_OFF);
     let val = read_f64(obj, CURRENT_PROGRESS_OFF);
     let flags = read_u64(obj, FLAGS_OFF);
     let is_indeterminate = flags & FLAG_IS_INDETERMINATE != 0;
-    let range = if (max - min).abs() < f64::EPSILON { 1.0 } else { max - min };
+    let range = if (max - min).abs() < f64::EPSILON {
+        1.0
+    } else {
+        max - min
+    };
     let ratio = ((val - min) / range).clamp(0.0, 1.0);
 
     cg_shims::bridge::with_context(cg_ctx, |c| {
@@ -194,7 +209,7 @@ mod tests {
         write_f64(prog, CURRENT_PROGRESS_OFF, 0.0);
         write_f64(prog, MIN_VALUE_OFF, 0.0);
         write_f64(prog, MAX_VALUE_OFF, 100.0);
-        
+
         assert_eq!(shim_nsprogressindicator_double_value(prog, 0), 0.0);
         assert_eq!(shim_nsprogressindicator_min_value(prog, 0), 0.0);
         assert_eq!(shim_nsprogressindicator_max_value(prog, 0), 100.0);
@@ -206,7 +221,7 @@ mod tests {
         let prog = alloc_obj(PROGRESS_INDICATOR_SIZE, 0xDEAD);
         write_f64(prog, MIN_VALUE_OFF, 0.0);
         write_f64(prog, MAX_VALUE_OFF, 100.0);
-        
+
         shim_nsprogressindicator_set_double_value(prog, 0, 50.5);
         assert!((shim_nsprogressindicator_double_value(prog, 0) - 50.5).abs() < 0.001);
         free_obj(prog);
@@ -217,11 +232,11 @@ mod tests {
         let prog = alloc_obj(PROGRESS_INDICATOR_SIZE, 0xDEAD);
         write_f64(prog, MIN_VALUE_OFF, 10.0);
         write_f64(prog, MAX_VALUE_OFF, 90.0);
-        
+
         // Try to set above max
         shim_nsprogressindicator_set_double_value(prog, 0, 150.0);
         assert!((shim_nsprogressindicator_double_value(prog, 0) - 90.0).abs() < 0.001);
-        
+
         // Try to set below min
         shim_nsprogressindicator_set_double_value(prog, 0, 5.0);
         assert!((shim_nsprogressindicator_double_value(prog, 0) - 10.0).abs() < 0.001);
@@ -232,10 +247,10 @@ mod tests {
     fn indeterminate_flag() {
         let prog = alloc_obj(PROGRESS_INDICATOR_SIZE, 0xDEAD);
         assert_eq!(shim_nsprogressindicator_is_indeterminate(prog, 0), 0);
-        
+
         shim_nsprogressindicator_set_indeterminate(prog, 0, 1);
         assert_eq!(shim_nsprogressindicator_is_indeterminate(prog, 0), 1);
-        
+
         shim_nsprogressindicator_set_indeterminate(prog, 0, 0);
         assert_eq!(shim_nsprogressindicator_is_indeterminate(prog, 0), 0);
         free_obj(prog);
@@ -245,10 +260,10 @@ mod tests {
     fn bezeled_flag() {
         let prog = alloc_obj(PROGRESS_INDICATOR_SIZE, 0xDEAD);
         assert_eq!(shim_nsprogressindicator_is_bezeled(prog, 0), 0);
-        
+
         shim_nsprogressindicator_set_bezeled(prog, 0, 1);
         assert_eq!(shim_nsprogressindicator_is_bezeled(prog, 0), 1);
-        
+
         shim_nsprogressindicator_set_bezeled(prog, 0, 0);
         assert_eq!(shim_nsprogressindicator_is_bezeled(prog, 0), 0);
         free_obj(prog);
@@ -257,13 +272,13 @@ mod tests {
     #[test]
     fn flags_independent() {
         let prog = alloc_obj(PROGRESS_INDICATOR_SIZE, 0xDEAD);
-        
+
         shim_nsprogressindicator_set_indeterminate(prog, 0, 1);
         shim_nsprogressindicator_set_bezeled(prog, 0, 1);
-        
+
         assert_eq!(shim_nsprogressindicator_is_indeterminate(prog, 0), 1);
         assert_eq!(shim_nsprogressindicator_is_bezeled(prog, 0), 1);
-        
+
         shim_nsprogressindicator_set_indeterminate(prog, 0, 0);
         assert_eq!(shim_nsprogressindicator_is_indeterminate(prog, 0), 0);
         assert_eq!(shim_nsprogressindicator_is_bezeled(prog, 0), 1);

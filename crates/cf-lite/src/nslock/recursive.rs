@@ -71,7 +71,10 @@ mod tests {
     fn alloc_returns_nonzero_with_correct_isa() {
         let obj = shim_nsrecursivelock_alloc(0, 0);
         assert_ne!(obj, 0);
-        assert_eq!(read_field(obj, 0), crate::nsobj::nsrecursivelock_class_addr());
+        assert_eq!(
+            read_field(obj, 0),
+            crate::nsobj::nsrecursivelock_class_addr()
+        );
         // Free manually — mutex was never initialized so dealloc would be unsound.
         crate::pal_alloc().free(obj as *mut u8);
     }

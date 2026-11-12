@@ -189,9 +189,7 @@ pub fn run_in_subprocess_with_output(binary: &Path) -> IsolatedRun {
             }
         }
 
-        IsolatedResult::Crashed(
-            stderr.lines().last().unwrap_or("unknown").to_string(),
-        )
+        IsolatedResult::Crashed(stderr.lines().last().unwrap_or("unknown").to_string())
     };
 
     IsolatedRun {

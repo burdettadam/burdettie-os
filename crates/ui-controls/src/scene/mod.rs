@@ -6,9 +6,7 @@
 //! native `GuiApp` (winit) and `HeadlessApp` (testing).
 
 use app_kit_lite::menu::{ModifierFlags, NSMenu};
-use graphics_core::{
-    Color, FontManager,
-};
+use graphics_core::{Color, FontManager};
 use ui_view::layout::LayoutConstraint;
 use window_backend::KeyboardLayout;
 
@@ -17,8 +15,20 @@ use crate::{
     TabView, TextField,
 };
 
-/// Button click handler: receives button index and mutable access to labels/textfields.
-pub type ButtonClickHandler = Box<dyn FnMut(usize, &mut Vec<Label>, &mut Vec<TextField>)>;
+/// Button click handler: receives button index and mutable access to labels/buttons/textfields.
+pub type ButtonClickHandler =
+    Box<dyn FnMut(usize, &mut Vec<Label>, &mut Vec<Button>, &mut Vec<TextField>)>;
+
+/// Custom key-down handler: receives the key and mutable access to labels/buttons/textfields.
+/// Return `true` to consume the event and stop default scene navigation.
+pub type KeyDownHandler = Box<
+    dyn FnMut(
+        window_backend::KeyCode,
+        &mut Vec<Label>,
+        &mut Vec<Button>,
+        &mut Vec<TextField>,
+    ) -> bool,
+>;
 
 /// Keyboard layout change handler.
 pub type LayoutChangeHandler = Box<dyn FnMut(KeyboardLayout)>;
@@ -41,6 +51,7 @@ pub struct AppScene {
     pub(crate) imageviews: Vec<ImageView>,
     pub(crate) scrollviews: Vec<ScrollView>,
     pub(crate) on_button_click: Option<ButtonClickHandler>,
+    pub(crate) on_key_down: Option<KeyDownHandler>,
     pub(crate) on_layout_change: Option<LayoutChangeHandler>,
     pub(crate) main_menu: Option<NSMenu>,
     pub(crate) focused_textfield: Option<usize>,
@@ -49,7 +60,6 @@ pub struct AppScene {
     pub(crate) constraints: Vec<LayoutConstraint>,
     pub(crate) keyboard_layout: KeyboardLayout,
 }
-
 
 mod impl_scene;
 

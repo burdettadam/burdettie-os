@@ -16,6 +16,14 @@ window-backend        = { workspace = true }
 window-backend-darwin = { workspace = true }
 ui-controls           = { workspace = true }
 macho-runtime         = { workspace = true }
+macho-parse           = { workspace = true }
+macho-types           = { workspace = true }
+plist                 = { workspace = true }
+serde                 = { workspace = true }
+serde_json            = { workspace = true }
+
+[dev-dependencies]
+tempfile              = { workspace = true }
 
 [lints]
 workspace = true

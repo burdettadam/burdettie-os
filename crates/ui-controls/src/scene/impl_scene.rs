@@ -8,11 +8,11 @@ use graphics_core::{
 use ui_view::layout::{LayoutConstraint, LayoutEngine};
 use window_backend::{KeyCode, KeyboardLayout};
 
+use super::AppScene;
 use crate::{
     Button, Checkbox, ComboBox, ImageView, Label, ProgressBar, RadioButton, ScrollView, Slider,
     TabView, TextField,
 };
-use super::AppScene;
 
 impl AppScene {
     pub fn new() -> Self {
@@ -30,6 +30,7 @@ impl AppScene {
             imageviews: Vec::new(),
             scrollviews: Vec::new(),
             on_button_click: None,
+            on_key_down: None,
             on_layout_change: None,
             main_menu: None,
             focused_textfield: None,
@@ -94,7 +95,25 @@ impl AppScene {
         &mut self,
         handler: impl FnMut(usize, &mut Vec<Label>, &mut Vec<TextField>) + 'static,
     ) {
+        let mut handler = handler;
+        self.on_button_click = Some(Box::new(move |idx, labels, _buttons, textfields| {
+            handler(idx, labels, textfields);
+        }));
+    }
+
+    pub fn on_button_click_with_buttons(
+        &mut self,
+        handler: impl FnMut(usize, &mut Vec<Label>, &mut Vec<Button>, &mut Vec<TextField>) + 'static,
+    ) {
         self.on_button_click = Some(Box::new(handler));
+    }
+
+    pub fn on_key_down(
+        &mut self,
+        handler: impl FnMut(KeyCode, &mut Vec<Label>, &mut Vec<Button>, &mut Vec<TextField>) -> bool
+            + 'static,
+    ) {
+        self.on_key_down = Some(Box::new(handler));
     }
 
     pub fn set_main_menu(&mut self, menu: NSMenu) {
@@ -112,10 +131,7 @@ impl AppScene {
     }
 
     /// Register a handler called when the keyboard layout changes (Ctrl+Space).
-    pub fn on_layout_change(
-        &mut self,
-        handler: impl FnMut(KeyboardLayout) + 'static,
-    ) {
+    pub fn on_layout_change(&mut self, handler: impl FnMut(KeyboardLayout) + 'static) {
         self.on_layout_change = Some(Box::new(handler));
     }
 
@@ -284,7 +300,12 @@ impl AppScene {
         if let Some(idx) = clicked_idx {
             self.buttons[idx].perform_click();
             if let Some(ref mut handler) = self.on_button_click {
-                handler(idx, &mut self.labels, &mut self.textfields);
+                handler(
+                    idx,
+                    &mut self.labels,
+                    &mut self.buttons,
+                    &mut self.textfields,
+                );
             }
             return true;
         }
@@ -321,6 +342,17 @@ impl AppScene {
             }
         }
 
+        if let Some(ref mut handler) = self.on_key_down {
+            if handler(
+                key,
+                &mut self.labels,
+                &mut self.buttons,
+                &mut self.textfields,
+            ) {
+                return true;
+            }
+        }
+
         match key {
             KeyCode::Tab => {
                 // Cycle focus between textfields
@@ -339,7 +371,12 @@ impl AppScene {
                 if let Some(idx) = clicked_idx {
                     self.buttons[idx].perform_click();
                     if let Some(ref mut handler) = self.on_button_click {
-                        handler(idx, &mut self.labels, &mut self.textfields);
+                        handler(
+                            idx,
+                            &mut self.labels,
+                            &mut self.buttons,
+                            &mut self.textfields,
+                        );
                     }
                     return true;
                 }
@@ -541,4 +578,3 @@ impl AppScene {
         }
     }
 }
-

@@ -39,14 +39,43 @@ fn with_table<R>(f: impl FnOnce(&mut HashMap<u64, FormatterConfig>) -> R) -> R {
 // ── Registration ───────────────────────────────────────────────
 
 pub fn install(table: &mut ShimTable) {
-    register_shims!(table,
-        ("_unum_open", shim_unum_open as *const () as u64, "unum_open (icu4x → real formatter)"),
-        ("_unum_close", shim_unum_close as *const () as u64, "unum_close (icu4x)"),
-        ("_unum_formatInt64", shim_unum_format_int64 as *const () as u64, "unum_formatInt64 (icu4x → real)"),
-        ("_unum_formatDouble", shim_unum_format_double as *const () as u64, "unum_formatDouble (icu4x → real)"),
-        ("_unum_parseToNumber", shim_unum_parse_to_number as *const () as u64, "unum_parseToNumber (real parser)"),
-        ("_unum_parse", shim_unum_parse as *const () as u64, "unum_parse → int32_t"),
-        ("_unum_parseDouble", shim_unum_parse_double as *const () as u64, "unum_parseDouble → double")
+    register_shims!(
+        table,
+        (
+            "_unum_open",
+            shim_unum_open as *const () as u64,
+            "unum_open (icu4x → real formatter)"
+        ),
+        (
+            "_unum_close",
+            shim_unum_close as *const () as u64,
+            "unum_close (icu4x)"
+        ),
+        (
+            "_unum_formatInt64",
+            shim_unum_format_int64 as *const () as u64,
+            "unum_formatInt64 (icu4x → real)"
+        ),
+        (
+            "_unum_formatDouble",
+            shim_unum_format_double as *const () as u64,
+            "unum_formatDouble (icu4x → real)"
+        ),
+        (
+            "_unum_parseToNumber",
+            shim_unum_parse_to_number as *const () as u64,
+            "unum_parseToNumber (real parser)"
+        ),
+        (
+            "_unum_parse",
+            shim_unum_parse as *const () as u64,
+            "unum_parse → int32_t"
+        ),
+        (
+            "_unum_parseDouble",
+            shim_unum_parse_double as *const () as u64,
+            "unum_parseDouble → double"
+        )
     );
 }
 
@@ -70,7 +99,9 @@ pub extern "C" fn shim_unum_open(
     with_table(|t| t.insert(handle, FormatterConfig { style }));
 
     if !status.is_null() {
-        unsafe { *status = U_ZERO_ERROR; }
+        unsafe {
+            *status = U_ZERO_ERROR;
+        }
     }
     handle
 }
@@ -90,7 +121,9 @@ pub extern "C" fn shim_unum_format_int64(
     status: *mut i32,
 ) -> i32 {
     if !status.is_null() {
-        unsafe { *status = U_ZERO_ERROR; }
+        unsafe {
+            *status = U_ZERO_ERROR;
+        }
     }
 
     let text = if let Some(fmt) = make_formatter() {
@@ -113,7 +146,9 @@ pub extern "C" fn shim_unum_format_double(
     status: *mut i32,
 ) -> i32 {
     if !status.is_null() {
-        unsafe { *status = U_ZERO_ERROR; }
+        unsafe {
+            *status = U_ZERO_ERROR;
+        }
     }
 
     let style = with_table(|t| t.get(&handle).map(|c| c.style).unwrap_or(1));
@@ -124,7 +159,11 @@ pub extern "C" fn shim_unum_format_double(
         let s = format!("{n}");
         if let Ok(dec) = s.parse::<icu_decimal::input::Decimal>() {
             let formatted = fmt.format(&dec).to_string();
-            if style == 3 { format!("{formatted}%") } else { formatted }
+            if style == 3 {
+                format!("{formatted}%")
+            } else {
+                formatted
+            }
         } else {
             s
         }
@@ -152,7 +191,9 @@ pub extern "C" fn shim_unum_parse_to_number(
     status: *mut i32,
 ) {
     if !status.is_null() {
-        unsafe { *status = U_ZERO_ERROR; }
+        unsafe {
+            *status = U_ZERO_ERROR;
+        }
     }
 
     let s = read_utf16(text, text_len);
@@ -161,7 +202,9 @@ pub extern "C" fn shim_unum_parse_to_number(
 
     // Store the parsed value in the result handle (a pointer to f64).
     if result != 0 {
-        unsafe { *(result as *mut f64) = parsed; }
+        unsafe {
+            *(result as *mut f64) = parsed;
+        }
     }
 
     if !parse_pos.is_null() {
@@ -182,7 +225,9 @@ pub extern "C" fn shim_unum_parse(
     status: *mut i32,
 ) -> i32 {
     if !status.is_null() {
-        unsafe { *status = U_ZERO_ERROR; }
+        unsafe {
+            *status = U_ZERO_ERROR;
+        }
     }
 
     let s = read_utf16(text, text_len);
@@ -190,11 +235,15 @@ pub extern "C" fn shim_unum_parse(
     let parsed = parse_number_string(&s, style);
 
     if !parse_pos.is_null() {
-        unsafe { *parse_pos = s.trim().len() as i32; }
+        unsafe {
+            *parse_pos = s.trim().len() as i32;
+        }
     }
 
     #[allow(clippy::cast_possible_truncation)]
-    { parsed as i32 }
+    {
+        parsed as i32
+    }
 }
 
 /// `unum_parseDouble(fmt, text, textLen, parsePos, status) → double`
@@ -208,7 +257,9 @@ pub extern "C" fn shim_unum_parse_double(
     status: *mut i32,
 ) -> f64 {
     if !status.is_null() {
-        unsafe { *status = U_ZERO_ERROR; }
+        unsafe {
+            *status = U_ZERO_ERROR;
+        }
     }
 
     let s = read_utf16(text, text_len);
@@ -216,7 +267,9 @@ pub extern "C" fn shim_unum_parse_double(
     let parsed = parse_number_string(&s, style);
 
     if !parse_pos.is_null() {
-        unsafe { *parse_pos = s.trim().len() as i32; }
+        unsafe {
+            *parse_pos = s.trim().len() as i32;
+        }
     }
 
     parsed
@@ -258,13 +311,18 @@ fn parse_number_string(s: &str, style: i32) -> f64 {
     };
 
     // Strip group separators (comma, thin space, non-breaking space)
-    let cleaned: String = s.chars()
+    let cleaned: String = s
+        .chars()
         .filter(|c| *c != ',' && *c != '\u{00A0}' && *c != '\u{202F}' && *c != ' ')
         .collect();
 
     let value = cleaned.parse::<f64>().unwrap_or(0.0);
 
-    if is_percent { value / 100.0 } else { value }
+    if is_percent {
+        value / 100.0
+    } else {
+        value
+    }
 }
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -280,7 +338,9 @@ fn write_utf16(s: &str, buf: *mut u16, buf_len: i32) -> i32 {
     }
 
     #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
-    { utf16.len() as i32 }
+    {
+        utf16.len() as i32
+    }
 }
 
 #[cfg(test)]
@@ -325,7 +385,10 @@ mod tests {
         assert!(len > 0);
 
         let text = String::from_utf16_lossy(&buf[..len as usize]);
-        assert!(text.contains("3"), "formatted 3.14 should contain '3': {text}");
+        assert!(
+            text.contains("3"),
+            "formatted 3.14 should contain '3': {text}"
+        );
 
         shim_unum_close(h);
     }
@@ -403,7 +466,8 @@ mod tests {
         let utf16: Vec<u16> = input.encode_utf16().collect();
         let mut pos = 0i32;
 
-        let val = shim_unum_parse_double(h, utf16.as_ptr(), utf16.len() as i32, &mut pos, &mut status);
+        let val =
+            shim_unum_parse_double(h, utf16.as_ptr(), utf16.len() as i32, &mut pos, &mut status);
         assert_eq!(status, 0);
         assert!((val - 3.14).abs() < 0.001);
 

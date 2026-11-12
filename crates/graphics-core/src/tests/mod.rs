@@ -2,16 +2,16 @@
 
 pub use super::*;
 
-mod basics_and_font;
-mod layouts_and_unicode;
 mod attributed;
-mod transform;
+mod basics_and_font;
 mod clip;
-mod rendering;
-mod shadow;
+mod gpu_stub;
+mod layouts_and_unicode;
+mod line_styles;
 mod path_and_gradient;
 mod renderer_methods;
+mod rendering;
 mod rotate;
+mod shadow;
 mod text_and_scaling;
-mod line_styles;
-mod gpu_stub;
+mod transform;

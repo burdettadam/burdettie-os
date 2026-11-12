@@ -76,8 +76,10 @@ impl ObjcRuntime {
         let mut sorted: Vec<(String, u64)> = Vec::with_capacity(class_loads.len());
         let mut visited: HashSet<String> = HashSet::new();
         // Build a quick name→imp map for reconstruction after DFS.
-        let imp_map: std::collections::HashMap<&str, u64> =
-            class_loads.iter().map(|(n, imp)| (n.as_str(), *imp)).collect();
+        let imp_map: std::collections::HashMap<&str, u64> = class_loads
+            .iter()
+            .map(|(n, imp)| (n.as_str(), *imp))
+            .collect();
         for (name, _) in &class_loads {
             self.visit_load_topo(name, &load_names, &imp_map, &mut visited, &mut sorted);
         }

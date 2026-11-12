@@ -37,6 +37,6 @@ pub use scene::AppScene;
 pub use scrollview::ScrollView;
 pub use slider::Slider;
 pub use splitview::{SplitOrientation, SplitView};
-pub use tabview::TabView;
 pub use tableview::{TableColumn, TableDataSource, TableView, VecDataSource};
+pub use tabview::TabView;
 pub use textfield::TextField;

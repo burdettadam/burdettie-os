@@ -7,6 +7,7 @@ rust-version.workspace = true
 
 [dependencies]
 app-kit-lite   = { workspace = true }
+cf-lite        = { workspace = true, optional = true }
 graphics-core  = { workspace = true }
 log            = { workspace = true }
 window-backend = { workspace = true }
@@ -19,6 +20,7 @@ accesskit_winit = { workspace = true }
 
 [features]
 default = []
+guest-appkit = ["dep:cf-lite"]
 gpu = ["graphics-core/gpu"]
 
 [lints]

@@ -11,14 +11,20 @@ use macho_run_plan::ExecutionPlan;
 pub fn print_why_failed(parsed: &ParsedMachO, binary_path: &Path, data: &[u8]) {
     let plan = ExecutionPlan::from_parsed_full(parsed, binary_path.to_path_buf(), data);
 
-    println!("=== Compatibility Diagnosis: {} ===\n", binary_path.display());
+    println!(
+        "=== Compatibility Diagnosis: {} ===\n",
+        binary_path.display()
+    );
 
     let mut issue_count = 0;
 
     // ── 1. Unresolved dylibs ───────────────────────────────────────
 
     if !plan.dependencies.unresolved.is_empty() {
-        println!("UNRESOLVED DYLIBS ({}):", plan.dependencies.unresolved.len());
+        println!(
+            "UNRESOLVED DYLIBS ({}):",
+            plan.dependencies.unresolved.len()
+        );
         for name in &plan.dependencies.unresolved {
             println!("  ✗ {name}");
             issue_count += 1;
@@ -48,9 +54,7 @@ pub fn print_why_failed(parsed: &ParsedMachO, binary_path: &Path, data: &[u8]) {
         let ok = bindings.bound_count;
         let weak = bindings.weak_unbound_count;
         let failed = bindings.failed.len();
-        println!(
-            "Symbol bindings: {ok}/{total} bound, {weak} weak-unbound, {failed} failed"
-        );
+        println!("Symbol bindings: {ok}/{total} bound, {weak} weak-unbound, {failed} failed");
     }
 
     // ── 3. ObjC metadata summary ──────────────────────────────────
@@ -72,9 +76,7 @@ pub fn print_why_failed(parsed: &ParsedMachO, binary_path: &Path, data: &[u8]) {
         let n_ctors = inits.constructors.len();
         let n_steps = inits.init_steps.len();
         if n_ctors > 0 || n_steps > 0 {
-            println!(
-                "Initializers: {n_ctors} constructors, {n_steps} init steps"
-            );
+            println!("Initializers: {n_ctors} constructors, {n_steps} init steps");
         }
     }
 

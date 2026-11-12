@@ -7,6 +7,26 @@ use runtime_diagnostics::DiagEvent;
 
 use super::forwarding::forwarding_trampoline;
 
+#[inline]
+fn normalize_isa(rt: &crate::class::ObjcRuntime, raw_isa: u64) -> u64 {
+    if rt.is_known_isa(raw_isa) {
+        return raw_isa;
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    {
+        raw_isa & 0x007ffffffffffff8
+    }
+    #[cfg(target_arch = "x86_64")]
+    {
+        raw_isa & 0x00007ffffffffff8
+    }
+    #[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
+    {
+        raw_isa
+    }
+}
+
 /// Resolve (self, SEL) → IMP.
 #[no_mangle]
 pub extern "C" fn objc_msg_lookup_imp(obj: u64, sel: u64) -> u64 {
@@ -44,9 +64,7 @@ pub extern "C" fn objc_msg_lookup_imp(obj: u64, sel: u64) -> u64 {
                 return imp;
             }
         }
-        log::debug!(
-            "objc_msgSend: unhandled tagged pointer {obj:#x} for '{sel_str}'"
-        );
+        log::debug!("objc_msgSend: unhandled tagged pointer {obj:#x} for '{sel_str}'");
         runtime_diagnostics::emit(DiagEvent::HostFallback {
             reason: "tagged pointer — no handler".into(),
             selector: sel_str.into(),
@@ -59,9 +77,7 @@ pub extern "C" fn objc_msg_lookup_imp(obj: u64, sel: u64) -> u64 {
         let sel_str = unsafe { CStr::from_ptr(sel as *const c_char) }
             .to_str()
             .unwrap_or("");
-        log::warn!(
-            "objc_msgSend: unaligned pointer {obj:#x} for '{sel_str}'"
-        );
+        log::warn!("objc_msgSend: unaligned pointer {obj:#x} for '{sel_str}'");
         return unrecognized_selector_stub as *const () as u64;
     }
 
@@ -78,25 +94,13 @@ pub extern "C" fn objc_msg_lookup_imp(obj: u64, sel: u64) -> u64 {
         std::process::abort();
     };
 
-    let isa = if let Some(dispatch_isa) = known_class_dispatch_isa
-        .or_else(|| rt.dispatch_isa_for_receiver(obj))
+    let isa = if let Some(dispatch_isa) =
+        known_class_dispatch_isa.or_else(|| rt.dispatch_isa_for_receiver(obj))
     {
         dispatch_isa
     } else {
         let raw_isa = unsafe { *(obj as *const u64) };
-
-        #[cfg(target_arch = "aarch64")]
-        {
-            raw_isa & 0x007ffffffffffff8
-        }
-        #[cfg(target_arch = "x86_64")]
-        {
-            raw_isa & 0x00007ffffffffff8
-        }
-        #[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
-        {
-            raw_isa
-        }
+        normalize_isa(rt, raw_isa)
     };
 
     match rt.msg_lookup(isa, sel_str) {
@@ -146,9 +150,7 @@ pub extern "C" fn objc_msg_lookup_imp(obj: u64, sel: u64) -> u64 {
                         }
                     }
 
-                    log::debug!(
-                        "objc_msgSend: forwarding '{sel_str}' on {obj:#x} (isa={isa:#x})"
-                    );
+                    log::debug!("objc_msgSend: forwarding '{sel_str}' on {obj:#x} (isa={isa:#x})");
                     runtime_diagnostics::emit(DiagEvent::ForwardingEntered {
                         selector: sel_str.into(),
                         receiver: obj,
@@ -158,9 +160,7 @@ pub extern "C" fn objc_msg_lookup_imp(obj: u64, sel: u64) -> u64 {
                 }
 
                 drop(guard);
-                log::debug!(
-                    "objc_msgSend: forwarding '{sel_str}' on {obj:#x} (isa={isa:#x})"
-                );
+                log::debug!("objc_msgSend: forwarding '{sel_str}' on {obj:#x} (isa={isa:#x})");
                 runtime_diagnostics::emit(DiagEvent::ForwardingEntered {
                     selector: sel_str.into(),
                     receiver: obj,
@@ -176,7 +176,9 @@ pub extern "C" fn objc_msg_lookup_imp(obj: u64, sel: u64) -> u64 {
             // any host runtime.
             log::warn!(
                 "objc_msgSend: unrecognized selector '{}' sent to instance {:#x} (isa={:#x})",
-                sel_str, obj, isa
+                sel_str,
+                obj,
+                isa
             );
             runtime_diagnostics::emit(DiagEvent::UnknownIsa {
                 isa,
@@ -193,14 +195,9 @@ pub extern "C" fn objc_msg_lookup_imp(obj: u64, sel: u64) -> u64 {
 /// Used by shims that need to call optional delegate methods safely.
 #[no_mangle]
 pub extern "C" fn objc_has_method(obj: u64, sel: u64) -> u8 {
-    if obj == 0 || sel == 0 { return 0; }
-    let raw_isa = unsafe { *(obj as *const u64) };
-    #[cfg(target_arch = "aarch64")]
-    let isa = raw_isa & 0x007ffffffffffff8;
-    #[cfg(target_arch = "x86_64")]
-    let isa = raw_isa & 0x00007ffffffffff8;
-    #[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
-    let isa = raw_isa;
+    if obj == 0 || sel == 0 {
+        return 0;
+    }
     let sel_str = unsafe { CStr::from_ptr(sel as *const c_char) }
         .to_str()
         .unwrap_or("");
@@ -208,7 +205,11 @@ pub extern "C" fn objc_has_method(obj: u64, sel: u64) -> u8 {
         Ok(g) => g,
         Err(e) => e.into_inner(),
     };
-    let Some(rt) = guard.as_ref() else { return 0; };
+    let Some(rt) = guard.as_ref() else {
+        return 0;
+    };
+    let raw_isa = unsafe { *(obj as *const u64) };
+    let isa = normalize_isa(rt, raw_isa);
     u8::from(rt.msg_lookup(isa, sel_str).is_some())
 }
 
@@ -233,7 +234,9 @@ pub extern "C" fn objc_msg_super_lookup_imp(receiver: u64, super_class: u64, sel
 
     match rt.msg_lookup(super_class, sel_str) {
         Some(imp) => {
-            log::trace!("objc_msgSendSuper: [{sel_str}] on {receiver:#x} (super={super_class:#x}) → imp={imp:#x}");
+            log::trace!(
+                "objc_msgSendSuper: [{sel_str}] on {receiver:#x} (super={super_class:#x}) → imp={imp:#x}"
+            );
             imp
         }
         None => {
@@ -244,7 +247,9 @@ pub extern "C" fn objc_msg_super_lookup_imp(receiver: u64, super_class: u64, sel
             });
             log::warn!(
                 "objc_msgSendSuper: unrecognized selector '{}' on {:#x} (super={:#x}) → returning nil",
-                sel_str, receiver, super_class
+                sel_str,
+                receiver,
+                super_class
             );
             unrecognized_selector_stub as *const () as u64
         }
@@ -276,23 +281,27 @@ pub extern "C" fn objc_msg_super2_lookup_imp(receiver: u64, current_class: u64, 
             None => {
                 log::warn!(
                     "objc_msgSendSuper2: class '{}' at {:#x} has no superclass → returning nil",
-                    info.name, current_class
+                    info.name,
+                    current_class
                 );
                 return unrecognized_selector_stub as *const () as u64;
             }
         },
         None => {
-            runtime_diagnostics::emit(DiagEvent::Super2UnknownClass {
-                current_class,
-            });
-            log::warn!("objc_msgSendSuper2: unknown class at {:#x} → returning nil", current_class);
+            runtime_diagnostics::emit(DiagEvent::Super2UnknownClass { current_class });
+            log::warn!(
+                "objc_msgSendSuper2: unknown class at {:#x} → returning nil",
+                current_class
+            );
             return unrecognized_selector_stub as *const () as u64;
         }
     };
 
     match rt.msg_lookup(super_class, sel_str) {
         Some(imp) => {
-            log::trace!("objc_msgSendSuper2: [{sel_str}] on {receiver:#x} (super={super_class:#x}) → imp={imp:#x}");
+            log::trace!(
+                "objc_msgSendSuper2: [{sel_str}] on {receiver:#x} (super={super_class:#x}) → imp={imp:#x}"
+            );
             imp
         }
         None => {
@@ -303,7 +312,9 @@ pub extern "C" fn objc_msg_super2_lookup_imp(receiver: u64, current_class: u64, 
             });
             log::warn!(
                 "objc_msgSendSuper2: unrecognized selector '{}' on {:#x} (super={:#x}) → returning nil",
-                sel_str, receiver, super_class
+                sel_str,
+                receiver,
+                super_class
             );
             unrecognized_selector_stub as *const () as u64
         }
@@ -406,7 +417,10 @@ mod tests {
         setup_lookup_metaclass("DispatchClass", meta_addr, vec![("alloc", imp_addr)]);
 
         let sel = CString::new("alloc").unwrap();
-        assert_eq!(objc_msg_lookup_imp(class_addr, sel.as_ptr() as u64), imp_addr);
+        assert_eq!(
+            objc_msg_lookup_imp(class_addr, sel.as_ptr() as u64),
+            imp_addr
+        );
     }
 
     #[test]
@@ -441,6 +455,20 @@ mod tests {
         let obj_addr = &*fake_obj as *const u64 as u64;
 
         let sel = CString::new("doStuff").unwrap();
+        assert_eq!(objc_has_method(obj_addr, sel.as_ptr() as u64), 1);
+    }
+
+    #[test]
+    fn lookup_preserves_known_high_synthetic_isa() {
+        let class_addr = 0x0050_0000_0001_0000u64;
+        let imp_addr = 0x0000_0002_0000_4321u64;
+        setup_lookup_class("HighSynthDispatch", class_addr, vec![("init", imp_addr)]);
+
+        let fake_obj: Box<u64> = Box::new(class_addr);
+        let obj_addr = &*fake_obj as *const u64 as u64;
+        let sel = CString::new("init").unwrap();
+
+        assert_eq!(objc_msg_lookup_imp(obj_addr, sel.as_ptr() as u64), imp_addr);
         assert_eq!(objc_has_method(obj_addr, sel.as_ptr() as u64), 1);
     }
 

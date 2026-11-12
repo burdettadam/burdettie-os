@@ -12,42 +12,100 @@ pub struct SandboxStubs;
 impl SandboxStubs {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
-        register_shims!(table,
-            ("_sandbox_check", shim_sandbox_check as *const () as u64, "sandbox_check (stub → 0, not sandboxed)"),
-            ("_sandbox_extension_consume", shim_sandbox_extension_consume as *const () as u64, "sandbox_extension_consume (stub → 0)"),
-            ("_sandbox_init", shim_sandbox_init as *const () as u64, "sandbox_init (stub → 0, accepted but not enforced)"),
-            ("_sandbox_init_with_parameters", shim_sandbox_init_with_parameters as *const () as u64, "sandbox_init_with_parameters (stub → 0)"),
-            ("_sandbox_free_error", shim_sandbox_free_error as *const () as u64, "sandbox_free_error (no-op)"),
-            ("_sandbox_extension_issue_file", shim_sandbox_extension_issue_file as *const () as u64, "sandbox_extension_issue_file (stub → mock token)"),
-            ("_sandbox_extension_issue_mach", shim_sandbox_extension_issue_mach as *const () as u64, "sandbox_extension_issue_mach (stub → mock token)"),
-            ("_sandbox_extension_issue_generic", shim_sandbox_extension_issue_generic as *const () as u64, "sandbox_extension_issue_generic (stub → mock token)"),
-            ("_sandbox_extension_release", shim_sandbox_extension_release as *const () as u64, "sandbox_extension_release (stub → 0)"),
-            ("_sandbox_check_by_audit_token", shim_sandbox_check_by_audit_token as *const () as u64, "sandbox_check_by_audit_token (stub → 0, allowed)"),
-            ("_sandbox_apply", shim_sandbox_apply as *const () as u64, "sandbox_apply (stub → 0, not enforced)"),
+        register_shims!(
+            table,
+            (
+                "_sandbox_check",
+                shim_sandbox_check as *const () as u64,
+                "sandbox_check (stub → 0, not sandboxed)"
+            ),
+            (
+                "_sandbox_extension_consume",
+                shim_sandbox_extension_consume as *const () as u64,
+                "sandbox_extension_consume (stub → 0)"
+            ),
+            (
+                "_sandbox_init",
+                shim_sandbox_init as *const () as u64,
+                "sandbox_init (stub → 0, accepted but not enforced)"
+            ),
+            (
+                "_sandbox_init_with_parameters",
+                shim_sandbox_init_with_parameters as *const () as u64,
+                "sandbox_init_with_parameters (stub → 0)"
+            ),
+            (
+                "_sandbox_free_error",
+                shim_sandbox_free_error as *const () as u64,
+                "sandbox_free_error (no-op)"
+            ),
+            (
+                "_sandbox_extension_issue_file",
+                shim_sandbox_extension_issue_file as *const () as u64,
+                "sandbox_extension_issue_file (stub → mock token)"
+            ),
+            (
+                "_sandbox_extension_issue_mach",
+                shim_sandbox_extension_issue_mach as *const () as u64,
+                "sandbox_extension_issue_mach (stub → mock token)"
+            ),
+            (
+                "_sandbox_extension_issue_generic",
+                shim_sandbox_extension_issue_generic as *const () as u64,
+                "sandbox_extension_issue_generic (stub → mock token)"
+            ),
+            (
+                "_sandbox_extension_release",
+                shim_sandbox_extension_release as *const () as u64,
+                "sandbox_extension_release (stub → 0)"
+            ),
+            (
+                "_sandbox_check_by_audit_token",
+                shim_sandbox_check_by_audit_token as *const () as u64,
+                "sandbox_check_by_audit_token (stub → 0, allowed)"
+            ),
+            (
+                "_sandbox_apply",
+                shim_sandbox_apply as *const () as u64,
+                "sandbox_apply (stub → 0, not enforced)"
+            ),
         );
         log::debug!("SandboxStubs: registered 11 stubs");
     }
 }
 
 /// Returns 0 = operation allowed (not sandboxed).
-pub extern "C" fn shim_sandbox_check(_pid: i32, _operation: u64, _type: i32) -> i32 { 0 }
+pub extern "C" fn shim_sandbox_check(_pid: i32, _operation: u64, _type: i32) -> i32 {
+    0
+}
 
 /// Returns 0 = success (extension consumed).
-pub extern "C" fn shim_sandbox_extension_consume(_token: u64) -> i32 { 0 }
+pub extern "C" fn shim_sandbox_extension_consume(_token: u64) -> i32 {
+    0
+}
 
 /// Returns 0 = success. Profile accepted but not enforced.
 /// If `errorbuf` is non-null, clears it to null (no error).
 pub extern "C" fn shim_sandbox_init(_profile: u64, _flags: u64, errorbuf: u64) -> i32 {
     if errorbuf != 0 {
-        unsafe { *(errorbuf as *mut u64) = 0; }
+        unsafe {
+            *(errorbuf as *mut u64) = 0;
+        }
     }
     0
 }
 
 /// Returns 0 = success. Same semantics as `sandbox_init`.
-pub extern "C" fn shim_sandbox_init_with_parameters(_profile: u64, _flags: u64, _params: u64, errorbuf: u64) -> i32 {
+pub extern "C" fn shim_sandbox_init_with_parameters(
+    _profile: u64,
+    _flags: u64,
+    _params: u64,
+    errorbuf: u64,
+) -> i32 {
     if errorbuf != 0 {
-        unsafe { *(errorbuf as *mut u64) = 0; }
+        unsafe {
+            *(errorbuf as *mut u64) = 0;
+        }
     }
     0
 }
@@ -71,13 +129,23 @@ pub extern "C" fn shim_sandbox_extension_issue_generic(_type: u64, _flags: u32) 
 }
 
 /// Returns 0 = success (handle released).
-pub extern "C" fn shim_sandbox_extension_release(_handle: i64) -> i32 { 0 }
+pub extern "C" fn shim_sandbox_extension_release(_handle: i64) -> i32 {
+    0
+}
 
 /// Returns 0 = operation allowed (not sandboxed).
-pub extern "C" fn shim_sandbox_check_by_audit_token(_token: u64, _operation: u64, _type: i32) -> i32 { 0 }
+pub extern "C" fn shim_sandbox_check_by_audit_token(
+    _token: u64,
+    _operation: u64,
+    _type: i32,
+) -> i32 {
+    0
+}
 
 /// Returns 0 = success (sandbox "applied" but not enforced).
-pub extern "C" fn shim_sandbox_apply(_container: u64) -> i32 { 0 }
+pub extern "C" fn shim_sandbox_apply(_container: u64) -> i32 {
+    0
+}
 
 #[cfg(test)]
 mod tests {

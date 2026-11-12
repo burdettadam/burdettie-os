@@ -36,19 +36,68 @@ impl StatShims {
         #[cfg(not(target_os = "macos"))]
         {
             use crate::register_shims;
-            register_shims!(table,
-                ("_stat", shim_stat as *const () as u64, "stat macOS→Linux struct"),
-                ("_stat$INODE64", shim_stat as *const () as u64, "stat$INODE64 macOS→Linux struct"),
-                ("_lstat", shim_lstat as *const () as u64, "lstat macOS→Linux struct"),
-                ("_lstat$INODE64", shim_lstat as *const () as u64, "lstat$INODE64 macOS→Linux struct"),
-                ("_fstat", shim_fstat as *const () as u64, "fstat macOS→Linux struct"),
-                ("_fstat$INODE64", shim_fstat as *const () as u64, "fstat$INODE64 macOS→Linux struct"),
-                ("_fstatat", shim_fstatat as *const () as u64, "fstatat macOS→Linux struct"),
-                ("_fstatat$INODE64", shim_fstatat as *const () as u64, "fstatat$INODE64 macOS→Linux struct"),
-                ("_statfs", shim_statfs as *const () as u64, "statfs macOS→Linux struct"),
-                ("_statfs$INODE64", shim_statfs as *const () as u64, "statfs$INODE64 macOS→Linux struct"),
-                ("_fstatfs", shim_fstatfs as *const () as u64, "fstatfs macOS→Linux struct"),
-                ("_fstatfs$INODE64", shim_fstatfs as *const () as u64, "fstatfs$INODE64 macOS→Linux struct"),
+            register_shims!(
+                table,
+                (
+                    "_stat",
+                    shim_stat as *const () as u64,
+                    "stat macOS→Linux struct"
+                ),
+                (
+                    "_stat$INODE64",
+                    shim_stat as *const () as u64,
+                    "stat$INODE64 macOS→Linux struct"
+                ),
+                (
+                    "_lstat",
+                    shim_lstat as *const () as u64,
+                    "lstat macOS→Linux struct"
+                ),
+                (
+                    "_lstat$INODE64",
+                    shim_lstat as *const () as u64,
+                    "lstat$INODE64 macOS→Linux struct"
+                ),
+                (
+                    "_fstat",
+                    shim_fstat as *const () as u64,
+                    "fstat macOS→Linux struct"
+                ),
+                (
+                    "_fstat$INODE64",
+                    shim_fstat as *const () as u64,
+                    "fstat$INODE64 macOS→Linux struct"
+                ),
+                (
+                    "_fstatat",
+                    shim_fstatat as *const () as u64,
+                    "fstatat macOS→Linux struct"
+                ),
+                (
+                    "_fstatat$INODE64",
+                    shim_fstatat as *const () as u64,
+                    "fstatat$INODE64 macOS→Linux struct"
+                ),
+                (
+                    "_statfs",
+                    shim_statfs as *const () as u64,
+                    "statfs macOS→Linux struct"
+                ),
+                (
+                    "_statfs$INODE64",
+                    shim_statfs as *const () as u64,
+                    "statfs$INODE64 macOS→Linux struct"
+                ),
+                (
+                    "_fstatfs",
+                    shim_fstatfs as *const () as u64,
+                    "fstatfs macOS→Linux struct"
+                ),
+                (
+                    "_fstatfs$INODE64",
+                    shim_fstatfs as *const () as u64,
+                    "fstatfs$INODE64 macOS→Linux struct"
+                ),
             );
         }
         #[cfg(target_os = "macos")]
@@ -60,25 +109,25 @@ impl StatShims {
 #[cfg(not(target_os = "macos"))]
 #[repr(C)]
 struct DarwinStat {
-    st_dev: i32,         // 0
-    st_mode: u16,        // 4
-    st_nlink: u16,       // 6
-    st_ino: u64,         // 8
-    st_uid: u32,         // 16
-    st_gid: u32,         // 20
-    st_rdev: i32,        // 24
-    _pad0: i32,          // 28 (padding for alignment)
-    st_atimespec: [i64; 2], // 32 (tv_sec, tv_nsec)
-    st_mtimespec: [i64; 2], // 48
-    st_ctimespec: [i64; 2], // 64
+    st_dev: i32,                // 0
+    st_mode: u16,               // 4
+    st_nlink: u16,              // 6
+    st_ino: u64,                // 8
+    st_uid: u32,                // 16
+    st_gid: u32,                // 20
+    st_rdev: i32,               // 24
+    _pad0: i32,                 // 28 (padding for alignment)
+    st_atimespec: [i64; 2],     // 32 (tv_sec, tv_nsec)
+    st_mtimespec: [i64; 2],     // 48
+    st_ctimespec: [i64; 2],     // 64
     st_birthtimespec: [i64; 2], // 80
-    st_size: i64,        // 96
-    st_blocks: i64,      // 104
-    st_blksize: i32,     // 112
-    st_flags: u32,       // 116
-    st_gen: u32,         // 120
-    _pad1: i32,          // 124
-    _reserved: [i64; 2], // 128
+    st_size: i64,               // 96
+    st_blocks: i64,             // 104
+    st_blksize: i32,            // 112
+    st_flags: u32,              // 116
+    st_gen: u32,                // 120
+    _pad1: i32,                 // 124
+    _reserved: [i64; 2],        // 128
 }
 
 /// Convert a Linux `libc::stat` to a macOS `DarwinStat` layout.
@@ -111,51 +160,48 @@ unsafe fn linux_stat_to_darwin(linux: &libc::stat, darwin: *mut DarwinStat) {
 
 /// `int stat(const char *path, struct stat *buf)`
 #[cfg(not(target_os = "macos"))]
-extern "C" fn shim_stat(
-    path: *const libc::c_char,
-    darwin_buf: *mut DarwinStat,
-) -> libc::c_int {
+extern "C" fn shim_stat(path: *const libc::c_char, darwin_buf: *mut DarwinStat) -> libc::c_int {
     if darwin_buf.is_null() {
         return -1;
     }
     let mut linux_buf: libc::stat = unsafe { std::mem::zeroed() };
     let ret = unsafe { libc::stat(path, &mut linux_buf) };
     if ret == 0 {
-        unsafe { linux_stat_to_darwin(&linux_buf, darwin_buf); }
+        unsafe {
+            linux_stat_to_darwin(&linux_buf, darwin_buf);
+        }
     }
     ret
 }
 
 /// `int lstat(const char *path, struct stat *buf)`
 #[cfg(not(target_os = "macos"))]
-extern "C" fn shim_lstat(
-    path: *const libc::c_char,
-    darwin_buf: *mut DarwinStat,
-) -> libc::c_int {
+extern "C" fn shim_lstat(path: *const libc::c_char, darwin_buf: *mut DarwinStat) -> libc::c_int {
     if darwin_buf.is_null() {
         return -1;
     }
     let mut linux_buf: libc::stat = unsafe { std::mem::zeroed() };
     let ret = unsafe { libc::lstat(path, &mut linux_buf) };
     if ret == 0 {
-        unsafe { linux_stat_to_darwin(&linux_buf, darwin_buf); }
+        unsafe {
+            linux_stat_to_darwin(&linux_buf, darwin_buf);
+        }
     }
     ret
 }
 
 /// `int fstat(int fd, struct stat *buf)`
 #[cfg(not(target_os = "macos"))]
-extern "C" fn shim_fstat(
-    fd: libc::c_int,
-    darwin_buf: *mut DarwinStat,
-) -> libc::c_int {
+extern "C" fn shim_fstat(fd: libc::c_int, darwin_buf: *mut DarwinStat) -> libc::c_int {
     if darwin_buf.is_null() {
         return -1;
     }
     let mut linux_buf: libc::stat = unsafe { std::mem::zeroed() };
     let ret = unsafe { libc::fstat(fd, &mut linux_buf) };
     if ret == 0 {
-        unsafe { linux_stat_to_darwin(&linux_buf, darwin_buf); }
+        unsafe {
+            linux_stat_to_darwin(&linux_buf, darwin_buf);
+        }
     }
     ret
 }
@@ -174,7 +220,9 @@ extern "C" fn shim_fstatat(
     let mut linux_buf: libc::stat = unsafe { std::mem::zeroed() };
     let ret = unsafe { libc::fstatat(fd, path, &mut linux_buf, flag) };
     if ret == 0 {
-        unsafe { linux_stat_to_darwin(&linux_buf, darwin_buf); }
+        unsafe {
+            linux_stat_to_darwin(&linux_buf, darwin_buf);
+        }
     }
     ret
 }
@@ -255,34 +303,32 @@ unsafe fn linux_statfs_to_darwin(linux: &libc::statfs, darwin: *mut DarwinStatfs
 
 /// `int statfs(const char *path, struct statfs *buf)`
 #[cfg(not(target_os = "macos"))]
-extern "C" fn shim_statfs(
-    path: *const libc::c_char,
-    darwin_buf: *mut DarwinStatfs,
-) -> libc::c_int {
+extern "C" fn shim_statfs(path: *const libc::c_char, darwin_buf: *mut DarwinStatfs) -> libc::c_int {
     if darwin_buf.is_null() {
         return -1;
     }
     let mut linux_buf: libc::statfs = unsafe { std::mem::zeroed() };
     let ret = unsafe { libc::statfs(path, &mut linux_buf) };
     if ret == 0 {
-        unsafe { linux_statfs_to_darwin(&linux_buf, darwin_buf); }
+        unsafe {
+            linux_statfs_to_darwin(&linux_buf, darwin_buf);
+        }
     }
     ret
 }
 
 /// `int fstatfs(int fd, struct statfs *buf)`
 #[cfg(not(target_os = "macos"))]
-extern "C" fn shim_fstatfs(
-    fd: libc::c_int,
-    darwin_buf: *mut DarwinStatfs,
-) -> libc::c_int {
+extern "C" fn shim_fstatfs(fd: libc::c_int, darwin_buf: *mut DarwinStatfs) -> libc::c_int {
     if darwin_buf.is_null() {
         return -1;
     }
     let mut linux_buf: libc::statfs = unsafe { std::mem::zeroed() };
     let ret = unsafe { libc::fstatfs(fd, &mut linux_buf) };
     if ret == 0 {
-        unsafe { linux_statfs_to_darwin(&linux_buf, darwin_buf); }
+        unsafe {
+            linux_statfs_to_darwin(&linux_buf, darwin_buf);
+        }
     }
     ret
 }

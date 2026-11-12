@@ -186,7 +186,12 @@ pub extern "C" fn shim_nsstackview_arranged_subviews(obj: u64, _cmd: u64) -> u64
 }
 
 /// `-[NSStackView insertArrangedSubview:atIndex:]`
-pub extern "C" fn shim_nsstackview_insert_arranged_subview(obj: u64, _cmd: u64, view: u64, index: u64) {
+pub extern "C" fn shim_nsstackview_insert_arranged_subview(
+    obj: u64,
+    _cmd: u64,
+    view: u64,
+    index: u64,
+) {
     if obj == 0 || view == 0 {
         return;
     }
@@ -210,9 +215,7 @@ pub(crate) fn perform_stack_layout(obj: u64) {
         return;
     }
 
-    let arranged: Vec<u64> = with_arranged(|map| {
-        map.get(&obj).cloned().unwrap_or_default()
-    });
+    let arranged: Vec<u64> = with_arranged(|map| map.get(&obj).cloned().unwrap_or_default());
     if arranged.is_empty() {
         return;
     }
@@ -222,14 +225,22 @@ pub(crate) fn perform_stack_layout(obj: u64) {
     let distribution = shim_nsstackview_distribution(obj, 0);
 
     // Attribute indices based on orientation.
-    let leading_attr: u64 = if orientation == 1 { 3 } else { 1 };  // Top / Left
+    let leading_attr: u64 = if orientation == 1 { 3 } else { 1 }; // Top / Left
     let trailing_attr: u64 = if orientation == 1 { 4 } else { 2 }; // Bottom / Right
-    let size_attr: u64 = if orientation == 1 { 8 } else { 7 };     // Height / Width
+    let size_attr: u64 = if orientation == 1 { 8 } else { 7 }; // Height / Width
 
     // 1. Pin first arranged subview's leading to stack view's leading.
     let first = arranged[0];
     let c_lead = crate::nslayoutconstraint::shim_nslayoutconstraint_create(
-        0, 0, first, leading_attr, 0, obj, leading_attr, 1.0, 0.0,
+        0,
+        0,
+        first,
+        leading_attr,
+        0,
+        obj,
+        leading_attr,
+        1.0,
+        0.0,
     );
     if c_lead != 0 {
         crate::nslayoutconstraint::shim_nslayoutconstraint_set_active(c_lead, 0, 1);
@@ -242,7 +253,15 @@ pub(crate) fn perform_stack_layout(obj: u64) {
         let curr = arranged[i];
         // curr.leading = prev.trailing + spacing
         let c = crate::nslayoutconstraint::shim_nslayoutconstraint_create(
-            0, 0, curr, leading_attr, 0, prev, trailing_attr, 1.0, spacing,
+            0,
+            0,
+            curr,
+            leading_attr,
+            0,
+            prev,
+            trailing_attr,
+            1.0,
+            spacing,
         );
         if c != 0 {
             crate::nslayoutconstraint::shim_nslayoutconstraint_set_active(c, 0, 1);
@@ -253,7 +272,15 @@ pub(crate) fn perform_stack_layout(obj: u64) {
     // 3. Pin last arranged subview's trailing to stack view's trailing.
     let last = *arranged.last().unwrap();
     let c_trail = crate::nslayoutconstraint::shim_nslayoutconstraint_create(
-        0, 0, obj, trailing_attr, 0, last, trailing_attr, 1.0, 0.0,
+        0,
+        0,
+        obj,
+        trailing_attr,
+        0,
+        last,
+        trailing_attr,
+        1.0,
+        0.0,
     );
     if c_trail != 0 {
         crate::nslayoutconstraint::shim_nslayoutconstraint_set_active(c_trail, 0, 1);
@@ -265,7 +292,15 @@ pub(crate) fn perform_stack_layout(obj: u64) {
         for i in 1..arranged.len() {
             // arranged[i].size = arranged[0].size
             let c = crate::nslayoutconstraint::shim_nslayoutconstraint_create(
-                0, 0, arranged[i], size_attr, 0, arranged[0], size_attr, 1.0, 0.0,
+                0,
+                0,
+                arranged[i],
+                size_attr,
+                0,
+                arranged[0],
+                size_attr,
+                1.0,
+                0.0,
             );
             if c != 0 {
                 crate::nslayoutconstraint::shim_nslayoutconstraint_set_active(c, 0, 1);
@@ -417,8 +452,11 @@ mod tests {
         assert_ne!(sv, 0);
 
         let isa = unsafe { *(sv as *const u64) };
-        assert_eq!(isa, crate::nsobj::nsstackview_class_addr(),
-            "ISA should be nsstackview, not nsview");
+        assert_eq!(
+            isa,
+            crate::nsobj::nsstackview_class_addr(),
+            "ISA should be nsstackview, not nsview"
+        );
 
         assert!((shim_nsstackview_spacing(sv, 0) - 8.0).abs() < f64::EPSILON);
 
@@ -434,8 +472,8 @@ mod tests {
         let sv = alloc_obj(STACK_VIEW_SIZE, crate::nsobj::nsstackview_class_addr());
         // Set frame for the stack view.
         unsafe {
-            *((sv as usize + 24) as *mut f64) = 0.0;  // frame_x
-            *((sv as usize + 32) as *mut f64) = 0.0;  // frame_y
+            *((sv as usize + 24) as *mut f64) = 0.0; // frame_x
+            *((sv as usize + 32) as *mut f64) = 0.0; // frame_y
             *((sv as usize + 40) as *mut f64) = 300.0; // frame_w
             *((sv as usize + 48) as *mut f64) = 100.0; // frame_h
         }

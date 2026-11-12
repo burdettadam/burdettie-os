@@ -112,7 +112,9 @@ fn extract_cfstring(ptr: u64) -> Option<String> {
         let mut slen = 0usize;
         while slen < 1024 {
             let b = *p.add(slen);
-            if b == 0 { break; }
+            if b == 0 {
+                break;
+            }
             slen += 1;
         }
         if slen > 0 && slen < 1024 {
@@ -139,8 +141,12 @@ fn setup_inotify_watches(paths: &[String]) -> (Option<i32>, Vec<i32>) {
             libc::inotify_add_watch(
                 fd,
                 c_path.as_ptr(),
-                libc::IN_CREATE | libc::IN_DELETE | libc::IN_MODIFY
-                    | libc::IN_MOVED_FROM | libc::IN_MOVED_TO | libc::IN_ATTRIB,
+                libc::IN_CREATE
+                    | libc::IN_DELETE
+                    | libc::IN_MODIFY
+                    | libc::IN_MOVED_FROM
+                    | libc::IN_MOVED_TO
+                    | libc::IN_ATTRIB,
             )
         };
         if wd >= 0 {
@@ -159,7 +165,7 @@ fn setup_inotify_watches(paths: &[String]) -> (Option<i32>, Vec<i32>) {
 extern "C" fn shim_fsevent_stream_create(
     _allocator: u64,
     callback: u64,
-    context: u64,  // FSEventStreamContext*
+    context: u64, // FSEventStreamContext*
     paths_to_watch: u64,
     _since_when: u64,
     latency: f64,
@@ -175,7 +181,12 @@ extern "C" fn shim_fsevent_stream_create(
         0
     };
 
-    log::trace!("FSEventStreamCreate: handle={:#x} paths={:?} latency={}", handle, paths, latency);
+    log::trace!(
+        "FSEventStreamCreate: handle={:#x} paths={:?} latency={}",
+        handle,
+        paths,
+        latency
+    );
 
     #[cfg(target_os = "linux")]
     let (inotify_fd, watch_fds) = setup_inotify_watches(&paths);
@@ -207,9 +218,13 @@ extern "C" fn shim_fsevent_stream_release(stream_ref: u64) {
         {
             if let Some(fd) = _stream.inotify_fd {
                 for wd in &_stream.watch_fds {
-                    unsafe { libc::inotify_rm_watch(fd, *wd); }
+                    unsafe {
+                        libc::inotify_rm_watch(fd, *wd);
+                    }
                 }
-                unsafe { libc::close(fd); }
+                unsafe {
+                    libc::close(fd);
+                }
             }
         }
     }
@@ -257,10 +272,7 @@ extern "C" fn shim_fsevent_stream_schedule_with_run_loop(
 }
 
 /// void FSEventStreamSetDispatchQueue(FSEventStreamRef, dispatch_queue_t)
-extern "C" fn shim_fsevent_stream_set_dispatch_queue(
-    _stream_ref: u64,
-    _queue: u64,
-) {
+extern "C" fn shim_fsevent_stream_set_dispatch_queue(_stream_ref: u64, _queue: u64) {
     // No-op
 }
 
@@ -321,31 +333,104 @@ pub struct FsEventsStubs;
 impl FsEventsStubs {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
-        register_shims!(table,
+        register_shims!(
+            table,
             // FSEventStream lifecycle
-            ("_FSEventStreamCreate", shim_fsevent_stream_create as *const () as u64, "FSEventStreamCreate → handle"),
-            ("_FSEventStreamRelease", shim_fsevent_stream_release as *const () as u64, "FSEventStreamRelease → cleanup"),
-            ("_FSEventStreamRetain", shim_fsevent_stream_retain as *const () as u64, "FSEventStreamRetain → no-op"),
-            ("_FSEventStreamStart", shim_fsevent_stream_start as *const () as u64, "FSEventStreamStart → true"),
-            ("_FSEventStreamStop", shim_fsevent_stream_stop as *const () as u64, "FSEventStreamStop → no-op"),
-            ("_FSEventStreamInvalidate", shim_fsevent_stream_invalidate as *const () as u64, "FSEventStreamInvalidate → no-op"),
+            (
+                "_FSEventStreamCreate",
+                shim_fsevent_stream_create as *const () as u64,
+                "FSEventStreamCreate → handle"
+            ),
+            (
+                "_FSEventStreamRelease",
+                shim_fsevent_stream_release as *const () as u64,
+                "FSEventStreamRelease → cleanup"
+            ),
+            (
+                "_FSEventStreamRetain",
+                shim_fsevent_stream_retain as *const () as u64,
+                "FSEventStreamRetain → no-op"
+            ),
+            (
+                "_FSEventStreamStart",
+                shim_fsevent_stream_start as *const () as u64,
+                "FSEventStreamStart → true"
+            ),
+            (
+                "_FSEventStreamStop",
+                shim_fsevent_stream_stop as *const () as u64,
+                "FSEventStreamStop → no-op"
+            ),
+            (
+                "_FSEventStreamInvalidate",
+                shim_fsevent_stream_invalidate as *const () as u64,
+                "FSEventStreamInvalidate → no-op"
+            ),
             // Scheduling
-            ("_FSEventStreamScheduleWithRunLoop", shim_fsevent_stream_schedule_with_run_loop as *const () as u64, "FSEventStreamScheduleWithRunLoop → no-op"),
-            ("_FSEventStreamSetDispatchQueue", shim_fsevent_stream_set_dispatch_queue as *const () as u64, "FSEventStreamSetDispatchQueue → no-op"),
+            (
+                "_FSEventStreamScheduleWithRunLoop",
+                shim_fsevent_stream_schedule_with_run_loop as *const () as u64,
+                "FSEventStreamScheduleWithRunLoop → no-op"
+            ),
+            (
+                "_FSEventStreamSetDispatchQueue",
+                shim_fsevent_stream_set_dispatch_queue as *const () as u64,
+                "FSEventStreamSetDispatchQueue → no-op"
+            ),
             // Queries
-            ("_FSEventStreamGetLatestEventId", shim_fsevent_stream_get_latest_event_id as *const () as u64, "FSEventStreamGetLatestEventId → id"),
-            ("_FSEventStreamCopyPathsBeingWatched", shim_fsevent_stream_copy_paths_being_watched as *const () as u64, "FSEventStreamCopyPathsBeingWatched → NULL"),
+            (
+                "_FSEventStreamGetLatestEventId",
+                shim_fsevent_stream_get_latest_event_id as *const () as u64,
+                "FSEventStreamGetLatestEventId → id"
+            ),
+            (
+                "_FSEventStreamCopyPathsBeingWatched",
+                shim_fsevent_stream_copy_paths_being_watched as *const () as u64,
+                "FSEventStreamCopyPathsBeingWatched → NULL"
+            ),
             // Flush
-            ("_FSEventStreamFlushAsync", shim_fsevent_stream_flush_async as *const () as u64, "FSEventStreamFlushAsync → id"),
-            ("_FSEventStreamFlushSync", shim_fsevent_stream_flush_sync as *const () as u64, "FSEventStreamFlushSync → no-op"),
-            ("_FSEventStreamShow", shim_fsevent_stream_show as *const () as u64, "FSEventStreamShow → no-op"),
+            (
+                "_FSEventStreamFlushAsync",
+                shim_fsevent_stream_flush_async as *const () as u64,
+                "FSEventStreamFlushAsync → id"
+            ),
+            (
+                "_FSEventStreamFlushSync",
+                shim_fsevent_stream_flush_sync as *const () as u64,
+                "FSEventStreamFlushSync → no-op"
+            ),
+            (
+                "_FSEventStreamShow",
+                shim_fsevent_stream_show as *const () as u64,
+                "FSEventStreamShow → no-op"
+            ),
             // Global
-            ("_FSEventsGetCurrentEventId", shim_fsevents_get_current_event_id as *const () as u64, "FSEventsGetCurrentEventId → id"),
-            ("_FSEventsCopyUUIDForDevice", shim_fsevents_copy_uuid_for_device as *const () as u64, "FSEventsCopyUUIDForDevice → NULL"),
-            ("_FSEventsGetLastEventIdForDeviceBeforeTime", shim_fsevents_get_last_event_id_for_device as *const () as u64, "FSEventsGetLastEventIdForDeviceBeforeTime → id"),
-            ("_FSEventsPurgeEventsForDeviceUpToEventId", shim_fsevents_purge_events as *const () as u64, "FSEventsPurgeEventsForDeviceUpToEventId → true"),
+            (
+                "_FSEventsGetCurrentEventId",
+                shim_fsevents_get_current_event_id as *const () as u64,
+                "FSEventsGetCurrentEventId → id"
+            ),
+            (
+                "_FSEventsCopyUUIDForDevice",
+                shim_fsevents_copy_uuid_for_device as *const () as u64,
+                "FSEventsCopyUUIDForDevice → NULL"
+            ),
+            (
+                "_FSEventsGetLastEventIdForDeviceBeforeTime",
+                shim_fsevents_get_last_event_id_for_device as *const () as u64,
+                "FSEventsGetLastEventIdForDeviceBeforeTime → id"
+            ),
+            (
+                "_FSEventsPurgeEventsForDeviceUpToEventId",
+                shim_fsevents_purge_events as *const () as u64,
+                "FSEventsPurgeEventsForDeviceUpToEventId → true"
+            ),
             // Data symbol
-            ("_kFSEventStreamEventIdSinceNow", &K_FSEVENT_STREAM_EVENT_ID_SINCE_NOW as *const u64 as u64, "kFSEventStreamEventIdSinceNow = 0xFFFF...")
+            (
+                "_kFSEventStreamEventIdSinceNow",
+                &K_FSEVENT_STREAM_EVENT_ID_SINCE_NOW as *const u64 as u64,
+                "kFSEventStreamEventIdSinceNow = 0xFFFF..."
+            )
         );
 
         log::debug!("FsEventsStubs: registered 17 shims + 1 data symbol");

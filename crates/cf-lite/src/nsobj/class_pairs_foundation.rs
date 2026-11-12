@@ -2,7 +2,7 @@
 
 use std::cell::UnsafeCell;
 
-use super::{SyncArray, nsobject_class_addr, nsobject_metaclass_addr};
+use super::{nsobject_class_addr, nsobject_metaclass_addr, SyncArray};
 
 define_class_pair!(child NSSTRING_CLASS_DATA, NSSTRING_METACLASS_DATA, NSSTRING_INIT,
     ensure: ensure_nsstring_init,
@@ -399,4 +399,3 @@ define_class_pair!(child NSUNDOMANAGER_CLASS_DATA, NSUNDOMANAGER_METACLASS_DATA,
     meta_addr: nsundomanager_metaclass_addr,
     parent_class: nsobject_class_addr,
     parent_meta: nsobject_metaclass_addr);
-

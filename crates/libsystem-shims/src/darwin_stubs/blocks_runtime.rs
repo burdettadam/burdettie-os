@@ -24,24 +24,103 @@ const BLOCK_FIELD_IS_OBJECT: i32 = 3; // captured ObjC object
 const BLOCK_FIELD_IS_BLOCK: i32 = 7; // captured nested block
 const BLOCK_FIELD_IS_BYREF: i32 = 8; // captured __block variable
 
+pub(crate) const BLOCK_IS_GLOBAL_FLAG: i32 = BLOCK_IS_GLOBAL;
+
 /// 8-byte sentinel for `_NSConcreteStackBlock`.
 static NSCONCRETESTACK_SENTINEL: [u8; 8] = [0x53, 0x54, 0x4B, 0x42, 0x4C, 0x4B, 0x00, 0x00];
 
 /// 8-byte sentinel for `_NSConcreteGlobalBlock`.
 static NSCONCRETEGLOBAL_SENTINEL: [u8; 8] = [0x47, 0x4C, 0x42, 0x42, 0x4C, 0x4B, 0x00, 0x00];
 
+#[derive(Debug)]
+pub(crate) struct OwnedBlock(u64);
+
+impl OwnedBlock {
+    pub(crate) fn from_block(block: u64) -> Option<Self> {
+        let copied = shim_block_copy(block);
+        if copied == 0 {
+            None
+        } else {
+            Some(Self(copied))
+        }
+    }
+
+    pub(crate) fn from_ptr(block: *const u8) -> Option<Self> {
+        Self::from_block(block as u64)
+    }
+
+    pub(crate) fn addr(&self) -> u64 {
+        self.0
+    }
+
+    pub(crate) fn as_ptr(&self) -> *const u8 {
+        self.0 as *const u8
+    }
+}
+
+impl Clone for OwnedBlock {
+    fn clone(&self) -> Self {
+        let copied = shim_block_copy(self.0);
+        assert_ne!(copied, 0, "OwnedBlock clone failed");
+        Self(copied)
+    }
+}
+
+impl Drop for OwnedBlock {
+    fn drop(&mut self) {
+        shim_block_release(self.0);
+    }
+}
+
+unsafe impl Send for OwnedBlock {}
+
+pub(crate) unsafe fn invoke_block0(block: u64) {
+    if block == 0 {
+        return;
+    }
+    let block_ptr = block as *const u8;
+    let invoke_ptr = unsafe { *(block_ptr.add(16) as *const usize) };
+    let invoke: extern "C" fn(*const u8) = unsafe { std::mem::transmute(invoke_ptr) };
+    invoke(block_ptr);
+}
+
 pub struct BlocksRuntimeStubs;
 
 impl BlocksRuntimeStubs {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
-        register_shims!(table,
-            ("__Block_copy", shim_block_copy as *const () as u64, "Block_copy — copy a block to the heap"),
-            ("__Block_release", shim_block_release as *const () as u64, "Block_release — release a heap block"),
-            ("__Block_object_assign", shim_block_object_assign as *const () as u64, "Block_object_assign — captured object assign/copy"),
-            ("__Block_object_dispose", shim_block_object_dispose as *const () as u64, "Block_object_dispose — captured object dispose/release"),
-            ("__NSConcreteStackBlock", NSCONCRETESTACK_SENTINEL.as_ptr() as u64, "NSConcreteStackBlock data symbol"),
-            ("__NSConcreteGlobalBlock", NSCONCRETEGLOBAL_SENTINEL.as_ptr() as u64, "NSConcreteGlobalBlock data symbol"),
+        register_shims!(
+            table,
+            (
+                "__Block_copy",
+                shim_block_copy as *const () as u64,
+                "Block_copy — copy a block to the heap"
+            ),
+            (
+                "__Block_release",
+                shim_block_release as *const () as u64,
+                "Block_release — release a heap block"
+            ),
+            (
+                "__Block_object_assign",
+                shim_block_object_assign as *const () as u64,
+                "Block_object_assign — captured object assign/copy"
+            ),
+            (
+                "__Block_object_dispose",
+                shim_block_object_dispose as *const () as u64,
+                "Block_object_dispose — captured object dispose/release"
+            ),
+            (
+                "__NSConcreteStackBlock",
+                NSCONCRETESTACK_SENTINEL.as_ptr() as u64,
+                "NSConcreteStackBlock data symbol"
+            ),
+            (
+                "__NSConcreteGlobalBlock",
+                NSCONCRETEGLOBAL_SENTINEL.as_ptr() as u64,
+                "NSConcreteGlobalBlock data symbol"
+            ),
         );
         log::debug!("BlocksRuntimeStubs: registered 6 stubs");
     }
@@ -96,7 +175,11 @@ pub extern "C" fn shim_block_copy(block: u64) -> u64 {
         let desc = read_descriptor(block);
         let size = if desc != 0 {
             let s = std::ptr::read_unaligned((desc as *const u8).add(8) as *const u64) as usize;
-            if s >= BLOCK_SIZE { s } else { BLOCK_SIZE }
+            if s >= BLOCK_SIZE {
+                s
+            } else {
+                BLOCK_SIZE
+            }
         } else {
             BLOCK_SIZE
         };
@@ -172,27 +255,32 @@ pub extern "C" fn shim_block_object_assign(dest_addr: u64, object: u64, flags: i
     match kind {
         BLOCK_FIELD_IS_BLOCK => {
             let copied = shim_block_copy(object);
-            unsafe { *(dest_addr as *mut u64) = copied; }
+            unsafe {
+                *(dest_addr as *mut u64) = copied;
+            }
         }
         BLOCK_FIELD_IS_BYREF => {
             // Copy byref struct to heap and update forwarding pointers.
             // Byref layout: [isa:8][forwarding:8][flags:4][size:4][...].
-            let forwarding = unsafe {
-                std::ptr::read_unaligned((object as *const u8).add(8) as *const u64)
-            };
+            let forwarding =
+                unsafe { std::ptr::read_unaligned((object as *const u8).add(8) as *const u64) };
             // If forwarding already points elsewhere, it's already on the heap
             if forwarding != object && forwarding != 0 {
-                unsafe { *(dest_addr as *mut u64) = forwarding; }
+                unsafe {
+                    *(dest_addr as *mut u64) = forwarding;
+                }
                 return;
             }
             // Read size from offset 20
-            let size = unsafe {
-                std::ptr::read_unaligned((object as *const u8).add(20) as *const u32)
-            } as usize;
+            let size =
+                unsafe { std::ptr::read_unaligned((object as *const u8).add(20) as *const u32) }
+                    as usize;
             let alloc_size = if size >= BLOCK_SIZE { size } else { BLOCK_SIZE };
             let heap = unsafe { libc::malloc(alloc_size) };
             if heap.is_null() {
-                unsafe { *(dest_addr as *mut u64) = object; }
+                unsafe {
+                    *(dest_addr as *mut u64) = object;
+                }
                 return;
             }
             unsafe {
@@ -206,9 +294,9 @@ pub extern "C" fn shim_block_object_assign(dest_addr: u64, object: u64, flags: i
             }
         }
         // IS_OBJECT or unknown — store pointer as-is.
-        _ => {
-            unsafe { *(dest_addr as *mut u64) = object; }
-        }
+        _ => unsafe {
+            *(dest_addr as *mut u64) = object;
+        },
     }
 }
 
@@ -342,22 +430,25 @@ mod tests {
             std::ptr::write_unaligned(byref.as_mut_ptr().add(24) as *mut u64, 0xDEAD_BEEF);
         }
         let mut dest: u64 = 0;
-        shim_block_object_assign(&mut dest as *mut u64 as u64, byref_ptr, BLOCK_FIELD_IS_BYREF);
+        shim_block_object_assign(
+            &mut dest as *mut u64 as u64,
+            byref_ptr,
+            BLOCK_FIELD_IS_BYREF,
+        );
         // dest should point to a heap copy, not the original stack byref
         assert_ne!(dest, 0);
         assert_ne!(dest, byref_ptr, "byref should be copied to heap");
         // Stack copy's forwarding should now point to heap copy
-        let stack_fwd = unsafe {
-            std::ptr::read_unaligned(byref.as_ptr().add(8) as *const u64)
-        };
+        let stack_fwd = unsafe { std::ptr::read_unaligned(byref.as_ptr().add(8) as *const u64) };
         assert_eq!(stack_fwd, dest, "stack forwarding should point to heap");
         // Heap copy's forwarding should point to itself
-        let heap_fwd = unsafe {
-            std::ptr::read_unaligned((dest as *const u8).add(8) as *const u64)
-        };
+        let heap_fwd =
+            unsafe { std::ptr::read_unaligned((dest as *const u8).add(8) as *const u64) };
         assert_eq!(heap_fwd, dest, "heap forwarding should point to itself");
         // Clean up
-        unsafe { libc::free(dest as *mut libc::c_void); }
+        unsafe {
+            libc::free(dest as *mut libc::c_void);
+        }
     }
 
     #[test]
@@ -371,7 +462,11 @@ mod tests {
             blk.as_ptr() as u64,
             BLOCK_FIELD_IS_BLOCK,
         );
-        assert_eq!(dest, blk.as_ptr() as u64, "IS_BLOCK on global should store same ptr");
+        assert_eq!(
+            dest,
+            blk.as_ptr() as u64,
+            "IS_BLOCK on global should store same ptr"
+        );
     }
 
     #[test]
@@ -404,10 +499,7 @@ mod tests {
             // invoke at offset 16.
             std::ptr::write_unaligned(buf.as_mut_ptr().add(16) as *mut u64, 0xCAFE);
             // descriptor at offset 24.
-            std::ptr::write_unaligned(
-                buf.as_mut_ptr().add(24) as *mut u64,
-                desc.as_ptr() as u64,
-            );
+            std::ptr::write_unaligned(buf.as_mut_ptr().add(24) as *mut u64, desc.as_ptr() as u64);
         }
         let heap = shim_block_copy(buf.as_ptr() as u64);
         assert_ne!(heap, 0);

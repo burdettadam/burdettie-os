@@ -6,7 +6,7 @@ use crate::decode::Instruction;
 // ── PAC bit positions ───────────────────────────────────────────────────────
 // In userspace (EL0, TTBR0), virtual addresses use bits[47:0] and bit 55
 // indicates the top-byte-ignore region. PAC bits occupy [54:48] (7 bits).
-const PAC_MASK: u64  = 0x007F_0000_0000_0000; // bits 54:48
+const PAC_MASK: u64 = 0x007F_0000_0000_0000; // bits 54:48
 const ADDR_MASK: u64 = 0x0000_FFFF_FFFF_FFFF; // bits 47:0
 
 /// Compute a PAC value using a simplified SipHash-like mixing of pointer,
@@ -51,24 +51,31 @@ fn pac_strip(ptr: u64) -> u64 {
 // Formula: (o0 << 15) | (1 << 14) | (op1 << 11) | (CRn << 7) | (CRm << 3) | op2
 // where o0=1 for op0=3, bit14=1 is always set in register access form.
 /// TPIDR_EL0 (Thread Pointer ID, EL0): op0=3, op1=3, CRn=13, CRm=0, op2=2
-const SYSREG_TPIDR_EL0:  u16 = (1 << 15) | (1 << 14) | (3 << 11) | (13 << 7) | (0 << 3) | 2;
+const SYSREG_TPIDR_EL0: u16 = (1 << 15) | (1 << 14) | (3 << 11) | (13 << 7) | (0 << 3) | 2;
 /// CTR_EL0 (Cache Type Register): op0=3, op1=3, CRn=0, CRm=0, op2=1
-const SYSREG_CTR_EL0:    u16 = (1 << 15) | (1 << 14) | (3 << 11) | (0 << 7)  | (0 << 3) | 1;
+const SYSREG_CTR_EL0: u16 = (1 << 15) | (1 << 14) | (3 << 11) | (0 << 7) | (0 << 3) | 1;
 /// CNTVCT_EL0 (Virtual Timer Counter): op0=3, op1=3, CRn=14, CRm=0, op2=2
 const SYSREG_CNTVCT_EL0: u16 = (1 << 15) | (1 << 14) | (3 << 11) | (14 << 7) | (0 << 3) | 2;
 /// DAIF (Debug/Async/IRQ/FIQ mask): op0=3, op1=3, CRn=4, CRm=2, op2=1
-const SYSREG_DAIF:       u16 = (1 << 15) | (1 << 14) | (3 << 11) | (4 << 7)  | (2 << 3) | 1;
+const SYSREG_DAIF: u16 = (1 << 15) | (1 << 14) | (3 << 11) | (4 << 7) | (2 << 3) | 1;
 /// NZCV (Condition flags): op0=3, op1=3, CRn=4, CRm=2, op2=0
-const SYSREG_NZCV:       u16 = (1 << 15) | (1 << 14) | (3 << 11) | (4 << 7)  | (2 << 3) | 0;
+const SYSREG_NZCV: u16 = (1 << 15) | (1 << 14) | (3 << 11) | (4 << 7) | (2 << 3) | 0;
 /// FPCR (FP Control Register): op0=3, op1=3, CRn=4, CRm=4, op2=0
-const SYSREG_FPCR:       u16 = (1 << 15) | (1 << 14) | (3 << 11) | (4 << 7)  | (4 << 3) | 0;
+const SYSREG_FPCR: u16 = (1 << 15) | (1 << 14) | (3 << 11) | (4 << 7) | (4 << 3) | 0;
 /// FPSR (FP Status Register): op0=3, op1=3, CRn=4, CRm=4, op2=1
-const SYSREG_FPSR:       u16 = (1 << 15) | (1 << 14) | (3 << 11) | (4 << 7)  | (4 << 3) | 1;
+const SYSREG_FPSR: u16 = (1 << 15) | (1 << 14) | (3 << 11) | (4 << 7) | (4 << 3) | 1;
 
 /// Synthetic CTR_EL0 value:
 /// IcacheLineSize=4 (16 words = 64 bytes), DcacheLineSize=4, IDC=1, DIC=1, L1Ip=3 (VIPT)
 const CTR_EL0_VALUE: u64 = 0x8201_4004;
 
+fn virtual_timer_counter_nanos() -> u64 {
+    static START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+    START
+        .get_or_init(std::time::Instant::now)
+        .elapsed()
+        .as_nanos() as u64
+}
 
 impl Interpreter {
     pub(super) fn exec_branch(&mut self, insn: Instruction, pc: u64) -> StepResult {
@@ -106,7 +113,11 @@ impl Interpreter {
             Instruction::Ret { rn } => {
                 let target = self.cpu.read_reg(rn);
                 if target == SENTINEL_LR {
-                    log::trace!("RET to sentinel: x0={:#x} sp={:#x}", self.cpu.x[0], self.cpu.sp);
+                    log::trace!(
+                        "RET to sentinel: x0={:#x} sp={:#x}",
+                        self.cpu.x[0],
+                        self.cpu.sp
+                    );
                     return StepResult::Exit(ExitReason::Returned {
                         code: self.cpu.x[0] as i64,
                     });
@@ -174,14 +185,11 @@ impl Interpreter {
             Instruction::Mrs { rt, sysreg } => {
                 // Known system registers: return plausible stub values.
                 let val = match sysreg {
-                    SYSREG_TPIDR_EL0   => self.cpu.tpidr_el0,
-                    SYSREG_CTR_EL0     => CTR_EL0_VALUE,
-                    SYSREG_CNTVCT_EL0  => {
-                        // Virtual timer counter: approximate using monotonic clock.
-                        let mut ts = libc::timespec { tv_sec: 0, tv_nsec: 0 };
-                        unsafe { libc::clock_gettime(libc::CLOCK_MONOTONIC, &mut ts) };
-                        (ts.tv_sec as u64).wrapping_mul(1_000_000_000)
-                            .wrapping_add(ts.tv_nsec as u64)
+                    SYSREG_TPIDR_EL0 => self.cpu.tpidr_el0,
+                    SYSREG_CTR_EL0 => CTR_EL0_VALUE,
+                    SYSREG_CNTVCT_EL0 => {
+                        // Virtual timer counter: approximate using monotonic host time.
+                        virtual_timer_counter_nanos()
                     }
                     SYSREG_NZCV => {
                         let n = self.cpu.nzcv.n as u64;
@@ -222,7 +230,10 @@ impl Interpreter {
             }
             Instruction::Brk { imm } => {
                 log::debug!("BRK #{imm} at {pc:#x}");
-                return StepResult::Exit(ExitReason::Unimplemented { pc, raw: 0xD420_0000 | ((imm as u32) << 5) });
+                return StepResult::Exit(ExitReason::Unimplemented {
+                    pc,
+                    raw: 0xD420_0000 | ((imm as u32) << 5),
+                });
             }
 
             // ── Pointer Authentication (ARMv8.3 arm64e) ──────────
@@ -301,7 +312,7 @@ impl Interpreter {
     /// Handle an FFI call: extract args from registers, call the host function,
     /// and process the result (return, exit, or tail-call).
     fn do_ffi_call(&mut self, target: u64, _call_pc: u64) -> StepResult {
-        // The interpreter stack is mmap'd at a real virtual address, so
+        // The interpreter stack is allocated at a real virtual address, so
         // guest pointers (stack, segment) ARE valid host pointers.
         // No address translation is needed at the FFI boundary.
         //
@@ -310,12 +321,24 @@ impl Interpreter {
         let aligned_sp = self.cpu.sp & !0xF;
         let args = crate::ffi::FfiCallArgs {
             x: [
-                self.cpu.x[0], self.cpu.x[1], self.cpu.x[2], self.cpu.x[3],
-                self.cpu.x[4], self.cpu.x[5], self.cpu.x[6], self.cpu.x[7],
+                self.cpu.x[0],
+                self.cpu.x[1],
+                self.cpu.x[2],
+                self.cpu.x[3],
+                self.cpu.x[4],
+                self.cpu.x[5],
+                self.cpu.x[6],
+                self.cpu.x[7],
             ],
             d: [
-                self.cpu.read_d(0), self.cpu.read_d(1), self.cpu.read_d(2), self.cpu.read_d(3),
-                self.cpu.read_d(4), self.cpu.read_d(5), self.cpu.read_d(6), self.cpu.read_d(7),
+                self.cpu.read_d(0),
+                self.cpu.read_d(1),
+                self.cpu.read_d(2),
+                self.cpu.read_d(3),
+                self.cpu.read_d(4),
+                self.cpu.read_d(5),
+                self.cpu.read_d(6),
+                self.cpu.read_d(7),
             ],
             x8: self.cpu.x[8],
             host_x8: self.cpu.x[8],
@@ -325,7 +348,10 @@ impl Interpreter {
         let result = self.ffi.call_or_stub(target, &args);
         match result {
             crate::ffi::FfiResult::Return(val) => {
-                log::trace!("FFI {target:#x} ({}) returned {val:#x}", name.unwrap_or("?"));
+                log::trace!(
+                    "FFI {target:#x} ({}) returned {val:#x}",
+                    name.unwrap_or("?")
+                );
                 self.cpu.x[0] = val;
                 self.cpu.pc = self.cpu.x[30];
                 StepResult::Continue
@@ -366,11 +392,7 @@ mod tests {
         // pos 0: B +8 → jump to pos 2
         // pos 1: MOVZ X0, #99 (skipped)
         // pos 2: MOVZ X0, #42
-        let mut t = test_interp(&[
-            enc_b(8),
-            enc_movz(true, 0, 99, 0),
-            enc_movz(true, 0, 42, 0),
-        ]);
+        let mut t = test_interp(&[enc_b(8), enc_movz(true, 0, 99, 0), enc_movz(true, 0, 42, 0)]);
         let cpu = t.run_ok();
         assert_eq!(cpu.x[0], 42);
     }
@@ -430,10 +452,7 @@ mod tests {
     #[test]
     fn test_cbz_taken() {
         // x0=0 → CBZ taken, skip MOVZ
-        let mut t = test_interp(&[
-            enc_cbz(true, 0, 8),
-            enc_movz(true, 1, 99, 0),
-        ]);
+        let mut t = test_interp(&[enc_cbz(true, 0, 8), enc_movz(true, 1, 99, 0)]);
         t.interp.cpu.x[0] = 0;
         t.interp.cpu.x[1] = 42;
         let cpu = t.run_ok();
@@ -443,10 +462,7 @@ mod tests {
     #[test]
     fn test_cbz_not_taken() {
         // x0=1 → CBZ not taken, MOVZ executes
-        let mut t = test_interp(&[
-            enc_cbz(true, 0, 8),
-            enc_movz(true, 1, 99, 0),
-        ]);
+        let mut t = test_interp(&[enc_cbz(true, 0, 8), enc_movz(true, 1, 99, 0)]);
         t.interp.cpu.x[0] = 1;
         t.interp.cpu.x[1] = 42;
         let cpu = t.run_ok();
@@ -456,10 +472,7 @@ mod tests {
     #[test]
     fn test_cbz_32bit_upper_bits_ignored() {
         // 32-bit CBZ: upper 32 bits ignored. x0=0x1_0000_0000 → W0=0 → taken
-        let mut t = test_interp(&[
-            enc_cbz(false, 0, 8),
-            enc_movz(true, 1, 99, 0),
-        ]);
+        let mut t = test_interp(&[enc_cbz(false, 0, 8), enc_movz(true, 1, 99, 0)]);
         t.interp.cpu.x[0] = 0x1_0000_0000;
         t.interp.cpu.x[1] = 42;
         let cpu = t.run_ok();
@@ -471,10 +484,7 @@ mod tests {
     #[test]
     fn test_cbnz_taken() {
         // x0=5 → CBNZ taken, skip MOVZ
-        let mut t = test_interp(&[
-            enc_cbnz(true, 0, 8),
-            enc_movz(true, 1, 99, 0),
-        ]);
+        let mut t = test_interp(&[enc_cbnz(true, 0, 8), enc_movz(true, 1, 99, 0)]);
         t.interp.cpu.x[0] = 5;
         t.interp.cpu.x[1] = 42;
         let cpu = t.run_ok();
@@ -484,10 +494,7 @@ mod tests {
     #[test]
     fn test_cbnz_not_taken() {
         // x0=0 → CBNZ not taken, MOVZ executes
-        let mut t = test_interp(&[
-            enc_cbnz(true, 0, 8),
-            enc_movz(true, 1, 99, 0),
-        ]);
+        let mut t = test_interp(&[enc_cbnz(true, 0, 8), enc_movz(true, 1, 99, 0)]);
         t.interp.cpu.x[0] = 0;
         t.interp.cpu.x[1] = 42;
         let cpu = t.run_ok();
@@ -527,10 +534,7 @@ mod tests {
     #[test]
     fn test_ret_clean() {
         // RET with sentinel LR exits cleanly
-        let mut t = test_interp(&[
-            enc_movz(true, 0, 42, 0),
-            enc_ret(30),
-        ]);
+        let mut t = test_interp(&[enc_movz(true, 0, 42, 0), enc_ret(30)]);
         let cpu = t.run_ok();
         assert_eq!(cpu.x[0], 42);
     }
@@ -540,10 +544,7 @@ mod tests {
     #[test]
     fn test_tbz_taken() {
         // x0=2 (0b10) → bit 0 is 0 → TBZ taken, skip MOVZ
-        let mut t = test_interp(&[
-            enc_tbz(0, 0, 8),
-            enc_movz(true, 1, 99, 0),
-        ]);
+        let mut t = test_interp(&[enc_tbz(0, 0, 8), enc_movz(true, 1, 99, 0)]);
         t.interp.cpu.x[0] = 2;
         t.interp.cpu.x[1] = 42;
         let cpu = t.run_ok();
@@ -553,10 +554,7 @@ mod tests {
     #[test]
     fn test_tbz_not_taken() {
         // x0=3 (0b11) → bit 0 is 1 → TBZ not taken, MOVZ executes
-        let mut t = test_interp(&[
-            enc_tbz(0, 0, 8),
-            enc_movz(true, 1, 99, 0),
-        ]);
+        let mut t = test_interp(&[enc_tbz(0, 0, 8), enc_movz(true, 1, 99, 0)]);
         t.interp.cpu.x[0] = 3;
         t.interp.cpu.x[1] = 42;
         let cpu = t.run_ok();
@@ -568,10 +566,7 @@ mod tests {
     #[test]
     fn test_tbnz_taken() {
         // x0=1 → bit 0 is 1 → TBNZ taken, skip MOVZ
-        let mut t = test_interp(&[
-            enc_tbnz(0, 0, 8),
-            enc_movz(true, 1, 99, 0),
-        ]);
+        let mut t = test_interp(&[enc_tbnz(0, 0, 8), enc_movz(true, 1, 99, 0)]);
         t.interp.cpu.x[0] = 1;
         t.interp.cpu.x[1] = 42;
         let cpu = t.run_ok();
@@ -581,10 +576,7 @@ mod tests {
     #[test]
     fn test_tbnz_not_taken() {
         // x0=2 (0b10) → bit 0 is 0 → TBNZ not taken, MOVZ executes
-        let mut t = test_interp(&[
-            enc_tbnz(0, 0, 8),
-            enc_movz(true, 1, 99, 0),
-        ]);
+        let mut t = test_interp(&[enc_tbnz(0, 0, 8), enc_movz(true, 1, 99, 0)]);
         t.interp.cpu.x[0] = 2;
         t.interp.cpu.x[1] = 42;
         let cpu = t.run_ok();
@@ -607,7 +599,7 @@ mod tests {
             enc_pac_insn(0b001000, 0, 1), // AUTIA X0, X1
         ]);
         t.interp.cpu.x[0] = 0x0000_1234_5678_9ABC; // pointer to sign
-        t.interp.cpu.x[1] = 0x42;                    // context
+        t.interp.cpu.x[1] = 0x42; // context
         let cpu = t.run_ok();
         // After sign+verify, original pointer should be restored
         assert_eq!(cpu.x[0], 0x0000_1234_5678_9ABC);
@@ -641,7 +633,11 @@ mod tests {
         t.interp.cpu.x[1] = 0x42;
         let cpu = t.run_ok();
         // Should have error bit set (bit 54)
-        assert_ne!(cpu.x[0] & (1 << 54), 0, "error bit should be set on auth failure");
+        assert_ne!(
+            cpu.x[0] & (1 << 54),
+            0,
+            "error bit should be set on auth failure"
+        );
     }
 
     #[test]

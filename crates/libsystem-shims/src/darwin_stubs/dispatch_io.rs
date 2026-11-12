@@ -19,7 +19,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
-use super::dispatch_queue;
+use super::{blocks_runtime::OwnedBlock, dispatch_queue};
 use crate::table::ShimTable;
 
 // ── Handle allocator ───────────────────────────────────────────
@@ -44,7 +44,7 @@ struct Channel {
     fd: i32,
     io_type: u64,
     queue: u64,
-    cleanup_block: Mutex<u64>,
+    cleanup_block: Mutex<Option<OwnedBlock>>,
     closed: AtomicBool,
     high_water: Mutex<usize>,
     low_water: Mutex<usize>,
@@ -69,8 +69,7 @@ unsafe fn invoke_io_handler(block: u64, done: bool, data: u64, error: i32) {
     }
     let block_ptr = block as *const u8;
     let invoke_ptr = *(block_ptr.add(16) as *const usize);
-    let invoke: extern "C" fn(*const u8, i32, u64, i32) =
-        std::mem::transmute(invoke_ptr);
+    let invoke: extern "C" fn(*const u8, i32, u64, i32) = std::mem::transmute(invoke_ptr);
     invoke(block_ptr, done as i32, data, error);
 }
 
@@ -83,6 +82,24 @@ unsafe fn invoke_cleanup(block: u64, error: i32) {
     let invoke_ptr = *(block_ptr.add(16) as *const usize);
     let invoke: extern "C" fn(*const u8, i32) = std::mem::transmute(invoke_ptr);
     invoke(block_ptr, error);
+}
+
+fn queue_io_handler(queue: u64, handler: OwnedBlock, done: bool, data: u64, error: i32) {
+    dispatch_queue::queue_async(
+        queue,
+        Box::new(move || {
+            unsafe { invoke_io_handler(handler.addr(), done, data, error) };
+        }),
+    );
+}
+
+fn queue_cleanup(queue: u64, cleanup: OwnedBlock, error: i32) {
+    dispatch_queue::queue_async(
+        queue,
+        Box::new(move || {
+            unsafe { invoke_cleanup(cleanup.addr(), error) };
+        }),
+    );
 }
 
 // ── dispatch_data helpers ──────────────────────────────────────
@@ -102,17 +119,12 @@ fn create_dispatch_data(bytes: &[u8]) -> u64 {
 
 /// `dispatch_io_t dispatch_io_create(dispatch_io_type_t type, dispatch_fd_t fd,
 ///     dispatch_queue_t queue, void (^cleanup_handler)(int error))`
-extern "C" fn shim_dispatch_io_create(
-    io_type: u64,
-    fd: i32,
-    queue: u64,
-    cleanup: u64,
-) -> u64 {
+extern "C" fn shim_dispatch_io_create(io_type: u64, fd: i32, queue: u64, cleanup: u64) -> u64 {
     let chan = Arc::new(Channel {
         fd,
         io_type,
         queue,
-        cleanup_block: Mutex::new(cleanup),
+        cleanup_block: Mutex::new(OwnedBlock::from_block(cleanup)),
         closed: AtomicBool::new(false),
         high_water: Mutex::new(usize::MAX), // default: no limit
         low_water: Mutex::new(0),
@@ -142,9 +154,13 @@ extern "C" fn shim_dispatch_io_create_with_path(
     let c_path = unsafe { std::ffi::CStr::from_ptr(path as *const std::ffi::c_char) };
     let fd = unsafe { libc::open(c_path.as_ptr(), oflag, mode as libc::c_uint) };
     if fd < 0 {
-        let err = std::io::Error::last_os_error().raw_os_error().unwrap_or(libc::EIO);
+        let err = std::io::Error::last_os_error()
+            .raw_os_error()
+            .unwrap_or(libc::EIO);
         // Invoke cleanup with the error
-        unsafe { invoke_cleanup(cleanup, err) };
+        if let Some(cleanup) = OwnedBlock::from_block(cleanup) {
+            unsafe { invoke_cleanup(cleanup.addr(), err) };
+        }
         return 0;
     }
 
@@ -161,9 +177,9 @@ extern "C" fn shim_dispatch_io_read(
     queue: u64,
     handler: u64,
 ) {
-    if handler == 0 {
+    let Some(handler) = OwnedBlock::from_block(handler) else {
         return;
-    }
+    };
 
     let chan = {
         let reg = registry().lock().unwrap();
@@ -171,14 +187,14 @@ extern "C" fn shim_dispatch_io_read(
             Some(c) => Arc::clone(c),
             None => {
                 // Unknown channel — invoke handler with error
-                unsafe { invoke_io_handler(handler, true, 0, libc::EBADF) };
+                unsafe { invoke_io_handler(handler.addr(), true, 0, libc::EBADF) };
                 return;
             }
         }
     };
 
     if chan.closed.load(Ordering::Acquire) {
-        unsafe { invoke_io_handler(handler, true, 0, libc::ECANCELED) };
+        unsafe { invoke_io_handler(handler.addr(), true, 0, libc::ECANCELED) };
         return;
     }
 
@@ -206,18 +222,16 @@ extern "C" fn shim_dispatch_io_read(
             };
 
             if result < 0 {
-                let err = std::io::Error::last_os_error().raw_os_error().unwrap_or(libc::EIO);
-                dispatch_queue::queue_async(target_queue, Box::new(move || {
-                    unsafe { invoke_io_handler(handler, true, 0, err) };
-                }));
+                let err = std::io::Error::last_os_error()
+                    .raw_os_error()
+                    .unwrap_or(libc::EIO);
+                queue_io_handler(target_queue, handler, true, 0, err);
             } else {
                 let n = result as usize;
                 buf.truncate(n);
                 let data = create_dispatch_data(&buf);
                 let done = n == 0 || (length != usize::MAX && length != 0 && n >= length);
-                dispatch_queue::queue_async(target_queue, Box::new(move || {
-                    unsafe { invoke_io_handler(handler, done, data, 0) };
-                }));
+                queue_io_handler(target_queue, handler, done, data, 0);
             }
         })
         .ok();
@@ -233,23 +247,23 @@ extern "C" fn shim_dispatch_io_write(
     queue: u64,
     handler: u64,
 ) {
-    if handler == 0 {
+    let Some(handler) = OwnedBlock::from_block(handler) else {
         return;
-    }
+    };
 
     let chan = {
         let reg = registry().lock().unwrap();
         match reg.get(&channel) {
             Some(c) => Arc::clone(c),
             None => {
-                unsafe { invoke_io_handler(handler, true, 0, libc::EBADF) };
+                unsafe { invoke_io_handler(handler.addr(), true, 0, libc::EBADF) };
                 return;
             }
         }
     };
 
     if chan.closed.load(Ordering::Acquire) {
-        unsafe { invoke_io_handler(handler, true, 0, libc::ECANCELED) };
+        unsafe { invoke_io_handler(handler.addr(), true, 0, libc::ECANCELED) };
         return;
     }
 
@@ -265,25 +279,16 @@ extern "C" fn shim_dispatch_io_write(
         .spawn(move || {
             let buf = bytes.unwrap_or_default();
             let result = if io_type == DISPATCH_IO_RANDOM && offset >= 0 {
-                unsafe {
-                    libc::pwrite(
-                        fd,
-                        buf.as_ptr() as *const libc::c_void,
-                        buf.len(),
-                        offset,
-                    )
-                }
+                unsafe { libc::pwrite(fd, buf.as_ptr() as *const libc::c_void, buf.len(), offset) }
             } else {
-                unsafe {
-                    libc::write(fd, buf.as_ptr() as *const libc::c_void, buf.len())
-                }
+                unsafe { libc::write(fd, buf.as_ptr() as *const libc::c_void, buf.len()) }
             };
 
             if result < 0 {
-                let err = std::io::Error::last_os_error().raw_os_error().unwrap_or(libc::EIO);
-                dispatch_queue::queue_async(target_queue, Box::new(move || {
-                    unsafe { invoke_io_handler(handler, true, 0, err) };
-                }));
+                let err = std::io::Error::last_os_error()
+                    .raw_os_error()
+                    .unwrap_or(libc::EIO);
+                queue_io_handler(target_queue, handler, true, 0, err);
             } else {
                 // Remaining data (if partial write, return unwritten portion)
                 let written = result as usize;
@@ -293,9 +298,7 @@ extern "C" fn shim_dispatch_io_write(
                     0
                 };
                 let done = written >= buf.len();
-                dispatch_queue::queue_async(target_queue, Box::new(move || {
-                    unsafe { invoke_io_handler(handler, done, remaining, 0) };
-                }));
+                queue_io_handler(target_queue, handler, done, remaining, 0);
             }
         })
         .ok();
@@ -317,12 +320,10 @@ extern "C" fn shim_dispatch_io_close(channel: u64, flags: u64) {
         }
 
         // Invoke cleanup handler
-        let cleanup = *chan.cleanup_block.lock().unwrap();
-        if cleanup != 0 {
+        let cleanup = chan.cleanup_block.lock().unwrap().take();
+        if let Some(cleanup) = cleanup {
             let queue = chan.queue;
-            dispatch_queue::queue_async(queue, Box::new(move || {
-                unsafe { invoke_cleanup(cleanup, 0) };
-            }));
+            queue_cleanup(queue, cleanup, 0);
         }
     }
 }
@@ -361,43 +362,46 @@ extern "C" fn shim_dispatch_io_get_descriptor(channel: u64) -> i32 {
 ///
 /// Convenience wrapper that creates a channel, reads, and closes.
 extern "C" fn shim_dispatch_read(fd: i32, length: usize, queue: u64, handler: u64) {
-    if handler == 0 {
+    let Some(handler) = OwnedBlock::from_block(handler) else {
         return;
-    }
+    };
 
     std::thread::Builder::new()
         .name("dispatch-read".into())
         .spawn(move || {
             let read_size = if length == 0 { 64 * 1024 } else { length };
             let mut buf = vec![0u8; read_size];
-            let result = unsafe {
-                libc::read(fd, buf.as_mut_ptr() as *mut libc::c_void, read_size)
-            };
+            let result =
+                unsafe { libc::read(fd, buf.as_mut_ptr() as *mut libc::c_void, read_size) };
 
             if result < 0 {
-                let err = std::io::Error::last_os_error().raw_os_error().unwrap_or(libc::EIO);
-                dispatch_queue::queue_async(queue, Box::new(move || {
-                    unsafe {
-                        let block_ptr = handler as *const u8;
+                let err = std::io::Error::last_os_error()
+                    .raw_os_error()
+                    .unwrap_or(libc::EIO);
+                dispatch_queue::queue_async(
+                    queue,
+                    Box::new(move || unsafe {
+                        let block_ptr = handler.as_ptr();
                         let invoke_ptr = *(block_ptr.add(16) as *const usize);
                         let invoke: extern "C" fn(*const u8, u64, i32) =
                             std::mem::transmute(invoke_ptr);
                         invoke(block_ptr, 0, err);
-                    }
-                }));
+                    }),
+                );
             } else {
                 let n = result as usize;
                 buf.truncate(n);
                 let data = create_dispatch_data(&buf);
-                dispatch_queue::queue_async(queue, Box::new(move || {
-                    unsafe {
-                        let block_ptr = handler as *const u8;
+                dispatch_queue::queue_async(
+                    queue,
+                    Box::new(move || unsafe {
+                        let block_ptr = handler.as_ptr();
                         let invoke_ptr = *(block_ptr.add(16) as *const usize);
                         let invoke: extern "C" fn(*const u8, u64, i32) =
                             std::mem::transmute(invoke_ptr);
                         invoke(block_ptr, data, 0);
-                    }
-                }));
+                    }),
+                );
             }
         })
         .ok();
@@ -407,9 +411,9 @@ extern "C" fn shim_dispatch_read(fd: i32, length: usize, queue: u64, handler: u6
 ///     dispatch_queue_t queue,
 ///     void (^handler)(dispatch_data_t remaining, int error))`
 extern "C" fn shim_dispatch_write(fd: i32, data: u64, queue: u64, handler: u64) {
-    if handler == 0 {
+    let Some(handler) = OwnedBlock::from_block(handler) else {
         return;
-    }
+    };
 
     let bytes = super::dispatch_data_source::get_data_bytes(data);
 
@@ -417,31 +421,33 @@ extern "C" fn shim_dispatch_write(fd: i32, data: u64, queue: u64, handler: u64) 
         .name("dispatch-write".into())
         .spawn(move || {
             let buf = bytes.unwrap_or_default();
-            let result = unsafe {
-                libc::write(fd, buf.as_ptr() as *const libc::c_void, buf.len())
-            };
+            let result = unsafe { libc::write(fd, buf.as_ptr() as *const libc::c_void, buf.len()) };
 
             if result < 0 {
-                let err = std::io::Error::last_os_error().raw_os_error().unwrap_or(libc::EIO);
-                dispatch_queue::queue_async(queue, Box::new(move || {
-                    unsafe {
-                        let block_ptr = handler as *const u8;
+                let err = std::io::Error::last_os_error()
+                    .raw_os_error()
+                    .unwrap_or(libc::EIO);
+                dispatch_queue::queue_async(
+                    queue,
+                    Box::new(move || unsafe {
+                        let block_ptr = handler.as_ptr();
                         let invoke_ptr = *(block_ptr.add(16) as *const usize);
                         let invoke: extern "C" fn(*const u8, u64, i32) =
                             std::mem::transmute(invoke_ptr);
                         invoke(block_ptr, 0, err);
-                    }
-                }));
+                    }),
+                );
             } else {
-                dispatch_queue::queue_async(queue, Box::new(move || {
-                    unsafe {
-                        let block_ptr = handler as *const u8;
+                dispatch_queue::queue_async(
+                    queue,
+                    Box::new(move || unsafe {
+                        let block_ptr = handler.as_ptr();
                         let invoke_ptr = *(block_ptr.add(16) as *const usize);
                         let invoke: extern "C" fn(*const u8, u64, i32) =
                             std::mem::transmute(invoke_ptr);
                         invoke(block_ptr, 0, 0);
-                    }
-                }));
+                    }),
+                );
             }
         })
         .ok();
@@ -454,18 +460,63 @@ pub struct DispatchIoStubs;
 impl DispatchIoStubs {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
-        register_shims!(table,
-            ("_dispatch_io_create", shim_dispatch_io_create as *const () as u64, "dispatch_io_create (real fd-based channel)"),
-            ("_dispatch_io_create_with_path", shim_dispatch_io_create_with_path as *const () as u64, "dispatch_io_create_with_path (real)"),
-            ("_dispatch_io_read", shim_dispatch_io_read as *const () as u64, "dispatch_io_read (real async read)"),
-            ("_dispatch_io_write", shim_dispatch_io_write as *const () as u64, "dispatch_io_write (real async write)"),
-            ("_dispatch_io_close", shim_dispatch_io_close as *const () as u64, "dispatch_io_close (real cleanup)"),
-            ("_dispatch_io_set_high_water", shim_dispatch_io_set_high_water as *const () as u64, "dispatch_io_set_high_water (real)"),
-            ("_dispatch_io_set_low_water", shim_dispatch_io_set_low_water as *const () as u64, "dispatch_io_set_low_water (real)"),
-            ("_dispatch_io_set_interval", shim_dispatch_io_set_interval as *const () as u64, "dispatch_io_set_interval (stub)"),
-            ("_dispatch_io_get_descriptor", shim_dispatch_io_get_descriptor as *const () as u64, "dispatch_io_get_descriptor (real)"),
-            ("_dispatch_read", shim_dispatch_read as *const () as u64, "dispatch_read (convenience wrapper)"),
-            ("_dispatch_write", shim_dispatch_write as *const () as u64, "dispatch_write (convenience wrapper)")
+        register_shims!(
+            table,
+            (
+                "_dispatch_io_create",
+                shim_dispatch_io_create as *const () as u64,
+                "dispatch_io_create (real fd-based channel)"
+            ),
+            (
+                "_dispatch_io_create_with_path",
+                shim_dispatch_io_create_with_path as *const () as u64,
+                "dispatch_io_create_with_path (real)"
+            ),
+            (
+                "_dispatch_io_read",
+                shim_dispatch_io_read as *const () as u64,
+                "dispatch_io_read (real async read)"
+            ),
+            (
+                "_dispatch_io_write",
+                shim_dispatch_io_write as *const () as u64,
+                "dispatch_io_write (real async write)"
+            ),
+            (
+                "_dispatch_io_close",
+                shim_dispatch_io_close as *const () as u64,
+                "dispatch_io_close (real cleanup)"
+            ),
+            (
+                "_dispatch_io_set_high_water",
+                shim_dispatch_io_set_high_water as *const () as u64,
+                "dispatch_io_set_high_water (real)"
+            ),
+            (
+                "_dispatch_io_set_low_water",
+                shim_dispatch_io_set_low_water as *const () as u64,
+                "dispatch_io_set_low_water (real)"
+            ),
+            (
+                "_dispatch_io_set_interval",
+                shim_dispatch_io_set_interval as *const () as u64,
+                "dispatch_io_set_interval (stub)"
+            ),
+            (
+                "_dispatch_io_get_descriptor",
+                shim_dispatch_io_get_descriptor as *const () as u64,
+                "dispatch_io_get_descriptor (real)"
+            ),
+            (
+                "_dispatch_read",
+                shim_dispatch_read as *const () as u64,
+                "dispatch_read (convenience wrapper)"
+            ),
+            (
+                "_dispatch_write",
+                shim_dispatch_write as *const () as u64,
+                "dispatch_write (convenience wrapper)"
+            )
         );
         log::debug!("DispatchIoStubs: registered 11 dispatch_io shims");
     }

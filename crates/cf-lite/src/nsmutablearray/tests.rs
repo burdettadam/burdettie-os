@@ -121,7 +121,10 @@ fn init_with_capacity_initializes_allocated_object() {
     assert_eq!(get_count(obj), 0);
     assert_eq!(read_field(obj, NSMUTABLEARRAY_CAP_OFF), 6);
     assert_ne!(read_field(obj, NSMUTABLEARRAY_ELEMS_OFF), 0);
-    assert_eq!(read_field(obj, 0), crate::nsobj::nsmutablearray_class_addr());
+    assert_eq!(
+        read_field(obj, 0),
+        crate::nsobj::nsmutablearray_class_addr()
+    );
     free_array(obj);
 }
 
@@ -178,7 +181,10 @@ fn init_with_objects_collects_variadic_items_until_nil() {
     assert_eq!(nsarray::shim_nsarray_object_at_index(obj, 0, 0), 0xAA);
     assert_eq!(nsarray::shim_nsarray_object_at_index(obj, 0, 1), 0xBB);
     assert_eq!(nsarray::shim_nsarray_object_at_index(obj, 0, 2), 0xCC);
-    assert_eq!(read_field(obj, 0), crate::nsobj::nsmutablearray_class_addr());
+    assert_eq!(
+        read_field(obj, 0),
+        crate::nsobj::nsmutablearray_class_addr()
+    );
     free_array(obj);
 }
 
@@ -284,7 +290,10 @@ fn insert_beyond_count_is_noop() {
 
 #[test]
 fn insert_nil_obj_is_noop() {
-    assert_eq!(shim_nsmutablearray_insert_object_at_index(0, 0, 0xABC, 0), 0);
+    assert_eq!(
+        shim_nsmutablearray_insert_object_at_index(0, 0, 0xABC, 0),
+        0
+    );
 }
 
 // ── removeObjectAtIndex: ───────────────────────────────────────────
@@ -390,7 +399,10 @@ fn replace_out_of_bounds_is_noop() {
 
 #[test]
 fn replace_nil_is_noop() {
-    assert_eq!(shim_nsmutablearray_replace_object_at_index(0, 0, 0, 0xABC), 0);
+    assert_eq!(
+        shim_nsmutablearray_replace_object_at_index(0, 0, 0, 0xABC),
+        0
+    );
 }
 
 #[test]

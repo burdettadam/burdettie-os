@@ -310,19 +310,31 @@ fn copy_byref_to_heap(byref: u64) -> u64 {
 
     // Read size from the byref struct
     let size = unsafe { *((byref as usize + BYREF_SIZE_OFF) as *const u32) } as usize;
-    let alloc_size = if size >= BYREF_MIN_SIZE { size } else { BYREF_MIN_SIZE };
+    let alloc_size = if size >= BYREF_MIN_SIZE {
+        size
+    } else {
+        BYREF_MIN_SIZE
+    };
 
     let heap = crate::pal_alloc().malloc(alloc_size) as u64;
-    if heap == 0 { return byref; }
+    if heap == 0 {
+        return byref;
+    }
 
     // Bitwise copy
-    unsafe { std::ptr::copy_nonoverlapping(byref as *const u8, heap as *mut u8, alloc_size); }
+    unsafe {
+        std::ptr::copy_nonoverlapping(byref as *const u8, heap as *mut u8, alloc_size);
+    }
 
     // Set heap copy's forwarding to itself
-    unsafe { *((heap as usize + BYREF_FORWARDING_OFF) as *mut u64) = heap; }
+    unsafe {
+        *((heap as usize + BYREF_FORWARDING_OFF) as *mut u64) = heap;
+    }
 
     // Update stack copy's forwarding to point to heap
-    unsafe { *((byref as usize + BYREF_FORWARDING_OFF) as *mut u64) = heap; }
+    unsafe {
+        *((byref as usize + BYREF_FORWARDING_OFF) as *mut u64) = heap;
+    }
 
     // Set BYREF_NEEDS_FREE on heap copy
     unsafe {
@@ -343,7 +355,12 @@ fn copy_byref_to_heap(byref: u64) -> u64 {
         }
     }
 
-    log::debug!("_Block_object_assign: copied byref {:#x} → heap {:#x} ({} bytes)", byref, heap, alloc_size);
+    log::debug!(
+        "_Block_object_assign: copied byref {:#x} → heap {:#x} ({} bytes)",
+        byref,
+        heap,
+        alloc_size
+    );
     heap
 }
 
@@ -362,22 +379,35 @@ pub extern "C" fn shim_block_object_assign(dest_addr: u64, object: u64, flags: u
         BLOCK_FIELD_IS_OBJECT => {
             // Retain the ObjC object and store pointer
             crate::refcount::REFCOUNTS.retain(object);
-            unsafe { *(dest_addr as *mut u64) = object; }
+            unsafe {
+                *(dest_addr as *mut u64) = object;
+            }
         }
         BLOCK_FIELD_IS_BLOCK => {
             // Block_copy the nested block
             let copied = shim_block_copy(object);
-            unsafe { *(dest_addr as *mut u64) = copied; }
+            unsafe {
+                *(dest_addr as *mut u64) = copied;
+            }
         }
-        _ if kind == BLOCK_FIELD_IS_BYREF || kind == (BLOCK_FIELD_IS_BYREF | BLOCK_BYREF_CALLER) => {
+        _ if kind == BLOCK_FIELD_IS_BYREF
+            || kind == (BLOCK_FIELD_IS_BYREF | BLOCK_BYREF_CALLER) =>
+        {
             // __block byref: copy to heap and update forwarding pointers
             let heap = copy_byref_to_heap(object);
-            unsafe { *(dest_addr as *mut u64) = heap; }
+            unsafe {
+                *(dest_addr as *mut u64) = heap;
+            }
         }
         _ => {
             // Unknown flag combination — store pointer as-is
-            log::debug!("_Block_object_assign: unknown flags {:#x}, storing pointer", flags);
-            unsafe { *(dest_addr as *mut u64) = object; }
+            log::debug!(
+                "_Block_object_assign: unknown flags {:#x}, storing pointer",
+                flags
+            );
+            unsafe {
+                *(dest_addr as *mut u64) = object;
+            }
         }
     }
 }
@@ -686,7 +716,11 @@ mod tests {
             *((byref.as_mut_ptr().add(BYREF_SIZE_OFF)) as *mut u32) = BYREF_MIN_SIZE as u32;
         }
         let mut dest: u64 = 0;
-        shim_block_object_assign(&mut dest as *mut u64 as u64, byref_ptr, BLOCK_FIELD_IS_BYREF);
+        shim_block_object_assign(
+            &mut dest as *mut u64 as u64,
+            byref_ptr,
+            BLOCK_FIELD_IS_BYREF,
+        );
         assert_ne!(dest, 0);
         assert_ne!(dest, byref_ptr, "byref should be copied to heap");
         // Stack forwarding → heap
@@ -695,7 +729,9 @@ mod tests {
         // Heap forwarding → itself
         let heap_fwd = unsafe { *((dest as usize + BYREF_FORWARDING_OFF) as *const u64) };
         assert_eq!(heap_fwd, dest);
-        unsafe { libc::free(dest as *mut libc::c_void); }
+        unsafe {
+            libc::free(dest as *mut libc::c_void);
+        }
     }
 
     #[test]

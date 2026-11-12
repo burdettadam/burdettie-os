@@ -78,7 +78,12 @@ impl ObjcRuntime {
 
             log::debug!(
                 "ObjcRuntime: registered class '{}' at {:#x}, {} methods, {} ivars, {} props, size={}",
-                name, mapped_addr, methods.len(), ivars.len(), properties.len(), instance_size,
+                name,
+                mapped_addr,
+                methods.len(),
+                ivars.len(),
+                properties.len(),
+                instance_size,
             );
 
             let mut info = ClassInfo {
@@ -103,12 +108,15 @@ impl ObjcRuntime {
             info.rebuild_indices();
 
             let name_arc: Arc<str> = Arc::from(name.as_str());
-            self.classes_by_addr.insert(mapped_addr, Arc::clone(&name_arc));
-            self.classes_by_name.insert(Arc::clone(&name_arc), Arc::new(info));
+            self.classes_by_addr
+                .insert(mapped_addr, Arc::clone(&name_arc));
+            self.classes_by_name
+                .insert(Arc::clone(&name_arc), Arc::new(info));
 
             if class_ref.metaclass_addr != 0 {
                 let meta_mapped = (class_ref.metaclass_addr as i64 + slide) as u64;
-                self.classes_by_addr.insert(meta_mapped, Arc::clone(&name_arc));
+                self.classes_by_addr
+                    .insert(meta_mapped, Arc::clone(&name_arc));
                 self.metaclass_addrs.insert(meta_mapped);
                 log::debug!(
                     "ObjcRuntime: registered metaclass for '{}' at {:#x}",
@@ -130,9 +138,9 @@ impl ObjcRuntime {
                         cat.name.as_deref().unwrap_or("?"),
                         cat_class_addr,
                     );
-                    runtime_diagnostics::emit(
-                        runtime_diagnostics::DiagEvent::CategoryOrphan { class_addr: cat_class_addr },
-                    );
+                    runtime_diagnostics::emit(runtime_diagnostics::DiagEvent::CategoryOrphan {
+                        class_addr: cat_class_addr,
+                    });
                     continue;
                 }
             };
@@ -151,7 +159,8 @@ impl ObjcRuntime {
                     if class_info.method_index.contains_key(&*m.selector) {
                         log::debug!(
                             "ObjcRuntime: category skip -[{} {}] (shim exists)",
-                            target_name, m.selector,
+                            target_name,
+                            m.selector,
                         );
                         continue;
                     }
@@ -165,7 +174,8 @@ impl ObjcRuntime {
                     if class_info.class_method_index.contains_key(&*m.selector) {
                         log::debug!(
                             "ObjcRuntime: category skip +[{} {}] (shim exists)",
-                            target_name, m.selector,
+                            target_name,
+                            m.selector,
                         );
                         continue;
                     }
@@ -283,9 +293,9 @@ impl ObjcRuntime {
                         cat.name.as_deref().unwrap_or("?"),
                         resolved_cls,
                     );
-                    runtime_diagnostics::emit(
-                        runtime_diagnostics::DiagEvent::CategoryOrphan { class_addr: resolved_cls },
-                    );
+                    runtime_diagnostics::emit(runtime_diagnostics::DiagEvent::CategoryOrphan {
+                        class_addr: resolved_cls,
+                    });
                     continue;
                 }
             };
@@ -304,7 +314,8 @@ impl ObjcRuntime {
                     if class_info.method_index.contains_key(&*m.selector) {
                         log::debug!(
                             "ObjcRuntime: category skip -[{} {}] (shim exists)",
-                            target_name, m.selector,
+                            target_name,
+                            m.selector,
                         );
                         continue;
                     }
@@ -318,7 +329,8 @@ impl ObjcRuntime {
                     if class_info.class_method_index.contains_key(&*m.selector) {
                         log::debug!(
                             "ObjcRuntime: category skip +[{} {}] (shim exists)",
-                            target_name, m.selector,
+                            target_name,
+                            m.selector,
                         );
                         continue;
                     }

@@ -153,10 +153,22 @@ pub fn print_matrix(benchmarks: &[ToolBenchmark]) {
     println!("┌──────────────────────────────────────────────────────────────────┐");
     println!("│ SUMMARY                                                         │");
     println!("├──────────────────────────────────────────────────────────────────┤");
-    println!("│ Tools benchmarked:  {:>4}/{:<4}  passing                          │", summary.tools_passing, summary.total_tools);
-    println!("│ Average overhead:   {:>8.1}x                                     │", summary.avg_overhead);
-    println!("│ Worst overhead:     {:>8.1}x  ({:<20})              │", summary.max_overhead.1, summary.max_overhead.0);
-    println!("│ Best overhead:      {:>8.1}x  ({:<20})              │", summary.min_overhead.1, summary.min_overhead.0);
+    println!(
+        "│ Tools benchmarked:  {:>4}/{:<4}  passing                          │",
+        summary.tools_passing, summary.total_tools
+    );
+    println!(
+        "│ Average overhead:   {:>8.1}x                                     │",
+        summary.avg_overhead
+    );
+    println!(
+        "│ Worst overhead:     {:>8.1}x  ({:<20})              │",
+        summary.max_overhead.1, summary.max_overhead.0
+    );
+    println!(
+        "│ Best overhead:      {:>8.1}x  ({:<20})              │",
+        summary.min_overhead.1, summary.min_overhead.0
+    );
     println!("│ Global bottleneck:  {:<42} │", summary.global_bottleneck);
     println!("├──────────────────────────────────────────────────────────────────┤");
     println!("│ Average Time Distribution by Phase:                             │");
@@ -291,7 +303,9 @@ fn compute_summary(benchmarks: &[ToolBenchmark]) -> MatrixSummary {
         .unwrap_or_else(|| "unknown".to_string());
 
     let avg_map_images_subphases = average_breakdown_subphases(
-        benchmarks.iter().map(|b| &b.loader_timing.map_images_breakdown),
+        benchmarks
+            .iter()
+            .map(|b| &b.loader_timing.map_images_breakdown),
     );
     let avg_objc_reg_subphases = average_breakdown_subphases(
         benchmarks
@@ -312,7 +326,9 @@ fn compute_summary(benchmarks: &[ToolBenchmark]) -> MatrixSummary {
     }
 }
 
-fn average_breakdown_subphases<'a>(breakdowns: impl Iterator<Item = &'a PhaseBreakdown>) -> Vec<(String, f64)> {
+fn average_breakdown_subphases<'a>(
+    breakdowns: impl Iterator<Item = &'a PhaseBreakdown>,
+) -> Vec<(String, f64)> {
     let mut sums: std::collections::BTreeMap<String, f64> = std::collections::BTreeMap::new();
     let mut count = 0.0f64;
 
@@ -322,7 +338,8 @@ fn average_breakdown_subphases<'a>(breakdowns: impl Iterator<Item = &'a PhaseBre
         }
         count += 1.0;
         for timing in &breakdown.timings {
-            *sums.entry(timing.name.clone()).or_default() += timing.duration().as_secs_f64() * 1000.0;
+            *sums.entry(timing.name.clone()).or_default() +=
+                timing.duration().as_secs_f64() * 1000.0;
         }
     }
 

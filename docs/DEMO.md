@@ -59,7 +59,26 @@ docker build -f docker/Dockerfile.demo -t burdettie-os-demo dist/
 docker run -it --rm burdettie-os-demo
 ```
 
-### Option C: VM with Virtualization.framework
+### Option C: Runtime Image With GUI Viewer (Docker)
+
+```bash
+# Build the Linux runtime image with GUI support for the host CPU by default
+docker build -f docker/Dockerfile.burdettie -t burdettie-os .
+
+# Force the ARM64 reference lane explicitly when needed
+docker build --platform linux/arm64 -f docker/Dockerfile.burdettie -t burdettie-os .
+
+# Start a browser-viewable GUI session on the home screen
+./scripts/docker-gui.sh
+
+# Or switch the session into guest-app mode
+RUST_LOG=info BURDETTIE_GUI_MODE=guest BURDETTIE_GUEST_APP=/workspace/fixtures/cocoa_draw/app ./scripts/docker-gui.sh
+```
+
+This path is for runtime validation and live demos of the Linux display-backed
+execution lane. The packaged `Dockerfile.demo` image remains a CLI-first bundle.
+
+### Option D: VM with Virtualization.framework
 
 ```bash
 # One command — installs macOS guest if needed, then boots
@@ -165,7 +184,8 @@ The runtime currently passes **62/62** fixture binaries through all stages:
 compile the test binaries.
 
 **GUI app doesn't launch** — Ensure you've built with `cargo build
---workspace`. GUI apps require macOS with a display server.
+--workspace`. Native demo apps need a display server; for Linux Docker runs use
+`./scripts/docker-gui.sh` or `burdettie-gui` inside `docker/Dockerfile.burdettie`.
 
 **VM won't boot** — Requires macOS 13+ on Apple Silicon. Check
 `./vm-image/launch.sh status` for diagnostics.

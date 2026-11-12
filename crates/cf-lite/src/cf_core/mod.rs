@@ -5,13 +5,13 @@
 //! counterparts are literally the same objects with the same ISA.
 //! `(__bridge NSString *)cfStr` is a no-op pointer cast.
 
-mod core_ops;
-mod collections;
 pub mod cf_extras;
+mod collections;
+mod core_ops;
 
-pub use core_ops::*;
-pub use collections::*;
 pub use cf_extras::*;
+pub use collections::*;
+pub use core_ops::*;
 
 #[cfg(test)]
 mod tests {

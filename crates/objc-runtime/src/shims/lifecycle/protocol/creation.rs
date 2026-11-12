@@ -4,8 +4,9 @@ use std::ffi::{c_char, CStr};
 
 use crate::class::{ProtocolInfo, OBJC_RUNTIME};
 
-use super::helpers::{protocol_name_to_sentinel, sentinel_to_protocol_name,
-    STAGED_PROTOCOLS, StagedInit};
+use super::helpers::{
+    protocol_name_to_sentinel, sentinel_to_protocol_name, StagedInit, STAGED_PROTOCOLS,
+};
 
 // ── Runtime protocol creation ──────────────────────────────────────
 
@@ -17,9 +18,7 @@ pub extern "C" fn shim_objc_allocate_protocol(name: *const c_char) -> u64 {
     if name.is_null() {
         return 0;
     }
-    let name_str = unsafe { CStr::from_ptr(name) }
-        .to_str()
-        .unwrap_or("");
+    let name_str = unsafe { CStr::from_ptr(name) }.to_str().unwrap_or("");
     if name_str.is_empty() {
         return 0;
     }
@@ -114,8 +113,8 @@ pub extern "C" fn shim_class_add_protocol(cls: u64, protocol: u64) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::class::{ObjcRuntime, OBJC_RUNTIME};
     use std::ffi::CString;
-    use crate::class::{OBJC_RUNTIME, ObjcRuntime};
 
     fn ensure_runtime() {
         let mut guard = OBJC_RUNTIME.write().unwrap();
@@ -158,4 +157,3 @@ mod tests {
         assert_eq!(shim_class_add_protocol(0x1234, 0), 0);
     }
 }
-

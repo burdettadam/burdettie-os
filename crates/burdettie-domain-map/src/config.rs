@@ -27,8 +27,8 @@ impl RewriteConfig {
             .map(|v| !matches!(v.as_str(), "0" | "false" | "no" | "off"))
             .unwrap_or(true);
 
-        let target_host = std::env::var("BURDETTIE_SERVICES_HOST")
-            .unwrap_or_else(|_| "127.0.0.1".into());
+        let target_host =
+            std::env::var("BURDETTIE_SERVICES_HOST").unwrap_or_else(|_| "127.0.0.1".into());
 
         let target_port = std::env::var("BURDETTIE_SERVICES_PORT")
             .ok()
@@ -44,7 +44,12 @@ impl RewriteConfig {
             })
             .unwrap_or_default();
 
-        Self { enabled, target_host, target_port, passthrough }
+        Self {
+            enabled,
+            target_host,
+            target_port,
+            passthrough,
+        }
     }
 
     /// Disabled config — no rewriting.

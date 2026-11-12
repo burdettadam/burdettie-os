@@ -58,7 +58,10 @@ pub(crate) fn lookup(path: &Path) -> Option<(Arc<[u8]>, Arc<ParsedMachO>)> {
         // Alias under raw path so next lookup hits the fast branch.
         guard.insert(
             path.to_path_buf(),
-            CachedBinary { data: data.clone(), parsed: parsed.clone() },
+            CachedBinary {
+                data: data.clone(),
+                parsed: parsed.clone(),
+            },
         );
         return Some((data, parsed));
     }
@@ -67,13 +70,23 @@ pub(crate) fn lookup(path: &Path) -> Option<(Arc<[u8]>, Arc<ParsedMachO>)> {
 
 /// Insert an entry under both the raw path and the canonical path so that both
 /// `lookup(raw)` and `lookup(canonical)` hit the fast branch next time.
-pub(crate) fn insert_both(raw: &Path, canonical: PathBuf, data: Arc<[u8]>, parsed: Arc<ParsedMachO>) {
+pub(crate) fn insert_both(
+    raw: &Path,
+    canonical: PathBuf,
+    data: Arc<[u8]>,
+    parsed: Arc<ParsedMachO>,
+) {
     let mut guard = binary_parse_cache()
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
     if raw != canonical.as_path() {
-        guard.insert(raw.to_path_buf(), CachedBinary { data: data.clone(), parsed: parsed.clone() });
+        guard.insert(
+            raw.to_path_buf(),
+            CachedBinary {
+                data: data.clone(),
+                parsed: parsed.clone(),
+            },
+        );
     }
     guard.insert(canonical, CachedBinary { data, parsed });
 }
-

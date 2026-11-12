@@ -224,7 +224,10 @@ fn init_with_capacity_initializes_allocated_dictionary() {
     assert_eq!(unsafe { *((obj as usize + CAP_OFF) as *const u64) }, 7);
     assert_ne!(unsafe { *((obj as usize + KEYS_OFF) as *const u64) }, 0);
     assert_ne!(unsafe { *((obj as usize + VALS_OFF) as *const u64) }, 0);
-    assert_eq!(unsafe { *(obj as *const u64) }, crate::nsobj::nsmutabledictionary_class_addr());
+    assert_eq!(
+        unsafe { *(obj as *const u64) },
+        crate::nsobj::nsmutabledictionary_class_addr()
+    );
     free_dict(obj);
 }
 
@@ -262,7 +265,10 @@ fn init_with_dictionary_nil_source_returns_empty_dictionary() {
     let obj = crate::pal_alloc().calloc(1, 40) as u64;
     shim_nsmutabledict_init_with_dictionary(obj, 0, 0);
     assert_eq!(get_count(obj), 0);
-    assert_eq!(unsafe { *((obj as usize + CAP_OFF) as *const u64) }, INITIAL_CAPACITY);
+    assert_eq!(
+        unsafe { *((obj as usize + CAP_OFF) as *const u64) },
+        INITIAL_CAPACITY
+    );
     free_dict(obj);
 }
 
@@ -279,7 +285,10 @@ fn copy_returns_immutable_dictionary_clone() {
 
     let copy = nsdictionary::shim_nsmutabledict_copy(dict, 0);
     assert_ne!(copy, 0);
-    assert_eq!(unsafe { *(copy as *const u64) }, crate::nsobj::nsdictionary_class_addr());
+    assert_eq!(
+        unsafe { *(copy as *const u64) },
+        crate::nsobj::nsdictionary_class_addr()
+    );
     assert_eq!(nsdictionary::shim_nsdictionary_count(copy, 0), 2);
     assert_eq!(
         cfstring::extract_cfstring_cstr(nsdictionary::shim_nsdictionary_object_for_key(
@@ -495,15 +504,22 @@ fn remove_objects_for_keys_removes_matching() {
     // Build an NSArray with keys "a" and "c"
     let items = [make_str("a"), make_str("c")];
     let arr = crate::nsarray::shim_nsarray_array_with_objects_count(
-        crate::nsobj::nsarray_class_addr(), 0,
+        crate::nsobj::nsarray_class_addr(),
+        0,
         items.as_ptr() as u64,
         2,
     );
     shim_nsmutabledict_remove_objects_for_keys(dict, 0, arr);
     assert_eq!(get_count(dict), 1);
     // "b" remains
-    assert_ne!(nsdictionary::shim_nsdictionary_object_for_key(dict, 0, make_str("b")), 0);
-    assert_eq!(nsdictionary::shim_nsdictionary_object_for_key(dict, 0, make_str("a")), 0);
+    assert_ne!(
+        nsdictionary::shim_nsdictionary_object_for_key(dict, 0, make_str("b")),
+        0
+    );
+    assert_eq!(
+        nsdictionary::shim_nsdictionary_object_for_key(dict, 0, make_str("a")),
+        0
+    );
     free_dict(dict);
 }
 
@@ -525,7 +541,8 @@ fn remove_objects_for_keys_nonexistent_no_crash() {
     shim_nsmutabledict_set_object_for_key(dict, 0, make_str("v"), make_str("k"));
     let items = [make_str("missing")];
     let arr = crate::nsarray::shim_nsarray_array_with_objects_count(
-        crate::nsobj::nsarray_class_addr(), 0,
+        crate::nsobj::nsarray_class_addr(),
+        0,
         items.as_ptr() as u64,
         1,
     );
@@ -548,9 +565,18 @@ fn set_dictionary_replaces_contents() {
 
     shim_nsmutabledict_set_dictionary(dict, 0, other);
     assert_eq!(get_count(dict), 2);
-    assert_eq!(nsdictionary::shim_nsdictionary_object_for_key(dict, 0, make_str("existing")), 0);
-    assert_ne!(nsdictionary::shim_nsdictionary_object_for_key(dict, 0, make_str("k1")), 0);
-    assert_ne!(nsdictionary::shim_nsdictionary_object_for_key(dict, 0, make_str("k2")), 0);
+    assert_eq!(
+        nsdictionary::shim_nsdictionary_object_for_key(dict, 0, make_str("existing")),
+        0
+    );
+    assert_ne!(
+        nsdictionary::shim_nsdictionary_object_for_key(dict, 0, make_str("k1")),
+        0
+    );
+    assert_ne!(
+        nsdictionary::shim_nsdictionary_object_for_key(dict, 0, make_str("k2")),
+        0
+    );
     free_dict(dict);
     free_dict(other);
 }

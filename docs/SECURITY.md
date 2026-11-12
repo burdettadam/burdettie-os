@@ -98,24 +98,24 @@ CDHash values match output from Apple's `codesign` tool.
 
 ## Known Limitations
 
-Six Foundation API gaps remain after Phase C9. These are the boundaries of
-current real-world CLI tool compatibility:
+Several Foundation API gaps remain after Phase C9. These are the highest-impact
+boundaries of current real-world CLI tool compatibility:
 
 | Priority | API | Impact | Status |
 |---|---|---|---|
 | 1 | **NSURLSession** | HTTP client — REST APIs, file downloads, network requests | Not started |
-| 2 | **NSKeyedArchiver / NSKeyedUnarchiver** | Binary object graph serialization (Xcode caches, preferences) | Not started |
+| 2 | **NSKeyedArchiver / NSKeyedUnarchiver** | Binary object graph serialization (Xcode caches, preferences) | Partial — Apple keyed-archive decode exists; broader semantic parity remains incomplete |
 | 3 | **NSStream / NSInputStream / NSOutputStream** | Stream-based I/O | Not started |
-| 4 | **NSRunLoop selectors** | `run`, `runUntilDate:`, `runMode:beforeDate:` (event loop management) | Stub only |
-| 5 | **NSXMLParser** | XML parsing (config files, plists) | Not started |
-| 6 | **NSCoder (protocol)** | Foundation archiving base protocol — required for NSKeyedArchiver | Not started |
+| 4 | **NSRunLoop selectors** | `run`, `runUntilDate:`, `runMode:beforeDate:` (event loop management) | Partial — timers and blocking exist; broader source and mode behavior remains incomplete |
+| 5 | **NSXMLParser** | XML parsing (config files, plists) | Partial — basic parsing exists; wider parity remains incomplete |
+| 6 | **NSCoder (protocol)** | Foundation archiving base protocol — required for NSKeyedArchiver | Partial — base protocol exists; broader delegation and semantic parity remain incomplete |
 
 Of these, **NSURLSession** is the highest-impact gap. It is used by any CLI tool
 that makes HTTP requests or downloads files, and it unlocks the largest remaining
 category of real-world macOS software.
 
 Additionally:
-- Real macOS `.app` bundles with NIB/XIB files do not run (NIB loading is a stub).
+- Build-time XIB/NIB compilation is still incomplete, but runtime loading of compiled nib archives is now implemented; broad `.app` compatibility still depends on wider AppKit coverage.
 - CoreGraphics / CoreAnimation are not implemented — GPU rendering goes through `wgpu` directly.
 - Linux CI is not yet wired (Docker image exists; CI matrix pending).
 - The ARM64 interpreter processes ~12–50µs per fixture; JIT translation (E3d) is not yet implemented.

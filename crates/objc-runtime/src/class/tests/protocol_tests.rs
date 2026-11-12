@@ -1,5 +1,5 @@
-use super::*;
 use super::make_metadata;
+use super::*;
 
 // ── Protocol tests ─────────────────────────────────────────────────
 
@@ -128,4 +128,3 @@ fn register_image_with_protocols() {
     assert_eq!(cls.protocol_names, vec!["Codable".to_string()]);
     assert!(rt.class_conforms_to_protocol("MyClass", "Codable"));
 }
-

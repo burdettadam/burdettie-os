@@ -5,16 +5,16 @@ mod emitter;
 mod parser;
 
 pub use parser::{
-    CompactEntry, generate_eh_frame, generate_eh_frame_runtime, parse_compact_unwind,
+    generate_eh_frame, generate_eh_frame_runtime, parse_compact_unwind, CompactEntry,
 };
 
 // ── Tests ──────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::constants::*;
-    use super::emitter::{write_uleb128, write_sleb128};
+    use super::emitter::{write_sleb128, write_uleb128};
+    use super::*;
 
     /// Build a minimal __unwind_info section with one regular second-level page.
     fn build_test_unwind_info(func_entries: &[(u32, u32)]) -> Vec<u8> {
@@ -40,12 +40,22 @@ mod tests {
 
         // First-level index entry 0: funcOffset=0, secondLevel=<page>, lsda=0.
         let page_off = 28 + 2 * 12; // after 2 index entries
-        let index0 = [0u32.to_le_bytes(), (page_off as u32).to_le_bytes(), 0u32.to_le_bytes()].concat();
+        let index0 = [
+            0u32.to_le_bytes(),
+            (page_off as u32).to_le_bytes(),
+            0u32.to_le_bytes(),
+        ]
+        .concat();
         data.extend_from_slice(&index0);
 
         // Sentinel index entry 1: funcOffset=0xFFFF (upper bound), secondLevel=0, lsda=0.
         let sentinel_func = func_entries.last().map_or(0x1000, |(off, _)| off + 0x100);
-        let index1 = [sentinel_func.to_le_bytes(), 0u32.to_le_bytes(), 0u32.to_le_bytes()].concat();
+        let index1 = [
+            sentinel_func.to_le_bytes(),
+            0u32.to_le_bytes(),
+            0u32.to_le_bytes(),
+        ]
+        .concat();
         data.extend_from_slice(&index1);
 
         // Regular second-level page header: kind=2, entryPageOffset=8, entryCount=N.
@@ -133,16 +143,31 @@ mod tests {
         // After CIE (at offset 4 + cie_len): first FDE.
         let fde1_off = 4 + cie_len as usize;
         assert!(fde1_off + 8 <= eh.len());
-        let fde1_len = u32::from_ne_bytes([eh[fde1_off], eh[fde1_off+1], eh[fde1_off+2], eh[fde1_off+3]]);
+        let fde1_len = u32::from_ne_bytes([
+            eh[fde1_off],
+            eh[fde1_off + 1],
+            eh[fde1_off + 2],
+            eh[fde1_off + 3],
+        ]);
         assert!(fde1_len > 0);
 
         // FDE CIE pointer should be non-zero (offset back to CIE).
-        let fde1_cie_ptr = u32::from_ne_bytes([eh[fde1_off+4], eh[fde1_off+5], eh[fde1_off+6], eh[fde1_off+7]]);
+        let fde1_cie_ptr = u32::from_ne_bytes([
+            eh[fde1_off + 4],
+            eh[fde1_off + 5],
+            eh[fde1_off + 6],
+            eh[fde1_off + 7],
+        ]);
         assert!(fde1_cie_ptr > 0);
 
         // Terminator at end: last 4 bytes should be 0.
         let term_off = eh.len() - 4;
-        let term = u32::from_ne_bytes([eh[term_off], eh[term_off+1], eh[term_off+2], eh[term_off+3]]);
+        let term = u32::from_ne_bytes([
+            eh[term_off],
+            eh[term_off + 1],
+            eh[term_off + 2],
+            eh[term_off + 3],
+        ]);
         assert_eq!(term, 0, "eh_frame should end with zero terminator");
     }
 
@@ -162,23 +187,29 @@ mod tests {
         // Should have CIE + 1 FDE + terminator.
         let cie_len = u32::from_ne_bytes([eh[0], eh[1], eh[2], eh[3]]);
         let fde_off = 4 + cie_len as usize;
-        let fde_len = u32::from_ne_bytes([eh[fde_off], eh[fde_off+1], eh[fde_off+2], eh[fde_off+3]]);
+        let fde_len = u32::from_ne_bytes([
+            eh[fde_off],
+            eh[fde_off + 1],
+            eh[fde_off + 2],
+            eh[fde_off + 3],
+        ]);
         assert!(fde_len > 0);
     }
 
     #[test]
     fn zero_encoding_entries_are_skipped() {
-        let entries = vec![
-            CompactEntry {
-                func_offset: 0,
-                func_length: 0x20,
-                encoding: 0,
-                personality_slot_offset: None,
-                lsda_offset: None,
-            },
-        ];
+        let entries = vec![CompactEntry {
+            func_offset: 0,
+            func_length: 0x20,
+            encoding: 0,
+            personality_slot_offset: None,
+            lsda_offset: None,
+        }];
         let eh = generate_eh_frame(&entries, 0x4000);
-        assert!(eh.is_empty(), "zero-encoding entries should not emit terminator-only eh_frame data");
+        assert!(
+            eh.is_empty(),
+            "zero-encoding entries should not emit terminator-only eh_frame data"
+        );
     }
 
     #[test]
@@ -192,7 +223,10 @@ mod tests {
         }];
 
         let eh = generate_eh_frame(&entries, 0x4000);
-        assert!(eh.is_empty(), "DWARF-mode entries should not emit terminator-only eh_frame data");
+        assert!(
+            eh.is_empty(),
+            "DWARF-mode entries should not emit terminator-only eh_frame data"
+        );
     }
 
     #[test]

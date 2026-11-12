@@ -162,8 +162,7 @@ mod tests {
         let name = make_string("NSInvalidArgumentException");
         let reason = make_string("bad arg");
         let info: u64 = 0xCAFE;
-        let obj =
-            shim_nsexception_exception_with_name_reason_userinfo(0, 0, name, reason, info);
+        let obj = shim_nsexception_exception_with_name_reason_userinfo(0, 0, name, reason, info);
         assert_eq!(read_field(obj, NSEXCEPTION_USERINFO_OFF), info);
         free_obj(obj);
         free_obj(name);

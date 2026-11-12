@@ -56,10 +56,9 @@ pub(crate) fn format_objc_object(obj: u64) -> String {
 
 /// Format a tagged pointer guest-side using the runtime's known Foundation
 /// tagged-pointer class mapping.
-
 mod tagged;
-use self::tagged::format_tagged_pointer;
 pub(crate) use self::tagged::expand_format;
+use self::tagged::format_tagged_pointer;
 
 #[cfg(test)]
 mod tests {

@@ -13,16 +13,22 @@ const INITIAL_CAP: u64 = 16;
 
 fn alloc_mutable_data(cap: u64) -> u64 {
     let obj = crate::pal_alloc().calloc(1, 32) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *(obj as *mut u64) = crate::nsobj::nsmutabledata_class_addr();
     }
     let real_cap = if cap == 0 { INITIAL_CAP } else { cap };
     let buf = crate::pal_alloc().calloc(real_cap as usize, 1) as u64;
     if buf != 0 {
-        unsafe { *((obj as usize + BYTES_OFF) as *mut u64) = buf; }
+        unsafe {
+            *((obj as usize + BYTES_OFF) as *mut u64) = buf;
+        }
     }
-    unsafe { *((obj as usize + CAP_OFF) as *mut u64) = real_cap; }
+    unsafe {
+        *((obj as usize + CAP_OFF) as *mut u64) = real_cap;
+    }
     obj
 }
 
@@ -30,9 +36,13 @@ unsafe fn grow_if_needed(obj: u64, needed: u64) {
     let len = *((obj as usize + LENGTH_OFF) as *const u64);
     let cap = *((obj as usize + CAP_OFF) as *const u64);
     let required = len + needed;
-    if required <= cap { return; }
+    if required <= cap {
+        return;
+    }
     let mut new_cap = if cap == 0 { INITIAL_CAP } else { cap };
-    while new_cap < required { new_cap *= 2; }
+    while new_cap < required {
+        new_cap *= 2;
+    }
     let old_buf = *((obj as usize + BYTES_OFF) as *const u64);
     let new_buf = crate::pal_alloc().realloc(old_buf as *mut u8, new_cap as usize) as u64;
     if new_buf != 0 {
@@ -60,24 +70,33 @@ pub extern "C" fn shim_nsmutabledata_data_with_capacity(_cls: u64, _cmd: u64, ca
 pub extern "C" fn shim_nsmutabledata_data_with_length(_cls: u64, _cmd: u64, length: u64) -> u64 {
     let obj = alloc_mutable_data(length);
     if obj != 0 {
-        unsafe { *((obj as usize + LENGTH_OFF) as *mut u64) = length; }
+        unsafe {
+            *((obj as usize + LENGTH_OFF) as *mut u64) = length;
+        }
     }
     obj
 }
 
 /// `+[NSMutableData dataWithBytes:length:]`
 pub extern "C" fn shim_nsmutabledata_data_with_bytes(
-    _cls: u64, _cmd: u64, bytes: u64, length: u64,
+    _cls: u64,
+    _cmd: u64,
+    bytes: u64,
+    length: u64,
 ) -> u64 {
     let obj = alloc_mutable_data(length);
-    if obj == 0 || length == 0 || bytes == 0 { return obj; }
+    if obj == 0 || length == 0 || bytes == 0 {
+        return obj;
+    }
     let buf = unsafe { *((obj as usize + BYTES_OFF) as *const u64) };
     if buf != 0 {
         unsafe {
             std::ptr::copy_nonoverlapping(bytes as *const u8, buf as *mut u8, length as usize);
         }
     }
-    unsafe { *((obj as usize + LENGTH_OFF) as *mut u64) = length; }
+    unsafe {
+        *((obj as usize + LENGTH_OFF) as *mut u64) = length;
+    }
     obj
 }
 
@@ -85,13 +104,17 @@ pub extern "C" fn shim_nsmutabledata_data_with_bytes(
 
 /// `-[NSMutableData length]`
 pub extern "C" fn shim_nsmutabledata_length(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + LENGTH_OFF) as *const u64) }
 }
 
 /// `-[NSMutableData bytes]` / `-[NSMutableData mutableBytes]`
 pub extern "C" fn shim_nsmutabledata_bytes(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + BYTES_OFF) as *const u64) }
 }
 
@@ -99,10 +122,17 @@ pub extern "C" fn shim_nsmutabledata_bytes(obj: u64, _cmd: u64) -> u64 {
 
 /// `-[NSMutableData appendBytes:length:]`
 pub extern "C" fn shim_nsmutabledata_append_bytes(
-    obj: u64, _cmd: u64, bytes: u64, length: u64,
+    obj: u64,
+    _cmd: u64,
+    bytes: u64,
+    length: u64,
 ) -> u64 {
-    if obj == 0 || length == 0 || bytes == 0 { return 0; }
-    unsafe { grow_if_needed(obj, length); }
+    if obj == 0 || length == 0 || bytes == 0 {
+        return 0;
+    }
+    unsafe {
+        grow_if_needed(obj, length);
+    }
     let len = unsafe { *((obj as usize + LENGTH_OFF) as *const u64) };
     let buf = unsafe { *((obj as usize + BYTES_OFF) as *const u64) };
     if buf != 0 {
@@ -120,7 +150,9 @@ pub extern "C" fn shim_nsmutabledata_append_bytes(
 
 /// `-[NSMutableData appendData:]`
 pub extern "C" fn shim_nsmutabledata_append_data(obj: u64, _cmd: u64, other: u64) -> u64 {
-    if obj == 0 || other == 0 { return 0; }
+    if obj == 0 || other == 0 {
+        return 0;
+    }
     let other_len = crate::nsdata::shim_nsdata_length(other, 0);
     let other_bytes = crate::nsdata::shim_nsdata_bytes(other, 0);
     if other_len > 0 && other_bytes != 0 {
@@ -131,27 +163,44 @@ pub extern "C" fn shim_nsmutabledata_append_data(obj: u64, _cmd: u64, other: u64
 
 /// `-[NSMutableData setLength:]`
 pub extern "C" fn shim_nsmutabledata_set_length(obj: u64, _cmd: u64, new_len: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let old_len = unsafe { *((obj as usize + LENGTH_OFF) as *const u64) };
     if new_len > old_len {
-        unsafe { grow_if_needed(obj, new_len - old_len); }
+        unsafe {
+            grow_if_needed(obj, new_len - old_len);
+        }
     }
-    unsafe { *((obj as usize + LENGTH_OFF) as *mut u64) = new_len; }
+    unsafe {
+        *((obj as usize + LENGTH_OFF) as *mut u64) = new_len;
+    }
     0
 }
 
 /// `-[NSMutableData resetBytesInRange:]` (loc, len)
 pub extern "C" fn shim_nsmutabledata_reset_bytes_in_range(
-    obj: u64, _cmd: u64, loc: u64, len: u64,
+    obj: u64,
+    _cmd: u64,
+    loc: u64,
+    len: u64,
 ) -> u64 {
-    if obj == 0 || len == 0 { return 0; }
+    if obj == 0 || len == 0 {
+        return 0;
+    }
     let buf = unsafe { *((obj as usize + BYTES_OFF) as *const u64) };
     let data_len = unsafe { *((obj as usize + LENGTH_OFF) as *const u64) };
-    if buf == 0 { return 0; }
+    if buf == 0 {
+        return 0;
+    }
     let end = (loc + len).min(data_len);
     if loc < end {
         unsafe {
-            std::ptr::write_bytes((buf as usize + loc as usize) as *mut u8, 0, (end - loc) as usize);
+            std::ptr::write_bytes(
+                (buf as usize + loc as usize) as *mut u8,
+                0,
+                (end - loc) as usize,
+            );
         }
     }
     0
@@ -159,12 +208,20 @@ pub extern "C" fn shim_nsmutabledata_reset_bytes_in_range(
 
 /// `-[NSMutableData replaceBytesInRange:withBytes:]` (loc, len, bytes)
 pub extern "C" fn shim_nsmutabledata_replace_bytes_in_range(
-    obj: u64, _cmd: u64, loc: u64, len: u64, bytes: u64,
+    obj: u64,
+    _cmd: u64,
+    loc: u64,
+    len: u64,
+    bytes: u64,
 ) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let buf = unsafe { *((obj as usize + BYTES_OFF) as *const u64) };
     let data_len = unsafe { *((obj as usize + LENGTH_OFF) as *const u64) };
-    if buf == 0 { return 0; }
+    if buf == 0 {
+        return 0;
+    }
     let end = (loc + len).min(data_len);
     if bytes != 0 && loc < end {
         unsafe {
@@ -180,7 +237,9 @@ pub extern "C" fn shim_nsmutabledata_replace_bytes_in_range(
 
 /// `-[NSMutableData description]`
 pub extern "C" fn shim_nsmutabledata_description(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let len = unsafe { *((obj as usize + LENGTH_OFF) as *const u64) };
     let desc = format!("<NSMutableData: {} bytes>", len);
     let c_str = std::ffi::CString::new(desc).unwrap_or_default();
@@ -204,7 +263,9 @@ mod tests {
 
     // Helper: free an NSMutableData (frees both the internal buffer and the obj).
     unsafe fn free_md(obj: u64) {
-        if obj == 0 { return; }
+        if obj == 0 {
+            return;
+        }
         let buf = *((obj as usize + BYTES_OFF) as *const u64);
         if buf != 0 {
             crate::pal_alloc().free(buf as *mut u8);
@@ -220,7 +281,9 @@ mod tests {
         assert_ne!(obj, 0);
         let len = shim_nsmutabledata_length(obj, 0);
         assert_eq!(len, 0);
-        unsafe { free_md(obj); }
+        unsafe {
+            free_md(obj);
+        }
     }
 
     // ── +[NSMutableData dataWithCapacity:] ─────────────────────────
@@ -234,7 +297,9 @@ mod tests {
         // capacity stored internally
         let cap = read_field(obj, CAP_OFF);
         assert_eq!(cap, 256);
-        unsafe { free_md(obj); }
+        unsafe {
+            free_md(obj);
+        }
     }
 
     #[test]
@@ -243,7 +308,9 @@ mod tests {
         assert_ne!(obj, 0);
         let cap = read_field(obj, CAP_OFF);
         assert_eq!(cap, INITIAL_CAP);
-        unsafe { free_md(obj); }
+        unsafe {
+            free_md(obj);
+        }
     }
 
     // ── +[NSMutableData dataWithLength:] ───────────────────────────
@@ -256,7 +323,9 @@ mod tests {
         // buffer should be zeroed
         let bytes = unsafe { read_bytes(obj, 64) };
         assert!(bytes.iter().all(|&b| b == 0));
-        unsafe { free_md(obj); }
+        unsafe {
+            free_md(obj);
+        }
     }
 
     // ── +[NSMutableData dataWithBytes:length:] ─────────────────────
@@ -269,7 +338,9 @@ mod tests {
         assert_eq!(shim_nsmutabledata_length(obj, 0), 4);
         let bytes = unsafe { read_bytes(obj, 4) };
         assert_eq!(bytes, vec![0xCA, 0xFE, 0xBA, 0xBE]);
-        unsafe { free_md(obj); }
+        unsafe {
+            free_md(obj);
+        }
     }
 
     #[test]
@@ -278,7 +349,9 @@ mod tests {
         let obj = shim_nsmutabledata_data_with_bytes(0, 0, src.as_ptr() as u64, 0);
         assert_ne!(obj, 0);
         assert_eq!(shim_nsmutabledata_length(obj, 0), 0);
-        unsafe { free_md(obj); }
+        unsafe {
+            free_md(obj);
+        }
     }
 
     #[test]
@@ -286,7 +359,9 @@ mod tests {
         let obj = shim_nsmutabledata_data_with_bytes(0, 0, 0, 10);
         assert_ne!(obj, 0);
         assert_eq!(shim_nsmutabledata_length(obj, 0), 0);
-        unsafe { free_md(obj); }
+        unsafe {
+            free_md(obj);
+        }
     }
 
     // ── -[NSMutableData length] / bytes ────────────────────────────
@@ -306,7 +381,9 @@ mod tests {
         let obj = shim_nsmutabledata_data(0, 0);
         let ptr = shim_nsmutabledata_bytes(obj, 0);
         assert_ne!(ptr, 0);
-        unsafe { free_md(obj); }
+        unsafe {
+            free_md(obj);
+        }
     }
 
     // ── -[NSMutableData appendBytes:length:] ───────────────────────
@@ -319,7 +396,9 @@ mod tests {
         assert_eq!(shim_nsmutabledata_length(obj, 0), 3);
         let bytes = unsafe { read_bytes(obj, 3) };
         assert_eq!(bytes, vec![1, 2, 3]);
-        unsafe { free_md(obj); }
+        unsafe {
+            free_md(obj);
+        }
     }
 
     #[test]
@@ -332,7 +411,9 @@ mod tests {
         assert_eq!(shim_nsmutabledata_length(obj, 0), 4);
         let bytes = unsafe { read_bytes(obj, 4) };
         assert_eq!(bytes, vec![0xAA, 0xBB, 0xCC, 0xDD]);
-        unsafe { free_md(obj); }
+        unsafe {
+            free_md(obj);
+        }
     }
 
     #[test]
@@ -343,7 +424,9 @@ mod tests {
         assert_eq!(shim_nsmutabledata_length(obj, 0), 8);
         let bytes = unsafe { read_bytes(obj, 8) };
         assert_eq!(bytes, vec![1, 2, 3, 4, 5, 6, 7, 8]);
-        unsafe { free_md(obj); }
+        unsafe {
+            free_md(obj);
+        }
     }
 
     #[test]
@@ -360,7 +443,9 @@ mod tests {
         let src: [u8; 2] = [1, 2];
         shim_nsmutabledata_append_bytes(obj, 0, src.as_ptr() as u64, 0);
         assert_eq!(shim_nsmutabledata_length(obj, 0), 0);
-        unsafe { free_md(obj); }
+        unsafe {
+            free_md(obj);
+        }
     }
 
     #[test]
@@ -368,7 +453,9 @@ mod tests {
         let obj = shim_nsmutabledata_data(0, 0);
         shim_nsmutabledata_append_bytes(obj, 0, 0, 5);
         assert_eq!(shim_nsmutabledata_length(obj, 0), 0);
-        unsafe { free_md(obj); }
+        unsafe {
+            free_md(obj);
+        }
     }
 
     // ── -[NSMutableData appendData:] ───────────────────────────────
@@ -384,7 +471,9 @@ mod tests {
         // Cross-check with nsdata shim
         assert_eq!(crate::nsdata::shim_nsdata_length(src, 0), 3);
         free_obj(src); // nsdata needs separate free
-        unsafe { free_md(obj); }
+        unsafe {
+            free_md(obj);
+        }
     }
 
     #[test]
@@ -393,7 +482,9 @@ mod tests {
         let r = shim_nsmutabledata_append_data(obj, 0, 0);
         assert_eq!(r, 0);
         assert_eq!(shim_nsmutabledata_length(obj, 0), 0);
-        unsafe { free_md(obj); }
+        unsafe {
+            free_md(obj);
+        }
     }
 
     #[test]
@@ -409,7 +500,9 @@ mod tests {
         shim_nsmutabledata_append_data(obj, 0, empty);
         assert_eq!(shim_nsmutabledata_length(obj, 0), 0);
         free_obj(empty);
-        unsafe { free_md(obj); }
+        unsafe {
+            free_md(obj);
+        }
     }
 
     // ── -[NSMutableData setLength:] ────────────────────────────────
@@ -419,7 +512,9 @@ mod tests {
         let obj = shim_nsmutabledata_data(0, 0);
         shim_nsmutabledata_set_length(obj, 0, 100);
         assert_eq!(shim_nsmutabledata_length(obj, 0), 100);
-        unsafe { free_md(obj); }
+        unsafe {
+            free_md(obj);
+        }
     }
 
     #[test]
@@ -431,7 +526,9 @@ mod tests {
         // Original bytes should still be intact
         let bytes = unsafe { read_bytes(obj, 3) };
         assert_eq!(bytes, vec![1, 2, 3]);
-        unsafe { free_md(obj); }
+        unsafe {
+            free_md(obj);
+        }
     }
 
     #[test]
@@ -439,7 +536,9 @@ mod tests {
         let obj = shim_nsmutabledata_data_with_length(0, 0, 50);
         shim_nsmutabledata_set_length(obj, 0, 0);
         assert_eq!(shim_nsmutabledata_length(obj, 0), 0);
-        unsafe { free_md(obj); }
+        unsafe {
+            free_md(obj);
+        }
     }
 
     #[test]
@@ -458,7 +557,9 @@ mod tests {
         shim_nsmutabledata_reset_bytes_in_range(obj, 0, 2, 2);
         let bytes = unsafe { read_bytes(obj, 6) };
         assert_eq!(bytes, vec![1, 2, 0, 0, 5, 6]);
-        unsafe { free_md(obj); }
+        unsafe {
+            free_md(obj);
+        }
     }
 
     #[test]
@@ -469,7 +570,9 @@ mod tests {
         shim_nsmutabledata_reset_bytes_in_range(obj, 0, 2, 100);
         let bytes = unsafe { read_bytes(obj, 4) };
         assert_eq!(bytes, vec![0xFF, 0xFF, 0, 0]);
-        unsafe { free_md(obj); }
+        unsafe {
+            free_md(obj);
+        }
     }
 
     #[test]
@@ -479,7 +582,9 @@ mod tests {
         shim_nsmutabledata_reset_bytes_in_range(obj, 0, 0, 0);
         let bytes = unsafe { read_bytes(obj, 3) };
         assert_eq!(bytes, vec![1, 2, 3]); // unchanged
-        unsafe { free_md(obj); }
+        unsafe {
+            free_md(obj);
+        }
     }
 
     #[test]
@@ -495,12 +600,12 @@ mod tests {
         let src: [u8; 5] = [1, 2, 3, 4, 5];
         let obj = shim_nsmutabledata_data_with_bytes(0, 0, src.as_ptr() as u64, 5);
         let replacement: [u8; 2] = [0xAA, 0xBB];
-        shim_nsmutabledata_replace_bytes_in_range(
-            obj, 0, 1, 2, replacement.as_ptr() as u64,
-        );
+        shim_nsmutabledata_replace_bytes_in_range(obj, 0, 1, 2, replacement.as_ptr() as u64);
         let bytes = unsafe { read_bytes(obj, 5) };
         assert_eq!(bytes, vec![1, 0xAA, 0xBB, 4, 5]);
-        unsafe { free_md(obj); }
+        unsafe {
+            free_md(obj);
+        }
     }
 
     #[test]
@@ -509,12 +614,12 @@ mod tests {
         let obj = shim_nsmutabledata_data_with_bytes(0, 0, src.as_ptr() as u64, 4);
         let replacement: [u8; 10] = [0xFF; 10];
         // Range extends past data length — should clamp
-        shim_nsmutabledata_replace_bytes_in_range(
-            obj, 0, 3, 10, replacement.as_ptr() as u64,
-        );
+        shim_nsmutabledata_replace_bytes_in_range(obj, 0, 3, 10, replacement.as_ptr() as u64);
         let bytes = unsafe { read_bytes(obj, 4) };
         assert_eq!(bytes, vec![1, 2, 3, 0xFF]);
-        unsafe { free_md(obj); }
+        unsafe {
+            free_md(obj);
+        }
     }
 
     #[test]
@@ -525,7 +630,9 @@ mod tests {
         // bytes should be unchanged (null bytes ptr = no-op for copy)
         let bytes = unsafe { read_bytes(obj, 3) };
         assert_eq!(bytes, vec![1, 2, 3]);
-        unsafe { free_md(obj); }
+        unsafe {
+            free_md(obj);
+        }
     }
 
     #[test]
@@ -542,7 +649,9 @@ mod tests {
         let desc = shim_nsmutabledata_description(obj, 0);
         assert_ne!(desc, 0);
         assert_string_eq(desc, "<NSMutableData: 0 bytes>");
-        unsafe { free_md(obj); }
+        unsafe {
+            free_md(obj);
+        }
     }
 
     #[test]
@@ -552,7 +661,9 @@ mod tests {
         let desc = shim_nsmutabledata_description(obj, 0);
         assert_ne!(desc, 0);
         assert_string_eq(desc, "<NSMutableData: 5 bytes>");
-        unsafe { free_md(obj); }
+        unsafe {
+            free_md(obj);
+        }
     }
 
     #[test]
@@ -581,6 +692,8 @@ mod tests {
         shim_nsmutabledata_append_bytes(obj, 0, b.as_ptr() as u64, 2);
         assert_eq!(shim_nsmutabledata_length(obj, 0), 3);
 
-        unsafe { free_md(obj); }
+        unsafe {
+            free_md(obj);
+        }
     }
 }

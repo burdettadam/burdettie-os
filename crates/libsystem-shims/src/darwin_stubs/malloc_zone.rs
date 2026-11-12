@@ -20,22 +20,83 @@ pub struct MallocZoneStubs;
 impl MallocZoneStubs {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
-        register_shims!(table,
-            ("_malloc_default_zone", shim_malloc_default_zone as *const () as u64, "malloc_default_zone → default zone pointer"),
-            ("_malloc_create_zone", shim_malloc_create_zone as *const () as u64, "malloc_create_zone → default zone pointer"),
-            ("_malloc_destroy_zone", shim_malloc_destroy_zone as *const () as u64, "malloc_destroy_zone (no-op)"),
-            ("_malloc_zone_malloc", shim_malloc_zone_malloc as *const () as u64, "malloc_zone_malloc → libc::malloc"),
-            ("_malloc_zone_calloc", shim_malloc_zone_calloc as *const () as u64, "malloc_zone_calloc → libc::calloc"),
-            ("_malloc_zone_realloc", shim_malloc_zone_realloc as *const () as u64, "malloc_zone_realloc → libc::realloc"),
-            ("_malloc_zone_free", shim_malloc_zone_free as *const () as u64, "malloc_zone_free → libc::free"),
-            ("_malloc_zone_memalign", shim_malloc_zone_memalign as *const () as u64, "malloc_zone_memalign → libc::posix_memalign"),
-            ("_malloc_size", shim_malloc_size as *const () as u64, "malloc_size → 0 (portable fallback)"),
-            ("_malloc_good_size", shim_malloc_good_size as *const () as u64, "malloc_good_size → next 16-byte alignment"),
-            ("_malloc_zone_statistics", shim_malloc_zone_statistics as *const () as u64, "malloc_zone_statistics → zeroed stats"),
-            ("_malloc_zone_batch_malloc", shim_malloc_zone_batch_malloc as *const () as u64, "malloc_zone_batch_malloc → individual mallocs"),
-            ("_malloc_zone_batch_free", shim_malloc_zone_batch_free as *const () as u64, "malloc_zone_batch_free → individual frees"),
-            ("_malloc_set_zone_name", shim_malloc_set_zone_name as *const () as u64, "malloc_set_zone_name (no-op)"),
-            ("_malloc_zone_from_ptr", shim_malloc_zone_from_ptr as *const () as u64, "malloc_zone_from_ptr → default zone")
+        register_shims!(
+            table,
+            (
+                "_malloc_default_zone",
+                shim_malloc_default_zone as *const () as u64,
+                "malloc_default_zone → default zone pointer"
+            ),
+            (
+                "_malloc_create_zone",
+                shim_malloc_create_zone as *const () as u64,
+                "malloc_create_zone → default zone pointer"
+            ),
+            (
+                "_malloc_destroy_zone",
+                shim_malloc_destroy_zone as *const () as u64,
+                "malloc_destroy_zone (no-op)"
+            ),
+            (
+                "_malloc_zone_malloc",
+                shim_malloc_zone_malloc as *const () as u64,
+                "malloc_zone_malloc → libc::malloc"
+            ),
+            (
+                "_malloc_zone_calloc",
+                shim_malloc_zone_calloc as *const () as u64,
+                "malloc_zone_calloc → libc::calloc"
+            ),
+            (
+                "_malloc_zone_realloc",
+                shim_malloc_zone_realloc as *const () as u64,
+                "malloc_zone_realloc → libc::realloc"
+            ),
+            (
+                "_malloc_zone_free",
+                shim_malloc_zone_free as *const () as u64,
+                "malloc_zone_free → libc::free"
+            ),
+            (
+                "_malloc_zone_memalign",
+                shim_malloc_zone_memalign as *const () as u64,
+                "malloc_zone_memalign → libc::posix_memalign"
+            ),
+            (
+                "_malloc_size",
+                shim_malloc_size as *const () as u64,
+                "malloc_size → 0 (portable fallback)"
+            ),
+            (
+                "_malloc_good_size",
+                shim_malloc_good_size as *const () as u64,
+                "malloc_good_size → next 16-byte alignment"
+            ),
+            (
+                "_malloc_zone_statistics",
+                shim_malloc_zone_statistics as *const () as u64,
+                "malloc_zone_statistics → zeroed stats"
+            ),
+            (
+                "_malloc_zone_batch_malloc",
+                shim_malloc_zone_batch_malloc as *const () as u64,
+                "malloc_zone_batch_malloc → individual mallocs"
+            ),
+            (
+                "_malloc_zone_batch_free",
+                shim_malloc_zone_batch_free as *const () as u64,
+                "malloc_zone_batch_free → individual frees"
+            ),
+            (
+                "_malloc_set_zone_name",
+                shim_malloc_set_zone_name as *const () as u64,
+                "malloc_set_zone_name (no-op)"
+            ),
+            (
+                "_malloc_zone_from_ptr",
+                shim_malloc_zone_from_ptr as *const () as u64,
+                "malloc_zone_from_ptr → default zone"
+            )
         );
         log::debug!("MallocZoneStubs: registered 15 stubs");
     }
@@ -77,9 +138,8 @@ pub extern "C" fn shim_malloc_zone_free(_zone: u64, ptr: u64) {
 /// Allocates `size` bytes with the given alignment via posix_memalign.
 pub extern "C" fn shim_malloc_zone_memalign(_zone: u64, alignment: u64, size: u64) -> u64 {
     let mut out: *mut libc::c_void = core::ptr::null_mut();
-    let ret = unsafe {
-        libc::posix_memalign(&mut out, alignment as libc::size_t, size as libc::size_t)
-    };
+    let ret =
+        unsafe { libc::posix_memalign(&mut out, alignment as libc::size_t, size as libc::size_t) };
     if ret == 0 {
         out as u64
     } else {
@@ -181,7 +241,10 @@ mod tests {
         assert_ne!(ptr, 0);
         // calloc must return zeroed memory.
         let slice = unsafe { core::slice::from_raw_parts(ptr as *const u8, 128) };
-        assert!(slice.iter().all(|&b| b == 0), "calloc memory must be zeroed");
+        assert!(
+            slice.iter().all(|&b| b == 0),
+            "calloc memory must be zeroed"
+        );
         shim_malloc_zone_free(zone, ptr);
     }
 
@@ -213,12 +276,7 @@ mod tests {
         let zone = shim_malloc_default_zone();
         const N: u32 = 8;
         let mut results = [0u64; N as usize];
-        let allocated = shim_malloc_zone_batch_malloc(
-            zone,
-            64,
-            results.as_mut_ptr() as u64,
-            N,
-        );
+        let allocated = shim_malloc_zone_batch_malloc(zone, 64, results.as_mut_ptr() as u64, N);
         assert_eq!(allocated, N);
         for &ptr in &results {
             assert_ne!(ptr, 0, "each batch-allocated pointer must be non-null");

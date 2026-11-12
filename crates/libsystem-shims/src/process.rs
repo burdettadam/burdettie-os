@@ -26,6 +26,14 @@ struct ProcessState {
     /// Stored `argv` head pointer so `_NSGetArgv` can return `&argv`.
     argv_head: usize,
     env: Vec<(CString, CString)>,
+    /// Keeps `KEY=VALUE` CString data alive for `_NSGetEnviron`.
+    #[allow(dead_code)]
+    env_cstrings: Vec<CString>,
+    /// Pointer array for `_NSGetEnviron`, stored as usize for Send+Sync.
+    #[allow(dead_code)]
+    env_ptrs: Vec<usize>,
+    /// Stored environment head pointer so `_NSGetEnviron` can return `&environ`.
+    env_head: usize,
 }
 
 /// Global process state, initialised once before any shim is called.
@@ -117,6 +125,25 @@ impl ProcessShims {
                 .collect();
             argv_ptrs.push(0); // NULL terminator
             let argv_head = argv_ptrs.as_ptr() as usize;
+            let env: Vec<(CString, CString)> = config
+                .env
+                .iter()
+                .map(|(k, v)| {
+                    (
+                        CString::new(k.clone()).unwrap_or_else(|_| CString::new("").unwrap()),
+                        CString::new(v.clone()).unwrap_or_else(|_| CString::new("").unwrap()),
+                    )
+                })
+                .collect();
+            let env_cstrings: Vec<CString> = config
+                .env
+                .iter()
+                .map(|(k, v)| CString::new(format!("{k}={v}")).unwrap_or_default())
+                .collect();
+            let mut env_ptrs: Vec<usize> =
+                env_cstrings.iter().map(|cs| cs.as_ptr() as usize).collect();
+            env_ptrs.push(0);
+            let env_head = env_ptrs.as_ptr() as usize;
 
             ProcessState {
                 progname: CString::new(config.process_name.clone())
@@ -127,16 +154,10 @@ impl ProcessShims {
                 argv_cstrings,
                 argv_ptrs,
                 argv_head,
-                env: config
-                    .env
-                    .iter()
-                    .map(|(k, v)| {
-                        (
-                            CString::new(k.clone()).unwrap_or_else(|_| CString::new("").unwrap()),
-                            CString::new(v.clone()).unwrap_or_else(|_| CString::new("").unwrap()),
-                        )
-                    })
-                    .collect(),
+                env,
+                env_cstrings,
+                env_ptrs,
+                env_head,
             }
         });
 
@@ -150,19 +171,51 @@ impl ProcessShims {
             shim_nsgetexecutablepath as *const () as u64,
             "_NSGetExecutablePath → executable path",
         );
-        table.register("__NSGetArgc", shim_nsgetargc as *const () as u64, "_NSGetArgc → &argc");
-        table.register("__NSGetArgv", shim_nsgetargv as *const () as u64, "_NSGetArgv → &argv");
-        table.register("__NSGetEnviron", shim_nsgetenviron as *const () as u64, "_NSGetEnviron → &environ");
+        table.register(
+            "__NSGetArgc",
+            shim_nsgetargc as *const () as u64,
+            "_NSGetArgc → &argc",
+        );
+        table.register(
+            "__NSGetArgv",
+            shim_nsgetargv as *const () as u64,
+            "_NSGetArgv → &argv",
+        );
+        table.register(
+            "__NSGetEnviron",
+            shim_nsgetenviron as *const () as u64,
+            "_NSGetEnviron → &environ",
+        );
         table.register(
             "_getenv",
             shim_getenv as *const () as u64,
             "getenv → environment variable",
         );
-        table.register("_setenv", shim_setenv as *const () as u64, "setenv → set env var");
-        table.register("_putenv", shim_putenv as *const () as u64, "putenv → KEY=VALUE env");
-        table.register("_unsetenv", shim_unsetenv as *const () as u64, "unsetenv → remove env var");
-        table.register("_execv", shim_execv as *const () as u64, "execv → preserve guest argv");
-        table.register("_dladdr", shim_dladdr as *const () as u64, "dladdr → guest-aware address lookup");
+        table.register(
+            "_setenv",
+            shim_setenv as *const () as u64,
+            "setenv → set env var",
+        );
+        table.register(
+            "_putenv",
+            shim_putenv as *const () as u64,
+            "putenv → KEY=VALUE env",
+        );
+        table.register(
+            "_unsetenv",
+            shim_unsetenv as *const () as u64,
+            "unsetenv → remove env var",
+        );
+        table.register(
+            "_execv",
+            shim_execv as *const () as u64,
+            "execv → preserve guest argv",
+        );
+        table.register(
+            "_dladdr",
+            shim_dladdr as *const () as u64,
+            "dladdr → guest-aware address lookup",
+        );
 
         log::debug!("ProcessShims: registered 10 process identity shims");
     }
@@ -219,10 +272,19 @@ extern "C" fn shim_nsgetargv() -> *const *const *const std::ffi::c_char {
 /// On macOS this is in `crt_externs.h`. On Linux, we return a pointer to
 /// the libc `environ` global variable, which is the same semantics.
 extern "C" fn shim_nsgetenviron() -> *const *const *const std::ffi::c_char {
-    extern "C" {
-        static mut environ: *const *const std::ffi::c_char;
+    #[cfg(unix)]
+    {
+        extern "C" {
+            static mut environ: *const *const std::ffi::c_char;
+        }
+        std::ptr::addr_of!(environ) as *const *const *const std::ffi::c_char
     }
-    unsafe { std::ptr::addr_of!(environ) as *const *const *const std::ffi::c_char }
+
+    #[cfg(not(unix))]
+    {
+        let state = PROCESS_STATE.get().expect("process state not initialised");
+        &state.env_head as *const usize as *const *const *const std::ffi::c_char
+    }
 }
 
 /// `char *getenv(const char *name)`
@@ -268,9 +330,14 @@ extern "C" fn shim_setenv(
     }
     let name_cstr = unsafe { std::ffi::CStr::from_ptr(name) };
     let val_cstr = unsafe { std::ffi::CStr::from_ptr(value) };
-    let Ok(mut overrides) = ENV_OVERRIDES.lock() else { return -1; };
+    let Ok(mut overrides) = ENV_OVERRIDES.lock() else {
+        return -1;
+    };
     let name_bytes = name_cstr.to_bytes();
-    if let Some(existing) = overrides.iter_mut().find(|(k, _)| k.as_bytes() == name_bytes) {
+    if let Some(existing) = overrides
+        .iter_mut()
+        .find(|(k, _)| k.as_bytes() == name_bytes)
+    {
         if overwrite != 0 {
             existing.1 = CString::from(val_cstr);
         }
@@ -282,15 +349,23 @@ extern "C" fn shim_setenv(
 
 /// `int putenv(char *str)` — accepts "KEY=VALUE" or "KEY=" strings.
 extern "C" fn shim_putenv(str: *mut std::ffi::c_char) -> i32 {
-    if str.is_null() { return -1; }
+    if str.is_null() {
+        return -1;
+    }
     let s = unsafe { std::ffi::CStr::from_ptr(str) };
     let bytes = s.to_bytes();
     if let Some(eq_pos) = bytes.iter().position(|&b| b == b'=') {
         let key = &bytes[..eq_pos];
         let val = &bytes[eq_pos + 1..];
-        let Ok(key_cs) = CString::new(key) else { return -1; };
-        let Ok(val_cs) = CString::new(val) else { return -1; };
-        let Ok(mut overrides) = ENV_OVERRIDES.lock() else { return -1; };
+        let Ok(key_cs) = CString::new(key) else {
+            return -1;
+        };
+        let Ok(val_cs) = CString::new(val) else {
+            return -1;
+        };
+        let Ok(mut overrides) = ENV_OVERRIDES.lock() else {
+            return -1;
+        };
         if let Some(existing) = overrides.iter_mut().find(|(k, _)| k.as_bytes() == key) {
             existing.1 = val_cs;
         } else {
@@ -304,10 +379,14 @@ extern "C" fn shim_putenv(str: *mut std::ffi::c_char) -> i32 {
 
 /// `int unsetenv(const char *name)`
 extern "C" fn shim_unsetenv(name: *const std::ffi::c_char) -> i32 {
-    if name.is_null() { return -1; }
+    if name.is_null() {
+        return -1;
+    }
     let name_cstr = unsafe { std::ffi::CStr::from_ptr(name) };
     let name_bytes = name_cstr.to_bytes();
-    let Ok(mut overrides) = ENV_OVERRIDES.lock() else { return -1; };
+    let Ok(mut overrides) = ENV_OVERRIDES.lock() else {
+        return -1;
+    };
     overrides.retain(|(k, _)| k.as_bytes() != name_bytes);
     0
 }
@@ -327,7 +406,7 @@ extern "C" fn shim_execv(
     let mut arg_ptrs: Vec<*const std::ffi::c_char> = args.iter().map(|arg| arg.as_ptr()).collect();
     arg_ptrs.push(std::ptr::null());
 
-    unsafe { libc::execv(path_owned.as_ptr(), arg_ptrs.as_ptr()) }
+    unsafe { libc::execv(path_owned.as_ptr(), arg_ptrs.as_ptr()) as i32 }
 }
 
 /// `int dladdr(const void *addr, Dl_info *info)`
@@ -336,6 +415,7 @@ extern "C" fn shim_execv(
 /// fails (e.g. because the address is in guest-mapped memory), fill in
 /// `Dl_info` with the guest executable path so that LLVM/Clang path
 /// computations produce valid results instead of giving up.
+#[cfg(unix)]
 extern "C" fn shim_dladdr(addr: *const u8, info: *mut libc::Dl_info) -> i32 {
     if info.is_null() {
         return 0;
@@ -364,6 +444,11 @@ extern "C" fn shim_dladdr(addr: *const u8, info: *mut libc::Dl_info) -> i32 {
         state.exec_path.to_string_lossy()
     );
     1 // success
+}
+
+#[cfg(not(unix))]
+extern "C" fn shim_dladdr(_addr: *const u8, _info: *mut libc::c_void) -> i32 {
+    0
 }
 
 #[cfg(test)]
@@ -431,9 +516,7 @@ mod tests {
         assert!(!argv_ptr.is_null());
         let argv = unsafe { *argv_ptr };
         assert!(!argv.is_null());
-        let first = unsafe { std::ffi::CStr::from_ptr(*argv) }
-            .to_str()
-            .unwrap();
+        let first = unsafe { std::ffi::CStr::from_ptr(*argv) }.to_str().unwrap();
         assert_eq!(first, "test-app");
     }
 
@@ -453,7 +536,10 @@ mod tests {
             .iter()
             .map(|arg| arg.to_str().unwrap().to_string())
             .collect();
-        assert_eq!(as_strings, vec!["/real/altool".to_string(), "--verbose".to_string()]);
+        assert_eq!(
+            as_strings,
+            vec!["/real/altool".to_string(), "--verbose".to_string()]
+        );
     }
 
     #[test]
@@ -467,7 +553,10 @@ mod tests {
             .iter()
             .map(|arg| arg.to_str().unwrap().to_string())
             .collect();
-        assert_eq!(as_strings, vec!["/real/altool".to_string(), "--help".to_string()]);
+        assert_eq!(
+            as_strings,
+            vec!["/real/altool".to_string(), "--help".to_string()]
+        );
     }
 
     #[test]
@@ -477,7 +566,13 @@ mod tests {
         let value = CString::new("1").unwrap();
 
         assert_eq!(shim_setenv(key.as_ptr(), value.as_ptr(), 1), 0);
-        assert_eq!(ENV_OVERRIDES.lock().unwrap_or_else(|e| e.into_inner()).len(), 1);
+        assert_eq!(
+            ENV_OVERRIDES
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .len(),
+            1
+        );
 
         clear_env_overrides();
 

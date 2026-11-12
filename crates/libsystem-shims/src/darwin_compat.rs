@@ -40,21 +40,48 @@ impl DarwinCompatShims {
             log::info!("DarwinCompatShims: registering Linux compat shims");
 
             // ── errno ───────────────────────────────────────────────
-            register_shims!(table,
-                ("___error", shim_error as *const () as u64, "__error → errno location"),
+            register_shims!(
+                table,
+                (
+                    "___error",
+                    shim_error as *const () as u64,
+                    "__error → errno location"
+                ),
             );
 
             // ── assert ──────────────────────────────────────────────
-            register_shims!(table,
-                ("___assert_rtn", shim_assert_rtn as *const () as u64, "__assert_rtn compat"),
+            register_shims!(
+                table,
+                (
+                    "___assert_rtn",
+                    shim_assert_rtn as *const () as u64,
+                    "__assert_rtn compat"
+                ),
             );
 
             // ── locale / ctype ──────────────────────────────────────
-            register_shims!(table,
-                ("___maskrune", shim_maskrune as *const () as u64, "__maskrune compat"),
-                ("___tolower", shim_tolower as *const () as u64, "__tolower compat"),
-                ("___toupper", shim_toupper as *const () as u64, "__toupper compat"),
-                ("__DefaultRuneLocale", shim_default_rune_locale_addr() as u64, "DefaultRuneLocale data"),
+            register_shims!(
+                table,
+                (
+                    "___maskrune",
+                    shim_maskrune as *const () as u64,
+                    "__maskrune compat"
+                ),
+                (
+                    "___tolower",
+                    shim_tolower as *const () as u64,
+                    "__tolower compat"
+                ),
+                (
+                    "___toupper",
+                    shim_toupper as *const () as u64,
+                    "__toupper compat"
+                ),
+                (
+                    "__DefaultRuneLocale",
+                    shim_default_rune_locale_addr() as u64,
+                    "DefaultRuneLocale data"
+                ),
             );
 
             // ── stdio file pointers ─────────────────────────────────
@@ -62,10 +89,23 @@ impl DarwinCompatShims {
             // inline putc/getc macros see macOS-layout fields.
             {
                 use crate::cross_platform::stdio::stdio_shadow_ptr_addr;
-                register_shims!(table,
-                    ("___stderrp", stdio_shadow_ptr_addr(2) as u64, "__stderrp data (shadow)"),
-                    ("___stdoutp", stdio_shadow_ptr_addr(1) as u64, "__stdoutp data (shadow)"),
-                    ("___stdinp", stdio_shadow_ptr_addr(0) as u64, "__stdinp data (shadow)"),
+                register_shims!(
+                    table,
+                    (
+                        "___stderrp",
+                        stdio_shadow_ptr_addr(2) as u64,
+                        "__stderrp data (shadow)"
+                    ),
+                    (
+                        "___stdoutp",
+                        stdio_shadow_ptr_addr(1) as u64,
+                        "__stdoutp data (shadow)"
+                    ),
+                    (
+                        "___stdinp",
+                        stdio_shadow_ptr_addr(0) as u64,
+                        "__stdinp data (shadow)"
+                    ),
                 );
             }
 
@@ -74,205 +114,530 @@ impl DarwinCompatShims {
             // `____mb_cur_max` is a FUNCTION (int ___mb_cur_max(void)) —
             // some tools (awk) call the function variant rather than
             // loading the data symbol.
-            register_shims!(table,
-                ("___mb_cur_max", shim_mb_cur_max_addr() as u64, "__mb_cur_max data"),
-                ("____mb_cur_max", shim_mb_cur_max_fn as *const () as u64, "___mb_cur_max() function"),
+            register_shims!(
+                table,
+                (
+                    "___mb_cur_max",
+                    shim_mb_cur_max_addr() as u64,
+                    "__mb_cur_max data"
+                ),
+                (
+                    "____mb_cur_max",
+                    shim_mb_cur_max_fn as *const () as u64,
+                    "___mb_cur_max() function"
+                ),
             );
 
             // ── collate lookup ──────────────────────────────────────
-            register_shims!(table,
-                ("___collate_lookup_l", shim_collate_lookup_l as *const () as u64, "__collate_lookup_l stub"),
+            register_shims!(
+                table,
+                (
+                    "___collate_lookup_l",
+                    shim_collate_lookup_l as *const () as u64,
+                    "__collate_lookup_l stub"
+                ),
             );
 
             // ── setlocale (category-number translation) ─────────────
-            register_shims!(table,
-                ("_setlocale", shim_setlocale as *const () as u64, "setlocale macOS→Linux categories"),
-                ("_newlocale", shim_newlocale as *const () as u64, "newlocale macOS→Linux mask"),
-                ("_querylocale", shim_querylocale as *const () as u64, "querylocale macOS→Linux mask"),
+            register_shims!(
+                table,
+                (
+                    "_setlocale",
+                    shim_setlocale as *const () as u64,
+                    "setlocale macOS→Linux categories"
+                ),
+                (
+                    "_newlocale",
+                    shim_newlocale as *const () as u64,
+                    "newlocale macOS→Linux mask"
+                ),
+                (
+                    "_querylocale",
+                    shim_querylocale as *const () as u64,
+                    "querylocale macOS→Linux mask"
+                ),
             );
 
             // ── nl_langinfo (nl_item translation) ───────────────────
-            register_shims!(table,
-                ("_nl_langinfo", shim_nl_langinfo as *const () as u64, "nl_langinfo macOS→Linux nl_item"),
-                ("_nl_langinfo_l", shim_nl_langinfo_l as *const () as u64, "nl_langinfo_l macOS→Linux nl_item"),
+            register_shims!(
+                table,
+                (
+                    "_nl_langinfo",
+                    shim_nl_langinfo as *const () as u64,
+                    "nl_langinfo macOS→Linux nl_item"
+                ),
+                (
+                    "_nl_langinfo_l",
+                    shim_nl_langinfo_l as *const () as u64,
+                    "nl_langinfo_l macOS→Linux nl_item"
+                ),
             );
 
             // ── fortified string functions ──────────────────────────
-            register_shims!(table,
-                ("___strlcpy_chk", shim_strlcpy_chk as *const () as u64, "__strlcpy_chk compat"),
-                ("___strlcat_chk", shim_strlcat_chk as *const () as u64, "__strlcat_chk compat"),
+            register_shims!(
+                table,
+                (
+                    "___strlcpy_chk",
+                    shim_strlcpy_chk as *const () as u64,
+                    "__strlcpy_chk compat"
+                ),
+                (
+                    "___strlcat_chk",
+                    shim_strlcat_chk as *const () as u64,
+                    "__strlcat_chk compat"
+                ),
             );
 
             // ── time ────────────────────────────────────────────────
-            register_shims!(table,
-                ("_clock_gettime_nsec_np", shim_clock_gettime_nsec_np as *const () as u64,
-                 "clock_gettime_nsec_np compat"),
+            register_shims!(
+                table,
+                (
+                    "_clock_gettime_nsec_np",
+                    shim_clock_gettime_nsec_np as *const () as u64,
+                    "clock_gettime_nsec_np compat"
+                ),
             );
 
             // ── malloc_type shims (macOS Sonoma+) ───────────────────
-            register_shims!(table,
-                ("_malloc_type_malloc", shim_malloc_type_malloc as *const () as u64, "malloc_type_malloc → malloc"),
-                ("_malloc_type_calloc", shim_malloc_type_calloc as *const () as u64, "malloc_type_calloc → calloc"),
-                ("_malloc_type_realloc", shim_malloc_type_realloc as *const () as u64, "malloc_type_realloc → realloc"),
+            register_shims!(
+                table,
+                (
+                    "_malloc_type_malloc",
+                    shim_malloc_type_malloc as *const () as u64,
+                    "malloc_type_malloc → malloc"
+                ),
+                (
+                    "_malloc_type_calloc",
+                    shim_malloc_type_calloc as *const () as u64,
+                    "malloc_type_calloc → calloc"
+                ),
+                (
+                    "_malloc_type_realloc",
+                    shim_malloc_type_realloc as *const () as u64,
+                    "malloc_type_realloc → realloc"
+                ),
             );
 
             // ── __chkstk_darwin (stack probe — no-op with guard pages) ──
-            register_shims!(table,
-                ("____chkstk_darwin", shim_chkstk_darwin as *const () as u64, "__chkstk_darwin no-op"),
+            register_shims!(
+                table,
+                (
+                    "____chkstk_darwin",
+                    shim_chkstk_darwin as *const () as u64,
+                    "__chkstk_darwin no-op"
+                ),
+                (
+                    "___stack_chk_guard",
+                    shim_stack_chk_guard_addr() as u64,
+                    "__stack_chk_guard data"
+                ),
             );
 
             // ── sysctl ──────────────────────────────────────────────
-            register_shims!(table,
+            register_shims!(
+                table,
                 ("_sysctl", shim_sysctl as *const () as u64, "sysctl compat"),
-                ("_sysctlbyname", shim_sysctlbyname as *const () as u64, "sysctlbyname compat"),
+                (
+                    "_sysctlbyname",
+                    shim_sysctlbyname as *const () as u64,
+                    "sysctlbyname compat"
+                ),
             );
 
             // ── BSD string functions ────────────────────────────────
-            register_shims!(table,
-                ("_strlcpy", shim_strlcpy as *const () as u64, "strlcpy compat"),
-                ("_strlcat", shim_strlcat as *const () as u64, "strlcat compat"),
-                ("_fmtcheck", shim_fmtcheck as *const () as u64, "fmtcheck compat"),
-                ("_reallocf", shim_reallocf as *const () as u64, "reallocf compat"),
+            register_shims!(
+                table,
+                (
+                    "_strerror_r",
+                    shim_strerror_r as *const () as u64,
+                    "strerror_r POSIX compat"
+                ),
+                ("___bzero", shim_bzero as *const () as u64, "__bzero compat"),
+                (
+                    "_strlcpy",
+                    shim_strlcpy as *const () as u64,
+                    "strlcpy compat"
+                ),
+                (
+                    "_strlcat",
+                    shim_strlcat as *const () as u64,
+                    "strlcat compat"
+                ),
+                (
+                    "_fmtcheck",
+                    shim_fmtcheck as *const () as u64,
+                    "fmtcheck compat"
+                ),
+                (
+                    "_reallocf",
+                    shim_reallocf as *const () as u64,
+                    "reallocf compat"
+                ),
             );
 
             // ── BSD error/warning functions ─────────────────────────
-            register_shims!(table,
+            register_shims!(
+                table,
                 ("_errc", shim_errc as *const () as u64, "errc compat"),
                 ("_warnc", shim_warnc as *const () as u64, "warnc compat"),
             );
 
             // ── compat_mode (macOS-specific, always returns 0) ──────
-            register_shims!(table,
-                ("_compat_mode", shim_compat_mode as *const () as u64, "compat_mode stub"),
+            register_shims!(
+                table,
+                (
+                    "_compat_mode",
+                    shim_compat_mode as *const () as u64,
+                    "compat_mode stub"
+                ),
             );
 
             // ── sigsetjmp (glibc uses __sigsetjmp) ──────────────────
-            register_shims!(table,
-                ("_sigsetjmp", shim_sigsetjmp as *const () as u64, "sigsetjmp compat"),
+            register_shims!(
+                table,
+                (
+                    "_sigsetjmp",
+                    shim_sigsetjmp as *const () as u64,
+                    "sigsetjmp compat"
+                ),
             );
 
             // ── fgetln (BSD line reader) ────────────────────────────
-            register_shims!(table,
+            register_shims!(
+                table,
                 ("_fgetln", shim_fgetln as *const () as u64, "fgetln compat"),
             );
 
             // ── BSD user/group/file-flag functions ──────────────────
-            register_shims!(table,
-                ("_user_from_uid", shim_user_from_uid as *const () as u64, "user_from_uid compat"),
-                ("_group_from_gid", shim_group_from_gid as *const () as u64, "group_from_gid compat"),
-                ("_strmode", shim_strmode as *const () as u64, "strmode compat"),
-                ("_fflagstostr", shim_fflagstostr as *const () as u64, "fflagstostr compat"),
-                ("_strtofflags", shim_strtofflags as *const () as u64, "strtofflags stub"),
+            register_shims!(
+                table,
+                (
+                    "_user_from_uid",
+                    shim_user_from_uid as *const () as u64,
+                    "user_from_uid compat"
+                ),
+                (
+                    "_group_from_gid",
+                    shim_group_from_gid as *const () as u64,
+                    "group_from_gid compat"
+                ),
+                (
+                    "_strmode",
+                    shim_strmode as *const () as u64,
+                    "strmode compat"
+                ),
+                (
+                    "_fflagstostr",
+                    shim_fflagstostr as *const () as u64,
+                    "fflagstostr compat"
+                ),
+                (
+                    "_strtofflags",
+                    shim_strtofflags as *const () as u64,
+                    "strtofflags stub"
+                ),
                 ("_getmode", shim_getmode as *const () as u64, "getmode stub"),
                 ("_setmode", shim_setmode as *const () as u64, "setmode stub"),
-                ("_lchflags", shim_lchflags as *const () as u64, "lchflags stub"),
+                (
+                    "_lchflags",
+                    shim_lchflags as *const () as u64,
+                    "lchflags stub"
+                ),
                 ("_devname", shim_devname as *const () as u64, "devname stub"),
             );
 
+            // ── libproc / privilege / ucontext ─────────────────────
+            register_shims!(
+                table,
+                (
+                    "_proc_listallpids",
+                    shim_proc_listallpids as *const () as u64,
+                    "proc_listallpids compat"
+                ),
+                (
+                    "_proc_pidinfo",
+                    shim_proc_pidinfo as *const () as u64,
+                    "proc_pidinfo stub"
+                ),
+                (
+                    "_proc_pidpath",
+                    shim_proc_pidpath as *const () as u64,
+                    "proc_pidpath compat"
+                ),
+                ("_setuid", shim_setuid as *const () as u64, "setuid compat"),
+                (
+                    "_getcontext",
+                    shim_getcontext as *const () as u64,
+                    "getcontext stub"
+                ),
+                (
+                    "_makecontext",
+                    shim_makecontext as *const () as u64,
+                    "makecontext stub"
+                ),
+                (
+                    "_setcontext",
+                    shim_setcontext as *const () as u64,
+                    "setcontext stub"
+                ),
+                (
+                    "___sincos_stret",
+                    shim_sincos_stret as *const () as u64,
+                    "__sincos_stret compat"
+                ),
+                (
+                    "___sincosf_stret",
+                    shim_sincosf_stret as *const () as u64,
+                    "__sincosf_stret compat"
+                ),
+            );
+
             // ── __darwin_check_fd_set_overflow ──────────────────────
-            register_shims!(table,
-                ("___darwin_check_fd_set_overflow", shim_darwin_check_fd_set_overflow as *const () as u64,
-                 "__darwin_check_fd_set_overflow stub"),
+            register_shims!(
+                table,
+                (
+                    "___darwin_check_fd_set_overflow",
+                    shim_darwin_check_fd_set_overflow as *const () as u64,
+                    "__darwin_check_fd_set_overflow stub"
+                ),
             );
 
             // ── heapsort / mergesort ────────────────────────────────
-            register_shims!(table,
-                ("_heapsort", shim_heapsort as *const () as u64, "heapsort → qsort"),
-                ("_mergesort", shim_mergesort as *const () as u64, "mergesort → qsort"),
+            register_shims!(
+                table,
+                (
+                    "_heapsort",
+                    shim_heapsort as *const () as u64,
+                    "heapsort → qsort"
+                ),
+                (
+                    "_mergesort",
+                    shim_mergesort as *const () as u64,
+                    "mergesort → qsort"
+                ),
             );
 
             // ── CC_SHA256 (CommonCrypto → OpenSSL/manual) ───────────
-            register_shims!(table,
-                ("_CC_SHA256_Init", shim_cc_sha256_init as *const () as u64, "CC_SHA256_Init compat"),
-                ("_CC_SHA256_Update", shim_cc_sha256_update as *const () as u64, "CC_SHA256_Update compat"),
-                ("_CC_SHA256_Final", shim_cc_sha256_final as *const () as u64, "CC_SHA256_Final compat"),
+            register_shims!(
+                table,
+                (
+                    "_CC_SHA256_Init",
+                    shim_cc_sha256_init as *const () as u64,
+                    "CC_SHA256_Init compat"
+                ),
+                (
+                    "_CC_SHA256_Update",
+                    shim_cc_sha256_update as *const () as u64,
+                    "CC_SHA256_Update compat"
+                ),
+                (
+                    "_CC_SHA256_Final",
+                    shim_cc_sha256_final as *const () as u64,
+                    "CC_SHA256_Final compat"
+                ),
             );
 
             // ── Mach semaphore stubs ────────────────────────────────
-            register_shims!(table,
-                ("_semaphore_create", shim_semaphore_create as *const () as u64, "semaphore_create stub"),
-                ("_semaphore_destroy", shim_semaphore_destroy as *const () as u64, "semaphore_destroy stub"),
-                ("_semaphore_signal", shim_semaphore_signal as *const () as u64, "semaphore_signal stub"),
-                ("_semaphore_wait", shim_semaphore_wait as *const () as u64, "semaphore_wait stub"),
+            register_shims!(
+                table,
+                (
+                    "_semaphore_create",
+                    shim_semaphore_create as *const () as u64,
+                    "semaphore_create stub"
+                ),
+                (
+                    "_semaphore_destroy",
+                    shim_semaphore_destroy as *const () as u64,
+                    "semaphore_destroy stub"
+                ),
+                (
+                    "_semaphore_signal",
+                    shim_semaphore_signal as *const () as u64,
+                    "semaphore_signal stub"
+                ),
+                (
+                    "_semaphore_wait",
+                    shim_semaphore_wait as *const () as u64,
+                    "semaphore_wait stub"
+                ),
             );
 
             // ── fgetwln (BSD wide-char line reader) ─────────────────
-            register_shims!(table,
-                ("_fgetwln", shim_fgetwln as *const () as u64, "fgetwln → fgetwc loop"),
+            register_shims!(
+                table,
+                (
+                    "_fgetwln",
+                    shim_fgetwln as *const () as u64,
+                    "fgetwln → fgetwc loop"
+                ),
             );
 
             // ── quarantine stubs ────────────────────────────────────
-            register_shims!(table,
-                ("__qtn_error", shim_qtn_error as *const () as u64, "qtn_error stub"),
-                ("__qtn_file_alloc", shim_qtn_file_alloc as *const () as u64, "qtn_file_alloc stub"),
-                ("__qtn_file_free", shim_qtn_file_free as *const () as u64, "qtn_file_free stub"),
-                ("__qtn_file_init_with_path", shim_qtn_file_init_with_path as *const () as u64, "qtn_file_init_with_path stub"),
-                ("__qtn_file_apply_to_path", shim_qtn_file_apply_to_path as *const () as u64, "qtn_file_apply_to_path stub"),
-                ("__qtn_file_init_with_fd", shim_qtn_file_init_with_fd as *const () as u64, "qtn_file_init_with_fd stub"),
-                ("__qtn_file_apply_to_fd", shim_qtn_file_apply_to_fd as *const () as u64, "qtn_file_apply_to_fd stub"),
+            register_shims!(
+                table,
+                (
+                    "__qtn_error",
+                    shim_qtn_error as *const () as u64,
+                    "qtn_error stub"
+                ),
+                (
+                    "__qtn_file_alloc",
+                    shim_qtn_file_alloc as *const () as u64,
+                    "qtn_file_alloc stub"
+                ),
+                (
+                    "__qtn_file_free",
+                    shim_qtn_file_free as *const () as u64,
+                    "qtn_file_free stub"
+                ),
+                (
+                    "__qtn_file_init_with_path",
+                    shim_qtn_file_init_with_path as *const () as u64,
+                    "qtn_file_init_with_path stub"
+                ),
+                (
+                    "__qtn_file_apply_to_path",
+                    shim_qtn_file_apply_to_path as *const () as u64,
+                    "qtn_file_apply_to_path stub"
+                ),
+                (
+                    "__qtn_file_init_with_fd",
+                    shim_qtn_file_init_with_fd as *const () as u64,
+                    "qtn_file_init_with_fd stub"
+                ),
+                (
+                    "__qtn_file_apply_to_fd",
+                    shim_qtn_file_apply_to_fd as *const () as u64,
+                    "qtn_file_apply_to_fd stub"
+                ),
             );
 
             // ── Mach-O introspection stubs ──────────────────────────
-            register_shims!(table,
-                ("_NXGetAllArchInfos", shim_nx_get_all_arch_infos as *const () as u64, "NXGetAllArchInfos stub"),
-                ("_swap_fat_header", shim_swap_fat_header as *const () as u64, "swap_fat_header stub"),
-                ("_swap_fat_arch", shim_swap_fat_arch as *const () as u64, "swap_fat_arch stub"),
+            register_shims!(
+                table,
+                (
+                    "_NXGetAllArchInfos",
+                    shim_nx_get_all_arch_infos as *const () as u64,
+                    "NXGetAllArchInfos stub"
+                ),
+                (
+                    "_swap_fat_header",
+                    shim_swap_fat_header as *const () as u64,
+                    "swap_fat_header stub"
+                ),
+                (
+                    "_swap_fat_arch",
+                    shim_swap_fat_arch as *const () as u64,
+                    "swap_fat_arch stub"
+                ),
             );
 
             // ── memset_pattern16 ────────────────────────────────────
-            register_shims!(table,
-                ("_memset_pattern16", shim_memset_pattern16 as *const () as u64, "memset_pattern16 compat"),
+            register_shims!(
+                table,
+                (
+                    "_memset_pattern16",
+                    shim_memset_pattern16 as *const () as u64,
+                    "memset_pattern16 compat"
+                ),
             );
 
             // ── readpassphrase (BSD) ────────────────────────────────
-            register_shims!(table,
-                ("_readpassphrase", shim_readpassphrase as *const () as u64, "readpassphrase stub"),
+            register_shims!(
+                table,
+                (
+                    "_readpassphrase",
+                    shim_readpassphrase as *const () as u64,
+                    "readpassphrase stub"
+                ),
             );
 
             // ── ACL stubs ───────────────────────────────────────────
-            register_shims!(table,
-                ("_acl_get_link_np", shim_acl_get_link_np as *const () as u64, "acl_get_link_np stub"),
+            register_shims!(
+                table,
+                (
+                    "_acl_get_link_np",
+                    shim_acl_get_link_np as *const () as u64,
+                    "acl_get_link_np stub"
+                ),
             );
 
             // libxo stubs are now in darwin_stubs/libxo_stubs.rs
 
             // ── lchmod (not implemented on most Linux fs) ───────────
-            register_shims!(table,
+            register_shims!(
+                table,
                 ("_lchmod", shim_lchmod as *const () as u64, "lchmod stub"),
             );
 
             // stat/fstat/lstat struct layout translation is in cross_platform/stat.rs
 
             // ── Mach error string (macOS-only API) ──────────────────
-            register_shims!(table,
-                ("_mach_error_string", shim_mach_error_string as *const () as u64, "mach_error_string stub"),
+            register_shims!(
+                table,
+                (
+                    "_mach_error_string",
+                    shim_mach_error_string as *const () as u64,
+                    "mach_error_string stub"
+                ),
             );
 
             // ── libc++ compat (newer symbols not in LLVM 14) ────────
-            register_shims!(table,
-                ("__ZNSt3__122__libcpp_verbose_abortEPKcz", shim_libcpp_verbose_abort as *const () as u64,
-                 "__libcpp_verbose_abort → fprintf+abort"),
+            register_shims!(
+                table,
+                (
+                    "__ZNSt3__122__libcpp_verbose_abortEPKcz",
+                    shim_libcpp_verbose_abort as *const () as u64,
+                    "__libcpp_verbose_abort → fprintf+abort"
+                ),
             );
 
             // ── os_variant stubs (Darwin-only APIs) ─────────────────
-            register_shims!(table,
-                ("_os_variant_is_darwinos", shim_os_variant_false as *const () as u64, "os_variant_is_darwinos → false"),
-                ("_os_variant_has_internal_content", shim_os_variant_false as *const () as u64, "os_variant_has_internal_content → false"),
+            register_shims!(
+                table,
+                (
+                    "_os_variant_is_darwinos",
+                    shim_os_variant_false as *const () as u64,
+                    "os_variant_is_darwinos → false"
+                ),
+                (
+                    "_os_variant_has_internal_content",
+                    shim_os_variant_false as *const () as u64,
+                    "os_variant_has_internal_content → false"
+                ),
             );
 
             // NOTE: ___srget and ___swbuf are now registered in
             // cross_platform/stdio.rs along with all other FILE shims.
 
             // ── BSD number parsing ──────────────────────────────────
-            register_shims!(table,
-                ("_expand_number", shim_expand_number as *const () as u64, "expand_number compat"),
-                ("_strtonum", shim_strtonum as *const () as u64, "strtonum compat"),
+            register_shims!(
+                table,
+                (
+                    "_expand_number",
+                    shim_expand_number as *const () as u64,
+                    "expand_number compat"
+                ),
+                (
+                    "_strtonum",
+                    shim_strtonum as *const () as u64,
+                    "strtonum compat"
+                ),
             );
 
             // ── arc4random legacy ───────────────────────────────────
-            register_shims!(table,
-                ("_arc4random_stir", shim_arc4random_stir as *const () as u64, "arc4random_stir no-op"),
-                ("_arc4random_addrandom", shim_arc4random_addrandom as *const () as u64, "arc4random_addrandom no-op"),
+            register_shims!(
+                table,
+                (
+                    "_arc4random_stir",
+                    shim_arc4random_stir as *const () as u64,
+                    "arc4random_stir no-op"
+                ),
+                (
+                    "_arc4random_addrandom",
+                    shim_arc4random_addrandom as *const () as u64,
+                    "arc4random_addrandom no-op"
+                ),
             );
 
             log::info!("DarwinCompatShims: registered compat shims");
@@ -316,9 +681,7 @@ extern "C" fn shim_assert_rtn(
             function: *const libc::c_char,
         ) -> !;
     }
-    unsafe {
-        __assert_fail(expr, file, line as libc::c_uint, func)
-    }
+    unsafe { __assert_fail(expr, file, line as libc::c_uint, func) }
 }
 
 // ── locale / ctype ──────────────────────────────────────────────────
@@ -471,20 +834,17 @@ fn ensure_rune_locale() {
         // Safety: single-threaded init via Once.
         unsafe {
             for i in 0..=255i32 {
-                DEFAULT_RUNE_LOCALE.__runetype[i as usize] =
-                    ascii_rune_flags(i) as u32;
-                DEFAULT_RUNE_LOCALE.__maplower[i as usize] =
-                    if (i as u8).is_ascii_uppercase() {
-                        i + 32
-                    } else {
-                        i
-                    };
-                DEFAULT_RUNE_LOCALE.__mapupper[i as usize] =
-                    if (i as u8).is_ascii_lowercase() {
-                        i - 32
-                    } else {
-                        i
-                    };
+                DEFAULT_RUNE_LOCALE.__runetype[i as usize] = ascii_rune_flags(i) as u32;
+                DEFAULT_RUNE_LOCALE.__maplower[i as usize] = if (i as u8).is_ascii_uppercase() {
+                    i + 32
+                } else {
+                    i
+                };
+                DEFAULT_RUNE_LOCALE.__mapupper[i as usize] = if (i as u8).is_ascii_lowercase() {
+                    i - 32
+                } else {
+                    i
+                };
             }
         }
     });
@@ -600,13 +960,13 @@ extern "C" fn shim_setlocale(
     locale: *const libc::c_char,
 ) -> *mut libc::c_char {
     let linux_category = match macos_category {
-        0 => 6,  // LC_ALL
-        1 => 3,  // LC_COLLATE
-        2 => 0,  // LC_CTYPE
-        3 => 4,  // LC_MONETARY
-        4 => 1,  // LC_NUMERIC
-        5 => 2,  // LC_TIME
-        6 => 5,  // LC_MESSAGES
+        0 => 6,              // LC_ALL
+        1 => 3,              // LC_COLLATE
+        2 => 0,              // LC_CTYPE
+        3 => 4,              // LC_MONETARY
+        4 => 1,              // LC_NUMERIC
+        5 => 2,              // LC_TIME
+        6 => 5,              // LC_MESSAGES
         _ => macos_category, // pass-through for unknowns
     };
     unsafe { libc::setlocale(linux_category, locale) }
@@ -626,12 +986,24 @@ fn translate_locale_mask(macos_mask: libc::c_int) -> libc::c_int {
         return libc::LC_ALL_MASK;
     }
     let mut linux_mask: libc::c_int = 0;
-    if macos_mask & (1 << 0) != 0 { linux_mask |= libc::LC_COLLATE_MASK; }   // macOS LC_COLLATE=0
-    if macos_mask & (1 << 1) != 0 { linux_mask |= libc::LC_CTYPE_MASK; }     // macOS LC_CTYPE=1
-    if macos_mask & (1 << 2) != 0 { linux_mask |= libc::LC_MONETARY_MASK; }  // macOS LC_MONETARY=2
-    if macos_mask & (1 << 3) != 0 { linux_mask |= libc::LC_NUMERIC_MASK; }   // macOS LC_NUMERIC=3
-    if macos_mask & (1 << 4) != 0 { linux_mask |= libc::LC_TIME_MASK; }      // macOS LC_TIME=4
-    if macos_mask & (1 << 5) != 0 { linux_mask |= libc::LC_MESSAGES_MASK; }  // macOS LC_MESSAGES=5
+    if macos_mask & (1 << 0) != 0 {
+        linux_mask |= libc::LC_COLLATE_MASK;
+    } // macOS LC_COLLATE=0
+    if macos_mask & (1 << 1) != 0 {
+        linux_mask |= libc::LC_CTYPE_MASK;
+    } // macOS LC_CTYPE=1
+    if macos_mask & (1 << 2) != 0 {
+        linux_mask |= libc::LC_MONETARY_MASK;
+    } // macOS LC_MONETARY=2
+    if macos_mask & (1 << 3) != 0 {
+        linux_mask |= libc::LC_NUMERIC_MASK;
+    } // macOS LC_NUMERIC=3
+    if macos_mask & (1 << 4) != 0 {
+        linux_mask |= libc::LC_TIME_MASK;
+    } // macOS LC_TIME=4
+    if macos_mask & (1 << 5) != 0 {
+        linux_mask |= libc::LC_MESSAGES_MASK;
+    } // macOS LC_MESSAGES=5
     linux_mask
 }
 
@@ -655,10 +1027,7 @@ extern "C" fn shim_newlocale(
 /// but since we can't reverse the translation reliably, we just
 /// return the mask as-is (the caller typically only checks for zero/non-zero).
 #[cfg(not(target_os = "macos"))]
-extern "C" fn shim_querylocale(
-    mask: libc::c_int,
-    _loc: libc::locale_t,
-) -> libc::c_int {
+extern "C" fn shim_querylocale(mask: libc::c_int, _loc: libc::locale_t) -> libc::c_int {
     // glibc doesn't have querylocale; just return the mask unchanged
     // since BSD code typically only checks the result for 0 vs non-0.
     mask
@@ -677,15 +1046,15 @@ extern "C" fn shim_querylocale(
 #[cfg(not(target_os = "macos"))]
 fn translate_nl_item(macos_item: libc::c_int) -> Option<libc::nl_item> {
     Some(match macos_item {
-        1  => libc::D_T_FMT,
-        2  => libc::D_FMT,
-        3  => libc::T_FMT,
-        4  => libc::T_FMT_AMPM,
-        5  => libc::AM_STR,
-        6  => libc::PM_STR,
-        7  => libc::DAY_1,
-        8  => libc::DAY_2,
-        9  => libc::DAY_3,
+        1 => libc::D_T_FMT,
+        2 => libc::D_FMT,
+        3 => libc::T_FMT,
+        4 => libc::T_FMT_AMPM,
+        5 => libc::AM_STR,
+        6 => libc::PM_STR,
+        7 => libc::DAY_1,
+        8 => libc::DAY_2,
+        9 => libc::DAY_3,
         10 => libc::DAY_4,
         11 => libc::DAY_5,
         12 => libc::DAY_6,
@@ -731,7 +1100,7 @@ fn translate_nl_item(macos_item: libc::c_int) -> Option<libc::nl_item> {
         52 => libc::YESEXPR,
         53 => libc::NOEXPR,
         56 => libc::CRNCYSTR,
-        _  => return None,
+        _ => return None,
     })
 }
 
@@ -783,16 +1152,28 @@ extern "C" fn shim_collate_lookup_l(
     _loc: libc::locale_t,
 ) {
     if s.is_null() {
-        if !len.is_null()  { unsafe { *len = 0 }; }
-        if !prim.is_null() { unsafe { *prim = 0 }; }
-        if !sec.is_null()  { unsafe { *sec = 0 }; }
+        if !len.is_null() {
+            unsafe { *len = 0 };
+        }
+        if !prim.is_null() {
+            unsafe { *prim = 0 };
+        }
+        if !sec.is_null() {
+            unsafe { *sec = 0 };
+        }
         return;
     }
     let wc = unsafe { *s } as libc::c_int;
     // In "C" locale: one character consumed, primary = ordinal, secondary = 0
-    if !len.is_null()  { unsafe { *len = 1 }; }
-    if !prim.is_null() { unsafe { *prim = wc }; }
-    if !sec.is_null()  { unsafe { *sec = 0 }; }
+    if !len.is_null() {
+        unsafe { *len = 1 };
+    }
+    if !prim.is_null() {
+        unsafe { *prim = wc };
+    }
+    if !sec.is_null() {
+        unsafe { *sec = 0 };
+    }
 }
 
 // ── fortified string functions ──────────────────────────────────────
@@ -914,6 +1295,118 @@ unsafe extern "C" fn shim_chkstk_darwin() {
     core::arch::naked_asm!("ret");
 }
 
+#[cfg(not(target_os = "macos"))]
+static STACK_CHK_GUARD_VALUE: u64 = 0x9B37_79B9_7F4A_7C15;
+
+#[cfg(not(target_os = "macos"))]
+fn shim_stack_chk_guard_addr() -> *const u64 {
+    &STACK_CHK_GUARD_VALUE as *const u64
+}
+
+#[cfg(not(target_os = "macos"))]
+extern "C" fn shim_bzero(ptr: *mut libc::c_void, len: usize) {
+    if !ptr.is_null() {
+        unsafe {
+            libc::memset(ptr, 0, len);
+        }
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+extern "C" fn shim_proc_listallpids(buffer: *mut libc::c_void, buffersize: i32) -> i32 {
+    let pid = unsafe { libc::getpid() };
+    if !buffer.is_null() && buffersize >= std::mem::size_of::<i32>() as i32 {
+        unsafe {
+            *(buffer as *mut i32) = pid;
+        }
+        return 1;
+    }
+    0
+}
+
+#[cfg(not(target_os = "macos"))]
+extern "C" fn shim_proc_pidinfo(
+    _pid: i32,
+    _flavor: i32,
+    _arg: u64,
+    _buffer: *mut libc::c_void,
+    _buffersize: i32,
+) -> i32 {
+    0
+}
+
+#[cfg(not(target_os = "macos"))]
+extern "C" fn shim_proc_pidpath(pid: i32, buffer: *mut libc::c_void, buffersize: u32) -> i32 {
+    if buffer.is_null() || buffersize == 0 || pid != unsafe { libc::getpid() } {
+        return 0;
+    }
+    let path = crate::process::process_path().unwrap_or("burdettie-os");
+    let bytes = path.as_bytes();
+    let copy_len = bytes.len().min(buffersize.saturating_sub(1) as usize);
+    unsafe {
+        std::ptr::copy_nonoverlapping(bytes.as_ptr(), buffer as *mut u8, copy_len);
+        *((buffer as *mut u8).add(copy_len)) = 0;
+    }
+    copy_len as i32
+}
+
+#[cfg(not(target_os = "macos"))]
+extern "C" fn shim_setuid(uid: libc::uid_t) -> libc::c_int {
+    let current = unsafe { libc::geteuid() };
+    if uid == current {
+        return 0;
+    }
+    unsafe {
+        *shim_error() = libc::EPERM;
+    }
+    -1
+}
+
+#[cfg(not(target_os = "macos"))]
+extern "C" fn shim_getcontext(_ucp: *mut libc::c_void) -> libc::c_int {
+    unsafe {
+        *shim_error() = libc::ENOSYS;
+    }
+    -1
+}
+
+#[cfg(not(target_os = "macos"))]
+extern "C" fn shim_makecontext(_ucp: *mut libc::c_void, _func: u64, _argc: libc::c_int) {}
+
+#[cfg(not(target_os = "macos"))]
+extern "C" fn shim_setcontext(_ucp: *const libc::c_void) -> libc::c_int {
+    unsafe {
+        *shim_error() = libc::ENOSYS;
+    }
+    -1
+}
+
+#[cfg(not(target_os = "macos"))]
+#[repr(C)]
+struct DoublePair {
+    sin: f64,
+    cos: f64,
+}
+
+#[cfg(not(target_os = "macos"))]
+#[repr(C)]
+struct FloatPair {
+    sin: f32,
+    cos: f32,
+}
+
+#[cfg(not(target_os = "macos"))]
+extern "C" fn shim_sincos_stret(value: f64) -> DoublePair {
+    let (sin, cos) = value.sin_cos();
+    DoublePair { sin, cos }
+}
+
+#[cfg(not(target_os = "macos"))]
+extern "C" fn shim_sincosf_stret(value: f32) -> FloatPair {
+    let (sin, cos) = value.sin_cos();
+    FloatPair { sin, cos }
+}
+
 // ── sysctl ──────────────────────────────────────────────────────────
 
 /// `int sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp,
@@ -942,10 +1435,10 @@ extern "C" fn shim_sysctl(
     }
 
     let value: &[u8] = match mib1 {
-        1 => b"Darwin\0",        // KERN_OSTYPE
-        2 => b"24.0.0\0",        // KERN_OSRELEASE
-        10 => b"linux\0",        // KERN_HOSTNAME
-        65 => b"macOS\0",        // KERN_OSPRODUCTVERSION (used by some tools)
+        1 => b"Darwin\0", // KERN_OSTYPE
+        2 => b"24.0.0\0", // KERN_OSRELEASE
+        10 => b"linux\0", // KERN_HOSTNAME
+        65 => b"macOS\0", // KERN_OSPRODUCTVERSION (used by some tools)
         _ => return -1,
     };
 
@@ -981,7 +1474,9 @@ extern "C" fn shim_sysctlbyname(
     _newlen: libc::size_t,
 ) -> libc::c_int {
     if name.is_null() {
-        unsafe { *libc::__errno_location() = libc::EINVAL; }
+        unsafe {
+            *libc::__errno_location() = libc::EINVAL;
+        }
         return -1;
     }
     let c_str = unsafe { std::ffi::CStr::from_ptr(name) };
@@ -1008,7 +1503,9 @@ extern "C" fn shim_sysctlbyname(
                         *oldlenp = 4;
                     }
                 } else {
-                    unsafe { *oldlenp = 4; }
+                    unsafe {
+                        *oldlenp = 4;
+                    }
                 }
             }
             return 0;
@@ -1026,7 +1523,9 @@ extern "C" fn shim_sysctlbyname(
                         *oldlenp = 8;
                     }
                 } else {
-                    unsafe { *oldlenp = 8; }
+                    unsafe {
+                        *oldlenp = 8;
+                    }
                 }
             }
             return 0;
@@ -1042,7 +1541,9 @@ extern "C" fn shim_sysctlbyname(
                         }
                     }
                 } else {
-                    unsafe { *oldlenp = 8; }
+                    unsafe {
+                        *oldlenp = 8;
+                    }
                 }
             }
             return 0;
@@ -1059,7 +1560,9 @@ extern "C" fn shim_sysctlbyname(
                         }
                     }
                 } else {
-                    unsafe { *oldlenp = 8; }
+                    unsafe {
+                        *oldlenp = 8;
+                    }
                 }
             }
             return 0;
@@ -1067,7 +1570,9 @@ extern "C" fn shim_sysctlbyname(
         "machdep.cpu.brand_string" => b"Apple M1\0",
         _ => {
             log::trace!("sysctlbyname: unknown key '{}'", key);
-            unsafe { *libc::__errno_location() = libc::ENOENT; }
+            unsafe {
+                *libc::__errno_location() = libc::ENOENT;
+            }
             return -1;
         }
     };
@@ -1075,7 +1580,9 @@ extern "C" fn shim_sysctlbyname(
     // String-valued keys
     if oldp.is_null() || oldlenp.is_null() {
         if !oldlenp.is_null() {
-            unsafe { *oldlenp = value.len(); }
+            unsafe {
+                *oldlenp = value.len();
+            }
         }
         return 0;
     }
@@ -1102,7 +1609,11 @@ extern "C" fn shim_strlcpy(
     }
     let src_len = unsafe { libc::strlen(src) };
     if dstsize > 0 && !dst.is_null() {
-        let copy_len = if src_len < dstsize { src_len } else { dstsize - 1 };
+        let copy_len = if src_len < dstsize {
+            src_len
+        } else {
+            dstsize - 1
+        };
         unsafe {
             std::ptr::copy_nonoverlapping(src, dst, copy_len);
             *dst.add(copy_len) = 0;
@@ -1128,10 +1639,47 @@ extern "C" fn shim_strlcat(
             return dst_len + src_len;
         }
         let remaining = dstsize - dst_len - 1;
-        let copy_len = if src_len < remaining { src_len } else { remaining };
+        let copy_len = if src_len < remaining {
+            src_len
+        } else {
+            remaining
+        };
         std::ptr::copy_nonoverlapping(src, dst.add(dst_len), copy_len);
         *dst.add(dst_len + copy_len) = 0;
         dst_len + src_len
+    }
+}
+
+/// `int strerror_r(int errnum, char *buf, size_t buflen)`
+#[cfg(not(target_os = "macos"))]
+extern "C" fn shim_strerror_r(
+    errnum: libc::c_int,
+    buf: *mut libc::c_char,
+    buflen: libc::size_t,
+) -> libc::c_int {
+    if buf.is_null() || buflen == 0 {
+        return libc::ERANGE;
+    }
+
+    unsafe {
+        let message = libc::strerror(errnum);
+        if message.is_null() {
+            *buf = 0;
+            return libc::EINVAL;
+        }
+
+        let msg_len = libc::strlen(message);
+        if msg_len + 1 > buflen {
+            let copy_len = buflen.saturating_sub(1);
+            if copy_len > 0 {
+                std::ptr::copy_nonoverlapping(message, buf, copy_len);
+            }
+            *buf.add(copy_len) = 0;
+            return libc::ERANGE;
+        }
+
+        std::ptr::copy_nonoverlapping(message, buf, msg_len + 1);
+        0
     }
 }
 
@@ -1177,7 +1725,11 @@ extern "C" fn shim_errc(status: libc::c_int, code: libc::c_int, fmt: *const libc
     } else {
         String::new()
     };
-    eprintln!("error: {}: {}", msg, std::io::Error::from_raw_os_error(code));
+    eprintln!(
+        "error: {}: {}",
+        msg,
+        std::io::Error::from_raw_os_error(code)
+    );
     std::process::exit(status);
 }
 
@@ -1191,7 +1743,11 @@ extern "C" fn shim_warnc(code: libc::c_int, fmt: *const libc::c_char) {
     } else {
         String::new()
     };
-    eprintln!("warning: {}: {}", msg, std::io::Error::from_raw_os_error(code));
+    eprintln!(
+        "warning: {}: {}",
+        msg,
+        std::io::Error::from_raw_os_error(code)
+    );
 }
 
 // ── compat_mode ─────────────────────────────────────────────────────
@@ -1226,15 +1782,10 @@ extern "C" fn shim_sigsetjmp(env: *mut libc::c_void, savemask: libc::c_int) -> l
 /// BSD function that returns a pointer to the next line (NOT NUL-terminated).
 /// We implement via getline and cache the buffer in a thread-local.
 #[cfg(not(target_os = "macos"))]
-extern "C" fn shim_fgetln(
-    stream: *mut libc::FILE,
-    len: *mut libc::size_t,
-) -> *mut libc::c_char {
+extern "C" fn shim_fgetln(stream: *mut libc::FILE, len: *mut libc::size_t) -> *mut libc::c_char {
     use std::cell::RefCell;
     // Translate shadow DarwinFile* → real glibc FILE*
-    let real_stream = unsafe {
-        crate::cross_platform::stdio::extract_real_fp(stream as *mut u8)
-    };
+    let real_stream = unsafe { crate::cross_platform::stdio::extract_real_fp(stream as *mut u8) };
     thread_local! {
         static BUF: RefCell<(*mut libc::c_char, libc::size_t)> = RefCell::new((std::ptr::null_mut(), 0));
     }
@@ -1328,21 +1879,69 @@ extern "C" fn shim_strmode(mode: libc::mode_t, bp: *mut libc::c_char) {
     };
     let s = [
         ft,
-        if mode & libc::S_IRUSR != 0 { b'r' } else { b'-' },
-        if mode & libc::S_IWUSR != 0 { b'w' } else { b'-' },
+        if mode & libc::S_IRUSR != 0 {
+            b'r'
+        } else {
+            b'-'
+        },
+        if mode & libc::S_IWUSR != 0 {
+            b'w'
+        } else {
+            b'-'
+        },
         if mode & libc::S_ISUID != 0 {
-            if mode & libc::S_IXUSR != 0 { b's' } else { b'S' }
-        } else if mode & libc::S_IXUSR != 0 { b'x' } else { b'-' },
-        if mode & libc::S_IRGRP != 0 { b'r' } else { b'-' },
-        if mode & libc::S_IWGRP != 0 { b'w' } else { b'-' },
+            if mode & libc::S_IXUSR != 0 {
+                b's'
+            } else {
+                b'S'
+            }
+        } else if mode & libc::S_IXUSR != 0 {
+            b'x'
+        } else {
+            b'-'
+        },
+        if mode & libc::S_IRGRP != 0 {
+            b'r'
+        } else {
+            b'-'
+        },
+        if mode & libc::S_IWGRP != 0 {
+            b'w'
+        } else {
+            b'-'
+        },
         if mode & libc::S_ISGID != 0 {
-            if mode & libc::S_IXGRP != 0 { b's' } else { b'S' }
-        } else if mode & libc::S_IXGRP != 0 { b'x' } else { b'-' },
-        if mode & libc::S_IROTH != 0 { b'r' } else { b'-' },
-        if mode & libc::S_IWOTH != 0 { b'w' } else { b'-' },
+            if mode & libc::S_IXGRP != 0 {
+                b's'
+            } else {
+                b'S'
+            }
+        } else if mode & libc::S_IXGRP != 0 {
+            b'x'
+        } else {
+            b'-'
+        },
+        if mode & libc::S_IROTH != 0 {
+            b'r'
+        } else {
+            b'-'
+        },
+        if mode & libc::S_IWOTH != 0 {
+            b'w'
+        } else {
+            b'-'
+        },
         if mode & libc::S_ISVTX != 0 {
-            if mode & libc::S_IXOTH != 0 { b't' } else { b'T' }
-        } else if mode & libc::S_IXOTH != 0 { b'x' } else { b'-' },
+            if mode & libc::S_IXOTH != 0 {
+                b't'
+            } else {
+                b'T'
+            }
+        } else if mode & libc::S_IXOTH != 0 {
+            b'x'
+        } else {
+            b'-'
+        },
         b' ',
         0,
     ];
@@ -1546,9 +2145,7 @@ extern "C" fn shim_fgetwln(
 ) -> *const libc::wchar_t {
     use std::cell::RefCell;
     // Translate shadow DarwinFile* → real glibc FILE*
-    let real_stream = unsafe {
-        crate::cross_platform::stdio::extract_real_fp(stream as *mut u8)
-    };
+    let real_stream = unsafe { crate::cross_platform::stdio::extract_real_fp(stream as *mut u8) };
     extern "C" {
         fn fgetwc(stream: *mut libc::FILE) -> u32;
     }
@@ -1704,11 +2301,7 @@ extern "C" fn shim_qtn_file_apply_to_fd(_file: u64, _fd: libc::c_int) -> libc::c
 ///
 /// Fills `b` with repeated copies of the 16-byte pattern.
 #[cfg(not(target_os = "macos"))]
-extern "C" fn shim_memset_pattern16(
-    b: *mut u8,
-    pattern16: *const u8,
-    len: libc::size_t,
-) {
+extern "C" fn shim_memset_pattern16(b: *mut u8, pattern16: *const u8, len: libc::size_t) {
     if b.is_null() || pattern16.is_null() {
         return;
     }
@@ -1734,7 +2327,9 @@ extern "C" fn shim_readpassphrase(
     _flags: libc::c_int,
 ) -> *mut libc::c_char {
     if !buf.is_null() && bufsiz > 0 {
-        unsafe { *buf = 0; }
+        unsafe {
+            *buf = 0;
+        }
     }
     buf
 }
@@ -1748,7 +2343,9 @@ extern "C" fn shim_acl_get_link_np(
     _path: *const libc::c_char,
     _acl_type: libc::c_int,
 ) -> *mut libc::c_void {
-    unsafe { *libc::__errno_location() = libc::ENOTSUP; }
+    unsafe {
+        *libc::__errno_location() = libc::ENOTSUP;
+    }
     std::ptr::null_mut()
 }
 
@@ -1757,11 +2354,10 @@ extern "C" fn shim_acl_get_link_np(
 /// `int lchmod(const char *path, mode_t mode)` — not supported on Linux,
 /// returns -1 with errno=ENOTSUP.
 #[cfg(not(target_os = "macos"))]
-extern "C" fn shim_lchmod(
-    _path: *const libc::c_char,
-    _mode: libc::mode_t,
-) -> libc::c_int {
-    unsafe { *libc::__errno_location() = libc::ENOTSUP; }
+extern "C" fn shim_lchmod(_path: *const libc::c_char, _mode: libc::mode_t) -> libc::c_int {
+    unsafe {
+        *libc::__errno_location() = libc::ENOTSUP;
+    }
     -1
 }
 
@@ -1858,10 +2454,7 @@ extern "C" fn shim_swbuf(c: libc::c_int, fp: *mut libc::FILE) -> libc::c_int {
 /// Parse human-readable number strings like "1K", "2M", "3G".
 /// Returns 0 on success, -1 on error (sets errno).
 #[cfg(not(target_os = "macos"))]
-extern "C" fn shim_expand_number(
-    buf: *const libc::c_char,
-    num: *mut u64,
-) -> libc::c_int {
+extern "C" fn shim_expand_number(buf: *const libc::c_char, num: *mut u64) -> libc::c_int {
     if buf.is_null() || num.is_null() {
         unsafe { *libc::__errno_location() = libc::EINVAL };
         return -1;

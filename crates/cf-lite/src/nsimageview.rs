@@ -1,18 +1,18 @@
 //! NSImageView shim: image display control for AppKit.
 //!
-//! Object layout (64 bytes, inherits NSControl at 48):
+//! Object layout (inherits NSControl at offsets 0-119):
 //!
-//!   offset  0: isa        (u64)
-//!   offset  8: image_ptr  (u64 — NSImage*)
-//!   offset 16: flags      (u64 — bit 0: allows_cut_copy_paste,
-//!                               bit 1: animates,
-//!                               bit 2: is_editable)
+//!   offset   0: NSControl fields
+//!   offset 120: image_ptr  (u64, NSImage*)
+//!   offset 128: flags      (u64, bit 0: allows_cut_copy_paste,
+//!                                bit 1: animates,
+//!                                bit 2: is_editable)
 //!
-//! Total: 64 bytes.
+//! Total: 136 bytes.
 
-const IMAGE_OFF: usize = 8;
-const FLAGS_OFF: usize = 16;
-pub(crate) const IMAGE_VIEW_SIZE: usize = 64;
+const IMAGE_OFF: usize = crate::nscontrol::CONTROL_SIZE;
+const FLAGS_OFF: usize = IMAGE_OFF + 8;
+pub(crate) const IMAGE_VIEW_SIZE: usize = FLAGS_OFF + 8;
 
 const FLAG_ALLOWS_CUT_COPY_PASTE: u64 = 1 << 0;
 const FLAG_ANIMATES: u64 = 1 << 1;
@@ -63,6 +63,77 @@ fn get_flag(obj: u64, flag: u64) -> u8 {
         return 0;
     }
     u8::from(read_flags(obj) & flag != 0)
+}
+
+fn resolve_archived_image(candidate: u64) -> u64 {
+    if candidate == 0 {
+        return 0;
+    }
+    if candidate % 8 != 0 {
+        return 0;
+    }
+
+    if unsafe { *(candidate as *const u64) } == crate::nsobj::nsimage_class_addr() {
+        return candidate;
+    }
+
+    if crate::cfstring::extract_cfstring_cstr(candidate).is_some() {
+        return crate::nsimage::shim_nsimage_image_named(0, 0, candidate);
+    }
+
+    0
+}
+
+/// `-[NSImageView initWithCoder:]`.
+pub extern "C" fn shim_nsimageview_init_with_coder(obj: u64, _cmd: u64, coder: u64) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
+
+    crate::nsview::shim_nsview_init_with_coder(obj, 0, coder);
+    crate::nscontrol::init_control_defaults(obj);
+
+    let archived_image = crate::nskeyedarchiver::decode_object_for_any_key(
+        coder,
+        &[
+            "NSImage",
+            "NS.image",
+            "image",
+            "_image",
+            "NSImageName",
+            "imageName",
+        ],
+    );
+    let image = resolve_archived_image(archived_image);
+    if image != 0 {
+        shim_nsimageview_set_image(obj, 0, image);
+    }
+
+    if let Some(value) = crate::nskeyedarchiver::decode_bool_for_any_key(
+        coder,
+        &[
+            "NSAllowsCutCopyPaste",
+            "allowsCutCopyPaste",
+            "_allowsCutCopyPaste",
+        ],
+    ) {
+        shim_nsimageview_set_allows_cut_copy_paste(obj, 0, u8::from(value));
+    }
+
+    if let Some(value) =
+        crate::nskeyedarchiver::decode_bool_for_any_key(coder, &["NSAnimates", "animates"])
+    {
+        shim_nsimageview_set_animates(obj, 0, u8::from(value));
+    }
+
+    if let Some(value) = crate::nskeyedarchiver::decode_bool_for_any_key(
+        coder,
+        &["NSEditable", "editable", "isEditable", "_editable"],
+    ) {
+        shim_nsimageview_set_editable(obj, 0, u8::from(value));
+    }
+
+    obj
 }
 
 /// `-[NSImageView image]`
@@ -123,12 +194,18 @@ pub extern "C" fn shim_nsimageview_set_image_scaling(_obj: u64, _cmd: u64, _scal
 
 /// `-[NSImageView drawRect:]` — renders the image via CGContextDrawImage.
 pub extern "C" fn shim_nsimageview_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let cg_ctx = crate::nsgraphicscontext::current_cg_context_handle();
-    if cg_ctx == 0 { return; }
+    if cg_ctx == 0 {
+        return;
+    }
 
     let image_ptr = read_u64(obj, IMAGE_OFF);
-    if image_ptr == 0 { return; }
+    if image_ptr == 0 {
+        return;
+    }
 
     // Get the CGImage handle from our NSImage.
     // NSImage stores image info in IMAGE_STORE; try to get a CG handle.
@@ -161,9 +238,15 @@ mod tests {
         assert_eq!(shim_nsimageview_is_editable(0, 0), 0);
         shim_nsimageview_set_editable(0, 0, 1);
 
-        assert_eq!(shim_nsimageview_image_alignment(0, 0), IMAGE_ALIGNMENT_CENTER);
+        assert_eq!(
+            shim_nsimageview_image_alignment(0, 0),
+            IMAGE_ALIGNMENT_CENTER
+        );
         shim_nsimageview_set_image_alignment(0, 0, 99);
-        assert_eq!(shim_nsimageview_image_scaling(0, 0), IMAGE_SCALING_PROPORTIONALLY_DOWN);
+        assert_eq!(
+            shim_nsimageview_image_scaling(0, 0),
+            IMAGE_SCALING_PROPORTIONALLY_DOWN
+        );
         shim_nsimageview_set_image_scaling(0, 0, 99);
     }
 
@@ -223,13 +306,19 @@ mod tests {
         assert_eq!(shim_nsimageview_allows_cut_copy_paste(view, 0), 1);
         assert_eq!(shim_nsimageview_animates(view, 0), 1);
         assert_eq!(shim_nsimageview_is_editable(view, 0), 1);
-        assert_eq!(read_field(view, FLAGS_OFF), FLAG_ALLOWS_CUT_COPY_PASTE | FLAG_ANIMATES | FLAG_IS_EDITABLE);
+        assert_eq!(
+            read_field(view, FLAGS_OFF),
+            FLAG_ALLOWS_CUT_COPY_PASTE | FLAG_ANIMATES | FLAG_IS_EDITABLE
+        );
 
         shim_nsimageview_set_animates(view, 0, 0);
         assert_eq!(shim_nsimageview_allows_cut_copy_paste(view, 0), 1);
         assert_eq!(shim_nsimageview_animates(view, 0), 0);
         assert_eq!(shim_nsimageview_is_editable(view, 0), 1);
-        assert_eq!(read_field(view, FLAGS_OFF), FLAG_ALLOWS_CUT_COPY_PASTE | FLAG_IS_EDITABLE);
+        assert_eq!(
+            read_field(view, FLAGS_OFF),
+            FLAG_ALLOWS_CUT_COPY_PASTE | FLAG_IS_EDITABLE
+        );
 
         free_obj(view);
     }
@@ -244,7 +333,10 @@ mod tests {
         assert_eq!(shim_nsimageview_is_editable(view, 0), 0);
 
         shim_nsimageview_set_editable(view, 0, 1);
-        assert_eq!(read_field(view, FLAGS_OFF), (1_u64 << 63) | FLAG_ANIMATES | FLAG_IS_EDITABLE);
+        assert_eq!(
+            read_field(view, FLAGS_OFF),
+            (1_u64 << 63) | FLAG_ANIMATES | FLAG_IS_EDITABLE
+        );
 
         free_obj(view);
     }
@@ -255,8 +347,14 @@ mod tests {
         shim_nsimageview_set_image_alignment(view, 0, 7);
         shim_nsimageview_set_image_scaling(view, 0, 42);
 
-        assert_eq!(shim_nsimageview_image_alignment(view, 0), IMAGE_ALIGNMENT_CENTER);
-        assert_eq!(shim_nsimageview_image_scaling(view, 0), IMAGE_SCALING_PROPORTIONALLY_DOWN);
+        assert_eq!(
+            shim_nsimageview_image_alignment(view, 0),
+            IMAGE_ALIGNMENT_CENTER
+        );
+        assert_eq!(
+            shim_nsimageview_image_scaling(view, 0),
+            IMAGE_SCALING_PROPORTIONALLY_DOWN
+        );
         assert_eq!(read_field(view, IMAGE_OFF), 0);
         assert_eq!(read_field(view, FLAGS_OFF), 0);
 

@@ -7,8 +7,8 @@
 
 use std::collections::HashMap;
 use std::ffi::CStr;
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Mutex;
 
 use crate::table::ShimTable;
 
@@ -21,10 +21,10 @@ fn next_handle() -> u64 {
 
 // ── SCNetworkReachabilityFlags constants ────────────────────────
 /// Apple SCNetworkReachabilityFlags values.
-const K_SC_FLAG_REACHABLE: u32 = 1 << 1;      // 2
+const K_SC_FLAG_REACHABLE: u32 = 1 << 1; // 2
 #[allow(dead_code)]
 const K_SC_FLAG_CONNECTION_REQUIRED: u32 = 1 << 2; // 4
-const K_SC_FLAG_IS_DIRECT: u32 = 1 << 17;     // 131072
+const K_SC_FLAG_IS_DIRECT: u32 = 1 << 17; // 131072
 const K_SC_FLAG_IS_LOCAL_ADDRESS: u32 = 1 << 16; // 65536
 
 /// Data symbol for kSCNetworkReachabilityFlagsReachable.
@@ -97,7 +97,8 @@ struct ReachabilityTarget {
 
 static REACHABILITY_STORE: Mutex<Option<HashMap<u64, ReachabilityTarget>>> = Mutex::new(None);
 
-fn reachability_store() -> std::sync::MutexGuard<'static, Option<HashMap<u64, ReachabilityTarget>>> {
+fn reachability_store() -> std::sync::MutexGuard<'static, Option<HashMap<u64, ReachabilityTarget>>>
+{
     REACHABILITY_STORE.lock().unwrap_or_else(|e| e.into_inner())
 }
 
@@ -134,89 +135,339 @@ impl SystemConfigurationStubs {
         use crate::register_shims;
 
         // ── SCNetworkReachability ───────────────────────────────
-        register_shims!(table,
-            ("_SCNetworkReachabilityCreateWithName", shim_sc_reachability_create_with_name as *const () as u64, "SCNetworkReachabilityCreateWithName → handle"),
-            ("_SCNetworkReachabilityCreateWithAddress", shim_sc_reachability_create_with_address as *const () as u64, "SCNetworkReachabilityCreateWithAddress → handle"),
-            ("_SCNetworkReachabilityCreateWithAddressPair", shim_sc_reachability_create_with_address_pair as *const () as u64, "SCNetworkReachabilityCreateWithAddressPair → handle"),
-            ("_SCNetworkReachabilityGetFlags", shim_sc_reachability_get_flags as *const () as u64, "SCNetworkReachabilityGetFlags → real check"),
-            ("_SCNetworkReachabilitySetCallback", shim_sc_reachability_set_callback as *const () as u64, "SCNetworkReachabilitySetCallback → TRUE"),
-            ("_SCNetworkReachabilityScheduleWithRunLoop", shim_sc_reachability_schedule_with_run_loop as *const () as u64, "SCNetworkReachabilityScheduleWithRunLoop → TRUE"),
-            ("_SCNetworkReachabilityUnscheduleFromRunLoop", shim_sc_reachability_unschedule_from_run_loop as *const () as u64, "SCNetworkReachabilityUnscheduleFromRunLoop → TRUE"),
-            ("_SCNetworkReachabilitySetDispatchQueue", shim_sc_reachability_set_dispatch_queue as *const () as u64, "SCNetworkReachabilitySetDispatchQueue → TRUE")
+        register_shims!(
+            table,
+            (
+                "_SCNetworkReachabilityCreateWithName",
+                shim_sc_reachability_create_with_name as *const () as u64,
+                "SCNetworkReachabilityCreateWithName → handle"
+            ),
+            (
+                "_SCNetworkReachabilityCreateWithAddress",
+                shim_sc_reachability_create_with_address as *const () as u64,
+                "SCNetworkReachabilityCreateWithAddress → handle"
+            ),
+            (
+                "_SCNetworkReachabilityCreateWithAddressPair",
+                shim_sc_reachability_create_with_address_pair as *const () as u64,
+                "SCNetworkReachabilityCreateWithAddressPair → handle"
+            ),
+            (
+                "_SCNetworkReachabilityGetFlags",
+                shim_sc_reachability_get_flags as *const () as u64,
+                "SCNetworkReachabilityGetFlags → real check"
+            ),
+            (
+                "_SCNetworkReachabilitySetCallback",
+                shim_sc_reachability_set_callback as *const () as u64,
+                "SCNetworkReachabilitySetCallback → TRUE"
+            ),
+            (
+                "_SCNetworkReachabilityScheduleWithRunLoop",
+                shim_sc_reachability_schedule_with_run_loop as *const () as u64,
+                "SCNetworkReachabilityScheduleWithRunLoop → TRUE"
+            ),
+            (
+                "_SCNetworkReachabilityUnscheduleFromRunLoop",
+                shim_sc_reachability_unschedule_from_run_loop as *const () as u64,
+                "SCNetworkReachabilityUnscheduleFromRunLoop → TRUE"
+            ),
+            (
+                "_SCNetworkReachabilitySetDispatchQueue",
+                shim_sc_reachability_set_dispatch_queue as *const () as u64,
+                "SCNetworkReachabilitySetDispatchQueue → TRUE"
+            )
         );
 
         // ── SCDynamicStore ──────────────────────────────────────
-        register_shims!(table,
-            ("_SCDynamicStoreCreate", shim_sc_dynamic_store_create as *const () as u64, "SCDynamicStoreCreate → handle"),
-            ("_SCDynamicStoreCopyValue", shim_sc_dynamic_store_copy_value as *const () as u64, "SCDynamicStoreCopyValue → real network data"),
-            ("_SCDynamicStoreCopyMultiple", shim_sc_dynamic_store_copy_multiple as *const () as u64, "SCDynamicStoreCopyMultiple → dict"),
-            ("_SCDynamicStoreSetValue", shim_sc_dynamic_store_set_value as *const () as u64, "SCDynamicStoreSetValue → TRUE"),
-            ("_SCDynamicStoreSetNotificationKeys", shim_sc_dynamic_store_set_notification_keys as *const () as u64, "SCDynamicStoreSetNotificationKeys → TRUE"),
-            ("_SCDynamicStoreSetDispatchQueue", shim_sc_dynamic_store_set_dispatch_queue as *const () as u64, "SCDynamicStoreSetDispatchQueue → TRUE"),
-            ("_SCDynamicStoreCopyKeyList", shim_sc_dynamic_store_copy_key_list as *const () as u64, "SCDynamicStoreCopyKeyList → array"),
-            ("_SCDynamicStoreCreateRunLoopSource", shim_sc_dynamic_store_create_run_loop_source as *const () as u64, "SCDynamicStoreCreateRunLoopSource → handle"),
-            ("_SCDynamicStoreNotifyValue", shim_sc_dynamic_store_notify_value as *const () as u64, "SCDynamicStoreNotifyValue → TRUE")
+        register_shims!(
+            table,
+            (
+                "_SCDynamicStoreCreate",
+                shim_sc_dynamic_store_create as *const () as u64,
+                "SCDynamicStoreCreate → handle"
+            ),
+            (
+                "_SCDynamicStoreCopyValue",
+                shim_sc_dynamic_store_copy_value as *const () as u64,
+                "SCDynamicStoreCopyValue → real network data"
+            ),
+            (
+                "_SCDynamicStoreCopyMultiple",
+                shim_sc_dynamic_store_copy_multiple as *const () as u64,
+                "SCDynamicStoreCopyMultiple → dict"
+            ),
+            (
+                "_SCDynamicStoreSetValue",
+                shim_sc_dynamic_store_set_value as *const () as u64,
+                "SCDynamicStoreSetValue → TRUE"
+            ),
+            (
+                "_SCDynamicStoreSetNotificationKeys",
+                shim_sc_dynamic_store_set_notification_keys as *const () as u64,
+                "SCDynamicStoreSetNotificationKeys → TRUE"
+            ),
+            (
+                "_SCDynamicStoreSetDispatchQueue",
+                shim_sc_dynamic_store_set_dispatch_queue as *const () as u64,
+                "SCDynamicStoreSetDispatchQueue → TRUE"
+            ),
+            (
+                "_SCDynamicStoreCopyKeyList",
+                shim_sc_dynamic_store_copy_key_list as *const () as u64,
+                "SCDynamicStoreCopyKeyList → array"
+            ),
+            (
+                "_SCDynamicStoreCreateRunLoopSource",
+                shim_sc_dynamic_store_create_run_loop_source as *const () as u64,
+                "SCDynamicStoreCreateRunLoopSource → handle"
+            ),
+            (
+                "_SCDynamicStoreNotifyValue",
+                shim_sc_dynamic_store_notify_value as *const () as u64,
+                "SCDynamicStoreNotifyValue → TRUE"
+            )
         );
 
         // ── SCPreferences ───────────────────────────────────────
-        register_shims!(table,
-            ("_SCPreferencesCreate", shim_sc_preferences_create as *const () as u64, "SCPreferencesCreate → handle"),
-            ("_SCPreferencesGetValue", shim_sc_preferences_get_value as *const () as u64, "SCPreferencesGetValue → value"),
-            ("_SCPreferencesSetValue", shim_sc_preferences_set_value as *const () as u64, "SCPreferencesSetValue → TRUE"),
-            ("_SCPreferencesCommitChanges", shim_sc_preferences_commit_changes as *const () as u64, "SCPreferencesCommitChanges → TRUE"),
-            ("_SCPreferencesApplyChanges", shim_sc_preferences_apply_changes as *const () as u64, "SCPreferencesApplyChanges → TRUE"),
-            ("_SCPreferencesPathGetValue", shim_sc_preferences_path_get_value as *const () as u64, "SCPreferencesPathGetValue → NULL"),
-            ("_SCPreferencesLock", shim_sc_preferences_lock as *const () as u64, "SCPreferencesLock → TRUE"),
-            ("_SCPreferencesUnlock", shim_sc_preferences_unlock as *const () as u64, "SCPreferencesUnlock → TRUE")
+        register_shims!(
+            table,
+            (
+                "_SCPreferencesCreate",
+                shim_sc_preferences_create as *const () as u64,
+                "SCPreferencesCreate → handle"
+            ),
+            (
+                "_SCPreferencesGetValue",
+                shim_sc_preferences_get_value as *const () as u64,
+                "SCPreferencesGetValue → value"
+            ),
+            (
+                "_SCPreferencesSetValue",
+                shim_sc_preferences_set_value as *const () as u64,
+                "SCPreferencesSetValue → TRUE"
+            ),
+            (
+                "_SCPreferencesCommitChanges",
+                shim_sc_preferences_commit_changes as *const () as u64,
+                "SCPreferencesCommitChanges → TRUE"
+            ),
+            (
+                "_SCPreferencesApplyChanges",
+                shim_sc_preferences_apply_changes as *const () as u64,
+                "SCPreferencesApplyChanges → TRUE"
+            ),
+            (
+                "_SCPreferencesPathGetValue",
+                shim_sc_preferences_path_get_value as *const () as u64,
+                "SCPreferencesPathGetValue → NULL"
+            ),
+            (
+                "_SCPreferencesLock",
+                shim_sc_preferences_lock as *const () as u64,
+                "SCPreferencesLock → TRUE"
+            ),
+            (
+                "_SCPreferencesUnlock",
+                shim_sc_preferences_unlock as *const () as u64,
+                "SCPreferencesUnlock → TRUE"
+            )
         );
 
         // ── SCNetworkConfiguration ──────────────────────────────
-        register_shims!(table,
-            ("_SCNetworkInterfaceCopyAll", shim_sc_network_interface_copy_all as *const () as u64, "SCNetworkInterfaceCopyAll → real interfaces"),
-            ("_SCNetworkServiceCopyAll", shim_sc_network_service_copy_all as *const () as u64, "SCNetworkServiceCopyAll → NULL"),
-            ("_SCNetworkInterfaceGetBSDName", shim_sc_network_interface_get_bsd_name as *const () as u64, "SCNetworkInterfaceGetBSDName → name"),
-            ("_SCNetworkInterfaceGetInterfaceType", shim_sc_network_interface_get_interface_type as *const () as u64, "SCNetworkInterfaceGetInterfaceType → type"),
-            ("_SCNetworkInterfaceGetHardwareAddressString", shim_sc_network_interface_get_hw_addr as *const () as u64, "SCNetworkInterfaceGetHardwareAddressString → MAC"),
-            ("_SCNetworkInterfaceGetLocalizedDisplayName", shim_sc_network_interface_get_display_name as *const () as u64, "SCNetworkInterfaceGetLocalizedDisplayName → name"),
-            ("_SCNetworkInterfaceGetConfiguration", shim_sc_network_interface_get_configuration as *const () as u64, "SCNetworkInterfaceGetConfiguration → NULL")
+        register_shims!(
+            table,
+            (
+                "_SCNetworkInterfaceCopyAll",
+                shim_sc_network_interface_copy_all as *const () as u64,
+                "SCNetworkInterfaceCopyAll → real interfaces"
+            ),
+            (
+                "_SCNetworkServiceCopyAll",
+                shim_sc_network_service_copy_all as *const () as u64,
+                "SCNetworkServiceCopyAll → NULL"
+            ),
+            (
+                "_SCNetworkInterfaceGetBSDName",
+                shim_sc_network_interface_get_bsd_name as *const () as u64,
+                "SCNetworkInterfaceGetBSDName → name"
+            ),
+            (
+                "_SCNetworkInterfaceGetInterfaceType",
+                shim_sc_network_interface_get_interface_type as *const () as u64,
+                "SCNetworkInterfaceGetInterfaceType → type"
+            ),
+            (
+                "_SCNetworkInterfaceGetHardwareAddressString",
+                shim_sc_network_interface_get_hw_addr as *const () as u64,
+                "SCNetworkInterfaceGetHardwareAddressString → MAC"
+            ),
+            (
+                "_SCNetworkInterfaceGetLocalizedDisplayName",
+                shim_sc_network_interface_get_display_name as *const () as u64,
+                "SCNetworkInterfaceGetLocalizedDisplayName → name"
+            ),
+            (
+                "_SCNetworkInterfaceGetConfiguration",
+                shim_sc_network_interface_get_configuration as *const () as u64,
+                "SCNetworkInterfaceGetConfiguration → NULL"
+            )
         );
 
         // ── Error handling ──────────────────────────────────────
-        register_shims!(table,
+        register_shims!(
+            table,
             ("_SCError", shim_sc_error as *const () as u64, "SCError → 0"),
-            ("_SCErrorString", shim_sc_error_string as *const () as u64, "SCErrorString → string"),
-            ("_SCCopyLastError", shim_sc_copy_last_error as *const () as u64, "SCCopyLastError → NULL")
+            (
+                "_SCErrorString",
+                shim_sc_error_string as *const () as u64,
+                "SCErrorString → string"
+            ),
+            (
+                "_SCCopyLastError",
+                shim_sc_copy_last_error as *const () as u64,
+                "SCCopyLastError → NULL"
+            )
         );
 
         // ── Data symbols: key string constants ──────────────────
-        register_shims!(table,
-            ("_kSCNetworkReachabilityFlagsReachable", &K_SC_NETWORK_REACHABILITY_FLAGS_REACHABLE as *const u32 as u64, "kSCNetworkReachabilityFlagsReachable"),
-            ("_kSCDynamicStoreDomainState", KSCDYNAMIC_STORE_DOMAIN_STATE.as_ptr() as u64, "kSCDynamicStoreDomainState"),
-            ("_kSCDynamicStoreDomainSetup", KSCDYNAMIC_STORE_DOMAIN_SETUP.as_ptr() as u64, "kSCDynamicStoreDomainSetup"),
-            ("_kSCCompNetwork", KSCCOMP_NETWORK.as_ptr() as u64, "kSCCompNetwork"),
-            ("_kSCCompInterface", KSCCOMP_INTERFACE.as_ptr() as u64, "kSCCompInterface"),
-            ("_kSCCompService", KSCCOMP_SERVICE.as_ptr() as u64, "kSCCompService"),
-            ("_kSCCompGlobal", KSCCOMP_GLOBAL.as_ptr() as u64, "kSCCompGlobal"),
-            ("_kSCEntNetIPv4", KSCENT_NET_IPV4.as_ptr() as u64, "kSCEntNetIPv4"),
-            ("_kSCEntNetIPv6", KSCENT_NET_IPV6.as_ptr() as u64, "kSCEntNetIPv6"),
-            ("_kSCEntNetDNS", KSCENT_NET_DNS.as_ptr() as u64, "kSCEntNetDNS"),
-            ("_kSCEntNetProxies", KSCENT_NET_PROXIES.as_ptr() as u64, "kSCEntNetProxies"),
-            ("_kSCEntNetLink", KSCENT_NET_LINK.as_ptr() as u64, "kSCEntNetLink"),
-            ("_kSCEntNetAirPort", KSCENT_NET_AIRPORT.as_ptr() as u64, "kSCEntNetAirPort"),
-            ("_kSCEntNetEthernet", KSCENT_NET_ETHERNET.as_ptr() as u64, "kSCEntNetEthernet"),
-            ("_kSCPropNetIPv4Addresses", KSCPROP_NET_IPV4_ADDRESSES.as_ptr() as u64, "kSCPropNetIPv4Addresses"),
-            ("_kSCPropNetIPv4Router", KSCPROP_NET_IPV4_ROUTER.as_ptr() as u64, "kSCPropNetIPv4Router"),
-            ("_kSCPropNetIPv4SubnetMasks", KSCPROP_NET_IPV4_SUBNET_MASKS.as_ptr() as u64, "kSCPropNetIPv4SubnetMasks"),
-            ("_kSCPropNetIPv6Addresses", KSCPROP_NET_IPV6_ADDRESSES.as_ptr() as u64, "kSCPropNetIPv6Addresses"),
-            ("_kSCPropNetDNSServerAddresses", KSCPROP_NET_DNS_SERVER_ADDRESSES.as_ptr() as u64, "kSCPropNetDNSServerAddresses"),
-            ("_kSCPropNetDNSSearchDomains", KSCPROP_NET_DNS_SEARCH_DOMAINS.as_ptr() as u64, "kSCPropNetDNSSearchDomains"),
-            ("_kSCPropInterfaceName", KSCPROP_INTERFACE_NAME.as_ptr() as u64, "kSCPropInterfaceName"),
-            ("_kSCPropNetInterfaceType", KSCPROP_NET_INTERFACE_TYPE.as_ptr() as u64, "kSCPropNetInterfaceType"),
-            ("_kSCPropNetInterfaceHardware", KSCPROP_NET_INTERFACE_HARDWARE.as_ptr() as u64, "kSCPropNetInterfaceHardware"),
-            ("_kSCValNetInterfaceTypeEthernet", KSCVAL_NET_INTERFACE_TYPE_ETHERNET.as_ptr() as u64, "kSCValNetInterfaceTypeEthernet"),
-            ("_kSCPropNetLinkActive", KSCPROP_NET_LINK_ACTIVE.as_ptr() as u64, "kSCPropNetLinkActive"),
-            ("_kSCDynamicStorePropNetPrimaryInterface", KSCPROP_NET_PRIMARY_INTERFACE.as_ptr() as u64, "kSCDynamicStorePropNetPrimaryInterface"),
-            ("_kSCDynamicStorePropNetPrimaryService", KSCPROP_NET_PRIMARY_SERVICE.as_ptr() as u64, "kSCDynamicStorePropNetPrimaryService")
+        register_shims!(
+            table,
+            (
+                "_kSCNetworkReachabilityFlagsReachable",
+                &K_SC_NETWORK_REACHABILITY_FLAGS_REACHABLE as *const u32 as u64,
+                "kSCNetworkReachabilityFlagsReachable"
+            ),
+            (
+                "_kSCDynamicStoreDomainState",
+                KSCDYNAMIC_STORE_DOMAIN_STATE.as_ptr() as u64,
+                "kSCDynamicStoreDomainState"
+            ),
+            (
+                "_kSCDynamicStoreDomainSetup",
+                KSCDYNAMIC_STORE_DOMAIN_SETUP.as_ptr() as u64,
+                "kSCDynamicStoreDomainSetup"
+            ),
+            (
+                "_kSCCompNetwork",
+                KSCCOMP_NETWORK.as_ptr() as u64,
+                "kSCCompNetwork"
+            ),
+            (
+                "_kSCCompInterface",
+                KSCCOMP_INTERFACE.as_ptr() as u64,
+                "kSCCompInterface"
+            ),
+            (
+                "_kSCCompService",
+                KSCCOMP_SERVICE.as_ptr() as u64,
+                "kSCCompService"
+            ),
+            (
+                "_kSCCompGlobal",
+                KSCCOMP_GLOBAL.as_ptr() as u64,
+                "kSCCompGlobal"
+            ),
+            (
+                "_kSCEntNetIPv4",
+                KSCENT_NET_IPV4.as_ptr() as u64,
+                "kSCEntNetIPv4"
+            ),
+            (
+                "_kSCEntNetIPv6",
+                KSCENT_NET_IPV6.as_ptr() as u64,
+                "kSCEntNetIPv6"
+            ),
+            (
+                "_kSCEntNetDNS",
+                KSCENT_NET_DNS.as_ptr() as u64,
+                "kSCEntNetDNS"
+            ),
+            (
+                "_kSCEntNetProxies",
+                KSCENT_NET_PROXIES.as_ptr() as u64,
+                "kSCEntNetProxies"
+            ),
+            (
+                "_kSCEntNetLink",
+                KSCENT_NET_LINK.as_ptr() as u64,
+                "kSCEntNetLink"
+            ),
+            (
+                "_kSCEntNetAirPort",
+                KSCENT_NET_AIRPORT.as_ptr() as u64,
+                "kSCEntNetAirPort"
+            ),
+            (
+                "_kSCEntNetEthernet",
+                KSCENT_NET_ETHERNET.as_ptr() as u64,
+                "kSCEntNetEthernet"
+            ),
+            (
+                "_kSCPropNetIPv4Addresses",
+                KSCPROP_NET_IPV4_ADDRESSES.as_ptr() as u64,
+                "kSCPropNetIPv4Addresses"
+            ),
+            (
+                "_kSCPropNetIPv4Router",
+                KSCPROP_NET_IPV4_ROUTER.as_ptr() as u64,
+                "kSCPropNetIPv4Router"
+            ),
+            (
+                "_kSCPropNetIPv4SubnetMasks",
+                KSCPROP_NET_IPV4_SUBNET_MASKS.as_ptr() as u64,
+                "kSCPropNetIPv4SubnetMasks"
+            ),
+            (
+                "_kSCPropNetIPv6Addresses",
+                KSCPROP_NET_IPV6_ADDRESSES.as_ptr() as u64,
+                "kSCPropNetIPv6Addresses"
+            ),
+            (
+                "_kSCPropNetDNSServerAddresses",
+                KSCPROP_NET_DNS_SERVER_ADDRESSES.as_ptr() as u64,
+                "kSCPropNetDNSServerAddresses"
+            ),
+            (
+                "_kSCPropNetDNSSearchDomains",
+                KSCPROP_NET_DNS_SEARCH_DOMAINS.as_ptr() as u64,
+                "kSCPropNetDNSSearchDomains"
+            ),
+            (
+                "_kSCPropInterfaceName",
+                KSCPROP_INTERFACE_NAME.as_ptr() as u64,
+                "kSCPropInterfaceName"
+            ),
+            (
+                "_kSCPropNetInterfaceType",
+                KSCPROP_NET_INTERFACE_TYPE.as_ptr() as u64,
+                "kSCPropNetInterfaceType"
+            ),
+            (
+                "_kSCPropNetInterfaceHardware",
+                KSCPROP_NET_INTERFACE_HARDWARE.as_ptr() as u64,
+                "kSCPropNetInterfaceHardware"
+            ),
+            (
+                "_kSCValNetInterfaceTypeEthernet",
+                KSCVAL_NET_INTERFACE_TYPE_ETHERNET.as_ptr() as u64,
+                "kSCValNetInterfaceTypeEthernet"
+            ),
+            (
+                "_kSCPropNetLinkActive",
+                KSCPROP_NET_LINK_ACTIVE.as_ptr() as u64,
+                "kSCPropNetLinkActive"
+            ),
+            (
+                "_kSCDynamicStorePropNetPrimaryInterface",
+                KSCPROP_NET_PRIMARY_INTERFACE.as_ptr() as u64,
+                "kSCDynamicStorePropNetPrimaryInterface"
+            ),
+            (
+                "_kSCDynamicStorePropNetPrimaryService",
+                KSCPROP_NET_PRIMARY_SERVICE.as_ptr() as u64,
+                "kSCDynamicStorePropNetPrimaryService"
+            )
         );
 
         log::debug!("SystemConfigurationStubs: registered 63 shims + 27 data symbols");
@@ -329,7 +580,9 @@ fn alloc_cfarray(items: &[u64]) -> u64 {
 
 /// Read a sysfs/procfs text file, trimming whitespace.
 fn read_sysfs(path: &str) -> Option<String> {
-    std::fs::read_to_string(path).ok().map(|s| s.trim().to_string())
+    std::fs::read_to_string(path)
+        .ok()
+        .map(|s| s.trim().to_string())
 }
 
 /// Extract a CFString key from a pointer (reads [isa][len][ptr] layout).
@@ -437,7 +690,10 @@ fn get_default_gateway() -> Option<String> {
                 // Gateway is hex-encoded in little-endian
                 if let Ok(gw) = u32::from_str_radix(fields[2], 16) {
                     let bytes = gw.to_le_bytes();
-                    return Some(format!("{}.{}.{}.{}", bytes[0], bytes[1], bytes[2], bytes[3]));
+                    return Some(format!(
+                        "{}.{}.{}.{}",
+                        bytes[0], bytes[1], bytes[2], bytes[3]
+                    ));
                 }
             }
         }
@@ -459,9 +715,16 @@ fn get_subnet_mask(iface: &str) -> Option<String> {
                 if let Some(addr_cidr) = trimmed.split_whitespace().nth(1) {
                     if let Some(prefix_str) = addr_cidr.split('/').nth(1) {
                         if let Ok(prefix) = prefix_str.parse::<u32>() {
-                            let mask = if prefix == 0 { 0u32 } else { !0u32 << (32 - prefix) };
+                            let mask = if prefix == 0 {
+                                0u32
+                            } else {
+                                !0u32 << (32 - prefix)
+                            };
                             let bytes = mask.to_be_bytes();
-                            return Some(format!("{}.{}.{}.{}", bytes[0], bytes[1], bytes[2], bytes[3]));
+                            return Some(format!(
+                                "{}.{}.{}.{}",
+                                bytes[0], bytes[1], bytes[2], bytes[3]
+                            ));
                         }
                     }
                 }
@@ -519,8 +782,7 @@ fn get_mac_address(iface: &str) -> Option<String> {
 
 /// Get MTU for an interface.
 fn get_mtu(iface: &str) -> Option<i64> {
-    read_sysfs(&format!("/sys/class/net/{}/mtu", iface))
-        .and_then(|s| s.parse().ok())
+    read_sysfs(&format!("/sys/class/net/{}/mtu", iface)).and_then(|s| s.parse().ok())
 }
 
 /// List all non-loopback network interfaces.
@@ -559,7 +821,9 @@ fn dynamic_store_lookup(key: &str) -> u64 {
     }
 
     // State:/Network/Global/DNS → DNS servers
-    if key.contains("/Network/Global/DNS") || key.contains("/Network/Service/") && key.ends_with("/DNS") {
+    if key.contains("/Network/Global/DNS")
+        || key.contains("/Network/Service/") && key.ends_with("/DNS")
+    {
         return build_dns_dict();
     }
 
@@ -623,9 +887,16 @@ fn build_global_ipv4_dict() -> u64 {
 
     // Primary interface
     if let Some(iface) = get_primary_interface() {
-        dict_set(dict, alloc_cfstring("PrimaryInterface"), alloc_cfstring(&iface));
-        dict_set(dict, alloc_cfstring("PrimaryService"),
-                 alloc_cfstring(&format!("burdettie-{}", iface)));
+        dict_set(
+            dict,
+            alloc_cfstring("PrimaryInterface"),
+            alloc_cfstring(&iface),
+        );
+        dict_set(
+            dict,
+            alloc_cfstring("PrimaryService"),
+            alloc_cfstring(&format!("burdettie-{}", iface)),
+        );
 
         // Router (default gateway)
         if let Some(gw) = get_default_gateway() {
@@ -646,13 +917,21 @@ fn build_dns_dict() -> u64 {
     let servers = get_dns_servers();
     if !servers.is_empty() {
         let server_cfs: Vec<u64> = servers.iter().map(|s| alloc_cfstring(s)).collect();
-        dict_set(dict, alloc_cfstring("ServerAddresses"), alloc_cfarray(&server_cfs));
+        dict_set(
+            dict,
+            alloc_cfstring("ServerAddresses"),
+            alloc_cfarray(&server_cfs),
+        );
     }
 
     let domains = get_dns_search_domains();
     if !domains.is_empty() {
         let domain_cfs: Vec<u64> = domains.iter().map(|d| alloc_cfstring(d)).collect();
-        dict_set(dict, alloc_cfstring("SearchDomains"), alloc_cfarray(&domain_cfs));
+        dict_set(
+            dict,
+            alloc_cfstring("SearchDomains"),
+            alloc_cfarray(&domain_cfs),
+        );
     }
 
     dict
@@ -665,7 +944,11 @@ fn build_link_dict(iface: &str) -> u64 {
         return 0;
     }
     let active = is_link_active(iface);
-    dict_set(dict, alloc_cfstring("Active"), alloc_cfnumber_i64(if active { 1 } else { 0 }));
+    dict_set(
+        dict,
+        alloc_cfstring("Active"),
+        alloc_cfnumber_i64(if active { 1 } else { 0 }),
+    );
     dict
 }
 
@@ -683,7 +966,11 @@ fn build_interface_ipv4_dict(iface: &str) -> u64 {
     }
 
     if let Some(mask) = get_subnet_mask(iface) {
-        dict_set(dict, alloc_cfstring("SubnetMasks"), alloc_cfarray(&[alloc_cfstring(&mask)]));
+        dict_set(
+            dict,
+            alloc_cfstring("SubnetMasks"),
+            alloc_cfarray(&[alloc_cfstring(&mask)]),
+        );
     }
 
     dict_set(dict, alloc_cfstring("InterfaceName"), alloc_cfstring(iface));
@@ -722,7 +1009,11 @@ fn build_interface_dict(iface: &str) -> u64 {
     // Determine type
     let itype = if iface.starts_with("wl") || iface.starts_with("wlan") {
         "IEEE80211" // WiFi
-    } else if iface.starts_with("eth") || iface.starts_with("en") || iface.starts_with("ens") || iface.starts_with("enp") {
+    } else if iface.starts_with("eth")
+        || iface.starts_with("en")
+        || iface.starts_with("ens")
+        || iface.starts_with("enp")
+    {
         "Ethernet"
     } else if iface.starts_with("docker") || iface.starts_with("br-") || iface.starts_with("veth") {
         "Bridge"
@@ -739,11 +1030,19 @@ fn build_interface_dict(iface: &str) -> u64 {
         "Bridge" => "Bridge",
         _ => iface,
     };
-    dict_set(dict, alloc_cfstring("UserDefinedName"), alloc_cfstring(display_name));
+    dict_set(
+        dict,
+        alloc_cfstring("UserDefinedName"),
+        alloc_cfstring(display_name),
+    );
 
     // MAC address
     if let Some(mac) = get_mac_address(iface) {
-        dict_set(dict, alloc_cfstring("HardwareAddress"), alloc_cfstring(&mac));
+        dict_set(
+            dict,
+            alloc_cfstring("HardwareAddress"),
+            alloc_cfstring(&mac),
+        );
     }
 
     // MTU
@@ -752,8 +1051,11 @@ fn build_interface_dict(iface: &str) -> u64 {
     }
 
     // Link active
-    dict_set(dict, alloc_cfstring("Active"),
-             alloc_cfnumber_i64(if is_link_active(iface) { 1 } else { 0 }));
+    dict_set(
+        dict,
+        alloc_cfstring("Active"),
+        alloc_cfnumber_i64(if is_link_active(iface) { 1 } else { 0 }),
+    );
 
     dict
 }
@@ -778,15 +1080,15 @@ fn check_reachability(hostname: &str) -> u32 {
     hints.ai_socktype = libc::SOCK_STREAM;
 
     let mut result: *mut libc::addrinfo = std::ptr::null_mut();
-    let rc = unsafe {
-        libc::getaddrinfo(cstr.as_ptr(), std::ptr::null(), &hints, &mut result)
-    };
+    let rc = unsafe { libc::getaddrinfo(cstr.as_ptr(), std::ptr::null(), &hints, &mut result) };
 
     if rc != 0 || result.is_null() {
         log::debug!("SCReachability: getaddrinfo failed for '{hostname}' → not reachable");
         return 0;
     }
-    unsafe { libc::freeaddrinfo(result); }
+    unsafe {
+        libc::freeaddrinfo(result);
+    }
 
     // DNS resolved — host is reachable
     log::trace!("SCReachability: '{hostname}' → reachable");
@@ -810,7 +1112,9 @@ pub extern "C" fn shim_sc_reachability_create_with_name(_alloc: u64, name: u64) 
         flags: 0,
     };
     let mut guard = reachability_store();
-    guard.get_or_insert_with(HashMap::new).insert(handle, target);
+    guard
+        .get_or_insert_with(HashMap::new)
+        .insert(handle, target);
     log::trace!("SCNetworkReachabilityCreateWithName: host={hostname} → handle={handle:#x}");
     handle
 }
@@ -823,7 +1127,10 @@ pub extern "C" fn shim_sc_reachability_create_with_address(_alloc: u64, addr: u6
         if family == 2 {
             // AF_INET: extract 4-byte IP at offset 4
             let ip_bytes = unsafe { std::slice::from_raw_parts((addr as *const u8).add(4), 4) };
-            Some(format!("{}.{}.{}.{}", ip_bytes[0], ip_bytes[1], ip_bytes[2], ip_bytes[3]))
+            Some(format!(
+                "{}.{}.{}.{}",
+                ip_bytes[0], ip_bytes[1], ip_bytes[2], ip_bytes[3]
+            ))
         } else {
             None
         }
@@ -832,12 +1139,11 @@ pub extern "C" fn shim_sc_reachability_create_with_address(_alloc: u64, addr: u6
     };
 
     let handle = next_handle();
-    let target = ReachabilityTarget {
-        hostname,
-        flags: 0,
-    };
+    let target = ReachabilityTarget { hostname, flags: 0 };
     let mut guard = reachability_store();
-    guard.get_or_insert_with(HashMap::new).insert(handle, target);
+    guard
+        .get_or_insert_with(HashMap::new)
+        .insert(handle, target);
     log::trace!("SCNetworkReachabilityCreateWithAddress → handle={handle:#x}");
     handle
 }
@@ -871,17 +1177,29 @@ pub extern "C" fn shim_sc_reachability_get_flags(target: u64, flags: u64) -> u8 
 }
 
 /// `SCNetworkReachabilitySetCallback(target, callback, context) -> Boolean`
-pub extern "C" fn shim_sc_reachability_set_callback(_target: u64, _callback: u64, _context: u64) -> u8 {
+pub extern "C" fn shim_sc_reachability_set_callback(
+    _target: u64,
+    _callback: u64,
+    _context: u64,
+) -> u8 {
     1 // TRUE — no-op, we never fire callbacks
 }
 
 /// `SCNetworkReachabilityScheduleWithRunLoop(target, rl, mode) -> Boolean`
-pub extern "C" fn shim_sc_reachability_schedule_with_run_loop(_target: u64, _rl: u64, _mode: u64) -> u8 {
+pub extern "C" fn shim_sc_reachability_schedule_with_run_loop(
+    _target: u64,
+    _rl: u64,
+    _mode: u64,
+) -> u8 {
     1 // TRUE
 }
 
 /// `SCNetworkReachabilityUnscheduleFromRunLoop(target, rl, mode) -> Boolean`
-pub extern "C" fn shim_sc_reachability_unschedule_from_run_loop(_target: u64, _rl: u64, _mode: u64) -> u8 {
+pub extern "C" fn shim_sc_reachability_unschedule_from_run_loop(
+    _target: u64,
+    _rl: u64,
+    _mode: u64,
+) -> u8 {
     1 // TRUE
 }
 
@@ -892,14 +1210,20 @@ pub extern "C" fn shim_sc_reachability_set_dispatch_queue(_target: u64, _queue: 
 
 /// `SCNetworkReachabilityCreateWithAddressPair(alloc, localAddr, remoteAddr) → SCNetworkReachabilityRef`
 pub extern "C" fn shim_sc_reachability_create_with_address_pair(
-    _alloc: u64, _local_addr: u64, remote_addr: u64,
+    _alloc: u64,
+    _local_addr: u64,
+    remote_addr: u64,
 ) -> u64 {
     // Extract hostname from remote address if AF_INET
     let hostname = if remote_addr != 0 {
         let family = unsafe { *(remote_addr as *const u8).add(1) };
         if family == 2 {
-            let ip_bytes = unsafe { std::slice::from_raw_parts((remote_addr as *const u8).add(4), 4) };
-            Some(format!("{}.{}.{}.{}", ip_bytes[0], ip_bytes[1], ip_bytes[2], ip_bytes[3]))
+            let ip_bytes =
+                unsafe { std::slice::from_raw_parts((remote_addr as *const u8).add(4), 4) };
+            Some(format!(
+                "{}.{}.{}.{}",
+                ip_bytes[0], ip_bytes[1], ip_bytes[2], ip_bytes[3]
+            ))
         } else {
             None
         }
@@ -908,12 +1232,11 @@ pub extern "C" fn shim_sc_reachability_create_with_address_pair(
     };
 
     let handle = next_handle();
-    let target = ReachabilityTarget {
-        hostname,
-        flags: 0,
-    };
+    let target = ReachabilityTarget { hostname, flags: 0 };
     let mut guard = reachability_store();
-    guard.get_or_insert_with(HashMap::new).insert(handle, target);
+    guard
+        .get_or_insert_with(HashMap::new)
+        .insert(handle, target);
     handle
 }
 
@@ -921,7 +1244,10 @@ pub extern "C" fn shim_sc_reachability_create_with_address_pair(
 
 /// `SCDynamicStoreCreate(alloc, name, callback, ctx) -> SCDynamicStoreRef`
 pub extern "C" fn shim_sc_dynamic_store_create(
-    _alloc: u64, _name: u64, callback: u64, _ctx: u64,
+    _alloc: u64,
+    _name: u64,
+    callback: u64,
+    _ctx: u64,
 ) -> u64 {
     let handle = next_handle();
     let state = DynStoreState {
@@ -959,7 +1285,9 @@ pub extern "C" fn shim_sc_dynamic_store_copy_value(_store: u64, key: u64) -> u64
 
 /// `SCDynamicStoreCopyMultiple(store, keys, patterns) -> CFDictionaryRef`
 pub extern "C" fn shim_sc_dynamic_store_copy_multiple(
-    _store: u64, _keys: u64, _patterns: u64,
+    _store: u64,
+    _keys: u64,
+    _patterns: u64,
 ) -> u64 {
     // Return an empty dict — full key enumeration not yet implemented
     alloc_mutable_dict()
@@ -972,7 +1300,9 @@ pub extern "C" fn shim_sc_dynamic_store_set_value(_store: u64, _key: u64, _value
 
 /// `SCDynamicStoreSetNotificationKeys(store, keys, patterns) -> Boolean`
 pub extern "C" fn shim_sc_dynamic_store_set_notification_keys(
-    _store: u64, _keys: u64, _patterns: u64,
+    _store: u64,
+    _keys: u64,
+    _patterns: u64,
 ) -> u8 {
     1 // TRUE — we accept the registration but don't fire callbacks yet
 }
@@ -990,9 +1320,18 @@ pub extern "C" fn shim_sc_dynamic_store_copy_key_list(_store: u64, _pattern: u64
     let mut keys = Vec::new();
 
     if let Some(iface) = get_primary_interface() {
-        keys.push(alloc_cfstring(&format!("State:/Network/Interface/{}/IPv4", iface)));
-        keys.push(alloc_cfstring(&format!("State:/Network/Interface/{}/IPv6", iface)));
-        keys.push(alloc_cfstring(&format!("State:/Network/Interface/{}/Link", iface)));
+        keys.push(alloc_cfstring(&format!(
+            "State:/Network/Interface/{}/IPv4",
+            iface
+        )));
+        keys.push(alloc_cfstring(&format!(
+            "State:/Network/Interface/{}/IPv6",
+            iface
+        )));
+        keys.push(alloc_cfstring(&format!(
+            "State:/Network/Interface/{}/Link",
+            iface
+        )));
     }
     keys.push(alloc_cfstring("State:/Network/Global/IPv4"));
     keys.push(alloc_cfstring("State:/Network/Global/DNS"));
@@ -1003,7 +1342,9 @@ pub extern "C" fn shim_sc_dynamic_store_copy_key_list(_store: u64, _pattern: u64
 
 /// `SCDynamicStoreCreateRunLoopSource(alloc, store, order) -> CFRunLoopSourceRef`
 pub extern "C" fn shim_sc_dynamic_store_create_run_loop_source(
-    _alloc: u64, _store: u64, _order: i64,
+    _alloc: u64,
+    _store: u64,
+    _order: i64,
 ) -> u64 {
     // Return a non-zero sentinel — the run loop source won't actually fire
     // but apps check for non-NULL to confirm registration succeeded
@@ -1021,7 +1362,9 @@ pub extern "C" fn shim_sc_dynamic_store_notify_value(_store: u64, _key: u64) -> 
 pub extern "C" fn shim_sc_preferences_create(_alloc: u64, _name: u64, _prefs_id: u64) -> u64 {
     let handle = next_handle();
     let mut guard = prefs_store();
-    guard.get_or_insert_with(HashMap::new).insert(handle, HashMap::new());
+    guard
+        .get_or_insert_with(HashMap::new)
+        .insert(handle, HashMap::new());
     handle
 }
 
@@ -1214,7 +1557,11 @@ mod tests {
         let mut flags: u32 = 0;
         let ret = shim_sc_reachability_get_flags(handle, &mut flags as *mut u32 as u64);
         assert_eq!(ret, 1, "GetFlags should return TRUE");
-        assert_ne!(flags & K_SC_FLAG_REACHABLE, 0, "localhost should be reachable");
+        assert_ne!(
+            flags & K_SC_FLAG_REACHABLE,
+            0,
+            "localhost should be reachable"
+        );
     }
 
     #[test]
@@ -1352,7 +1699,10 @@ mod tests {
     #[test]
     fn test_network_service_copy_all_returns_array() {
         let arr = shim_sc_network_service_copy_all(0);
-        assert_ne!(arr, 0, "SCNetworkServiceCopyAll should return non-NULL (empty array)");
+        assert_ne!(
+            arr, 0,
+            "SCNetworkServiceCopyAll should return non-NULL (empty array)"
+        );
     }
 
     // ── Error handling tests ────────────────────────────────────
@@ -1398,7 +1748,11 @@ mod tests {
 
     #[test]
     fn test_alloc_cfarray_count() {
-        let items = [alloc_cfstring("a"), alloc_cfstring("b"), alloc_cfstring("c")];
+        let items = [
+            alloc_cfstring("a"),
+            alloc_cfstring("b"),
+            alloc_cfstring("c"),
+        ];
         let arr = alloc_cfarray(&items);
         assert_ne!(arr, 0);
         let count = unsafe { *((arr as usize + 8) as *const u64) };
@@ -1425,7 +1779,10 @@ mod tests {
         let servers = get_dns_servers();
         // Should find at least one DNS server on any system
         // (CI containers always have a resolv.conf)
-        assert!(!servers.is_empty() || true, "DNS servers may be empty on some systems");
+        assert!(
+            !servers.is_empty() || true,
+            "DNS servers may be empty on some systems"
+        );
     }
 
     #[test]

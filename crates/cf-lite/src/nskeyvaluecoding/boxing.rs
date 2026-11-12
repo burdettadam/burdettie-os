@@ -20,9 +20,7 @@ pub(super) fn extract_setter_param_type(type_encoding: &str) -> char {
 pub(super) fn autounbox_if_scalar(value: u64, param_type: char) -> u64 {
     match param_type {
         '@' => value,
-        'i' | 'I' | 's' | 'S' | 'c' | 'C' | 'l' | 'L' | 'q' | 'Q' | 'B' => {
-            unbox_int(value) as u64
-        }
+        'i' | 'I' | 's' | 'S' | 'c' | 'C' | 'l' | 'L' | 'q' | 'Q' | 'B' => unbox_int(value) as u64,
         'f' | 'd' => {
             let dval = unbox_double(value);
             if param_type == 'f' {
@@ -46,9 +44,7 @@ pub(super) fn autobox_if_scalar(raw: u64, return_type: char) -> u64 {
             let val = f32::from_bits(raw as u32) as f64;
             nsnumber::alloc_nsnumber(0x1, val.to_bits())
         }
-        'd' => {
-            nsnumber::alloc_nsnumber(0x1, raw)
-        }
+        'd' => nsnumber::alloc_nsnumber(0x1, raw),
         _ => raw,
     }
 }

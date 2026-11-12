@@ -8,26 +8,26 @@
 
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Mutex;
 
 // ── XPC type tag constants (must match data_symbols.rs) ────────
 
 pub const XPC_TYPE_TAG_DICTIONARY: u64 = 0x5850_4306;
-pub const XPC_TYPE_TAG_ARRAY: u64     = 0x5850_4302;
-pub const XPC_TYPE_TAG_STRING: u64    = 0x5850_4308;
-pub const XPC_TYPE_TAG_INT64: u64     = 0x5850_4309;
-pub const XPC_TYPE_TAG_UINT64: u64    = 0x5850_430A;
-pub const XPC_TYPE_TAG_BOOL: u64      = 0x5850_4303;
-pub const XPC_TYPE_TAG_DATA: u64      = 0x5850_4305;
-pub const XPC_TYPE_TAG_DOUBLE: u64    = 0x5850_430B; // reusing DATE slot; see note
-pub const XPC_TYPE_TAG_DATE: u64      = 0x5850_430B;
-pub const XPC_TYPE_TAG_UUID: u64      = 0x5850_430F;
-pub const XPC_TYPE_TAG_FD: u64        = 0x5850_430C;
-pub const XPC_TYPE_TAG_NULL: u64      = 0x5850_430D;
-pub const XPC_TYPE_TAG_ERROR: u64     = 0x5850_4307;
+pub const XPC_TYPE_TAG_ARRAY: u64 = 0x5850_4302;
+pub const XPC_TYPE_TAG_STRING: u64 = 0x5850_4308;
+pub const XPC_TYPE_TAG_INT64: u64 = 0x5850_4309;
+pub const XPC_TYPE_TAG_UINT64: u64 = 0x5850_430A;
+pub const XPC_TYPE_TAG_BOOL: u64 = 0x5850_4303;
+pub const XPC_TYPE_TAG_DATA: u64 = 0x5850_4305;
+pub const XPC_TYPE_TAG_DOUBLE: u64 = 0x5850_430B; // reusing DATE slot; see note
+pub const XPC_TYPE_TAG_DATE: u64 = 0x5850_430B;
+pub const XPC_TYPE_TAG_UUID: u64 = 0x5850_430F;
+pub const XPC_TYPE_TAG_FD: u64 = 0x5850_430C;
+pub const XPC_TYPE_TAG_NULL: u64 = 0x5850_430D;
+pub const XPC_TYPE_TAG_ERROR: u64 = 0x5850_4307;
 pub const XPC_TYPE_TAG_CONNECTION: u64 = 0x5850_4304;
-pub const XPC_TYPE_TAG_ENDPOINT: u64  = 0x5850_4310;
+pub const XPC_TYPE_TAG_ENDPOINT: u64 = 0x5850_4310;
 
 // ── Value types ────────────────────────────────────────────────
 
@@ -41,13 +41,13 @@ pub enum XpcValue {
     Double(f64),
     String(CString),
     Data(Vec<u8>),
-    Date(i64),           // nanoseconds since epoch
+    Date(i64), // nanoseconds since epoch
     Uuid([u8; 16]),
     Fd(i32),
-    Array(Vec<u64>),     // child handles
+    Array(Vec<u64>),                 // child handles
     Dictionary(Vec<(CString, u64)>), // ordered key-value pairs (preserves insertion order)
-    Error(u64),          // error sentinel id
-    Connection(u64),     // connection id (see xpc_transport)
+    Error(u64),                      // error sentinel id
+    Connection(u64),                 // connection id (see xpc_transport)
     Endpoint(u64),
 }
 
@@ -89,7 +89,9 @@ pub(crate) fn with_table<R>(f: impl FnOnce(&mut HashMap<u64, XpcValue>) -> R) ->
 /// Allocate a new handle and store the value.
 pub fn alloc(value: XpcValue) -> u64 {
     let handle = NEXT_HANDLE.fetch_add(1, Ordering::Relaxed);
-    with_table(|t| { t.insert(handle, value); });
+    with_table(|t| {
+        t.insert(handle, value);
+    });
     handle
 }
 
@@ -100,7 +102,9 @@ pub fn get(handle: u64) -> Option<XpcValue> {
 
 /// Remove a value (xpc_release).
 pub fn release(handle: u64) {
-    with_table(|t| { t.remove(&handle); });
+    with_table(|t| {
+        t.remove(&handle);
+    });
 }
 
 /// Check if a handle is known.
@@ -221,7 +225,9 @@ pub fn dict_get(dict: u64, key: &CStr) -> u64 {
 
 /// Set a string value in a dictionary.
 pub fn dict_set_string(dict: u64, key_ptr: u64, value_ptr: u64) {
-    if key_ptr == 0 { return; }
+    if key_ptr == 0 {
+        return;
+    }
     let key = unsafe { CStr::from_ptr(key_ptr as *const std::ffi::c_char) };
     let val_handle = create_string_from_ptr(value_ptr);
     dict_set(dict, key, val_handle);
@@ -229,10 +235,14 @@ pub fn dict_set_string(dict: u64, key_ptr: u64, value_ptr: u64) {
 
 /// Get a string pointer from a dictionary.
 pub fn dict_get_string(dict: u64, key_ptr: u64) -> u64 {
-    if key_ptr == 0 { return 0; }
+    if key_ptr == 0 {
+        return 0;
+    }
     let key = unsafe { CStr::from_ptr(key_ptr as *const std::ffi::c_char) };
     let handle = dict_get(dict, key);
-    if handle == 0 { return 0; }
+    if handle == 0 {
+        return 0;
+    }
     with_table(|t| {
         if let Some(XpcValue::String(s)) = t.get(&handle) {
             s.as_ptr() as u64
@@ -244,7 +254,9 @@ pub fn dict_get_string(dict: u64, key_ptr: u64) -> u64 {
 
 /// Set an int64 in a dictionary.
 pub fn dict_set_int64(dict: u64, key_ptr: u64, value: i64) {
-    if key_ptr == 0 { return; }
+    if key_ptr == 0 {
+        return;
+    }
     let key = unsafe { CStr::from_ptr(key_ptr as *const std::ffi::c_char) };
     let h = create_int64(value);
     dict_set(dict, key, h);
@@ -252,21 +264,25 @@ pub fn dict_set_int64(dict: u64, key_ptr: u64, value: i64) {
 
 /// Get an int64 from a dictionary.
 pub fn dict_get_int64(dict: u64, key_ptr: u64) -> i64 {
-    if key_ptr == 0 { return 0; }
+    if key_ptr == 0 {
+        return 0;
+    }
     let key = unsafe { CStr::from_ptr(key_ptr as *const std::ffi::c_char) };
     let handle = dict_get(dict, key);
-    if handle == 0 { return 0; }
-    with_table(|t| {
-        match t.get(&handle) {
-            Some(XpcValue::Int64(v)) => *v,
-            _ => 0,
-        }
+    if handle == 0 {
+        return 0;
+    }
+    with_table(|t| match t.get(&handle) {
+        Some(XpcValue::Int64(v)) => *v,
+        _ => 0,
     })
 }
 
 /// Set a uint64 in a dictionary.
 pub fn dict_set_uint64(dict: u64, key_ptr: u64, value: u64) {
-    if key_ptr == 0 { return; }
+    if key_ptr == 0 {
+        return;
+    }
     let key = unsafe { CStr::from_ptr(key_ptr as *const std::ffi::c_char) };
     let h = create_uint64(value);
     dict_set(dict, key, h);
@@ -274,21 +290,25 @@ pub fn dict_set_uint64(dict: u64, key_ptr: u64, value: u64) {
 
 /// Get a uint64 from a dictionary.
 pub fn dict_get_uint64(dict: u64, key_ptr: u64) -> u64 {
-    if key_ptr == 0 { return 0; }
+    if key_ptr == 0 {
+        return 0;
+    }
     let key = unsafe { CStr::from_ptr(key_ptr as *const std::ffi::c_char) };
     let handle = dict_get(dict, key);
-    if handle == 0 { return 0; }
-    with_table(|t| {
-        match t.get(&handle) {
-            Some(XpcValue::Uint64(v)) => *v,
-            _ => 0,
-        }
+    if handle == 0 {
+        return 0;
+    }
+    with_table(|t| match t.get(&handle) {
+        Some(XpcValue::Uint64(v)) => *v,
+        _ => 0,
     })
 }
 
 /// Set a bool in a dictionary.
 pub fn dict_set_bool(dict: u64, key_ptr: u64, value: bool) {
-    if key_ptr == 0 { return; }
+    if key_ptr == 0 {
+        return;
+    }
     let key = unsafe { CStr::from_ptr(key_ptr as *const std::ffi::c_char) };
     let h = create_bool(value);
     dict_set(dict, key, h);
@@ -296,21 +316,25 @@ pub fn dict_set_bool(dict: u64, key_ptr: u64, value: bool) {
 
 /// Get a bool from a dictionary.
 pub fn dict_get_bool(dict: u64, key_ptr: u64) -> bool {
-    if key_ptr == 0 { return false; }
+    if key_ptr == 0 {
+        return false;
+    }
     let key = unsafe { CStr::from_ptr(key_ptr as *const std::ffi::c_char) };
     let handle = dict_get(dict, key);
-    if handle == 0 { return false; }
-    with_table(|t| {
-        match t.get(&handle) {
-            Some(XpcValue::Bool(v)) => *v,
-            _ => false,
-        }
+    if handle == 0 {
+        return false;
+    }
+    with_table(|t| match t.get(&handle) {
+        Some(XpcValue::Bool(v)) => *v,
+        _ => false,
     })
 }
 
 /// Set data in a dictionary.
 pub fn dict_set_data(dict: u64, key_ptr: u64, data_ptr: u64, len: u64) {
-    if key_ptr == 0 { return; }
+    if key_ptr == 0 {
+        return;
+    }
     let key = unsafe { CStr::from_ptr(key_ptr as *const std::ffi::c_char) };
     let h = create_data_from_ptr(data_ptr, len);
     dict_set(dict, key, h);
@@ -318,21 +342,25 @@ pub fn dict_set_data(dict: u64, key_ptr: u64, data_ptr: u64, len: u64) {
 
 /// Get data pointer from a dictionary (returns pointer to bytes, sets length).
 pub fn dict_get_data(dict: u64, key_ptr: u64) -> u64 {
-    if key_ptr == 0 { return 0; }
+    if key_ptr == 0 {
+        return 0;
+    }
     let key = unsafe { CStr::from_ptr(key_ptr as *const std::ffi::c_char) };
     let handle = dict_get(dict, key);
-    if handle == 0 { return 0; }
-    with_table(|t| {
-        match t.get(&handle) {
-            Some(XpcValue::Data(d)) if !d.is_empty() => d.as_ptr() as u64,
-            _ => 0,
-        }
+    if handle == 0 {
+        return 0;
+    }
+    with_table(|t| match t.get(&handle) {
+        Some(XpcValue::Data(d)) if !d.is_empty() => d.as_ptr() as u64,
+        _ => 0,
     })
 }
 
 /// Set an fd in a dictionary.
 pub fn dict_set_fd(dict: u64, key_ptr: u64, fd: i32) {
-    if key_ptr == 0 { return; }
+    if key_ptr == 0 {
+        return;
+    }
     let key = unsafe { CStr::from_ptr(key_ptr as *const std::ffi::c_char) };
     let h = create_fd(fd);
     dict_set(dict, key, h);
@@ -353,7 +381,9 @@ pub fn dict_get_count(dict: u64) -> u64 {
 ///
 /// `applier` is an ObjC block: invoke at offset +16, takes (block, key_cstr, value_handle).
 pub fn dict_apply(dict: u64, applier: u64) -> bool {
-    if applier == 0 { return true; }
+    if applier == 0 {
+        return true;
+    }
 
     // Snapshot the pairs so we don't hold the lock during callback
     let pairs: Vec<(CString, u64)> = with_table(|t| {
@@ -365,12 +395,16 @@ pub fn dict_apply(dict: u64, applier: u64) -> bool {
     });
 
     let invoke_ptr = unsafe { *((applier + 16) as *const u64) };
-    if invoke_ptr == 0 { return true; }
+    if invoke_ptr == 0 {
+        return true;
+    }
     let invoke: extern "C" fn(u64, u64, u64) -> i32 = unsafe { std::mem::transmute(invoke_ptr) };
 
     for (key, val) in &pairs {
         let result = invoke(applier, key.as_ptr() as u64, *val);
-        if result == 0 { return false; }
+        if result == 0 {
+            return false;
+        }
     }
     true
 }
@@ -407,7 +441,9 @@ pub fn array_get_value(arr: u64, index: u64) -> u64 {
 
 /// Apply a callback to each element.
 pub fn array_apply(arr: u64, applier: u64) -> bool {
-    if applier == 0 { return true; }
+    if applier == 0 {
+        return true;
+    }
 
     let elements: Vec<u64> = with_table(|t| {
         if let Some(XpcValue::Array(vec)) = t.get(&arr) {
@@ -418,12 +454,16 @@ pub fn array_apply(arr: u64, applier: u64) -> bool {
     });
 
     let invoke_ptr = unsafe { *((applier + 16) as *const u64) };
-    if invoke_ptr == 0 { return true; }
+    if invoke_ptr == 0 {
+        return true;
+    }
     let invoke: extern "C" fn(u64, u64, u64) -> i32 = unsafe { std::mem::transmute(invoke_ptr) };
 
     for (i, val) in elements.iter().enumerate() {
         let result = invoke(applier, i as u64, *val);
-        if result == 0 { return false; }
+        if result == 0 {
+            return false;
+        }
     }
     true
 }
@@ -431,117 +471,112 @@ pub fn array_apply(arr: u64, applier: u64) -> bool {
 // ── Primitive accessors ────────────────────────────────────────
 
 pub fn get_bool_value(handle: u64) -> bool {
-    with_table(|t| {
-        match t.get(&handle) {
-            Some(XpcValue::Bool(v)) => *v,
-            _ => false,
-        }
+    with_table(|t| match t.get(&handle) {
+        Some(XpcValue::Bool(v)) => *v,
+        _ => false,
     })
 }
 
 pub fn get_int64_value(handle: u64) -> i64 {
-    with_table(|t| {
-        match t.get(&handle) {
-            Some(XpcValue::Int64(v)) => *v,
-            _ => 0,
-        }
+    with_table(|t| match t.get(&handle) {
+        Some(XpcValue::Int64(v)) => *v,
+        _ => 0,
     })
 }
 
 pub fn get_uint64_value(handle: u64) -> u64 {
-    with_table(|t| {
-        match t.get(&handle) {
-            Some(XpcValue::Uint64(v)) => *v,
-            _ => 0,
-        }
+    with_table(|t| match t.get(&handle) {
+        Some(XpcValue::Uint64(v)) => *v,
+        _ => 0,
     })
 }
 
 pub fn get_double_value(handle: u64) -> f64 {
-    with_table(|t| {
-        match t.get(&handle) {
-            Some(XpcValue::Double(v)) => *v,
-            _ => 0.0,
-        }
+    with_table(|t| match t.get(&handle) {
+        Some(XpcValue::Double(v)) => *v,
+        _ => 0.0,
     })
 }
 
 pub fn get_string_ptr(handle: u64) -> u64 {
-    with_table(|t| {
-        match t.get(&handle) {
-            Some(XpcValue::String(s)) => s.as_ptr() as u64,
-            _ => 0,
-        }
+    with_table(|t| match t.get(&handle) {
+        Some(XpcValue::String(s)) => s.as_ptr() as u64,
+        _ => 0,
     })
 }
 
 pub fn get_string_length(handle: u64) -> u64 {
-    with_table(|t| {
-        match t.get(&handle) {
-            Some(XpcValue::String(s)) => s.to_bytes().len() as u64,
-            _ => 0,
-        }
+    with_table(|t| match t.get(&handle) {
+        Some(XpcValue::String(s)) => s.to_bytes().len() as u64,
+        _ => 0,
     })
 }
 
 pub fn get_data_ptr(handle: u64) -> u64 {
-    with_table(|t| {
-        match t.get(&handle) {
-            Some(XpcValue::Data(d)) if !d.is_empty() => d.as_ptr() as u64,
-            _ => 0,
-        }
+    with_table(|t| match t.get(&handle) {
+        Some(XpcValue::Data(d)) if !d.is_empty() => d.as_ptr() as u64,
+        _ => 0,
     })
 }
 
 pub fn get_data_length(handle: u64) -> u64 {
-    with_table(|t| {
-        match t.get(&handle) {
-            Some(XpcValue::Data(d)) => d.len() as u64,
-            _ => 0,
-        }
+    with_table(|t| match t.get(&handle) {
+        Some(XpcValue::Data(d)) => d.len() as u64,
+        _ => 0,
     })
 }
 
 pub fn get_date_value(handle: u64) -> i64 {
-    with_table(|t| {
-        match t.get(&handle) {
-            Some(XpcValue::Date(v)) => *v,
-            _ => 0,
-        }
+    with_table(|t| match t.get(&handle) {
+        Some(XpcValue::Date(v)) => *v,
+        _ => 0,
     })
 }
 
 /// Get the type tag for an object handle (for `xpc_get_type`).
 pub fn get_type_tag(handle: u64) -> u64 {
-    with_table(|t| {
-        t.get(&handle).map(|v| v.type_tag()).unwrap_or(0)
-    })
+    with_table(|t| t.get(&handle).map(|v| v.type_tag()).unwrap_or(0))
 }
 
 /// Build a human-readable description string.
 pub fn copy_description(handle: u64) -> u64 {
-    let desc = with_table(|t| {
-        match t.get(&handle) {
-            Some(XpcValue::Null) => "null".to_string(),
-            Some(XpcValue::Bool(v)) => format!("{}", v),
-            Some(XpcValue::Int64(v)) => format!("{}", v),
-            Some(XpcValue::Uint64(v)) => format!("{}", v),
-            Some(XpcValue::Double(v)) => format!("{}", v),
-            Some(XpcValue::String(s)) => format!("\"{}\"", s.to_str().unwrap_or("?")),
-            Some(XpcValue::Data(d)) => format!("<data: {} bytes>", d.len()),
-            Some(XpcValue::Date(v)) => format!("<date: {}>", v),
-            Some(XpcValue::Uuid(u)) => {
-                format!("{:02X}{:02X}{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}",
-                    u[0],u[1],u[2],u[3],u[4],u[5],u[6],u[7],u[8],u[9],u[10],u[11],u[12],u[13],u[14],u[15])
-            }
-            Some(XpcValue::Fd(fd)) => format!("<fd: {}>", fd),
-            Some(XpcValue::Array(arr)) => format!("<array: {} elements>", arr.len()),
-            Some(XpcValue::Dictionary(d)) => format!("<dictionary: {} entries>", d.len()),
-            Some(XpcValue::Error(_)) => "<error>".to_string(),
-            Some(XpcValue::Connection(_)) => "<connection>".to_string(),
-            Some(XpcValue::Endpoint(_)) => "<endpoint>".to_string(),
-            None => "<invalid xpc object>".to_string(),
+    let desc = with_table(|t| match t.get(&handle) {
+        Some(XpcValue::Null) => "null".to_string(),
+        Some(XpcValue::Bool(v)) => format!("{}", v),
+        Some(XpcValue::Int64(v)) => format!("{}", v),
+        Some(XpcValue::Uint64(v)) => format!("{}", v),
+        Some(XpcValue::Double(v)) => format!("{}", v),
+        Some(XpcValue::String(s)) => format!("\"{}\"", s.to_str().unwrap_or("?")),
+        Some(XpcValue::Data(d)) => format!("<data: {} bytes>", d.len()),
+        Some(XpcValue::Date(v)) => format!("<date: {}>", v),
+        Some(XpcValue::Uuid(u)) => {
+            format!(
+                "{:02X}{:02X}{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}",
+                u[0],
+                u[1],
+                u[2],
+                u[3],
+                u[4],
+                u[5],
+                u[6],
+                u[7],
+                u[8],
+                u[9],
+                u[10],
+                u[11],
+                u[12],
+                u[13],
+                u[14],
+                u[15]
+            )
         }
+        Some(XpcValue::Fd(fd)) => format!("<fd: {}>", fd),
+        Some(XpcValue::Array(arr)) => format!("<array: {} elements>", arr.len()),
+        Some(XpcValue::Dictionary(d)) => format!("<dictionary: {} entries>", d.len()),
+        Some(XpcValue::Error(_)) => "<error>".to_string(),
+        Some(XpcValue::Connection(_)) => "<connection>".to_string(),
+        Some(XpcValue::Endpoint(_)) => "<endpoint>".to_string(),
+        None => "<invalid xpc object>".to_string(),
     });
     // Leak a CString — callers are expected to free with free() but we
     // accept the small leak for correctness (matching Apple's behavior
@@ -552,7 +587,9 @@ pub fn copy_description(handle: u64) -> u64 {
 
 /// Check equality between two XPC objects.
 pub fn equal(a: u64, b: u64) -> bool {
-    if a == b { return true; }
+    if a == b {
+        return true;
+    }
     let va = get(a);
     let vb = get(b);
     match (va, vb) {
@@ -687,9 +724,15 @@ mod tests {
     #[test]
     fn type_tags() {
         assert_eq!(get_type_tag(create_int64(0)), XPC_TYPE_TAG_INT64);
-        assert_eq!(get_type_tag(create_string(&CString::new("").unwrap())), XPC_TYPE_TAG_STRING);
+        assert_eq!(
+            get_type_tag(create_string(&CString::new("").unwrap())),
+            XPC_TYPE_TAG_STRING
+        );
         assert_eq!(get_type_tag(create_bool(false)), XPC_TYPE_TAG_BOOL);
-        assert_eq!(get_type_tag(create_dictionary_empty()), XPC_TYPE_TAG_DICTIONARY);
+        assert_eq!(
+            get_type_tag(create_dictionary_empty()),
+            XPC_TYPE_TAG_DICTIONARY
+        );
         assert_eq!(get_type_tag(create_array_empty()), XPC_TYPE_TAG_ARRAY);
     }
 

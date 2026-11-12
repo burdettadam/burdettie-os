@@ -2,7 +2,7 @@
 
 use super::{ExitReason, Interpreter, StepResult};
 use crate::decode::Instruction;
-use crate::{mem_read_u64, mem_read_u32, mem_read_u16, mem_read_u8};
+use crate::{mem_read_u16, mem_read_u32, mem_read_u64, mem_read_u8};
 
 impl Interpreter {
     pub(super) fn exec_ls(&mut self, insn: Instruction, pc: u64) -> StepResult {
@@ -27,7 +27,11 @@ impl Interpreter {
                     self.mem.write_u32(addr, val as u32)
                 };
                 if !ok {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr,
+                        is_write: true,
+                    });
                 }
                 self.cpu.pc = pc + 4;
             }
@@ -52,7 +56,11 @@ impl Interpreter {
                     self.mem.write_u32(addr, val as u32)
                 };
                 if !ok {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr,
+                        is_write: true,
+                    });
                 }
                 self.cpu.pc = pc + 4;
             }
@@ -79,7 +87,11 @@ impl Interpreter {
                     self.mem.write_u32(base, val as u32)
                 };
                 if !ok {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: true });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr: base,
+                        is_write: true,
+                    });
                 }
                 self.cpu.pc = pc + 4;
             }
@@ -106,7 +118,11 @@ impl Interpreter {
                     self.mem.write_u32(base, val as u32)
                 };
                 if !ok {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: true });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr: base,
+                        is_write: true,
+                    });
                 }
                 let new_base = (base as i64).wrapping_add(imm as i64) as u64;
                 self.cpu.write_reg(rn, new_base);
@@ -125,7 +141,11 @@ impl Interpreter {
                 let base = (self.cpu.read_reg(rn) as i64).wrapping_add(imm as i64) as u64;
                 self.cpu.write_reg(rn, base);
                 if !self.mem.write_u8(base, self.cpu.read_reg_zr(rt) as u8) {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: true });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr: base,
+                        is_write: true,
+                    });
                 }
                 self.cpu.pc = pc + 4;
             }
@@ -140,7 +160,11 @@ impl Interpreter {
                 let base = (self.cpu.read_reg(rn) as i64).wrapping_add(imm as i64) as u64;
                 self.cpu.write_reg(rn, base);
                 if !self.mem.write_u16(base, self.cpu.read_reg_zr(rt) as u16) {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: true });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr: base,
+                        is_write: true,
+                    });
                 }
                 self.cpu.pc = pc + 4;
             }
@@ -148,7 +172,11 @@ impl Interpreter {
                 let base = (self.cpu.read_reg(rn) as i64).wrapping_add(imm as i64) as u64;
                 self.cpu.write_reg(rn, base);
                 let byte = mem_read_u8!(self, base, pc);
-                let val = if sf { (byte as i8) as i64 as u64 } else { (byte as i8) as i32 as u32 as u64 };
+                let val = if sf {
+                    (byte as i8) as i64 as u64
+                } else {
+                    (byte as i8) as i32 as u32 as u64
+                };
                 self.cpu.write_reg_zr(rt, val);
                 self.cpu.pc = pc + 4;
             }
@@ -156,7 +184,11 @@ impl Interpreter {
                 let base = (self.cpu.read_reg(rn) as i64).wrapping_add(imm as i64) as u64;
                 self.cpu.write_reg(rn, base);
                 let hw = mem_read_u16!(self, base, pc);
-                let val = if sf { (hw as i16) as i64 as u64 } else { (hw as i16) as i32 as u32 as u64 };
+                let val = if sf {
+                    (hw as i16) as i64 as u64
+                } else {
+                    (hw as i16) as i32 as u32 as u64
+                };
                 self.cpu.write_reg_zr(rt, val);
                 self.cpu.pc = pc + 4;
             }
@@ -173,53 +205,76 @@ impl Interpreter {
                 let base = self.cpu.read_reg(rn);
                 let val = mem_read_u8!(self, base, pc) as u64;
                 self.cpu.write_reg_zr(rt, val);
-                self.cpu.write_reg(rn, (base as i64).wrapping_add(imm as i64) as u64);
+                self.cpu
+                    .write_reg(rn, (base as i64).wrapping_add(imm as i64) as u64);
                 self.cpu.pc = pc + 4;
             }
             Instruction::StrbPost { rt, rn, imm } => {
                 let base = self.cpu.read_reg(rn);
                 if !self.mem.write_u8(base, self.cpu.read_reg_zr(rt) as u8) {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: true });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr: base,
+                        is_write: true,
+                    });
                 }
-                self.cpu.write_reg(rn, (base as i64).wrapping_add(imm as i64) as u64);
+                self.cpu
+                    .write_reg(rn, (base as i64).wrapping_add(imm as i64) as u64);
                 self.cpu.pc = pc + 4;
             }
             Instruction::LdrhPost { rt, rn, imm } => {
                 let base = self.cpu.read_reg(rn);
                 let val = mem_read_u16!(self, base, pc) as u64;
                 self.cpu.write_reg_zr(rt, val);
-                self.cpu.write_reg(rn, (base as i64).wrapping_add(imm as i64) as u64);
+                self.cpu
+                    .write_reg(rn, (base as i64).wrapping_add(imm as i64) as u64);
                 self.cpu.pc = pc + 4;
             }
             Instruction::StrhPost { rt, rn, imm } => {
                 let base = self.cpu.read_reg(rn);
                 if !self.mem.write_u16(base, self.cpu.read_reg_zr(rt) as u16) {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: true });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr: base,
+                        is_write: true,
+                    });
                 }
-                self.cpu.write_reg(rn, (base as i64).wrapping_add(imm as i64) as u64);
+                self.cpu
+                    .write_reg(rn, (base as i64).wrapping_add(imm as i64) as u64);
                 self.cpu.pc = pc + 4;
             }
             Instruction::LdrsbPost { sf, rt, rn, imm } => {
                 let base = self.cpu.read_reg(rn);
                 let byte = mem_read_u8!(self, base, pc);
-                let val = if sf { (byte as i8) as i64 as u64 } else { (byte as i8) as i32 as u32 as u64 };
+                let val = if sf {
+                    (byte as i8) as i64 as u64
+                } else {
+                    (byte as i8) as i32 as u32 as u64
+                };
                 self.cpu.write_reg_zr(rt, val);
-                self.cpu.write_reg(rn, (base as i64).wrapping_add(imm as i64) as u64);
+                self.cpu
+                    .write_reg(rn, (base as i64).wrapping_add(imm as i64) as u64);
                 self.cpu.pc = pc + 4;
             }
             Instruction::LdrshPost { sf, rt, rn, imm } => {
                 let base = self.cpu.read_reg(rn);
                 let hw = mem_read_u16!(self, base, pc);
-                let val = if sf { (hw as i16) as i64 as u64 } else { (hw as i16) as i32 as u32 as u64 };
+                let val = if sf {
+                    (hw as i16) as i64 as u64
+                } else {
+                    (hw as i16) as i32 as u32 as u64
+                };
                 self.cpu.write_reg_zr(rt, val);
-                self.cpu.write_reg(rn, (base as i64).wrapping_add(imm as i64) as u64);
+                self.cpu
+                    .write_reg(rn, (base as i64).wrapping_add(imm as i64) as u64);
                 self.cpu.pc = pc + 4;
             }
             Instruction::LdrswPost { rt, rn, imm } => {
                 let base = self.cpu.read_reg(rn);
                 let word = mem_read_u32!(self, base, pc);
                 self.cpu.write_reg_zr(rt, (word as i32) as i64 as u64);
-                self.cpu.write_reg(rn, (base as i64).wrapping_add(imm as i64) as u64);
+                self.cpu
+                    .write_reg(rn, (base as i64).wrapping_add(imm as i64) as u64);
                 self.cpu.pc = pc + 4;
             }
 
@@ -243,10 +298,7 @@ mod tests {
     // 1. STR/LDR 64-bit round-trip
     #[test]
     fn test_exec_str_ldr_64() {
-        let mut t = test_interp(&[
-            enc_str_imm64(0, 2, 0),
-            enc_ldr_imm64(1, 2, 0),
-        ]);
+        let mut t = test_interp(&[enc_str_imm64(0, 2, 0), enc_ldr_imm64(1, 2, 0)]);
         t.interp.cpu.x[0] = 0xDEAD_BEEF_CAFE_BABE;
         t.interp.cpu.x[2] = t.data_base;
         let cpu = t.run_ok();
@@ -256,10 +308,7 @@ mod tests {
     // 2. STR/LDR 32-bit round-trip (zero-extends on load)
     #[test]
     fn test_exec_str_ldr_32() {
-        let mut t = test_interp(&[
-            enc_str_imm32(0, 2, 0),
-            enc_ldr_imm32(1, 2, 0),
-        ]);
+        let mut t = test_interp(&[enc_str_imm32(0, 2, 0), enc_ldr_imm32(1, 2, 0)]);
         t.interp.cpu.x[0] = 0xFFFF_FFFF_ABCD_1234;
         t.interp.cpu.x[2] = t.data_base;
         let cpu = t.run_ok();
@@ -270,10 +319,7 @@ mod tests {
     // 3. STRB/LDRB byte store/load
     #[test]
     fn test_exec_strb_ldrb() {
-        let mut t = test_interp(&[
-            enc_strb_imm(0, 2, 0),
-            enc_ldrb_imm(1, 2, 0),
-        ]);
+        let mut t = test_interp(&[enc_strb_imm(0, 2, 0), enc_ldrb_imm(1, 2, 0)]);
         t.interp.cpu.x[0] = 0xFF42;
         t.interp.cpu.x[2] = t.data_base;
         let cpu = t.run_ok();
@@ -283,10 +329,7 @@ mod tests {
     // 4. STRH/LDRH halfword store/load
     #[test]
     fn test_exec_strh_ldrh() {
-        let mut t = test_interp(&[
-            enc_strh_imm(0, 2, 0),
-            enc_ldrh_imm(1, 2, 0),
-        ]);
+        let mut t = test_interp(&[enc_strh_imm(0, 2, 0), enc_ldrh_imm(1, 2, 0)]);
         t.interp.cpu.x[0] = 0xDEAD_BEEF;
         t.interp.cpu.x[2] = t.data_base;
         let cpu = t.run_ok();
@@ -296,10 +339,7 @@ mod tests {
     // 5. STP/LDP 64-bit pair store/load
     #[test]
     fn test_exec_stp_ldp_64() {
-        let mut t = test_interp(&[
-            enc_stp64(0, 1, 4, 0),
-            enc_ldp64(2, 3, 4, 0),
-        ]);
+        let mut t = test_interp(&[enc_stp64(0, 1, 4, 0), enc_ldp64(2, 3, 4, 0)]);
         t.interp.cpu.x[0] = 0x1111_2222_3333_4444;
         t.interp.cpu.x[1] = 0xAAAA_BBBB_CCCC_DDDD;
         t.interp.cpu.x[4] = t.data_base;
@@ -362,7 +402,13 @@ mod tests {
         t.interp.cpu.x[2] = 0xDEAD_0000; // unmapped address
         let exit = t.run();
         assert!(
-            matches!(exit, ExitReason::MemoryFault { is_write: false, .. }),
+            matches!(
+                exit,
+                ExitReason::MemoryFault {
+                    is_write: false,
+                    ..
+                }
+            ),
             "Expected MemoryFault, got: {exit:?}"
         );
     }
@@ -440,10 +486,7 @@ mod tests {
     // 17. STP/LDP 64-bit with offset
     #[test]
     fn test_exec_stp_ldp_64_with_offset() {
-        let mut t = test_interp(&[
-            enc_stp64(0, 1, 4, 16),
-            enc_ldp64(2, 3, 4, 16),
-        ]);
+        let mut t = test_interp(&[enc_stp64(0, 1, 4, 16), enc_ldp64(2, 3, 4, 16)]);
         t.interp.cpu.x[0] = 0xAAAA;
         t.interp.cpu.x[1] = 0xBBBB;
         t.interp.cpu.x[4] = t.data_base;
@@ -485,14 +528,10 @@ mod tests {
     // 20. STRB at byte offset, LDRB at same offset
     #[test]
     fn test_exec_strb_ldrb_with_offset() {
-        let mut t = test_interp(&[
-            enc_strb_imm(0, 2, 5),
-            enc_ldrb_imm(1, 2, 5),
-        ]);
+        let mut t = test_interp(&[enc_strb_imm(0, 2, 5), enc_ldrb_imm(1, 2, 5)]);
         t.interp.cpu.x[0] = 0x7F;
         t.interp.cpu.x[2] = t.data_base;
         let cpu = t.run_ok();
         assert_eq!(cpu.x[1], 0x7F);
     }
 }
-

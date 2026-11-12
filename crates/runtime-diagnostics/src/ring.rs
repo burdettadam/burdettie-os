@@ -52,8 +52,7 @@ impl DiagCategory {
             | DiagEvent::SymbolMissing { .. }
             | DiagEvent::BindFailed { .. } => Self::SymbolResolution,
 
-            DiagEvent::HostFallback { .. }
-            | DiagEvent::UnknownIsa { .. } => Self::HostFallback,
+            DiagEvent::HostFallback { .. } | DiagEvent::UnknownIsa { .. } => Self::HostFallback,
 
             DiagEvent::MethodDispatch { .. } => Self::MethodTrace,
 
@@ -214,10 +213,7 @@ impl DiagRing {
 
     /// Return events matching a predicate, in chronological order.
     pub fn filter<F: Fn(&DiagEvent) -> bool>(&self, pred: F) -> Vec<StampedEvent> {
-        self.iter()
-            .filter(|se| pred(&se.event))
-            .cloned()
-            .collect()
+        self.iter().filter(|se| pred(&se.event)).cloned().collect()
     }
 
     /// Return events of a specific category, in chronological order.

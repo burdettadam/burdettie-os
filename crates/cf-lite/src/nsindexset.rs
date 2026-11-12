@@ -130,7 +130,11 @@ pub extern "C" fn shim_nsindexset_contains_index(obj: u64, _cmd: u64, index: u64
     let result = u8::from(idxs.binary_search(&index).is_ok());
     eprintln!(
         "[containsIndex] obj={:#x} index={} → {} (set has {} entries: {:?})",
-        obj, index, result, idxs.len(), &idxs[..idxs.len().min(8)]
+        obj,
+        index,
+        result,
+        idxs.len(),
+        &idxs[..idxs.len().min(8)]
     );
     result
 }
@@ -305,8 +309,7 @@ pub extern "C" fn shim_nsindexset_enumerate_indexes_using_block(obj: u64, _cmd: 
     if invoke == 0 {
         return;
     }
-    let invoke_fn: extern "C" fn(u64, u64, *mut u8) =
-        unsafe { std::mem::transmute(invoke) };
+    let invoke_fn: extern "C" fn(u64, u64, *mut u8) = unsafe { std::mem::transmute(invoke) };
     let idxs = read_indexes(obj);
     let mut stop: u8 = 0;
     for &idx in idxs {
@@ -329,8 +332,7 @@ pub extern "C" fn shim_nsindexset_indexes_passing_test(obj: u64, _cmd: u64, bloc
     if invoke == 0 {
         return alloc_nsindexset(&[], false);
     }
-    let invoke_fn: extern "C" fn(u64, u64, *mut u8) -> u8 =
-        unsafe { std::mem::transmute(invoke) };
+    let invoke_fn: extern "C" fn(u64, u64, *mut u8) -> u8 = unsafe { std::mem::transmute(invoke) };
     let idxs = read_indexes(obj);
     let mut result = Vec::new();
     let mut stop: u8 = 0;
@@ -500,9 +502,9 @@ mod tests {
     #[test]
     fn enumerate_indexes_using_block() {
         let set = shim_nsindexset_with_range(0, 0, 5, 3); // {5,6,7}
-        // We'll use a fake block struct to verify the enumerate logic.
-        // Block layout: isa(0), flags(8), invoke(16), ...
-        // We need a real callable function pointer at offset 16.
+                                                          // We'll use a fake block struct to verify the enumerate logic.
+                                                          // Block layout: isa(0), flags(8), invoke(16), ...
+                                                          // We need a real callable function pointer at offset 16.
         static mut COLLECTED: Vec<u64> = Vec::new();
 
         extern "C" fn test_block_invoke(block: u64, idx: u64, stop: *mut u8) {

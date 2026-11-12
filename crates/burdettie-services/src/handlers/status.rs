@@ -56,21 +56,20 @@ pub fn inc_replay_hit() {
 pub struct StatusHandler;
 
 impl Handler for StatusHandler {
-    fn handle(&self, path: &str, _method: &str, _body: &[u8], _request: &Request)
-        -> Option<HandlerResponse>
-    {
+    fn handle(
+        &self,
+        path: &str,
+        _method: &str,
+        _body: &[u8],
+        _request: &Request,
+    ) -> Option<HandlerResponse> {
         if path != "/_burdettie/status" {
             return None;
         }
 
-        let uptime_secs = START_TIME
-            .get()
-            .map(|t| t.elapsed().as_secs())
-            .unwrap_or(0);
+        let uptime_secs = START_TIME.get().map(|t| t.elapsed().as_secs()).unwrap_or(0);
 
-        let record_count = crate::global_recorder()
-            .map(|r| r.count())
-            .unwrap_or(-1);
+        let record_count = crate::global_recorder().map(|r| r.count()).unwrap_or(-1);
 
         let response = serde_json::json!({
             "server": "burdettie",

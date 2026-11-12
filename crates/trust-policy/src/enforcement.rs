@@ -93,7 +93,10 @@ mod tests {
         let deny = SecurityVerdict::Deny {
             reason: "test".to_string(),
         };
-        assert_eq!(EnforcementMode::Promiscuous.apply(deny), SecurityVerdict::Allow);
+        assert_eq!(
+            EnforcementMode::Promiscuous.apply(deny),
+            SecurityVerdict::Allow
+        );
     }
 
     #[test]

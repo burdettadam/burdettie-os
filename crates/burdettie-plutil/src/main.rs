@@ -56,7 +56,13 @@ fn run(args: &[String]) -> bool {
             i += 1;
             let (type_flag, type_value, remaining) = parse_type_and_value(&args[i..]);
             let (opts, rest) = parse_options(&remaining);
-            return cmd_insert(&keypath, type_flag.as_deref(), type_value.as_deref(), &rest, &opts);
+            return cmd_insert(
+                &keypath,
+                type_flag.as_deref(),
+                type_value.as_deref(),
+                &rest,
+                &opts,
+            );
         }
         "-replace" => {
             i += 1;
@@ -189,7 +195,15 @@ fn parse_type_and_value(args: &[String]) -> (Option<String>, Option<String>, Vec
         return (None, None, Vec::new());
     }
     let type_flags = [
-        "-bool", "-integer", "-float", "-string", "-date", "-data", "-xml", "-json", "-array",
+        "-bool",
+        "-integer",
+        "-float",
+        "-string",
+        "-date",
+        "-data",
+        "-xml",
+        "-json",
+        "-array",
         "-dictionary",
     ];
     if type_flags.contains(&args[0].as_str()) {
@@ -199,11 +213,7 @@ fn parse_type_and_value(args: &[String]) -> (Option<String>, Option<String>, Vec
             return (Some(type_flag), None, args[1..].to_vec());
         }
         if args.len() > 1 && !args[1].starts_with('-') {
-            return (
-                Some(type_flag),
-                Some(args[1].clone()),
-                args[2..].to_vec(),
-            );
+            return (Some(type_flag), Some(args[1].clone()), args[2..].to_vec());
         }
         // Value might start with - (negative numbers), check if it's not a known flag
         if args.len() > 1
@@ -214,11 +224,7 @@ fn parse_type_and_value(args: &[String]) -> (Option<String>, Option<String>, Vec
             && args[1] != "-n"
             && args[1] != "-e"
         {
-            return (
-                Some(type_flag),
-                Some(args[1].clone()),
-                args[2..].to_vec(),
-            );
+            return (Some(type_flag), Some(args[1].clone()), args[2..].to_vec());
         }
         return (Some(type_flag), None, args[1..].to_vec());
     }
@@ -238,12 +244,7 @@ fn read_plist(path: &str) -> Result<Value, String> {
     }
 }
 
-fn write_output(
-    value: &Value,
-    format: &str,
-    path: &str,
-    opts: &Options,
-) -> Result<(), String> {
+fn write_output(value: &Value, format: &str, path: &str, opts: &Options) -> Result<(), String> {
     let output_path = get_output_path(path, opts);
     match format {
         "xml1" => {
@@ -429,10 +430,7 @@ fn navigate_keypath_mut<'a>(root: &'a mut Value, keypath: &str) -> Option<&'a mu
 }
 
 /// Navigate to the parent of the last keypath component, returning (parent, last_key)
-fn navigate_to_parent<'a>(
-    root: &'a mut Value,
-    keypath: &str,
-) -> Option<(&'a mut Value, String)> {
+fn navigate_to_parent<'a>(root: &'a mut Value, keypath: &str) -> Option<(&'a mut Value, String)> {
     let parts: Vec<&str> = keypath.split('.').collect();
     if parts.is_empty() {
         return None;
@@ -472,8 +470,7 @@ fn make_value(type_flag: Option<&str>, type_value: Option<&str>) -> Result<Value
         }
         Some("-date") => {
             let v = type_value.ok_or("No date value specified")?;
-            let date =
-                plist::Date::from_xml_format(v).map_err(|_| format!("Invalid date: {v}"))?;
+            let date = plist::Date::from_xml_format(v).map_err(|_| format!("Invalid date: {v}"))?;
             Ok(Value::Date(date))
         }
         Some("-data") => {
@@ -863,15 +860,11 @@ fn cmd_extract(keypath: &str, format: &str, files: &[String], opts: &Options) ->
                                 }
                             }
                             Value::Real(f) => f.to_string(),
-                            Value::Boolean(b) => {
-                                if *b { "true" } else { "false" }.to_string()
-                            }
+                            Value::Boolean(b) => if *b { "true" } else { "false" }.to_string(),
                             Value::Data(d) => BASE64.encode(d),
                             Value::Date(d) => d.to_xml_format(),
                             _ => {
-                                eprintln!(
-                                    "{file}: Cannot extract container type as raw"
-                                );
+                                eprintln!("{file}: Cannot extract container type as raw");
                                 all_ok = false;
                                 continue;
                             }
@@ -1006,8 +999,7 @@ fn write_value_to_original_format(
     let format = if original_path == "-" {
         "xml1" // Default for stdin
     } else {
-        let bytes = std::fs::read(original_path)
-            .map_err(|e| format!("{original_path}: {e}"))?;
+        let bytes = std::fs::read(original_path).map_err(|e| format!("{original_path}: {e}"))?;
         detect_format(&bytes)
     };
     let opts = Options::default();
@@ -1065,11 +1057,7 @@ mod tests {
 
     fn temp_dir() -> PathBuf {
         let id = TEST_COUNTER.fetch_add(1, Ordering::Relaxed);
-        let dir = std::env::temp_dir().join(format!(
-            "plutil-test-{}-{}",
-            std::process::id(),
-            id
-        ));
+        let dir = std::env::temp_dir().join(format!("plutil-test-{}-{}", std::process::id(), id));
         fs::create_dir_all(&dir).unwrap();
         dir
     }
@@ -1168,7 +1156,12 @@ mod tests {
         // Read it back
         let value = Value::from_file(&bin_path).unwrap();
         assert_eq!(
-            value.as_dictionary().unwrap().get("enabled").unwrap().as_boolean(),
+            value
+                .as_dictionary()
+                .unwrap()
+                .get("enabled")
+                .unwrap()
+                .as_boolean(),
             Some(true)
         );
         fs::remove_dir_all(&dir).ok();
@@ -1294,11 +1287,7 @@ mod tests {
 </dict>
 </plist>"#,
         );
-        let result = run(&[
-            "-type".into(),
-            "name".into(),
-            path.to_string_lossy().into(),
-        ]);
+        let result = run(&["-type".into(), "name".into(), path.to_string_lossy().into()]);
         assert!(result);
         let result = run(&[
             "-type".into(),
@@ -1392,9 +1381,7 @@ mod tests {
         let root = Value::Dictionary(root_dict);
 
         assert_eq!(
-            navigate_keypath(&root, "nested.key")
-                .unwrap()
-                .as_string(),
+            navigate_keypath(&root, "nested.key").unwrap().as_string(),
             Some("value")
         );
         assert_eq!(
@@ -1416,15 +1403,11 @@ mod tests {
     #[test]
     fn test_make_value() {
         assert_eq!(
-            make_value(Some("-bool"), Some("YES"))
-                .unwrap()
-                .as_boolean(),
+            make_value(Some("-bool"), Some("YES")).unwrap().as_boolean(),
             Some(true)
         );
         assert_eq!(
-            make_value(Some("-bool"), Some("NO"))
-                .unwrap()
-                .as_boolean(),
+            make_value(Some("-bool"), Some("NO")).unwrap().as_boolean(),
             Some(false)
         );
         assert_eq!(
@@ -1434,15 +1417,11 @@ mod tests {
             Some(99)
         );
         assert_eq!(
-            make_value(Some("-float"), Some("1.5"))
-                .unwrap()
-                .as_real(),
+            make_value(Some("-float"), Some("1.5")).unwrap().as_real(),
             Some(1.5)
         );
         assert_eq!(
-            make_value(Some("-string"), Some("hi"))
-                .unwrap()
-                .as_string(),
+            make_value(Some("-string"), Some("hi")).unwrap().as_string(),
             Some("hi")
         );
         assert!(make_value(Some("-array"), None)
@@ -1860,9 +1839,7 @@ mod tests {
     #[test]
     fn test_make_value_float_negative() {
         assert_eq!(
-            make_value(Some("-float"), Some("-3.14"))
-                .unwrap()
-                .as_real(),
+            make_value(Some("-float"), Some("-3.14")).unwrap().as_real(),
             Some(-3.14)
         );
     }
@@ -2034,10 +2011,7 @@ mod tests {
             value_type_name(&Value::Dictionary(Dictionary::new())),
             "dictionary"
         );
-        assert_eq!(
-            value_type_name(&Value::Uid(plist::Uid::new(42))),
-            "uid"
-        );
+        assert_eq!(value_type_name(&Value::Uid(plist::Uid::new(42))), "uid");
     }
 
     // ── plist ↔ JSON conversion thorough ────────────────────────────
@@ -2114,7 +2088,10 @@ mod tests {
     #[test]
     fn test_navigate_keypath_empty() {
         let root = Value::String("hello".into());
-        assert_eq!(navigate_keypath(&root, "").unwrap().as_string(), Some("hello"));
+        assert_eq!(
+            navigate_keypath(&root, "").unwrap().as_string(),
+            Some("hello")
+        );
     }
 
     #[test]
@@ -2156,17 +2133,18 @@ mod tests {
         let v = navigate_keypath_mut(&mut root, "key").unwrap();
         *v = Value::Integer(99.into());
         assert_eq!(
-            root.as_dictionary().unwrap().get("key").unwrap().as_signed_integer(),
+            root.as_dictionary()
+                .unwrap()
+                .get("key")
+                .unwrap()
+                .as_signed_integer(),
             Some(99)
         );
     }
 
     #[test]
     fn test_navigate_keypath_mut_array() {
-        let mut root = Value::Array(vec![
-            Value::String("a".into()),
-            Value::String("b".into()),
-        ]);
+        let mut root = Value::Array(vec![Value::String("a".into()), Value::String("b".into())]);
         let v = navigate_keypath_mut(&mut root, "1").unwrap();
         *v = Value::String("B".into());
         assert_eq!(root.as_array().unwrap()[1].as_string(), Some("B"));
@@ -2697,8 +2675,7 @@ mod tests {
             out.to_string_lossy().into(),
             path.to_string_lossy().into(),
         ]));
-        let j: JsonValue =
-            serde_json::from_str(&fs::read_to_string(&out).unwrap()).unwrap();
+        let j: JsonValue = serde_json::from_str(&fs::read_to_string(&out).unwrap()).unwrap();
         assert_eq!(j["Theme"], "dark");
         assert_eq!(j["FontSize"], 14);
         fs::remove_dir_all(&dir).ok();
@@ -2766,13 +2743,11 @@ mod tests {
         let dir = temp_dir();
         let path = write_rich_plist(&dir);
         // Each should succeed (type name verified by value_type_name unit test)
-        for key in &["Name", "Version", "Enabled", "Score", "Tags", "Settings", "Data"] {
+        for key in &[
+            "Name", "Version", "Enabled", "Score", "Tags", "Settings", "Data",
+        ] {
             assert!(
-                run(&[
-                    "-type".into(),
-                    (*key).into(),
-                    path.to_string_lossy().into(),
-                ]),
+                run(&["-type".into(), (*key).into(), path.to_string_lossy().into(),]),
                 "type query failed for key {key}"
             );
         }
@@ -2943,7 +2918,13 @@ mod tests {
             path.to_string_lossy().into(),
         ]));
         let v = Value::from_file(&path).unwrap();
-        let f = v.as_dictionary().unwrap().get("pi").unwrap().as_real().unwrap();
+        let f = v
+            .as_dictionary()
+            .unwrap()
+            .get("pi")
+            .unwrap()
+            .as_real()
+            .unwrap();
         assert!((f - 3.14159).abs() < 1e-10);
         fs::remove_dir_all(&dir).ok();
     }
@@ -3152,8 +3133,7 @@ mod tests {
         ]));
         let json_path = dir.join("rich.json");
         assert!(json_path.exists());
-        let j: JsonValue =
-            serde_json::from_str(&fs::read_to_string(&json_path).unwrap()).unwrap();
+        let j: JsonValue = serde_json::from_str(&fs::read_to_string(&json_path).unwrap()).unwrap();
         assert_eq!(j["Name"], "BurdettieOS");
         fs::remove_dir_all(&dir).ok();
     }
@@ -3196,7 +3176,11 @@ mod tests {
 <plist version="1.0"><dict/></plist>"#,
         );
         let p2 = dir.join("bad.plist");
-        fs::write(&p2, &[0x62, 0x70, 0x6c, 0x69, 0x73, 0x74, 0x30, 0x30, 0xff, 0xff]).unwrap(); // corrupt bplist header
+        fs::write(
+            &p2,
+            &[0x62, 0x70, 0x6c, 0x69, 0x73, 0x74, 0x30, 0x30, 0xff, 0xff],
+        )
+        .unwrap(); // corrupt bplist header
         let result = run(&[
             "-lint".into(),
             p1.to_string_lossy().into(),
@@ -3233,7 +3217,11 @@ mod tests {
         );
         let v = Value::from_file(&path).unwrap();
         assert_eq!(
-            v.as_dictionary().unwrap().get("newkey").unwrap().as_string(),
+            v.as_dictionary()
+                .unwrap()
+                .get("newkey")
+                .unwrap()
+                .as_string(),
             Some("hello")
         );
         assert_eq!(
@@ -3296,27 +3284,45 @@ mod tests {
         let path = dir.join("workflow.plist");
 
         // 1. Create empty plist
-        assert!(run(&["-create".into(), "xml1".into(), path.to_string_lossy().into()]));
+        assert!(run(&[
+            "-create".into(),
+            "xml1".into(),
+            path.to_string_lossy().into()
+        ]));
 
         // 2. Insert values
         assert!(run(&[
-            "-insert".into(), "app".into(), "-string".into(), "BurdettieOS".into(),
+            "-insert".into(),
+            "app".into(),
+            "-string".into(),
+            "BurdettieOS".into(),
             path.to_string_lossy().into(),
         ]));
         assert!(run(&[
-            "-insert".into(), "version".into(), "-integer".into(), "1".into(),
+            "-insert".into(),
+            "version".into(),
+            "-integer".into(),
+            "1".into(),
             path.to_string_lossy().into(),
         ]));
         assert!(run(&[
-            "-insert".into(), "features".into(), "-array".into(),
+            "-insert".into(),
+            "features".into(),
+            "-array".into(),
             path.to_string_lossy().into(),
         ]));
         assert!(run(&[
-            "-insert".into(), "features.0".into(), "-string".into(), "macho".into(),
+            "-insert".into(),
+            "features.0".into(),
+            "-string".into(),
+            "macho".into(),
             path.to_string_lossy().into(),
         ]));
         assert!(run(&[
-            "-insert".into(), "features.1".into(), "-string".into(), "arm64".into(),
+            "-insert".into(),
+            "features.1".into(),
+            "-string".into(),
+            "arm64".into(),
             path.to_string_lossy().into(),
         ]));
 
@@ -3326,53 +3332,67 @@ mod tests {
         // 4. Convert to JSON
         let json_path = dir.join("workflow.json");
         assert!(run(&[
-            "-convert".into(), "json".into(), "-r".into(),
-            "-o".into(), json_path.to_string_lossy().into(),
+            "-convert".into(),
+            "json".into(),
+            "-r".into(),
+            "-o".into(),
+            json_path.to_string_lossy().into(),
             path.to_string_lossy().into(),
         ]));
-        let j: JsonValue =
-            serde_json::from_str(&fs::read_to_string(&json_path).unwrap()).unwrap();
+        let j: JsonValue = serde_json::from_str(&fs::read_to_string(&json_path).unwrap()).unwrap();
         assert_eq!(j["app"], "BurdettieOS");
         assert_eq!(j["features"].as_array().unwrap().len(), 2);
 
         // 5. Replace version
         assert!(run(&[
-            "-replace".into(), "version".into(), "-integer".into(), "2".into(),
+            "-replace".into(),
+            "version".into(),
+            "-integer".into(),
+            "2".into(),
             path.to_string_lossy().into(),
         ]));
 
         // 6. Remove a feature
         assert!(run(&[
-            "-remove".into(), "features.0".into(),
+            "-remove".into(),
+            "features.0".into(),
             path.to_string_lossy().into(),
         ]));
 
         // 7. Extract remaining feature
         let feat_out = dir.join("feat.txt");
         assert!(run(&[
-            "-extract".into(), "features.0".into(), "raw".into(),
-            "-o".into(), feat_out.to_string_lossy().into(),
+            "-extract".into(),
+            "features.0".into(),
+            "raw".into(),
+            "-o".into(),
+            feat_out.to_string_lossy().into(),
             path.to_string_lossy().into(),
         ]));
         assert_eq!(fs::read_to_string(&feat_out).unwrap().trim(), "arm64");
 
         // 8. Type check
         assert!(run(&[
-            "-type".into(), "version".into(),
+            "-type".into(),
+            "version".into(),
             path.to_string_lossy().into(),
         ]));
 
         // 9. Convert to binary and back
         let bin_path = dir.join("workflow.bplist");
         assert!(run(&[
-            "-convert".into(), "binary1".into(),
-            "-o".into(), bin_path.to_string_lossy().into(),
+            "-convert".into(),
+            "binary1".into(),
+            "-o".into(),
+            bin_path.to_string_lossy().into(),
             path.to_string_lossy().into(),
         ]));
         let final_xml = dir.join("final.plist");
         assert!(run(&[
-            "-convert".into(), "xml1".into(),
-            "-o".into(), final_xml.to_string_lossy().into(),
+            "-convert".into(),
+            "xml1".into(),
+            "-o".into(),
+            final_xml.to_string_lossy().into(),
             bin_path.to_string_lossy().into(),
         ]));
 
@@ -3400,8 +3420,7 @@ mod tests {
             out.to_string_lossy().into(),
             path.to_string_lossy().into(),
         ]));
-        let j: JsonValue =
-            serde_json::from_str(&fs::read_to_string(&out).unwrap()).unwrap();
+        let j: JsonValue = serde_json::from_str(&fs::read_to_string(&out).unwrap()).unwrap();
         assert!(j.is_object());
         assert_eq!(j["Name"], "BurdettieOS");
         fs::remove_dir_all(&dir).ok();
@@ -3633,10 +3652,17 @@ mod tests {
         ]));
 
         let bytes = fs::read(&path).unwrap();
-        assert!(bytes.starts_with(b"bplist"), "should preserve binary format after replace");
+        assert!(
+            bytes.starts_with(b"bplist"),
+            "should preserve binary format after replace"
+        );
         let v = Value::from_file(&path).unwrap();
         assert_eq!(
-            v.as_dictionary().unwrap().get("key").unwrap().as_signed_integer(),
+            v.as_dictionary()
+                .unwrap()
+                .get("key")
+                .unwrap()
+                .as_signed_integer(),
             Some(99)
         );
         fs::remove_dir_all(&dir).ok();
@@ -3660,7 +3686,10 @@ mod tests {
         ]));
 
         let bytes = fs::read(&path).unwrap();
-        assert!(bytes.starts_with(b"bplist"), "should preserve binary format after remove");
+        assert!(
+            bytes.starts_with(b"bplist"),
+            "should preserve binary format after remove"
+        );
         let v = Value::from_file(&path).unwrap();
         let d = v.as_dictionary().unwrap();
         assert!(d.get("keep").is_some());
@@ -3692,7 +3721,10 @@ mod tests {
             path.to_string_lossy().into(),
         ]));
         let bytes = fs::read(&path).unwrap();
-        assert!(bytes.starts_with(b"bplist"), "should be binary after in-place convert");
+        assert!(
+            bytes.starts_with(b"bplist"),
+            "should be binary after in-place convert"
+        );
 
         // Convert back to xml in-place
         assert!(run(&[
@@ -3701,7 +3733,10 @@ mod tests {
             path.to_string_lossy().into(),
         ]));
         let content = fs::read_to_string(&path).unwrap();
-        assert!(content.contains("<?xml"), "should be XML after in-place convert back");
+        assert!(
+            content.contains("<?xml"),
+            "should be XML after in-place convert back"
+        );
         fs::remove_dir_all(&dir).ok();
     }
 
@@ -3723,8 +3758,7 @@ mod tests {
             json_path.to_string_lossy().into(),
             path.to_string_lossy().into(),
         ]));
-        let j: JsonValue =
-            serde_json::from_str(&fs::read_to_string(&json_path).unwrap()).unwrap();
+        let j: JsonValue = serde_json::from_str(&fs::read_to_string(&json_path).unwrap()).unwrap();
         assert_eq!(j["msg"], "hello");
         fs::remove_dir_all(&dir).ok();
     }
@@ -3856,7 +3890,11 @@ mod tests {
         // Output has the new key
         let v = Value::from_file(&out).unwrap();
         assert_eq!(
-            v.as_dictionary().unwrap().get("NewKey").unwrap().as_string(),
+            v.as_dictionary()
+                .unwrap()
+                .get("NewKey")
+                .unwrap()
+                .as_string(),
             Some("new")
         );
         fs::remove_dir_all(&dir).ok();
@@ -3879,7 +3917,11 @@ mod tests {
         // Original unchanged
         let orig = Value::from_file(&src).unwrap();
         assert_eq!(
-            orig.as_dictionary().unwrap().get("Name").unwrap().as_string(),
+            orig.as_dictionary()
+                .unwrap()
+                .get("Name")
+                .unwrap()
+                .as_string(),
             Some("BurdettieOS")
         );
         // Output has the replaced value
@@ -4141,7 +4183,11 @@ mod tests {
     fn test_large_plist_many_keys() {
         let dir = temp_dir();
         let path = dir.join("large.plist");
-        assert!(run(&["-create".into(), "xml1".into(), path.to_string_lossy().into()]));
+        assert!(run(&[
+            "-create".into(),
+            "xml1".into(),
+            path.to_string_lossy().into()
+        ]));
         // Insert 100 keys
         for i in 0..100 {
             assert!(
@@ -4162,11 +4208,19 @@ mod tests {
         assert_eq!(v.as_dictionary().unwrap().len(), 100);
         // Extract a few spot checks
         assert_eq!(
-            v.as_dictionary().unwrap().get("key_0").unwrap().as_signed_integer(),
+            v.as_dictionary()
+                .unwrap()
+                .get("key_0")
+                .unwrap()
+                .as_signed_integer(),
             Some(0)
         );
         assert_eq!(
-            v.as_dictionary().unwrap().get("key_99").unwrap().as_signed_integer(),
+            v.as_dictionary()
+                .unwrap()
+                .get("key_99")
+                .unwrap()
+                .as_signed_integer(),
             Some(99)
         );
         fs::remove_dir_all(&dir).ok();
@@ -4178,7 +4232,11 @@ mod tests {
     fn test_large_array() {
         let dir = temp_dir();
         let path = dir.join("arr_large.plist");
-        assert!(run(&["-create".into(), "xml1".into(), path.to_string_lossy().into()]));
+        assert!(run(&[
+            "-create".into(),
+            "xml1".into(),
+            path.to_string_lossy().into()
+        ]));
         assert!(run(&[
             "-insert".into(),
             "items".into(),
@@ -4195,7 +4253,13 @@ mod tests {
             ]));
         }
         let v = Value::from_file(&path).unwrap();
-        let items = v.as_dictionary().unwrap().get("items").unwrap().as_array().unwrap();
+        let items = v
+            .as_dictionary()
+            .unwrap()
+            .get("items")
+            .unwrap()
+            .as_array()
+            .unwrap();
         assert_eq!(items.len(), 50);
         assert_eq!(items[0].as_signed_integer(), Some(0));
         assert_eq!(items[49].as_signed_integer(), Some(49));
@@ -4222,7 +4286,13 @@ mod tests {
             path.to_string_lossy().into(),
         ]));
         let v = Value::from_file(&path).unwrap();
-        assert!(v.as_dictionary().unwrap().get("created").unwrap().as_date().is_some());
+        assert!(v
+            .as_dictionary()
+            .unwrap()
+            .get("created")
+            .unwrap()
+            .as_date()
+            .is_some());
         fs::remove_dir_all(&dir).ok();
     }
 
@@ -4249,7 +4319,13 @@ mod tests {
             path.to_string_lossy().into(),
         ]));
         let v = Value::from_file(&path).unwrap();
-        let arr = v.as_dictionary().unwrap().get("nested").unwrap().as_array().unwrap();
+        let arr = v
+            .as_dictionary()
+            .unwrap()
+            .get("nested")
+            .unwrap()
+            .as_array()
+            .unwrap();
         assert_eq!(arr.len(), 2);
         fs::remove_dir_all(&dir).ok();
     }
@@ -4493,7 +4569,11 @@ mod tests {
         ]));
         let v = Value::from_file(&path).unwrap();
         assert_eq!(
-            v.as_dictionary().unwrap().get("disabled").unwrap().as_boolean(),
+            v.as_dictionary()
+                .unwrap()
+                .get("disabled")
+                .unwrap()
+                .as_boolean(),
             Some(false)
         );
         fs::remove_dir_all(&dir).ok();

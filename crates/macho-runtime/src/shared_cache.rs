@@ -67,10 +67,14 @@ struct CachedImage {
     header_size: usize,
 }
 
-/// RAII wrapper around a raw mmap.
-struct Mmap {
-    ptr: *mut u8,
-    len: usize,
+/// Shared cache bytes, backed by mmap on Unix and owned memory elsewhere.
+enum Mmap {
+    #[cfg(unix)]
+    Raw {
+        ptr: *mut u8,
+        len: usize,
+    },
+    Owned(Vec<u8>),
 }
 
 // Safety: The mmap is read-only and lives for the lifetime of SharedCacheLoader.
@@ -79,17 +83,26 @@ unsafe impl Sync for Mmap {}
 
 impl Mmap {
     fn as_slice(&self) -> &[u8] {
-        // Safety: ptr was obtained from a successful mmap call with length `len`,
-        // mapped as PROT_READ. The slice is valid for the lifetime of `self`.
-        unsafe { std::slice::from_raw_parts(self.ptr, self.len) }
+        match self {
+            #[cfg(unix)]
+            Self::Raw { ptr, len } => {
+                // Safety: ptr was obtained from a successful mmap call with length `len`,
+                // mapped as PROT_READ. The slice is valid for the lifetime of `self`.
+                unsafe { std::slice::from_raw_parts(*ptr, *len) }
+            }
+            Self::Owned(bytes) => bytes.as_slice(),
+        }
     }
 }
 
 impl Drop for Mmap {
     fn drop(&mut self) {
-        // Safety: ptr and len come from a successful mmap call.
-        unsafe {
-            libc::munmap(self.ptr as *mut libc::c_void, self.len);
+        #[cfg(unix)]
+        if let Self::Raw { ptr, len } = self {
+            // Safety: ptr and len come from a successful mmap call.
+            unsafe {
+                libc::munmap(*ptr as *mut libc::c_void, *len);
+            }
         }
     }
 }
@@ -97,34 +110,48 @@ impl Drop for Mmap {
 impl SharedCacheLoader {
     /// Open and memory-map a shared cache file, then parse its image catalog.
     pub fn open(path: &Path) -> Result<Self, SharedCacheError> {
-        use std::os::unix::io::AsRawFd;
+        #[cfg(unix)]
+        let mmap = {
+            use std::os::unix::io::AsRawFd;
 
-        let file = std::fs::File::open(path)?;
-        let file_size = file.metadata()?.len() as usize;
-        if file_size == 0 {
-            return Err(SharedCacheError::EmptyFile);
-        }
+            let file = std::fs::File::open(path)?;
+            let file_size = file.metadata()?.len() as usize;
+            if file_size == 0 {
+                return Err(SharedCacheError::EmptyFile);
+            }
 
-        // Safety: we mmap the file as read-only (PROT_READ, MAP_PRIVATE).
-        // The FD can be closed immediately after mmap returns.
-        let ptr = unsafe {
-            libc::mmap(
-                std::ptr::null_mut(),
-                file_size,
-                libc::PROT_READ,
-                libc::MAP_PRIVATE,
-                file.as_raw_fd(),
-                0,
-            )
+            // Safety: we mmap the file as read-only (PROT_READ, MAP_PRIVATE).
+            // The FD can be closed immediately after mmap returns.
+            let ptr = unsafe {
+                libc::mmap(
+                    std::ptr::null_mut(),
+                    file_size,
+                    libc::PROT_READ,
+                    libc::MAP_PRIVATE,
+                    file.as_raw_fd(),
+                    0,
+                )
+            };
+            if ptr == libc::MAP_FAILED {
+                return Err(SharedCacheError::MmapFailed(std::io::Error::last_os_error()));
+            }
+
+            Mmap::Raw {
+                ptr: ptr as *mut u8,
+                len: file_size,
+            }
         };
-        if ptr == libc::MAP_FAILED {
-            return Err(SharedCacheError::MmapFailed(std::io::Error::last_os_error()));
-        }
 
-        let mmap = Mmap {
-            ptr: ptr as *mut u8,
-            len: file_size,
+        #[cfg(not(unix))]
+        let mmap = {
+            let data = std::fs::read(path)?;
+            if data.is_empty() {
+                return Err(SharedCacheError::EmptyFile);
+            }
+            Mmap::Owned(data)
         };
+
+        let file_size = mmap.as_slice().len();
 
         // Parse the cache structure from the mapped data.
         let cache = SharedCache::parse(mmap.as_slice())?;
@@ -133,17 +160,14 @@ impl SharedCacheLoader {
         let mut images = Vec::with_capacity(cache.images().len());
         for img in cache.images() {
             // Resolve VM address → file offset via the cache mappings.
-            let file_offset = cache
-                .mappings()
-                .iter()
-                .find_map(|m| {
-                    let addr = img.address();
-                    if addr >= m.address && addr < m.address + m.size {
-                        Some((m.file_offset + (addr - m.address)) as usize)
-                    } else {
-                        None
-                    }
-                });
+            let file_offset = cache.mappings().iter().find_map(|m| {
+                let addr = img.address();
+                if addr >= m.address && addr < m.address + m.size {
+                    Some((m.file_offset + (addr - m.address)) as usize)
+                } else {
+                    None
+                }
+            });
 
             let file_offset = match file_offset {
                 Some(off) => off,
@@ -261,10 +285,7 @@ impl SharedCacheLoader {
                 }
             }
 
-            log::debug!(
-                "eager_export_map: {} → {} exports",
-                path, count
-            );
+            log::debug!("eager_export_map: {} → {} exports", path, count);
         }
 
         log::info!(
@@ -286,7 +307,11 @@ impl SharedCacheLoader {
         // Try LC_DYLD_EXPORTS_TRIE first (modern)
         for cmd in &parsed.commands {
             if cmd.cmd == LoadCommandType::DyldExportsTrie {
-                if let LoadCommandPayload::LinkEdit { data_off, data_size } = &cmd.payload {
+                if let LoadCommandPayload::LinkEdit {
+                    data_off,
+                    data_size,
+                } = &cmd.payload
+                {
                     let off = *data_off as usize;
                     let size = *data_size as usize;
                     if size == 0 {
@@ -308,7 +333,12 @@ impl SharedCacheLoader {
         // Fall back to LC_DYLD_INFO(_ONLY)
         for cmd in &parsed.commands {
             if cmd.cmd == LoadCommandType::DyldInfoOnly || cmd.cmd == LoadCommandType::DyldInfo {
-                if let LoadCommandPayload::DyldInfo { export_off, export_size, .. } = &cmd.payload {
+                if let LoadCommandPayload::DyldInfo {
+                    export_off,
+                    export_size,
+                    ..
+                } = &cmd.payload
+                {
                     let off = *export_off as usize;
                     let size = *export_size as usize;
                     if size == 0 {

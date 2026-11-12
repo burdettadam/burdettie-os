@@ -4,41 +4,41 @@
 //! buffer (`Surface`), and a `Renderer` trait for drawing shapes and text.
 //! Backends implement `Renderer` for their specific rendering target.
 
-mod geometry;
 mod color;
 mod font;
 mod font_manager;
-mod text_layout;
-pub mod text_system;
-mod surface;
-mod renderer;
-mod software;
+mod geometry;
+pub mod gpu_stub;
+mod gradient;
 mod image_buf;
 mod path;
-mod gradient;
+mod renderer;
 mod shadow;
+mod software;
+mod surface;
+mod text_layout;
+pub mod text_system;
 pub mod unicode;
-pub mod gpu_stub;
 
 #[cfg(feature = "gpu")]
 pub mod gpu;
 
-pub use geometry::*;
 pub use color::*;
 pub use font::*;
 pub use font_manager::*;
-pub use text_layout::*;
-pub use surface::*;
-pub use renderer::*;
-pub use software::*;
+pub use geometry::*;
+pub use gpu_stub::GpuStubRenderer;
+pub use gradient::*;
 pub use image_buf::*;
 pub use path::*;
-pub use gradient::*;
+pub use renderer::*;
 pub use shadow::*;
-pub use gpu_stub::GpuStubRenderer;
+pub use software::*;
+pub use surface::*;
+pub use text_layout::*;
 
 #[cfg(feature = "gpu")]
-pub use gpu::{GpuRenderer, try_create_gpu_renderer};
+pub use gpu::{try_create_gpu_renderer, GpuRenderer};
 
 // ── Renderer factory ───────────────────────────────────────────────
 
@@ -66,14 +66,11 @@ pub fn create_renderer(backend: RendererBackend, width: u32, height: u32) -> Box
             // intentionally simple.
             Box::new(gpu_stub::GpuStubRenderer::new(width, height))
         }
-        RendererBackend::Gpu => {
-            Box::new(gpu_stub::GpuStubRenderer::new(width, height))
-        }
+        RendererBackend::Gpu => Box::new(gpu_stub::GpuStubRenderer::new(width, height)),
     }
 }
 
 // ── Tests ──────────────────────────────────────────────────────────
-
 
 #[cfg(test)]
 mod tests;

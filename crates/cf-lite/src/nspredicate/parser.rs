@@ -8,7 +8,9 @@ use regex::Regex;
 
 /// Given an object and a keypath string, extract the value using objectForKey:.
 fn kvc_value(obj: u64, keypath: &str) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let isa = unsafe { *(obj as *const u64) };
     if isa == nsobj::nsdictionary_class_addr()
         || isa == nsobj::nsmutabledictionary_class_addr()
@@ -32,22 +34,26 @@ fn kvc_value(obj: u64, keypath: &str) -> u64 {
 
 /// Read an integer from an NSNumber (handles tagged pointers and constant nums).
 fn num_value(obj: u64) -> i64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     if obj & (1u64 << 63) != 0 {
         // Tagged pointer NSNumber
         return crate::nsnumber::tagged_int_value(obj);
     }
     let (tag, raw) = nsnumber::read_number_pub(obj);
     match tag {
-        0 | 2 => raw as i64,  // int or bool
-        1 => f64::from_bits(raw) as i64,  // double
+        0 | 2 => raw as i64,             // int or bool
+        1 => f64::from_bits(raw) as i64, // double
         _ => raw as i64,
     }
 }
 
 /// Read a string value from an NSString.
 fn str_value(obj: u64) -> Option<String> {
-    if obj == 0 { return None; }
+    if obj == 0 {
+        return None;
+    }
     cfstring::extract_cfstring_cstr(obj).map(|s| s.to_string())
 }
 
@@ -137,7 +143,17 @@ fn parse_single_predicate(expr: &str, arg0: u64) -> Box<dyn Fn(u64) -> bool + Se
     }
 
     // String operators with keypath
-    for op in &["BEGINSWITH", "CONTAINS[c]", "CONTAINS", "ENDSWITH", "IN", "BETWEEN", "LIKE[c]", "LIKE", "MATCHES"] {
+    for op in &[
+        "BEGINSWITH",
+        "CONTAINS[c]",
+        "CONTAINS",
+        "ENDSWITH",
+        "IN",
+        "BETWEEN",
+        "LIKE[c]",
+        "LIKE",
+        "MATCHES",
+    ] {
         let up_expr = trimmed.to_uppercase();
         if let Some(idx) = up_expr.find(&format!(" {} ", op.to_uppercase())) {
             let keypath = trimmed[..idx].trim().to_string();
@@ -157,22 +173,34 @@ fn parse_self_predicate(expr: &str, arg0: u64) -> Box<dyn Fn(u64) -> bool + Send
     if let Some(idx) = up.find("SELF ==") {
         let rhs = expr[idx + 7..].trim();
         if rhs == "%@" {
-            let val_str = cfstring::extract_cfstring_cstr(arg0).unwrap_or("").to_string();
+            let val_str = cfstring::extract_cfstring_cstr(arg0)
+                .unwrap_or("")
+                .to_string();
             return Box::new(move |obj| {
-                cfstring::extract_cfstring_cstr(obj).map(|s| s == val_str).unwrap_or(false)
+                cfstring::extract_cfstring_cstr(obj)
+                    .map(|s| s == val_str)
+                    .unwrap_or(false)
             });
         }
         let val = strip_quotes(rhs).to_string();
         return Box::new(move |obj| {
-            cfstring::extract_cfstring_cstr(obj).map(|s| s == val).unwrap_or(false)
+            cfstring::extract_cfstring_cstr(obj)
+                .map(|s| s == val)
+                .unwrap_or(false)
         });
     }
 
     // Check SELF string operators
-    struct SelfOp { kw: &'static str }
+    struct SelfOp {
+        kw: &'static str,
+    }
     let ops = [
-        SelfOp { kw: "CONTAINS" }, SelfOp { kw: "BEGINSWITH" }, SelfOp { kw: "ENDSWITH" },
-        SelfOp { kw: "LIKE[c]" }, SelfOp { kw: "LIKE" }, SelfOp { kw: "MATCHES" },
+        SelfOp { kw: "CONTAINS" },
+        SelfOp { kw: "BEGINSWITH" },
+        SelfOp { kw: "ENDSWITH" },
+        SelfOp { kw: "LIKE[c]" },
+        SelfOp { kw: "LIKE" },
+        SelfOp { kw: "MATCHES" },
     ];
     for op in &ops {
         let pat = format!("SELF {}", op.kw);
@@ -180,7 +208,9 @@ fn parse_self_predicate(expr: &str, arg0: u64) -> Box<dyn Fn(u64) -> bool + Send
             let idx = up.find(&pat).unwrap();
             let rhs = expr[idx + pat.len()..].trim();
             let val = if rhs == "%@" {
-                cfstring::extract_cfstring_cstr(arg0).unwrap_or("").to_string()
+                cfstring::extract_cfstring_cstr(arg0)
+                    .unwrap_or("")
+                    .to_string()
             } else {
                 strip_quotes(rhs).to_string()
             };
@@ -208,7 +238,10 @@ fn parse_self_predicate(expr: &str, arg0: u64) -> Box<dyn Fn(u64) -> bool + Send
 }
 
 fn make_comparison_predicate(
-    keypath: &str, op: &str, rhs: &str, arg0: u64,
+    keypath: &str,
+    op: &str,
+    rhs: &str,
+    arg0: u64,
 ) -> Box<dyn Fn(u64) -> bool + Send + Sync> {
     let kp = keypath.to_string();
 
@@ -219,7 +252,9 @@ fn make_comparison_predicate(
         let op = op.to_string();
         return Box::new(move |obj| {
             let val = kvc_value(obj, &kp);
-            if val == 0 { return false; }
+            if val == 0 {
+                return false;
+            }
             // Try string comparison first
             if let Some(ref expected) = rhs_str {
                 if let Some(actual) = str_value(val) {
@@ -241,14 +276,19 @@ fn make_comparison_predicate(
     let op = op.to_string();
     Box::new(move |obj| {
         let val = kvc_value(obj, &kp);
-        if val == 0 { return false; }
+        if val == 0 {
+            return false;
+        }
         let n = num_value(val);
         compare_nums(n, rhs_val, &op)
     })
 }
 
 fn make_string_predicate(
-    keypath: &str, op: &str, rhs: &str, arg0: u64,
+    keypath: &str,
+    op: &str,
+    rhs: &str,
+    arg0: u64,
 ) -> Box<dyn Fn(u64) -> bool + Send + Sync> {
     let kp = keypath.to_string();
     let op_up = op.to_uppercase();
@@ -263,8 +303,9 @@ fn make_string_predicate(
             Box::new(move |obj| {
                 let val = kvc_value(obj, &kp);
                 match str_value(val) {
-                    Some(s) if case_insensitive =>
-                        s.to_lowercase().starts_with(&expected.to_lowercase()),
+                    Some(s) if case_insensitive => {
+                        s.to_lowercase().starts_with(&expected.to_lowercase())
+                    }
                     Some(s) => s.starts_with(&*expected),
                     None => false,
                 }
@@ -275,8 +316,9 @@ fn make_string_predicate(
             Box::new(move |obj| {
                 let val = kvc_value(obj, &kp);
                 match str_value(val) {
-                    Some(s) if case_insensitive =>
-                        s.to_lowercase().contains(&expected.to_lowercase()),
+                    Some(s) if case_insensitive => {
+                        s.to_lowercase().contains(&expected.to_lowercase())
+                    }
                     Some(s) => s.contains(&*expected),
                     None => false,
                 }
@@ -287,8 +329,9 @@ fn make_string_predicate(
             Box::new(move |obj| {
                 let val = kvc_value(obj, &kp);
                 match str_value(val) {
-                    Some(s) if case_insensitive =>
-                        s.to_lowercase().ends_with(&expected.to_lowercase()),
+                    Some(s) if case_insensitive => {
+                        s.to_lowercase().ends_with(&expected.to_lowercase())
+                    }
                     Some(s) => s.ends_with(&*expected),
                     None => false,
                 }
@@ -311,7 +354,9 @@ fn make_string_predicate(
             let (lo, hi) = extract_between_range(arg0);
             Box::new(move |obj| {
                 let val = kvc_value(obj, &kp);
-                if val == 0 { return false; }
+                if val == 0 {
+                    return false;
+                }
                 let n = num_value(val);
                 n >= lo && n <= hi
             })
@@ -357,7 +402,7 @@ fn like_match(s: &str, pattern: &str, case_insensitive: bool) -> bool {
         match ch {
             '*' => regex_pat.push_str(".*"),
             '?' => regex_pat.push('.'),
-            c if ".+^${}[]|()\\" .contains(c) => {
+            c if ".+^${}[]|()\\".contains(c) => {
                 regex_pat.push('\\');
                 regex_pat.push(c);
             }
@@ -365,7 +410,9 @@ fn like_match(s: &str, pattern: &str, case_insensitive: bool) -> bool {
         }
     }
     regex_pat.push('$');
-    Regex::new(&regex_pat).map(|r| r.is_match(&s)).unwrap_or(false)
+    Regex::new(&regex_pat)
+        .map(|r| r.is_match(&s))
+        .unwrap_or(false)
 }
 
 fn compare_nums(lhs: i64, rhs: i64, op: &str) -> bool {
@@ -382,7 +429,9 @@ fn compare_nums(lhs: i64, rhs: i64, op: &str) -> bool {
 
 fn resolve_string_arg(rhs: &str, arg0: u64) -> String {
     if rhs == "%@" {
-        cfstring::extract_cfstring_cstr(arg0).unwrap_or("").to_string()
+        cfstring::extract_cfstring_cstr(arg0)
+            .unwrap_or("")
+            .to_string()
     } else {
         strip_quotes(rhs).to_string()
     }
@@ -390,9 +439,7 @@ fn resolve_string_arg(rhs: &str, arg0: u64) -> String {
 
 fn strip_quotes(s: &str) -> &str {
     let s = s.trim();
-    if (s.starts_with('\'') && s.ends_with('\''))
-        || (s.starts_with('"') && s.ends_with('"'))
-    {
+    if (s.starts_with('\'') && s.ends_with('\'')) || (s.starts_with('"') && s.ends_with('"')) {
         &s[1..s.len() - 1]
     } else {
         s
@@ -402,7 +449,9 @@ fn strip_quotes(s: &str) -> &str {
 /// Extract strings from an NSArray.
 fn extract_string_array(arr: u64) -> Vec<String> {
     let mut result = Vec::new();
-    if arr == 0 { return result; }
+    if arr == 0 {
+        return result;
+    }
     let isa = unsafe { *(arr as *const u64) };
     if isa != nsobj::nsarray_class_addr() && isa != nsobj::nsmutablearray_class_addr() {
         return result;
@@ -420,14 +469,18 @@ fn extract_string_array(arr: u64) -> Vec<String> {
 
 /// Extract [low, high] from an NSArray of two NSNumbers.
 fn extract_between_range(arr: u64) -> (i64, i64) {
-    if arr == 0 { return (0, 0); }
+    if arr == 0 {
+        return (0, 0);
+    }
     let isa = unsafe { *(arr as *const u64) };
     if isa != nsobj::nsarray_class_addr() && isa != nsobj::nsmutablearray_class_addr() {
         return (0, 0);
     }
     let count = unsafe { *((arr + 8) as *const u64) } as usize;
     let elems = unsafe { *((arr + 16) as *const u64) };
-    if count < 2 { return (0, 0); }
+    if count < 2 {
+        return (0, 0);
+    }
     let lo = unsafe { *((elems as *const u64).add(0)) };
     let hi = unsafe { *((elems as *const u64).add(1)) };
     (num_value(lo), num_value(hi))

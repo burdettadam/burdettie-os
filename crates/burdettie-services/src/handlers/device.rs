@@ -26,9 +26,13 @@ const ACTIVATION_SUCCESS_PLIST: &[u8] = br#"<?xml version="1.0" encoding="UTF-8"
 pub struct DeviceHandler;
 
 impl Handler for DeviceHandler {
-    fn handle(&self, path: &str, method: &str, body: &[u8], _request: &Request)
-        -> Option<HandlerResponse>
-    {
+    fn handle(
+        &self,
+        path: &str,
+        method: &str,
+        body: &[u8],
+        _request: &Request,
+    ) -> Option<HandlerResponse> {
         if !path.starts_with("/api/v1/device/") {
             return None;
         }
@@ -39,6 +43,8 @@ impl Handler for DeviceHandler {
         );
 
         // Return an activation success plist for all device endpoints.
-        Some(HandlerResponse::plist_xml(ACTIVATION_SUCCESS_PLIST.to_vec()))
+        Some(HandlerResponse::plist_xml(
+            ACTIVATION_SUCCESS_PLIST.to_vec(),
+        ))
     }
 }

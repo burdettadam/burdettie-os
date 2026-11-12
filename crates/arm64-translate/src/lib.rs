@@ -24,6 +24,6 @@ pub mod test_helpers;
 
 pub use cpu::CpuState;
 pub use decode::Instruction;
-pub use ffi::{FfiBridge, FfiCallArgs, FfiResult, call_host_capturing};
+pub use ffi::{call_host_capturing, FfiBridge, FfiCallArgs, FfiResult};
 pub use interp::{ExitReason, Interpreter};
 pub use mem::Memory;

@@ -1,10 +1,10 @@
 //! KVC accessor and ivar access logic.
 
-use crate::nsnumber;
 use super::boxing::{
     autobox_if_scalar, autounbox_if_scalar, extract_return_type, extract_setter_param_type,
     unbox_double, unbox_int,
 };
+use crate::nsnumber;
 
 /// Capitalize the first character of a key for getter/setter name construction.
 fn capitalize_first(s: &str) -> String {
@@ -41,8 +41,7 @@ pub(crate) fn try_getter_accessor(obj: u64, key: &str) -> Option<u64> {
             let sel_ptr = rt.intern_selector(sel_name) as u64;
             drop(guard);
             let msg_send = objc_runtime::objc_msg_send_addr();
-            let send: extern "C" fn(u64, u64) -> u64 =
-                unsafe { std::mem::transmute(msg_send) };
+            let send: extern "C" fn(u64, u64) -> u64 = unsafe { std::mem::transmute(msg_send) };
             let raw = send(obj, sel_ptr);
             return Some(autobox_if_scalar(raw, return_type));
         }
@@ -56,10 +55,7 @@ pub(crate) fn try_setter_accessor(obj: u64, key: &str, value: u64) -> bool {
     use objc_runtime::OBJC_RUNTIME;
 
     let cap_key = capitalize_first(key);
-    let candidates = [
-        format!("set{}:", cap_key),
-        format!("_set{}:", cap_key),
-    ];
+    let candidates = [format!("set{}:", cap_key), format!("_set{}:", cap_key)];
 
     let isa = unsafe { *(obj as *const u64) };
 
@@ -78,8 +74,7 @@ pub(crate) fn try_setter_accessor(obj: u64, key: &str, value: u64) -> bool {
             drop(guard);
             let msg_send = objc_runtime::objc_msg_send_addr();
             let actual_value = autounbox_if_scalar(value, param_type);
-            let send: extern "C" fn(u64, u64, u64) =
-                unsafe { std::mem::transmute(msg_send) };
+            let send: extern "C" fn(u64, u64, u64) = unsafe { std::mem::transmute(msg_send) };
             send(obj, sel_ptr, actual_value);
             return true;
         }

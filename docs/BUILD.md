@@ -114,6 +114,30 @@ docker run --rm burdettie-os-dev cargo test \
     --lib
 ```
 
+### Linux Runtime Images
+
+Use the Linux runtime images when development must continue without a live Mac
+tooling bridge.
+
+```bash
+# Full Linux ARM64 runtime build and interpreted runtime tests
+docker build --platform linux/arm64 -f docker/Dockerfile.linux-e2e -t burdettie-linux-e2e .
+docker run --rm --platform linux/arm64 burdettie-linux-e2e
+
+# Runtime image with imported Apple tool support (host-native by default)
+docker build -f docker/Dockerfile.burdettie -t burdettie-os .
+
+# Force the ARM64 reference lane explicitly when needed
+docker build --platform linux/arm64 -f docker/Dockerfile.burdettie -t burdettie-os .
+
+# Fast runtime iteration loop
+./scripts/linux-test.sh
+./scripts/linux-test.sh --shell
+```
+
+For Docker-first runtime and imported-artifact workflows, see
+`docs/DOCKER_FIRST_DEVELOPMENT.md`.
+
 ### Demo Image (runtime + fixtures)
 
 The demo image packages pre-built binaries for inspection and exploration.

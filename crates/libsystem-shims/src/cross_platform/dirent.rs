@@ -29,13 +29,38 @@ impl DirentShims {
         #[cfg(not(target_os = "macos"))]
         {
             use crate::register_shims;
-            register_shims!(table,
-                ("_readdir", shim_readdir as *const () as u64, "readdir macOS→Linux dirent"),
-                ("_readdir$INODE64", shim_readdir as *const () as u64, "readdir$INODE64 macOS→Linux dirent"),
-                ("_scandir", shim_scandir as *const () as u64, "scandir macOS→Linux dirent"),
-                ("_scandir$INODE64", shim_scandir as *const () as u64, "scandir$INODE64 macOS→Linux dirent"),
-                ("_alphasort", shim_alphasort as *const () as u64, "alphasort macOS dirent"),
-                ("_alphasort$INODE64", shim_alphasort as *const () as u64, "alphasort$INODE64 macOS dirent"),
+            register_shims!(
+                table,
+                (
+                    "_readdir",
+                    shim_readdir as *const () as u64,
+                    "readdir macOS→Linux dirent"
+                ),
+                (
+                    "_readdir$INODE64",
+                    shim_readdir as *const () as u64,
+                    "readdir$INODE64 macOS→Linux dirent"
+                ),
+                (
+                    "_scandir",
+                    shim_scandir as *const () as u64,
+                    "scandir macOS→Linux dirent"
+                ),
+                (
+                    "_scandir$INODE64",
+                    shim_scandir as *const () as u64,
+                    "scandir$INODE64 macOS→Linux dirent"
+                ),
+                (
+                    "_alphasort",
+                    shim_alphasort as *const () as u64,
+                    "alphasort macOS dirent"
+                ),
+                (
+                    "_alphasort$INODE64",
+                    shim_alphasort as *const () as u64,
+                    "alphasort$INODE64 macOS dirent"
+                ),
             );
         }
         #[cfg(target_os = "macos")]
@@ -50,13 +75,13 @@ const DARWIN_DIRENT_SIZE: usize = 1048;
 #[cfg(not(target_os = "macos"))]
 #[repr(C)]
 struct DarwinDirent {
-    d_ino: u64,            // 0
-    d_seekoff: u64,        // 8
-    d_reclen: u16,         // 16
-    d_namlen: u16,         // 18
-    d_type: u8,            // 20
-    d_name: [u8; 1024],    // 21
-    _pad: [u8; 3],         // 1045 (pad to 1048)
+    d_ino: u64,         // 0
+    d_seekoff: u64,     // 8
+    d_reclen: u16,      // 16
+    d_namlen: u16,      // 18
+    d_type: u8,         // 20
+    d_name: [u8; 1024], // 21
+    _pad: [u8; 3],      // 1045 (pad to 1048)
 }
 
 /// Thread-local buffer for translated dirent results.
@@ -104,11 +129,7 @@ unsafe fn linux_to_darwin_dirent(linux: &libc::dirent, darwin_ptr: *mut DarwinDi
     d.d_type = linux.d_type;
 
     let copy_len = std::cmp::min(name_len + 1, 1024);
-    std::ptr::copy_nonoverlapping(
-        name_ptr as *const u8,
-        d.d_name.as_mut_ptr(),
-        copy_len,
-    );
+    std::ptr::copy_nonoverlapping(name_ptr as *const u8, d.d_name.as_mut_ptr(), copy_len);
 }
 
 /// `scandir` shim: reads a directory using glibc opendir/readdir, translates
@@ -121,10 +142,14 @@ extern "C" fn shim_scandir(
     dirname: *const libc::c_char,
     namelist: *mut *mut *mut DarwinDirent,
     filter: Option<unsafe extern "C" fn(*const DarwinDirent) -> libc::c_int>,
-    compar: Option<unsafe extern "C" fn(*const *const DarwinDirent, *const *const DarwinDirent) -> libc::c_int>,
+    compar: Option<
+        unsafe extern "C" fn(*const *const DarwinDirent, *const *const DarwinDirent) -> libc::c_int,
+    >,
 ) -> libc::c_int {
     if dirname.is_null() || namelist.is_null() {
-        unsafe { *libc::__errno_location() = libc::EFAULT; }
+        unsafe {
+            *libc::__errno_location() = libc::EFAULT;
+        }
         return -1;
     }
 
@@ -137,14 +162,18 @@ extern "C" fn shim_scandir(
 
     loop {
         // Reset errno to distinguish end-of-dir from error
-        unsafe { *libc::__errno_location() = 0; }
+        unsafe {
+            *libc::__errno_location() = 0;
+        }
         let linux_ent = unsafe { libc::readdir(dir) };
         if linux_ent.is_null() {
             if unsafe { *libc::__errno_location() } != 0 {
                 // Error — free everything and return -1
                 let saved_errno = unsafe { *libc::__errno_location() };
                 for ptr in &entries {
-                    unsafe { libc::free(*ptr as *mut libc::c_void); }
+                    unsafe {
+                        libc::free(*ptr as *mut libc::c_void);
+                    }
                 }
                 unsafe {
                     libc::closedir(dir);
@@ -156,12 +185,12 @@ extern "C" fn shim_scandir(
         }
 
         // Allocate a macOS-sized dirent on the heap
-        let darwin_ptr = unsafe {
-            libc::malloc(DARWIN_DIRENT_SIZE) as *mut DarwinDirent
-        };
+        let darwin_ptr = unsafe { libc::malloc(DARWIN_DIRENT_SIZE) as *mut DarwinDirent };
         if darwin_ptr.is_null() {
             for ptr in &entries {
-                unsafe { libc::free(*ptr as *mut libc::c_void); }
+                unsafe {
+                    libc::free(*ptr as *mut libc::c_void);
+                }
             }
             unsafe {
                 libc::closedir(dir);
@@ -170,12 +199,16 @@ extern "C" fn shim_scandir(
             return -1;
         }
 
-        unsafe { linux_to_darwin_dirent(&*linux_ent, darwin_ptr); }
+        unsafe {
+            linux_to_darwin_dirent(&*linux_ent, darwin_ptr);
+        }
 
         // Apply the guest filter (if any)
         if let Some(f) = filter {
             if unsafe { f(darwin_ptr) } == 0 {
-                unsafe { libc::free(darwin_ptr as *mut libc::c_void); }
+                unsafe {
+                    libc::free(darwin_ptr as *mut libc::c_void);
+                }
                 continue;
             }
         }
@@ -183,13 +216,19 @@ extern "C" fn shim_scandir(
         entries.push(darwin_ptr);
     }
 
-    unsafe { libc::closedir(dir); }
+    unsafe {
+        libc::closedir(dir);
+    }
 
     // Sort if comparator provided
     if let Some(cmp) = compar {
         entries.sort_by(|a, b| {
-            let result = unsafe { cmp(a as *const *mut DarwinDirent as *const *const DarwinDirent,
-                                       b as *const *mut DarwinDirent as *const *const DarwinDirent) };
+            let result = unsafe {
+                cmp(
+                    a as *const *mut DarwinDirent as *const *const DarwinDirent,
+                    b as *const *mut DarwinDirent as *const *const DarwinDirent,
+                )
+            };
             result.cmp(&0)
         });
     }
@@ -202,18 +241,26 @@ extern "C" fn shim_scandir(
     };
     if list_ptr.is_null() && count > 0 {
         for ptr in &entries {
-            unsafe { libc::free(*ptr as *mut libc::c_void); }
+            unsafe {
+                libc::free(*ptr as *mut libc::c_void);
+            }
         }
-        unsafe { *libc::__errno_location() = libc::ENOMEM; }
+        unsafe {
+            *libc::__errno_location() = libc::ENOMEM;
+        }
         return -1;
     }
 
     // Copy pointers into the allocated array
     for (i, ptr) in entries.iter().enumerate() {
-        unsafe { *list_ptr.add(i) = *ptr; }
+        unsafe {
+            *list_ptr.add(i) = *ptr;
+        }
     }
 
-    unsafe { *namelist = list_ptr; }
+    unsafe {
+        *namelist = list_ptr;
+    }
     count as libc::c_int
 }
 

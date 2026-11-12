@@ -26,6 +26,16 @@ fn err_generic() -> VprocErrT {
     &VPROC_ERR_GENERIC as *const u8 as VprocErrT
 }
 
+#[cfg(unix)]
+fn current_uid() -> i32 {
+    unsafe { libc::getuid() as i32 }
+}
+
+#[cfg(not(unix))]
+fn current_uid() -> i32 {
+    0
+}
+
 // ── Transaction tracking ────────────────────────────────────────────
 
 /// Outstanding transaction count.  Positive = dirty, zero = clean.
@@ -131,7 +141,7 @@ fn with_swap<R>(f: impl FnOnce(&mut SwapState) -> R) -> R {
         Mutex::new(SwapState {
             last_exit_status: 0,
             global_on_demand: true,
-            mgr_uid: unsafe { libc::getuid() } as i32,
+            mgr_uid: current_uid(),
             mgr_pid: unsafe { libc::getpid() },
             is_managed: true,
             mgr_name: "com.apple.xpc.launchd".to_string(),
@@ -145,12 +155,7 @@ fn with_swap<R>(f: impl FnOnce(&mut SwapState) -> R) -> R {
 }
 
 /// `vproc_swap_integer(vp, key, inval, outval)` → vproc_err_t.
-pub fn vproc_swap_integer(
-    _vp: VprocT,
-    key: u32,
-    inval: *const i64,
-    outval: *mut i64,
-) -> VprocErrT {
+pub fn vproc_swap_integer(_vp: VprocT, key: u32, inval: *const i64, outval: *mut i64) -> VprocErrT {
     let Some(gsk) = gsk_from_raw(key) else {
         return err_generic();
     };
@@ -169,7 +174,9 @@ pub fn vproc_swap_integer(
                 VprocGsk::TransactionsEnabled => i64::from(state.transactions_enabled),
                 _ => 0,
             };
-            unsafe { *outval = val; }
+            unsafe {
+                *outval = val;
+            }
         }
 
         // Write new value if inval provided
@@ -214,7 +221,9 @@ pub fn vproc_swap_complex(
                     let c_val = std::ffi::CString::new(v).unwrap_or_default();
                     dict_insert(dict, new_string(c_val.as_ptr()), c_key.as_ptr());
                 }
-                unsafe { *outval = dict; }
+                unsafe {
+                    *outval = dict;
+                }
             }
             VPROC_ERR_NONE
         }
@@ -227,7 +236,9 @@ pub fn vproc_swap_complex(
                     let c_key = std::ffi::CString::new(label).unwrap_or_default();
                     dict_insert(dict, new_integer(0), c_key.as_ptr());
                 }
-                unsafe { *outval = dict; }
+                unsafe {
+                    *outval = dict;
+                }
             }
             VPROC_ERR_NONE
         }
@@ -272,7 +283,9 @@ pub fn _vproc_get_last_exit_status(wstatus: *mut i32) -> VprocErrT {
     if wstatus.is_null() {
         return err_generic();
     }
-    unsafe { *wstatus = LAST_EXIT_STATUS.load(Ordering::Relaxed); }
+    unsafe {
+        *wstatus = LAST_EXIT_STATUS.load(Ordering::Relaxed);
+    }
     VPROC_ERR_NONE
 }
 
@@ -282,10 +295,7 @@ pub fn _vproc_set_global_on_demand(_val: bool) -> VprocErrT {
 }
 
 /// `_vproc_send_signal_by_label(label, sig)` → vproc_err_t.
-pub fn _vproc_send_signal_by_label(
-    label: *const libc::c_char,
-    sig: i32,
-) -> VprocErrT {
+pub fn _vproc_send_signal_by_label(label: *const libc::c_char, sig: i32) -> VprocErrT {
     if label.is_null() {
         return err_generic();
     }
@@ -349,16 +359,16 @@ pub fn _vproc_standby_timeout() -> usize {
 }
 
 /// `_vproc_transaction_count_for_pid(pid, &count, &condemned)` → kern_return_t.
-pub fn _vproc_transaction_count_for_pid(
-    _pid: i32,
-    count: *mut i32,
-    condemned: *mut bool,
-) -> u32 {
+pub fn _vproc_transaction_count_for_pid(_pid: i32, count: *mut i32, condemned: *mut bool) -> u32 {
     if !count.is_null() {
-        unsafe { *count = TRANSACTION_COUNT.load(Ordering::Relaxed) as i32; }
+        unsafe {
+            *count = TRANSACTION_COUNT.load(Ordering::Relaxed) as i32;
+        }
     }
     if !condemned.is_null() {
-        unsafe { *condemned = false; }
+        unsafe {
+            *condemned = false;
+        }
     }
     0 // KERN_SUCCESS
 }
@@ -384,10 +394,7 @@ pub fn _vprocmgr_move_subset_to_user(
 }
 
 /// `_vprocmgr_switch_to_session(session, flags)` → vproc_err_t.
-pub fn _vprocmgr_switch_to_session(
-    _session: *const libc::c_char,
-    _flags: u32,
-) -> VprocErrT {
+pub fn _vprocmgr_switch_to_session(_session: *const libc::c_char, _flags: u32) -> VprocErrT {
     VPROC_ERR_NONE
 }
 
@@ -513,9 +520,13 @@ mod tests {
         );
         assert!(r.is_null());
         assert!(!outstr.is_null());
-        let name = unsafe { std::ffi::CStr::from_ptr(outstr) }.to_str().unwrap_or("");
+        let name = unsafe { std::ffi::CStr::from_ptr(outstr) }
+            .to_str()
+            .unwrap_or("");
         assert_eq!(name, "com.apple.xpc.launchd");
-        unsafe { libc::free(outstr as *mut libc::c_void); }
+        unsafe {
+            libc::free(outstr as *mut libc::c_void);
+        }
     }
 
     #[test]
@@ -593,12 +604,8 @@ mod tests {
             VprocGsk::TransactionsEnabled,
         ] {
             let mut out: i64 = -999;
-            let r = vproc_swap_integer(
-                std::ptr::null_mut(),
-                key as u32,
-                std::ptr::null(),
-                &mut out,
-            );
+            let r =
+                vproc_swap_integer(std::ptr::null_mut(), key as u32, std::ptr::null(), &mut out);
             assert!(r.is_null(), "swap_integer({:?}) should succeed", key);
             // We just verify it doesn't crash and returns *some* value
         }
@@ -864,18 +871,20 @@ mod tests {
     fn concurrent_transaction_tracking() {
         use std::sync::Arc;
         let barrier = Arc::new(std::sync::Barrier::new(4));
-        let handles: Vec<_> = (0..4).map(|_| {
-            let b = barrier.clone();
-            std::thread::spawn(move || {
-                b.wait();
-                for _ in 0..100 {
-                    _vproc_transaction_begin();
-                }
-                for _ in 0..100 {
-                    _vproc_transaction_end();
-                }
+        let handles: Vec<_> = (0..4)
+            .map(|_| {
+                let b = barrier.clone();
+                std::thread::spawn(move || {
+                    b.wait();
+                    for _ in 0..100 {
+                        _vproc_transaction_begin();
+                    }
+                    for _ in 0..100 {
+                        _vproc_transaction_end();
+                    }
+                })
             })
-        }).collect();
+            .collect();
         for h in handles {
             h.join().unwrap();
         }

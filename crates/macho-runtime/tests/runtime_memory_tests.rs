@@ -6,14 +6,18 @@ mod common;
 
 #[test]
 fn runtime_nsstring_mutable_exit_zero() {
-    let Some(result) = common::run_fixture("nsstring_mutable/app") else { return };
+    let Some(result) = common::run_fixture("nsstring_mutable/app") else {
+        return;
+    };
 
     assert_eq!(result.exit_code, 0, "nsstring_mutable should exit 0");
 }
 
 #[test]
 fn runtime_nsstring_mutable_nslog_captures() {
-    let Some((result, lines)) = common::run_fixture_with_nslog("nsstring_mutable/app") else { return };
+    let Some((result, lines)) = common::run_fixture_with_nslog("nsstring_mutable/app") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0);
 
     assert!(
@@ -35,7 +39,9 @@ fn runtime_nsstring_mutable_nslog_captures() {
 
 #[test]
 fn runtime_nsstring_mutable_class_hierarchy() {
-    let Some(_result) = common::run_fixture("nsstring_mutable/app") else { return };
+    let Some(_result) = common::run_fixture("nsstring_mutable/app") else {
+        return;
+    };
 
     let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
@@ -84,14 +90,18 @@ fn runtime_nsstring_mutable_class_hierarchy() {
 
 #[test]
 fn runtime_autorelease_exit_zero() {
-    let Some(result) = common::run_fixture("autorelease/app") else { return };
+    let Some(result) = common::run_fixture("autorelease/app") else {
+        return;
+    };
 
     assert_eq!(result.exit_code, 0, "autorelease fixture should exit 0");
 }
 
 #[test]
 fn runtime_autorelease_nslog_captures() {
-    let Some((result, lines)) = common::run_fixture_with_nslog("autorelease/app") else { return };
+    let Some((result, lines)) = common::run_fixture_with_nslog("autorelease/app") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0);
 
     assert!(
@@ -110,7 +120,9 @@ fn runtime_autorelease_nslog_captures() {
 
 #[test]
 fn runtime_autorelease_nsobject_memory_methods() {
-    let Some(_result) = common::run_fixture("autorelease/app") else { return };
+    let Some(_result) = common::run_fixture("autorelease/app") else {
+        return;
+    };
 
     let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
@@ -126,13 +138,17 @@ fn runtime_autorelease_nsobject_memory_methods() {
 
 #[test]
 fn runtime_introspection_exit_zero() {
-    let Some((result, _lines)) = common::run_fixture_with_nslog("runtime_introspection/app") else { return };
+    let Some((result, _lines)) = common::run_fixture_with_nslog("runtime_introspection/app") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0, "runtime_introspection should exit 0");
 }
 
 #[test]
 fn runtime_introspection_nslog_captures() {
-    let Some((result, lines)) = common::run_fixture_with_nslog("runtime_introspection/app") else { return };
+    let Some((result, lines)) = common::run_fixture_with_nslog("runtime_introspection/app") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0);
 
     assert!(
@@ -159,7 +175,9 @@ fn runtime_introspection_nslog_captures() {
 
 #[test]
 fn runtime_introspection_shims_resolvable() {
-    let Some(_result) = common::run_fixture("runtime_introspection/app") else { return };
+    let Some(_result) = common::run_fixture("runtime_introspection/app") else {
+        return;
+    };
 
     let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
@@ -179,13 +197,18 @@ fn runtime_introspection_shims_resolvable() {
 
 #[test]
 fn runtime_property_introspection_exit_zero() {
-    let Some((result, _lines)) = common::run_fixture_with_nslog("property_introspection/app") else { return };
+    let Some((result, _lines)) = common::run_fixture_with_nslog("property_introspection/app")
+    else {
+        return;
+    };
     assert_eq!(result.exit_code, 0, "property_introspection should exit 0");
 }
 
 #[test]
 fn runtime_property_introspection_nslog_captures() {
-    let Some((result, lines)) = common::run_fixture_with_nslog("property_introspection/app") else { return };
+    let Some((result, lines)) = common::run_fixture_with_nslog("property_introspection/app") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0);
 
     assert!(
@@ -207,7 +230,9 @@ fn runtime_property_introspection_nslog_captures() {
 
 #[test]
 fn runtime_property_introspection_class_has_ivars() {
-    let Some(_result) = common::run_fixture("property_introspection/app") else { return };
+    let Some(_result) = common::run_fixture("property_introspection/app") else {
+        return;
+    };
 
     let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");

@@ -36,7 +36,8 @@ pub fn register_nsprocessinfo_class(rt: &mut objc_runtime::ObjcRuntime) {
             ),
             me(
                 "isOperatingSystemAtLeastVersion:",
-                nsprocessinfo::shim_nsprocessinfo_is_operating_system_at_least_version as *const () as u64,
+                nsprocessinfo::shim_nsprocessinfo_is_operating_system_at_least_version as *const ()
+                    as u64,
                 "B@:{_NSOperatingSystemVersion=qqq}",
             ),
             me(
@@ -108,24 +109,153 @@ pub fn register_nsbundle_class(rt: &mut objc_runtime::ObjcRuntime) {
         name: "NSBundle".to_string(),
         mapped_addr: class_addr,
         methods: vec![
-            me("bundlePath", nsbundle::shim_nsbundle_bundle_path as *const () as u64, "@@:"),
-            me("bundleURL", nsbundle::shim_nsbundle_bundle_url as *const () as u64, "@@:"),
-            me("resourcePath", nsbundle::shim_nsbundle_resource_path as *const () as u64, "@@:"),
-            me("executablePath", nsbundle::shim_nsbundle_executable_path as *const () as u64, "@@:"),
-            me("executableURL", nsbundle::shim_nsbundle_executable_url as *const () as u64, "@@:"),
-            me("bundleIdentifier", nsbundle::shim_nsbundle_bundle_identifier as *const () as u64, "@@:"),
-            me("infoDictionary", nsbundle::shim_nsbundle_info_dictionary as *const () as u64, "@@:"),
-            me("objectForInfoDictionaryKey:", nsbundle::shim_nsbundle_object_for_info_key as *const () as u64, "@@:@"),
-            me("pathForResource:ofType:", nsbundle::shim_nsbundle_path_for_resource as *const () as u64, "@@:@@"),
-            me("loadNibNamed:owner:topLevelObjects:", nsbundle::shim_nsbundle_load_nib_named as *const () as u64, "B@:@@^@"),
-            me("URLForResource:withExtension:", nsbundle::shim_nsbundle_url_for_resource as *const () as u64, "@@:@@"),
-            me("localizedStringForKey:value:table:", nsbundle::shim_nsbundle_localized_string as *const () as u64, "@@:@@@"),
+            me(
+                "bundlePath",
+                nsbundle::shim_nsbundle_bundle_path as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "bundleURL",
+                nsbundle::shim_nsbundle_bundle_url as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "resourcePath",
+                nsbundle::shim_nsbundle_resource_path as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "resourceURL",
+                nsbundle::shim_nsbundle_resource_url as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "executablePath",
+                nsbundle::shim_nsbundle_executable_path as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "executableURL",
+                nsbundle::shim_nsbundle_executable_url as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "bundleIdentifier",
+                nsbundle::shim_nsbundle_bundle_identifier as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "infoDictionary",
+                nsbundle::shim_nsbundle_info_dictionary as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "objectForInfoDictionaryKey:",
+                nsbundle::shim_nsbundle_object_for_info_key as *const () as u64,
+                "@@:@",
+            ),
+            me(
+                "pathForResource:ofType:",
+                nsbundle::shim_nsbundle_path_for_resource as *const () as u64,
+                "@@:@@",
+            ),
+            me(
+                "pathForResource:ofType:inDirectory:",
+                nsbundle::shim_nsbundle_path_for_resource_in_directory as *const () as u64,
+                "@@:@@@",
+            ),
+            me(
+                "pathForResource:ofType:inDirectory:forLocalization:",
+                nsbundle::shim_nsbundle_path_for_resource_in_directory_for_localization as *const ()
+                    as u64,
+                "@@:@@@@",
+            ),
+            me(
+                "loadNibNamed:owner:topLevelObjects:",
+                nsbundle::shim_nsbundle_load_nib_named as *const () as u64,
+                "B@:@@^@",
+            ),
+            me(
+                "URLForResource:withExtension:",
+                nsbundle::shim_nsbundle_url_for_resource as *const () as u64,
+                "@@:@@",
+            ),
+            me(
+                "URLForResource:withExtension:subdirectory:",
+                nsbundle::shim_nsbundle_url_for_resource_subdirectory as *const () as u64,
+                "@@:@@@",
+            ),
+            me(
+                "URLForResource:withExtension:subdirectory:localization:",
+                nsbundle::shim_nsbundle_url_for_resource_subdirectory_localization as *const ()
+                    as u64,
+                "@@:@@@@",
+            ),
+            me(
+                "URLsForResourcesWithExtension:subdirectory:",
+                nsbundle::shim_nsbundle_urls_for_resources_with_extension_subdirectory as *const ()
+                    as u64,
+                "@@:@@",
+            ),
+            me(
+                "URLsForResourcesWithExtension:subdirectory:localization:",
+                nsbundle::shim_nsbundle_urls_for_resources_with_extension_subdirectory_localization
+                    as *const () as u64,
+                "@@:@@@",
+            ),
+            me(
+                "localizedStringForKey:value:table:",
+                nsbundle::shim_nsbundle_localized_string as *const () as u64,
+                "@@:@@@",
+            ),
+            me(
+                "localizations",
+                nsbundle::shim_nsbundle_localizations as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "preferredLocalizations",
+                nsbundle::shim_nsbundle_preferred_localizations as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "developmentLocalization",
+                nsbundle::shim_nsbundle_development_localization as *const () as u64,
+                "@@:",
+            ),
         ],
         class_methods: vec![
-            me("mainBundle", nsbundle::shim_nsbundle_main_bundle as *const () as u64, "@@:"),
-            me("allFrameworks", nsbundle::shim_nsbundle_all_frameworks as *const () as u64, "@@:"),
-            me("bundleWithPath:", nsbundle::shim_nsbundle_bundle_with_path as *const () as u64, "@@:@"),
-            me("bundleForClass:", nsbundle::shim_nsbundle_bundle_for_class as *const () as u64, "@@:@"),
+            me(
+                "mainBundle",
+                nsbundle::shim_nsbundle_main_bundle as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "allFrameworks",
+                nsbundle::shim_nsbundle_all_frameworks as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "bundleWithPath:",
+                nsbundle::shim_nsbundle_bundle_with_path as *const () as u64,
+                "@@:@",
+            ),
+            me(
+                "bundleForClass:",
+                nsbundle::shim_nsbundle_bundle_for_class as *const () as u64,
+                "@@:@",
+            ),
+            me(
+                "loadNibNamed:owner:",
+                nsbundle::shim_nsbundle_load_nib_named_owner as *const () as u64,
+                "B@:@@",
+            ),
+            me(
+                "loadNibFile:externalNameTable:withZone:",
+                nsbundle::shim_nsbundle_load_nib_file_external_name_table_with_zone as *const ()
+                    as u64,
+                "B@:@@^v",
+            ),
         ],
         ivars: vec![],
         properties: vec![],
@@ -157,7 +287,8 @@ pub fn register_nsfilemanager_class(rt: &mut objc_runtime::ObjcRuntime) {
             ),
             me(
                 "fileExistsAtPath:isDirectory:",
-                nsfilemanager::shim_nsfilemanager_file_exists_at_path_is_directory as *const () as u64,
+                nsfilemanager::shim_nsfilemanager_file_exists_at_path_is_directory as *const ()
+                    as u64,
                 "B@:@^B",
             ),
             me(
@@ -264,7 +395,11 @@ pub fn register_nsuserdefaults_class(rt: &mut objc_runtime::ObjcRuntime) {
         name: "NSUserDefaults".to_string(),
         mapped_addr: class_addr,
         methods: vec![
-            me("init", nsuserdefaults::shim_nsuserdefaults_init as *const () as u64, "@@:"),
+            me(
+                "init",
+                nsuserdefaults::shim_nsuserdefaults_init as *const () as u64,
+                "@@:",
+            ),
             me(
                 "initWithSuiteName:",
                 nsuserdefaults::shim_nsuserdefaults_init_with_suite_name as *const () as u64,

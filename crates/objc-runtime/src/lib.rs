@@ -12,25 +12,26 @@
     clippy::expect_used,
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss,
-    clippy::cast_possible_wrap,
+    clippy::cast_possible_wrap
 )]
 //!
 //! This is a minimal, single-threaded, lab-grade ObjC runtime — it
 //! implements enough to run simple ObjC binaries without Foundation.
 
-pub(crate) mod blocks;
 pub mod backend;
+pub(crate) mod blocks;
 mod class;
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
+mod platform_fallback;
 pub mod refcount;
 pub mod shims;
 
 pub use class::{ClassInfo, MethodEntry, ObjcRuntime, ProtocolInfo, OBJC_RUNTIME};
 pub use shims::ObjcShims;
 pub use shims::{
-    host_nsexception_ehtype_addr,
-    shim_nsobject_autorelease, shim_nsobject_dealloc, shim_nsobject_release, shim_nsobject_retain,
-    shim_nsobject_retain_count, shim_objc_exception_throw,
-    shim_class_conforms_to_protocol,
+    host_nsexception_ehtype_addr, shim_class_conforms_to_protocol, shim_nsobject_autorelease,
+    shim_nsobject_dealloc, shim_nsobject_release, shim_nsobject_retain, shim_nsobject_retain_count,
+    shim_objc_exception_throw,
 };
 
 // Re-export for KVC/KVO dispatch — allows calling guest methods through the trampoline.
@@ -45,13 +46,16 @@ static HOST_SYMBOLS: OnceLock<Arc<dyn platform_core::symbols::HostSymbolResolver
 /// Set the global host symbol resolver. Called once during runtime initialization.
 pub fn set_host_symbols(resolver: Arc<dyn platform_core::symbols::HostSymbolResolver>) {
     if HOST_SYMBOLS.set(resolver).is_err() {
-        log::debug!("objc-runtime: set_host_symbols called more than once (harmless if reusing runtime)");
+        log::debug!(
+            "objc-runtime: set_host_symbols called more than once (harmless if reusing runtime)"
+        );
     }
 }
 
 /// Get the global host symbol resolver.
 #[allow(dead_code)]
-pub(crate) fn host_symbols() -> Option<&'static Arc<dyn platform_core::symbols::HostSymbolResolver>> {
+pub(crate) fn host_symbols() -> Option<&'static Arc<dyn platform_core::symbols::HostSymbolResolver>>
+{
     HOST_SYMBOLS.get()
 }
 
@@ -64,14 +68,18 @@ static PAL_THREADING: OnceLock<Arc<dyn platform_core::threading::Threading>> = O
 /// Set the global heap allocator. Called once during runtime initialization.
 pub fn set_allocator(alloc: Arc<dyn platform_core::alloc::Allocator>) {
     if PAL_ALLOC.set(alloc).is_err() {
-        log::debug!("objc-runtime: set_allocator called more than once (harmless if reusing runtime)");
+        log::debug!(
+            "objc-runtime: set_allocator called more than once (harmless if reusing runtime)"
+        );
     }
 }
 
 /// Set the global threading provider. Called once during runtime initialization.
 pub fn set_threading(threading: Arc<dyn platform_core::threading::Threading>) {
     if PAL_THREADING.set(threading).is_err() {
-        log::debug!("objc-runtime: set_threading called more than once (harmless if reusing runtime)");
+        log::debug!(
+            "objc-runtime: set_threading called more than once (harmless if reusing runtime)"
+        );
     }
 }
 
@@ -90,6 +98,12 @@ pub(crate) fn pal_alloc() -> &'static dyn platform_core::alloc::Allocator {
         static FALLBACK: LinuxAllocator = LinuxAllocator;
         PAL_ALLOC.get().map(|a| a.as_ref()).unwrap_or(&FALLBACK)
     }
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    {
+        static FALLBACK: platform_fallback::FallbackAllocator =
+            platform_fallback::FallbackAllocator;
+        PAL_ALLOC.get().map(|a| a.as_ref()).unwrap_or(&FALLBACK)
+    }
 }
 
 /// Access the platform threading primitives from shim functions.
@@ -105,6 +119,12 @@ pub(crate) fn pal_threading() -> &'static dyn platform_core::threading::Threadin
     {
         use platform_linux::LinuxThreading;
         static FALLBACK: LinuxThreading = LinuxThreading;
+        PAL_THREADING.get().map(|t| t.as_ref()).unwrap_or(&FALLBACK)
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    {
+        static FALLBACK: platform_fallback::FallbackThreading =
+            platform_fallback::FallbackThreading;
         PAL_THREADING.get().map(|t| t.as_ref()).unwrap_or(&FALLBACK)
     }
 }

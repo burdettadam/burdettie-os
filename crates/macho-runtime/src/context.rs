@@ -56,7 +56,9 @@ impl RuntimeContext {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             if let Some(cached) = guard.get(&key) {
-                return Self { shim_table: cached.clone() };
+                return Self {
+                    shim_table: cached.clone(),
+                };
             }
         }
 

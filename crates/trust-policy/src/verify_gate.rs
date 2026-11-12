@@ -303,8 +303,7 @@ mod tests {
 
     #[test]
     fn deny_unsigned_mode() {
-        let gate =
-            VerifyingCodeSignature::new(VerificationLevel::PresenceOnly).deny_unsigned(true);
+        let gate = VerifyingCodeSignature::new(VerificationLevel::PresenceOnly).deny_unsigned(true);
         let result = gate.verify_with_data(&unsigned_cs_info(), None, None, None);
         assert!(result.verdict.is_deny());
     }
@@ -313,8 +312,7 @@ mod tests {
     fn trust_cache_hit_skips_checks() {
         let mut reg = TrustAnchorRegistry::new();
         reg.add_trusted_cd_hash("abc123def456");
-        let gate =
-            VerifyingCodeSignature::with_registry(VerificationLevel::Full, Arc::new(reg));
+        let gate = VerifyingCodeSignature::with_registry(VerificationLevel::Full, Arc::new(reg));
         let bad_pages = invalid_page_hashes();
         let result = gate.verify_with_data(&signed_cs_info(), None, None, Some(&bad_pages));
         assert!(result.trust_cache_hit);

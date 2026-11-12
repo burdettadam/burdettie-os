@@ -1,0 +1,85 @@
+wing: burdettie_os
+rooms:
+- name: apps
+  description: Files from apps/
+  keywords:
+  - apps
+  - apps
+- name: book
+  description: Files from book/
+  keywords:
+  - book
+  - book
+- name: corpus
+  description: Files from corpus/
+  keywords:
+  - corpus
+  - corpus
+- name: crates
+  description: Files from crates/
+  keywords:
+  - crates
+  - crates
+- name: docker
+  description: Files from docker/
+  keywords:
+  - docker
+  - docker
+- name: documentation
+  description: Files from docs/
+  keywords:
+  - documentation
+  - docs
+- name: examples
+  description: Files from examples/
+  keywords:
+  - examples
+  - examples
+- name: fixtures
+  description: Files from fixtures/
+  keywords:
+  - fixtures
+  - fixtures
+- name: formula
+  description: Files from Formula/
+  keywords:
+  - formula
+  - formula
+- name: libressl_bundle
+  description: Files from libressl-bundle/
+  keywords:
+  - libressl_bundle
+  - libressl-bundle
+- name: memories
+  description: Files from memories/
+  keywords:
+  - memories
+  - memories
+- name: packaging
+  description: Files from packaging/
+  keywords:
+  - packaging
+  - packaging
+- name: scripts
+  description: Files from scripts/
+  keywords:
+  - scripts
+  - scripts
+- name: swift
+  description: Files from swift/
+  keywords:
+  - swift
+  - swift
+- name: vm_image
+  description: Files from vm-image/
+  keywords:
+  - vm_image
+  - vm-image
+- name: testing
+  description: Files from Tests/
+  keywords:
+  - testing
+  - tests
+- name: general
+  description: Files that don't fit other rooms
+  keywords: []

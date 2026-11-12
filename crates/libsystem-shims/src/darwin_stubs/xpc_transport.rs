@@ -14,8 +14,8 @@
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Mutex;
 
 use super::xpc_objects;
 
@@ -108,7 +108,9 @@ pub fn create_connection(name_ptr: u64, _queue: u64, _flags: u64) -> u64 {
         service_name
     );
 
-    with_conns(|t| { t.insert(conn_id, conn); });
+    with_conns(|t| {
+        t.insert(conn_id, conn);
+    });
     obj_handle
 }
 
@@ -257,9 +259,7 @@ pub fn set_context(handle: u64, ctx: u64) {
 /// Get the opaque context pointer from a connection.
 pub fn get_context(handle: u64) -> u64 {
     if let Some(id) = conn_id_for_handle(handle) {
-        with_conns(|t| {
-            t.get(&id).map(|c| c.context).unwrap_or(0)
-        })
+        with_conns(|t| t.get(&id).map(|c| c.context).unwrap_or(0))
     } else {
         0
     }
@@ -300,7 +300,11 @@ pub fn send_message(handle: u64, message: u64) {
                 });
             }
             _ => {
-                log::debug!("xpc: send_message on connection {} dropped (state={:?})", id, state);
+                log::debug!(
+                    "xpc: send_message on connection {} dropped (state={:?})",
+                    id,
+                    state
+                );
             }
         }
     }
@@ -310,12 +314,12 @@ pub fn send_message(handle: u64, message: u64) {
 ///
 /// Tries pipe handlers first, then socket transport, then loopback fallback.
 pub fn send_message_with_reply(handle: u64, message: u64, _queue: u64, reply_handler: u64) {
-    if reply_handler == 0 { return; }
+    if reply_handler == 0 {
+        return;
+    }
 
     if let Some(id) = conn_id_for_handle(handle) {
-        let service = with_conns(|t| {
-            t.get(&id).and_then(|c| c.service_name.clone())
-        });
+        let service = with_conns(|t| t.get(&id).and_then(|c| c.service_name.clone()));
 
         if let Some(ref name) = service {
             // Try pipe handler first (in-process routing)
@@ -345,9 +349,7 @@ pub fn send_message_with_reply(handle: u64, message: u64, _queue: u64, reply_han
 /// Tries pipe handlers first, then socket transport, then returns error.
 pub fn send_message_with_reply_sync(handle: u64, message: u64) -> u64 {
     if let Some(id) = conn_id_for_handle(handle) {
-        let service = with_conns(|t| {
-            t.get(&id).and_then(|c| c.service_name.clone())
-        });
+        let service = with_conns(|t| t.get(&id).and_then(|c| c.service_name.clone()));
 
         if let Some(ref name) = service {
             // Try pipe handler first (in-process routing)
@@ -426,13 +428,16 @@ pub mod socket_transport {
     /// Sanitizes the name to prevent path traversal.
     pub fn socket_path(service_name: &str) -> std::path::PathBuf {
         // Sanitize: only allow safe characters, strip path separators and ..
-        let safe_name: String = service_name.chars().map(|c| {
-            if c.is_alphanumeric() || c == '.' || c == '-' || c == '_' {
-                c
-            } else {
-                '_'
-            }
-        }).collect();
+        let safe_name: String = service_name
+            .chars()
+            .map(|c| {
+                if c.is_alphanumeric() || c == '.' || c == '-' || c == '_' {
+                    c
+                } else {
+                    '_'
+                }
+            })
+            .collect();
         // Extra protection: collapse any ".." sequences
         let safe_name = safe_name.replace("..", "__");
         std::path::PathBuf::from(SOCKET_DIR).join(format!("{}.sock", safe_name))
@@ -453,7 +458,11 @@ pub mod socket_transport {
                     log::debug!("xpc_socket: send failed for '{}': {}", service_name, e);
                     return false;
                 }
-                log::debug!("xpc_socket: sent {} bytes to '{}'", data.len(), service_name);
+                log::debug!(
+                    "xpc_socket: sent {} bytes to '{}'",
+                    data.len(),
+                    service_name
+                );
                 true
             }
             Err(e) => {
@@ -513,8 +522,8 @@ pub mod socket_transport {
         // Remove stale socket if it exists
         let _ = std::fs::remove_file(&path);
 
-        let listener = UnixListener::bind(&path)
-            .map_err(|e| format!("bind '{}': {}", path.display(), e))?;
+        let listener =
+            UnixListener::bind(&path).map_err(|e| format!("bind '{}': {}", path.display(), e))?;
 
         log::debug!("xpc_socket: listening on {}", path.display());
 
@@ -651,43 +660,70 @@ pub mod socket_transport {
 
     /// Deserialize a single value from the wire, advancing `pos`.
     fn deserialize_value(data: &[u8], pos: &mut usize) -> u64 {
-        if *pos >= data.len() { return xpc_objects::create_null(); }
+        if *pos >= data.len() {
+            return xpc_objects::create_null();
+        }
 
         let type_tag = data[*pos];
         *pos += 1;
 
         match type_tag {
             b'i' => {
-                if *pos + 8 > data.len() { return xpc_objects::create_null(); }
+                if *pos + 8 > data.len() {
+                    return xpc_objects::create_null();
+                }
                 let v = i64::from_le_bytes([
-                    data[*pos], data[*pos+1], data[*pos+2], data[*pos+3],
-                    data[*pos+4], data[*pos+5], data[*pos+6], data[*pos+7],
+                    data[*pos],
+                    data[*pos + 1],
+                    data[*pos + 2],
+                    data[*pos + 3],
+                    data[*pos + 4],
+                    data[*pos + 5],
+                    data[*pos + 6],
+                    data[*pos + 7],
                 ]);
                 *pos += 8;
                 xpc_objects::create_int64(v)
             }
             b'u' => {
-                if *pos + 8 > data.len() { return xpc_objects::create_null(); }
+                if *pos + 8 > data.len() {
+                    return xpc_objects::create_null();
+                }
                 let v = u64::from_le_bytes([
-                    data[*pos], data[*pos+1], data[*pos+2], data[*pos+3],
-                    data[*pos+4], data[*pos+5], data[*pos+6], data[*pos+7],
+                    data[*pos],
+                    data[*pos + 1],
+                    data[*pos + 2],
+                    data[*pos + 3],
+                    data[*pos + 4],
+                    data[*pos + 5],
+                    data[*pos + 6],
+                    data[*pos + 7],
                 ]);
                 *pos += 8;
                 xpc_objects::create_uint64(v)
             }
             b'b' => {
-                if *pos >= data.len() { return xpc_objects::create_null(); }
+                if *pos >= data.len() {
+                    return xpc_objects::create_null();
+                }
                 let v = data[*pos] != 0;
                 *pos += 1;
                 xpc_objects::create_bool(v)
             }
             b's' => {
-                if *pos + 4 > data.len() { return xpc_objects::create_null(); }
+                if *pos + 4 > data.len() {
+                    return xpc_objects::create_null();
+                }
                 let slen = u32::from_le_bytes([
-                    data[*pos], data[*pos+1], data[*pos+2], data[*pos+3],
+                    data[*pos],
+                    data[*pos + 1],
+                    data[*pos + 2],
+                    data[*pos + 3],
                 ]) as usize;
                 *pos += 4;
-                if *pos + slen > data.len() { return xpc_objects::create_null(); }
+                if *pos + slen > data.len() {
+                    return xpc_objects::create_null();
+                }
                 let h = if let Ok(s) = std::ffi::CString::new(&data[*pos..*pos + slen]) {
                     xpc_objects::create_string(&s)
                 } else {
@@ -697,48 +733,83 @@ pub mod socket_transport {
                 h
             }
             b'd' => {
-                if *pos + 4 > data.len() { return xpc_objects::create_null(); }
+                if *pos + 4 > data.len() {
+                    return xpc_objects::create_null();
+                }
                 let dlen = u32::from_le_bytes([
-                    data[*pos], data[*pos+1], data[*pos+2], data[*pos+3],
+                    data[*pos],
+                    data[*pos + 1],
+                    data[*pos + 2],
+                    data[*pos + 3],
                 ]) as usize;
                 *pos += 4;
-                if *pos + dlen > data.len() { return xpc_objects::create_null(); }
+                if *pos + dlen > data.len() {
+                    return xpc_objects::create_null();
+                }
                 let h = xpc_objects::create_data(&data[*pos..*pos + dlen]);
                 *pos += dlen;
                 h
             }
             b'f' => {
-                if *pos + 8 > data.len() { return xpc_objects::create_null(); }
+                if *pos + 8 > data.len() {
+                    return xpc_objects::create_null();
+                }
                 let v = f64::from_le_bytes([
-                    data[*pos], data[*pos+1], data[*pos+2], data[*pos+3],
-                    data[*pos+4], data[*pos+5], data[*pos+6], data[*pos+7],
+                    data[*pos],
+                    data[*pos + 1],
+                    data[*pos + 2],
+                    data[*pos + 3],
+                    data[*pos + 4],
+                    data[*pos + 5],
+                    data[*pos + 6],
+                    data[*pos + 7],
                 ]);
                 *pos += 8;
                 xpc_objects::create_double(v)
             }
             b't' => {
-                if *pos + 8 > data.len() { return xpc_objects::create_null(); }
+                if *pos + 8 > data.len() {
+                    return xpc_objects::create_null();
+                }
                 let v = i64::from_le_bytes([
-                    data[*pos], data[*pos+1], data[*pos+2], data[*pos+3],
-                    data[*pos+4], data[*pos+5], data[*pos+6], data[*pos+7],
+                    data[*pos],
+                    data[*pos + 1],
+                    data[*pos + 2],
+                    data[*pos + 3],
+                    data[*pos + 4],
+                    data[*pos + 5],
+                    data[*pos + 6],
+                    data[*pos + 7],
                 ]);
                 *pos += 8;
                 xpc_objects::create_date(v)
             }
             b'D' => {
-                if *pos + 4 > data.len() { return xpc_objects::create_null(); }
+                if *pos + 4 > data.len() {
+                    return xpc_objects::create_null();
+                }
                 let count = u32::from_le_bytes([
-                    data[*pos], data[*pos+1], data[*pos+2], data[*pos+3],
+                    data[*pos],
+                    data[*pos + 1],
+                    data[*pos + 2],
+                    data[*pos + 3],
                 ]) as usize;
                 *pos += 4;
                 let dict = xpc_objects::create_dictionary_empty();
                 for _ in 0..count {
-                    if *pos + 4 > data.len() { break; }
+                    if *pos + 4 > data.len() {
+                        break;
+                    }
                     let key_len = u32::from_le_bytes([
-                        data[*pos], data[*pos+1], data[*pos+2], data[*pos+3],
+                        data[*pos],
+                        data[*pos + 1],
+                        data[*pos + 2],
+                        data[*pos + 3],
                     ]) as usize;
                     *pos += 4;
-                    if *pos + key_len > data.len() { break; }
+                    if *pos + key_len > data.len() {
+                        break;
+                    }
                     let key_bytes = &data[*pos..*pos + key_len];
                     *pos += key_len;
                     let key = match std::ffi::CString::new(key_bytes) {
@@ -755,9 +826,14 @@ pub mod socket_transport {
                 dict
             }
             b'A' => {
-                if *pos + 4 > data.len() { return xpc_objects::create_null(); }
+                if *pos + 4 > data.len() {
+                    return xpc_objects::create_null();
+                }
                 let count = u32::from_le_bytes([
-                    data[*pos], data[*pos+1], data[*pos+2], data[*pos+3],
+                    data[*pos],
+                    data[*pos + 1],
+                    data[*pos + 2],
+                    data[*pos + 3],
                 ]) as usize;
                 *pos += 4;
                 let arr = xpc_objects::create_array_empty();
@@ -802,7 +878,10 @@ pub mod socket_transport {
 
             let dict2 = deserialize_message(&data);
             assert_eq!(xpc_objects::dict_get_count(dict2), 3);
-            assert_eq!(xpc_objects::dict_get_int64(dict2, b"count\0".as_ptr() as u64), 42);
+            assert_eq!(
+                xpc_objects::dict_get_int64(dict2, b"count\0".as_ptr() as u64),
+                42
+            );
             assert!(xpc_objects::dict_get_bool(dict2, b"flag\0".as_ptr() as u64));
 
             let name_ptr = xpc_objects::dict_get_string(dict2, b"name\0".as_ptr() as u64);
@@ -839,14 +918,20 @@ pub mod socket_transport {
             let restored = deserialize_message(&data);
 
             assert_eq!(xpc_objects::dict_get_count(restored), 2);
-            assert_eq!(xpc_objects::dict_get_int64(restored, b"top\0".as_ptr() as u64), 1);
+            assert_eq!(
+                xpc_objects::dict_get_int64(restored, b"top\0".as_ptr() as u64),
+                1
+            );
 
             // Get the nested dict
             let child_key = std::ffi::CString::new("child").unwrap();
             let child_handle = xpc_objects::dict_get(restored, &child_key);
             assert_ne!(child_handle, 0);
             assert_eq!(xpc_objects::dict_get_count(child_handle), 2);
-            assert_eq!(xpc_objects::dict_get_int64(child_handle, b"x\0".as_ptr() as u64), 99);
+            assert_eq!(
+                xpc_objects::dict_get_int64(child_handle, b"x\0".as_ptr() as u64),
+                99
+            );
             let y_ptr = xpc_objects::dict_get_string(child_handle, b"y\0".as_ptr() as u64);
             assert_ne!(y_ptr, 0);
             let y_str = unsafe { std::ffi::CStr::from_ptr(y_ptr as *const std::ffi::c_char) };
@@ -870,7 +955,10 @@ pub mod socket_transport {
             let restored = deserialize_message(&data);
 
             assert_eq!(xpc_objects::dict_get_count(restored), 2);
-            assert_eq!(xpc_objects::dict_get_int64(restored, b"total\0".as_ptr() as u64), 2);
+            assert_eq!(
+                xpc_objects::dict_get_int64(restored, b"total\0".as_ptr() as u64),
+                2
+            );
 
             let items_handle = xpc_objects::dict_get(restored, &key);
             assert_ne!(items_handle, 0);
@@ -886,11 +974,7 @@ pub mod socket_transport {
         fn deeply_nested_roundtrip() {
             // dict → dict → array → dict
             let leaf = xpc_objects::create_dictionary_empty();
-            xpc_objects::dict_set_string(
-                leaf,
-                b"msg\0".as_ptr() as u64,
-                b"deep\0".as_ptr() as u64,
-            );
+            xpc_objects::dict_set_string(leaf, b"msg\0".as_ptr() as u64, b"deep\0".as_ptr() as u64);
 
             let arr = xpc_objects::create_array_empty();
             xpc_objects::array_append(arr, leaf);
@@ -1018,7 +1102,10 @@ mod tests {
         let h = create_connection(name.as_ptr() as u64, 0, 0);
         assert_ne!(h, 0);
         assert!(xpc_objects::is_valid(h));
-        assert_eq!(xpc_objects::get_type_tag(h), xpc_objects::XPC_TYPE_TAG_CONNECTION);
+        assert_eq!(
+            xpc_objects::get_type_tag(h),
+            xpc_objects::XPC_TYPE_TAG_CONNECTION
+        );
     }
 
     #[test]
@@ -1043,7 +1130,7 @@ mod tests {
 
         // Cancel
         cancel(h);
-        let state = with_conns(|t| t.get(& id).unwrap().state);
+        let state = with_conns(|t| t.get(&id).unwrap().state);
         assert_eq!(state, ConnState::Cancelled);
     }
 
@@ -1064,7 +1151,10 @@ mod tests {
         let msg = xpc_objects::create_dictionary_empty();
         let reply = send_message_with_reply_sync(h, msg);
         assert_ne!(reply, 0);
-        assert_eq!(xpc_objects::get_type_tag(reply), xpc_objects::XPC_TYPE_TAG_ERROR);
+        assert_eq!(
+            xpc_objects::get_type_tag(reply),
+            xpc_objects::XPC_TYPE_TAG_ERROR
+        );
     }
 
     #[test]

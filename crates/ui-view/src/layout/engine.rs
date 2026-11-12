@@ -5,8 +5,8 @@ use std::collections::HashMap;
 use graphics_core::Rect;
 
 use super::types::{
-    EdgeInsets, GUIDE_SENTINELS, LAYOUT_MARGINS_GUIDE, LayoutAttribute, LayoutConstraint,
-    LayoutPriority, LayoutRelation, SAFE_AREA_GUIDE, SUPERVIEW, ViewId,
+    EdgeInsets, LayoutAttribute, LayoutConstraint, LayoutPriority, LayoutRelation, ViewId,
+    GUIDE_SENTINELS, LAYOUT_MARGINS_GUIDE, SAFE_AREA_GUIDE, SUPERVIEW,
 };
 
 /// Unique key for a solver variable.
@@ -112,22 +112,52 @@ impl LayoutEngine {
         // Initialize superview values from container.
         values.insert(VarKey(SUPERVIEW, LayoutAttribute::Left), self.container.x);
         values.insert(VarKey(SUPERVIEW, LayoutAttribute::Top), self.container.y);
-        values.insert(VarKey(SUPERVIEW, LayoutAttribute::Width), self.container.width);
-        values.insert(VarKey(SUPERVIEW, LayoutAttribute::Height), self.container.height);
+        values.insert(
+            VarKey(SUPERVIEW, LayoutAttribute::Width),
+            self.container.width,
+        );
+        values.insert(
+            VarKey(SUPERVIEW, LayoutAttribute::Height),
+            self.container.height,
+        );
 
         // Initialize layout margins guide (container inset by margins).
         let mg = &self.margins;
-        values.insert(VarKey(LAYOUT_MARGINS_GUIDE, LayoutAttribute::Left), self.container.x + mg.left);
-        values.insert(VarKey(LAYOUT_MARGINS_GUIDE, LayoutAttribute::Top), self.container.y + mg.top);
-        values.insert(VarKey(LAYOUT_MARGINS_GUIDE, LayoutAttribute::Width), (self.container.width - mg.left - mg.right).max(0.0));
-        values.insert(VarKey(LAYOUT_MARGINS_GUIDE, LayoutAttribute::Height), (self.container.height - mg.top - mg.bottom).max(0.0));
+        values.insert(
+            VarKey(LAYOUT_MARGINS_GUIDE, LayoutAttribute::Left),
+            self.container.x + mg.left,
+        );
+        values.insert(
+            VarKey(LAYOUT_MARGINS_GUIDE, LayoutAttribute::Top),
+            self.container.y + mg.top,
+        );
+        values.insert(
+            VarKey(LAYOUT_MARGINS_GUIDE, LayoutAttribute::Width),
+            (self.container.width - mg.left - mg.right).max(0.0),
+        );
+        values.insert(
+            VarKey(LAYOUT_MARGINS_GUIDE, LayoutAttribute::Height),
+            (self.container.height - mg.top - mg.bottom).max(0.0),
+        );
 
         // Initialize safe area guide (container inset by safe area insets).
         let sa = &self.safe_area_insets;
-        values.insert(VarKey(SAFE_AREA_GUIDE, LayoutAttribute::Left), self.container.x + sa.left);
-        values.insert(VarKey(SAFE_AREA_GUIDE, LayoutAttribute::Top), self.container.y + sa.top);
-        values.insert(VarKey(SAFE_AREA_GUIDE, LayoutAttribute::Width), (self.container.width - sa.left - sa.right).max(0.0));
-        values.insert(VarKey(SAFE_AREA_GUIDE, LayoutAttribute::Height), (self.container.height - sa.top - sa.bottom).max(0.0));
+        values.insert(
+            VarKey(SAFE_AREA_GUIDE, LayoutAttribute::Left),
+            self.container.x + sa.left,
+        );
+        values.insert(
+            VarKey(SAFE_AREA_GUIDE, LayoutAttribute::Top),
+            self.container.y + sa.top,
+        );
+        values.insert(
+            VarKey(SAFE_AREA_GUIDE, LayoutAttribute::Width),
+            (self.container.width - sa.left - sa.right).max(0.0),
+        );
+        values.insert(
+            VarKey(SAFE_AREA_GUIDE, LayoutAttribute::Height),
+            (self.container.height - sa.top - sa.bottom).max(0.0),
+        );
 
         // Initialize view variables with defaults (centered, zero size).
         for &vid in &view_ids {
@@ -165,10 +195,18 @@ impl LayoutEngine {
                 let error = match constraint.relation {
                     LayoutRelation::Equal => rhs - lhs,
                     LayoutRelation::GreaterOrEqual => {
-                        if lhs < rhs { rhs - lhs } else { 0.0 }
+                        if lhs < rhs {
+                            rhs - lhs
+                        } else {
+                            0.0
+                        }
                     }
                     LayoutRelation::LessOrEqual => {
-                        if lhs > rhs { rhs - lhs } else { 0.0 }
+                        if lhs > rhs {
+                            rhs - lhs
+                        } else {
+                            0.0
+                        }
                     }
                 };
 
@@ -185,9 +223,16 @@ impl LayoutEngine {
                 };
 
                 let correction = error * strength * 0.5;
-                apply_correction(&mut values, constraint.first_item, constraint.first_attribute, correction);
+                apply_correction(
+                    &mut values,
+                    constraint.first_item,
+                    constraint.first_attribute,
+                    correction,
+                );
 
-                if let (Some(sid), Some(sattr)) = (constraint.second_item, constraint.second_attribute) {
+                if let (Some(sid), Some(sattr)) =
+                    (constraint.second_item, constraint.second_attribute)
+                {
                     if sid != SUPERVIEW {
                         apply_correction(&mut values, sid, sattr, -correction * 0.25);
                     }
@@ -231,10 +276,24 @@ impl LayoutEngine {
         // Build output frames.
         let mut frames = HashMap::new();
         for &vid in &view_ids {
-            let left   = values.get(&VarKey(vid, LayoutAttribute::Left)).copied().unwrap_or(0.0);
-            let top    = values.get(&VarKey(vid, LayoutAttribute::Top)).copied().unwrap_or(0.0);
-            let width  = values.get(&VarKey(vid, LayoutAttribute::Width)).copied().unwrap_or(0.0).max(0.0);
-            let height = values.get(&VarKey(vid, LayoutAttribute::Height)).copied().unwrap_or(0.0).max(0.0);
+            let left = values
+                .get(&VarKey(vid, LayoutAttribute::Left))
+                .copied()
+                .unwrap_or(0.0);
+            let top = values
+                .get(&VarKey(vid, LayoutAttribute::Top))
+                .copied()
+                .unwrap_or(0.0);
+            let width = values
+                .get(&VarKey(vid, LayoutAttribute::Width))
+                .copied()
+                .unwrap_or(0.0)
+                .max(0.0);
+            let height = values
+                .get(&VarKey(vid, LayoutAttribute::Height))
+                .copied()
+                .unwrap_or(0.0)
+                .max(0.0);
             frames.insert(vid, Rect::new(left, top, width, height));
         }
 
@@ -244,22 +303,38 @@ impl LayoutEngine {
 
 /// Resolve a derived attribute from the 4 base variables (Left, Top, Width, Height).
 fn resolve_attr(values: &HashMap<VarKey, f64>, view: ViewId, attr: LayoutAttribute) -> f64 {
-    let left   = values.get(&VarKey(view, LayoutAttribute::Left)).copied().unwrap_or(0.0);
-    let top    = values.get(&VarKey(view, LayoutAttribute::Top)).copied().unwrap_or(0.0);
-    let width  = values.get(&VarKey(view, LayoutAttribute::Width)).copied().unwrap_or(0.0);
-    let height = values.get(&VarKey(view, LayoutAttribute::Height)).copied().unwrap_or(0.0);
+    let left = values
+        .get(&VarKey(view, LayoutAttribute::Left))
+        .copied()
+        .unwrap_or(0.0);
+    let top = values
+        .get(&VarKey(view, LayoutAttribute::Top))
+        .copied()
+        .unwrap_or(0.0);
+    let width = values
+        .get(&VarKey(view, LayoutAttribute::Width))
+        .copied()
+        .unwrap_or(0.0);
+    let height = values
+        .get(&VarKey(view, LayoutAttribute::Height))
+        .copied()
+        .unwrap_or(0.0);
 
     match attr {
-        LayoutAttribute::Left    => left,
-        LayoutAttribute::Top     => top,
-        LayoutAttribute::Width   => width,
-        LayoutAttribute::Height  => height,
-        LayoutAttribute::Right   => left + width,
-        LayoutAttribute::Bottom  => top + height,
+        LayoutAttribute::Left => left,
+        LayoutAttribute::Top => top,
+        LayoutAttribute::Width => width,
+        LayoutAttribute::Height => height,
+        LayoutAttribute::Right => left + width,
+        LayoutAttribute::Bottom => top + height,
         LayoutAttribute::CenterX => left + width / 2.0,
         LayoutAttribute::CenterY => top + height / 2.0,
         LayoutAttribute::AspectRatio => {
-            if height.abs() > 1e-9 { width / height } else { 0.0 }
+            if height.abs() > 1e-9 {
+                width / height
+            } else {
+                0.0
+            }
         }
     }
 }
@@ -276,7 +351,10 @@ fn apply_correction(
         return; // Never modify guide sentinels.
     }
     match attr {
-        LayoutAttribute::Left | LayoutAttribute::Top | LayoutAttribute::Width | LayoutAttribute::Height => {
+        LayoutAttribute::Left
+        | LayoutAttribute::Top
+        | LayoutAttribute::Width
+        | LayoutAttribute::Height => {
             if let Some(v) = values.get_mut(&VarKey(view, attr)) {
                 *v += delta;
                 if matches!(attr, LayoutAttribute::Width | LayoutAttribute::Height) && *v < 0.0 {

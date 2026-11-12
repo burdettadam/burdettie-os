@@ -15,23 +15,35 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 fn read_u64(obj: u64, offset: usize) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as *const u8).add(offset) as *const u64) }
 }
 
 fn write_u64(obj: u64, offset: usize, val: u64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as *mut u8).add(offset) as *mut u64) = val; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as *mut u8).add(offset) as *mut u64) = val;
+    }
 }
 
 fn read_f64(obj: u64, offset: usize) -> f64 {
-    if obj == 0 { return 0.0; }
+    if obj == 0 {
+        return 0.0;
+    }
     unsafe { *((obj as *const u8).add(offset) as *const f64) }
 }
 
 fn write_f64(obj: u64, offset: usize, val: f64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as *mut u8).add(offset) as *mut f64) = val; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as *mut u8).add(offset) as *mut f64) = val;
+    }
 }
 
 pub(crate) const TRACKING_AREA_SIZE: usize = 48;
@@ -63,13 +75,21 @@ fn set_owner(obj: u64, owner: u64) {
 
 fn get_owner(obj: u64) -> u64 {
     let guard = TRACKING_OWNERS.lock().unwrap();
-    guard.as_ref().and_then(|m| m.get(&obj)).copied().unwrap_or(0)
+    guard
+        .as_ref()
+        .and_then(|m| m.get(&obj))
+        .copied()
+        .unwrap_or(0)
 }
 
 /// `-[NSTrackingArea initWithRect:options:owner:userInfo:]`
 pub extern "C" fn shim_nstrackingarea_init(
-    obj: u64, _cmd: u64,
-    x: f64, y: f64, w: f64, h: f64,
+    obj: u64,
+    _cmd: u64,
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
     options: u64,
     owner: u64,
     _user_info: u64,
@@ -79,7 +99,9 @@ pub extern "C" fn shim_nstrackingarea_init(
     } else {
         obj
     };
-    if ptr == 0 { return 0; }
+    if ptr == 0 {
+        return 0;
+    }
 
     write_u64(ptr, 0, nsobj::nstrackingarea_class_addr());
     write_f64(ptr, RECT_X_OFF, x);
@@ -118,7 +140,9 @@ pub extern "C" fn shim_nstrackingarea_options(obj: u64, _cmd: u64) -> u64 {
 
 /// `-[NSTrackingArea owner]`
 pub extern "C" fn shim_nstrackingarea_owner(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     get_owner(obj)
 }
 
@@ -134,7 +158,9 @@ static VIEW_TRACKING_AREAS: Mutex<Option<HashMap<u64, Vec<u64>>>> = Mutex::new(N
 
 /// `-[NSView addTrackingArea:]`
 pub extern "C" fn shim_nsview_add_tracking_area(obj: u64, _cmd: u64, area: u64) {
-    if obj == 0 || area == 0 { return; }
+    if obj == 0 || area == 0 {
+        return;
+    }
     let mut guard = VIEW_TRACKING_AREAS.lock().unwrap();
     let map = guard.get_or_insert_with(HashMap::new);
     map.entry(obj).or_default().push(area);
@@ -142,7 +168,9 @@ pub extern "C" fn shim_nsview_add_tracking_area(obj: u64, _cmd: u64, area: u64) 
 
 /// `-[NSView removeTrackingArea:]`
 pub extern "C" fn shim_nsview_remove_tracking_area(obj: u64, _cmd: u64, area: u64) {
-    if obj == 0 || area == 0 { return; }
+    if obj == 0 || area == 0 {
+        return;
+    }
     let mut guard = VIEW_TRACKING_AREAS.lock().unwrap();
     if let Some(map) = guard.as_mut() {
         if let Some(areas) = map.get_mut(&obj) {
@@ -153,9 +181,12 @@ pub extern "C" fn shim_nsview_remove_tracking_area(obj: u64, _cmd: u64, area: u6
 
 /// `-[NSView trackingAreas]`
 pub extern "C" fn shim_nsview_tracking_areas(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let guard = VIEW_TRACKING_AREAS.lock().unwrap();
-    let areas = guard.as_ref()
+    let areas = guard
+        .as_ref()
         .and_then(|m| m.get(&obj))
         .cloned()
         .unwrap_or_default();
@@ -169,7 +200,9 @@ pub extern "C" fn shim_nsview_update_tracking_areas(_obj: u64, _cmd: u64) {}
 /// system).  Returns a list of `(tracking_area, owner)` pairs whose rect
 /// contains the point and whose options include `MouseEnteredAndExited`.
 pub(crate) fn tracking_areas_containing_point(view: u64, px: f64, py: f64) -> Vec<(u64, u64)> {
-    if view == 0 { return Vec::new(); }
+    if view == 0 {
+        return Vec::new();
+    }
     let guard = VIEW_TRACKING_AREAS.lock().unwrap();
     let areas = match guard.as_ref().and_then(|m| m.get(&view)) {
         Some(a) => a,
@@ -178,7 +211,9 @@ pub(crate) fn tracking_areas_containing_point(view: u64, px: f64, py: f64) -> Ve
     let mut result = Vec::new();
     for &area in areas {
         let opts = read_u64(area, OPTIONS_OFF);
-        if opts & MOUSE_ENTERED_AND_EXITED == 0 { continue; }
+        if opts & MOUSE_ENTERED_AND_EXITED == 0 {
+            continue;
+        }
         let rx = read_f64(area, RECT_X_OFF);
         let ry = read_f64(area, RECT_Y_OFF);
         let rw = read_f64(area, RECT_W_OFF);
@@ -202,10 +237,16 @@ static LAST_HOVER_VIEW: Mutex<Option<HashMap<u64, u64>>> = Mutex::new(None);
 pub(crate) fn process_mouse_tracking(window: u64, current_view: u64, event: u64) {
     let previous_view = {
         let guard = LAST_HOVER_VIEW.lock().unwrap();
-        guard.as_ref().and_then(|m| m.get(&window)).copied().unwrap_or(0)
+        guard
+            .as_ref()
+            .and_then(|m| m.get(&window))
+            .copied()
+            .unwrap_or(0)
     };
 
-    if previous_view == current_view { return; }
+    if previous_view == current_view {
+        return;
+    }
 
     // mouseExited: on the previous view's tracking area owner.
     if previous_view != 0 {
@@ -215,12 +256,20 @@ pub(crate) fn process_mouse_tracking(window: u64, current_view: u64, event: u64)
         // Since the mouse *left* the view entirely, fire exit on all tracking areas.
         for &(_area, owner) in &owners_exited {
             if owner != 0 {
-                crate::nsapplication::dispatch_selector_named_to_target(owner, "mouseExited:", event);
+                crate::nsapplication::dispatch_selector_named_to_target(
+                    owner,
+                    "mouseExited:",
+                    event,
+                );
             }
         }
         if owners_exited.is_empty() {
             // Fall back to the view itself.
-            crate::nsapplication::dispatch_selector_named_to_target(previous_view, "mouseExited:", event);
+            crate::nsapplication::dispatch_selector_named_to_target(
+                previous_view,
+                "mouseExited:",
+                event,
+            );
         }
     }
 
@@ -231,12 +280,20 @@ pub(crate) fn process_mouse_tracking(window: u64, current_view: u64, event: u64)
         let owners_entered = tracking_areas_containing_point(current_view, local.x, local.y);
         for &(_area, owner) in &owners_entered {
             if owner != 0 {
-                crate::nsapplication::dispatch_selector_named_to_target(owner, "mouseEntered:", event);
+                crate::nsapplication::dispatch_selector_named_to_target(
+                    owner,
+                    "mouseEntered:",
+                    event,
+                );
             }
         }
         if owners_entered.is_empty() {
             // Fall back to the view itself.
-            crate::nsapplication::dispatch_selector_named_to_target(current_view, "mouseEntered:", event);
+            crate::nsapplication::dispatch_selector_named_to_target(
+                current_view,
+                "mouseEntered:",
+                event,
+            );
         }
     }
 
@@ -258,9 +315,15 @@ mod tests {
     #[test]
     fn init_and_accessors() {
         let ta = shim_nstrackingarea_init(
-            0, 0, 10.0, 20.0, 100.0, 50.0,
+            0,
+            0,
+            10.0,
+            20.0,
+            100.0,
+            50.0,
             MOUSE_ENTERED_AND_EXITED | ACTIVE_ALWAYS,
-            0xBEEF, 0,
+            0xBEEF,
+            0,
         );
         assert_ne!(ta, 0);
         assert_eq!(read_u64(ta, 0), nsobj::nstrackingarea_class_addr());
@@ -268,7 +331,10 @@ mod tests {
         assert_eq!(shim_nstrackingarea_rect_y(ta, 0), 20.0);
         assert_eq!(shim_nstrackingarea_rect_w(ta, 0), 100.0);
         assert_eq!(shim_nstrackingarea_rect_h(ta, 0), 50.0);
-        assert_eq!(shim_nstrackingarea_options(ta, 0), MOUSE_ENTERED_AND_EXITED | ACTIVE_ALWAYS);
+        assert_eq!(
+            shim_nstrackingarea_options(ta, 0),
+            MOUSE_ENTERED_AND_EXITED | ACTIVE_ALWAYS
+        );
         assert_eq!(shim_nstrackingarea_owner(ta, 0), 0xBEEF);
         free_obj(ta);
     }

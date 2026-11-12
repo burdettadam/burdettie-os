@@ -2,9 +2,9 @@
 
 use macho_parse::ParsedMachO;
 
-use crate::types::*;
 use super::class::parse_method_list;
 use super::util::{read_cstring, resolve_on_disk_pointer, resolve_to_vmaddr};
+use crate::types::*;
 
 // ── Category parsing ───────────────────────────────────────────────
 

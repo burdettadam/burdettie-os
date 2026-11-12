@@ -27,14 +27,17 @@ pub fn grapheme_clusters(text: &str) -> Vec<&str> {
 /// rather than advancing the cursor.
 pub fn is_combining_mark(ch: char) -> bool {
     // Unicode general categories Mn (nonspacing), Mc (spacing combining), Me (enclosing)
-    matches!(unicode_category(ch),
-        UnicodeCategory::Mn | UnicodeCategory::Mc | UnicodeCategory::Me)
+    matches!(
+        unicode_category(ch),
+        UnicodeCategory::Mn | UnicodeCategory::Mc | UnicodeCategory::Me
+    )
 }
 
 /// Returns `true` if `ch` is a zero-width formatting character that should
 /// not produce any visible output or cursor advance.
 pub fn is_zero_width(ch: char) -> bool {
-    matches!(ch,
+    matches!(
+        ch,
         '\u{200B}'  // Zero-width space
         | '\u{200C}' // Zero-width non-joiner (ZWNJ)
         | '\u{200D}' // Zero-width joiner (ZWJ)
@@ -53,7 +56,8 @@ pub fn is_zero_width(ch: char) -> bool {
 
 /// Returns `true` if `ch` is a Unicode bidirectional control character.
 fn is_bidi_control(ch: char) -> bool {
-    matches!(ch,
+    matches!(
+        ch,
         '\u{200E}' // Left-to-right mark
         | '\u{200F}' // Right-to-left mark
         | '\u{202A}' // Left-to-right embedding
@@ -304,7 +308,8 @@ fn unicode_category(ch: char) -> UnicodeCategory {
     }
 
     // Enclosing combining marks (Me)
-    if matches!(cp, 0x0488..=0x0489 | 0x1ABE | 0x20DD..=0x20E0 | 0x20E2..=0x20E4 | 0xA670..=0xA672) {
+    if matches!(cp, 0x0488..=0x0489 | 0x1ABE | 0x20DD..=0x20E0 | 0x20E2..=0x20E4 | 0xA670..=0xA672)
+    {
         return UnicodeCategory::Me;
     }
 
@@ -362,9 +367,9 @@ mod tests {
 
     #[test]
     fn emoji_detection() {
-        assert!(is_emoji('😀'));       // U+1F600
-        assert!(is_emoji('🎉'));       // U+1F389
-        assert!(is_emoji('🚀'));       // U+1F680
+        assert!(is_emoji('😀')); // U+1F600
+        assert!(is_emoji('🎉')); // U+1F389
+        assert!(is_emoji('🚀')); // U+1F680
         assert!(is_emoji('\u{2600}')); // ☀ sun
         assert!(!is_emoji('a'));
         assert!(!is_emoji(' '));

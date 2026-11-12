@@ -8,18 +8,23 @@ use crate::decode::Instruction;
 ///       4=A (ties-away), 6=X (exact, raise inexact), 7=I (current rounding → ties-even)
 fn fp_round_f64(val: f64, mode: u8) -> f64 {
     match mode {
-        0 | 7 => val.round_ties_even(),             // FRINTN / FRINTI
-        1 => val.ceil(),                              // FRINTP
-        2 => val.floor(),                             // FRINTM
-        3 => val.trunc(),                             // FRINTZ
-        4 => {                                        // FRINTA (ties away from zero)
+        0 | 7 => val.round_ties_even(), // FRINTN / FRINTI
+        1 => val.ceil(),                // FRINTP
+        2 => val.floor(),               // FRINTM
+        3 => val.trunc(),               // FRINTZ
+        4 => {
+            // FRINTA (ties away from zero)
             if val.fract().abs() == 0.5 {
-                if val > 0.0 { val.ceil() } else { val.floor() }
+                if val > 0.0 {
+                    val.ceil()
+                } else {
+                    val.floor()
+                }
             } else {
                 val.round_ties_even()
             }
         }
-        6 => val.round_ties_even(),                   // FRINTX (same as N for our purposes)
+        6 => val.round_ties_even(), // FRINTX (same as N for our purposes)
         _ => val,
     }
 }
@@ -33,7 +38,11 @@ fn fp_round_f32(val: f32, mode: u8) -> f32 {
         3 => val.trunc(),
         4 => {
             if val.fract().abs() == 0.5 {
-                if val > 0.0 { val.ceil() } else { val.floor() }
+                if val > 0.0 {
+                    val.ceil()
+                } else {
+                    val.floor()
+                }
             } else {
                 val.round_ties_even()
             }
@@ -47,7 +56,6 @@ impl Interpreter {
     pub(super) fn exec_fp_dp(&mut self, insn: Instruction, pc: u64) -> StepResult {
         match insn {
             // ── FP Data Processing ─────────────────────────────────
-
             Instruction::FMovReg { sf, rd, rn } => {
                 if sf {
                     self.cpu.write_d(rd, self.cpu.read_d(rn));
@@ -81,7 +89,12 @@ impl Interpreter {
                 self.cpu.pc = pc + 4;
             }
 
-            Instruction::Scvtf { sf_fp, sf_int, rd, rn } => {
+            Instruction::Scvtf {
+                sf_fp,
+                sf_int,
+                rd,
+                rn,
+            } => {
                 if sf_fp {
                     // to double
                     let val = if sf_int {
@@ -101,7 +114,12 @@ impl Interpreter {
                 }
                 self.cpu.pc = pc + 4;
             }
-            Instruction::Ucvtf { sf_fp, sf_int, rd, rn } => {
+            Instruction::Ucvtf {
+                sf_fp,
+                sf_int,
+                rd,
+                rn,
+            } => {
                 if sf_fp {
                     let val = if sf_int {
                         self.cpu.read_reg(rn) as f64
@@ -119,21 +137,39 @@ impl Interpreter {
                 }
                 self.cpu.pc = pc + 4;
             }
-            Instruction::Fcvtzs { sf_int, sf_fp, rd, rn } => {
+            Instruction::Fcvtzs {
+                sf_int,
+                sf_fp,
+                rd,
+                rn,
+            } => {
                 if sf_fp {
                     // from double
                     let f = f64::from_bits(self.cpu.read_d(rn));
-                    let val = if sf_int { f as i64 as u64 } else { f as i32 as u32 as u64 };
+                    let val = if sf_int {
+                        f as i64 as u64
+                    } else {
+                        f as i32 as u32 as u64
+                    };
                     self.cpu.write_reg(rd, val);
                 } else {
                     // from single
                     let f = f32::from_bits(self.cpu.read_s(rn));
-                    let val = if sf_int { f as i64 as u64 } else { f as i32 as u32 as u64 };
+                    let val = if sf_int {
+                        f as i64 as u64
+                    } else {
+                        f as i32 as u32 as u64
+                    };
                     self.cpu.write_reg(rd, val);
                 }
                 self.cpu.pc = pc + 4;
             }
-            Instruction::Fcvtzu { sf_int, sf_fp, rd, rn } => {
+            Instruction::Fcvtzu {
+                sf_int,
+                sf_fp,
+                rd,
+                rn,
+            } => {
                 if sf_fp {
                     let f = f64::from_bits(self.cpu.read_d(rn));
                     let val = if sf_int { f as u64 } else { f as u32 as u64 };
@@ -271,13 +307,27 @@ impl Interpreter {
                 }
                 self.cpu.pc = pc + 4;
             }
-            Instruction::Fcsel { sf, rd, rn, rm, cond } => {
+            Instruction::Fcsel {
+                sf,
+                rd,
+                rn,
+                rm,
+                cond,
+            } => {
                 let take = cond.eval(self.cpu.nzcv);
                 if sf {
-                    let val = if take { self.cpu.read_d(rn) } else { self.cpu.read_d(rm) };
+                    let val = if take {
+                        self.cpu.read_d(rn)
+                    } else {
+                        self.cpu.read_d(rm)
+                    };
                     self.cpu.write_d(rd, val);
                 } else {
-                    let val = if take { self.cpu.read_s(rn) } else { self.cpu.read_s(rm) };
+                    let val = if take {
+                        self.cpu.read_s(rn)
+                    } else {
+                        self.cpu.read_s(rm)
+                    };
                     self.cpu.write_s(rd, val);
                 }
                 self.cpu.pc = pc + 4;
@@ -391,7 +441,6 @@ mod tests {
     // ── FABS ────────────────────────────────────────────────────
 
     #[test]
-    #[ignore] // Decoder 1-source guard bug: odd opcode (000001) fails bits[15:10] == 010000 check
     fn test_exec_fabs_double() {
         // FABS D0, D1 — manual encoding 0x1E60C020
         let mut t = test_interp(&[0x1E60C020]);
@@ -403,13 +452,21 @@ mod tests {
     // ── FSQRT ───────────────────────────────────────────────────
 
     #[test]
-    #[ignore] // Decoder 1-source guard bug: odd opcode (000011) fails bits[15:10] == 010000 check
     fn test_exec_fsqrt_double() {
         // FSQRT D0, D1 — manual encoding 0x1E61C020
         let mut t = test_interp(&[0x1E61C020]);
         t.interp.cpu.write_d(1, f64::to_bits(9.0));
         let cpu = t.run_ok();
         assert_eq!(f64::from_bits(cpu.read_d(0)), 3.0);
+    }
+
+    #[test]
+    fn test_exec_fabd_single() {
+        let mut t = test_interp(&[enc_fabd(false, 0, 1, 2)]);
+        t.interp.cpu.write_s(1, f32::to_bits(7.25));
+        t.interp.cpu.write_s(2, f32::to_bits(2.0));
+        let cpu = t.run_ok();
+        assert_eq!(f32::from_bits(cpu.read_s(0)), 5.25);
     }
 
     // ── FADD ────────────────────────────────────────────────────
@@ -518,7 +575,6 @@ mod tests {
     // ── FCVT ────────────────────────────────────────────────────
 
     #[test]
-    #[ignore] // Decoder 1-source guard bug: FCVT S→D uses opcode=000101 (odd), fails guard
     fn test_exec_fcvt_single_to_double() {
         // FCVT D0, S1 — manual encoding 0x1E22C020
         let mut t = test_interp(&[0x1E22C020]);
@@ -539,7 +595,6 @@ mod tests {
     // ── FCSEL ───────────────────────────────────────────────────
 
     #[test]
-    #[ignore] // Decoder FCSEL guard bug: bits[23:21] check rejects valid single/double encodings
     fn test_exec_fcsel_cond_true() {
         // FCSEL D0, D1, D2, EQ — manual encoding 0x1E620C20
         // Set Z=1 so EQ is true → should select D1

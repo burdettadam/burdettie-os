@@ -9,6 +9,8 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
+use macho_exec::register_tlv_atexit;
+
 use crate::table::ShimTable;
 
 /// Manages TLS descriptor → allocation mapping.
@@ -68,7 +70,11 @@ impl TlsShims {
             shim_tlv_bootstrap as *const () as u64,
             "TLV bootstrap thunk",
         );
-        table.register("__tlv_atexit", shim_tlv_atexit as *const () as u64, "TLV atexit (no-op)");
+        table.register(
+            "__tlv_atexit",
+            shim_tlv_atexit as *const () as u64,
+            "TLV atexit",
+        );
 
         log::debug!("TlsShims: registered 2 TLS shims");
     }
@@ -148,10 +154,31 @@ extern "C" fn shim_tlv_bootstrap(desc: *mut TlvDescriptor) -> *mut u8 {
 }
 
 /// `void _tlv_atexit(void (*dtor)(void *), void *arg)` — register a
-/// destructor for a TLV. Thread cleanup is handled by the pthread key
-/// destructor, so this is a no-op.
-extern "C" fn shim_tlv_atexit(_dtor: Option<extern "C" fn(*mut u8)>, _arg: *mut u8) {
-    log::trace!("_tlv_atexit called (cleanup via pthread key destructor)");
+/// destructor for a TLV object so it runs before the owning TLV block is
+/// freed on thread exit.
+extern "C" fn shim_tlv_atexit(dtor: Option<extern "C" fn(*mut u8)>, arg: *mut u8) {
+    let dtor_addr = dtor.map(|func| func as *const () as usize).unwrap_or(0);
+    let Some(dtor) = dtor else {
+        log::trace!(
+            "_tlv_atexit called with null dtor for arg={:#x}",
+            arg as usize
+        );
+        return;
+    };
+
+    if register_tlv_atexit(arg, dtor) {
+        log::trace!(
+            "_tlv_atexit registered: dtor={:#x} arg={:#x}",
+            dtor_addr,
+            arg as usize
+        );
+    } else {
+        log::warn!(
+            "_tlv_atexit could not associate destructor with a live TLV block: dtor={:#x} arg={:#x}",
+            dtor_addr,
+            arg as usize
+        );
+    }
 }
 
 #[cfg(test)]

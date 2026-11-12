@@ -62,9 +62,9 @@ pub(super) fn emit_block(code: &mut CodeBuffer, block: &[Instruction]) -> Option
     code.emit32(enc_stp_pre(29, 30, 31, -48));
     code.emit32(enc_stp_offset(19, 20, 31, 16));
     code.emit32(enc_stp_offset(21, 22, 31, 32));
-    code.emit32(enc_mov_reg(19, 0));       // mov x19, x0
-    code.emit32(enc_movz(20, 0, 0));       // mov x20, #0
-    code.emit32(enc_mov_reg(21, 1));       // mov x21, x1
+    code.emit32(enc_mov_reg(19, 0)); // mov x19, x0
+    code.emit32(enc_movz(20, 0, 0)); // mov x20, #0
+    code.emit32(enc_mov_reg(21, 1)); // mov x21, x1
 
     let mut insn_count = 0u32;
 
@@ -76,7 +76,13 @@ pub(super) fn emit_block(code: &mut CodeBuffer, block: &[Instruction]) -> Option
                 // Just increment counter, no code needed.
             }
 
-            Instruction::AddImm { sf, rd, rn, imm, shift } => {
+            Instruction::AddImm {
+                sf,
+                rd,
+                rn,
+                imm,
+                shift,
+            } => {
                 let effective_imm = if shift == 1 { imm << 12 } else { imm };
                 // Load Rn from CpuState
                 emit_load_guest_gpr(code, 0, rn, sf);
@@ -92,7 +98,13 @@ pub(super) fn emit_block(code: &mut CodeBuffer, block: &[Instruction]) -> Option
                 emit_store_guest_gpr(code, 0, rd, sf);
             }
 
-            Instruction::SubImm { sf, rd, rn, imm, shift } => {
+            Instruction::SubImm {
+                sf,
+                rd,
+                rn,
+                imm,
+                shift,
+            } => {
                 let effective_imm = if shift == 1 { imm << 12 } else { imm };
                 emit_load_guest_gpr(code, 0, rn, sf);
                 if effective_imm <= 0xFFF {
@@ -105,7 +117,12 @@ pub(super) fn emit_block(code: &mut CodeBuffer, block: &[Instruction]) -> Option
                 emit_store_guest_gpr(code, 0, rd, sf);
             }
 
-            Instruction::Movz { sf, rd, imm16, shift } => {
+            Instruction::Movz {
+                sf,
+                rd,
+                imm16,
+                shift,
+            } => {
                 // MOVZ directly into x0, then store
                 code.emit32(enc_movz(0, imm16, shift / 16));
                 if !sf {
@@ -114,18 +131,35 @@ pub(super) fn emit_block(code: &mut CodeBuffer, block: &[Instruction]) -> Option
                 emit_store_guest_gpr(code, 0, rd, sf);
             }
 
-            Instruction::Movk { sf, rd, imm16, shift } => {
+            Instruction::Movk {
+                sf,
+                rd,
+                imm16,
+                shift,
+            } => {
                 emit_load_guest_gpr(code, 0, rd, sf);
                 code.emit32(enc_movk(sf, 0, imm16, shift / 16));
                 emit_store_guest_gpr(code, 0, rd, sf);
             }
 
-            Instruction::Movn { sf, rd, imm16, shift } => {
+            Instruction::Movn {
+                sf,
+                rd,
+                imm16,
+                shift,
+            } => {
                 code.emit32(enc_movn(sf, 0, imm16, shift / 16));
                 emit_store_guest_gpr(code, 0, rd, sf);
             }
 
-            Instruction::AddReg { sf, rd, rn, rm, shift_type, shift_amount } => {
+            Instruction::AddReg {
+                sf,
+                rd,
+                rn,
+                rm,
+                shift_type,
+                shift_amount,
+            } => {
                 emit_load_guest_gpr(code, 0, rn, sf);
                 emit_load_guest_gpr(code, 1, rm, sf);
                 // ADD Xd, Xn, Xm, shift #amount
@@ -133,17 +167,42 @@ pub(super) fn emit_block(code: &mut CodeBuffer, block: &[Instruction]) -> Option
                 emit_store_guest_gpr(code, 0, rd, sf);
             }
 
-            Instruction::SubReg { sf, rd, rn, rm, shift_type, shift_amount } => {
+            Instruction::SubReg {
+                sf,
+                rd,
+                rn,
+                rm,
+                shift_type,
+                shift_amount,
+            } => {
                 emit_load_guest_gpr(code, 0, rn, sf);
                 emit_load_guest_gpr(code, 1, rm, sf);
                 code.emit32(enc_sub_reg(sf, 0, 0, 1, shift_type, shift_amount));
                 emit_store_guest_gpr(code, 0, rd, sf);
             }
 
-            Instruction::LogicalReg { sf, opc, n, rd, rn, rm, shift_type, shift_amount } => {
+            Instruction::LogicalReg {
+                sf,
+                opc,
+                n,
+                rd,
+                rn,
+                rm,
+                shift_type,
+                shift_amount,
+            } => {
                 emit_load_guest_gpr(code, 0, rn, sf);
                 emit_load_guest_gpr(code, 1, rm, sf);
-                code.emit32(enc_logical_reg(sf, opc, n, 0, 0, 1, shift_type, shift_amount));
+                code.emit32(enc_logical_reg(
+                    sf,
+                    opc,
+                    n,
+                    0,
+                    0,
+                    1,
+                    shift_type,
+                    shift_amount,
+                ));
                 emit_store_guest_gpr(code, 0, rd, sf);
             }
 
@@ -166,7 +225,13 @@ pub(super) fn emit_block(code: &mut CodeBuffer, block: &[Instruction]) -> Option
 
             // ── Flag-setting arithmetic ────────────────────────────────
             // ADDS/SUBS with immediate — needed for CMP (= SUBS with Rd=31)
-            Instruction::AddsImm { sf, rd, rn, imm, shift } => {
+            Instruction::AddsImm {
+                sf,
+                rd,
+                rn,
+                imm,
+                shift,
+            } => {
                 let effective_imm = if shift == 1 { imm << 12 } else { imm };
                 emit_load_guest_gpr(code, 0, rn, sf);
                 if effective_imm <= 0xFFF {
@@ -180,7 +245,13 @@ pub(super) fn emit_block(code: &mut CodeBuffer, block: &[Instruction]) -> Option
                 emit_store_guest_gpr(code, 0, rd, sf);
             }
 
-            Instruction::SubsImm { sf, rd, rn, imm, shift } => {
+            Instruction::SubsImm {
+                sf,
+                rd,
+                rn,
+                imm,
+                shift,
+            } => {
                 let effective_imm = if shift == 1 { imm << 12 } else { imm };
                 emit_load_guest_gpr(code, 0, rn, sf);
                 if effective_imm <= 0xFFF {
@@ -194,7 +265,14 @@ pub(super) fn emit_block(code: &mut CodeBuffer, block: &[Instruction]) -> Option
                 emit_store_guest_gpr(code, 0, rd, sf);
             }
 
-            Instruction::AddsReg { sf, rd, rn, rm, shift_type, shift_amount } => {
+            Instruction::AddsReg {
+                sf,
+                rd,
+                rn,
+                rm,
+                shift_type,
+                shift_amount,
+            } => {
                 emit_load_guest_gpr(code, 0, rn, sf);
                 emit_load_guest_gpr(code, 1, rm, sf);
                 code.emit32(enc_adds_reg(sf, 0, 0, 1, shift_type, shift_amount));
@@ -202,7 +280,14 @@ pub(super) fn emit_block(code: &mut CodeBuffer, block: &[Instruction]) -> Option
                 emit_store_guest_gpr(code, 0, rd, sf);
             }
 
-            Instruction::SubsReg { sf, rd, rn, rm, shift_type, shift_amount } => {
+            Instruction::SubsReg {
+                sf,
+                rd,
+                rn,
+                rm,
+                shift_type,
+                shift_amount,
+            } => {
                 emit_load_guest_gpr(code, 0, rn, sf);
                 emit_load_guest_gpr(code, 1, rm, sf);
                 code.emit32(enc_subs_reg(sf, 0, 0, 1, shift_type, shift_amount));
@@ -216,7 +301,7 @@ pub(super) fn emit_block(code: &mut CodeBuffer, block: &[Instruction]) -> Option
             Instruction::LdrImm { sf, rt, rn, imm } => {
                 // imm is the byte offset already scaled by decoder
                 emit_load_guest_gpr(code, 0, rn, true); // base addr always 64-bit
-                // Add offset if non-zero
+                                                        // Add offset if non-zero
                 if imm > 0 {
                     if !emit_add_imm_flexible(code, 0, 0, imm) {
                         return None;
@@ -232,8 +317,8 @@ pub(super) fn emit_block(code: &mut CodeBuffer, block: &[Instruction]) -> Option
             }
 
             Instruction::StrImm { sf, rt, rn, imm } => {
-                emit_load_guest_gpr(code, 1, rt, sf);     // value
-                emit_load_guest_gpr(code, 0, rn, true);   // base addr
+                emit_load_guest_gpr(code, 1, rt, sf); // value
+                emit_load_guest_gpr(code, 0, rn, true); // base addr
                 if imm > 0 {
                     if !emit_add_imm_flexible(code, 0, 0, imm) {
                         return None;
@@ -247,7 +332,13 @@ pub(super) fn emit_block(code: &mut CodeBuffer, block: &[Instruction]) -> Option
             }
 
             // ── Load/Store pair (signed offset) ────────────────────────
-            Instruction::Ldp { sf, rt, rt2, rn, imm } => {
+            Instruction::Ldp {
+                sf,
+                rt,
+                rt2,
+                rn,
+                imm,
+            } => {
                 emit_load_guest_gpr(code, 0, rn, true); // base addr
                 let byte_offset = imm as i32;
                 if byte_offset != 0 {
@@ -268,7 +359,13 @@ pub(super) fn emit_block(code: &mut CodeBuffer, block: &[Instruction]) -> Option
                 emit_store_guest_gpr(code, 2, rt2, sf);
             }
 
-            Instruction::Stp { sf, rt, rt2, rn, imm } => {
+            Instruction::Stp {
+                sf,
+                rt,
+                rt2,
+                rn,
+                imm,
+            } => {
                 emit_load_guest_gpr(code, 1, rt, sf);
                 emit_load_guest_gpr(code, 2, rt2, sf);
                 emit_load_guest_gpr(code, 0, rn, true); // base addr
@@ -334,7 +431,13 @@ pub(super) fn emit_block(code: &mut CodeBuffer, block: &[Instruction]) -> Option
             }
 
             // ── Division ───────────────────────────────────────────────
-            Instruction::Div { sf, rd, rn, rm, is_signed } => {
+            Instruction::Div {
+                sf,
+                rd,
+                rn,
+                rm,
+                is_signed,
+            } => {
                 emit_load_guest_gpr(code, 0, rn, sf);
                 emit_load_guest_gpr(code, 1, rm, sf);
                 code.emit32(enc_div(sf, 2, 0, 1, is_signed));
@@ -342,7 +445,13 @@ pub(super) fn emit_block(code: &mut CodeBuffer, block: &[Instruction]) -> Option
             }
 
             // ── Conditional select ─────────────────────────────────────
-            Instruction::Csel { sf, rd, rn, rm, cond } => {
+            Instruction::Csel {
+                sf,
+                rd,
+                rn,
+                rm,
+                cond,
+            } => {
                 emit_load_guest_gpr(code, 0, rn, sf);
                 emit_load_guest_gpr(code, 1, rm, sf);
                 emit_load_nzcv_to_host(code);
@@ -350,7 +459,13 @@ pub(super) fn emit_block(code: &mut CodeBuffer, block: &[Instruction]) -> Option
                 emit_store_guest_gpr(code, 2, rd, sf);
             }
 
-            Instruction::Csinc { sf, rd, rn, rm, cond } => {
+            Instruction::Csinc {
+                sf,
+                rd,
+                rn,
+                rm,
+                cond,
+            } => {
                 emit_load_guest_gpr(code, 0, rn, sf);
                 emit_load_guest_gpr(code, 1, rm, sf);
                 emit_load_nzcv_to_host(code);
@@ -358,7 +473,13 @@ pub(super) fn emit_block(code: &mut CodeBuffer, block: &[Instruction]) -> Option
                 emit_store_guest_gpr(code, 2, rd, sf);
             }
 
-            Instruction::Csinv { sf, rd, rn, rm, cond } => {
+            Instruction::Csinv {
+                sf,
+                rd,
+                rn,
+                rm,
+                cond,
+            } => {
                 emit_load_guest_gpr(code, 0, rn, sf);
                 emit_load_guest_gpr(code, 1, rm, sf);
                 emit_load_nzcv_to_host(code);
@@ -366,7 +487,13 @@ pub(super) fn emit_block(code: &mut CodeBuffer, block: &[Instruction]) -> Option
                 emit_store_guest_gpr(code, 2, rd, sf);
             }
 
-            Instruction::Csneg { sf, rd, rn, rm, cond } => {
+            Instruction::Csneg {
+                sf,
+                rd,
+                rn,
+                rm,
+                cond,
+            } => {
                 emit_load_guest_gpr(code, 0, rn, sf);
                 emit_load_guest_gpr(code, 1, rm, sf);
                 emit_load_nzcv_to_host(code);
@@ -375,19 +502,34 @@ pub(super) fn emit_block(code: &mut CodeBuffer, block: &[Instruction]) -> Option
             }
 
             // ── Bitfield (covers LSR, LSL, ASR, SXTW, UXTB, UXTH, etc.) ──
-            Instruction::Bitfield { sf, opc, rd, rn, immr, imms } => {
+            Instruction::Bitfield {
+                sf,
+                opc,
+                rd,
+                rn,
+                immr,
+                imms,
+            } => {
                 emit_load_guest_gpr(code, 0, rn, sf);
                 code.emit32(enc_bitfield(sf, opc, 0, 0, immr, imms));
                 // For opc=1 (BFM), it's an insert — we need the destination too.
                 // BFM merges bits into Rd, so load Rd first into a different reg.
                 // For simplicity, only JIT UBFM (opc=2) and SBFM (opc=0) which
                 // don't require the old Rd value. Bail on BFM (opc=1).
-                if opc == 1 { return None; }
+                if opc == 1 {
+                    return None;
+                }
                 emit_store_guest_gpr(code, 0, rd, sf);
             }
 
             // ── Logical immediate ─────────────────────────────────────
-            Instruction::LogicalImm { sf, opc, rd, rn, imm } => {
+            Instruction::LogicalImm {
+                sf,
+                opc,
+                rd,
+                rn,
+                imm,
+            } => {
                 emit_load_guest_gpr(code, 0, rn, sf);
                 // Load the pre-decoded immediate into x1 via MOVZ+MOVK
                 emit_load_imm64(code, 1, imm);
@@ -502,7 +644,7 @@ fn emit_store_nzcv_from_host(code: &mut CodeBuffer) {
 
     // Z bit → CpuState.nzcv.z
     code.emit32(enc_lsr_imm(true, 3, 2, 30)); // LSR X3, X2, #30
-    code.emit32(enc_and_imm1(true, 3, 3));     // AND X3, X3, #1
+    code.emit32(enc_and_imm1(true, 3, 3)); // AND X3, X3, #1
     code.emit32(enc_strb_to_cpu(3, NZCV_Z_OFFSET));
 
     // C bit → CpuState.nzcv.c
@@ -651,7 +793,16 @@ fn enc_sub_reg(sf: bool, rd: u8, rn: u8, rm: u8, shift: u8, amount: u8) -> u32 {
 }
 
 /// Logical (shifted register): sf opc 01010 shift N Rm imm6 Rn Rd
-fn enc_logical_reg(sf: bool, opc: u8, n: bool, rd: u8, rn: u8, rm: u8, shift: u8, amount: u8) -> u32 {
+fn enc_logical_reg(
+    sf: bool,
+    opc: u8,
+    n: bool,
+    rd: u8,
+    rn: u8,
+    rm: u8,
+    shift: u8,
+    amount: u8,
+) -> u32 {
     (u32::from(sf) << 31)
         | ((opc as u32 & 0x3) << 29)
         | (0b01010 << 24)
@@ -916,10 +1067,7 @@ fn enc_strb_to_cpu(rt: u8, offset: u32) -> u32 {
 /// LDRB Wt, [Xn, #offset] — load byte from CpuState via x19
 fn enc_ldrb_from_cpu(rt: u8, offset: u32) -> u32 {
     // LDRB Wt, [X19, #imm12] — size=00, V=0, opc=01
-    (0b00_111_0_01_01 << 22)
-        | ((offset & 0xFFF) << 10)
-        | (19u32 << 5)
-        | (rt as u32 & 0x1F)
+    (0b00_111_0_01_01 << 22) | ((offset & 0xFFF) << 10) | (19u32 << 5) | (rt as u32 & 0x1F)
 }
 
 /// LDRB Wt, [Xn, #0] (unsigned offset, scaled)

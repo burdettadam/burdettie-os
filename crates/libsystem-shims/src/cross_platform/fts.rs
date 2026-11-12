@@ -37,17 +37,58 @@ impl FtsShims {
         #[cfg(not(target_os = "macos"))]
         {
             use crate::register_shims;
-            register_shims!(table,
-                ("_fts_open$INODE64", shim_fts_open as *const () as u64, "fts_open FTSENT layout translation"),
-                ("_fts_open", shim_fts_open as *const () as u64, "fts_open FTSENT layout translation"),
-                ("_fts_read$INODE64", shim_fts_read as *const () as u64, "fts_read FTSENT layout translation"),
-                ("_fts_read", shim_fts_read as *const () as u64, "fts_read FTSENT layout translation"),
-                ("_fts_close$INODE64", shim_fts_close as *const () as u64, "fts_close passthrough"),
-                ("_fts_close", shim_fts_close as *const () as u64, "fts_close passthrough"),
-                ("_fts_set$INODE64", shim_fts_set as *const () as u64, "fts_set passthrough"),
-                ("_fts_set", shim_fts_set as *const () as u64, "fts_set passthrough"),
-                ("_fts_children$INODE64", shim_fts_children as *const () as u64, "fts_children FTSENT layout translation"),
-                ("_fts_children", shim_fts_children as *const () as u64, "fts_children FTSENT layout translation"),
+            register_shims!(
+                table,
+                (
+                    "_fts_open$INODE64",
+                    shim_fts_open as *const () as u64,
+                    "fts_open FTSENT layout translation"
+                ),
+                (
+                    "_fts_open",
+                    shim_fts_open as *const () as u64,
+                    "fts_open FTSENT layout translation"
+                ),
+                (
+                    "_fts_read$INODE64",
+                    shim_fts_read as *const () as u64,
+                    "fts_read FTSENT layout translation"
+                ),
+                (
+                    "_fts_read",
+                    shim_fts_read as *const () as u64,
+                    "fts_read FTSENT layout translation"
+                ),
+                (
+                    "_fts_close$INODE64",
+                    shim_fts_close as *const () as u64,
+                    "fts_close passthrough"
+                ),
+                (
+                    "_fts_close",
+                    shim_fts_close as *const () as u64,
+                    "fts_close passthrough"
+                ),
+                (
+                    "_fts_set$INODE64",
+                    shim_fts_set as *const () as u64,
+                    "fts_set passthrough"
+                ),
+                (
+                    "_fts_set",
+                    shim_fts_set as *const () as u64,
+                    "fts_set passthrough"
+                ),
+                (
+                    "_fts_children$INODE64",
+                    shim_fts_children as *const () as u64,
+                    "fts_children FTSENT layout translation"
+                ),
+                (
+                    "_fts_children",
+                    shim_fts_children as *const () as u64,
+                    "fts_children FTSENT layout translation"
+                ),
             );
         }
         #[cfg(target_os = "macos")]
@@ -103,29 +144,29 @@ mod inner {
     }
 
     // ── Linux FTSENT field offsets ────────────────────────────────────
-    const LINUX_FTS_PARENT: usize = 8;    // ptr
-    const LINUX_FTS_LINK: usize = 16;     // ptr
-    const LINUX_FTS_NAMELEN: usize = 66;  // u16
-    const LINUX_FTS_DEV: usize = 80;      // u64
-    const LINUX_FTS_NLINK: usize = 88;    // u32
-    const LINUX_FTS_LEVEL: usize = 92;    // i16
-    const LINUX_FTS_INFO: usize = 94;     // u16
-    const LINUX_FTS_FLAGS: usize = 96;    // u16
-    const LINUX_FTS_INSTR: usize = 98;    // u16
-    const LINUX_FTS_STATP: usize = 104;   // ptr
-    const LINUX_FTS_NAME: usize = 112;    // flex array
+    const LINUX_FTS_PARENT: usize = 8; // ptr
+    const LINUX_FTS_LINK: usize = 16; // ptr
+    const LINUX_FTS_NAMELEN: usize = 66; // u16
+    const LINUX_FTS_DEV: usize = 80; // u64
+    const LINUX_FTS_NLINK: usize = 88; // u32
+    const LINUX_FTS_LEVEL: usize = 92; // i16
+    const LINUX_FTS_INFO: usize = 94; // u16
+    const LINUX_FTS_FLAGS: usize = 96; // u16
+    const LINUX_FTS_INSTR: usize = 98; // u16
+    const LINUX_FTS_STATP: usize = 104; // ptr
+    const LINUX_FTS_NAME: usize = 112; // flex array
 
     // ── macOS FTSENT field offsets ────────────────────────────────────
     const DARWIN_FTS_PARENT: usize = 8;
     const DARWIN_FTS_LINK: usize = 16;
-    const DARWIN_FTS_DEV: usize = 80;     // i32
-    const DARWIN_FTS_NLINK: usize = 84;   // u16
-    const DARWIN_FTS_LEVEL: usize = 86;   // i16
-    const DARWIN_FTS_INFO: usize = 88;    // u16
-    const DARWIN_FTS_FLAGS: usize = 90;   // u16
-    const DARWIN_FTS_INSTR: usize = 92;   // u16
-    const DARWIN_FTS_STATP: usize = 96;   // ptr
-    const DARWIN_FTS_NAME: usize = 104;   // flex array
+    const DARWIN_FTS_DEV: usize = 80; // i32
+    const DARWIN_FTS_NLINK: usize = 84; // u16
+    const DARWIN_FTS_LEVEL: usize = 86; // i16
+    const DARWIN_FTS_INFO: usize = 88; // u16
+    const DARWIN_FTS_FLAGS: usize = 90; // u16
+    const DARWIN_FTS_INSTR: usize = 92; // u16
+    const DARWIN_FTS_STATP: usize = 96; // ptr
+    const DARWIN_FTS_NAME: usize = 104; // flex array
 
     /// Read a native-endian value from a byte buffer at the given offset.
     unsafe fn read_at<T: Copy>(buf: *const u8, off: usize) -> T {
@@ -134,7 +175,9 @@ mod inner {
 
     /// Write a native-endian value into a byte buffer at the given offset.
     unsafe fn write_at<T: Copy>(buf: *mut u8, off: usize, val: T) {
-        unsafe { std::ptr::write_unaligned(buf.add(off) as *mut T, val); }
+        unsafe {
+            std::ptr::write_unaligned(buf.add(off) as *mut T, val);
+        }
     }
 
     /// Translate a Linux stat struct in-place from a copied buffer.
@@ -180,7 +223,7 @@ mod inner {
             write_at::<i64>(buf, 56, st_mtime_nsec);
             write_at::<i64>(buf, 64, st_ctime);
             write_at::<i64>(buf, 72, st_ctime_nsec);
-            write_at::<i64>(buf, 80, st_ctime);       // birthtimespec = ctime
+            write_at::<i64>(buf, 80, st_ctime); // birthtimespec = ctime
             write_at::<i64>(buf, 88, st_ctime_nsec);
             write_at::<i64>(buf, 96, st_size);
             write_at::<i64>(buf, 104, st_blocks);
@@ -313,7 +356,11 @@ mod inner {
                         write_at::<u16>(bufs.parent.as_mut_ptr(), DARWIN_FTS_INFO, 0);
                         write_at::<u16>(bufs.parent.as_mut_ptr(), DARWIN_FTS_FLAGS, 0);
                         write_at::<u16>(bufs.parent.as_mut_ptr(), DARWIN_FTS_INSTR, 0);
-                        write_at::<*const u8>(bufs.parent.as_mut_ptr(), DARWIN_FTS_STATP, std::ptr::null());
+                        write_at::<*const u8>(
+                            bufs.parent.as_mut_ptr(),
+                            DARWIN_FTS_STATP,
+                            std::ptr::null(),
+                        );
                         // Empty fts_name at macOS offset 104
                         *bufs.parent.as_mut_ptr().add(DARWIN_FTS_NAME) = 0;
                     }
@@ -372,6 +419,4 @@ mod inner {
 }
 
 #[cfg(not(target_os = "macos"))]
-pub use inner::{
-    shim_fts_open, shim_fts_read, shim_fts_close, shim_fts_set, shim_fts_children,
-};
+pub use inner::{shim_fts_children, shim_fts_close, shim_fts_open, shim_fts_read, shim_fts_set};

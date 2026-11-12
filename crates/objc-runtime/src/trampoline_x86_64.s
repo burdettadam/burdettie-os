@@ -1,5 +1,8 @@
 // x86_64 objc_msgSend trampoline for burdettie-os.
 //
+// Cross-platform: builds on macOS (Mach-O) and Linux (ELF).
+// Mach-O uses _underscore C symbol prefixes, while ELF uses bare names.
+//
 // Preserves the entire argument register file (rdi-r9, xmm0-7) across
 // the class-table lookup, then tail-calls the resolved IMP. This is
 // the x86_64 equivalent of the ARM64 trampoline.
@@ -25,16 +28,22 @@
 // objc_msgSend_fp2ret returns long double in x87 st(0) — the IMP
 // handles that, our trampoline just dispatches.
 
+#ifdef __APPLE__
+#define CSYM(name) _##name
+#else
+#define CSYM(name) name
+#endif
+
 #ifdef __x86_64__
 
-.global _shim_objc_msg_send_x86_64_asm
-.global _shim_objc_msg_send_stret_x86_64_asm
-.global _shim_objc_msg_send_fp2ret_x86_64_asm
+.global CSYM(shim_objc_msg_send_x86_64_asm)
+.global CSYM(shim_objc_msg_send_stret_x86_64_asm)
+.global CSYM(shim_objc_msg_send_fp2ret_x86_64_asm)
 .p2align 4
 
-_shim_objc_msg_send_x86_64_asm:
-_shim_objc_msg_send_stret_x86_64_asm:
-_shim_objc_msg_send_fp2ret_x86_64_asm:
+CSYM(shim_objc_msg_send_x86_64_asm):
+CSYM(shim_objc_msg_send_stret_x86_64_asm):
+CSYM(shim_objc_msg_send_fp2ret_x86_64_asm):
     // ── nil check ──────────────────────────────────────────
     testq   %rdi, %rdi
     jz      .Lnil_return_x86
@@ -86,7 +95,7 @@ _shim_objc_msg_send_fp2ret_x86_64_asm:
     // rsi = SEL  (already in rsi)
     // Call Rust lookup: extern "C" fn(self: u64, sel: u64) -> u64
     //   Returns: rax = IMP
-    callq   _objc_msg_lookup_imp
+    callq   CSYM(objc_msg_lookup_imp)
 
     // IMP is now in rax — move to r11 (scratch, not an arg register)
     movq    %rax, %r11
@@ -136,12 +145,12 @@ _shim_objc_msg_send_fp2ret_x86_64_asm:
 //   4. Restore argument registers, but replace rdi with receiver.
 //   5. Tail-call the IMP.
 
-.global _shim_objc_msg_send_super_x86_64_asm
-.global _shim_objc_msg_send_super_stret_x86_64_asm
+.global CSYM(shim_objc_msg_send_super_x86_64_asm)
+.global CSYM(shim_objc_msg_send_super_stret_x86_64_asm)
 .p2align 4
 
-_shim_objc_msg_send_super_x86_64_asm:
-_shim_objc_msg_send_super_stret_x86_64_asm:
+CSYM(shim_objc_msg_send_super_x86_64_asm):
+CSYM(shim_objc_msg_send_super_stret_x86_64_asm):
     // Read objc_super struct before saving registers.
     // r10 = receiver, r11 = super_class
     movq    (%rdi),  %r10       // receiver = objc_super->receiver
@@ -177,7 +186,7 @@ _shim_objc_msg_send_super_stret_x86_64_asm:
     movq    %r10, %rdi          // arg0 = receiver
     movq    %r11, %rsi          // arg1 = super_class
     movq   8(%rsp), %rdx        // arg2 = saved rsi = SEL
-    callq   _objc_msg_super_lookup_imp
+    callq   CSYM(objc_msg_super_lookup_imp)
 
     // IMP → r11
     movq    %rax, %r11
@@ -219,12 +228,12 @@ _shim_objc_msg_send_super_stret_x86_64_asm:
 // rdi = pointer to struct objc_super { id receiver; Class current_class; }
 // rsi = SEL
 
-.global _shim_objc_msg_send_super2_x86_64_asm
-.global _shim_objc_msg_send_super2_stret_x86_64_asm
+.global CSYM(shim_objc_msg_send_super2_x86_64_asm)
+.global CSYM(shim_objc_msg_send_super2_stret_x86_64_asm)
 .p2align 4
 
-_shim_objc_msg_send_super2_x86_64_asm:
-_shim_objc_msg_send_super2_stret_x86_64_asm:
+CSYM(shim_objc_msg_send_super2_x86_64_asm):
+CSYM(shim_objc_msg_send_super2_stret_x86_64_asm):
     // Read objc_super struct
     movq    (%rdi),  %r10       // receiver
     movq   8(%rdi),  %r11       // current_class (NOT the super)
@@ -256,7 +265,7 @@ _shim_objc_msg_send_super2_stret_x86_64_asm:
     movq    %r10, %rdi
     movq    %r11, %rsi
     movq   8(%rsp), %rdx        // SEL from saved rsi
-    callq   _objc_msg_super2_lookup_imp
+    callq   CSYM(objc_msg_super2_lookup_imp)
 
     movq    %rax, %r11
 

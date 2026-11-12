@@ -2,20 +2,24 @@
 
 mod common;
 
-use common::{RUNTIME_LOCK, ShimSet};
+use common::{ShimSet, RUNTIME_LOCK};
 
 // ── KVO (Key-Value Observing) tests (Phase B1) ────────────────────
 
 #[test]
 fn runtime_kvo_basics_exit_zero() {
-    let Some(result) = common::run_fixture("kvo_basics/app") else { return };
+    let Some(result) = common::run_fixture("kvo_basics/app") else {
+        return;
+    };
 
     assert_eq!(result.exit_code, 0, "kvo_basics should exit 0");
 }
 
 #[test]
 fn runtime_kvo_basics_nsobject_has_kvo_methods() {
-    let Some(_result) = common::run_fixture("kvo_basics/app") else { return };
+    let Some(_result) = common::run_fixture("kvo_basics/app") else {
+        return;
+    };
 
     let guard = objc_runtime::OBJC_RUNTIME.read().unwrap();
     if let Some(rt) = guard.as_ref() {
@@ -38,26 +42,29 @@ fn runtime_kvo_basics_nsobject_has_kvo_methods() {
 
 #[test]
 fn runtime_kvo_multiple_observers_exit_zero() {
-    let Some(result) = common::run_fixture("kvo_multiple_observers/app") else { return };
+    let Some(result) = common::run_fixture("kvo_multiple_observers/app") else {
+        return;
+    };
 
-    assert_eq!(
-        result.exit_code, 0,
-        "kvo_multiple_observers should exit 0"
-    );
+    assert_eq!(result.exit_code, 0, "kvo_multiple_observers should exit 0");
 }
 
 // ── KVC tests ──────────────────────────────────────────────────────
 
 #[test]
 fn runtime_kvc_basics_exit_zero() {
-    let Some(result) = common::run_fixture("kvc_basics/app") else { return };
+    let Some(result) = common::run_fixture("kvc_basics/app") else {
+        return;
+    };
 
     assert_eq!(result.exit_code, 0, "kvc_basics should exit 0");
 }
 
 #[test]
 fn runtime_kvc_nsobject_has_kvc_methods() {
-    let Some(_result) = common::run_fixture("kvc_basics/app") else { return };
+    let Some(_result) = common::run_fixture("kvc_basics/app") else {
+        return;
+    };
 
     let guard = objc_runtime::OBJC_RUNTIME
         .read()
@@ -83,7 +90,9 @@ fn runtime_kvc_nsobject_has_kvc_methods() {
 
 #[test]
 fn runtime_kvc_simple_exit_zero() {
-    let Some(result) = common::run_fixture("kvc_simple/app") else { return };
+    let Some(result) = common::run_fixture("kvc_simple/app") else {
+        return;
+    };
 
     assert_eq!(result.exit_code, 0, "kvc_simple should exit 0");
 }
@@ -94,7 +103,9 @@ fn runtime_kvc_simple_exit_zero() {
 /// @unionOfObjects, and @distinctUnionOfObjects must complete with exit 0.
 #[test]
 fn runtime_kvc_operators_exit_zero() {
-    let Some(result) = common::run_fixture("kvc_operators/app") else { return };
+    let Some(result) = common::run_fixture("kvc_operators/app") else {
+        return;
+    };
 
     assert_eq!(
         result.exit_code, 0,
@@ -106,7 +117,9 @@ fn runtime_kvc_operators_exit_zero() {
 /// the Product class registered (confirming the binary loaded fully).
 #[test]
 fn runtime_kvc_operators_product_class_registered() {
-    let Some(_result) = common::run_fixture("kvc_operators/app") else { return };
+    let Some(_result) = common::run_fixture("kvc_operators/app") else {
+        return;
+    };
 
     let guard = objc_runtime::OBJC_RUNTIME
         .read()
@@ -123,14 +136,18 @@ fn runtime_kvc_operators_product_class_registered() {
 
 #[test]
 fn runtime_swizzle_basics_exit_zero() {
-    let Some(result) = common::run_fixture("swizzle_basics/app") else { return };
+    let Some(result) = common::run_fixture("swizzle_basics/app") else {
+        return;
+    };
 
     assert_eq!(result.exit_code, 0, "swizzle_basics should exit 0");
 }
 
 #[test]
 fn runtime_swizzle_restore_exit_zero() {
-    let Some(result) = common::run_fixture("swizzle_restore/app") else { return };
+    let Some(result) = common::run_fixture("swizzle_restore/app") else {
+        return;
+    };
 
     assert_eq!(result.exit_code, 0, "swizzle_restore should exit 0");
 }
@@ -147,11 +164,15 @@ fn runtime_swizzle_shims_registered() {
 
     // All three swizzling APIs should be in the shim table
     assert!(
-        ctx.shim_table.resolve("_method_exchangeImplementations").is_some(),
+        ctx.shim_table
+            .resolve("_method_exchangeImplementations")
+            .is_some(),
         "method_exchangeImplementations should be registered"
     );
     assert!(
-        ctx.shim_table.resolve("_method_setImplementation").is_some(),
+        ctx.shim_table
+            .resolve("_method_setImplementation")
+            .is_some(),
         "method_setImplementation should be registered"
     );
     assert!(

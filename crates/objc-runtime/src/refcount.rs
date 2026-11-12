@@ -8,6 +8,7 @@
 
 use std::cell::RefCell;
 use std::collections::HashMap;
+#[cfg(target_os = "macos")]
 use std::ffi::c_void;
 use std::sync::{LazyLock, Mutex};
 
@@ -62,7 +63,10 @@ impl ShardedRefCounts {
 
     /// Increment the retain count. Returns the new count.
     pub fn retain(&self, obj: u64) -> usize {
-        let mut shard = self.shard_for(obj).lock().unwrap_or_else(|e| e.into_inner());
+        let mut shard = self
+            .shard_for(obj)
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let count = shard.entry(obj).or_insert(1);
         *count += 1;
         *count
@@ -71,7 +75,10 @@ impl ShardedRefCounts {
     /// Decrement the retain count. Returns the new count.
     /// Returns 0 when the object should be deallocated.
     pub fn release(&self, obj: u64) -> usize {
-        let mut shard = self.shard_for(obj).lock().unwrap_or_else(|e| e.into_inner());
+        let mut shard = self
+            .shard_for(obj)
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let count = shard.entry(obj).or_insert(1);
         if *count <= 1 {
             shard.remove(&obj);
@@ -83,13 +90,19 @@ impl ShardedRefCounts {
 
     /// Get the current retain count (1 if not tracked).
     pub fn count(&self, obj: u64) -> usize {
-        let shard = self.shard_for(obj).lock().unwrap_or_else(|e| e.into_inner());
+        let shard = self
+            .shard_for(obj)
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         shard.get(&obj).copied().unwrap_or(1)
     }
 
     /// Remove tracking for an object (after dealloc).
     pub fn remove(&self, obj: u64) {
-        let mut shard = self.shard_for(obj).lock().unwrap_or_else(|e| e.into_inner());
+        let mut shard = self
+            .shard_for(obj)
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         shard.remove(&obj);
     }
 

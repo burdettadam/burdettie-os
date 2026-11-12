@@ -8,15 +8,17 @@
 //! `ui-controls` — the same backend-agnostic kernel used by `HeadlessApp`
 //! for testing.
 
+#[cfg(feature = "guest-appkit")]
+mod guest_bridge;
 mod keymap;
 
 use std::num::NonZeroU32;
 use std::sync::Arc;
 
+use app_kit_lite::menu::{ModifierFlags, NSMenu};
 use graphics_core::Color;
 use ui_controls::{AppScene, Button, Label, TextField};
-use window_backend::{KeyCode, WindowMode, Theme};
-use app_kit_lite::menu::{ModifierFlags, NSMenu};
+use window_backend::{KeyCode, Theme, WindowMode};
 
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
@@ -25,8 +27,10 @@ use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::keyboard::PhysicalKey;
 use winit::window::{Window, WindowId};
 
-pub use keymap::{map_winit_key, map_winit_mouse};
 pub use graphics_core::Rect;
+#[cfg(feature = "guest-appkit")]
+pub use guest_bridge::WinitGuiBridge;
+pub use keymap::{map_winit_key, map_winit_mouse};
 pub use window_backend::WindowConfig;
 
 // ── GuiApp ─────────────────────────────────────────────────────────
@@ -76,6 +80,21 @@ impl GuiApp {
         handler: impl FnMut(usize, &mut Vec<Label>, &mut Vec<TextField>) + 'static,
     ) {
         self.scene.on_button_click(handler);
+    }
+
+    pub fn on_button_click_with_buttons(
+        &mut self,
+        handler: impl FnMut(usize, &mut Vec<Label>, &mut Vec<Button>, &mut Vec<TextField>) + 'static,
+    ) {
+        self.scene.on_button_click_with_buttons(handler);
+    }
+
+    pub fn on_key_down(
+        &mut self,
+        handler: impl FnMut(KeyCode, &mut Vec<Label>, &mut Vec<Button>, &mut Vec<TextField>) -> bool
+            + 'static,
+    ) {
+        self.scene.on_key_down(handler);
     }
 
     /// Set the main menu bar.
@@ -168,10 +187,9 @@ impl ApplicationHandler for AppState {
             WindowEvent::Resized(size) => {
                 if size.width > 0 && size.height > 0 {
                     if let Some(ref mut surface) = self.sb_surface {
-                        if let (Some(w), Some(h)) = (
-                            NonZeroU32::new(size.width),
-                            NonZeroU32::new(size.height),
-                        ) {
+                        if let (Some(w), Some(h)) =
+                            (NonZeroU32::new(size.width), NonZeroU32::new(size.height))
+                        {
                             if let Err(e) = surface.resize(w, h) {
                                 log::warn!("softbuffer resize failed: {}", e);
                             }
@@ -381,9 +399,9 @@ mod tests {
     fn scroll_wheel_variant_exists() {
         // Compile-time verification that LineDelta and PixelDelta are handled.
         let line = winit::event::MouseScrollDelta::LineDelta(0.0, 1.0);
-        let pixel = winit::event::MouseScrollDelta::PixelDelta(
-            winit::dpi::PhysicalPosition::new(0.0, 10.0),
-        );
+        let pixel = winit::event::MouseScrollDelta::PixelDelta(winit::dpi::PhysicalPosition::new(
+            0.0, 10.0,
+        ));
         match line {
             winit::event::MouseScrollDelta::LineDelta(x, y) => {
                 assert_eq!((x as f64 * 20.0, y as f64 * 20.0), (0.0, 20.0));

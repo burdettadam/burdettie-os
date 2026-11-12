@@ -6,7 +6,9 @@ mod common;
 
 #[test]
 fn runtime_nslog_format_at_sign_outputs_string() {
-    let Some((result, lines)) = common::run_fixture_with_nslog("objc_foundation/app") else { return };
+    let Some((result, lines)) = common::run_fixture_with_nslog("objc_foundation/app") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0);
 
     // T8 calls NSLog(@"%@", @"hello from Foundation")
@@ -19,7 +21,9 @@ fn runtime_nslog_format_at_sign_outputs_string() {
 
 #[test]
 fn runtime_nslog_dynamic_nsstring() {
-    let Some((result, lines)) = common::run_fixture_with_nslog("nsstring_dynamic/app") else { return };
+    let Some((result, lines)) = common::run_fixture_with_nslog("nsstring_dynamic/app") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0);
 
     // T15 calls NSLog(@"T15 str1=%@", str1) where str1 = "hello"
@@ -34,14 +38,18 @@ fn runtime_nslog_dynamic_nsstring() {
 
 #[test]
 fn runtime_nsarray_basics_exit_zero() {
-    let Some(result) = common::run_fixture("nsarray_basics/app") else { return };
+    let Some(result) = common::run_fixture("nsarray_basics/app") else {
+        return;
+    };
 
     assert_eq!(result.exit_code, 0, "nsarray_basics should exit 0");
 }
 
 #[test]
 fn runtime_nsarray_class_registered() {
-    let Some(_result) = common::run_fixture("nsarray_basics/app") else { return };
+    let Some(_result) = common::run_fixture("nsarray_basics/app") else {
+        return;
+    };
 
     let guard = objc_runtime::OBJC_RUNTIME.read().unwrap();
     if let Some(rt) = guard.as_ref() {
@@ -57,7 +65,9 @@ fn runtime_nsarray_class_registered() {
 
 #[test]
 fn runtime_nsarray_nslog_captures_element() {
-    let Some((result, lines)) = common::run_fixture_with_nslog("nsarray_basics/app") else { return };
+    let Some((result, lines)) = common::run_fixture_with_nslog("nsarray_basics/app") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0);
 
     // T16 calls NSLog(@"T16 first=%@", first) where first = "apple"
@@ -72,14 +82,18 @@ fn runtime_nsarray_nslog_captures_element() {
 
 #[test]
 fn runtime_nsnumber_basics_exit_zero() {
-    let Some(result) = common::run_fixture("nsnumber_basics/app") else { return };
+    let Some(result) = common::run_fixture("nsnumber_basics/app") else {
+        return;
+    };
 
     assert_eq!(result.exit_code, 0, "nsnumber_basics should exit 0");
 }
 
 #[test]
 fn runtime_nsnumber_class_registered() {
-    let Some(_result) = common::run_fixture("nsnumber_basics/app") else { return };
+    let Some(_result) = common::run_fixture("nsnumber_basics/app") else {
+        return;
+    };
 
     let guard = objc_runtime::OBJC_RUNTIME.read().unwrap();
     if let Some(rt) = guard.as_ref() {
@@ -95,7 +109,9 @@ fn runtime_nsnumber_class_registered() {
 
 #[test]
 fn runtime_nsnumber_nslog_captures_value() {
-    let Some((result, lines)) = common::run_fixture_with_nslog("nsnumber_basics/app") else { return };
+    let Some((result, lines)) = common::run_fixture_with_nslog("nsnumber_basics/app") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0);
 
     // T17 calls NSLog(@"T17 n42=%@", n42) where n42 = numberWithInt:42
@@ -110,14 +126,18 @@ fn runtime_nsnumber_nslog_captures_value() {
 
 #[test]
 fn runtime_nsdictionary_basics_exit_zero() {
-    let Some(result) = common::run_fixture("nsdictionary_basics/app") else { return };
+    let Some(result) = common::run_fixture("nsdictionary_basics/app") else {
+        return;
+    };
 
     assert_eq!(result.exit_code, 0, "nsdictionary_basics should exit 0");
 }
 
 #[test]
 fn runtime_nsdictionary_class_registered() {
-    let Some(_result) = common::run_fixture("nsdictionary_basics/app") else { return };
+    let Some(_result) = common::run_fixture("nsdictionary_basics/app") else {
+        return;
+    };
 
     let guard = objc_runtime::OBJC_RUNTIME.read().unwrap();
     if let Some(rt) = guard.as_ref() {
@@ -135,7 +155,9 @@ fn runtime_nsdictionary_class_registered() {
 
 #[test]
 fn runtime_nsdictionary_nslog_captures_description() {
-    let Some((result, lines)) = common::run_fixture_with_nslog("nsdictionary_basics/app") else { return };
+    let Some((result, lines)) = common::run_fixture_with_nslog("nsdictionary_basics/app") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0);
 
     assert!(

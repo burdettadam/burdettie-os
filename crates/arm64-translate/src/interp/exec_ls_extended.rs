@@ -2,13 +2,19 @@
 
 use super::{ExitReason, Interpreter, StepResult};
 use crate::decode::Instruction;
-use crate::{mem_read_u64, mem_read_u32, mem_read_u16, mem_read_u8};
+use crate::{mem_read_u16, mem_read_u32, mem_read_u64, mem_read_u8};
 
 impl Interpreter {
     pub(super) fn exec_ls_extended(&mut self, insn: Instruction, pc: u64) -> StepResult {
         match insn {
             // ── Load/Store pair ────────────────────────────────────
-            Instruction::Ldp { sf, rt, rt2, rn, imm } => {
+            Instruction::Ldp {
+                sf,
+                rt,
+                rt2,
+                rn,
+                imm,
+            } => {
                 let base = (self.cpu.read_reg(rn) as i64).wrapping_add(imm as i64) as u64;
                 let size = if sf { 8u64 } else { 4 };
                 let (v1, v2) = if sf {
@@ -16,21 +22,39 @@ impl Interpreter {
                     let b = self.mem.read_u64(base + size);
                     match (a, b) {
                         (Some(a), Some(b)) => (a, b),
-                        _ => return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: false }),
+                        _ => {
+                            return StepResult::Exit(ExitReason::MemoryFault {
+                                pc,
+                                addr: base,
+                                is_write: false,
+                            })
+                        }
                     }
                 } else {
                     let a = self.mem.read_u32(base);
                     let b = self.mem.read_u32(base + size);
                     match (a, b) {
                         (Some(a), Some(b)) => (a as u64, b as u64),
-                        _ => return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: false }),
+                        _ => {
+                            return StepResult::Exit(ExitReason::MemoryFault {
+                                pc,
+                                addr: base,
+                                is_write: false,
+                            })
+                        }
                     }
                 };
                 self.cpu.write_reg_zr(rt, v1);
                 self.cpu.write_reg_zr(rt2, v2);
                 self.cpu.pc = pc + 4;
             }
-            Instruction::Stp { sf, rt, rt2, rn, imm } => {
+            Instruction::Stp {
+                sf,
+                rt,
+                rt2,
+                rn,
+                imm,
+            } => {
                 let base = (self.cpu.read_reg(rn) as i64).wrapping_add(imm as i64) as u64;
                 let size = if sf { 8u64 } else { 4 };
                 let v1 = self.cpu.read_reg_zr(rt);
@@ -38,33 +62,62 @@ impl Interpreter {
                 let ok = if sf {
                     self.mem.write_u64(base, v1) && self.mem.write_u64(base + size, v2)
                 } else {
-                    self.mem.write_u32(base, v1 as u32) && self.mem.write_u32(base + size, v2 as u32)
+                    self.mem.write_u32(base, v1 as u32)
+                        && self.mem.write_u32(base + size, v2 as u32)
                 };
                 if !ok {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: true });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr: base,
+                        is_write: true,
+                    });
                 }
                 self.cpu.pc = pc + 4;
             }
-            Instruction::LdpPre { sf, rt, rt2, rn, imm } => {
+            Instruction::LdpPre {
+                sf,
+                rt,
+                rt2,
+                rn,
+                imm,
+            } => {
                 let base = (self.cpu.read_reg(rn) as i64).wrapping_add(imm as i64) as u64;
                 self.cpu.write_reg(rn, base);
                 let size = if sf { 8u64 } else { 4 };
                 let (v1, v2) = if sf {
                     match (self.mem.read_u64(base), self.mem.read_u64(base + size)) {
                         (Some(a), Some(b)) => (a, b),
-                        _ => return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: false }),
+                        _ => {
+                            return StepResult::Exit(ExitReason::MemoryFault {
+                                pc,
+                                addr: base,
+                                is_write: false,
+                            })
+                        }
                     }
                 } else {
                     match (self.mem.read_u32(base), self.mem.read_u32(base + size)) {
                         (Some(a), Some(b)) => (a as u64, b as u64),
-                        _ => return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: false }),
+                        _ => {
+                            return StepResult::Exit(ExitReason::MemoryFault {
+                                pc,
+                                addr: base,
+                                is_write: false,
+                            })
+                        }
                     }
                 };
                 self.cpu.write_reg_zr(rt, v1);
                 self.cpu.write_reg_zr(rt2, v2);
                 self.cpu.pc = pc + 4;
             }
-            Instruction::StpPre { sf, rt, rt2, rn, imm } => {
+            Instruction::StpPre {
+                sf,
+                rt,
+                rt2,
+                rn,
+                imm,
+            } => {
                 let base = (self.cpu.read_reg(rn) as i64).wrapping_add(imm as i64) as u64;
                 self.cpu.write_reg(rn, base);
                 let size = if sf { 8u64 } else { 4 };
@@ -73,25 +126,48 @@ impl Interpreter {
                 let ok = if sf {
                     self.mem.write_u64(base, v1) && self.mem.write_u64(base + size, v2)
                 } else {
-                    self.mem.write_u32(base, v1 as u32) && self.mem.write_u32(base + size, v2 as u32)
+                    self.mem.write_u32(base, v1 as u32)
+                        && self.mem.write_u32(base + size, v2 as u32)
                 };
                 if !ok {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: true });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr: base,
+                        is_write: true,
+                    });
                 }
                 self.cpu.pc = pc + 4;
             }
-            Instruction::LdpPost { sf, rt, rt2, rn, imm } => {
+            Instruction::LdpPost {
+                sf,
+                rt,
+                rt2,
+                rn,
+                imm,
+            } => {
                 let base = self.cpu.read_reg(rn);
                 let size = if sf { 8u64 } else { 4 };
                 let (v1, v2) = if sf {
                     match (self.mem.read_u64(base), self.mem.read_u64(base + size)) {
                         (Some(a), Some(b)) => (a, b),
-                        _ => return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: false }),
+                        _ => {
+                            return StepResult::Exit(ExitReason::MemoryFault {
+                                pc,
+                                addr: base,
+                                is_write: false,
+                            })
+                        }
                     }
                 } else {
                     match (self.mem.read_u32(base), self.mem.read_u32(base + size)) {
                         (Some(a), Some(b)) => (a as u64, b as u64),
-                        _ => return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: false }),
+                        _ => {
+                            return StepResult::Exit(ExitReason::MemoryFault {
+                                pc,
+                                addr: base,
+                                is_write: false,
+                            })
+                        }
                     }
                 };
                 self.cpu.write_reg_zr(rt, v1);
@@ -100,7 +176,13 @@ impl Interpreter {
                 self.cpu.write_reg(rn, new_base);
                 self.cpu.pc = pc + 4;
             }
-            Instruction::StpPost { sf, rt, rt2, rn, imm } => {
+            Instruction::StpPost {
+                sf,
+                rt,
+                rt2,
+                rn,
+                imm,
+            } => {
                 let base = self.cpu.read_reg(rn);
                 let size = if sf { 8u64 } else { 4 };
                 let v1 = self.cpu.read_reg_zr(rt);
@@ -108,10 +190,15 @@ impl Interpreter {
                 let ok = if sf {
                     self.mem.write_u64(base, v1) && self.mem.write_u64(base + size, v2)
                 } else {
-                    self.mem.write_u32(base, v1 as u32) && self.mem.write_u32(base + size, v2 as u32)
+                    self.mem.write_u32(base, v1 as u32)
+                        && self.mem.write_u32(base + size, v2 as u32)
                 };
                 if !ok {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: true });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr: base,
+                        is_write: true,
+                    });
                 }
                 let new_base = (base as i64).wrapping_add(imm as i64) as u64;
                 self.cpu.write_reg(rn, new_base);
@@ -129,7 +216,11 @@ impl Interpreter {
                 let addr = (self.cpu.read_reg(rn) as i64).wrapping_add(imm as i64) as u64;
                 let val = self.cpu.read_reg_zr(rt) as u8;
                 if !self.mem.write_u8(addr, val) {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr,
+                        is_write: true,
+                    });
                 }
                 self.cpu.pc = pc + 4;
             }
@@ -143,7 +234,11 @@ impl Interpreter {
                 let addr = (self.cpu.read_reg(rn) as i64).wrapping_add(imm as i64) as u64;
                 let val = self.cpu.read_reg_zr(rt) as u16;
                 if !self.mem.write_u16(addr, val) {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr,
+                        is_write: true,
+                    });
                 }
                 self.cpu.pc = pc + 4;
             }
@@ -156,20 +251,35 @@ impl Interpreter {
             Instruction::Ldrsb { rt, rn, imm, sf } => {
                 let addr = (self.cpu.read_reg(rn) as i64).wrapping_add(imm as i64) as u64;
                 let v = mem_read_u8!(self, addr, pc);
-                let val = if sf { v as i8 as i64 as u64 } else { v as i8 as i32 as u32 as u64 };
+                let val = if sf {
+                    v as i8 as i64 as u64
+                } else {
+                    v as i8 as i32 as u32 as u64
+                };
                 self.cpu.write_reg_zr(rt, val);
                 self.cpu.pc = pc + 4;
             }
             Instruction::Ldrsh { rt, rn, imm, sf } => {
                 let addr = (self.cpu.read_reg(rn) as i64).wrapping_add(imm as i64) as u64;
                 let v = mem_read_u16!(self, addr, pc);
-                let val = if sf { v as i16 as i64 as u64 } else { v as i16 as i32 as u32 as u64 };
+                let val = if sf {
+                    v as i16 as i64 as u64
+                } else {
+                    v as i16 as i32 as u32 as u64
+                };
                 self.cpu.write_reg_zr(rt, val);
                 self.cpu.pc = pc + 4;
             }
 
             // ── Register-indexed loads/stores ──────────────────────
-            Instruction::LdrReg { sf, rt, rn, rm, extend, s } => {
+            Instruction::LdrReg {
+                sf,
+                rt,
+                rn,
+                rm,
+                extend,
+                s,
+            } => {
                 let addr = self.reg_index_addr(rn, rm, extend, s, if sf { 3 } else { 2 });
                 let val = if sf {
                     mem_read_u64!(self, addr, pc)
@@ -179,7 +289,14 @@ impl Interpreter {
                 self.cpu.write_reg_zr(rt, val);
                 self.cpu.pc = pc + 4;
             }
-            Instruction::StrReg { sf, rt, rn, rm, extend, s } => {
+            Instruction::StrReg {
+                sf,
+                rt,
+                rn,
+                rm,
+                extend,
+                s,
+            } => {
                 let addr = self.reg_index_addr(rn, rm, extend, s, if sf { 3 } else { 2 });
                 let ok = if sf {
                     self.mem.write_u64(addr, self.cpu.read_reg_zr(rt))
@@ -187,51 +304,115 @@ impl Interpreter {
                     self.mem.write_u32(addr, self.cpu.read_reg_zr(rt) as u32)
                 };
                 if !ok {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr,
+                        is_write: true,
+                    });
                 }
                 self.cpu.pc = pc + 4;
             }
-            Instruction::LdrbReg { rt, rn, rm, extend, s } => {
+            Instruction::LdrbReg {
+                rt,
+                rn,
+                rm,
+                extend,
+                s,
+            } => {
                 let addr = self.reg_index_addr(rn, rm, extend, s, 0);
                 let v = mem_read_u8!(self, addr, pc);
                 self.cpu.write_reg_zr(rt, v as u64);
                 self.cpu.pc = pc + 4;
             }
-            Instruction::StrbReg { rt, rn, rm, extend, s } => {
+            Instruction::StrbReg {
+                rt,
+                rn,
+                rm,
+                extend,
+                s,
+            } => {
                 let addr = self.reg_index_addr(rn, rm, extend, s, 0);
                 if !self.mem.write_u8(addr, self.cpu.read_reg_zr(rt) as u8) {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr,
+                        is_write: true,
+                    });
                 }
                 self.cpu.pc = pc + 4;
             }
-            Instruction::LdrhReg { rt, rn, rm, extend, s } => {
+            Instruction::LdrhReg {
+                rt,
+                rn,
+                rm,
+                extend,
+                s,
+            } => {
                 let addr = self.reg_index_addr(rn, rm, extend, s, 1);
                 let v = mem_read_u16!(self, addr, pc);
                 self.cpu.write_reg_zr(rt, v as u64);
                 self.cpu.pc = pc + 4;
             }
-            Instruction::StrhReg { rt, rn, rm, extend, s } => {
+            Instruction::StrhReg {
+                rt,
+                rn,
+                rm,
+                extend,
+                s,
+            } => {
                 let addr = self.reg_index_addr(rn, rm, extend, s, 1);
                 if !self.mem.write_u16(addr, self.cpu.read_reg_zr(rt) as u16) {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr,
+                        is_write: true,
+                    });
                 }
                 self.cpu.pc = pc + 4;
             }
-            Instruction::LdrsbReg { rt, rn, rm, extend, s, sf } => {
+            Instruction::LdrsbReg {
+                rt,
+                rn,
+                rm,
+                extend,
+                s,
+                sf,
+            } => {
                 let addr = self.reg_index_addr(rn, rm, extend, s, 0);
                 let v = mem_read_u8!(self, addr, pc);
-                let val = if sf { v as i8 as i64 as u64 } else { v as i8 as i32 as u32 as u64 };
+                let val = if sf {
+                    v as i8 as i64 as u64
+                } else {
+                    v as i8 as i32 as u32 as u64
+                };
                 self.cpu.write_reg_zr(rt, val);
                 self.cpu.pc = pc + 4;
             }
-            Instruction::LdrshReg { rt, rn, rm, extend, s, sf } => {
+            Instruction::LdrshReg {
+                rt,
+                rn,
+                rm,
+                extend,
+                s,
+                sf,
+            } => {
                 let addr = self.reg_index_addr(rn, rm, extend, s, 1);
                 let v = mem_read_u16!(self, addr, pc);
-                let val = if sf { v as i16 as i64 as u64 } else { v as i16 as i32 as u32 as u64 };
+                let val = if sf {
+                    v as i16 as i64 as u64
+                } else {
+                    v as i16 as i32 as u32 as u64
+                };
                 self.cpu.write_reg_zr(rt, val);
                 self.cpu.pc = pc + 4;
             }
-            Instruction::LdrswReg { rt, rn, rm, extend, s } => {
+            Instruction::LdrswReg {
+                rt,
+                rn,
+                rm,
+                extend,
+                s,
+            } => {
                 let addr = self.reg_index_addr(rn, rm, extend, s, 2);
                 let v = mem_read_u32!(self, addr, pc);
                 self.cpu.write_reg_zr(rt, v as i32 as i64 as u64);
@@ -258,12 +439,24 @@ impl Interpreter {
                 let val = if sf {
                     match self.mem.atomic_read_u64(addr) {
                         Some(v) => v,
-                        None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false }),
+                        None => {
+                            return StepResult::Exit(ExitReason::MemoryFault {
+                                pc,
+                                addr,
+                                is_write: false,
+                            })
+                        }
                     }
                 } else {
                     match self.mem.atomic_read_u32(addr) {
                         Some(v) => v as u64,
-                        None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false }),
+                        None => {
+                            return StepResult::Exit(ExitReason::MemoryFault {
+                                pc,
+                                addr,
+                                is_write: false,
+                            })
+                        }
                     }
                 };
                 self.cpu.write_reg_zr(rt, val);
@@ -278,7 +471,11 @@ impl Interpreter {
                     self.mem.atomic_write_u32(addr, val as u32)
                 };
                 if !ok {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr,
+                        is_write: true,
+                    });
                 }
                 self.cpu.pc = pc + 4;
             }
@@ -303,7 +500,11 @@ impl Interpreter {
                     self.mem.write_u8(addr, val as u8)
                 };
                 if !ok {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr,
+                        is_write: true,
+                    });
                 }
                 self.cpu.pc = pc + 4;
             }
@@ -315,12 +516,24 @@ impl Interpreter {
                 let val = if sf {
                     match self.mem.atomic_read_u64(addr) {
                         Some(v) => v,
-                        None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false }),
+                        None => {
+                            return StepResult::Exit(ExitReason::MemoryFault {
+                                pc,
+                                addr,
+                                is_write: false,
+                            })
+                        }
                     }
                 } else {
                     match self.mem.atomic_read_u32(addr) {
                         Some(v) => v as u64,
-                        None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false }),
+                        None => {
+                            return StepResult::Exit(ExitReason::MemoryFault {
+                                pc,
+                                addr,
+                                is_write: false,
+                            })
+                        }
                     }
                 };
                 self.cpu.write_reg_zr(rt, val);
@@ -358,7 +571,11 @@ impl Interpreter {
                         self.mem.atomic_write_u32(addr, val as u32)
                     };
                     if !ok {
-                        return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
+                        return StepResult::Exit(ExitReason::MemoryFault {
+                            pc,
+                            addr,
+                            is_write: true,
+                        });
                     }
                     self.cpu.write_reg_zr(rs, 0); // success
                 } else {
@@ -373,7 +590,11 @@ impl Interpreter {
                 if monitor_ok {
                     let val = self.cpu.read_reg_zr(rt) as u8;
                     if !self.mem.write_u8(addr, val) {
-                        return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
+                        return StepResult::Exit(ExitReason::MemoryFault {
+                            pc,
+                            addr,
+                            is_write: true,
+                        });
                     }
                     self.cpu.write_reg_zr(rs, 0);
                 } else {
@@ -388,7 +609,11 @@ impl Interpreter {
                 if monitor_ok {
                     let val = self.cpu.read_reg_zr(rt) as u16;
                     if !self.mem.write_u16(addr, val) {
-                        return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
+                        return StepResult::Exit(ExitReason::MemoryFault {
+                            pc,
+                            addr,
+                            is_write: true,
+                        });
                     }
                     self.cpu.write_reg_zr(rs, 0);
                 } else {
@@ -406,43 +631,83 @@ impl Interpreter {
             // ── LSE LDADD/LDCLR/LDSET/LDEOR/LDMAX/LDMIN atomics ────
             // Use real atomic operations for 4- and 8-byte sizes.
             // Byte/halfword sizes use non-atomic emulation (rare in practice).
-            Instruction::LseLoad { size, op, rs, rt, rn, .. } => {
+            Instruction::LseLoad {
+                size,
+                op,
+                rs,
+                rt,
+                rn,
+                ..
+            } => {
                 let addr = self.cpu.read_reg(rn);
                 let src = self.cpu.read_reg_zr(rs);
                 let orig = match size {
                     8 => {
                         let orig = match Self::lse_atomic_op64(&self.mem, op, addr, src) {
                             Some(v) => v,
-                            None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true }),
+                            None => {
+                                return StepResult::Exit(ExitReason::MemoryFault {
+                                    pc,
+                                    addr,
+                                    is_write: true,
+                                })
+                            }
                         };
                         orig
                     }
                     4 => {
                         let orig = match Self::lse_atomic_op32(&self.mem, op, addr, src as u32) {
                             Some(v) => v as u64,
-                            None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true }),
+                            None => {
+                                return StepResult::Exit(ExitReason::MemoryFault {
+                                    pc,
+                                    addr,
+                                    is_write: true,
+                                })
+                            }
                         };
                         orig
                     }
                     2 => {
                         let orig = match self.mem.read_u16(addr) {
                             Some(v) => v as u64,
-                            None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false }),
+                            None => {
+                                return StepResult::Exit(ExitReason::MemoryFault {
+                                    pc,
+                                    addr,
+                                    is_write: false,
+                                })
+                            }
                         };
                         let new_val = Self::lse_op32(op, orig as u32, src as u32) as u64;
                         if !self.mem.write_u16(addr, new_val as u16) {
-                            return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
+                            return StepResult::Exit(ExitReason::MemoryFault {
+                                pc,
+                                addr,
+                                is_write: true,
+                            });
                         }
                         orig
                     }
-                    _ => { // 1 (byte)
+                    _ => {
+                        // 1 (byte)
                         let orig = match self.mem.read_u8(addr) {
                             Some(v) => v as u64,
-                            None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false }),
+                            None => {
+                                return StepResult::Exit(ExitReason::MemoryFault {
+                                    pc,
+                                    addr,
+                                    is_write: false,
+                                })
+                            }
                         };
                         let new_val = Self::lse_op32(op, orig as u32, src as u32) as u64;
                         if !self.mem.write_u8(addr, new_val as u8) {
-                            return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
+                            return StepResult::Exit(ExitReason::MemoryFault {
+                                pc,
+                                addr,
+                                is_write: true,
+                            });
                         }
                         orig
                     }
@@ -453,30 +718,50 @@ impl Interpreter {
             }
 
             // ── SWP: atomic swap ────────────────────────────────────
-            Instruction::Swp { size, rs, rt, rn, .. } => {
+            Instruction::Swp {
+                size, rs, rt, rn, ..
+            } => {
                 let addr = self.cpu.read_reg(rn);
                 let src = self.cpu.read_reg_zr(rs);
                 let orig = match size {
-                    8 => {
-                        match self.mem.atomic_swap_u64(addr, src) {
-                            Some(v) => v,
-                            None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true }),
+                    8 => match self.mem.atomic_swap_u64(addr, src) {
+                        Some(v) => v,
+                        None => {
+                            return StepResult::Exit(ExitReason::MemoryFault {
+                                pc,
+                                addr,
+                                is_write: true,
+                            })
                         }
-                    }
-                    4 => {
-                        match self.mem.atomic_swap_u32(addr, src as u32) {
-                            Some(v) => v as u64,
-                            None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true }),
+                    },
+                    4 => match self.mem.atomic_swap_u32(addr, src as u32) {
+                        Some(v) => v as u64,
+                        None => {
+                            return StepResult::Exit(ExitReason::MemoryFault {
+                                pc,
+                                addr,
+                                is_write: true,
+                            })
                         }
-                    }
+                    },
                     _ => {
                         // Byte/halfword: non-atomic fallback
                         let v = match self.mem.read_u16(addr) {
                             Some(v) => v as u64,
-                            None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false }),
+                            None => {
+                                return StepResult::Exit(ExitReason::MemoryFault {
+                                    pc,
+                                    addr,
+                                    is_write: false,
+                                })
+                            }
                         };
                         if !self.mem.write_u16(addr, src as u16) {
-                            return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
+                            return StepResult::Exit(ExitReason::MemoryFault {
+                                pc,
+                                addr,
+                                is_write: true,
+                            });
                         }
                         v
                     }
@@ -493,12 +778,27 @@ impl Interpreter {
                 let orig = if sf {
                     match self.mem.atomic_cas_u64(addr, expected, new_val) {
                         Some(v) => v,
-                        None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true }),
+                        None => {
+                            return StepResult::Exit(ExitReason::MemoryFault {
+                                pc,
+                                addr,
+                                is_write: true,
+                            })
+                        }
                     }
                 } else {
-                    match self.mem.atomic_cas_u32(addr, expected as u32, new_val as u32) {
+                    match self
+                        .mem
+                        .atomic_cas_u32(addr, expected as u32, new_val as u32)
+                    {
                         Some(v) => v as u64,
-                        None => return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true }),
+                        None => {
+                            return StepResult::Exit(ExitReason::MemoryFault {
+                                pc,
+                                addr,
+                                is_write: true,
+                            })
+                        }
                     }
                 };
                 // Rs is written with the original value (whether or not swap occurred)
@@ -511,50 +811,74 @@ impl Interpreter {
         StepResult::Continue
     }
 
-/// Apply a 64-bit LSE atomic operation.
-/// op: 0=LDADD, 1=LDCLR, 2=LDEOR, 3=LDSET, 4=LDSMAX, 5=LDSMIN, 6=LDUMAX, 7=LDUMIN
-#[allow(dead_code)]
-fn lse_op64(op: u8, orig: u64, src: u64) -> u64 {
-    match op {
-        0 => orig.wrapping_add(src),                                   // LDADD
-        1 => orig & !src,                                              // LDCLR (AND NOT)
-        2 => orig ^ src,                                               // LDEOR
-        3 => orig | src,                                               // LDSET
-        4 => if (orig as i64) >= (src as i64) { orig } else { src },  // LDSMAX
-        5 => if (orig as i64) <= (src as i64) { orig } else { src },  // LDSMIN
-        6 => orig.max(src),                                            // LDUMAX
-        7 => orig.min(src),                                            // LDUMIN
-        _ => orig,
+    /// Apply a 64-bit LSE atomic operation.
+    /// op: 0=LDADD, 1=LDCLR, 2=LDEOR, 3=LDSET, 4=LDSMAX, 5=LDSMIN, 6=LDUMAX, 7=LDUMIN
+    #[allow(dead_code)]
+    fn lse_op64(op: u8, orig: u64, src: u64) -> u64 {
+        match op {
+            0 => orig.wrapping_add(src), // LDADD
+            1 => orig & !src,            // LDCLR (AND NOT)
+            2 => orig ^ src,             // LDEOR
+            3 => orig | src,             // LDSET
+            4 => {
+                if (orig as i64) >= (src as i64) {
+                    orig
+                } else {
+                    src
+                }
+            } // LDSMAX
+            5 => {
+                if (orig as i64) <= (src as i64) {
+                    orig
+                } else {
+                    src
+                }
+            } // LDSMIN
+            6 => orig.max(src),          // LDUMAX
+            7 => orig.min(src),          // LDUMIN
+            _ => orig,
+        }
     }
-}
 
-/// Apply a 32-bit LSE atomic operation.
-fn lse_op32(op: u8, orig: u32, src: u32) -> u32 {
-    match op {
-        0 => orig.wrapping_add(src),
-        1 => orig & !src,
-        2 => orig ^ src,
-        3 => orig | src,
-        4 => if (orig as i32) >= (src as i32) { orig } else { src },
-        5 => if (orig as i32) <= (src as i32) { orig } else { src },
-        6 => orig.max(src),
-        7 => orig.min(src),
-        _ => orig,
+    /// Apply a 32-bit LSE atomic operation.
+    fn lse_op32(op: u8, orig: u32, src: u32) -> u32 {
+        match op {
+            0 => orig.wrapping_add(src),
+            1 => orig & !src,
+            2 => orig ^ src,
+            3 => orig | src,
+            4 => {
+                if (orig as i32) >= (src as i32) {
+                    orig
+                } else {
+                    src
+                }
+            }
+            5 => {
+                if (orig as i32) <= (src as i32) {
+                    orig
+                } else {
+                    src
+                }
+            }
+            6 => orig.max(src),
+            7 => orig.min(src),
+            _ => orig,
+        }
     }
-}
 
     /// Perform a 64-bit LSE atomic operation using real atomic RMW.
     /// Returns the original value before the operation.
     fn lse_atomic_op64(mem: &crate::mem::Memory, op: u8, addr: u64, src: u64) -> Option<u64> {
         match op {
-            0 => mem.atomic_fetch_add_u64(addr, src),        // LDADD
-            1 => mem.atomic_fetch_and_u64(addr, !src),       // LDCLR (AND NOT)
-            2 => mem.atomic_fetch_xor_u64(addr, src),        // LDEOR
-            3 => mem.atomic_fetch_or_u64(addr, src),         // LDSET
-            4 => mem.atomic_fetch_smax_u64(addr, src),       // LDSMAX
-            5 => mem.atomic_fetch_smin_u64(addr, src),       // LDSMIN
-            6 => mem.atomic_fetch_smax_u64(addr, src),       // LDUMAX (use max)
-            7 => mem.atomic_fetch_smin_u64(addr, src),       // LDUMIN (use min)
+            0 => mem.atomic_fetch_add_u64(addr, src),  // LDADD
+            1 => mem.atomic_fetch_and_u64(addr, !src), // LDCLR (AND NOT)
+            2 => mem.atomic_fetch_xor_u64(addr, src),  // LDEOR
+            3 => mem.atomic_fetch_or_u64(addr, src),   // LDSET
+            4 => mem.atomic_fetch_smax_u64(addr, src), // LDSMAX
+            5 => mem.atomic_fetch_smin_u64(addr, src), // LDSMIN
+            6 => mem.atomic_fetch_smax_u64(addr, src), // LDUMAX (use max)
+            7 => mem.atomic_fetch_smin_u64(addr, src), // LDUMIN (use min)
             _ => mem.atomic_read_u64(addr),
         }
     }
@@ -562,10 +886,10 @@ fn lse_op32(op: u8, orig: u32, src: u32) -> u32 {
     /// Perform a 32-bit LSE atomic operation using real atomic RMW.
     fn lse_atomic_op32(mem: &crate::mem::Memory, op: u8, addr: u64, src: u32) -> Option<u32> {
         match op {
-            0 => mem.atomic_fetch_add_u32(addr, src),        // LDADD
-            1 => mem.atomic_fetch_and_u32(addr, !src),       // LDCLR
-            2 => mem.atomic_fetch_xor_u32(addr, src),        // LDEOR
-            3 => mem.atomic_fetch_or_u32(addr, src),         // LDSET
+            0 => mem.atomic_fetch_add_u32(addr, src),  // LDADD
+            1 => mem.atomic_fetch_and_u32(addr, !src), // LDCLR
+            2 => mem.atomic_fetch_xor_u32(addr, src),  // LDEOR
+            3 => mem.atomic_fetch_or_u32(addr, src),   // LDSET
             _ => {
                 // SMAX/SMIN/UMAX/UMIN: use CAS loop for 32-bit
                 let orig = mem.atomic_read_u32(addr)?;
@@ -579,9 +903,9 @@ fn lse_op32(op: u8, orig: u32, src: u32) -> u32 {
         let base = self.cpu.read_reg(rn);
         let raw_index = self.cpu.read_reg(rm);
         let index = match extend {
-            0b011 | 0b111 => raw_index,                           // LSL / SXTX (64-bit)
-            0b010 => raw_index & 0xFFFF_FFFF,                    // UXTW (zero-extend 32→64)
-            0b110 => (raw_index as u32) as i32 as i64 as u64,    // SXTW (sign-extend 32→64)
+            0b011 | 0b111 => raw_index,                       // LSL / SXTX (64-bit)
+            0b010 => raw_index & 0xFFFF_FFFF,                 // UXTW (zero-extend 32→64)
+            0b110 => (raw_index as u32) as i32 as i64 as u64, // SXTW (sign-extend 32→64)
             _ => raw_index,
         };
         let shift = if s { log2_size } else { 0 };
@@ -599,25 +923,41 @@ mod tests {
     /// LDP X pre-index: LDP Xt1, Xt2, [Xn, #imm]!
     fn enc_ldp_pre64(rt: u8, rt2: u8, rn: u8, byte_offset: i32) -> u32 {
         let imm7 = ((byte_offset / 8) as u32) & 0x7F;
-        0xA9C0_0000 | (imm7 << 15) | ((rt2 as u32 & 0x1F) << 10) | ((rn as u32 & 0x1F) << 5) | (rt as u32 & 0x1F)
+        0xA9C0_0000
+            | (imm7 << 15)
+            | ((rt2 as u32 & 0x1F) << 10)
+            | ((rn as u32 & 0x1F) << 5)
+            | (rt as u32 & 0x1F)
     }
 
     /// STP X pre-index: STP Xt1, Xt2, [Xn, #imm]!
     fn enc_stp_pre64(rt: u8, rt2: u8, rn: u8, byte_offset: i32) -> u32 {
         let imm7 = ((byte_offset / 8) as u32) & 0x7F;
-        0xA980_0000 | (imm7 << 15) | ((rt2 as u32 & 0x1F) << 10) | ((rn as u32 & 0x1F) << 5) | (rt as u32 & 0x1F)
+        0xA980_0000
+            | (imm7 << 15)
+            | ((rt2 as u32 & 0x1F) << 10)
+            | ((rn as u32 & 0x1F) << 5)
+            | (rt as u32 & 0x1F)
     }
 
     /// LDP X post-index: LDP Xt1, Xt2, [Xn], #imm
     fn enc_ldp_post64(rt: u8, rt2: u8, rn: u8, byte_offset: i32) -> u32 {
         let imm7 = ((byte_offset / 8) as u32) & 0x7F;
-        0xA8C0_0000 | (imm7 << 15) | ((rt2 as u32 & 0x1F) << 10) | ((rn as u32 & 0x1F) << 5) | (rt as u32 & 0x1F)
+        0xA8C0_0000
+            | (imm7 << 15)
+            | ((rt2 as u32 & 0x1F) << 10)
+            | ((rn as u32 & 0x1F) << 5)
+            | (rt as u32 & 0x1F)
     }
 
     /// STP X post-index: STP Xt1, Xt2, [Xn], #imm
     fn enc_stp_post64(rt: u8, rt2: u8, rn: u8, byte_offset: i32) -> u32 {
         let imm7 = ((byte_offset / 8) as u32) & 0x7F;
-        0xA880_0000 | (imm7 << 15) | ((rt2 as u32 & 0x1F) << 10) | ((rn as u32 & 0x1F) << 5) | (rt as u32 & 0x1F)
+        0xA880_0000
+            | (imm7 << 15)
+            | ((rt2 as u32 & 0x1F) << 10)
+            | ((rn as u32 & 0x1F) << 5)
+            | (rt as u32 & 0x1F)
     }
 
     /// LDRSW Xt, [Xn, #imm] (unsigned offset, imm must be 4-aligned)
@@ -662,10 +1002,7 @@ mod tests {
 
     #[test]
     fn test_exec_stp_64() {
-        let mut t = test_interp(&[
-            enc_stp64(0, 1, 2, 0),
-            enc_ldp64(3, 4, 2, 0),
-        ]);
+        let mut t = test_interp(&[enc_stp64(0, 1, 2, 0), enc_ldp64(3, 4, 2, 0)]);
         t.interp.cpu.x[0] = 0xDEAD_BEEF;
         t.interp.cpu.x[1] = 0xCAFE_BABE;
         t.interp.cpu.x[2] = t.data_base;
@@ -818,10 +1155,7 @@ mod tests {
 
     #[test]
     fn test_exec_ldrb_strb_roundtrip() {
-        let mut t = test_interp(&[
-            enc_strb_imm(0, 2, 0),
-            enc_ldrb_imm(1, 2, 0),
-        ]);
+        let mut t = test_interp(&[enc_strb_imm(0, 2, 0), enc_ldrb_imm(1, 2, 0)]);
         t.interp.cpu.x[0] = 0x42;
         t.interp.cpu.x[2] = t.data_base;
         let cpu = t.run_ok();
@@ -830,10 +1164,7 @@ mod tests {
 
     #[test]
     fn test_exec_ldrh_strh_roundtrip() {
-        let mut t = test_interp(&[
-            enc_strh_imm(0, 2, 0),
-            enc_ldrh_imm(1, 2, 0),
-        ]);
+        let mut t = test_interp(&[enc_strh_imm(0, 2, 0), enc_ldrh_imm(1, 2, 0)]);
         t.interp.cpu.x[0] = 0xABCD;
         t.interp.cpu.x[2] = t.data_base;
         let cpu = t.run_ok();

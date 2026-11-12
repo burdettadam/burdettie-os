@@ -21,31 +21,50 @@ const FLAG_AUTOREPEAT: u64 = 1 << 0;
 const FLAG_VALUE_WRAPS: u64 = 1 << 1;
 
 fn read_f64(obj: u64, offset: usize) -> f64 {
-    if obj == 0 { return 0.0; }
+    if obj == 0 {
+        return 0.0;
+    }
     unsafe { *((obj as usize + offset) as *const f64) }
 }
 
 fn write_f64(obj: u64, offset: usize, value: f64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as usize + offset) as *mut f64) = value; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + offset) as *mut f64) = value;
+    }
 }
 
 fn read_u64(obj: u64, offset: usize) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + offset) as *const u64) }
 }
 
 fn write_u64(obj: u64, offset: usize, value: u64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as usize + offset) as *mut u64) = value; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + offset) as *mut u64) = value;
+    }
 }
 
 /// `-[NSStepper initWithFrame:]`
 pub extern "C" fn shim_nsstepper_init_with_frame(
-    obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64,
+    obj: u64,
+    _cmd: u64,
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
 ) -> u64 {
     let obj = crate::nsview::shim_nsview_init_with_frame(obj, 0, x, y, w, h);
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     // Defaults: min=0, max=59, increment=1, autorepeat=YES, wraps=NO
     write_f64(obj, MIN_VALUE_OFF, 0.0);
     write_f64(obj, MAX_VALUE_OFF, 59.0);
@@ -91,9 +110,15 @@ pub extern "C" fn shim_nsstepper_autorepeat(obj: u64, _cmd: u64) -> u8 {
 
 /// `-[NSStepper setAutorepeat:]`
 pub extern "C" fn shim_nsstepper_set_autorepeat(obj: u64, _cmd: u64, flag: u8) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let mut flags = read_u64(obj, FLAGS_OFF);
-    if flag != 0 { flags |= FLAG_AUTOREPEAT; } else { flags &= !FLAG_AUTOREPEAT; }
+    if flag != 0 {
+        flags |= FLAG_AUTOREPEAT;
+    } else {
+        flags &= !FLAG_AUTOREPEAT;
+    }
     write_u64(obj, FLAGS_OFF, flags);
 }
 
@@ -104,9 +129,15 @@ pub extern "C" fn shim_nsstepper_value_wraps(obj: u64, _cmd: u64) -> u8 {
 
 /// `-[NSStepper setValueWraps:]`
 pub extern "C" fn shim_nsstepper_set_value_wraps(obj: u64, _cmd: u64, flag: u8) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let mut flags = read_u64(obj, FLAGS_OFF);
-    if flag != 0 { flags |= FLAG_VALUE_WRAPS; } else { flags &= !FLAG_VALUE_WRAPS; }
+    if flag != 0 {
+        flags |= FLAG_VALUE_WRAPS;
+    } else {
+        flags &= !FLAG_VALUE_WRAPS;
+    }
     write_u64(obj, FLAGS_OFF, flags);
 }
 
@@ -119,14 +150,20 @@ const INT_VALUE_OFF: usize = 104;
 
 /// `-[NSStepper integerValue]` — reads inherited NSControl int_value.
 pub extern "C" fn shim_nsstepper_integer_value(obj: u64, _cmd: u64) -> i64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + INT_VALUE_OFF) as *const i64) }
 }
 
 /// `-[NSStepper setIntegerValue:]`
 pub extern "C" fn shim_nsstepper_set_integer_value(obj: u64, _cmd: u64, val: i64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as usize + INT_VALUE_OFF) as *mut i64) = val; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + INT_VALUE_OFF) as *mut i64) = val;
+    }
 }
 
 /// `-[NSStepper doubleValue]` — cast from integer.
@@ -141,9 +178,13 @@ pub extern "C" fn shim_nsstepper_set_double_value(obj: u64, _cmd: u64, val: f64)
 
 /// `-[NSStepper drawRect:]` — renders up/down arrows.
 pub extern "C" fn shim_nsstepper_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let cg_ctx = crate::nsgraphicscontext::current_cg_context_handle();
-    if cg_ctx == 0 { return; }
+    if cg_ctx == 0 {
+        return;
+    }
 
     let half_h = h / 2.0;
 
@@ -172,7 +213,9 @@ pub extern "C" fn shim_nsstepper_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64, 
 
 /// `-[NSStepper mouseDown:]` — increment or decrement value based on click position.
 pub extern "C" fn shim_nsstepper_mouse_down(obj: u64, _cmd: u64, event: u64) {
-    if obj == 0 || event == 0 { return; }
+    if obj == 0 || event == 0 {
+        return;
+    }
 
     let (_, loc_y) = crate::nsevent::event_location_in_window(event);
     let frame = crate::nsview::view_frame(obj);
@@ -190,7 +233,11 @@ pub extern "C" fn shim_nsstepper_mouse_down(obj: u64, _cmd: u64, event: u64) {
         // Top half → increment.
         let v = current + inc;
         if v > max {
-            if wraps { min } else { max }
+            if wraps {
+                min
+            } else {
+                max
+            }
         } else {
             v
         }
@@ -198,7 +245,11 @@ pub extern "C" fn shim_nsstepper_mouse_down(obj: u64, _cmd: u64, event: u64) {
         // Bottom half → decrement.
         let v = current - inc;
         if v < min {
-            if wraps { max } else { min }
+            if wraps {
+                max
+            } else {
+                min
+            }
         } else {
             v
         }
@@ -210,7 +261,7 @@ pub extern "C" fn shim_nsstepper_mouse_down(obj: u64, _cmd: u64, event: u64) {
     let action = read_u64(obj, ACTION_OFF);
     let target = read_u64(obj, TARGET_OFF);
     if action != 0 {
-        let nsapp = crate::nsapplication::nsapp_global_addr();
+        let nsapp = crate::nsapplication::shim_nsapplication_shared_application(0, 0);
         crate::nsapplication::shim_nsapplication_send_action_to_from(nsapp, 0, action, target, obj);
     }
 

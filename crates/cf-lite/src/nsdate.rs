@@ -230,7 +230,10 @@ mod tests {
         // CF reference = 2001-01-01 → Unix offset = 978307200
         let d = alloc_nsdate(0.0);
         let ti = shim_nsdate_ti_since_1970(d, 0);
-        assert!((ti - CF_EPOCH_OFFSET).abs() < 1.0, "expected ~{CF_EPOCH_OFFSET} got {ti}");
+        assert!(
+            (ti - CF_EPOCH_OFFSET).abs() < 1.0,
+            "expected ~{CF_EPOCH_OFFSET} got {ti}"
+        );
         free_obj(d);
     }
 
@@ -330,7 +333,10 @@ mod tests {
         let d = shim_nsdate_distant_future(0, 0);
         assert_ne!(d, 0);
         let ti = shim_nsdate_ti_since_ref(d, 0);
-        assert!(ti > 1e9, "distantFuture should be far in the future, got {ti}");
+        assert!(
+            ti > 1e9,
+            "distantFuture should be far in the future, got {ti}"
+        );
         free_obj(d);
     }
 

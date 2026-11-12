@@ -36,8 +36,8 @@
 //! }
 //! ```
 
-mod header;
 mod error;
+mod header;
 mod image;
 
 pub use error::SharedCacheError;
@@ -65,7 +65,12 @@ impl<'a> SharedCache<'a> {
             images.len()
         );
 
-        Ok(Self { data, header, mappings, images })
+        Ok(Self {
+            data,
+            header,
+            mappings,
+            images,
+        })
     }
 
     /// Access the cache header.
@@ -94,7 +99,8 @@ impl<'a> SharedCache<'a> {
     /// to include all its mapped content. This data can be passed to
     /// `macho-parse` for further analysis.
     pub fn extract_image(&self, image: &ImageInfo) -> Result<&'a [u8], SharedCacheError> {
-        let file_offset = self.vm_addr_to_file_offset(image.address())
+        let file_offset = self
+            .vm_addr_to_file_offset(image.address())
             .ok_or(SharedCacheError::AddressNotMapped(image.address()))?;
 
         if file_offset >= self.data.len() {
@@ -113,9 +119,9 @@ impl<'a> SharedCache<'a> {
 
         // Read ncmds and sizeofcmds from the Mach-O header
         // mach_header_64: magic(4) + cpu(4) + sub(4) + filetype(4) + ncmds(4) + sizeofcmds(4) + flags(4) + reserved(4) = 32
-        let sizeofcmds = u32::from_le_bytes([
-            remaining[20], remaining[21], remaining[22], remaining[23],
-        ]) as usize;
+        let sizeofcmds =
+            u32::from_le_bytes([remaining[20], remaining[21], remaining[22], remaining[23]])
+                as usize;
         let header_plus_cmds = 32 + sizeofcmds;
 
         let end = file_offset + header_plus_cmds.min(remaining.len());

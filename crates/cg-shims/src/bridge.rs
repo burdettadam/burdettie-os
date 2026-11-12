@@ -7,7 +7,9 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use graphics_core::{BezierPath, Color, FontManager, ImageBuffer, Rect, Surface, SoftwareRenderer, Renderer, Point};
+use graphics_core::{
+    BezierPath, Color, FontManager, ImageBuffer, Point, Rect, Renderer, SoftwareRenderer, Surface,
+};
 
 /// Intersect two axis-aligned rectangles. Returns a zero-area rect if no overlap.
 fn intersect_rects(a: Rect, b: Rect) -> Rect {
@@ -177,7 +179,11 @@ impl CgContext {
     pub fn stroke_rect(&mut self, x: f64, y: f64, w: f64, h: f64) {
         let (tx, ty, tw, th) = self.transform_rect(x, y, w, h);
         let mut renderer = SoftwareRenderer::new(&mut self.surface);
-        renderer.stroke_rect(Rect::new(tx, ty, tw, th), self.stroke_color, self.line_width);
+        renderer.stroke_rect(
+            Rect::new(tx, ty, tw, th),
+            self.stroke_color,
+            self.line_width,
+        );
     }
 
     pub fn fill_ellipse(&mut self, x: f64, y: f64, w: f64, h: f64) {
@@ -232,9 +238,15 @@ impl CgContext {
                     let (c1x, c1y) = self.transform_point(ctrl1.x, ctrl1.y);
                     let (c2x, c2y) = self.transform_point(ctrl2.x, ctrl2.y);
                     let (ex, ey) = self.transform_point(end.x, end.y);
-                    out.cubic_to(Point::new(c1x, c1y), Point::new(c2x, c2y), Point::new(ex, ey));
+                    out.cubic_to(
+                        Point::new(c1x, c1y),
+                        Point::new(c2x, c2y),
+                        Point::new(ex, ey),
+                    );
                 }
-                graphics_core::PathElement::Close => { out.close(); }
+                graphics_core::PathElement::Close => {
+                    out.close();
+                }
             }
         }
         out
@@ -310,13 +322,16 @@ pub fn with_context<R>(handle: u64, f: impl FnOnce(&mut CgContext) -> R) -> Opti
 /// Release a context.
 pub fn context_release(handle: u64) {
     let mut guard = CONTEXTS.lock().unwrap_or_else(|e| e.into_inner());
-    if let Some(m) = guard.as_mut() { m.remove(&handle); }
+    if let Some(m) = guard.as_mut() {
+        m.remove(&handle);
+    }
 }
 
 /// Get the raw pixel data pointer for `CGBitmapContextGetData`.
 pub fn context_get_data(handle: u64) -> u64 {
     let guard = CONTEXTS.lock().unwrap_or_else(|e| e.into_inner());
-    guard.as_ref()
+    guard
+        .as_ref()
         .and_then(|m| m.get(&handle))
         .map(|ctx| ctx.surface.pixels().as_ptr() as u64)
         .unwrap_or(0)
@@ -325,7 +340,8 @@ pub fn context_get_data(handle: u64) -> u64 {
 /// Get width for `CGBitmapContextGetWidth`.
 pub fn context_get_width(handle: u64) -> u64 {
     let guard = CONTEXTS.lock().unwrap_or_else(|e| e.into_inner());
-    guard.as_ref()
+    guard
+        .as_ref()
         .and_then(|m| m.get(&handle))
         .map(|ctx| ctx.surface.width() as u64)
         .unwrap_or(0)
@@ -334,7 +350,8 @@ pub fn context_get_width(handle: u64) -> u64 {
 /// Get height for `CGBitmapContextGetHeight`.
 pub fn context_get_height(handle: u64) -> u64 {
     let guard = CONTEXTS.lock().unwrap_or_else(|e| e.into_inner());
-    guard.as_ref()
+    guard
+        .as_ref()
         .and_then(|m| m.get(&handle))
         .map(|ctx| ctx.surface.height() as u64)
         .unwrap_or(0)
@@ -357,12 +374,15 @@ pub fn with_path<R>(handle: u64, f: impl FnOnce(&mut BezierPath) -> R) -> Option
 
 pub fn path_release(handle: u64) {
     let mut guard = PATHS.lock().unwrap_or_else(|e| e.into_inner());
-    if let Some(m) = guard.as_mut() { m.remove(&handle); }
+    if let Some(m) = guard.as_mut() {
+        m.remove(&handle);
+    }
 }
 
 pub fn path_is_empty(handle: u64) -> bool {
     let guard = PATHS.lock().unwrap_or_else(|e| e.into_inner());
-    guard.as_ref()
+    guard
+        .as_ref()
         .and_then(|m| m.get(&handle))
         .map(|p| p.elements().is_empty())
         .unwrap_or(true)
@@ -373,22 +393,35 @@ pub fn path_append_path(dst: u64, src: u64) {
     // Collect elements from src first to avoid nested locks.
     let elements: Vec<graphics_core::PathElement> = {
         let guard = PATHS.lock().unwrap_or_else(|e| e.into_inner());
-        guard.as_ref()
+        guard
+            .as_ref()
             .and_then(|m| m.get(&src))
             .map(|p| p.elements().to_vec())
             .unwrap_or_default()
     };
-    if elements.is_empty() { return; }
+    if elements.is_empty() {
+        return;
+    }
     let mut guard = PATHS.lock().unwrap_or_else(|e| e.into_inner());
     if let Some(m) = guard.as_mut() {
         if let Some(p) = m.get_mut(&dst) {
             for elem in &elements {
                 match *elem {
-                    graphics_core::PathElement::MoveTo(pt) => { p.move_to(pt); }
-                    graphics_core::PathElement::LineTo(pt) => { p.line_to(pt); }
-                    graphics_core::PathElement::QuadTo { ctrl, end } => { p.quad_to(ctrl, end); }
-                    graphics_core::PathElement::CubicTo { ctrl1, ctrl2, end } => { p.cubic_to(ctrl1, ctrl2, end); }
-                    graphics_core::PathElement::Close => { p.close(); }
+                    graphics_core::PathElement::MoveTo(pt) => {
+                        p.move_to(pt);
+                    }
+                    graphics_core::PathElement::LineTo(pt) => {
+                        p.line_to(pt);
+                    }
+                    graphics_core::PathElement::QuadTo { ctrl, end } => {
+                        p.quad_to(ctrl, end);
+                    }
+                    graphics_core::PathElement::CubicTo { ctrl1, ctrl2, end } => {
+                        p.cubic_to(ctrl1, ctrl2, end);
+                    }
+                    graphics_core::PathElement::Close => {
+                        p.close();
+                    }
                 }
             }
         }
@@ -400,20 +433,33 @@ pub fn copy_path_to_context(path_handle: u64, ctx_handle: u64) {
     // Collect elements under the path lock first, then apply under the context lock.
     let elements: Vec<graphics_core::PathElement> = {
         let guard = PATHS.lock().unwrap_or_else(|e| e.into_inner());
-        guard.as_ref()
+        guard
+            .as_ref()
             .and_then(|m| m.get(&path_handle))
             .map(|p| p.elements().to_vec())
             .unwrap_or_default()
     };
-    if elements.is_empty() { return; }
+    if elements.is_empty() {
+        return;
+    }
     with_context(ctx_handle, |c| {
         for elem in &elements {
             match *elem {
-                graphics_core::PathElement::MoveTo(p) => { c.path.move_to(p); }
-                graphics_core::PathElement::LineTo(p) => { c.path.line_to(p); }
-                graphics_core::PathElement::QuadTo { ctrl, end } => { c.path.quad_to(ctrl, end); }
-                graphics_core::PathElement::CubicTo { ctrl1, ctrl2, end } => { c.path.cubic_to(ctrl1, ctrl2, end); }
-                graphics_core::PathElement::Close => { c.path.close(); }
+                graphics_core::PathElement::MoveTo(p) => {
+                    c.path.move_to(p);
+                }
+                graphics_core::PathElement::LineTo(p) => {
+                    c.path.line_to(p);
+                }
+                graphics_core::PathElement::QuadTo { ctrl, end } => {
+                    c.path.quad_to(ctrl, end);
+                }
+                graphics_core::PathElement::CubicTo { ctrl1, ctrl2, end } => {
+                    c.path.cubic_to(ctrl1, ctrl2, end);
+                }
+                graphics_core::PathElement::Close => {
+                    c.path.close();
+                }
             }
         }
     });
@@ -440,23 +486,46 @@ pub fn color_get_alpha(handle: u64) -> f64 {
 
 pub fn color_release(handle: u64) {
     let mut guard = COLORS.lock().unwrap_or_else(|e| e.into_inner());
-    if let Some(m) = guard.as_mut() { m.remove(&handle); }
+    if let Some(m) = guard.as_mut() {
+        m.remove(&handle);
+    }
 }
 
 // ── Image API ──────────────────────────────────────────────────
 
 /// Create a CGImage from raw pixel data. Stores an `ImageBuffer` in the handle table.
-pub fn image_create(width: u32, height: u32, bits_per_component: u32, bits_per_pixel: u32, bytes_per_row: u32, data_ptr: u64) -> u64 {
-    let bpp = if bits_per_pixel == 0 { 32 } else { bits_per_pixel };
-    let bpc = if bits_per_component == 0 { 8 } else { bits_per_component };
-    let bpr = if bytes_per_row == 0 { width * (bpp / 8) } else { bytes_per_row };
+pub fn image_create(
+    width: u32,
+    height: u32,
+    bits_per_component: u32,
+    bits_per_pixel: u32,
+    bytes_per_row: u32,
+    data_ptr: u64,
+) -> u64 {
+    let bpp = if bits_per_pixel == 0 {
+        32
+    } else {
+        bits_per_pixel
+    };
+    let bpc = if bits_per_component == 0 {
+        8
+    } else {
+        bits_per_component
+    };
+    let bpr = if bytes_per_row == 0 {
+        width * (bpp / 8)
+    } else {
+        bytes_per_row
+    };
 
     if width == 0 || height == 0 || data_ptr == 0 {
         // No pixel data — return a placeholder 1x1 transparent image.
         let img = ImageBuffer::new(1, 1);
         let handle = next_handle();
         let mut guard = IMAGES.lock().unwrap_or_else(|e| e.into_inner());
-        guard.get_or_insert_with(HashMap::new).insert(handle, Box::new(img));
+        guard
+            .get_or_insert_with(HashMap::new)
+            .insert(handle, Box::new(img));
         return handle;
     }
 
@@ -504,7 +573,9 @@ pub fn image_create(width: u32, height: u32, bits_per_component: u32, bits_per_p
         .unwrap_or_else(|| ImageBuffer::new(width, height));
     let handle = next_handle();
     let mut guard = IMAGES.lock().unwrap_or_else(|e| e.into_inner());
-    guard.get_or_insert_with(HashMap::new).insert(handle, Box::new(img));
+    guard
+        .get_or_insert_with(HashMap::new)
+        .insert(handle, Box::new(img));
     handle
 }
 
@@ -512,7 +583,9 @@ pub fn image_create(width: u32, height: u32, bits_per_component: u32, bits_per_p
 pub fn image_create_from_buffer(img: ImageBuffer) -> u64 {
     let handle = next_handle();
     let mut guard = IMAGES.lock().unwrap_or_else(|e| e.into_inner());
-    guard.get_or_insert_with(HashMap::new).insert(handle, Box::new(img));
+    guard
+        .get_or_insert_with(HashMap::new)
+        .insert(handle, Box::new(img));
     handle
 }
 
@@ -527,17 +600,17 @@ pub fn image_create_from_context(ctx_handle: u64) -> u64 {
         let mut rgba = vec![0u8; (w as usize) * (h as usize) * 4];
         for (i, &px) in pixels.iter().enumerate() {
             let off = i * 4;
-            rgba[off] = ((px >> 16) & 0xFF) as u8;     // R
-            rgba[off + 1] = ((px >> 8) & 0xFF) as u8;  // G
-            rgba[off + 2] = (px & 0xFF) as u8;          // B
-            rgba[off + 3] = ((px >> 24) & 0xFF) as u8;  // A
+            rgba[off] = ((px >> 16) & 0xFF) as u8; // R
+            rgba[off + 1] = ((px >> 8) & 0xFF) as u8; // G
+            rgba[off + 2] = (px & 0xFF) as u8; // B
+            rgba[off + 3] = ((px >> 24) & 0xFF) as u8; // A
         }
         drop(guard);
-        let img = ImageBuffer::from_rgba(w, h, rgba)
-            .unwrap_or_else(|| ImageBuffer::new(w, h));
+        let img = ImageBuffer::from_rgba(w, h, rgba).unwrap_or_else(|| ImageBuffer::new(w, h));
         let handle = next_handle();
         let mut ig = IMAGES.lock().unwrap_or_else(|e| e.into_inner());
-        ig.get_or_insert_with(HashMap::new).insert(handle, Box::new(img));
+        ig.get_or_insert_with(HashMap::new)
+            .insert(handle, Box::new(img));
         handle
     } else {
         drop(guard);
@@ -547,17 +620,27 @@ pub fn image_create_from_context(ctx_handle: u64) -> u64 {
 
 pub fn image_get_width(handle: u64) -> u32 {
     let guard = IMAGES.lock().unwrap_or_else(|e| e.into_inner());
-    guard.as_ref().and_then(|m| m.get(&handle)).map(|i| i.width()).unwrap_or(0)
+    guard
+        .as_ref()
+        .and_then(|m| m.get(&handle))
+        .map(|i| i.width())
+        .unwrap_or(0)
 }
 
 pub fn image_get_height(handle: u64) -> u32 {
     let guard = IMAGES.lock().unwrap_or_else(|e| e.into_inner());
-    guard.as_ref().and_then(|m| m.get(&handle)).map(|i| i.height()).unwrap_or(0)
+    guard
+        .as_ref()
+        .and_then(|m| m.get(&handle))
+        .map(|i| i.height())
+        .unwrap_or(0)
 }
 
 pub fn image_release(handle: u64) {
     let mut guard = IMAGES.lock().unwrap_or_else(|e| e.into_inner());
-    if let Some(m) = guard.as_mut() { m.remove(&handle); }
+    if let Some(m) = guard.as_mut() {
+        m.remove(&handle);
+    }
 }
 
 /// Get the RGBA8 pixel data, width, and height of a CGImage.
@@ -587,7 +670,10 @@ pub fn draw_image_in_context(ctx_handle: u64, image_handle: u64, x: f64, y: f64,
     // Read image data under the image lock first.
     let img: Option<ImageBuffer> = {
         let guard = IMAGES.lock().unwrap_or_else(|e| e.into_inner());
-        guard.as_ref().and_then(|m| m.get(&image_handle)).map(|i| (**i).clone())
+        guard
+            .as_ref()
+            .and_then(|m| m.get(&image_handle))
+            .map(|i| (**i).clone())
     };
     if let Some(img) = img {
         with_context(ctx_handle, |c| c.draw_image(&img, x, y, w, h));

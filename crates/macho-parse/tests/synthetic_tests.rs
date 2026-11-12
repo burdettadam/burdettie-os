@@ -128,7 +128,7 @@ fn reject_truncated_header_16_bytes() {
     data.extend_from_slice(&0x0100_000Cu32.to_le_bytes()); // ARM64
     data.extend_from_slice(&0u32.to_le_bytes()); // cpu_subtype
     data.extend_from_slice(&2u32.to_le_bytes()); // file_type
-                                                  // Missing: ncmds, sizeofcmds, flags, reserved
+                                                 // Missing: ncmds, sizeofcmds, flags, reserved
     let err = parse(&data).unwrap_err();
     match err {
         ParseError::UnexpectedEof { .. } => {}
@@ -208,9 +208,9 @@ fn parse_standard_segment_layout() {
     let data = build_macho64(
         &[
             ("__PAGEZERO", 0, 0x1_0000_0000, 0),      // ---
-            ("__TEXT", 0x1_0000_0000, 0x4000, 5),      // r-x
-            ("__DATA", 0x1_0000_4000, 0x4000, 3),      // rw-
-            ("__LINKEDIT", 0x1_0000_8000, 0x4000, 1),  // r--
+            ("__TEXT", 0x1_0000_0000, 0x4000, 5),     // r-x
+            ("__DATA", 0x1_0000_4000, 0x4000, 3),     // rw-
+            ("__LINKEDIT", 0x1_0000_8000, 0x4000, 1), // r--
         ],
         Some((0x1000, 0)),
     );

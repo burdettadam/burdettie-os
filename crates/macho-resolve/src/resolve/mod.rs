@@ -145,10 +145,7 @@ mod tests {
             env.framework_path,
             vec![PathBuf::from("/fw1"), PathBuf::from("/fw2")]
         );
-        assert_eq!(
-            env.fallback_library_path,
-            vec![PathBuf::from("/fallback")]
-        );
+        assert_eq!(env.fallback_library_path, vec![PathBuf::from("/fallback")]);
         assert!(env.fallback_framework_path.is_empty());
     }
 
@@ -206,13 +203,36 @@ mod tests {
         // 0 → 1 → 2   ⟹  leaves first: [2, 1, 0]
         let plan = make_plan(
             vec![
-                ImageNode { index: 0, path: PathBuf::from("/a"), install_name: None, depth: 0 },
-                ImageNode { index: 1, path: PathBuf::from("/b"), install_name: None, depth: 1 },
-                ImageNode { index: 2, path: PathBuf::from("/c"), install_name: None, depth: 2 },
+                ImageNode {
+                    index: 0,
+                    path: PathBuf::from("/a"),
+                    install_name: None,
+                    depth: 0,
+                },
+                ImageNode {
+                    index: 1,
+                    path: PathBuf::from("/b"),
+                    install_name: None,
+                    depth: 1,
+                },
+                ImageNode {
+                    index: 2,
+                    path: PathBuf::from("/c"),
+                    install_name: None,
+                    depth: 2,
+                },
             ],
             vec![
-                DependencyEdge { from: 0, to: 1, raw_name: "b".into() },
-                DependencyEdge { from: 1, to: 2, raw_name: "c".into() },
+                DependencyEdge {
+                    from: 0,
+                    to: 1,
+                    raw_name: "b".into(),
+                },
+                DependencyEdge {
+                    from: 1,
+                    to: 2,
+                    raw_name: "c".into(),
+                },
             ],
         );
         assert_eq!(plan.init_order(), vec![2, 1, 0]);

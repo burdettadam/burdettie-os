@@ -42,11 +42,7 @@ pub fn parse_protolist(parsed: &ParsedMachO, data: &[u8]) -> Vec<ObjcProtocolRef
 }
 
 /// Parse a single `protocol_t` structure from a raw pointer.
-fn parse_protocol_t(
-    parsed: &ParsedMachO,
-    data: &[u8],
-    proto_ptr: u64,
-) -> Option<ObjcProtocolRef> {
+fn parse_protocol_t(parsed: &ParsedMachO, data: &[u8], proto_ptr: u64) -> Option<ObjcProtocolRef> {
     let proto_off = resolve_on_disk_pointer(parsed, data, proto_ptr)?;
     // Need at least 64 bytes for the protocol_t struct
     if proto_off + 64 > data.len() {
@@ -55,8 +51,8 @@ fn parse_protocol_t(
 
     // +8: mangledName
     let name_raw = u64::from_le_bytes(data[proto_off + 8..proto_off + 16].try_into().unwrap());
-    let name = resolve_on_disk_pointer(parsed, data, name_raw)
-        .and_then(|off| read_cstring(data, off))?;
+    let name =
+        resolve_on_disk_pointer(parsed, data, name_raw).and_then(|off| read_cstring(data, off))?;
 
     // +16: protocols (adopted protocols list)
     let proto_list_raw =
@@ -86,8 +82,7 @@ fn parse_protocol_t(
     };
 
     // +40: optionalInstanceMethods
-    let opt_inst_raw =
-        u64::from_le_bytes(data[proto_off + 40..proto_off + 48].try_into().unwrap());
+    let opt_inst_raw = u64::from_le_bytes(data[proto_off + 40..proto_off + 48].try_into().unwrap());
     let optional_instance_methods = if opt_inst_raw != 0 {
         parse_method_list(parsed, data, opt_inst_raw)
     } else {
@@ -104,8 +99,7 @@ fn parse_protocol_t(
     };
 
     // +56: instanceProperties
-    let props_raw =
-        u64::from_le_bytes(data[proto_off + 56..proto_off + 64].try_into().unwrap());
+    let props_raw = u64::from_le_bytes(data[proto_off + 56..proto_off + 64].try_into().unwrap());
     let properties = if props_raw != 0 {
         parse_property_list(parsed, data, props_raw)
     } else {
@@ -127,11 +121,7 @@ fn parse_protocol_t(
 ///
 /// Layout: u64 count, then count × u64 protocol pointers.
 /// Each protocol pointer → protocol_t, from which we read the name.
-fn parse_protocol_name_list(
-    parsed: &ParsedMachO,
-    data: &[u8],
-    list_raw: u64,
-) -> Vec<String> {
+fn parse_protocol_name_list(parsed: &ParsedMachO, data: &[u8], list_raw: u64) -> Vec<String> {
     let Some(list_off) = resolve_on_disk_pointer(parsed, data, list_raw) else {
         return Vec::new();
     };

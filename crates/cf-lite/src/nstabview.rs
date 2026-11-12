@@ -33,9 +33,15 @@ fn write_u64(obj: u64, offset: usize, value: u64) {
 
 /// `-[NSTabView numberOfTabViewItems]` — returns actual count of items.
 pub extern "C" fn shim_nstabview_number_of_tab_view_items(obj: u64, _cmd: u64) -> i64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let guard = TAB_ITEMS.lock().unwrap();
-    guard.as_ref().and_then(|m| m.get(&obj)).map(|v| v.len() as i64).unwrap_or(0)
+    guard
+        .as_ref()
+        .and_then(|m| m.get(&obj))
+        .map(|v| v.len() as i64)
+        .unwrap_or(0)
 }
 
 /// `-[NSTabView delegate]`
@@ -54,7 +60,9 @@ pub extern "C" fn shim_nstabview_select_tab_view_item_at_index(obj: u64, _cmd: u
         return;
     }
     let old_idx = read_u64(obj, TAB_VIEW_DATA_OFF) as i64;
-    if old_idx == idx { return; }
+    if old_idx == idx {
+        return;
+    }
 
     let delegate = read_u64(obj, DELEGATE_OFF);
 
@@ -62,7 +70,10 @@ pub extern "C" fn shim_nstabview_select_tab_view_item_at_index(obj: u64, _cmd: u
     let new_item = tab_item_at(obj, idx);
     if delegate != 0 && new_item != 0 {
         crate::nsapplication::dispatch_selector_named_2arg(
-            delegate, "tabView:willSelectTabViewItem:", obj, new_item,
+            delegate,
+            "tabView:willSelectTabViewItem:",
+            obj,
+            new_item,
         );
     }
 
@@ -71,7 +82,10 @@ pub extern "C" fn shim_nstabview_select_tab_view_item_at_index(obj: u64, _cmd: u
     // Notify delegate: tabView:didSelectTabViewItem:
     if delegate != 0 && new_item != 0 {
         crate::nsapplication::dispatch_selector_named_2arg(
-            delegate, "tabView:didSelectTabViewItem:", obj, new_item,
+            delegate,
+            "tabView:didSelectTabViewItem:",
+            obj,
+            new_item,
         );
     }
 }
@@ -92,20 +106,27 @@ pub extern "C" fn shim_nstabview_tab_view_item_at_index(obj: u64, _cmd: u64, idx
 
 /// `-[NSTabView indexOfTabViewItem:]`
 pub extern "C" fn shim_nstabview_index_of_tab_view_item(obj: u64, _cmd: u64, item: u64) -> i64 {
-    if obj == 0 || item == 0 { return -1; }
+    if obj == 0 || item == 0 {
+        return -1;
+    }
     let guard = TAB_ITEMS.lock().unwrap();
     if let Some(items) = guard.as_ref().and_then(|m| m.get(&obj)) {
         for (i, &stored) in items.iter().enumerate() {
-            if stored == item { return i as i64; }
+            if stored == item {
+                return i as i64;
+            }
         }
     }
-    -1  // NSNotFound
+    -1 // NSNotFound
 }
 
 fn tab_item_at(obj: u64, idx: i64) -> u64 {
-    if obj == 0 || idx < 0 { return 0; }
+    if obj == 0 || idx < 0 {
+        return 0;
+    }
     let guard = TAB_ITEMS.lock().unwrap();
-    guard.as_ref()
+    guard
+        .as_ref()
         .and_then(|m| m.get(&obj))
         .and_then(|v| v.get(idx as usize).copied())
         .unwrap_or(0)
@@ -113,7 +134,9 @@ fn tab_item_at(obj: u64, idx: i64) -> u64 {
 
 /// `-[NSTabView addTabViewItem:]` — stores the item.
 pub extern "C" fn shim_nstabview_add_tab_view_item(obj: u64, _cmd: u64, item: u64) {
-    if obj == 0 || item == 0 { return; }
+    if obj == 0 || item == 0 {
+        return;
+    }
     let mut guard = TAB_ITEMS.lock().unwrap();
     let map = guard.get_or_insert_with(std::collections::HashMap::new);
     map.entry(obj).or_default().push(item);
@@ -121,7 +144,9 @@ pub extern "C" fn shim_nstabview_add_tab_view_item(obj: u64, _cmd: u64, item: u6
 
 /// `-[NSTabView removeTabViewItem:]` — removes the item.
 pub extern "C" fn shim_nstabview_remove_tab_view_item(obj: u64, _cmd: u64, item: u64) {
-    if obj == 0 || item == 0 { return; }
+    if obj == 0 || item == 0 {
+        return;
+    }
     let mut guard = TAB_ITEMS.lock().unwrap();
     if let Some(map) = guard.as_mut() {
         if let Some(items) = map.get_mut(&obj) {
@@ -132,14 +157,22 @@ pub extern "C" fn shim_nstabview_remove_tab_view_item(obj: u64, _cmd: u64, item:
 
 /// `-[NSTabView drawRect:]` — renders tab bar and selected content.
 pub extern "C" fn shim_nstabview_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let cg_ctx = crate::nsgraphicscontext::current_cg_context_handle();
-    if cg_ctx == 0 { return; }
+    if cg_ctx == 0 {
+        return;
+    }
 
     let selected = read_u64(obj, TAB_VIEW_DATA_OFF) as i64;
     let items = {
         let guard = TAB_ITEMS.lock().unwrap();
-        guard.as_ref().and_then(|m| m.get(&obj)).cloned().unwrap_or_default()
+        guard
+            .as_ref()
+            .and_then(|m| m.get(&obj))
+            .cloned()
+            .unwrap_or_default()
     };
     let count = items.len();
 
@@ -167,7 +200,9 @@ pub extern "C" fn shim_nstabview_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64, 
             if label != 0 {
                 let utf8 = crate::cfstring::shim_nsstring_utf8string(label, 0);
                 if !utf8.is_null() {
-                    let text = unsafe { std::ffi::CStr::from_ptr(utf8) }.to_str().unwrap_or("");
+                    let text = unsafe { std::ffi::CStr::from_ptr(utf8) }
+                        .to_str()
+                        .unwrap_or("");
                     if !text.is_empty() {
                         cg_shims::bridge::with_context(cg_ctx, |c| {
                             c.fill_color = graphics_core::Color::BLACK;
@@ -200,7 +235,9 @@ pub extern "C" fn shim_nstabview_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64, 
 
 /// `-[NSTabView mouseDown:]` — select tab under click.
 pub extern "C" fn shim_nstabview_mouse_down(obj: u64, _cmd: u64, event: u64) {
-    if obj == 0 || event == 0 { return; }
+    if obj == 0 || event == 0 {
+        return;
+    }
 
     let (loc_x, loc_y) = crate::nsevent::event_location_in_window(event);
     let frame = crate::nsview::view_frame(obj);
@@ -208,14 +245,22 @@ pub extern "C" fn shim_nstabview_mouse_down(obj: u64, _cmd: u64, event: u64) {
 
     // Tab bar is 28px tall at the top.
     let tab_height = 28.0;
-    if local_y >= tab_height { return; } // Click in content area, not tab bar.
+    if local_y >= tab_height {
+        return;
+    } // Click in content area, not tab bar.
 
     let items = {
         let guard = TAB_ITEMS.lock().unwrap();
-        guard.as_ref().and_then(|m| m.get(&obj)).cloned().unwrap_or_default()
+        guard
+            .as_ref()
+            .and_then(|m| m.get(&obj))
+            .cloned()
+            .unwrap_or_default()
     };
     let count = items.len();
-    if count == 0 { return; }
+    if count == 0 {
+        return;
+    }
 
     let local_x = loc_x - frame.origin.x;
     let tab_w = frame.size.width / count as f64;

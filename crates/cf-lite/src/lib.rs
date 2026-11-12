@@ -56,7 +56,11 @@ pub(crate) mod nscountedset;
 pub(crate) mod nsdata;
 pub(crate) mod nsdate;
 pub(crate) mod nsdateformatter;
+pub(crate) mod nsdecimalnumber;
 pub(crate) mod nsdictionary;
+pub(crate) mod nsdistributednotificationcenter;
+pub(crate) mod nsdocument;
+pub(crate) mod nsdocumentcontroller;
 pub(crate) mod nsenumerator;
 pub(crate) mod nserror;
 pub(crate) mod nsexception;
@@ -66,10 +70,14 @@ pub(crate) mod nshashtable;
 pub(crate) mod nsindexset;
 pub(crate) mod nsinvocation;
 pub(crate) mod nsjsonserialization;
+pub(crate) mod nskeyvaluecoding;
+pub(crate) mod nskeyvalueobserving;
 pub(crate) mod nslocale;
 pub(crate) mod nslock;
 pub mod nslog;
 pub(crate) mod nsmaptable;
+pub(crate) mod nsmeasurement;
+pub(crate) mod nsmethodsignature;
 pub(crate) mod nsmutablearray;
 pub(crate) mod nsmutablecharacterset;
 pub(crate) mod nsmutabledata;
@@ -77,17 +85,13 @@ pub(crate) mod nsmutabledict;
 pub(crate) mod nsmutableset;
 pub(crate) mod nsmutablestring;
 pub(crate) mod nsnotificationcenter;
-pub(crate) mod nsdistributednotificationcenter;
-pub(crate) mod nskeyvalueobserving;
-pub(crate) mod nskeyvaluecoding;
-pub(crate) mod nsmethodsignature;
 pub(crate) mod nsnull;
 pub(crate) mod nsnumber;
 pub(crate) mod nsnumberformatter;
-pub(crate) mod nsdecimalnumber;
 pub mod nsobj;
 pub(crate) mod nsoperation;
 pub(crate) mod nsorderedset;
+pub(crate) mod nspasteboard;
 pub(crate) mod nspredicate;
 pub(crate) mod nsprocessinfo;
 pub(crate) mod nspropertylistserialization;
@@ -110,8 +114,6 @@ pub(crate) mod nsvalue;
 pub(crate) mod nsview;
 pub(crate) mod nswindow;
 pub(crate) mod nsworkspace;
-pub(crate) mod nspasteboard;
-pub(crate) mod nsmeasurement;
 // Gap-analysis Phase C9
 pub(crate) mod nsbytecountformatter;
 pub(crate) mod nshost;
@@ -126,23 +128,26 @@ pub(crate) mod nsstream;
 pub(crate) mod nsurlsession;
 pub(crate) mod nsxmlparser;
 // Gap-analysis Phase C12: credential and cookie storage stubs
-pub(crate) mod nscredential;
 pub(crate) mod nsautoreleasepool;
+pub(crate) mod nscredential;
 
 // ── AppKit layer (GUI) ──────────────────────────────────────────
 // These modules implement stub AppKit classes. They are structurally
 // separate from Foundation and will eventually migrate to app-kit-lite.
 // XCStringsParser.framework shims
 pub(crate) mod xcstringsdata_entry;
-pub(crate) mod xcstringsdata_table;
 pub(crate) mod xcstringsdata_file;
+pub(crate) mod xcstringsdata_table;
 // AppKit stubs
-pub(crate) mod nsalert;
-pub(crate) mod nsapplication;
-pub(crate) mod nsappearance;
-pub(crate) mod nsbutton;
 pub(crate) mod calayer;
 pub(crate) mod layer_compositor;
+pub(crate) mod layout_solver;
+pub(crate) mod nsalert;
+pub(crate) mod nsappearance;
+pub(crate) mod nsapplication;
+pub(crate) mod nsbitmapimagerep;
+pub(crate) mod nsbox;
+pub(crate) mod nsbutton;
 pub(crate) mod nscolor;
 pub(crate) mod nscolorwell;
 pub(crate) mod nscombobox;
@@ -153,11 +158,14 @@ pub(crate) mod nsfontmanager;
 pub(crate) mod nsgraphicscontext;
 pub(crate) mod nsimage;
 pub(crate) mod nsimagerep;
-pub(crate) mod nsbitmapimagerep;
 pub(crate) mod nsimageview;
+pub(crate) mod nslayoutanchor;
+pub(crate) mod nslayoutconstraint;
+pub(crate) mod nslayoutconstraint_vfl;
+pub(crate) mod nslayoutguide;
 pub(crate) mod nsmenu_shim;
 pub(crate) mod nsnib;
-pub(crate) mod nsbox;
+pub(crate) mod nsopengl;
 pub(crate) mod nspanel;
 pub(crate) mod nspopupbutton;
 pub(crate) mod nsprogressindicator;
@@ -165,12 +173,8 @@ pub(crate) mod nsscrollview;
 pub(crate) mod nssegmentedcontrol;
 pub(crate) mod nsslider;
 pub(crate) mod nssplitview;
-pub(crate) mod nslayoutanchor;
-pub(crate) mod nslayoutconstraint;
-pub(crate) mod nslayoutconstraint_vfl;
-pub(crate) mod nslayoutguide;
-pub(crate) mod layout_solver;
 pub(crate) mod nsstackview;
+pub(crate) mod nsstoryboard;
 pub(crate) mod nstabview;
 pub(crate) mod nstabviewitem;
 pub(crate) mod nstextfield;
@@ -180,23 +184,22 @@ pub(crate) mod nsusernotificationcenter;
 pub(crate) mod nsviewcontroller;
 pub(crate) mod nswindowcontroller;
 // Tier 2 Feature Parity: safe area, size classes, animation, table view, undo
-pub(crate) mod nstraitcollection;
 pub(crate) mod nsanimationcontext;
 pub(crate) mod nsbezierpath;
-pub(crate) mod nstableview;
-pub(crate) mod nsoutlineview;
-pub(crate) mod nsundomanager;
 pub(crate) mod nsclipview;
-pub(crate) mod nstextview;
-#[cfg(target_os = "macos")]
-pub(crate) mod nsopenpanel;
-pub(crate) mod nstrackingarea;
-pub(crate) mod nscursor;
 pub(crate) mod nscolorpanel;
-pub(crate) mod nsstepper;
-pub(crate) mod nstextstorage;
+pub(crate) mod nscursor;
 pub(crate) mod nslayoutmanager;
+pub(crate) mod nsopenpanel;
+pub(crate) mod nsoutlineview;
+pub(crate) mod nsstepper;
+pub(crate) mod nstableview;
 pub(crate) mod nstextcontainer;
+pub(crate) mod nstextstorage;
+pub(crate) mod nstextview;
+pub(crate) mod nstrackingarea;
+pub(crate) mod nstraitcollection;
+pub(crate) mod nsundomanager;
 
 // GUI bridge: connects AppKit shims to a real windowing backend
 pub mod gui_bridge;
@@ -206,9 +209,11 @@ pub mod accessibility_bridge;
 pub(crate) mod nsaccessibility;
 
 // Framework stubs (CoreData, AVFoundation, CoreLocation, CoreBluetooth)
-pub(crate) mod coredata_stubs;
 pub(crate) mod avfoundation_stubs;
+pub(crate) mod coredata_stubs;
 pub(crate) mod corelocation_stubs;
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
+mod platform_fallback;
 
 pub use foundation::FoundationShims;
 
@@ -229,6 +234,7 @@ static PLATFORM: OnceLock<Arc<dyn PlatformProvider>> = OnceLock::new();
 /// safely for multiple guest executions in the same host process.
 pub fn reset_runtime_state_for_reuse() {
     nsapplication::reset_runtime_state_for_reuse();
+    nsdocumentcontroller::reset_runtime_state_for_reuse();
     nskeyvalueobserving::clear_all_observers();
     nsnotificationcenter::clear_all_observers();
     nsdistributednotificationcenter::clear_all_distributed_observers();
@@ -236,10 +242,12 @@ pub fn reset_runtime_state_for_reuse() {
     layout_solver::reset_global_state();
     nsview::reset_layout_priority_state();
     calayer::reset_layer_state();
+    nsopengl::reset_opengl_state();
 }
 
 /// Install the platform provider for Foundation shims.
 pub fn set_platform(provider: Arc<dyn PlatformProvider>) {
+    nsthread::init_main_thread_id();
     if PLATFORM.set(provider).is_err() {
         log::debug!("cf-lite: set_platform called more than once (harmless if reusing runtime)");
     }
@@ -268,6 +276,12 @@ pub(crate) fn pal_alloc() -> &'static dyn platform_core::alloc::Allocator {
         static FALLBACK: LinuxAllocator = LinuxAllocator;
         PLATFORM.get().map(|p| p.alloc()).unwrap_or(&FALLBACK)
     }
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    {
+        static FALLBACK: platform_fallback::FallbackAllocator =
+            platform_fallback::FallbackAllocator;
+        PLATFORM.get().map(|p| p.alloc()).unwrap_or(&FALLBACK)
+    }
 }
 
 /// Convenience accessor for the platform symbol resolver.
@@ -285,6 +299,12 @@ pub(crate) fn pal_symbols() -> &'static dyn platform_core::symbols::HostSymbolRe
         static FALLBACK: LinuxSymbolResolver = LinuxSymbolResolver::new();
         PLATFORM.get().map(|p| p.symbols()).unwrap_or(&FALLBACK)
     }
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    {
+        static FALLBACK: platform_fallback::FallbackSymbolResolver =
+            platform_fallback::FallbackSymbolResolver;
+        PLATFORM.get().map(|p| p.symbols()).unwrap_or(&FALLBACK)
+    }
 }
 
 /// Convenience accessor for the platform threading primitives.
@@ -300,6 +320,12 @@ pub(crate) fn pal_threading() -> &'static dyn platform_core::threading::Threadin
     {
         use platform_linux::LinuxThreading;
         static FALLBACK: LinuxThreading = LinuxThreading;
+        PLATFORM.get().map(|p| p.threading()).unwrap_or(&FALLBACK)
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    {
+        static FALLBACK: platform_fallback::FallbackThreading =
+            platform_fallback::FallbackThreading;
         PLATFORM.get().map(|p| p.threading()).unwrap_or(&FALLBACK)
     }
 }

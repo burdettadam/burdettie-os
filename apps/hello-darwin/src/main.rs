@@ -4,9 +4,7 @@
 
 use graphics_core::{Color, Rect};
 use ui_controls::{Button, Label};
-use ui_view::layout::{
-    equal, set_size, LayoutAttribute, ViewId, SUPERVIEW,
-};
+use ui_view::layout::{equal, set_size, LayoutAttribute, ViewId, SUPERVIEW};
 use window_backend::WindowConfig;
 use window_backend_darwin::GuiApp;
 
@@ -54,23 +52,71 @@ fn main() {
     let scene = app.scene_mut();
 
     // Title: pinned near top, full width with margins
-    scene.add_constraint(equal(title_id, LayoutAttribute::Left, SUPERVIEW, LayoutAttribute::Left, 30.0));
-    scene.add_constraint(equal(title_id, LayoutAttribute::Top, SUPERVIEW, LayoutAttribute::Top, 25.0));
+    scene.add_constraint(equal(
+        title_id,
+        LayoutAttribute::Left,
+        SUPERVIEW,
+        LayoutAttribute::Left,
+        30.0,
+    ));
+    scene.add_constraint(equal(
+        title_id,
+        LayoutAttribute::Top,
+        SUPERVIEW,
+        LayoutAttribute::Top,
+        25.0,
+    ));
     scene.add_constraints(set_size(title_id, 460.0, 24.0));
 
     // Run button: below title
-    scene.add_constraint(equal(run_id, LayoutAttribute::Left, SUPERVIEW, LayoutAttribute::Left, 30.0));
-    scene.add_constraint(equal(run_id, LayoutAttribute::Top, title_id, LayoutAttribute::Bottom, 31.0));
+    scene.add_constraint(equal(
+        run_id,
+        LayoutAttribute::Left,
+        SUPERVIEW,
+        LayoutAttribute::Left,
+        30.0,
+    ));
+    scene.add_constraint(equal(
+        run_id,
+        LayoutAttribute::Top,
+        title_id,
+        LayoutAttribute::Bottom,
+        31.0,
+    ));
     scene.add_constraints(set_size(run_id, 200.0, 40.0));
 
     // Quit button: right of Run button
-    scene.add_constraint(equal(quit_id, LayoutAttribute::Left, run_id, LayoutAttribute::Right, 30.0));
-    scene.add_constraint(equal(quit_id, LayoutAttribute::Top, run_id, LayoutAttribute::Top, 0.0));
+    scene.add_constraint(equal(
+        quit_id,
+        LayoutAttribute::Left,
+        run_id,
+        LayoutAttribute::Right,
+        30.0,
+    ));
+    scene.add_constraint(equal(
+        quit_id,
+        LayoutAttribute::Top,
+        run_id,
+        LayoutAttribute::Top,
+        0.0,
+    ));
     scene.add_constraints(set_size(quit_id, 120.0, 40.0));
 
     // Result label: below buttons
-    scene.add_constraint(equal(result_id, LayoutAttribute::Left, SUPERVIEW, LayoutAttribute::Left, 30.0));
-    scene.add_constraint(equal(result_id, LayoutAttribute::Top, run_id, LayoutAttribute::Bottom, 70.0));
+    scene.add_constraint(equal(
+        result_id,
+        LayoutAttribute::Left,
+        SUPERVIEW,
+        LayoutAttribute::Left,
+        30.0,
+    ));
+    scene.add_constraint(equal(
+        result_id,
+        LayoutAttribute::Top,
+        run_id,
+        LayoutAttribute::Bottom,
+        70.0,
+    ));
     scene.add_constraints(set_size(result_id, 460.0, 24.0));
 
     // Solve layout before running

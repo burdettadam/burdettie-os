@@ -2,8 +2,8 @@
 
 use std::ffi::{c_char, CStr};
 
+use super::lookup::{objc_msg_super2_lookup_imp, objc_msg_super_lookup_imp};
 use crate::class::OBJC_RUNTIME;
-use super::lookup::{objc_msg_super_lookup_imp, objc_msg_super2_lookup_imp};
 
 #[allow(dead_code)]
 pub extern "C" fn shim_objc_msg_send_rust(
@@ -116,20 +116,14 @@ mod tests {
         let super_struct: [u64; 2] = [0, 0];
         let ptr = super_struct.as_ptr() as u64;
         // receiver == 0 → objc_msg_super_lookup_imp returns 0 → returns 0.
-        assert_eq!(
-            shim_objc_msg_send_super_rust(ptr, 0, 0, 0, 0, 0, 0, 0),
-            0
-        );
+        assert_eq!(shim_objc_msg_send_super_rust(ptr, 0, 0, 0, 0, 0, 0, 0), 0);
     }
 
     #[test]
     fn msg_send_super2_rust_null() {
         let super_struct: [u64; 2] = [0, 0];
         let ptr = super_struct.as_ptr() as u64;
-        assert_eq!(
-            shim_objc_msg_send_super2_rust(ptr, 0, 0, 0, 0, 0, 0, 0),
-            0
-        );
+        assert_eq!(shim_objc_msg_send_super2_rust(ptr, 0, 0, 0, 0, 0, 0, 0), 0);
     }
 
     #[test]

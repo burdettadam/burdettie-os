@@ -19,43 +19,143 @@ impl LibeditStubs {
         use crate::register_shims;
 
         // ── EditLine (native libedit API) ───────────────────────
-        register_shims!(table,
-            ("_el_init", shim_el_init as *const () as u64, "el_init (stub → opaque handle)"),
-            ("_el_end", shim_el_end as *const () as u64, "el_end (stub → void)"),
-            ("_el_gets", shim_el_gets as *const () as u64, "el_gets (stub → reads from stdin)"),
-            ("_el_set", shim_el_set as *const () as u64, "el_set (stub → 0)"),
-            ("_el_get", shim_el_get as *const () as u64, "el_get (stub → -1)"),
-            ("_el_source", shim_el_source as *const () as u64, "el_source (stub → 0)"),
-            ("_el_line", shim_el_line as *const () as u64, "el_line (stub → empty LineInfo)"),
-            ("_el_parse", shim_el_parse as *const () as u64, "el_parse (stub → -1)"),
-            ("_el_resize", shim_el_resize as *const () as u64, "el_resize (stub → void)"),
-            ("_el_push", shim_el_push as *const () as u64, "el_push (stub → void)"),
-            ("_el_insertstr", shim_el_insertstr as *const () as u64, "el_insertstr (stub → -1)"),
-            ("_el_deletestr", shim_el_deletestr as *const () as u64, "el_deletestr (stub → void)")
+        register_shims!(
+            table,
+            (
+                "_el_init",
+                shim_el_init as *const () as u64,
+                "el_init (stub → opaque handle)"
+            ),
+            (
+                "_el_end",
+                shim_el_end as *const () as u64,
+                "el_end (stub → void)"
+            ),
+            (
+                "_el_gets",
+                shim_el_gets as *const () as u64,
+                "el_gets (stub → reads from stdin)"
+            ),
+            (
+                "_el_set",
+                shim_el_set as *const () as u64,
+                "el_set (stub → 0)"
+            ),
+            (
+                "_el_get",
+                shim_el_get as *const () as u64,
+                "el_get (stub → -1)"
+            ),
+            (
+                "_el_source",
+                shim_el_source as *const () as u64,
+                "el_source (stub → 0)"
+            ),
+            (
+                "_el_line",
+                shim_el_line as *const () as u64,
+                "el_line (stub → empty LineInfo)"
+            ),
+            (
+                "_el_parse",
+                shim_el_parse as *const () as u64,
+                "el_parse (stub → -1)"
+            ),
+            (
+                "_el_resize",
+                shim_el_resize as *const () as u64,
+                "el_resize (stub → void)"
+            ),
+            (
+                "_el_push",
+                shim_el_push as *const () as u64,
+                "el_push (stub → void)"
+            ),
+            (
+                "_el_insertstr",
+                shim_el_insertstr as *const () as u64,
+                "el_insertstr (stub → -1)"
+            ),
+            (
+                "_el_deletestr",
+                shim_el_deletestr as *const () as u64,
+                "el_deletestr (stub → void)"
+            )
         );
 
         // ── History API ─────────────────────────────────────────
-        register_shims!(table,
-            ("_history_init", shim_history_init as *const () as u64, "history_init (stub → opaque handle)"),
-            ("_history_end", shim_history_end as *const () as u64, "history_end (stub → void)"),
-            ("_history", shim_history as *const () as u64, "history (stub → 0)")
+        register_shims!(
+            table,
+            (
+                "_history_init",
+                shim_history_init as *const () as u64,
+                "history_init (stub → opaque handle)"
+            ),
+            (
+                "_history_end",
+                shim_history_end as *const () as u64,
+                "history_end (stub → void)"
+            ),
+            (
+                "_history",
+                shim_history as *const () as u64,
+                "history (stub → 0)"
+            )
         );
 
         // ── GNU Readline compatibility layer ────────────────────
-        register_shims!(table,
-            ("_readline", shim_readline as *const () as u64, "readline (stub → reads from stdin)"),
-            ("_add_history", shim_add_history as *const () as u64, "add_history (stub → void)"),
-            ("_rl_completion_matches", shim_rl_completion_matches as *const () as u64, "rl_completion_matches (stub → NULL)")
+        register_shims!(
+            table,
+            (
+                "_readline",
+                shim_readline as *const () as u64,
+                "readline (stub → reads from stdin)"
+            ),
+            (
+                "_add_history",
+                shim_add_history as *const () as u64,
+                "add_history (stub → void)"
+            ),
+            (
+                "_rl_completion_matches",
+                shim_rl_completion_matches as *const () as u64,
+                "rl_completion_matches (stub → NULL)"
+            )
         );
 
         // ── Readline global variables (data symbols) ────────────
-        register_shims!(table,
-            ("_rl_attempted_completion_function", &RL_ATTEMPTED_COMPLETION_FN as *const u64 as u64, "rl_attempted_completion_function data symbol"),
-            ("_rl_line_buffer", &RL_LINE_BUFFER as *const u64 as u64, "rl_line_buffer data symbol"),
-            ("_rl_point", &RL_POINT as *const i32 as u64, "rl_point data symbol"),
-            ("_rl_readline_name", &RL_READLINE_NAME as *const u64 as u64, "rl_readline_name data symbol"),
-            ("_rl_end", &RL_END as *const i32 as u64, "rl_end data symbol"),
-            ("_rl_prompt", &RL_PROMPT as *const u64 as u64, "rl_prompt data symbol")
+        register_shims!(
+            table,
+            (
+                "_rl_attempted_completion_function",
+                &RL_ATTEMPTED_COMPLETION_FN as *const u64 as u64,
+                "rl_attempted_completion_function data symbol"
+            ),
+            (
+                "_rl_line_buffer",
+                &RL_LINE_BUFFER as *const u64 as u64,
+                "rl_line_buffer data symbol"
+            ),
+            (
+                "_rl_point",
+                &RL_POINT as *const i32 as u64,
+                "rl_point data symbol"
+            ),
+            (
+                "_rl_readline_name",
+                &RL_READLINE_NAME as *const u64 as u64,
+                "rl_readline_name data symbol"
+            ),
+            (
+                "_rl_end",
+                &RL_END as *const i32 as u64,
+                "rl_end data symbol"
+            ),
+            (
+                "_rl_prompt",
+                &RL_PROMPT as *const u64 as u64,
+                "rl_prompt data symbol"
+            )
         );
 
         log::debug!("LibeditStubs: registered libedit/readline stubs");
@@ -93,12 +193,7 @@ static LINE_INFO: [u64; 3] = [0, 0, 0];
 // ── EditLine function stubs ─────────────────────────────────────
 
 /// el_init(prog, fin, fout, ferr) → EditLine*
-pub extern "C" fn shim_el_init(
-    _prog: *const u8,
-    _fin: u64,
-    _fout: u64,
-    _ferr: u64,
-) -> u64 {
+pub extern "C" fn shim_el_init(_prog: *const u8, _fin: u64, _fout: u64, _ferr: u64) -> u64 {
     &EL_SENTINEL as *const u64 as u64
 }
 
@@ -116,21 +211,23 @@ pub extern "C" fn shim_el_gets(_el: u64, count_out: *mut i32) -> *const u8 {
     let result = unsafe { libc::fgets(ptr as *mut libc::c_char, 1024, libc_stdin()) };
     if result.is_null() {
         if !count_out.is_null() {
-            unsafe { *count_out = 0; }
+            unsafe {
+                *count_out = 0;
+            }
         }
         return std::ptr::null();
     }
     let len = unsafe { libc::strlen(ptr as *const libc::c_char) } as i32;
     if !count_out.is_null() {
-        unsafe { *count_out = len; }
+        unsafe {
+            *count_out = len;
+        }
     }
     ptr
 }
 
 /// el_set(el, op, ...) → int  (variadic — we accept up to 4 extra args)
-pub extern "C" fn shim_el_set(
-    _el: u64, _op: i32, _a: u64, _b: u64, _c: u64, _d: u64,
-) -> i32 {
+pub extern "C" fn shim_el_set(_el: u64, _op: i32, _a: u64, _b: u64, _c: u64, _d: u64) -> i32 {
     0 // success
 }
 
@@ -213,7 +310,9 @@ pub extern "C" fn shim_readline(prompt: *const u8) -> *mut u8 {
     let out_len = unsafe { libc::strlen(buf.as_ptr() as *const libc::c_char) } + 1;
     let out = unsafe { libc::malloc(out_len) as *mut u8 };
     if !out.is_null() {
-        unsafe { std::ptr::copy_nonoverlapping(buf.as_ptr(), out, out_len); }
+        unsafe {
+            std::ptr::copy_nonoverlapping(buf.as_ptr(), out, out_len);
+        }
     }
     out
 }

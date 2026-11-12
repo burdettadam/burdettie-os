@@ -7,7 +7,7 @@
 //!   cargo run -p perf-bench --release -- --filter cache   # filter by name
 //!   cargo run -p perf-bench --release -- --iterations 5  # average over N runs
 
-#![allow(clippy::print_stderr)]  // CLI tool uses stderr for progress output
+#![allow(clippy::print_stderr)] // CLI tool uses stderr for progress output
 
 use std::path::PathBuf;
 use std::process::Command;
@@ -153,7 +153,9 @@ fn discover_corpus() -> Vec<(String, PathBuf)> {
         if !dir.is_dir() {
             continue;
         }
-        let Some(fname) = dir.file_name() else { continue };
+        let Some(fname) = dir.file_name() else {
+            continue;
+        };
         let name = fname.to_string_lossy().to_string();
         let bin = dir.join("app");
         if bin.is_file() {
@@ -206,7 +208,11 @@ fn average_timing(timings: &[timing::PhaseTiming]) -> timing::PhaseTiming {
         security: timings.iter().map(|t| t.security).sum::<Duration>() / n,
         map_images: timings.iter().map(|t| t.map_images).sum::<Duration>() / n,
         fixups: timings.iter().map(|t| t.fixups).sum::<Duration>() / n,
-        objc_registration: timings.iter().map(|t| t.objc_registration).sum::<Duration>() / n,
+        objc_registration: timings
+            .iter()
+            .map(|t| t.objc_registration)
+            .sum::<Duration>()
+            / n,
         protect: timings.iter().map(|t| t.protect).sum::<Duration>() / n,
         initialize: timings.iter().map(|t| t.initialize).sum::<Duration>() / n,
         execution: timings.iter().map(|t| t.execution).sum::<Duration>() / n,
@@ -220,8 +226,10 @@ fn average_timing(timings: &[timing::PhaseTiming]) -> timing::PhaseTiming {
 fn average_breakdown<'a>(
     breakdowns: impl Iterator<Item = &'a timing::PhaseBreakdown>,
 ) -> timing::PhaseBreakdown {
-    let mut timing_sums: std::collections::BTreeMap<String, u128> = std::collections::BTreeMap::new();
-    let mut counter_sums: std::collections::BTreeMap<String, u64> = std::collections::BTreeMap::new();
+    let mut timing_sums: std::collections::BTreeMap<String, u128> =
+        std::collections::BTreeMap::new();
+    let mut counter_sums: std::collections::BTreeMap<String, u64> =
+        std::collections::BTreeMap::new();
     let mut count = 0u128;
 
     for breakdown in breakdowns {

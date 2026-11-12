@@ -107,8 +107,16 @@ pub fn register_unwind_info(
         eh_frame,
     );
 
-    if let Err(e) = registry.register(sections.text_start, sections.text_end, compact_unwind, eh_frame) {
-        log::warn!("unwind: failed to register image at {:#x}: {e}", sections.text_start);
+    if let Err(e) = registry.register(
+        sections.text_start,
+        sections.text_end,
+        compact_unwind,
+        eh_frame,
+    ) {
+        log::warn!(
+            "unwind: failed to register image at {:#x}: {e}",
+            sections.text_start
+        );
     }
 }
 
@@ -120,7 +128,10 @@ pub fn unregister_unwind_info(segments: &[Segment], slide: i64, registry: &dyn U
     };
 
     if let Err(e) = registry.unregister(sections.text_start) {
-        log::warn!("unwind: failed to unregister image at {:#x}: {e}", sections.text_start);
+        log::warn!(
+            "unwind: failed to unregister image at {:#x}: {e}",
+            sections.text_start
+        );
     }
 }
 
@@ -162,7 +173,10 @@ mod tests {
         }
 
         fn unregister(&self, text_start: usize) -> Result<(), platform_core::PalError> {
-            self.unregistered.lock().unwrap_or_else(|e| e.into_inner()).push(text_start);
+            self.unregistered
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .push(text_start);
             Ok(())
         }
     }
@@ -220,12 +234,30 @@ mod tests {
         let segments = vec![seg];
 
         register_unwind_info(&segments, 0, &reg, None);
-        assert_eq!(reg.registered.lock().unwrap_or_else(|e| e.into_inner()).len(), 1);
-        assert_eq!(reg.registered.lock().unwrap_or_else(|e| e.into_inner())[0].0, 0x1_0000_0000);
+        assert_eq!(
+            reg.registered
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .len(),
+            1
+        );
+        assert_eq!(
+            reg.registered.lock().unwrap_or_else(|e| e.into_inner())[0].0,
+            0x1_0000_0000
+        );
 
         unregister_unwind_info(&segments, 0, &reg);
-        assert_eq!(reg.unregistered.lock().unwrap_or_else(|e| e.into_inner()).len(), 1);
-        assert_eq!(reg.unregistered.lock().unwrap_or_else(|e| e.into_inner())[0], 0x1_0000_0000);
+        assert_eq!(
+            reg.unregistered
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .len(),
+            1
+        );
+        assert_eq!(
+            reg.unregistered.lock().unwrap_or_else(|e| e.into_inner())[0],
+            0x1_0000_0000
+        );
     }
 
     #[test]
@@ -246,7 +278,11 @@ mod tests {
         let segments = vec![seg];
 
         register_unwind_info(&segments, 0, &reg, None);
-        assert!(reg.registered.lock().unwrap_or_else(|e| e.into_inner()).is_empty());
+        assert!(reg
+            .registered
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .is_empty());
     }
 
     #[test]
@@ -276,7 +312,11 @@ mod tests {
         };
         let segments = vec![seg];
         unregister_unwind_info(&segments, 0, &reg);
-        assert!(reg.unregistered.lock().unwrap_or_else(|e| e.into_inner()).is_empty());
+        assert!(reg
+            .unregistered
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .is_empty());
     }
 
     #[test]
@@ -307,6 +347,9 @@ mod tests {
         assert_eq!(registered.len(), 1);
         assert_eq!(registered[0].0, 0x5_0000_0000);
         assert_eq!(registered[0].2, Some((0x5_0000_0100, 0x60)));
-        assert_eq!(registered[0].3, Some((generated.as_ptr() as usize, generated.len())));
+        assert_eq!(
+            registered[0].3,
+            Some((generated.as_ptr() as usize, generated.len()))
+        );
     }
 }

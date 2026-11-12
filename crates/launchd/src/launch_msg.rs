@@ -367,10 +367,12 @@ mod tests {
 
         // Build a SubmitJob request
         let job_dict = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(job_dict, new_string(c_label.as_ptr()),
-            c"Label".as_ptr());
-        dict_insert(job_dict, new_string(c"/bin/true".as_ptr()),
-            c"Program".as_ptr());
+        dict_insert(job_dict, new_string(c_label.as_ptr()), c"Label".as_ptr());
+        dict_insert(
+            job_dict,
+            new_string(c"/bin/true".as_ptr()),
+            c"Program".as_ptr(),
+        );
 
         let request = alloc(LaunchDataType::Dictionary as u32);
         dict_insert(request, job_dict, c"SubmitJob".as_ptr());
@@ -384,12 +386,14 @@ mod tests {
 
         // GetJob
         let get_req = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(get_req, new_string(c_label.as_ptr()),
-            c"GetJob".as_ptr());
+        dict_insert(get_req, new_string(c_label.as_ptr()), c"GetJob".as_ptr());
         let reply = launch_msg(get_req);
         assert!(!reply.is_null());
         assert_eq!(get_type(reply), LaunchDataType::Dictionary as u32);
-        assert_eq!(dict_get_string_value(reply, "Label").as_deref(), Some(label.as_str()));
+        assert_eq!(
+            dict_get_string_value(reply, "Label").as_deref(),
+            Some(label.as_str())
+        );
         free(reply);
         free(get_req);
     }
@@ -401,8 +405,7 @@ mod tests {
         job::submit_job(job::Job::new(&label)).unwrap();
 
         let request = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(request, new_string(c_label.as_ptr()),
-            c"RemoveJob".as_ptr());
+        dict_insert(request, new_string(c_label.as_ptr()), c"RemoveJob".as_ptr());
 
         let reply = launch_msg(request);
         assert_eq!(get_errno(reply), 0);
@@ -540,7 +543,11 @@ mod tests {
     fn submit_invalid_job_dict_returns_einval() {
         // Job dict with no Label
         let job_dict = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(job_dict, new_string(c"/bin/true".as_ptr()), c"Program".as_ptr());
+        dict_insert(
+            job_dict,
+            new_string(c"/bin/true".as_ptr()),
+            c"Program".as_ptr(),
+        );
 
         let request = alloc(LaunchDataType::Dictionary as u32);
         dict_insert(request, job_dict, c"SubmitJob".as_ptr());
@@ -599,7 +606,11 @@ mod tests {
     #[test]
     fn set_user_environment_via_launch_msg() {
         let env_dict = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(env_dict, new_string(c"bar".as_ptr()), c"LAUNCHD_TEST_FOO".as_ptr());
+        dict_insert(
+            env_dict,
+            new_string(c"bar".as_ptr()),
+            c"LAUNCHD_TEST_FOO".as_ptr(),
+        );
 
         let request = alloc(LaunchDataType::Dictionary as u32);
         dict_insert(request, env_dict, c"SetUserEnvironment".as_ptr());
@@ -610,13 +621,19 @@ mod tests {
 
         assert_eq!(std::env::var("LAUNCHD_TEST_FOO").as_deref(), Ok("bar"));
         // Cleanup
-        unsafe { std::env::remove_var("LAUNCHD_TEST_FOO"); }
+        unsafe {
+            std::env::remove_var("LAUNCHD_TEST_FOO");
+        }
     }
 
     #[test]
     fn set_user_environment_non_dict_returns_einval() {
         let request = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(request, new_string(c"not_a_dict".as_ptr()), c"SetUserEnvironment".as_ptr());
+        dict_insert(
+            request,
+            new_string(c"not_a_dict".as_ptr()),
+            c"SetUserEnvironment".as_ptr(),
+        );
         let reply = launch_msg(request);
         assert_eq!(get_errno(reply), libc::EINVAL);
         free(reply);
@@ -627,7 +644,11 @@ mod tests {
     fn unset_user_environment_via_launch_msg() {
         std::env::set_var("LAUNCHD_TEST_UNSET", "value");
         let request = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(request, new_string(c"LAUNCHD_TEST_UNSET".as_ptr()), c"UnsetUserEnvironment".as_ptr());
+        dict_insert(
+            request,
+            new_string(c"LAUNCHD_TEST_UNSET".as_ptr()),
+            c"UnsetUserEnvironment".as_ptr(),
+        );
         let reply = launch_msg(request);
         assert_eq!(get_errno(reply), 0);
         free(reply);
@@ -656,7 +677,10 @@ mod tests {
         let reply = launch_msg(request);
         // Should return the job dict
         assert_eq!(get_type(reply), LaunchDataType::Dictionary as u32);
-        assert_eq!(dict_get_string_value(reply, "Label").as_deref(), Some(label.as_str()));
+        assert_eq!(
+            dict_get_string_value(reply, "Label").as_deref(),
+            Some(label.as_str())
+        );
         free(reply);
         free(request);
     }
@@ -664,7 +688,11 @@ mod tests {
     #[test]
     fn checkin_nonexistent_returns_esrch() {
         let request = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(request, new_string(c"com.nonexistent.checkin.42".as_ptr()), c"CheckIn".as_ptr());
+        dict_insert(
+            request,
+            new_string(c"com.nonexistent.checkin.42".as_ptr()),
+            c"CheckIn".as_ptr(),
+        );
         let reply = launch_msg(request);
         assert_eq!(get_errno(reply), libc::ESRCH);
         free(reply);

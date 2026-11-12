@@ -18,7 +18,13 @@ impl Interpreter {
             }
 
             // ── ADD/SUB immediate ──────────────────────────────────
-            Instruction::AddImm { sf, rd, rn, imm, shift } => {
+            Instruction::AddImm {
+                sf,
+                rd,
+                rn,
+                imm,
+                shift,
+            } => {
                 let op2 = shift_imm12(imm, shift);
                 let base = self.cpu.read_reg(rn);
                 let result = if sf {
@@ -29,7 +35,13 @@ impl Interpreter {
                 self.cpu.write_reg(rd, result);
                 self.cpu.pc = pc + 4;
             }
-            Instruction::AddsImm { sf, rd, rn, imm, shift } => {
+            Instruction::AddsImm {
+                sf,
+                rd,
+                rn,
+                imm,
+                shift,
+            } => {
                 let op2 = shift_imm12(imm, shift) as u64;
                 let base = self.cpu.read_reg(rn);
                 if sf {
@@ -47,7 +59,13 @@ impl Interpreter {
                 }
                 self.cpu.pc = pc + 4;
             }
-            Instruction::SubImm { sf, rd, rn, imm, shift } => {
+            Instruction::SubImm {
+                sf,
+                rd,
+                rn,
+                imm,
+                shift,
+            } => {
                 let op2 = shift_imm12(imm, shift);
                 let base = self.cpu.read_reg(rn);
                 let result = if sf {
@@ -58,7 +76,13 @@ impl Interpreter {
                 self.cpu.write_reg(rd, result);
                 self.cpu.pc = pc + 4;
             }
-            Instruction::SubsImm { sf, rd, rn, imm, shift } => {
+            Instruction::SubsImm {
+                sf,
+                rd,
+                rn,
+                imm,
+                shift,
+            } => {
                 let op2 = shift_imm12(imm, shift) as u64;
                 let base = self.cpu.read_reg(rn);
                 if sf {
@@ -80,13 +104,23 @@ impl Interpreter {
             }
 
             // ── MOV wide ───────────────────────────────────────────
-            Instruction::Movz { sf, rd, imm16, shift } => {
+            Instruction::Movz {
+                sf,
+                rd,
+                imm16,
+                shift,
+            } => {
                 let val = (imm16 as u64) << shift;
                 let val = if sf { val } else { val & 0xFFFF_FFFF };
                 self.cpu.write_reg(rd, val);
                 self.cpu.pc = pc + 4;
             }
-            Instruction::Movk { sf, rd, imm16, shift } => {
+            Instruction::Movk {
+                sf,
+                rd,
+                imm16,
+                shift,
+            } => {
                 let mask = 0xFFFFu64 << shift;
                 let old = self.cpu.read_reg(rd);
                 let val = (old & !mask) | ((imm16 as u64) << shift);
@@ -94,7 +128,12 @@ impl Interpreter {
                 self.cpu.write_reg(rd, val);
                 self.cpu.pc = pc + 4;
             }
-            Instruction::Movn { sf, rd, imm16, shift } => {
+            Instruction::Movn {
+                sf,
+                rd,
+                imm16,
+                shift,
+            } => {
                 let val = !((imm16 as u64) << shift);
                 let val = if sf { val } else { val & 0xFFFF_FFFF };
                 self.cpu.write_reg(rd, val);
@@ -113,13 +152,20 @@ impl Interpreter {
             }
 
             // ── Logical immediate ──────────────────────────────────
-            Instruction::LogicalImm { sf, opc, rd, rn, imm } => {
+            Instruction::LogicalImm {
+                sf,
+                opc,
+                rd,
+                rn,
+                imm,
+            } => {
                 let src = self.cpu.read_reg_zr(rn);
                 let result = match opc {
-                    0b00 => src & imm,        // AND
-                    0b01 => src | imm,        // ORR
-                    0b10 => src ^ imm,        // EOR
-                    0b11 => {                 // ANDS
+                    0b00 => src & imm, // AND
+                    0b01 => src | imm, // ORR
+                    0b10 => src ^ imm, // EOR
+                    0b11 => {
+                        // ANDS
                         let r = src & imm;
                         if sf {
                             self.cpu.update_nzcv64(r, false, false);
@@ -136,14 +182,32 @@ impl Interpreter {
             }
 
             // ── ADD/SUB register ───────────────────────────────────
-            Instruction::AddReg { sf, rd, rn, rm, shift_type, shift_amount } => {
+            Instruction::AddReg {
+                sf,
+                rd,
+                rn,
+                rm,
+                shift_type,
+                shift_amount,
+            } => {
                 let a = self.cpu.read_reg(rn);
                 let b = decode::apply_shift(self.cpu.read_reg(rm), shift_type, shift_amount, sf);
-                let result = if sf { a.wrapping_add(b) } else { (a as u32).wrapping_add(b as u32) as u64 };
+                let result = if sf {
+                    a.wrapping_add(b)
+                } else {
+                    (a as u32).wrapping_add(b as u32) as u64
+                };
                 self.cpu.write_reg(rd, result);
                 self.cpu.pc = pc + 4;
             }
-            Instruction::AddsReg { sf, rd, rn, rm, shift_type, shift_amount } => {
+            Instruction::AddsReg {
+                sf,
+                rd,
+                rn,
+                rm,
+                shift_type,
+                shift_amount,
+            } => {
                 let a = self.cpu.read_reg(rn);
                 let b = decode::apply_shift(self.cpu.read_reg(rm), shift_type, shift_amount, sf);
                 if sf {
@@ -159,14 +223,32 @@ impl Interpreter {
                 }
                 self.cpu.pc = pc + 4;
             }
-            Instruction::SubReg { sf, rd, rn, rm, shift_type, shift_amount } => {
+            Instruction::SubReg {
+                sf,
+                rd,
+                rn,
+                rm,
+                shift_type,
+                shift_amount,
+            } => {
                 let a = self.cpu.read_reg(rn);
                 let b = decode::apply_shift(self.cpu.read_reg(rm), shift_type, shift_amount, sf);
-                let result = if sf { a.wrapping_sub(b) } else { (a as u32).wrapping_sub(b as u32) as u64 };
+                let result = if sf {
+                    a.wrapping_sub(b)
+                } else {
+                    (a as u32).wrapping_sub(b as u32) as u64
+                };
                 self.cpu.write_reg(rd, result);
                 self.cpu.pc = pc + 4;
             }
-            Instruction::SubsReg { sf, rd, rn, rm, shift_type, shift_amount } => {
+            Instruction::SubsReg {
+                sf,
+                rd,
+                rn,
+                rm,
+                shift_type,
+                shift_amount,
+            } => {
                 let a = self.cpu.read_reg(rn);
                 let b = decode::apply_shift(self.cpu.read_reg(rm), shift_type, shift_amount, sf);
                 if sf {
@@ -186,15 +268,28 @@ impl Interpreter {
             }
 
             // ── Logical register ───────────────────────────────────
-            Instruction::LogicalReg { sf, opc, n, rd, rn, rm, shift_type, shift_amount } => {
+            Instruction::LogicalReg {
+                sf,
+                opc,
+                n,
+                rd,
+                rn,
+                rm,
+                shift_type,
+                shift_amount,
+            } => {
                 let a = self.cpu.read_reg_zr(rn);
-                let mut b = decode::apply_shift(self.cpu.read_reg_zr(rm), shift_type, shift_amount, sf);
-                if n { b = !b; } // N bit inverts Rm
+                let mut b =
+                    decode::apply_shift(self.cpu.read_reg_zr(rm), shift_type, shift_amount, sf);
+                if n {
+                    b = !b;
+                } // N bit inverts Rm
                 let result = match opc {
-                    0b00 => a & b,  // AND / BIC
-                    0b01 => a | b,  // ORR / ORN
-                    0b10 => a ^ b,  // EOR / EON
-                    0b11 => {       // ANDS / BICS
+                    0b00 => a & b, // AND / BIC
+                    0b01 => a | b, // ORR / ORN
+                    0b10 => a ^ b, // EOR / EON
+                    0b11 => {
+                        // ANDS / BICS
                         let r = a & b;
                         if sf {
                             self.cpu.update_nzcv64(r, false, false);
@@ -237,7 +332,13 @@ impl Interpreter {
             }
 
             // ── Division ───────────────────────────────────────────
-            Instruction::Div { sf, rd, rn, rm, is_signed } => {
+            Instruction::Div {
+                sf,
+                rd,
+                rn,
+                rm,
+                is_signed,
+            } => {
                 let a = self.cpu.read_reg(rn);
                 let b = self.cpu.read_reg(rm);
                 let result = if sf {
@@ -423,10 +524,7 @@ mod tests {
     #[test]
     fn test_movk_keeps_bits() {
         // MOVZ X0, #0xAAAA; MOVK X0, #0xBBBB, LSL #16
-        let mut t = test_interp(&[
-            enc_movz(true, 0, 0xAAAA, 0),
-            enc_movk(true, 0, 0xBBBB, 1),
-        ]);
+        let mut t = test_interp(&[enc_movz(true, 0, 0xAAAA, 0), enc_movk(true, 0, 0xBBBB, 1)]);
         let cpu = t.run_ok();
         assert_eq!(cpu.x[0], 0xBBBB_AAAA);
     }
@@ -600,4 +698,3 @@ mod tests {
         assert_eq!(cpu.x[0], 0);
     }
 }
-

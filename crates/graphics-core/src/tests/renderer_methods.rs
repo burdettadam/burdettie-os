@@ -66,7 +66,10 @@ fn stroke_path_rect() {
     // Border pixel on the top edge should have red component (AA may blend).
     let p = px(&surface, 25, 10);
     let r_ch = (p >> 16) & 0xFF;
-    assert!(r_ch > 0, "top-edge pixel should have red component, got 0x{p:08X}");
+    assert!(
+        r_ch > 0,
+        "top-edge pixel should have red component, got 0x{p:08X}"
+    );
     // Center pixel should remain black (not filled)
     assert_eq!(px(&surface, 30, 30), BLACK);
 }
@@ -110,7 +113,10 @@ fn fill_gradient_horizontal() {
     assert!(left_r < 20, "left pixel red={left_r}, expected near-black");
     // Right should be near-white (high RGB)
     let right_r = (right >> 16) & 0xFF;
-    assert!(right_r > 230, "right pixel red={right_r}, expected near-white");
+    assert!(
+        right_r > 230,
+        "right pixel red={right_r}, expected near-white"
+    );
 }
 
 #[test]
@@ -133,7 +139,10 @@ fn fill_gradient_vertical() {
     assert!(top_r < 20, "top pixel red={top_r}, expected near-black");
     // Bottom should be near-white
     let bottom_r = (bottom >> 16) & 0xFF;
-    assert!(bottom_r > 230, "bottom pixel red={bottom_r}, expected near-white");
+    assert!(
+        bottom_r > 230,
+        "bottom pixel red={bottom_r}, expected near-white"
+    );
 }
 
 // ── stroke_ellipse ─────────────────────────────────────────────────
@@ -166,5 +175,8 @@ fn stroke_ellipse_respects_clip() {
     assert_eq!(px(&surface, 20, 50), BLACK);
     // Some pixels on the right portion should be drawn (search near right edge)
     let right_drawn = (75..=80).any(|x| px(&surface, x, 50) != BLACK);
-    assert!(right_drawn, "right side of ellipse should have drawn pixels");
+    assert!(
+        right_drawn,
+        "right side of ellipse should have drawn pixels"
+    );
 }

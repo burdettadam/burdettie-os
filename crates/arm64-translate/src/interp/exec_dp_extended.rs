@@ -6,9 +6,14 @@ use crate::decode::Instruction;
 impl Interpreter {
     pub(super) fn exec_dp_extended(&mut self, insn: Instruction, pc: u64) -> StepResult {
         match insn {
-
             // ── Conditional select ─────────────────────────────────
-            Instruction::Csel { sf, rd, rn, rm, cond } => {
+            Instruction::Csel {
+                sf,
+                rd,
+                rn,
+                rm,
+                cond,
+            } => {
                 let val = if cond.eval(self.cpu.nzcv) {
                     self.cpu.read_reg_zr(rn)
                 } else {
@@ -18,7 +23,13 @@ impl Interpreter {
                 self.cpu.write_reg_zr(rd, val);
                 self.cpu.pc = pc + 4;
             }
-            Instruction::Csinc { sf, rd, rn, rm, cond } => {
+            Instruction::Csinc {
+                sf,
+                rd,
+                rn,
+                rm,
+                cond,
+            } => {
                 let val = if cond.eval(self.cpu.nzcv) {
                     self.cpu.read_reg_zr(rn)
                 } else {
@@ -28,7 +39,13 @@ impl Interpreter {
                 self.cpu.write_reg_zr(rd, val);
                 self.cpu.pc = pc + 4;
             }
-            Instruction::Csinv { sf, rd, rn, rm, cond } => {
+            Instruction::Csinv {
+                sf,
+                rd,
+                rn,
+                rm,
+                cond,
+            } => {
                 let val = if cond.eval(self.cpu.nzcv) {
                     self.cpu.read_reg_zr(rn)
                 } else {
@@ -38,7 +55,13 @@ impl Interpreter {
                 self.cpu.write_reg_zr(rd, val);
                 self.cpu.pc = pc + 4;
             }
-            Instruction::Csneg { sf, rd, rn, rm, cond } => {
+            Instruction::Csneg {
+                sf,
+                rd,
+                rn,
+                rm,
+                cond,
+            } => {
                 let val = if cond.eval(self.cpu.nzcv) {
                     self.cpu.read_reg_zr(rn)
                 } else {
@@ -50,10 +73,21 @@ impl Interpreter {
             }
 
             // ── Conditional compare ────────────────────────────────
-            Instruction::Ccmp { sf, rn, imm5_or_rm, nzcv, cond, is_imm } => {
+            Instruction::Ccmp {
+                sf,
+                rn,
+                imm5_or_rm,
+                nzcv,
+                cond,
+                is_imm,
+            } => {
                 if cond.eval(self.cpu.nzcv) {
                     let a = self.cpu.read_reg(rn);
-                    let b = if is_imm { imm5_or_rm as u64 } else { self.cpu.read_reg(imm5_or_rm) };
+                    let b = if is_imm {
+                        imm5_or_rm as u64
+                    } else {
+                        self.cpu.read_reg(imm5_or_rm)
+                    };
                     if sf {
                         let (result, borrow) = a.overflowing_sub(b);
                         let carry = !borrow;
@@ -77,10 +111,21 @@ impl Interpreter {
                 }
                 self.cpu.pc = pc + 4;
             }
-            Instruction::Ccmn { sf, rn, imm5_or_rm, nzcv, cond, is_imm } => {
+            Instruction::Ccmn {
+                sf,
+                rn,
+                imm5_or_rm,
+                nzcv,
+                cond,
+                is_imm,
+            } => {
                 if cond.eval(self.cpu.nzcv) {
                     let a = self.cpu.read_reg(rn);
-                    let b = if is_imm { imm5_or_rm as u64 } else { self.cpu.read_reg(imm5_or_rm) };
+                    let b = if is_imm {
+                        imm5_or_rm as u64
+                    } else {
+                        self.cpu.read_reg(imm5_or_rm)
+                    };
                     if sf {
                         let (result, carry) = a.overflowing_add(b);
                         let overflow = ((a ^ !b) & (a ^ result)) >> 63 != 0;
@@ -104,7 +149,13 @@ impl Interpreter {
             }
 
             // ── Variable shift ─────────────────────────────────────
-            Instruction::ShiftVar { sf, rd, rn, rm, shift_type } => {
+            Instruction::ShiftVar {
+                sf,
+                rd,
+                rn,
+                rm,
+                shift_type,
+            } => {
                 let val = self.cpu.read_reg(rn);
                 let shift_amount = self.cpu.read_reg(rm);
                 let result = if sf {
@@ -112,7 +163,8 @@ impl Interpreter {
                     crate::decode::apply_shift(val, shift_type, amt as u8, true)
                 } else {
                     let amt = (shift_amount & 31) as u32;
-                    let r = crate::decode::apply_shift(val & 0xFFFF_FFFF, shift_type, amt as u8, false);
+                    let r =
+                        crate::decode::apply_shift(val & 0xFFFF_FFFF, shift_type, amt as u8, false);
                     r & 0xFFFF_FFFF
                 };
                 self.cpu.write_reg(rd, result);
@@ -120,7 +172,14 @@ impl Interpreter {
             }
 
             // ── Bitfield (SBFM/BFM/UBFM) ──────────────────────────
-            Instruction::Bitfield { sf, opc, rd, rn, immr, imms } => {
+            Instruction::Bitfield {
+                sf,
+                opc,
+                rd,
+                rn,
+                immr,
+                imms,
+            } => {
                 let src = self.cpu.read_reg(rn);
                 let reg_size: u32 = if sf { 64 } else { 32 };
                 let r = immr as u32;
@@ -142,7 +201,11 @@ impl Interpreter {
                         let sign_bit = if s >= r { s - r } else { s };
                         let shift = 64 - sign_bit - 1;
                         let extended = ((bot as i64) << shift) >> shift;
-                        if sf { extended as u64 } else { extended as u64 & 0xFFFF_FFFF }
+                        if sf {
+                            extended as u64
+                        } else {
+                            extended as u64 & 0xFFFF_FFFF
+                        }
                     }
                     0b01 => {
                         // BFM: bitfield move (insert)
@@ -167,7 +230,11 @@ impl Interpreter {
                         } else {
                             src.rotate_right(r) & ((1u64 << (s + 1)) - 1)
                         };
-                        if sf { bot } else { bot & 0xFFFF_FFFF }
+                        if sf {
+                            bot
+                        } else {
+                            bot & 0xFFFF_FFFF
+                        }
                     }
                     _ => 0, // reserved, won't reach (decoder filters)
                 };
@@ -178,7 +245,11 @@ impl Interpreter {
             // ── Data processing (misc) ─────────────────────────────
             Instruction::Rev { sf, rd, rn } => {
                 let val = self.cpu.read_reg(rn);
-                let result = if sf { val.swap_bytes() } else { (val as u32).swap_bytes() as u64 };
+                let result = if sf {
+                    val.swap_bytes()
+                } else {
+                    (val as u32).swap_bytes() as u64
+                };
                 self.cpu.write_reg(rd, result);
                 self.cpu.pc = pc + 4;
             }
@@ -227,12 +298,18 @@ impl Interpreter {
                 let result = if sf {
                     // Count leading sign bits = leading zeros of (val ^ (val << 1)), minus nothing
                     // Actually CLS = number of bits following the sign bit that are equal to the sign bit
-                    if val == 0 || val == u64::MAX { 63u64 }
-                    else { (val as i64).leading_zeros() as u64 - 1 }
+                    if val == 0 || val == u64::MAX {
+                        63u64
+                    } else {
+                        (val as i64).leading_zeros() as u64 - 1
+                    }
                 } else {
                     let v = val as i32;
-                    if v == 0 || v == -1 { 31u64 }
-                    else { v.leading_zeros() as u64 - 1 }
+                    if v == 0 || v == -1 {
+                        31u64
+                    } else {
+                        v.leading_zeros() as u64 - 1
+                    }
                 };
                 self.cpu.write_reg(rd, result);
                 self.cpu.pc = pc + 4;
@@ -247,23 +324,42 @@ impl Interpreter {
                 self.cpu.write_reg(rd, result);
                 self.cpu.pc = pc + 4;
             }
-            Instruction::Extr { sf, rd, rn, rm, lsb } => {
+            Instruction::Extr {
+                sf,
+                rd,
+                rn,
+                rm,
+                lsb,
+            } => {
                 if sf {
                     let hi = self.cpu.read_reg(rn);
                     let lo = self.cpu.read_reg(rm);
-                    let result = if lsb == 0 { lo }
-                    else { (hi << (64 - lsb as u32)) | (lo >> lsb as u32) };
+                    let result = if lsb == 0 {
+                        lo
+                    } else {
+                        (hi << (64 - lsb as u32)) | (lo >> lsb as u32)
+                    };
                     self.cpu.write_reg(rd, result);
                 } else {
                     let hi = self.cpu.read_reg(rn) as u32;
                     let lo = self.cpu.read_reg(rm) as u32;
-                    let result = if lsb == 0 { lo }
-                    else { (hi << (32 - lsb as u32)) | (lo >> lsb as u32) };
+                    let result = if lsb == 0 {
+                        lo
+                    } else {
+                        (hi << (32 - lsb as u32)) | (lo >> lsb as u32)
+                    };
                     self.cpu.write_reg(rd, result as u64);
                 }
                 self.cpu.pc = pc + 4;
             }
-            Instruction::Crc32 { sf: _, rd, rn, rm, sz, c } => {
+            Instruction::Crc32 {
+                sf: _,
+                rd,
+                rn,
+                rm,
+                sz,
+                c,
+            } => {
                 // CRC32 using the standard polynomial or the CRC32C (Castagnoli) polynomial.
                 let acc = self.cpu.read_reg(rn) as u32;
                 let val = self.cpu.read_reg(rm);
@@ -290,7 +386,11 @@ fn crc32_iso(mut crc: u32, val: u64, nbytes: u32) -> u32 {
         let byte = ((val >> (i * 8)) & 0xFF) as u8;
         crc ^= byte as u32;
         for _ in 0..8 {
-            crc = if crc & 1 != 0 { (crc >> 1) ^ 0xEDB88320 } else { crc >> 1 };
+            crc = if crc & 1 != 0 {
+                (crc >> 1) ^ 0xEDB88320
+            } else {
+                crc >> 1
+            };
         }
     }
     !crc
@@ -303,7 +403,11 @@ fn crc32_castagnoli(mut crc: u32, val: u64, nbytes: u32) -> u32 {
         let byte = ((val >> (i * 8)) & 0xFF) as u8;
         crc ^= byte as u32;
         for _ in 0..8 {
-            crc = if crc & 1 != 0 { (crc >> 1) ^ 0x82F63B78 } else { crc >> 1 };
+            crc = if crc & 1 != 0 {
+                (crc >> 1) ^ 0x82F63B78
+            } else {
+                crc >> 1
+            };
         }
     }
     !crc
@@ -312,8 +416,8 @@ fn crc32_castagnoli(mut crc: u32, val: u64, nbytes: u32) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_helpers::*;
     use crate::cpu::Nzcv;
+    use crate::test_helpers::*;
 
     // ── Encoding helpers not in test_helpers ────────────────────────
 
@@ -389,7 +493,12 @@ mod tests {
         let mut t = test_interp(&[enc_csel(true, 0, 1, 2, 0)]); // cond=0 → EQ
         t.interp.cpu.x[1] = 42;
         t.interp.cpu.x[2] = 99;
-        t.interp.cpu.nzcv = Nzcv { n: false, z: true, c: false, v: false };
+        t.interp.cpu.nzcv = Nzcv {
+            n: false,
+            z: true,
+            c: false,
+            v: false,
+        };
         let cpu = t.run_ok();
         assert_eq!(cpu.x[0], 42);
     }
@@ -400,7 +509,12 @@ mod tests {
         let mut t = test_interp(&[enc_csel(true, 0, 1, 2, 0)]);
         t.interp.cpu.x[1] = 42;
         t.interp.cpu.x[2] = 99;
-        t.interp.cpu.nzcv = Nzcv { n: false, z: false, c: false, v: false };
+        t.interp.cpu.nzcv = Nzcv {
+            n: false,
+            z: false,
+            c: false,
+            v: false,
+        };
         let cpu = t.run_ok();
         assert_eq!(cpu.x[0], 99);
     }
@@ -411,7 +525,12 @@ mod tests {
         let mut t = test_interp(&[enc_csinc(true, 0, 1, 2, 0)]);
         t.interp.cpu.x[1] = 10;
         t.interp.cpu.x[2] = 99;
-        t.interp.cpu.nzcv = Nzcv { n: false, z: false, c: false, v: false };
+        t.interp.cpu.nzcv = Nzcv {
+            n: false,
+            z: false,
+            c: false,
+            v: false,
+        };
         let cpu = t.run_ok();
         assert_eq!(cpu.x[0], 100); // 99 + 1
     }
@@ -422,7 +541,12 @@ mod tests {
         let mut t = test_interp(&[enc_csinv(true, 0, 1, 2, 0)]);
         t.interp.cpu.x[1] = 10;
         t.interp.cpu.x[2] = 0;
-        t.interp.cpu.nzcv = Nzcv { n: false, z: false, c: false, v: false };
+        t.interp.cpu.nzcv = Nzcv {
+            n: false,
+            z: false,
+            c: false,
+            v: false,
+        };
         let cpu = t.run_ok();
         assert_eq!(cpu.x[0], !0u64); // NOT 0 == all ones
     }
@@ -433,7 +557,12 @@ mod tests {
         let mut t = test_interp(&[enc_csneg(true, 0, 1, 2, 0)]);
         t.interp.cpu.x[1] = 10;
         t.interp.cpu.x[2] = 5;
-        t.interp.cpu.nzcv = Nzcv { n: false, z: false, c: false, v: false };
+        t.interp.cpu.nzcv = Nzcv {
+            n: false,
+            z: false,
+            c: false,
+            v: false,
+        };
         let cpu = t.run_ok();
         assert_eq!(cpu.x[0], 5u64.wrapping_neg()); // -5 in two's complement
     }
@@ -448,10 +577,15 @@ mod tests {
         // X1 = 5, so 5 - 5 = 0 → Z flag set
         let mut t = test_interp(&[enc_ccmp_imm(true, 5, 0, 1, 0b0000)]);
         t.interp.cpu.x[1] = 5;
-        t.interp.cpu.nzcv = Nzcv { n: false, z: true, c: false, v: false }; // EQ true
+        t.interp.cpu.nzcv = Nzcv {
+            n: false,
+            z: true,
+            c: false,
+            v: false,
+        }; // EQ true
         let cpu = t.run_ok();
-        assert!(cpu.nzcv.z);   // result is zero
-        assert!(cpu.nzcv.c);   // no borrow → carry set
+        assert!(cpu.nzcv.z); // result is zero
+        assert!(cpu.nzcv.c); // no borrow → carry set
         assert!(!cpu.nzcv.n);
         assert!(!cpu.nzcv.v);
     }
@@ -461,12 +595,17 @@ mod tests {
         // CCMP X1, #5, #0b1010, NE  — NE is false (Z=1) → sets nzcv to 0b1010 (N=1,C=1)
         let mut t = test_interp(&[enc_ccmp_imm(true, 5, 1, 1, 0b1010)]);
         t.interp.cpu.x[1] = 100;
-        t.interp.cpu.nzcv = Nzcv { n: false, z: true, c: false, v: false }; // NE false
+        t.interp.cpu.nzcv = Nzcv {
+            n: false,
+            z: true,
+            c: false,
+            v: false,
+        }; // NE false
         let cpu = t.run_ok();
-        assert!(cpu.nzcv.n);    // bit 3 of 0b1010
-        assert!(!cpu.nzcv.z);   // bit 2
-        assert!(cpu.nzcv.c);    // bit 1
-        assert!(!cpu.nzcv.v);   // bit 0
+        assert!(cpu.nzcv.n); // bit 3 of 0b1010
+        assert!(!cpu.nzcv.z); // bit 2
+        assert!(cpu.nzcv.c); // bit 1
+        assert!(!cpu.nzcv.v); // bit 0
     }
 
     #[test]
@@ -475,10 +614,15 @@ mod tests {
         // X1 = 0xFFFF_FFFF_FFFF_FFFD (-3), so -3 + 3 = 0 → Z=1, C=1 (carry on wrap)
         let mut t = test_interp(&[enc_ccmn_imm(true, 3, 0, 1, 0b0000)]);
         t.interp.cpu.x[1] = 0xFFFF_FFFF_FFFF_FFFDu64;
-        t.interp.cpu.nzcv = Nzcv { n: false, z: true, c: false, v: false };
+        t.interp.cpu.nzcv = Nzcv {
+            n: false,
+            z: true,
+            c: false,
+            v: false,
+        };
         let cpu = t.run_ok();
-        assert!(cpu.nzcv.z);   // result is zero
-        assert!(cpu.nzcv.c);   // unsigned overflow (carry)
+        assert!(cpu.nzcv.z); // result is zero
+        assert!(cpu.nzcv.c); // unsigned overflow (carry)
         assert!(!cpu.nzcv.n);
     }
 

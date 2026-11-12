@@ -32,25 +32,39 @@ pub(super) fn decode_bitmask_imm(n: u32, imms: u32, immr: u32, sf: bool) -> u64 
     } else {
         // highest bit set in ~imms (6-bit field)
         let not_imms = (!imms) & 0x3F;
-        if not_imms == 0 { return 0; }
+        if not_imms == 0 {
+            return 0;
+        }
         (31 - not_imms.leading_zeros()) as u32
     };
 
-    if len == 0 { return 0; }
+    if len == 0 {
+        return 0;
+    }
 
     let size = 1u32 << len;
     let levels = size - 1;
     let s = imms & levels;
     let r = immr & levels;
 
-    if s == levels { return 0; } // reserved
+    if s == levels {
+        return 0;
+    } // reserved
 
-    let welem: u64 = if s + 1 >= 64 { u64::MAX } else { (1u64 << (s + 1)) - 1 };
+    let welem: u64 = if s + 1 >= 64 {
+        u64::MAX
+    } else {
+        (1u64 << (s + 1)) - 1
+    };
     // Rotate right by r within 'size' bits
     let rotated = if r == 0 {
         welem
     } else {
-        let mask = if size >= 64 { u64::MAX } else { (1u64 << size) - 1 };
+        let mask = if size >= 64 {
+            u64::MAX
+        } else {
+            (1u64 << size) - 1
+        };
         ((welem >> r) | (welem << (size - r))) & mask
     };
 
@@ -214,9 +228,18 @@ mod tests {
         // 64-bit ASR positive
         assert_eq!(apply_shift(0x100, 2, 4, true), 0x10);
         // 64-bit ASR negative (sign bit set)
-        assert_eq!(apply_shift(0x8000_0000_0000_0000, 2, 4, true), 0xF800_0000_0000_0000);
-        assert_eq!(apply_shift(0xFFFF_FFFF_FFFF_FFFF, 2, 1, true), 0xFFFF_FFFF_FFFF_FFFF);
-        assert_eq!(apply_shift(0x8000_0000_0000_0000, 2, 63, true), 0xFFFF_FFFF_FFFF_FFFF);
+        assert_eq!(
+            apply_shift(0x8000_0000_0000_0000, 2, 4, true),
+            0xF800_0000_0000_0000
+        );
+        assert_eq!(
+            apply_shift(0xFFFF_FFFF_FFFF_FFFF, 2, 1, true),
+            0xFFFF_FFFF_FFFF_FFFF
+        );
+        assert_eq!(
+            apply_shift(0x8000_0000_0000_0000, 2, 63, true),
+            0xFFFF_FFFF_FFFF_FFFF
+        );
         // 32-bit ASR negative
         assert_eq!(apply_shift(0x8000_0000, 2, 4, false), 0xF800_0000);
         assert_eq!(apply_shift(0x8000_0000, 2, 31, false), 0xFFFF_FFFF);
@@ -228,7 +251,10 @@ mod tests {
     fn test_apply_shift_ror() {
         // 64-bit ROR
         assert_eq!(apply_shift(1, 3, 1, true), 0x8000_0000_0000_0000);
-        assert_eq!(apply_shift(0x8000_0000_0000_0001, 3, 4, true), 0x1800_0000_0000_0000);
+        assert_eq!(
+            apply_shift(0x8000_0000_0000_0001, 3, 4, true),
+            0x1800_0000_0000_0000
+        );
         // 32-bit ROR
         assert_eq!(apply_shift(1, 3, 1, false), 0x8000_0000);
         assert_eq!(apply_shift(0x8000_0001, 3, 4, false), 0x1800_0000);

@@ -8,17 +8,16 @@
 //! the oldest entries when full, preventing unbounded memory growth.
 //! Per-category aggregate counters survive eviction.
 
-mod events;
 mod collector;
+mod events;
 pub mod ring;
 
-pub use events::DiagEvent;
-pub use ring::{DiagRing, StampedEvent, CategoryCounters, DiagCategory};
 pub use collector::{
-    emit, drain, drain_stamped, snapshot, snapshot_stamped,
-    has_events, clear, event_count,
-    total_emitted, evicted_count, counters, by_category, tail, resize,
+    by_category, clear, counters, drain, drain_stamped, emit, event_count, evicted_count,
+    has_events, resize, snapshot, snapshot_stamped, tail, total_emitted,
 };
+pub use events::DiagEvent;
+pub use ring::{CategoryCounters, DiagCategory, DiagRing, StampedEvent};
 
 #[cfg(test)]
 mod tests;

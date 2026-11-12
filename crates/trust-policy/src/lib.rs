@@ -16,8 +16,8 @@ mod builder;
 pub mod cert;
 pub mod config;
 pub mod effects;
-pub mod entitlements;
 pub mod enforcement;
+pub mod entitlements;
 mod gates;
 pub mod hardened;
 mod mock;
@@ -35,6 +35,7 @@ pub use apple::{
     AppleQuarantine, AppleSandbox, AppleSip,
 };
 pub use builder::{PolicyPreset, TrustPolicyBuilder};
+pub use effects::{EnrichedSecurityReport, EntitlementEffects};
 pub use gates::{
     AmfiPolicy, CodeSignatureValidator, EntitlementEvaluator, HardenedRuntimePolicy,
     LibraryValidator, QuarantinePolicy, SandboxPolicy, SecurityGate, SipPolicy,
@@ -44,7 +45,6 @@ pub use mock::{
     MockQuarantine, MockSandbox, MockSip,
 };
 pub use verdict::{GateDecision, SecurityVerdict};
-pub use effects::{EntitlementEffects, EnrichedSecurityReport};
 
 use macho_types::codesig::CsFlags;
 use serde::{Deserialize, Serialize};
@@ -496,20 +496,15 @@ mod tests {
     #[test]
     fn apple_default_validate_dylib_sip_loader_rejects_nonsip() {
         let policy = TrustPolicy::apple_default();
-        let verdict = policy.validate_dylib(
-            Path::new("/usr/bin/ls"),
-            Path::new("/tmp/evil.dylib"),
-        );
+        let verdict = policy.validate_dylib(Path::new("/usr/bin/ls"), Path::new("/tmp/evil.dylib"));
         assert!(verdict.is_deny());
     }
 
     #[test]
     fn permissive_validate_dylib_allows_any() {
         let policy = TrustPolicy::permissive();
-        let verdict = policy.validate_dylib(
-            Path::new("/usr/bin/ls"),
-            Path::new("/tmp/anything.dylib"),
-        );
+        let verdict =
+            policy.validate_dylib(Path::new("/usr/bin/ls"), Path::new("/tmp/anything.dylib"));
         assert!(verdict.is_allow());
     }
 

@@ -6,7 +6,7 @@
 
 use std::cell::UnsafeCell;
 
-use super::{SyncArray, nsobject_class_addr, nsobject_metaclass_addr};
+use super::{nsobject_class_addr, nsobject_metaclass_addr, SyncArray};
 
 // 16 stub classes — all children of NSObject
 

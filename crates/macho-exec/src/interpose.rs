@@ -72,11 +72,7 @@ impl InterposeTable {
         }
     }
 
-    fn collect_from_section(
-        &mut self,
-        image: &crate::MappedImage,
-        section: &macho_types::Section,
-    ) {
+    fn collect_from_section(&mut self, image: &crate::MappedImage, section: &macho_types::Section) {
         // Each tuple is 16 bytes: [replacement: u64, replacee: u64]
         let tuple_size = 16usize;
         let count = section.size as usize / tuple_size;
@@ -97,11 +93,7 @@ impl InterposeTable {
                     let replacement = unsafe { *(tuple_ptr as *const u64) };
                     let replacee = unsafe { *(tuple_ptr.add(8) as *const u64) };
                     if replacement != 0 && replacee != 0 {
-                        log::debug!(
-                            "interpose: {:#x} → {:#x}",
-                            replacee,
-                            replacement,
-                        );
+                        log::debug!("interpose: {:#x} → {:#x}", replacee, replacement,);
                         self.insert(replacee, replacement);
                     }
                 }
@@ -159,7 +151,11 @@ mod tests {
     struct DummyResolver;
     impl SymbolResolver for DummyResolver {
         fn resolve(&self, name: &str) -> Option<u64> {
-            if name == "_original" { Some(0xAAAA) } else { None }
+            if name == "_original" {
+                Some(0xAAAA)
+            } else {
+                None
+            }
         }
     }
 

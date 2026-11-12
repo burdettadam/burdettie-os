@@ -35,14 +35,18 @@ fn make_nsstring(s: &str) -> u64 {
 
 fn alloc_unit_linear(isa: u64, symbol: &str, coeff: f64, constant: f64) -> u64 {
     let obj = crate::pal_alloc().calloc(1, NSUNIT_SIZE) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *(obj as *mut u64) = isa;
         *((obj as usize + UNIT_COEFF_OFF) as *mut f64) = coeff;
         *((obj as usize + UNIT_CONST_OFF) as *mut f64) = constant;
     }
     let sym = make_nsstring(symbol);
-    unsafe { *((obj as usize + UNIT_SYMBOL_OFF) as *mut u64) = sym; }
+    unsafe {
+        *((obj as usize + UNIT_SYMBOL_OFF) as *mut u64) = sym;
+    }
     obj
 }
 
@@ -54,13 +58,17 @@ fn alloc_unit(isa: u64, symbol: &str) -> u64 {
 
 /// `−[NSUnit symbol]` — returns the unit symbol as NSString.
 pub extern "C" fn shim_nsunit_symbol(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + UNIT_SYMBOL_OFF) as *const u64) }
 }
 
 /// `-[NSUnit initWithSymbol:]`
 pub extern "C" fn shim_nsunit_init_with_symbol(obj: u64, _cmd: u64, symbol: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *(obj as *mut u64) = crate::nsobj::nsunit_class_addr();
         *((obj as usize + UNIT_SYMBOL_OFF) as *mut u64) = symbol;
@@ -77,7 +85,9 @@ pub extern "C" fn shim_nsunit_description(obj: u64, _cmd: u64) -> u64 {
 
 /// `-[NSDimension initWithSymbol:]` (same as NSUnit)
 pub extern "C" fn shim_nsdimension_init_with_symbol(obj: u64, _cmd: u64, symbol: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *(obj as *mut u64) = crate::nsobj::nsdimension_class_addr();
         *((obj as usize + UNIT_SYMBOL_OFF) as *mut u64) = symbol;
@@ -86,13 +96,17 @@ pub extern "C" fn shim_nsdimension_init_with_symbol(obj: u64, _cmd: u64, symbol:
 }
 
 /// `-[NSDimension baseUnit]` — stub: returns self.
-pub extern "C" fn shim_nsdimension_base_unit(obj: u64, _cmd: u64) -> u64 { obj }
+pub extern "C" fn shim_nsdimension_base_unit(obj: u64, _cmd: u64) -> u64 {
+    obj
+}
 
 // ── NSMeasurement ─────────────────────────────────────────────────────────────
 
 fn alloc_measurement(value: f64, unit: u64) -> u64 {
     let obj = crate::pal_alloc().calloc(1, NSMEASUREMENT_SIZE) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *(obj as *mut u64) = crate::nsobj::nsmeasurement_class_addr();
         *((obj as usize + MEAS_VALUE_OFF) as *mut f64) = value;
@@ -103,9 +117,14 @@ fn alloc_measurement(value: f64, unit: u64) -> u64 {
 
 /// `-[NSMeasurement initWithDoubleValue:unit:]`
 pub extern "C" fn shim_nsmeasurement_init_with_double_value_unit(
-    obj: u64, _cmd: u64, value: f64, unit: u64,
+    obj: u64,
+    _cmd: u64,
+    value: f64,
+    unit: u64,
 ) -> u64 {
-    if obj == 0 { return alloc_measurement(value, unit); }
+    if obj == 0 {
+        return alloc_measurement(value, unit);
+    }
     unsafe {
         *(obj as *mut u64) = crate::nsobj::nsmeasurement_class_addr();
         *((obj as usize + MEAS_VALUE_OFF) as *mut f64) = value;
@@ -116,22 +135,30 @@ pub extern "C" fn shim_nsmeasurement_init_with_double_value_unit(
 
 /// `-[NSMeasurement doubleValue]`
 pub extern "C" fn shim_nsmeasurement_double_value(obj: u64, _cmd: u64) -> f64 {
-    if obj == 0 { return 0.0; }
+    if obj == 0 {
+        return 0.0;
+    }
     unsafe { *((obj as usize + MEAS_VALUE_OFF) as *const f64) }
 }
 
 /// `-[NSMeasurement unit]`
 pub extern "C" fn shim_nsmeasurement_unit(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + MEAS_UNIT_OFF) as *const u64) }
 }
 
 /// `-[NSMeasurement measurementByConvertingToUnit:]`
 /// Performs linear unit conversion: converts via base unit using coefficient/constant.
 pub extern "C" fn shim_nsmeasurement_measurement_by_converting_to_unit(
-    obj: u64, _cmd: u64, to_unit: u64,
+    obj: u64,
+    _cmd: u64,
+    to_unit: u64,
 ) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let value = unsafe { *((obj as usize + MEAS_VALUE_OFF) as *const f64) };
     let from_unit = unsafe { *((obj as usize + MEAS_UNIT_OFF) as *const u64) };
 
@@ -139,14 +166,26 @@ pub extern "C" fn shim_nsmeasurement_measurement_by_converting_to_unit(
     let (from_coeff, from_const) = if from_unit != 0 {
         let c = unsafe { *((from_unit as usize + UNIT_COEFF_OFF) as *const f64) };
         let k = unsafe { *((from_unit as usize + UNIT_CONST_OFF) as *const f64) };
-        if c == 0.0 { (1.0f64, 0.0f64) } else { (c, k) }
-    } else { (1.0, 0.0) };
+        if c == 0.0 {
+            (1.0f64, 0.0f64)
+        } else {
+            (c, k)
+        }
+    } else {
+        (1.0, 0.0)
+    };
 
     let (to_coeff, to_const) = if to_unit != 0 {
         let c = unsafe { *((to_unit as usize + UNIT_COEFF_OFF) as *const f64) };
         let k = unsafe { *((to_unit as usize + UNIT_CONST_OFF) as *const f64) };
-        if c == 0.0 { (1.0f64, 0.0f64) } else { (c, k) }
-    } else { (1.0, 0.0) };
+        if c == 0.0 {
+            (1.0f64, 0.0f64)
+        } else {
+            (c, k)
+        }
+    } else {
+        (1.0, 0.0)
+    };
 
     // Convert: value → base → target
     let base = value * from_coeff + from_const;
@@ -157,26 +196,39 @@ pub extern "C" fn shim_nsmeasurement_measurement_by_converting_to_unit(
 
 /// `-[NSMeasurement isEqualToMeasurement:]`
 pub extern "C" fn shim_nsmeasurement_is_equal_to_measurement(
-    obj: u64, _cmd: u64, other: u64,
+    obj: u64,
+    _cmd: u64,
+    other: u64,
 ) -> u8 {
-    if obj == 0 || other == 0 { return 0; }
+    if obj == 0 || other == 0 {
+        return 0;
+    }
     let v1 = unsafe { *((obj as usize + MEAS_VALUE_OFF) as *const f64) };
     let v2 = unsafe { *((other as usize + MEAS_VALUE_OFF) as *const f64) };
     let u1 = unsafe { *((obj as usize + MEAS_UNIT_OFF) as *const u64) };
     let u2 = unsafe { *((other as usize + MEAS_UNIT_OFF) as *const u64) };
-    if (v1 - v2).abs() < f64::EPSILON && u1 == u2 { 1 } else { 0 }
+    if (v1 - v2).abs() < f64::EPSILON && u1 == u2 {
+        1
+    } else {
+        0
+    }
 }
 
 /// `-[NSMeasurement description]` — "value symbol" format.
 pub extern "C" fn shim_nsmeasurement_description(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let value = unsafe { *((obj as usize + MEAS_VALUE_OFF) as *const f64) };
     let unit = unsafe { *((obj as usize + MEAS_UNIT_OFF) as *const u64) };
     let sym = if unit != 0 {
-        crate::cfstring::extract_cfstring_cstr(
-            unsafe { *((unit as usize + UNIT_SYMBOL_OFF) as *const u64) }
-        ).unwrap_or("?")
-    } else { "" };
+        crate::cfstring::extract_cfstring_cstr(unsafe {
+            *((unit as usize + UNIT_SYMBOL_OFF) as *const u64)
+        })
+        .unwrap_or("?")
+    } else {
+        ""
+    };
     let s = format!("{value} {sym}");
     make_nsstring(&s)
 }
@@ -190,132 +242,525 @@ macro_rules! unit_singleton_linear {
     ($static:ident, $fn_name:ident, $isa_fn:ident, $symbol:expr, $coeff:expr, $const:expr) => {
         static $static: OnceLock<u64> = OnceLock::new();
         pub fn $fn_name() -> u64 {
-            *$static.get_or_init(|| alloc_unit_linear(crate::nsobj::$isa_fn(), $symbol, $coeff, $const))
+            *$static
+                .get_or_init(|| alloc_unit_linear(crate::nsobj::$isa_fn(), $symbol, $coeff, $const))
         }
     };
 }
 
 // ── NSUnitLength (base = meters) ─────────────────────────────────────────────
 
-unit_singleton_linear!(UNIT_METERS,          nsunitlength_meters,          nsunitlength_class_addr, "m",   1.0,         0.0);
-unit_singleton_linear!(UNIT_KILOMETERS,      nsunitlength_kilometers,      nsunitlength_class_addr, "km",  1_000.0,     0.0);
-unit_singleton_linear!(UNIT_CENTIMETERS,     nsunitlength_centimeters,     nsunitlength_class_addr, "cm",  0.01,        0.0);
-unit_singleton_linear!(UNIT_MILLIMETERS,     nsunitlength_millimeters,     nsunitlength_class_addr, "mm",  0.001,       0.0);
-unit_singleton_linear!(UNIT_INCHES,          nsunitlength_inches,          nsunitlength_class_addr, "in",  0.0254,      0.0);
-unit_singleton_linear!(UNIT_FEET,            nsunitlength_feet,            nsunitlength_class_addr, "ft",  0.3048,      0.0);
-unit_singleton_linear!(UNIT_YARDS,           nsunitlength_yards,           nsunitlength_class_addr, "yd",  0.9144,      0.0);
-unit_singleton_linear!(UNIT_MILES,           nsunitlength_miles,           nsunitlength_class_addr, "mi",  1_609.344,   0.0);
-unit_singleton_linear!(UNIT_NAUTICAL_MILES,  nsunitlength_nautical_miles,  nsunitlength_class_addr, "NM",  1_852.0,     0.0);
-unit_singleton_linear!(UNIT_LIGHTYEARS,      nsunitlength_light_years,     nsunitlength_class_addr, "ly",  9.4607305e15, 0.0);
+unit_singleton_linear!(
+    UNIT_METERS,
+    nsunitlength_meters,
+    nsunitlength_class_addr,
+    "m",
+    1.0,
+    0.0
+);
+unit_singleton_linear!(
+    UNIT_KILOMETERS,
+    nsunitlength_kilometers,
+    nsunitlength_class_addr,
+    "km",
+    1_000.0,
+    0.0
+);
+unit_singleton_linear!(
+    UNIT_CENTIMETERS,
+    nsunitlength_centimeters,
+    nsunitlength_class_addr,
+    "cm",
+    0.01,
+    0.0
+);
+unit_singleton_linear!(
+    UNIT_MILLIMETERS,
+    nsunitlength_millimeters,
+    nsunitlength_class_addr,
+    "mm",
+    0.001,
+    0.0
+);
+unit_singleton_linear!(
+    UNIT_INCHES,
+    nsunitlength_inches,
+    nsunitlength_class_addr,
+    "in",
+    0.0254,
+    0.0
+);
+unit_singleton_linear!(
+    UNIT_FEET,
+    nsunitlength_feet,
+    nsunitlength_class_addr,
+    "ft",
+    0.3048,
+    0.0
+);
+unit_singleton_linear!(
+    UNIT_YARDS,
+    nsunitlength_yards,
+    nsunitlength_class_addr,
+    "yd",
+    0.9144,
+    0.0
+);
+unit_singleton_linear!(
+    UNIT_MILES,
+    nsunitlength_miles,
+    nsunitlength_class_addr,
+    "mi",
+    1_609.344,
+    0.0
+);
+unit_singleton_linear!(
+    UNIT_NAUTICAL_MILES,
+    nsunitlength_nautical_miles,
+    nsunitlength_class_addr,
+    "NM",
+    1_852.0,
+    0.0
+);
+unit_singleton_linear!(
+    UNIT_LIGHTYEARS,
+    nsunitlength_light_years,
+    nsunitlength_class_addr,
+    "ly",
+    9.4607305e15,
+    0.0
+);
 
-pub extern "C" fn shim_nsunitlength_meters(_cls: u64, _cmd: u64)          -> u64 { nsunitlength_meters() }
-pub extern "C" fn shim_nsunitlength_kilometers(_cls: u64, _cmd: u64)      -> u64 { nsunitlength_kilometers() }
-pub extern "C" fn shim_nsunitlength_centimeters(_cls: u64, _cmd: u64)     -> u64 { nsunitlength_centimeters() }
-pub extern "C" fn shim_nsunitlength_millimeters(_cls: u64, _cmd: u64)     -> u64 { nsunitlength_millimeters() }
-pub extern "C" fn shim_nsunitlength_inches(_cls: u64, _cmd: u64)          -> u64 { nsunitlength_inches() }
-pub extern "C" fn shim_nsunitlength_feet(_cls: u64, _cmd: u64)            -> u64 { nsunitlength_feet() }
-pub extern "C" fn shim_nsunitlength_yards(_cls: u64, _cmd: u64)           -> u64 { nsunitlength_yards() }
-pub extern "C" fn shim_nsunitlength_miles(_cls: u64, _cmd: u64)           -> u64 { nsunitlength_miles() }
-pub extern "C" fn shim_nsunitlength_nautical_miles(_cls: u64, _cmd: u64)  -> u64 { nsunitlength_nautical_miles() }
-pub extern "C" fn shim_nsunitlength_light_years(_cls: u64, _cmd: u64)     -> u64 { nsunitlength_light_years() }
-pub extern "C" fn shim_nsunitlength_base_unit(_cls: u64, _cmd: u64)       -> u64 { nsunitlength_meters() }
+pub extern "C" fn shim_nsunitlength_meters(_cls: u64, _cmd: u64) -> u64 {
+    nsunitlength_meters()
+}
+pub extern "C" fn shim_nsunitlength_kilometers(_cls: u64, _cmd: u64) -> u64 {
+    nsunitlength_kilometers()
+}
+pub extern "C" fn shim_nsunitlength_centimeters(_cls: u64, _cmd: u64) -> u64 {
+    nsunitlength_centimeters()
+}
+pub extern "C" fn shim_nsunitlength_millimeters(_cls: u64, _cmd: u64) -> u64 {
+    nsunitlength_millimeters()
+}
+pub extern "C" fn shim_nsunitlength_inches(_cls: u64, _cmd: u64) -> u64 {
+    nsunitlength_inches()
+}
+pub extern "C" fn shim_nsunitlength_feet(_cls: u64, _cmd: u64) -> u64 {
+    nsunitlength_feet()
+}
+pub extern "C" fn shim_nsunitlength_yards(_cls: u64, _cmd: u64) -> u64 {
+    nsunitlength_yards()
+}
+pub extern "C" fn shim_nsunitlength_miles(_cls: u64, _cmd: u64) -> u64 {
+    nsunitlength_miles()
+}
+pub extern "C" fn shim_nsunitlength_nautical_miles(_cls: u64, _cmd: u64) -> u64 {
+    nsunitlength_nautical_miles()
+}
+pub extern "C" fn shim_nsunitlength_light_years(_cls: u64, _cmd: u64) -> u64 {
+    nsunitlength_light_years()
+}
+pub extern "C" fn shim_nsunitlength_base_unit(_cls: u64, _cmd: u64) -> u64 {
+    nsunitlength_meters()
+}
 
 // ── NSUnitMass (base = kilograms) ─────────────────────────────────────────────
 
-unit_singleton_linear!(UNIT_KILOGRAMS,   nsunitmass_kilograms,   nsunitmass_class_addr, "kg",    1.0,          0.0);
-unit_singleton_linear!(UNIT_GRAMS,       nsunitmass_grams,       nsunitmass_class_addr, "g",     0.001,        0.0);
-unit_singleton_linear!(UNIT_MILLIGRAMS,  nsunitmass_milligrams,  nsunitmass_class_addr, "mg",    0.000_001,    0.0);
-unit_singleton_linear!(UNIT_POUNDS,      nsunitmass_pounds,      nsunitmass_class_addr, "lb",    0.453_592,    0.0);
-unit_singleton_linear!(UNIT_OUNCES,      nsunitmass_ounces,      nsunitmass_class_addr, "oz",    0.028_349_5,  0.0);
-unit_singleton_linear!(UNIT_METRIC_TONS, nsunitmass_metric_tons, nsunitmass_class_addr, "t",     1_000.0,      0.0);
-unit_singleton_linear!(UNIT_SHORT_TONS,  nsunitmass_short_tons,  nsunitmass_class_addr, "tn",    907.185,      0.0);
+unit_singleton_linear!(
+    UNIT_KILOGRAMS,
+    nsunitmass_kilograms,
+    nsunitmass_class_addr,
+    "kg",
+    1.0,
+    0.0
+);
+unit_singleton_linear!(
+    UNIT_GRAMS,
+    nsunitmass_grams,
+    nsunitmass_class_addr,
+    "g",
+    0.001,
+    0.0
+);
+unit_singleton_linear!(
+    UNIT_MILLIGRAMS,
+    nsunitmass_milligrams,
+    nsunitmass_class_addr,
+    "mg",
+    0.000_001,
+    0.0
+);
+unit_singleton_linear!(
+    UNIT_POUNDS,
+    nsunitmass_pounds,
+    nsunitmass_class_addr,
+    "lb",
+    0.453_592,
+    0.0
+);
+unit_singleton_linear!(
+    UNIT_OUNCES,
+    nsunitmass_ounces,
+    nsunitmass_class_addr,
+    "oz",
+    0.028_349_5,
+    0.0
+);
+unit_singleton_linear!(
+    UNIT_METRIC_TONS,
+    nsunitmass_metric_tons,
+    nsunitmass_class_addr,
+    "t",
+    1_000.0,
+    0.0
+);
+unit_singleton_linear!(
+    UNIT_SHORT_TONS,
+    nsunitmass_short_tons,
+    nsunitmass_class_addr,
+    "tn",
+    907.185,
+    0.0
+);
 
-pub extern "C" fn shim_nsunitmass_kilograms(_cls: u64, _cmd: u64)   -> u64 { nsunitmass_kilograms() }
-pub extern "C" fn shim_nsunitmass_grams(_cls: u64, _cmd: u64)       -> u64 { nsunitmass_grams() }
-pub extern "C" fn shim_nsunitmass_milligrams(_cls: u64, _cmd: u64)  -> u64 { nsunitmass_milligrams() }
-pub extern "C" fn shim_nsunitmass_pounds(_cls: u64, _cmd: u64)      -> u64 { nsunitmass_pounds() }
-pub extern "C" fn shim_nsunitmass_ounces(_cls: u64, _cmd: u64)      -> u64 { nsunitmass_ounces() }
-pub extern "C" fn shim_nsunitmass_metric_tons(_cls: u64, _cmd: u64) -> u64 { nsunitmass_metric_tons() }
-pub extern "C" fn shim_nsunitmass_short_tons(_cls: u64, _cmd: u64)  -> u64 { nsunitmass_short_tons() }
-pub extern "C" fn shim_nsunitmass_base_unit(_cls: u64, _cmd: u64)   -> u64 { nsunitmass_kilograms() }
+pub extern "C" fn shim_nsunitmass_kilograms(_cls: u64, _cmd: u64) -> u64 {
+    nsunitmass_kilograms()
+}
+pub extern "C" fn shim_nsunitmass_grams(_cls: u64, _cmd: u64) -> u64 {
+    nsunitmass_grams()
+}
+pub extern "C" fn shim_nsunitmass_milligrams(_cls: u64, _cmd: u64) -> u64 {
+    nsunitmass_milligrams()
+}
+pub extern "C" fn shim_nsunitmass_pounds(_cls: u64, _cmd: u64) -> u64 {
+    nsunitmass_pounds()
+}
+pub extern "C" fn shim_nsunitmass_ounces(_cls: u64, _cmd: u64) -> u64 {
+    nsunitmass_ounces()
+}
+pub extern "C" fn shim_nsunitmass_metric_tons(_cls: u64, _cmd: u64) -> u64 {
+    nsunitmass_metric_tons()
+}
+pub extern "C" fn shim_nsunitmass_short_tons(_cls: u64, _cmd: u64) -> u64 {
+    nsunitmass_short_tons()
+}
+pub extern "C" fn shim_nsunitmass_base_unit(_cls: u64, _cmd: u64) -> u64 {
+    nsunitmass_kilograms()
+}
 
 // ── NSUnitTemperature (base = Kelvin) ─────────────────────────────────────────
 //  formula: K = value × coeff + const
 //  celsius:     K = C + 273.15    → coeff=1.0,       const=273.15
 //  fahrenheit:  K = F × 5/9 + 255.3722  → coeff=5/9, const=255.3722
 
-unit_singleton_linear!(UNIT_KELVIN,      nsunittemperature_kelvin,      nsunittemperature_class_addr, "K",   1.0,              0.0);
-unit_singleton_linear!(UNIT_CELSIUS,     nsunittemperature_celsius,     nsunittemperature_class_addr, "°C",  1.0,              273.15);
-unit_singleton_linear!(UNIT_FAHRENHEIT,  nsunittemperature_fahrenheit,  nsunittemperature_class_addr, "°F",  5.0 / 9.0,        255.372_222_222);
+unit_singleton_linear!(
+    UNIT_KELVIN,
+    nsunittemperature_kelvin,
+    nsunittemperature_class_addr,
+    "K",
+    1.0,
+    0.0
+);
+unit_singleton_linear!(
+    UNIT_CELSIUS,
+    nsunittemperature_celsius,
+    nsunittemperature_class_addr,
+    "°C",
+    1.0,
+    273.15
+);
+unit_singleton_linear!(
+    UNIT_FAHRENHEIT,
+    nsunittemperature_fahrenheit,
+    nsunittemperature_class_addr,
+    "°F",
+    5.0 / 9.0,
+    255.372_222_222
+);
 
-pub extern "C" fn shim_nsunittemperature_celsius(_cls: u64, _cmd: u64)    -> u64 { nsunittemperature_celsius() }
-pub extern "C" fn shim_nsunittemperature_fahrenheit(_cls: u64, _cmd: u64) -> u64 { nsunittemperature_fahrenheit() }
-pub extern "C" fn shim_nsunittemperature_kelvin(_cls: u64, _cmd: u64)     -> u64 { nsunittemperature_kelvin() }
-pub extern "C" fn shim_nsunittemperature_base_unit(_cls: u64, _cmd: u64)  -> u64 { nsunittemperature_kelvin() }
+pub extern "C" fn shim_nsunittemperature_celsius(_cls: u64, _cmd: u64) -> u64 {
+    nsunittemperature_celsius()
+}
+pub extern "C" fn shim_nsunittemperature_fahrenheit(_cls: u64, _cmd: u64) -> u64 {
+    nsunittemperature_fahrenheit()
+}
+pub extern "C" fn shim_nsunittemperature_kelvin(_cls: u64, _cmd: u64) -> u64 {
+    nsunittemperature_kelvin()
+}
+pub extern "C" fn shim_nsunittemperature_base_unit(_cls: u64, _cmd: u64) -> u64 {
+    nsunittemperature_kelvin()
+}
 
 // ── NSUnitVolume (base = liters) ──────────────────────────────────────────────
 
-unit_singleton_linear!(UNIT_LITERS,        nsunitvolume_liters,        nsunitvolume_class_addr, "L",      1.0,         0.0);
-unit_singleton_linear!(UNIT_MILLILITERS,   nsunitvolume_milliliters,   nsunitvolume_class_addr, "mL",     0.001,       0.0);
-unit_singleton_linear!(UNIT_CUBIC_METERS,  nsunitvolume_cubic_meters,  nsunitvolume_class_addr, "m³",     1_000.0,     0.0);
-unit_singleton_linear!(UNIT_GALLONS,       nsunitvolume_gallons,       nsunitvolume_class_addr, "gal",    3.785_41,    0.0);
-unit_singleton_linear!(UNIT_FLUID_OUNCES,  nsunitvolume_fluid_ounces,  nsunitvolume_class_addr, "fl oz",  0.029_573_5, 0.0);
-unit_singleton_linear!(UNIT_CUPS,          nsunitvolume_cups,          nsunitvolume_class_addr, "cup",    0.236_588,   0.0);
-unit_singleton_linear!(UNIT_PINTS,         nsunitvolume_pints,         nsunitvolume_class_addr, "pt",     0.473_176,   0.0);
+unit_singleton_linear!(
+    UNIT_LITERS,
+    nsunitvolume_liters,
+    nsunitvolume_class_addr,
+    "L",
+    1.0,
+    0.0
+);
+unit_singleton_linear!(
+    UNIT_MILLILITERS,
+    nsunitvolume_milliliters,
+    nsunitvolume_class_addr,
+    "mL",
+    0.001,
+    0.0
+);
+unit_singleton_linear!(
+    UNIT_CUBIC_METERS,
+    nsunitvolume_cubic_meters,
+    nsunitvolume_class_addr,
+    "m³",
+    1_000.0,
+    0.0
+);
+unit_singleton_linear!(
+    UNIT_GALLONS,
+    nsunitvolume_gallons,
+    nsunitvolume_class_addr,
+    "gal",
+    3.785_41,
+    0.0
+);
+unit_singleton_linear!(
+    UNIT_FLUID_OUNCES,
+    nsunitvolume_fluid_ounces,
+    nsunitvolume_class_addr,
+    "fl oz",
+    0.029_573_5,
+    0.0
+);
+unit_singleton_linear!(
+    UNIT_CUPS,
+    nsunitvolume_cups,
+    nsunitvolume_class_addr,
+    "cup",
+    0.236_588,
+    0.0
+);
+unit_singleton_linear!(
+    UNIT_PINTS,
+    nsunitvolume_pints,
+    nsunitvolume_class_addr,
+    "pt",
+    0.473_176,
+    0.0
+);
 
-pub extern "C" fn shim_nsunitvolume_liters(_cls: u64, _cmd: u64)        -> u64 { nsunitvolume_liters() }
-pub extern "C" fn shim_nsunitvolume_milliliters(_cls: u64, _cmd: u64)   -> u64 { nsunitvolume_milliliters() }
-pub extern "C" fn shim_nsunitvolume_cubic_meters(_cls: u64, _cmd: u64)  -> u64 { nsunitvolume_cubic_meters() }
-pub extern "C" fn shim_nsunitvolume_gallons(_cls: u64, _cmd: u64)       -> u64 { nsunitvolume_gallons() }
-pub extern "C" fn shim_nsunitvolume_fluid_ounces(_cls: u64, _cmd: u64)  -> u64 { nsunitvolume_fluid_ounces() }
-pub extern "C" fn shim_nsunitvolume_cups(_cls: u64, _cmd: u64)          -> u64 { nsunitvolume_cups() }
-pub extern "C" fn shim_nsunitvolume_pints(_cls: u64, _cmd: u64)         -> u64 { nsunitvolume_pints() }
-pub extern "C" fn shim_nsunitvolume_base_unit(_cls: u64, _cmd: u64)     -> u64 { nsunitvolume_liters() }
+pub extern "C" fn shim_nsunitvolume_liters(_cls: u64, _cmd: u64) -> u64 {
+    nsunitvolume_liters()
+}
+pub extern "C" fn shim_nsunitvolume_milliliters(_cls: u64, _cmd: u64) -> u64 {
+    nsunitvolume_milliliters()
+}
+pub extern "C" fn shim_nsunitvolume_cubic_meters(_cls: u64, _cmd: u64) -> u64 {
+    nsunitvolume_cubic_meters()
+}
+pub extern "C" fn shim_nsunitvolume_gallons(_cls: u64, _cmd: u64) -> u64 {
+    nsunitvolume_gallons()
+}
+pub extern "C" fn shim_nsunitvolume_fluid_ounces(_cls: u64, _cmd: u64) -> u64 {
+    nsunitvolume_fluid_ounces()
+}
+pub extern "C" fn shim_nsunitvolume_cups(_cls: u64, _cmd: u64) -> u64 {
+    nsunitvolume_cups()
+}
+pub extern "C" fn shim_nsunitvolume_pints(_cls: u64, _cmd: u64) -> u64 {
+    nsunitvolume_pints()
+}
+pub extern "C" fn shim_nsunitvolume_base_unit(_cls: u64, _cmd: u64) -> u64 {
+    nsunitvolume_liters()
+}
 
 // ── NSUnitAngle (base = degrees) ──────────────────────────────────────────────
 
-unit_singleton_linear!(UNIT_DEGREES,     nsunitangle_degrees,     nsunitangle_class_addr, "°",   1.0,                  0.0);
-unit_singleton_linear!(UNIT_RADIANS,     nsunitangle_radians,     nsunitangle_class_addr, "rad", 180.0 / std::f64::consts::PI, 0.0);
-unit_singleton_linear!(UNIT_ARCMINUTES,  nsunitangle_arcminutes,  nsunitangle_class_addr, "′",   1.0 / 60.0,           0.0);
-unit_singleton_linear!(UNIT_ARCSECONDS,  nsunitangle_arcseconds,  nsunitangle_class_addr, "″",   1.0 / 3_600.0,        0.0);
+unit_singleton_linear!(
+    UNIT_DEGREES,
+    nsunitangle_degrees,
+    nsunitangle_class_addr,
+    "°",
+    1.0,
+    0.0
+);
+unit_singleton_linear!(
+    UNIT_RADIANS,
+    nsunitangle_radians,
+    nsunitangle_class_addr,
+    "rad",
+    180.0 / std::f64::consts::PI,
+    0.0
+);
+unit_singleton_linear!(
+    UNIT_ARCMINUTES,
+    nsunitangle_arcminutes,
+    nsunitangle_class_addr,
+    "′",
+    1.0 / 60.0,
+    0.0
+);
+unit_singleton_linear!(
+    UNIT_ARCSECONDS,
+    nsunitangle_arcseconds,
+    nsunitangle_class_addr,
+    "″",
+    1.0 / 3_600.0,
+    0.0
+);
 
-pub extern "C" fn shim_nsunitangle_degrees(_cls: u64, _cmd: u64)     -> u64 { nsunitangle_degrees() }
-pub extern "C" fn shim_nsunitangle_radians(_cls: u64, _cmd: u64)     -> u64 { nsunitangle_radians() }
-pub extern "C" fn shim_nsunitangle_arcminutes(_cls: u64, _cmd: u64)  -> u64 { nsunitangle_arcminutes() }
-pub extern "C" fn shim_nsunitangle_arcseconds(_cls: u64, _cmd: u64)  -> u64 { nsunitangle_arcseconds() }
-pub extern "C" fn shim_nsunitangle_base_unit(_cls: u64, _cmd: u64)   -> u64 { nsunitangle_degrees() }
+pub extern "C" fn shim_nsunitangle_degrees(_cls: u64, _cmd: u64) -> u64 {
+    nsunitangle_degrees()
+}
+pub extern "C" fn shim_nsunitangle_radians(_cls: u64, _cmd: u64) -> u64 {
+    nsunitangle_radians()
+}
+pub extern "C" fn shim_nsunitangle_arcminutes(_cls: u64, _cmd: u64) -> u64 {
+    nsunitangle_arcminutes()
+}
+pub extern "C" fn shim_nsunitangle_arcseconds(_cls: u64, _cmd: u64) -> u64 {
+    nsunitangle_arcseconds()
+}
+pub extern "C" fn shim_nsunitangle_base_unit(_cls: u64, _cmd: u64) -> u64 {
+    nsunitangle_degrees()
+}
 
 // ── NSUnitSpeed (base = meters/second) ───────────────────────────────────────
 
-unit_singleton_linear!(UNIT_MPS,   nsunitspeed_meters_per_second,   nsunitspeed_class_addr, "m/s",  1.0,          0.0);
-unit_singleton_linear!(UNIT_KMPH,  nsunitspeed_kilometers_per_hour, nsunitspeed_class_addr, "km/h", 1.0 / 3.6,    0.0);
-unit_singleton_linear!(UNIT_MPH,   nsunitspeed_miles_per_hour,      nsunitspeed_class_addr, "mph",  0.447_04,     0.0);
-unit_singleton_linear!(UNIT_KNOTS, nsunitspeed_knots,               nsunitspeed_class_addr, "kn",   0.514_444,    0.0);
+unit_singleton_linear!(
+    UNIT_MPS,
+    nsunitspeed_meters_per_second,
+    nsunitspeed_class_addr,
+    "m/s",
+    1.0,
+    0.0
+);
+unit_singleton_linear!(
+    UNIT_KMPH,
+    nsunitspeed_kilometers_per_hour,
+    nsunitspeed_class_addr,
+    "km/h",
+    1.0 / 3.6,
+    0.0
+);
+unit_singleton_linear!(
+    UNIT_MPH,
+    nsunitspeed_miles_per_hour,
+    nsunitspeed_class_addr,
+    "mph",
+    0.447_04,
+    0.0
+);
+unit_singleton_linear!(
+    UNIT_KNOTS,
+    nsunitspeed_knots,
+    nsunitspeed_class_addr,
+    "kn",
+    0.514_444,
+    0.0
+);
 
-pub extern "C" fn shim_nsunitspeed_meters_per_second(_cls: u64, _cmd: u64)   -> u64 { nsunitspeed_meters_per_second() }
-pub extern "C" fn shim_nsunitspeed_kilometers_per_hour(_cls: u64, _cmd: u64) -> u64 { nsunitspeed_kilometers_per_hour() }
-pub extern "C" fn shim_nsunitspeed_miles_per_hour(_cls: u64, _cmd: u64)      -> u64 { nsunitspeed_miles_per_hour() }
-pub extern "C" fn shim_nsunitspeed_knots(_cls: u64, _cmd: u64)               -> u64 { nsunitspeed_knots() }
-pub extern "C" fn shim_nsunitspeed_base_unit(_cls: u64, _cmd: u64)           -> u64 { nsunitspeed_meters_per_second() }
+pub extern "C" fn shim_nsunitspeed_meters_per_second(_cls: u64, _cmd: u64) -> u64 {
+    nsunitspeed_meters_per_second()
+}
+pub extern "C" fn shim_nsunitspeed_kilometers_per_hour(_cls: u64, _cmd: u64) -> u64 {
+    nsunitspeed_kilometers_per_hour()
+}
+pub extern "C" fn shim_nsunitspeed_miles_per_hour(_cls: u64, _cmd: u64) -> u64 {
+    nsunitspeed_miles_per_hour()
+}
+pub extern "C" fn shim_nsunitspeed_knots(_cls: u64, _cmd: u64) -> u64 {
+    nsunitspeed_knots()
+}
+pub extern "C" fn shim_nsunitspeed_base_unit(_cls: u64, _cmd: u64) -> u64 {
+    nsunitspeed_meters_per_second()
+}
 
 // ── NSUnitDuration (base = seconds) ──────────────────────────────────────────
 
-unit_singleton_linear!(UNIT_SECONDS,       nsunitduration_seconds,       nsunitduration_class_addr, "s",   1.0,             0.0);
-unit_singleton_linear!(UNIT_MINUTES,       nsunitduration_minutes,       nsunitduration_class_addr, "min", 60.0,            0.0);
-unit_singleton_linear!(UNIT_HOURS,         nsunitduration_hours,         nsunitduration_class_addr, "hr",  3_600.0,         0.0);
-unit_singleton_linear!(UNIT_MILLISECONDS,  nsunitduration_milliseconds,  nsunitduration_class_addr, "ms",  0.001,           0.0);
-unit_singleton_linear!(UNIT_MICROSECONDS,  nsunitduration_microseconds,  nsunitduration_class_addr, "µs",  0.000_001,       0.0);
-unit_singleton_linear!(UNIT_NANOSECONDS,   nsunitduration_nanoseconds,   nsunitduration_class_addr, "ns",  1e-9,            0.0);
-unit_singleton_linear!(UNIT_PICOSECONDS,   nsunitduration_picoseconds,   nsunitduration_class_addr, "ps",  1e-12,           0.0);
+unit_singleton_linear!(
+    UNIT_SECONDS,
+    nsunitduration_seconds,
+    nsunitduration_class_addr,
+    "s",
+    1.0,
+    0.0
+);
+unit_singleton_linear!(
+    UNIT_MINUTES,
+    nsunitduration_minutes,
+    nsunitduration_class_addr,
+    "min",
+    60.0,
+    0.0
+);
+unit_singleton_linear!(
+    UNIT_HOURS,
+    nsunitduration_hours,
+    nsunitduration_class_addr,
+    "hr",
+    3_600.0,
+    0.0
+);
+unit_singleton_linear!(
+    UNIT_MILLISECONDS,
+    nsunitduration_milliseconds,
+    nsunitduration_class_addr,
+    "ms",
+    0.001,
+    0.0
+);
+unit_singleton_linear!(
+    UNIT_MICROSECONDS,
+    nsunitduration_microseconds,
+    nsunitduration_class_addr,
+    "µs",
+    0.000_001,
+    0.0
+);
+unit_singleton_linear!(
+    UNIT_NANOSECONDS,
+    nsunitduration_nanoseconds,
+    nsunitduration_class_addr,
+    "ns",
+    1e-9,
+    0.0
+);
+unit_singleton_linear!(
+    UNIT_PICOSECONDS,
+    nsunitduration_picoseconds,
+    nsunitduration_class_addr,
+    "ps",
+    1e-12,
+    0.0
+);
 
-pub extern "C" fn shim_nsunitduration_seconds(_cls: u64, _cmd: u64)       -> u64 { nsunitduration_seconds() }
-pub extern "C" fn shim_nsunitduration_minutes(_cls: u64, _cmd: u64)       -> u64 { nsunitduration_minutes() }
-pub extern "C" fn shim_nsunitduration_hours(_cls: u64, _cmd: u64)         -> u64 { nsunitduration_hours() }
-pub extern "C" fn shim_nsunitduration_milliseconds(_cls: u64, _cmd: u64)  -> u64 { nsunitduration_milliseconds() }
-pub extern "C" fn shim_nsunitduration_microseconds(_cls: u64, _cmd: u64)  -> u64 { nsunitduration_microseconds() }
-pub extern "C" fn shim_nsunitduration_nanoseconds(_cls: u64, _cmd: u64)   -> u64 { nsunitduration_nanoseconds() }
-pub extern "C" fn shim_nsunitduration_picoseconds(_cls: u64, _cmd: u64)   -> u64 { nsunitduration_picoseconds() }
-pub extern "C" fn shim_nsunitduration_base_unit(_cls: u64, _cmd: u64)     -> u64 { nsunitduration_seconds() }
+pub extern "C" fn shim_nsunitduration_seconds(_cls: u64, _cmd: u64) -> u64 {
+    nsunitduration_seconds()
+}
+pub extern "C" fn shim_nsunitduration_minutes(_cls: u64, _cmd: u64) -> u64 {
+    nsunitduration_minutes()
+}
+pub extern "C" fn shim_nsunitduration_hours(_cls: u64, _cmd: u64) -> u64 {
+    nsunitduration_hours()
+}
+pub extern "C" fn shim_nsunitduration_milliseconds(_cls: u64, _cmd: u64) -> u64 {
+    nsunitduration_milliseconds()
+}
+pub extern "C" fn shim_nsunitduration_microseconds(_cls: u64, _cmd: u64) -> u64 {
+    nsunitduration_microseconds()
+}
+pub extern "C" fn shim_nsunitduration_nanoseconds(_cls: u64, _cmd: u64) -> u64 {
+    nsunitduration_nanoseconds()
+}
+pub extern "C" fn shim_nsunitduration_picoseconds(_cls: u64, _cmd: u64) -> u64 {
+    nsunitduration_picoseconds()
+}
+pub extern "C" fn shim_nsunitduration_base_unit(_cls: u64, _cmd: u64) -> u64 {
+    nsunitduration_seconds()
+}
 
 // ── NSMeasurementFormatter ────────────────────────────────────────────────────
 //  Layout (32 bytes):
@@ -326,19 +771,27 @@ pub extern "C" fn shim_nsunitduration_base_unit(_cls: u64, _cmd: u64)     -> u64
 
 pub const NSMEASUREMENTFORMATTER_SIZE: usize = 32;
 const FMT_NUMFMT_OFF: usize = 8;
-const FMT_STYLE_OFF:  usize = 16;
+const FMT_STYLE_OFF: usize = 16;
 
 pub extern "C" fn shim_nsmeasurementformatter_alloc(cls: u64, _cmd: u64) -> u64 {
     let obj = crate::pal_alloc().calloc(1, NSMEASUREMENTFORMATTER_SIZE) as u64;
-    if obj == 0 { return 0; }
-    unsafe { *(obj as *mut u64) = cls; }
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *(obj as *mut u64) = cls;
+    }
     obj
 }
 
 pub extern "C" fn shim_nsmeasurementformatter_init(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     // ISA already set by alloc; set unitStyle = 1 (medium)
-    unsafe { *((obj as usize + FMT_STYLE_OFF) as *mut u64) = 1; }
+    unsafe {
+        *((obj as usize + FMT_STYLE_OFF) as *mut u64) = 1;
+    }
     obj
 }
 
@@ -348,23 +801,35 @@ pub extern "C" fn shim_nsmeasurementformatter_new(cls: u64, cmd: u64) -> u64 {
 }
 
 pub extern "C" fn shim_nsmeasurementformatter_unit_style(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 1; }
+    if obj == 0 {
+        return 1;
+    }
     unsafe { *((obj as usize + FMT_STYLE_OFF) as *const u64) }
 }
 
 pub extern "C" fn shim_nsmeasurementformatter_set_unit_style(obj: u64, _cmd: u64, style: u64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as usize + FMT_STYLE_OFF) as *mut u64) = style; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + FMT_STYLE_OFF) as *mut u64) = style;
+    }
 }
 
 pub extern "C" fn shim_nsmeasurementformatter_number_formatter(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + FMT_NUMFMT_OFF) as *const u64) }
 }
 
 pub extern "C" fn shim_nsmeasurementformatter_set_number_formatter(obj: u64, _cmd: u64, fmt: u64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as usize + FMT_NUMFMT_OFF) as *mut u64) = fmt; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + FMT_NUMFMT_OFF) as *mut u64) = fmt;
+    }
 }
 
 /// `-[NSMeasurementFormatter stringFromMeasurement:]` → NSString "{value} {symbol}"
@@ -373,11 +838,17 @@ pub extern "C" fn shim_nsmeasurementformatter_string_from_measurement(
     _cmd: u64,
     measurement: u64,
 ) -> u64 {
-    if measurement == 0 { return 0; }
+    if measurement == 0 {
+        return 0;
+    }
     let value = unsafe { *((measurement as usize + MEAS_VALUE_OFF) as *const f64) };
     let unit = unsafe { *((measurement as usize + MEAS_UNIT_OFF) as *const u64) };
 
-    let symbol_ns = if unit != 0 { shim_nsunit_symbol(unit, 0) } else { 0 };
+    let symbol_ns = if unit != 0 {
+        shim_nsunit_symbol(unit, 0)
+    } else {
+        0
+    };
     let sym_str = if symbol_ns != 0 {
         crate::cfstring::extract_cfstring_cstr(symbol_ns)
             .unwrap_or("")

@@ -120,7 +120,10 @@ mod tests {
 
     #[test]
     fn nil_safety() {
-        assert_eq!(shim_nstoolbaritem_init_with_item_identifier(0, 0, 0x1234), 0);
+        assert_eq!(
+            shim_nstoolbaritem_init_with_item_identifier(0, 0, 0x1234),
+            0
+        );
         assert_eq!(shim_nstoolbaritem_item_identifier(0, 0), 0);
         assert_eq!(shim_nstoolbaritem_image(0, 0), 0);
         shim_nstoolbaritem_set_image(0, 0, 0x1234);

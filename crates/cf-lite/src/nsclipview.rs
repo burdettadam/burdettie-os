@@ -9,23 +9,35 @@
 use crate::nsobj;
 
 fn read_u64(obj: u64, offset: usize) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as *const u8).add(offset) as *const u64) }
 }
 
 fn write_u64(obj: u64, offset: usize, val: u64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as *mut u8).add(offset) as *mut u64) = val; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as *mut u8).add(offset) as *mut u64) = val;
+    }
 }
 
 fn read_f64(obj: u64, offset: usize) -> f64 {
-    if obj == 0 { return 0.0; }
+    if obj == 0 {
+        return 0.0;
+    }
     unsafe { *((obj as *const u8).add(offset) as *const f64) }
 }
 
 fn write_f64(obj: u64, offset: usize, val: f64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as *mut u8).add(offset) as *mut f64) = val; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as *mut u8).add(offset) as *mut f64) = val;
+    }
 }
 
 pub(crate) const CLIP_VIEW_SIZE: usize = 104;
@@ -37,7 +49,9 @@ const BOUNDS_Y_OFF: usize = 96;
 pub extern "C" fn shim_nsclipview_init(obj: u64, _cmd: u64) -> u64 {
     if obj == 0 {
         let ptr = crate::pal_alloc().calloc(1, CLIP_VIEW_SIZE) as u64;
-        if ptr == 0 { return 0; }
+        if ptr == 0 {
+            return 0;
+        }
         write_u64(ptr, 0, nsobj::nsclipview_class_addr());
         return ptr;
     }
@@ -51,7 +65,9 @@ pub extern "C" fn shim_nsclipview_document_view(obj: u64, _cmd: u64) -> u64 {
 
 /// `-[NSClipView setDocumentView:]`
 pub extern "C" fn shim_nsclipview_set_document_view(obj: u64, _cmd: u64, view: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     write_u64(obj, DOC_VIEW_OFF, view);
     // Also add as subview for display pipeline.
     if view != 0 {
@@ -70,7 +86,9 @@ pub extern "C" fn shim_nsclipview_bounds_origin_y(obj: u64, _cmd: u64) -> f64 {
 
 /// `-[NSClipView setBoundsOrigin:]` — scrolls the clip view.
 pub extern "C" fn shim_nsclipview_set_bounds_origin(obj: u64, _cmd: u64, x: f64, y: f64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     write_f64(obj, BOUNDS_X_OFF, x);
     write_f64(obj, BOUNDS_Y_OFF, y);
     // Offset the document view's draw origin.
@@ -84,7 +102,12 @@ pub extern "C" fn shim_nsclipview_scroll_to_point(obj: u64, _cmd: u64, x: f64, y
 
 /// `-[NSClipView constrainBoundsRect:]` — returns proposed rect (no clipping).
 pub extern "C" fn shim_nsclipview_constrain_bounds_rect(
-    _obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64,
+    _obj: u64,
+    _cmd: u64,
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
 ) -> (f64, f64, f64, f64) {
     (x, y, w, h)
 }
@@ -92,9 +115,13 @@ pub extern "C" fn shim_nsclipview_constrain_bounds_rect(
 /// `-[NSClipView drawRect:]` — applies the bounds offset as a CTM translate,
 /// then draws the document view.
 pub extern "C" fn shim_nsclipview_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let cg_ctx = crate::nsgraphicscontext::current_cg_context_handle();
-    if cg_ctx == 0 { return; }
+    if cg_ctx == 0 {
+        return;
+    }
 
     let off_x = read_f64(obj, BOUNDS_X_OFF);
     let off_y = read_f64(obj, BOUNDS_Y_OFF);

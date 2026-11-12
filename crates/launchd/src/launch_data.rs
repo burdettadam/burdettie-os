@@ -183,7 +183,9 @@ pub fn dict_insert(dict: LaunchDataT, value: LaunchDataT, key: *const libc::c_ch
         return false;
     }
     let key_str = unsafe { CStr::from_ptr(key) };
-    let Ok(key_string) = key_str.to_str() else { return false };
+    let Ok(key_string) = key_str.to_str() else {
+        return false;
+    };
     let val = unsafe { Box::from_raw(value) };
     match unsafe { borrow_mut(dict) } {
         Some(LaunchData::Dictionary(map)) => {
@@ -204,7 +206,9 @@ pub fn dict_lookup(dict: LaunchDataT, key: *const libc::c_char) -> LaunchDataT {
         return LAUNCH_DATA_NULL;
     }
     let key_str = unsafe { CStr::from_ptr(key) };
-    let Ok(key_string) = key_str.to_str() else { return LAUNCH_DATA_NULL };
+    let Ok(key_string) = key_str.to_str() else {
+        return LAUNCH_DATA_NULL;
+    };
     match unsafe { borrow_mut(dict) } {
         Some(LaunchData::Dictionary(map)) => match map.get_mut(key_string) {
             Some(v) => v.as_mut() as *mut LaunchData,
@@ -220,7 +224,9 @@ pub fn dict_remove(dict: LaunchDataT, key: *const libc::c_char) -> bool {
         return false;
     }
     let key_str = unsafe { CStr::from_ptr(key) };
-    let Ok(key_string) = key_str.to_str() else { return false };
+    let Ok(key_string) = key_str.to_str() else {
+        return false;
+    };
     match unsafe { borrow_mut(dict) } {
         Some(LaunchData::Dictionary(map)) => map.remove(key_string).is_some(),
         _ => false,
@@ -228,7 +234,8 @@ pub fn dict_remove(dict: LaunchDataT, key: *const libc::c_char) -> bool {
 }
 
 /// Callback type for `launch_data_dict_iterate`.
-pub type DictIterateCallback = unsafe extern "C" fn(LaunchDataT, *const libc::c_char, *mut libc::c_void);
+pub type DictIterateCallback =
+    unsafe extern "C" fn(LaunchDataT, *const libc::c_char, *mut libc::c_void);
 
 /// `launch_data_dict_iterate(dict, callback, context)`.
 ///
@@ -356,7 +363,10 @@ pub fn new_opaque(data: *const libc::c_void, len: usize) -> LaunchDataT {
 /// `launch_data_set_fd(d, fd)` → bool.
 pub fn set_fd(handle: LaunchDataT, fd: i32) -> bool {
     match unsafe { borrow_mut(handle) } {
-        Some(d @ LaunchData::Fd(_)) => { *d = LaunchData::Fd(fd); true }
+        Some(d @ LaunchData::Fd(_)) => {
+            *d = LaunchData::Fd(fd);
+            true
+        }
         _ => false,
     }
 }
@@ -364,7 +374,10 @@ pub fn set_fd(handle: LaunchDataT, fd: i32) -> bool {
 /// `launch_data_set_machport(d, port)` → bool.
 pub fn set_machport(handle: LaunchDataT, port: u32) -> bool {
     match unsafe { borrow_mut(handle) } {
-        Some(d @ LaunchData::MachPort(_)) => { *d = LaunchData::MachPort(port); true }
+        Some(d @ LaunchData::MachPort(_)) => {
+            *d = LaunchData::MachPort(port);
+            true
+        }
         _ => false,
     }
 }
@@ -372,7 +385,10 @@ pub fn set_machport(handle: LaunchDataT, port: u32) -> bool {
 /// `launch_data_set_integer(d, val)` → bool.
 pub fn set_integer(handle: LaunchDataT, val: i64) -> bool {
     match unsafe { borrow_mut(handle) } {
-        Some(d @ LaunchData::Integer(_)) => { *d = LaunchData::Integer(val); true }
+        Some(d @ LaunchData::Integer(_)) => {
+            *d = LaunchData::Integer(val);
+            true
+        }
         _ => false,
     }
 }
@@ -380,7 +396,10 @@ pub fn set_integer(handle: LaunchDataT, val: i64) -> bool {
 /// `launch_data_set_bool(d, val)` → bool.
 pub fn set_bool(handle: LaunchDataT, val: bool) -> bool {
     match unsafe { borrow_mut(handle) } {
-        Some(d @ LaunchData::Bool(_)) => { *d = LaunchData::Bool(val); true }
+        Some(d @ LaunchData::Bool(_)) => {
+            *d = LaunchData::Bool(val);
+            true
+        }
         _ => false,
     }
 }
@@ -388,7 +407,10 @@ pub fn set_bool(handle: LaunchDataT, val: bool) -> bool {
 /// `launch_data_set_real(d, val)` → bool.
 pub fn set_real(handle: LaunchDataT, val: f64) -> bool {
     match unsafe { borrow_mut(handle) } {
-        Some(d @ LaunchData::Real(_)) => { *d = LaunchData::Real(val); true }
+        Some(d @ LaunchData::Real(_)) => {
+            *d = LaunchData::Real(val);
+            true
+        }
         _ => false,
     }
 }
@@ -615,10 +637,18 @@ mod tests {
         dict_insert(dict, new_integer(2), c"b".as_ptr());
 
         static mut COUNT: usize = 0;
-        unsafe extern "C" fn cb(_val: LaunchDataT, _key: *const libc::c_char, _ctx: *mut libc::c_void) {
-            unsafe { COUNT += 1; }
+        unsafe extern "C" fn cb(
+            _val: LaunchDataT,
+            _key: *const libc::c_char,
+            _ctx: *mut libc::c_void,
+        ) {
+            unsafe {
+                COUNT += 1;
+            }
         }
-        unsafe { COUNT = 0; }
+        unsafe {
+            COUNT = 0;
+        }
         dict_iterate(dict, cb, std::ptr::null_mut());
         assert_eq!(unsafe { COUNT }, 2);
         free(dict);
@@ -668,7 +698,12 @@ mod tests {
         free(r);
 
         let s = new_string(c"test".as_ptr());
-        assert_eq!(unsafe { CStr::from_ptr(get_string(s)) }.to_str().unwrap_or(""), "test");
+        assert_eq!(
+            unsafe { CStr::from_ptr(get_string(s)) }
+                .to_str()
+                .unwrap_or(""),
+            "test"
+        );
         free(s);
     }
 
@@ -729,7 +764,9 @@ mod tests {
         let d = alloc(LaunchDataType::String as u32);
         assert!(set_string(d, c"updated".as_ptr()));
         assert_eq!(
-            unsafe { CStr::from_ptr(get_string(d)) }.to_str().unwrap_or(""),
+            unsafe { CStr::from_ptr(get_string(d)) }
+                .to_str()
+                .unwrap_or(""),
             "updated"
         );
         free(d);
@@ -772,7 +809,10 @@ mod tests {
         dict_insert(dict, new_string(c"world".as_ptr()), c"hello".as_ptr());
         dict_insert(dict, new_integer(42), c"num".as_ptr());
 
-        assert_eq!(dict_get_string_value(dict, "hello").as_deref(), Some("world"));
+        assert_eq!(
+            dict_get_string_value(dict, "hello").as_deref(),
+            Some("world")
+        );
         assert_eq!(dict_get_integer_value(dict, "num"), Some(42));
         assert!(dict_get_string_value(dict, "missing").is_none());
         assert!(dict_get_integer_value(dict, "hello").is_none());
@@ -917,9 +957,13 @@ mod tests {
         let dict = alloc(LaunchDataType::Dictionary as u32);
         static mut CALLED: bool = false;
         unsafe extern "C" fn cb(_: LaunchDataT, _: *const libc::c_char, _: *mut libc::c_void) {
-            unsafe { CALLED = true; }
+            unsafe {
+                CALLED = true;
+            }
         }
-        unsafe { CALLED = false; }
+        unsafe {
+            CALLED = false;
+        }
         dict_iterate(dict, cb, std::ptr::null_mut());
         assert!(!unsafe { CALLED });
         free(dict);
@@ -930,9 +974,13 @@ mod tests {
         let arr = alloc(LaunchDataType::Array as u32);
         static mut CALLED: bool = false;
         unsafe extern "C" fn cb(_: LaunchDataT, _: *const libc::c_char, _: *mut libc::c_void) {
-            unsafe { CALLED = true; }
+            unsafe {
+                CALLED = true;
+            }
         }
-        unsafe { CALLED = false; }
+        unsafe {
+            CALLED = false;
+        }
         dict_iterate(arr, cb, std::ptr::null_mut());
         assert!(!unsafe { CALLED });
         free(arr);
@@ -979,7 +1027,11 @@ mod tests {
         dict_insert(inner_dict, new_bool(true), c"flag".as_ptr());
         dict_insert(outer, inner_arr, c"arr".as_ptr());
         dict_insert(outer, inner_dict, c"sub".as_ptr());
-        dict_insert(outer, new_opaque(b"\xDE\xAD".as_ptr() as *const _, 2), c"bin".as_ptr());
+        dict_insert(
+            outer,
+            new_opaque(b"\xDE\xAD".as_ptr() as *const _, 2),
+            c"bin".as_ptr(),
+        );
 
         let cloned = copy(outer);
         assert_eq!(dict_get_count(cloned), 3);
@@ -1060,7 +1112,11 @@ mod tests {
 
     #[test]
     fn dict_null_args_safety() {
-        assert!(!dict_insert(LAUNCH_DATA_NULL, new_integer(1), c"k".as_ptr()));
+        assert!(!dict_insert(
+            LAUNCH_DATA_NULL,
+            new_integer(1),
+            c"k".as_ptr()
+        ));
         let dict = alloc(LaunchDataType::Dictionary as u32);
         assert!(!dict_insert(dict, LAUNCH_DATA_NULL, c"k".as_ptr()));
         assert!(!dict_insert(dict, new_integer(1), std::ptr::null()));
@@ -1083,7 +1139,10 @@ mod tests {
     #[test]
     fn launch_data_type_from_raw_boundaries() {
         assert!(LaunchDataType::from_raw(0).is_none());
-        assert_eq!(LaunchDataType::from_raw(1), Some(LaunchDataType::Dictionary));
+        assert_eq!(
+            LaunchDataType::from_raw(1),
+            Some(LaunchDataType::Dictionary)
+        );
         assert_eq!(LaunchDataType::from_raw(10), Some(LaunchDataType::MachPort));
         assert!(LaunchDataType::from_raw(11).is_none());
         assert!(LaunchDataType::from_raw(u32::MAX).is_none());

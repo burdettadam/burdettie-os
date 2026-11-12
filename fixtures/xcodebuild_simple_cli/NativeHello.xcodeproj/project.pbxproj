@@ -1,0 +1,104 @@
+// !$*UTF8*$!
+{
+    archiveVersion = 1;
+    classes = {};
+    objectVersion = 56;
+    objects = {
+        PROJECT_DEBUG = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                BUILD_DIR = "$(PROJECT_DIR)/build";
+            };
+            name = Debug;
+        };
+        PROJECT_RELEASE = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                BUILD_DIR = "$(PROJECT_DIR)/build";
+            };
+            name = Release;
+        };
+        PROJECT_CONFIG_LIST = {
+            isa = XCConfigurationList;
+            buildConfigurations = (
+                PROJECT_DEBUG,
+                PROJECT_RELEASE,
+            );
+            defaultConfigurationName = Debug;
+        };
+        TARGET_DEBUG = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                OTHER_CFLAGS = -DHELLO_VALUE=41;
+            };
+            name = Debug;
+        };
+        TARGET_RELEASE = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                OTHER_CFLAGS = -DHELLO_VALUE=99;
+            };
+            name = Release;
+        };
+        TARGET_CONFIG_LIST = {
+            isa = XCConfigurationList;
+            buildConfigurations = (
+                TARGET_DEBUG,
+                TARGET_RELEASE,
+            );
+            defaultConfigurationName = Debug;
+        };
+        MAIN_FILE = {
+            isa = PBXFileReference;
+            lastKnownFileType = sourcecode.c.c;
+            path = main.c;
+            sourceTree = SOURCE_ROOT;
+        };
+        PRODUCT_FILE = {
+            isa = PBXFileReference;
+            explicitFileType = compiled.mach-o.executable;
+            path = NativeHello;
+            sourceTree = BUILT_PRODUCTS_DIR;
+        };
+        MAIN_BUILD_FILE = {
+            isa = PBXBuildFile;
+            fileRef = MAIN_FILE;
+        };
+        SOURCES_PHASE = {
+            isa = PBXSourcesBuildPhase;
+            files = (
+                MAIN_BUILD_FILE,
+            );
+        };
+        MAIN_GROUP = {
+            isa = PBXGroup;
+            children = (
+                MAIN_FILE,
+                PRODUCT_FILE,
+            );
+            sourceTree = "<group>";
+        };
+        MAIN_TARGET = {
+            isa = PBXNativeTarget;
+            buildConfigurationList = TARGET_CONFIG_LIST;
+            buildPhases = (
+                SOURCES_PHASE,
+            );
+            name = NativeHello;
+            productName = NativeHello;
+            productReference = PRODUCT_FILE;
+            productType = "com.apple.product-type.tool";
+        };
+        ROOT_PROJECT = {
+            isa = PBXProject;
+            buildConfigurationList = PROJECT_CONFIG_LIST;
+            mainGroup = MAIN_GROUP;
+            targets = (
+                MAIN_TARGET,
+            );
+        };
+    };
+    rootObject = ROOT_PROJECT;
+}

@@ -1,7 +1,7 @@
 //! Log output sinks — stdout, file, and HTTP POST.
 
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
 
 /// Configuration for where log events are written.
 #[derive(Debug, Clone)]

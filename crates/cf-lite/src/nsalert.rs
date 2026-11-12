@@ -88,7 +88,9 @@ pub extern "C" fn shim_nsalert_add_button_with_title(obj: u64, _cmd: u64, title:
         vec_ptr = Box::into_raw(boxed);
         write_u64(obj, BUTTON_TITLES_PTR_OFF, vec_ptr as u64);
     }
-    unsafe { (*vec_ptr).push(title); }
+    unsafe {
+        (*vec_ptr).push(title);
+    }
 }
 
 /// `-[NSAlert runModal]` — returns `NSAlertFirstButtonReturn` (1000).
@@ -104,8 +106,13 @@ pub extern "C" fn shim_nsalert_run_modal(obj: u64, _cmd: u64) -> i64 {
     if msg != 0 {
         let utf8 = crate::cfstring::shim_nsstring_utf8string(msg, 0);
         if !utf8.is_null() {
-            let s = unsafe { std::ffi::CStr::from_ptr(utf8) }.to_str().unwrap_or("");
-            log::info!("NSAlert runModal: \"{}\" — returning NSAlertFirstButtonReturn", s);
+            let s = unsafe { std::ffi::CStr::from_ptr(utf8) }
+                .to_str()
+                .unwrap_or("");
+            log::info!(
+                "NSAlert runModal: \"{}\" — returning NSAlertFirstButtonReturn",
+                s
+            );
         }
     }
     1000 // NSAlertFirstButtonReturn
@@ -114,10 +121,10 @@ pub extern "C" fn shim_nsalert_run_modal(obj: u64, _cmd: u64) -> i64 {
 /// `-[NSAlert beginSheetModalForWindow:completionHandler:]`
 ///
 /// Immediately invokes the completion handler with NSAlertFirstButtonReturn.
-pub extern "C" fn shim_nsalert_begin_sheet_modal(
-    obj: u64, _cmd: u64, _window: u64, handler: u64,
-) {
-    if obj == 0 { return; }
+pub extern "C" fn shim_nsalert_begin_sheet_modal(obj: u64, _cmd: u64, _window: u64, handler: u64) {
+    if obj == 0 {
+        return;
+    }
     if handler != 0 {
         // Invoke the block with NSAlertFirstButtonReturn (1000).
         // Block layout: isa @ 0, invoke @ 16.
@@ -136,7 +143,9 @@ pub extern "C" fn shim_nsalert_window(_obj: u64, _cmd: u64) -> u64 {
 
 /// `-[NSAlert buttons]` — returns NSArray of button title strings.
 pub extern "C" fn shim_nsalert_buttons(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let vec_ptr = read_u64(obj, BUTTON_TITLES_PTR_OFF) as *const Vec<u64>;
     if vec_ptr.is_null() {
         return crate::nsarray::make_nsarray(&[]);

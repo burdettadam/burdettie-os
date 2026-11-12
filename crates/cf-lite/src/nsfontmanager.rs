@@ -14,7 +14,9 @@ pub extern "C" fn shim_nsfontmanager_shared(_cls: u64, _cmd: u64) -> u64 {
     if *guard == 0 {
         let obj = crate::pal_alloc().calloc(1, 8) as u64;
         if obj != 0 {
-            unsafe { *(obj as *mut u64) = crate::nsobj::nsfontmanager_class_addr(); }
+            unsafe {
+                *(obj as *mut u64) = crate::nsobj::nsfontmanager_class_addr();
+            }
         }
         *guard = obj;
     }
@@ -27,10 +29,7 @@ pub extern "C" fn shim_nsfontmanager_set_factory(_cls: u64, _cmd: u64, _factory:
 }
 
 /// `-[NSFontManager availableFontFamilies]` — returns NSArray of font family names.
-pub extern "C" fn shim_nsfontmanager_available_font_families(
-    _obj: u64,
-    _cmd: u64,
-) -> u64 {
+pub extern "C" fn shim_nsfontmanager_available_font_families(_obj: u64, _cmd: u64) -> u64 {
     let families = cg_shims::bridge::font_family_names();
     build_nsarray_of_strings(&families)
 }
@@ -45,11 +44,7 @@ pub extern "C" fn shim_nsfontmanager_available_fonts(_obj: u64, _cmd: u64) -> u6
 }
 
 /// `-[NSFontManager availableMembersOfFontFamily:]` — stub returning nil.
-pub extern "C" fn shim_nsfontmanager_available_members(
-    _obj: u64,
-    _cmd: u64,
-    _family: u64,
-) -> u64 {
+pub extern "C" fn shim_nsfontmanager_available_members(_obj: u64, _cmd: u64, _family: u64) -> u64 {
     log::debug!("NSFontManager availableMembersOfFontFamily: (stub → nil)");
     0
 }
@@ -63,17 +58,12 @@ pub extern "C" fn shim_nsfontmanager_font_with_family(
     _weight: u64,
     size: f64,
 ) -> u64 {
-    let name = crate::cfstring::extract_cfstring_cstr(family_ptr)
-        .unwrap_or(".AppleSystemUIFont");
+    let name = crate::cfstring::extract_cfstring_cstr(family_ptr).unwrap_or(".AppleSystemUIFont");
     crate::nsfont::alloc_font_pub(name, size)
 }
 
 /// `-[NSFontManager convertFont:]` — stub returns same font.
-pub extern "C" fn shim_nsfontmanager_convert_font(
-    _obj: u64,
-    _cmd: u64,
-    font: u64,
-) -> u64 {
+pub extern "C" fn shim_nsfontmanager_convert_font(_obj: u64, _cmd: u64, font: u64) -> u64 {
     font
 }
 

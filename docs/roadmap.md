@@ -203,7 +203,8 @@ The project's north star: executing any ARM64 macOS binary that doesn't rely on
 GPU compositing (CoreAnimation/Metal) or hardware-specific entitlements.
 
 This requires:
-- NIB / XIB loading (XML + binary format parsing → view instantiation)
+- Broader NIB / XIB compatibility, especially build-time XIB compilation and
+  higher-fidelity runtime view instantiation
 - CoreGraphics basic 2D rendering API compatibility layer (over `wgpu`)
 - NSBundle plugin/framework loading
 - Mach IPC stubs for XPC-based services
@@ -262,12 +263,12 @@ Make the runtime easily consumable from the broader ecosystem:
 | # | Limitation | Severity | Remedy |
 |---|---|---|---|
 | L1 | **NSURLSession — no real HTTP** | Blocking | `resume` fires completionHandler with stub 200 OK response (nil data); synchronous POSIX socket GET required |
-| L2 | **NSKeyedArchiver — plist proxy, not true keyed format** | High | `encode/decodeObject:forKey:` implemented via in-memory store; wire to real NSCoder protocol for archive compatibility |
+| L2 | **NSKeyedArchiver / NSCoder semantic coverage incomplete** | Medium | Apple keyed-archive decode and plist-backed archive support exist; broaden `NSCoder` protocol parity and archive semantics for wider compatibility |
 | L3 | **NSCoder protocol — basic stubs only** | Medium | `NSCoder` registered as base class; `NSKeyedArchiver`/`NSKeyedUnarchiver` now inherit from it; full abstract protocol delegation unimplemented |
 | L4 | **NSRunLoop — single-pass timer firing, no I/O sources** | High | `run`/`addTimer:forMode:` now fire due timers once; `kevent`/`epoll` I/O source registration unimplemented |
 | L5 | **No external binary tested (T48)** | Blocking | All 63 fixtures compiled in-house; first wild binary will expose unknown selector gaps |
 | L6 | **Threading completely single-threaded** | High | `pthread_create`, `NSThread`, `dispatch_async` are stubs — concurrent programs serialize silently |
-| L7 | **No NIB / XIB loading** | Blocking (for GUI apps) | AppKit stub classes exist; NIB binary format parser not implemented |
+| L7 | **No build-time NIB / XIB compilation** | High | Runtime loading for compiled nib archives exists; XIB compilation and wider Interface Builder compatibility remain incomplete |
 | L8 | **ARM64 interpreter has no JIT** | High | Pure fetch-decode-execute loop; prohibitive for loop-heavy real-world binaries; E3d planned |
 | L9 | **Security gates are all permissive mocks** | Low (lab) | All 8 `TrustPolicy` gates log but enforce nothing — intentional for laboratory use |
 | L10 | ~~**Host ObjC fallback escape hatch**~~ | ✅ Fixed | `host_fallback` removed from `RuntimeConfig`; StubResolver (safe C stdlib) always active; no ObjC escape hatch |

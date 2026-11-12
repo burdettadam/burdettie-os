@@ -11,8 +11,20 @@ swift/
 examples/
 .DS_Store
 typescript/
-apps/
 corpus/
 fixtures/
 Formula/
 packaging/
+[ ]2
+/[ ]2
+/?2
+
+# Local imports and development state
+imports/
+.tmp-*
+.vscode/
+.mempalace/
+.copilot-bridge/
+**/__pycache__/
+.env
+.env.*

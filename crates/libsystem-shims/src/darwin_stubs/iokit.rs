@@ -55,7 +55,12 @@ fn track_matching_dict(class_name: &str) -> u64 {
 }
 
 fn lookup_matching_class(dict_handle: u64) -> Option<String> {
-    MATCHING_DICTS.lock().unwrap().as_ref()?.get(&dict_handle).cloned()
+    MATCHING_DICTS
+        .lock()
+        .unwrap()
+        .as_ref()?
+        .get(&dict_handle)
+        .cloned()
 }
 
 // ── Synthetic service registry ──────────────────────────────────────────────
@@ -122,7 +127,8 @@ fn ensure_registry() -> Vec<SyntheticService> {
             let name = entry.file_name();
             let name_str = name.to_string_lossy();
             // Skip loopback and virtual devices
-            if name_str != "lo" && !name_str.starts_with("veth") && !name_str.starts_with("docker") {
+            if name_str != "lo" && !name_str.starts_with("veth") && !name_str.starts_with("docker")
+            {
                 services.push(SyntheticService {
                     handle: alloc_handle(),
                     class_name: "IOEthernetInterface",
@@ -296,7 +302,11 @@ fn alloc_cfnumber_i64(val: i64) -> u64 {
 
 /// Allocate a CFBoolean-like sentinel.
 fn alloc_cfbool(val: bool) -> u64 {
-    if val { 1 } else { 0 } // macOS kCFBooleanTrue/False are sentinel addresses
+    if val {
+        1
+    } else {
+        0
+    } // macOS kCFBooleanTrue/False are sentinel addresses
 }
 
 /// Allocate a CFDictionary-compatible mutable object.
@@ -361,7 +371,9 @@ fn has_sysfs_battery() -> bool {
 
 /// Read a sysfs attribute value as a trimmed string.
 fn read_sysfs(path: &str) -> Option<String> {
-    std::fs::read_to_string(path).ok().map(|s| s.trim().to_string())
+    std::fs::read_to_string(path)
+        .ok()
+        .map(|s| s.trim().to_string())
 }
 
 /// Read a sysfs attribute as an i64.
@@ -397,7 +409,11 @@ fn build_power_source_dict() -> u64 {
         let is_charging = status == "Charging";
         let is_charged = status == "Full";
 
-        dict_set(dict, alloc_cfstring("Is Charging"), alloc_cfbool(is_charging));
+        dict_set(
+            dict,
+            alloc_cfstring("Is Charging"),
+            alloc_cfbool(is_charging),
+        );
         dict_set(dict, alloc_cfstring("Is Charged"), alloc_cfbool(is_charged));
         dict_set(dict, alloc_cfstring("Is Present"), alloc_cfbool(true));
 
@@ -405,25 +421,31 @@ fn build_power_source_dict() -> u64 {
         if let Some(now) = read_sysfs_i64(&format!("{}/energy_now", bat_path))
             .or_else(|| read_sysfs_i64(&format!("{}/charge_now", bat_path)))
         {
-            dict_set(dict, alloc_cfstring("Current Capacity"), alloc_cfnumber_i64(now));
+            dict_set(
+                dict,
+                alloc_cfstring("Current Capacity"),
+                alloc_cfnumber_i64(now),
+            );
         }
         if let Some(full) = read_sysfs_i64(&format!("{}/energy_full", bat_path))
             .or_else(|| read_sysfs_i64(&format!("{}/charge_full", bat_path)))
         {
-            dict_set(dict, alloc_cfstring("Max Capacity"), alloc_cfnumber_i64(full));
+            dict_set(
+                dict,
+                alloc_cfstring("Max Capacity"),
+                alloc_cfnumber_i64(full),
+            );
         }
 
         // Power source state
-        if let Some(ac_online) = read_sysfs(&format!("{}/power_supply", bat_path))
-            .or_else(|| {
-                // Check AC adapter
-                if std::path::Path::new("/sys/class/power_supply/AC/online").exists() {
-                    read_sysfs("/sys/class/power_supply/AC/online")
-                } else {
-                    None
-                }
-            })
-        {
+        if let Some(ac_online) = read_sysfs(&format!("{}/power_supply", bat_path)).or_else(|| {
+            // Check AC adapter
+            if std::path::Path::new("/sys/class/power_supply/AC/online").exists() {
+                read_sysfs("/sys/class/power_supply/AC/online")
+            } else {
+                None
+            }
+        }) {
             let on_ac = ac_online.trim() == "1";
             dict_set(
                 dict,
@@ -440,7 +462,11 @@ fn build_power_source_dict() -> u64 {
         }
 
         // Type
-        dict_set(dict, alloc_cfstring("Type"), alloc_cfstring("InternalBattery"));
+        dict_set(
+            dict,
+            alloc_cfstring("Type"),
+            alloc_cfstring("InternalBattery"),
+        );
 
         return dict;
     }
@@ -465,23 +491,43 @@ fn build_platform_expert_props() -> u64 {
 
     // Serial number
     if let Some(serial) = read_sysfs("/sys/class/dmi/id/product_serial") {
-        dict_set(dict, alloc_cfstring("IOPlatformSerialNumber"), alloc_cfstring(&serial));
+        dict_set(
+            dict,
+            alloc_cfstring("IOPlatformSerialNumber"),
+            alloc_cfstring(&serial),
+        );
     } else {
-        dict_set(dict, alloc_cfstring("IOPlatformSerialNumber"), alloc_cfstring("BURDETTIE0001"));
+        dict_set(
+            dict,
+            alloc_cfstring("IOPlatformSerialNumber"),
+            alloc_cfstring("BURDETTIE0001"),
+        );
     }
 
     // Hardware UUID
     if let Some(uuid) = read_sysfs("/sys/class/dmi/id/product_uuid") {
-        dict_set(dict, alloc_cfstring("IOPlatformUUID"), alloc_cfstring(&uuid));
+        dict_set(
+            dict,
+            alloc_cfstring("IOPlatformUUID"),
+            alloc_cfstring(&uuid),
+        );
     } else {
-        dict_set(dict, alloc_cfstring("IOPlatformUUID"), alloc_cfstring("00000000-0000-0000-0000-000000000000"));
+        dict_set(
+            dict,
+            alloc_cfstring("IOPlatformUUID"),
+            alloc_cfstring("00000000-0000-0000-0000-000000000000"),
+        );
     }
 
     // Model
     if let Some(model) = read_sysfs("/sys/class/dmi/id/product_name") {
         dict_set(dict, alloc_cfstring("model"), alloc_cfstring(&model));
     } else {
-        dict_set(dict, alloc_cfstring("model"), alloc_cfstring("BurdettieOS Virtual Platform"));
+        dict_set(
+            dict,
+            alloc_cfstring("model"),
+            alloc_cfstring("BurdettieOS Virtual Platform"),
+        );
     }
 
     // Board ID
@@ -515,7 +561,10 @@ macro_rules! io_const {
 io_const!(IOPM_NO_IDLE_SLEEP, "NoIdleSleepAssertion");
 io_const!(IOPM_NO_DISPLAY_SLEEP, "NoDisplaySleepAssertion");
 io_const!(IOPM_PREVENT_USER_IDLE_SYSTEM, "PreventUserIdleSystemSleep");
-io_const!(IOPM_PREVENT_USER_IDLE_DISPLAY, "PreventUserIdleDisplaySleep");
+io_const!(
+    IOPM_PREVENT_USER_IDLE_DISPLAY,
+    "PreventUserIdleDisplaySleep"
+);
 io_const!(IOPM_PREVENT_SYSTEM_SLEEP, "PreventSystemSleep");
 io_const!(IOPM_EXTERNAL_MEDIA, "ExternalMedia");
 io_const!(IOPM_NETWORK_CLIENT, "NetworkClientActive");
@@ -558,7 +607,8 @@ static ENTRY_IDS: Mutex<Option<HashMap<u32, u64>>> = Mutex::new(None);
 fn get_entry_id(handle: u32) -> u64 {
     let mut guard = ENTRY_IDS.lock().unwrap();
     let map = guard.get_or_insert_with(HashMap::new);
-    *map.entry(handle).or_insert_with(|| NEXT_ENTRY_ID.fetch_add(1, Ordering::Relaxed))
+    *map.entry(handle)
+        .or_insert_with(|| NEXT_ENTRY_ID.fetch_add(1, Ordering::Relaxed))
 }
 
 /// Maps absolute IOService path → handle for IORegistryEntryFromPath
@@ -581,440 +631,703 @@ impl IOKitStubs {
         use crate::register_shims;
 
         // ── Service matching & lifecycle ────────────────────────
-        register_shims!(table,
-            ("_IOServiceGetMatchingService",
-             shim_io_service_get_matching_service as *const () as u64,
-             "IOServiceGetMatchingService → synthetic service from registry"),
-            ("_IOServiceGetMatchingServices",
-             shim_io_service_get_matching_services as *const () as u64,
-             "IOServiceGetMatchingServices → iterator over matching services"),
-            ("_IOServiceMatching",
-             shim_io_service_matching as *const () as u64,
-             "IOServiceMatching → tracked matching dict"),
-            ("_IOServiceNameMatching",
-             shim_io_service_matching as *const () as u64,
-             "IOServiceNameMatching → tracked matching dict"),
-            ("_IOServiceOpen",
-             shim_io_service_open as *const () as u64,
-             "IOServiceOpen → kIOReturnSuccess, synthetic port"),
-            ("_IOServiceClose",
-             shim_io_return_success as *const () as u64,
-             "IOServiceClose → kIOReturnSuccess"),
-            ("_IOServiceAddNotification",
-             shim_io_return_success as *const () as u64,
-             "IOServiceAddNotification → kIOReturnSuccess"),
-            ("_IOServiceAddMatchingNotification",
-             shim_io_return_success as *const () as u64,
-             "IOServiceAddMatchingNotification → kIOReturnSuccess"),
-            ("_IOObjectRelease",
-             shim_io_return_success as *const () as u64,
-             "IOObjectRelease → kIOReturnSuccess"),
-            ("_IOObjectRetain",
-             shim_io_return_success as *const () as u64,
-             "IOObjectRetain → kIOReturnSuccess"),
-            ("_IOObjectGetClass",
-             shim_io_object_get_class as *const () as u64,
-             "IOObjectGetClass → class name from registry"),
-            ("_IOObjectConformsTo",
-             shim_io_object_conforms_to as *const () as u64,
-             "IOObjectConformsTo → 1 if class matches"),
-            ("_IOIteratorNext",
-             shim_io_iterator_next as *const () as u64,
-             "IOIteratorNext → next service or 0"),
-            ("_IOIteratorReset",
-             shim_io_iterator_reset as *const () as u64,
-             "IOIteratorReset → rewind"),
-            ("_IOIteratorIsValid",
-             shim_io_one_stub as *const () as u64,
-             "IOIteratorIsValid → 1 (always valid)")
+        register_shims!(
+            table,
+            (
+                "_IOServiceGetMatchingService",
+                shim_io_service_get_matching_service as *const () as u64,
+                "IOServiceGetMatchingService → synthetic service from registry"
+            ),
+            (
+                "_IOServiceGetMatchingServices",
+                shim_io_service_get_matching_services as *const () as u64,
+                "IOServiceGetMatchingServices → iterator over matching services"
+            ),
+            (
+                "_IOServiceMatching",
+                shim_io_service_matching as *const () as u64,
+                "IOServiceMatching → tracked matching dict"
+            ),
+            (
+                "_IOServiceNameMatching",
+                shim_io_service_matching as *const () as u64,
+                "IOServiceNameMatching → tracked matching dict"
+            ),
+            (
+                "_IOServiceOpen",
+                shim_io_service_open as *const () as u64,
+                "IOServiceOpen → kIOReturnSuccess, synthetic port"
+            ),
+            (
+                "_IOServiceClose",
+                shim_io_return_success as *const () as u64,
+                "IOServiceClose → kIOReturnSuccess"
+            ),
+            (
+                "_IOServiceAddNotification",
+                shim_io_return_success as *const () as u64,
+                "IOServiceAddNotification → kIOReturnSuccess"
+            ),
+            (
+                "_IOServiceAddMatchingNotification",
+                shim_io_return_success as *const () as u64,
+                "IOServiceAddMatchingNotification → kIOReturnSuccess"
+            ),
+            (
+                "_IOObjectRelease",
+                shim_io_return_success as *const () as u64,
+                "IOObjectRelease → kIOReturnSuccess"
+            ),
+            (
+                "_IOObjectRetain",
+                shim_io_return_success as *const () as u64,
+                "IOObjectRetain → kIOReturnSuccess"
+            ),
+            (
+                "_IOObjectGetClass",
+                shim_io_object_get_class as *const () as u64,
+                "IOObjectGetClass → class name from registry"
+            ),
+            (
+                "_IOObjectConformsTo",
+                shim_io_object_conforms_to as *const () as u64,
+                "IOObjectConformsTo → 1 if class matches"
+            ),
+            (
+                "_IOIteratorNext",
+                shim_io_iterator_next as *const () as u64,
+                "IOIteratorNext → next service or 0"
+            ),
+            (
+                "_IOIteratorReset",
+                shim_io_iterator_reset as *const () as u64,
+                "IOIteratorReset → rewind"
+            ),
+            (
+                "_IOIteratorIsValid",
+                shim_io_one_stub as *const () as u64,
+                "IOIteratorIsValid → 1 (always valid)"
+            )
         );
 
         // ── Master / main port ──────────────────────────────────
-        register_shims!(table,
-            ("_IOMasterPort",
-             shim_io_master_port as *const () as u64,
-             "IOMasterPort → kIOReturnSuccess, port=0"),
-            ("_IOMainPort",
-             shim_io_master_port as *const () as u64,
-             "IOMainPort → kIOReturnSuccess, port=0")
+        register_shims!(
+            table,
+            (
+                "_IOMasterPort",
+                shim_io_master_port as *const () as u64,
+                "IOMasterPort → kIOReturnSuccess, port=0"
+            ),
+            (
+                "_IOMainPort",
+                shim_io_master_port as *const () as u64,
+                "IOMainPort → kIOReturnSuccess, port=0"
+            )
         );
 
         // ── Registry entry ──────────────────────────────────────
-        register_shims!(table,
-            ("_IORegistryEntryCreateCFProperty",
-             shim_io_registry_entry_create_cf_property as *const () as u64,
-             "IORegistryEntryCreateCFProperty → sysfs-backed value"),
-            ("_IORegistryEntryGetName",
-             shim_io_registry_entry_get_name as *const () as u64,
-             "IORegistryEntryGetName → class name"),
-            ("_IORegistryEntryGetPath",
-             shim_io_registry_entry_get_path as *const () as u64,
-             "IORegistryEntryGetPath → synthetic IOService path"),
-            ("_IORegistryEntryCreateCFProperties",
-             shim_io_registry_entry_create_cf_properties as *const () as u64,
-             "IORegistryEntryCreateCFProperties → sysfs-backed dict"),
-            ("_IORegistryEntrySearchCFProperty",
-             shim_io_registry_entry_search_cf_property as *const () as u64,
-             "IORegistryEntrySearchCFProperty → delegates to CreateCFProperty"),
-            ("_IORegistryEntryGetParentEntry",
-             shim_io_registry_entry_get_parent as *const () as u64,
-             "IORegistryEntryGetParentEntry → root or 0"),
-            ("_IORegistryEntryGetChildEntry",
-             shim_io_return_not_found as *const () as u64,
-             "IORegistryEntryGetChildEntry → kIOReturnNotFound"),
-            ("_IORegistryEntryGetChildIterator",
-             shim_io_registry_entry_get_child_iterator as *const () as u64,
-             "IORegistryEntryGetChildIterator → empty iterator"),
-            ("_IORegistryGetRootEntry",
-             shim_io_registry_get_root_entry as *const () as u64,
-             "IORegistryGetRootEntry → platform expert handle")
+        register_shims!(
+            table,
+            (
+                "_IORegistryEntryCreateCFProperty",
+                shim_io_registry_entry_create_cf_property as *const () as u64,
+                "IORegistryEntryCreateCFProperty → sysfs-backed value"
+            ),
+            (
+                "_IORegistryEntryGetName",
+                shim_io_registry_entry_get_name as *const () as u64,
+                "IORegistryEntryGetName → class name"
+            ),
+            (
+                "_IORegistryEntryGetPath",
+                shim_io_registry_entry_get_path as *const () as u64,
+                "IORegistryEntryGetPath → synthetic IOService path"
+            ),
+            (
+                "_IORegistryEntryCreateCFProperties",
+                shim_io_registry_entry_create_cf_properties as *const () as u64,
+                "IORegistryEntryCreateCFProperties → sysfs-backed dict"
+            ),
+            (
+                "_IORegistryEntrySearchCFProperty",
+                shim_io_registry_entry_search_cf_property as *const () as u64,
+                "IORegistryEntrySearchCFProperty → delegates to CreateCFProperty"
+            ),
+            (
+                "_IORegistryEntryGetParentEntry",
+                shim_io_registry_entry_get_parent as *const () as u64,
+                "IORegistryEntryGetParentEntry → root or 0"
+            ),
+            (
+                "_IORegistryEntryGetChildEntry",
+                shim_io_return_not_found as *const () as u64,
+                "IORegistryEntryGetChildEntry → kIOReturnNotFound"
+            ),
+            (
+                "_IORegistryEntryGetChildIterator",
+                shim_io_registry_entry_get_child_iterator as *const () as u64,
+                "IORegistryEntryGetChildIterator → empty iterator"
+            ),
+            (
+                "_IORegistryGetRootEntry",
+                shim_io_registry_get_root_entry as *const () as u64,
+                "IORegistryGetRootEntry → platform expert handle"
+            )
         );
 
         // ── Connect / call ──────────────────────────────────────
-        register_shims!(table,
-            ("_IOConnectCallMethod",
-             shim_io_connect_call_method as *const () as u64,
-             "IOConnectCallMethod → kIOReturnUnsupported"),
-            ("_IOConnectCallStructMethod",
-             shim_io_connect_call_struct_method as *const () as u64,
-             "IOConnectCallStructMethod → kIOReturnUnsupported"),
-            ("_IOConnectCallScalarMethod",
-             shim_io_connect_call_scalar_method as *const () as u64,
-             "IOConnectCallScalarMethod → kIOReturnUnsupported"),
-            ("_IOConnectSetNotificationPort",
-             shim_io_return_success as *const () as u64,
-             "IOConnectSetNotificationPort → kIOReturnSuccess"),
-            ("_IOConnectMapMemory",
-             shim_io_return_unsupported_stub as *const () as u64,
-             "IOConnectMapMemory → kIOReturnUnsupported"),
-            ("_IOConnectUnmapMemory",
-             shim_io_return_success as *const () as u64,
-             "IOConnectUnmapMemory → kIOReturnSuccess")
+        register_shims!(
+            table,
+            (
+                "_IOConnectCallMethod",
+                shim_io_connect_call_method as *const () as u64,
+                "IOConnectCallMethod → kIOReturnUnsupported"
+            ),
+            (
+                "_IOConnectCallStructMethod",
+                shim_io_connect_call_struct_method as *const () as u64,
+                "IOConnectCallStructMethod → kIOReturnUnsupported"
+            ),
+            (
+                "_IOConnectCallScalarMethod",
+                shim_io_connect_call_scalar_method as *const () as u64,
+                "IOConnectCallScalarMethod → kIOReturnUnsupported"
+            ),
+            (
+                "_IOConnectSetNotificationPort",
+                shim_io_return_success as *const () as u64,
+                "IOConnectSetNotificationPort → kIOReturnSuccess"
+            ),
+            (
+                "_IOConnectMapMemory",
+                shim_io_return_unsupported_stub as *const () as u64,
+                "IOConnectMapMemory → kIOReturnUnsupported"
+            ),
+            (
+                "_IOConnectUnmapMemory",
+                shim_io_return_success as *const () as u64,
+                "IOConnectUnmapMemory → kIOReturnSuccess"
+            )
         );
 
         // ── Registry entry — extended ───────────────────────────
-        register_shims!(table,
-            ("_IORegistryEntryGetRegistryEntryID",
-             shim_io_registry_entry_get_id as *const () as u64,
-             "IORegistryEntryGetRegistryEntryID → unique 64-bit ID"),
-            ("_IORegistryEntryFromPath",
-             shim_io_registry_entry_from_path as *const () as u64,
-             "IORegistryEntryFromPath → lookup by path or 0"),
-            ("_IORegistryEntryGetLocationInPlane",
-             shim_io_registry_entry_get_location as *const () as u64,
-             "IORegistryEntryGetLocationInPlane → \"0\""),
-            ("_IORegistryEntrySetCFProperties",
-             shim_io_return_success as *const () as u64,
-             "IORegistryEntrySetCFProperties → kIOReturnSuccess"),
-            ("_IORegistryEntrySetCFProperty",
-             shim_io_return_success as *const () as u64,
-             "IORegistryEntrySetCFProperty → kIOReturnSuccess"),
-            ("_IORegistryEntryInPlane",
-             shim_io_one_stub as *const () as u64,
-             "IORegistryEntryInPlane → 1 (yes)")
+        register_shims!(
+            table,
+            (
+                "_IORegistryEntryGetRegistryEntryID",
+                shim_io_registry_entry_get_id as *const () as u64,
+                "IORegistryEntryGetRegistryEntryID → unique 64-bit ID"
+            ),
+            (
+                "_IORegistryEntryFromPath",
+                shim_io_registry_entry_from_path as *const () as u64,
+                "IORegistryEntryFromPath → lookup by path or 0"
+            ),
+            (
+                "_IORegistryEntryGetLocationInPlane",
+                shim_io_registry_entry_get_location as *const () as u64,
+                "IORegistryEntryGetLocationInPlane → \"0\""
+            ),
+            (
+                "_IORegistryEntrySetCFProperties",
+                shim_io_return_success as *const () as u64,
+                "IORegistryEntrySetCFProperties → kIOReturnSuccess"
+            ),
+            (
+                "_IORegistryEntrySetCFProperty",
+                shim_io_return_success as *const () as u64,
+                "IORegistryEntrySetCFProperty → kIOReturnSuccess"
+            ),
+            (
+                "_IORegistryEntryInPlane",
+                shim_io_one_stub as *const () as u64,
+                "IORegistryEntryInPlane → 1 (yes)"
+            )
         );
 
         // ── BSD name matching ───────────────────────────────────
-        register_shims!(table,
-            ("_IOBSDNameMatching",
-             shim_io_bsd_name_matching as *const () as u64,
-             "IOBSDNameMatching → tracked matching dict"),
-            ("_IOServiceWaitQuiet",
-             shim_io_return_success as *const () as u64,
-             "IOServiceWaitQuiet → kIOReturnSuccess (instant)"),
-            ("_IOKitGetBusyState",
-             shim_io_kit_get_busy_state as *const () as u64,
-             "IOKitGetBusyState → 0 (not busy)")
+        register_shims!(
+            table,
+            (
+                "_IOBSDNameMatching",
+                shim_io_bsd_name_matching as *const () as u64,
+                "IOBSDNameMatching → tracked matching dict"
+            ),
+            (
+                "_IOServiceWaitQuiet",
+                shim_io_return_success as *const () as u64,
+                "IOServiceWaitQuiet → kIOReturnSuccess (instant)"
+            ),
+            (
+                "_IOKitGetBusyState",
+                shim_io_kit_get_busy_state as *const () as u64,
+                "IOKitGetBusyState → 0 (not busy)"
+            )
         );
 
         // ── Plugin interface ────────────────────────────────────
-        register_shims!(table,
-            ("_IOCreatePlugInInterfaceForService",
-             shim_io_create_plugin_interface as *const () as u64,
-             "IOCreatePlugInInterfaceForService → kIOReturnUnsupported"),
-            ("_IODestroyPlugInInterface",
-             shim_io_return_success as *const () as u64,
-             "IODestroyPlugInInterface → kIOReturnSuccess")
+        register_shims!(
+            table,
+            (
+                "_IOCreatePlugInInterfaceForService",
+                shim_io_create_plugin_interface as *const () as u64,
+                "IOCreatePlugInInterfaceForService → kIOReturnUnsupported"
+            ),
+            (
+                "_IODestroyPlugInInterface",
+                shim_io_return_success as *const () as u64,
+                "IODestroyPlugInInterface → kIOReturnSuccess"
+            )
         );
 
         // ── Serialization ───────────────────────────────────────
-        register_shims!(table,
-            ("_IOCFSerialize",
-             shim_io_null_stub as *const () as u64,
-             "IOCFSerialize → NULL (deferred)"),
-            ("_IOCFUnserialize",
-             shim_io_null_stub as *const () as u64,
-             "IOCFUnserialize → NULL (deferred)")
+        register_shims!(
+            table,
+            (
+                "_IOCFSerialize",
+                shim_io_null_stub as *const () as u64,
+                "IOCFSerialize → NULL (deferred)"
+            ),
+            (
+                "_IOCFUnserialize",
+                shim_io_null_stub as *const () as u64,
+                "IOCFUnserialize → NULL (deferred)"
+            )
         );
 
         // ── Display info ────────────────────────────────────────
-        register_shims!(table,
-            ("_IODisplayCreateInfoDictionary",
-             shim_io_display_create_info_dict as *const () as u64,
-             "IODisplayCreateInfoDictionary → display props from sysfs"),
-            ("_IODisplayGetParameters",
-             shim_io_return_unsupported_stub as *const () as u64,
-             "IODisplayGetParameters → kIOReturnUnsupported"),
-            ("_IODisplaySetParameters",
-             shim_io_return_unsupported_stub as *const () as u64,
-             "IODisplaySetParameters → kIOReturnUnsupported"),
-            ("_IODisplayGetFloatParameter",
-             shim_io_return_unsupported_stub as *const () as u64,
-             "IODisplayGetFloatParameter → kIOReturnUnsupported")
+        register_shims!(
+            table,
+            (
+                "_IODisplayCreateInfoDictionary",
+                shim_io_display_create_info_dict as *const () as u64,
+                "IODisplayCreateInfoDictionary → display props from sysfs"
+            ),
+            (
+                "_IODisplayGetParameters",
+                shim_io_return_unsupported_stub as *const () as u64,
+                "IODisplayGetParameters → kIOReturnUnsupported"
+            ),
+            (
+                "_IODisplaySetParameters",
+                shim_io_return_unsupported_stub as *const () as u64,
+                "IODisplaySetParameters → kIOReturnUnsupported"
+            ),
+            (
+                "_IODisplayGetFloatParameter",
+                shim_io_return_unsupported_stub as *const () as u64,
+                "IODisplayGetFloatParameter → kIOReturnUnsupported"
+            )
         );
 
         // ── IOSurface stubs ─────────────────────────────────────
-        register_shims!(table,
-            ("_IOSurfaceCreate",
-             shim_io_null_stub as *const () as u64,
-             "IOSurfaceCreate → NULL"),
-            ("_IOSurfaceLookup",
-             shim_io_null_stub as *const () as u64,
-             "IOSurfaceLookup → NULL"),
-            ("_IOSurfaceGetBaseAddress",
-             shim_io_null_stub as *const () as u64,
-             "IOSurfaceGetBaseAddress → NULL"),
-            ("_IOSurfaceGetWidth",
-             shim_io_zero_u32_stub as *const () as u64,
-             "IOSurfaceGetWidth → 0"),
-            ("_IOSurfaceGetHeight",
-             shim_io_zero_u32_stub as *const () as u64,
-             "IOSurfaceGetHeight → 0"),
-            ("_IOSurfaceGetBytesPerRow",
-             shim_io_zero_u32_stub as *const () as u64,
-             "IOSurfaceGetBytesPerRow → 0"),
-            ("_IOSurfaceLock",
-             shim_io_return_success as *const () as u64,
-             "IOSurfaceLock → kIOReturnSuccess"),
-            ("_IOSurfaceUnlock",
-             shim_io_return_success as *const () as u64,
-             "IOSurfaceUnlock → kIOReturnSuccess")
+        register_shims!(
+            table,
+            (
+                "_IOSurfaceCreate",
+                shim_io_null_stub as *const () as u64,
+                "IOSurfaceCreate → NULL"
+            ),
+            (
+                "_IOSurfaceLookup",
+                shim_io_null_stub as *const () as u64,
+                "IOSurfaceLookup → NULL"
+            ),
+            (
+                "_IOSurfaceGetBaseAddress",
+                shim_io_null_stub as *const () as u64,
+                "IOSurfaceGetBaseAddress → NULL"
+            ),
+            (
+                "_IOSurfaceGetWidth",
+                shim_io_zero_u32_stub as *const () as u64,
+                "IOSurfaceGetWidth → 0"
+            ),
+            (
+                "_IOSurfaceGetHeight",
+                shim_io_zero_u32_stub as *const () as u64,
+                "IOSurfaceGetHeight → 0"
+            ),
+            (
+                "_IOSurfaceGetBytesPerRow",
+                shim_io_zero_u32_stub as *const () as u64,
+                "IOSurfaceGetBytesPerRow → 0"
+            ),
+            (
+                "_IOSurfaceLock",
+                shim_io_return_success as *const () as u64,
+                "IOSurfaceLock → kIOReturnSuccess"
+            ),
+            (
+                "_IOSurfaceUnlock",
+                shim_io_return_success as *const () as u64,
+                "IOSurfaceUnlock → kIOReturnSuccess"
+            )
         );
 
         // ── Power management — extended ─────────────────────────
-        register_shims!(table,
-            ("_IOPMAssertionCopyProperties",
-             shim_iopm_assertion_copy_properties as *const () as u64,
-             "IOPMAssertionCopyProperties → dict of assertion props"),
-            ("_IOPMConnectionCreate",
-             shim_io_return_success as *const () as u64,
-             "IOPMConnectionCreate → kIOReturnSuccess"),
-            ("_IOPMConnectionRelease",
-             shim_io_void_stub as *const () as u64,
-             "IOPMConnectionRelease → void"),
-            ("_IOPMConnectionSetNotification",
-             shim_io_return_success as *const () as u64,
-             "IOPMConnectionSetNotification → kIOReturnSuccess"),
-            ("_IOPMConnectionScheduleWithRunLoop",
-             shim_io_return_success as *const () as u64,
-             "IOPMConnectionScheduleWithRunLoop → kIOReturnSuccess"),
-            ("_IOPMSleepSystem",
-             shim_io_return_unsupported_stub as *const () as u64,
-             "IOPMSleepSystem → kIOReturnUnsupported"),
-            ("_IOPMSetAggressiveness",
-             shim_io_return_success as *const () as u64,
-             "IOPMSetAggressiveness → kIOReturnSuccess"),
-            ("_IOPMGetAggressiveness",
-             shim_io_return_success as *const () as u64,
-             "IOPMGetAggressiveness → kIOReturnSuccess")
+        register_shims!(
+            table,
+            (
+                "_IOPMAssertionCopyProperties",
+                shim_iopm_assertion_copy_properties as *const () as u64,
+                "IOPMAssertionCopyProperties → dict of assertion props"
+            ),
+            (
+                "_IOPMConnectionCreate",
+                shim_io_return_success as *const () as u64,
+                "IOPMConnectionCreate → kIOReturnSuccess"
+            ),
+            (
+                "_IOPMConnectionRelease",
+                shim_io_void_stub as *const () as u64,
+                "IOPMConnectionRelease → void"
+            ),
+            (
+                "_IOPMConnectionSetNotification",
+                shim_io_return_success as *const () as u64,
+                "IOPMConnectionSetNotification → kIOReturnSuccess"
+            ),
+            (
+                "_IOPMConnectionScheduleWithRunLoop",
+                shim_io_return_success as *const () as u64,
+                "IOPMConnectionScheduleWithRunLoop → kIOReturnSuccess"
+            ),
+            (
+                "_IOPMSleepSystem",
+                shim_io_return_unsupported_stub as *const () as u64,
+                "IOPMSleepSystem → kIOReturnUnsupported"
+            ),
+            (
+                "_IOPMSetAggressiveness",
+                shim_io_return_success as *const () as u64,
+                "IOPMSetAggressiveness → kIOReturnSuccess"
+            ),
+            (
+                "_IOPMGetAggressiveness",
+                shim_io_return_success as *const () as u64,
+                "IOPMGetAggressiveness → kIOReturnSuccess"
+            )
         );
 
         // ── IOPSNotification ────────────────────────────────────
-        register_shims!(table,
-            ("_IOPSNotificationCreateRunLoopSource",
-             shim_io_null_stub as *const () as u64,
-             "IOPSNotificationCreateRunLoopSource → NULL"),
-            ("_IOPSGetTimeRemainingEstimate",
-             shim_iops_get_time_remaining as *const () as u64,
-             "IOPSGetTimeRemainingEstimate → seconds or sentinel")
+        register_shims!(
+            table,
+            (
+                "_IOPSNotificationCreateRunLoopSource",
+                shim_io_null_stub as *const () as u64,
+                "IOPSNotificationCreateRunLoopSource → NULL"
+            ),
+            (
+                "_IOPSGetTimeRemainingEstimate",
+                shim_iops_get_time_remaining as *const () as u64,
+                "IOPSGetTimeRemainingEstimate → seconds or sentinel"
+            )
         );
 
         // ── Notification port ───────────────────────────────────
-        register_shims!(table,
-            ("_IONotificationPortCreate",
-             shim_io_notification_port_create as *const () as u64,
-             "IONotificationPortCreate → synthetic port"),
-            ("_IONotificationPortDestroy",
-             shim_io_void_stub as *const () as u64,
-             "IONotificationPortDestroy → void"),
-            ("_IONotificationPortGetRunLoopSource",
-             shim_io_null_stub as *const () as u64,
-             "IONotificationPortGetRunLoopSource → NULL"),
-            ("_IONotificationPortGetMachPort",
-             shim_io_zero_u32_stub as *const () as u64,
-             "IONotificationPortGetMachPort → 0"),
-            ("_IONotificationPortSetDispatchQueue",
-             shim_io_void_stub as *const () as u64,
-             "IONotificationPortSetDispatchQueue → void")
+        register_shims!(
+            table,
+            (
+                "_IONotificationPortCreate",
+                shim_io_notification_port_create as *const () as u64,
+                "IONotificationPortCreate → synthetic port"
+            ),
+            (
+                "_IONotificationPortDestroy",
+                shim_io_void_stub as *const () as u64,
+                "IONotificationPortDestroy → void"
+            ),
+            (
+                "_IONotificationPortGetRunLoopSource",
+                shim_io_null_stub as *const () as u64,
+                "IONotificationPortGetRunLoopSource → NULL"
+            ),
+            (
+                "_IONotificationPortGetMachPort",
+                shim_io_zero_u32_stub as *const () as u64,
+                "IONotificationPortGetMachPort → 0"
+            ),
+            (
+                "_IONotificationPortSetDispatchQueue",
+                shim_io_void_stub as *const () as u64,
+                "IONotificationPortSetDispatchQueue → void"
+            )
         );
 
         // ── Power management assertions ─────────────────────────
-        register_shims!(table,
-            ("_IOPMAssertionCreateWithName",
-             shim_iopm_assertion_create as *const () as u64,
-             "IOPMAssertionCreateWithName → tracked assertion"),
-            ("_IOPMAssertionCreateWithProperties",
-             shim_iopm_assertion_create_with_props as *const () as u64,
-             "IOPMAssertionCreateWithProperties → tracked assertion"),
-            ("_IOPMAssertionRelease",
-             shim_iopm_assertion_release as *const () as u64,
-             "IOPMAssertionRelease → release tracked assertion"),
-            ("_IOPMAssertionSetProperty",
-             shim_io_return_success as *const () as u64,
-             "IOPMAssertionSetProperty → kIOReturnSuccess"),
-            ("_IOPMAssertionDeclareUserActivity",
-             shim_iopm_assertion_create as *const () as u64,
-             "IOPMAssertionDeclareUserActivity → tracked assertion"),
-            ("_IOPMCopyFeatureDefault",
-             shim_io_null_stub as *const () as u64,
-             "IOPMCopyFeatureDefault → NULL"),
-            ("_IOPMCopyBatteryInfo",
-             shim_iopm_copy_battery_info as *const () as u64,
-             "IOPMCopyBatteryInfo → sysfs battery or unsupported")
+        register_shims!(
+            table,
+            (
+                "_IOPMAssertionCreateWithName",
+                shim_iopm_assertion_create as *const () as u64,
+                "IOPMAssertionCreateWithName → tracked assertion"
+            ),
+            (
+                "_IOPMAssertionCreateWithProperties",
+                shim_iopm_assertion_create_with_props as *const () as u64,
+                "IOPMAssertionCreateWithProperties → tracked assertion"
+            ),
+            (
+                "_IOPMAssertionRelease",
+                shim_iopm_assertion_release as *const () as u64,
+                "IOPMAssertionRelease → release tracked assertion"
+            ),
+            (
+                "_IOPMAssertionSetProperty",
+                shim_io_return_success as *const () as u64,
+                "IOPMAssertionSetProperty → kIOReturnSuccess"
+            ),
+            (
+                "_IOPMAssertionDeclareUserActivity",
+                shim_iopm_assertion_create as *const () as u64,
+                "IOPMAssertionDeclareUserActivity → tracked assertion"
+            ),
+            (
+                "_IOPMCopyFeatureDefault",
+                shim_io_null_stub as *const () as u64,
+                "IOPMCopyFeatureDefault → NULL"
+            ),
+            (
+                "_IOPMCopyBatteryInfo",
+                shim_iopm_copy_battery_info as *const () as u64,
+                "IOPMCopyBatteryInfo → sysfs battery or unsupported"
+            )
         );
 
         // ── Power source info ───────────────────────────────────
-        register_shims!(table,
-            ("_IOPSCopyPowerSourcesInfo",
-             shim_iops_copy_power_sources_info as *const () as u64,
-             "IOPSCopyPowerSourcesInfo → sysfs blob"),
-            ("_IOPSCopyPowerSourcesList",
-             shim_iops_copy_power_sources_list as *const () as u64,
-             "IOPSCopyPowerSourcesList → array of power sources"),
-            ("_IOPSGetPowerSourceDescription",
-             shim_iops_get_power_source_description as *const () as u64,
-             "IOPSGetPowerSourceDescription → sysfs-backed dict"),
-            ("_IOPSGetProvidingPowerSourceType",
-             shim_iops_get_providing_type as *const () as u64,
-             "IOPSGetProvidingPowerSourceType → AC/Battery string")
+        register_shims!(
+            table,
+            (
+                "_IOPSCopyPowerSourcesInfo",
+                shim_iops_copy_power_sources_info as *const () as u64,
+                "IOPSCopyPowerSourcesInfo → sysfs blob"
+            ),
+            (
+                "_IOPSCopyPowerSourcesList",
+                shim_iops_copy_power_sources_list as *const () as u64,
+                "IOPSCopyPowerSourcesList → array of power sources"
+            ),
+            (
+                "_IOPSGetPowerSourceDescription",
+                shim_iops_get_power_source_description as *const () as u64,
+                "IOPSGetPowerSourceDescription → sysfs-backed dict"
+            ),
+            (
+                "_IOPSGetProvidingPowerSourceType",
+                shim_iops_get_providing_type as *const () as u64,
+                "IOPSGetProvidingPowerSourceType → AC/Battery string"
+            )
         );
 
         // ── HID device & manager ────────────────────────────────
-        register_shims!(table,
-            ("_IOHIDManagerCreate",
-             shim_io_null_stub as *const () as u64,
-             "IOHIDManagerCreate → NULL"),
-            ("_IOHIDManagerOpen",
-             shim_io_return_success as *const () as u64,
-             "IOHIDManagerOpen → kIOReturnSuccess"),
-            ("_IOHIDManagerClose",
-             shim_io_return_success as *const () as u64,
-             "IOHIDManagerClose → kIOReturnSuccess"),
-            ("_IOHIDManagerSetDeviceMatching",
-             shim_io_void_stub as *const () as u64,
-             "IOHIDManagerSetDeviceMatching → void"),
-            ("_IOHIDManagerCopyDevices",
-             shim_io_null_stub as *const () as u64,
-             "IOHIDManagerCopyDevices → NULL (no HID devices)"),
-            ("_IOHIDManagerScheduleWithRunLoop",
-             shim_io_void_stub as *const () as u64,
-             "IOHIDManagerScheduleWithRunLoop → void"),
-            ("_IOHIDManagerRegisterDeviceMatchingCallback",
-             shim_io_void_stub as *const () as u64,
-             "IOHIDManagerRegisterDeviceMatchingCallback → void"),
-            ("_IOHIDManagerRegisterDeviceRemovalCallback",
-             shim_io_void_stub as *const () as u64,
-             "IOHIDManagerRegisterDeviceRemovalCallback → void"),
-            ("_IOHIDDeviceCreate",
-             shim_io_null_stub as *const () as u64,
-             "IOHIDDeviceCreate → NULL"),
-            ("_IOHIDDeviceOpen",
-             shim_io_return_success as *const () as u64,
-             "IOHIDDeviceOpen → kIOReturnSuccess"),
-            ("_IOHIDDeviceClose",
-             shim_io_return_success as *const () as u64,
-             "IOHIDDeviceClose → kIOReturnSuccess"),
-            ("_IOHIDDeviceGetProperty",
-             shim_io_null_stub as *const () as u64,
-             "IOHIDDeviceGetProperty → NULL"),
-            ("_IOHIDDeviceCopyMatchingElements",
-             shim_io_null_stub as *const () as u64,
-             "IOHIDDeviceCopyMatchingElements → NULL")
+        register_shims!(
+            table,
+            (
+                "_IOHIDManagerCreate",
+                shim_io_null_stub as *const () as u64,
+                "IOHIDManagerCreate → NULL"
+            ),
+            (
+                "_IOHIDManagerOpen",
+                shim_io_return_success as *const () as u64,
+                "IOHIDManagerOpen → kIOReturnSuccess"
+            ),
+            (
+                "_IOHIDManagerClose",
+                shim_io_return_success as *const () as u64,
+                "IOHIDManagerClose → kIOReturnSuccess"
+            ),
+            (
+                "_IOHIDManagerSetDeviceMatching",
+                shim_io_void_stub as *const () as u64,
+                "IOHIDManagerSetDeviceMatching → void"
+            ),
+            (
+                "_IOHIDManagerCopyDevices",
+                shim_io_null_stub as *const () as u64,
+                "IOHIDManagerCopyDevices → NULL (no HID devices)"
+            ),
+            (
+                "_IOHIDManagerScheduleWithRunLoop",
+                shim_io_void_stub as *const () as u64,
+                "IOHIDManagerScheduleWithRunLoop → void"
+            ),
+            (
+                "_IOHIDManagerRegisterDeviceMatchingCallback",
+                shim_io_void_stub as *const () as u64,
+                "IOHIDManagerRegisterDeviceMatchingCallback → void"
+            ),
+            (
+                "_IOHIDManagerRegisterDeviceRemovalCallback",
+                shim_io_void_stub as *const () as u64,
+                "IOHIDManagerRegisterDeviceRemovalCallback → void"
+            ),
+            (
+                "_IOHIDDeviceCreate",
+                shim_io_null_stub as *const () as u64,
+                "IOHIDDeviceCreate → NULL"
+            ),
+            (
+                "_IOHIDDeviceOpen",
+                shim_io_return_success as *const () as u64,
+                "IOHIDDeviceOpen → kIOReturnSuccess"
+            ),
+            (
+                "_IOHIDDeviceClose",
+                shim_io_return_success as *const () as u64,
+                "IOHIDDeviceClose → kIOReturnSuccess"
+            ),
+            (
+                "_IOHIDDeviceGetProperty",
+                shim_io_null_stub as *const () as u64,
+                "IOHIDDeviceGetProperty → NULL"
+            ),
+            (
+                "_IOHIDDeviceCopyMatchingElements",
+                shim_io_null_stub as *const () as u64,
+                "IOHIDDeviceCopyMatchingElements → NULL"
+            )
         );
 
         // ── Data symbols ────────────────────────────────────────
-        register_shims!(table,
-            ("_kIOMasterPortDefault",
-             &K_IO_MASTER_PORT_DEFAULT as *const u32 as u64,
-             "kIOMasterPortDefault data symbol (u32=0)"),
-            ("_kIOMainPortDefault",
-             &K_IO_MASTER_PORT_DEFAULT as *const u32 as u64,
-             "kIOMainPortDefault data symbol (u32=0)"),
-            ("_kIOPMAssertionTypeNoIdleSleep",
-             &IOPM_NO_IDLE_SLEEP as *const _ as u64,
-             "kIOPMAssertionTypeNoIdleSleep data symbol"),
-            ("_kIOPMAssertionTypeNoDisplaySleep",
-             &IOPM_NO_DISPLAY_SLEEP as *const _ as u64,
-             "kIOPMAssertionTypeNoDisplaySleep data symbol"),
-            ("_kIOPMAssertionTypePreventUserIdleSystemSleep",
-             &IOPM_PREVENT_USER_IDLE_SYSTEM as *const _ as u64,
-             "kIOPMAssertionTypePreventUserIdleSystemSleep data symbol"),
-            ("_kIOPMAssertionTypePreventUserIdleDisplaySleep",
-             &IOPM_PREVENT_USER_IDLE_DISPLAY as *const _ as u64,
-             "kIOPMAssertionTypePreventUserIdleDisplaySleep data symbol"),
-            ("_kIOPMAssertionTypePreventSystemSleep",
-             &IOPM_PREVENT_SYSTEM_SLEEP as *const _ as u64,
-             "kIOPMAssertionTypePreventSystemSleep data symbol"),
-            ("_kIOPMAssertionTypeExternalMedia",
-             &IOPM_EXTERNAL_MEDIA as *const _ as u64,
-             "kIOPMAssertionTypeExternalMedia data symbol"),
-            ("_kIOPMAssertionTypeNetworkClientActive",
-             &IOPM_NETWORK_CLIENT as *const _ as u64,
-             "kIOPMAssertionTypeNetworkClientActive data symbol"),
-            ("_kIOServicePlane",
-             &IO_SERVICE_PLANE as *const _ as u64,
-             "kIOServicePlane data symbol"),
-            ("_kIOPowerPlane",
-             &IO_POWER_PLANE as *const _ as u64,
-             "kIOPowerPlane data symbol"),
-            ("_kIODeviceTreePlane",
-             &IO_DEVICE_TREE_PLANE as *const _ as u64,
-             "kIODeviceTreePlane data symbol"),
-            ("_kIOUSBPlane",
-             &IO_USB_PLANE as *const _ as u64,
-             "kIOUSBPlane data symbol"),
-            ("_kIOFireWirePlane",
-             &IO_FIREWIRE_PLANE as *const _ as u64,
-             "kIOFireWirePlane data symbol"),
-            ("_kIOPMAssertionLevelOn",
-             &IOPM_ASSERTION_LEVEL_ON as *const u32 as u64,
-             "kIOPMAssertionLevelOn data symbol (u32=255)"),
-            ("_kIOPMAssertionLevelOff",
-             &IOPM_ASSERTION_LEVEL_OFF as *const u32 as u64,
-             "kIOPMAssertionLevelOff data symbol (u32=0)"),
-            ("_kIOUSBDeviceClassName",
-             &IO_USB_DEVICE_CLASS_NAME as *const _ as u64,
-             "kIOUSBDeviceClassName data symbol"),
-            ("_kIOUSBInterfaceClassName",
-             &IO_USB_INTERFACE_CLASS_NAME as *const _ as u64,
-             "kIOUSBInterfaceClassName data symbol"),
-            ("_kIOHIDDeviceKey",
-             &IO_HID_DEVICE_KEY as *const _ as u64,
-             "kIOHIDDeviceKey data symbol"),
-            ("_kIOHIDProductKey",
-             &IO_HID_PRODUCT_KEY as *const _ as u64,
-             "kIOHIDProductKey data symbol"),
-            ("_kIOHIDVendorIDKey",
-             &IO_HID_VENDOR_ID_KEY as *const _ as u64,
-             "kIOHIDVendorIDKey data symbol"),
-            ("_kIOHIDProductIDKey",
-             &IO_HID_PRODUCT_ID_KEY as *const _ as u64,
-             "kIOHIDProductIDKey data symbol"),
-            ("_kIOHIDTransportKey",
-             &IO_HID_TRANSPORT_KEY as *const _ as u64,
-             "kIOHIDTransportKey data symbol"),
-            ("_kIOMediaBSDNameKey",
-             &IO_MEDIA_BSD_NAME_KEY as *const _ as u64,
-             "kIOMediaBSDNameKey data symbol"),
-            ("_kIOMediaWholeKey",
-             &IO_MEDIA_WHOLE_KEY as *const _ as u64,
-             "kIOMediaWholeKey data symbol"),
-            ("_kIOMediaLeafKey",
-             &IO_MEDIA_LEAF_KEY as *const _ as u64,
-             "kIOMediaLeafKey data symbol"),
-            ("_kIOMediaSizeKey",
-             &IO_MEDIA_SIZE_KEY as *const _ as u64,
-             "kIOMediaSizeKey data symbol")
+        register_shims!(
+            table,
+            (
+                "_kIOMasterPortDefault",
+                &K_IO_MASTER_PORT_DEFAULT as *const u32 as u64,
+                "kIOMasterPortDefault data symbol (u32=0)"
+            ),
+            (
+                "_kIOMainPortDefault",
+                &K_IO_MASTER_PORT_DEFAULT as *const u32 as u64,
+                "kIOMainPortDefault data symbol (u32=0)"
+            ),
+            (
+                "_kIOPMAssertionTypeNoIdleSleep",
+                &IOPM_NO_IDLE_SLEEP as *const _ as u64,
+                "kIOPMAssertionTypeNoIdleSleep data symbol"
+            ),
+            (
+                "_kIOPMAssertionTypeNoDisplaySleep",
+                &IOPM_NO_DISPLAY_SLEEP as *const _ as u64,
+                "kIOPMAssertionTypeNoDisplaySleep data symbol"
+            ),
+            (
+                "_kIOPMAssertionTypePreventUserIdleSystemSleep",
+                &IOPM_PREVENT_USER_IDLE_SYSTEM as *const _ as u64,
+                "kIOPMAssertionTypePreventUserIdleSystemSleep data symbol"
+            ),
+            (
+                "_kIOPMAssertionTypePreventUserIdleDisplaySleep",
+                &IOPM_PREVENT_USER_IDLE_DISPLAY as *const _ as u64,
+                "kIOPMAssertionTypePreventUserIdleDisplaySleep data symbol"
+            ),
+            (
+                "_kIOPMAssertionTypePreventSystemSleep",
+                &IOPM_PREVENT_SYSTEM_SLEEP as *const _ as u64,
+                "kIOPMAssertionTypePreventSystemSleep data symbol"
+            ),
+            (
+                "_kIOPMAssertionTypeExternalMedia",
+                &IOPM_EXTERNAL_MEDIA as *const _ as u64,
+                "kIOPMAssertionTypeExternalMedia data symbol"
+            ),
+            (
+                "_kIOPMAssertionTypeNetworkClientActive",
+                &IOPM_NETWORK_CLIENT as *const _ as u64,
+                "kIOPMAssertionTypeNetworkClientActive data symbol"
+            ),
+            (
+                "_kIOServicePlane",
+                &IO_SERVICE_PLANE as *const _ as u64,
+                "kIOServicePlane data symbol"
+            ),
+            (
+                "_kIOPowerPlane",
+                &IO_POWER_PLANE as *const _ as u64,
+                "kIOPowerPlane data symbol"
+            ),
+            (
+                "_kIODeviceTreePlane",
+                &IO_DEVICE_TREE_PLANE as *const _ as u64,
+                "kIODeviceTreePlane data symbol"
+            ),
+            (
+                "_kIOUSBPlane",
+                &IO_USB_PLANE as *const _ as u64,
+                "kIOUSBPlane data symbol"
+            ),
+            (
+                "_kIOFireWirePlane",
+                &IO_FIREWIRE_PLANE as *const _ as u64,
+                "kIOFireWirePlane data symbol"
+            ),
+            (
+                "_kIOPMAssertionLevelOn",
+                &IOPM_ASSERTION_LEVEL_ON as *const u32 as u64,
+                "kIOPMAssertionLevelOn data symbol (u32=255)"
+            ),
+            (
+                "_kIOPMAssertionLevelOff",
+                &IOPM_ASSERTION_LEVEL_OFF as *const u32 as u64,
+                "kIOPMAssertionLevelOff data symbol (u32=0)"
+            ),
+            (
+                "_kIOUSBDeviceClassName",
+                &IO_USB_DEVICE_CLASS_NAME as *const _ as u64,
+                "kIOUSBDeviceClassName data symbol"
+            ),
+            (
+                "_kIOUSBInterfaceClassName",
+                &IO_USB_INTERFACE_CLASS_NAME as *const _ as u64,
+                "kIOUSBInterfaceClassName data symbol"
+            ),
+            (
+                "_kIOHIDDeviceKey",
+                &IO_HID_DEVICE_KEY as *const _ as u64,
+                "kIOHIDDeviceKey data symbol"
+            ),
+            (
+                "_kIOHIDProductKey",
+                &IO_HID_PRODUCT_KEY as *const _ as u64,
+                "kIOHIDProductKey data symbol"
+            ),
+            (
+                "_kIOHIDVendorIDKey",
+                &IO_HID_VENDOR_ID_KEY as *const _ as u64,
+                "kIOHIDVendorIDKey data symbol"
+            ),
+            (
+                "_kIOHIDProductIDKey",
+                &IO_HID_PRODUCT_ID_KEY as *const _ as u64,
+                "kIOHIDProductIDKey data symbol"
+            ),
+            (
+                "_kIOHIDTransportKey",
+                &IO_HID_TRANSPORT_KEY as *const _ as u64,
+                "kIOHIDTransportKey data symbol"
+            ),
+            (
+                "_kIOMediaBSDNameKey",
+                &IO_MEDIA_BSD_NAME_KEY as *const _ as u64,
+                "kIOMediaBSDNameKey data symbol"
+            ),
+            (
+                "_kIOMediaWholeKey",
+                &IO_MEDIA_WHOLE_KEY as *const _ as u64,
+                "kIOMediaWholeKey data symbol"
+            ),
+            (
+                "_kIOMediaLeafKey",
+                &IO_MEDIA_LEAF_KEY as *const _ as u64,
+                "kIOMediaLeafKey data symbol"
+            ),
+            (
+                "_kIOMediaSizeKey",
+                &IO_MEDIA_SIZE_KEY as *const _ as u64,
+                "kIOMediaSizeKey data symbol"
+            )
         );
 
         log::debug!("IOKitStubs: registered 130+ IOKit shims + 28 data symbols");
@@ -1042,9 +1355,7 @@ pub extern "C" fn shim_io_service_matching(name: *const u8) -> u64 {
 ///
 /// Looks up the class from the tracked matching dict, then finds the first
 /// matching synthetic service in the registry.
-pub extern "C" fn shim_io_service_get_matching_service(
-    _master_port: u32, matching: u64,
-) -> u32 {
+pub extern "C" fn shim_io_service_get_matching_service(_master_port: u32, matching: u64) -> u32 {
     let class_name = match lookup_matching_class(matching) {
         Some(c) => c,
         None => return 0,
@@ -1057,13 +1368,17 @@ pub extern "C" fn shim_io_service_get_matching_service(
 ///
 /// Populates an iterator with all matching services.
 pub extern "C" fn shim_io_service_get_matching_services(
-    _master_port: u32, matching: u64, existing: *mut u32,
+    _master_port: u32,
+    matching: u64,
+    existing: *mut u32,
 ) -> i32 {
     let class_name = match lookup_matching_class(matching) {
         Some(c) => c,
         None => {
             if !existing.is_null() {
-                unsafe { *existing = 0; }
+                unsafe {
+                    *existing = 0;
+                }
             }
             return K_IO_RETURN_SUCCESS;
         }
@@ -1078,17 +1393,24 @@ pub extern "C" fn shim_io_service_get_matching_services(
 
     let iter_handle = create_iterator(matching_handles);
     if !existing.is_null() {
-        unsafe { *existing = iter_handle; }
+        unsafe {
+            *existing = iter_handle;
+        }
     }
     K_IO_RETURN_SUCCESS
 }
 
 /// `IOServiceOpen` → kIOReturnSuccess with synthetic connect port.
 pub extern "C" fn shim_io_service_open(
-    _service: u32, _owning_task: u32, _type_: u32, connect: *mut u32,
+    _service: u32,
+    _owning_task: u32,
+    _type_: u32,
+    connect: *mut u32,
 ) -> i32 {
     if !connect.is_null() {
-        unsafe { *connect = alloc_handle(); }
+        unsafe {
+            *connect = alloc_handle();
+        }
     }
     K_IO_RETURN_SUCCESS
 }
@@ -1098,7 +1420,9 @@ pub extern "C" fn shim_io_service_open(
 /// `IOMasterPort(bootstrap, &port) → kern_return_t`
 pub extern "C" fn shim_io_master_port(_bootstrap: u32, port: *mut u32) -> i32 {
     if !port.is_null() {
-        unsafe { *port = 0; } // MACH_PORT_NULL — same as kIOMasterPortDefault
+        unsafe {
+            *port = 0;
+        } // MACH_PORT_NULL — same as kIOMasterPortDefault
     }
     K_IO_RETURN_SUCCESS
 }
@@ -1116,9 +1440,7 @@ pub extern "C" fn shim_io_return_not_found(_a: u64, _b: u64, _c: *mut u32) -> i3
 }
 
 /// Generic stub returning `kIOReturnUnsupported` (multi-arg).
-pub extern "C" fn shim_io_return_unsupported_stub(
-    _a: u64, _b: u64, _c: u64, _d: u64,
-) -> i32 {
+pub extern "C" fn shim_io_return_unsupported_stub(_a: u64, _b: u64, _c: u64, _d: u64) -> i32 {
     K_IO_RETURN_UNSUPPORTED
 }
 
@@ -1172,8 +1494,7 @@ pub extern "C" fn shim_io_object_conforms_to(obj: u32, class_name: *const u8) ->
     if class_name.is_null() {
         return 0;
     }
-    let target = unsafe { CStr::from_ptr(class_name as *const _) }
-        .to_string_lossy();
+    let target = unsafe { CStr::from_ptr(class_name as *const _) }.to_string_lossy();
     if let Some(service) = find_service_by_handle(obj) {
         if service.class_name == target.as_ref() {
             return 1;
@@ -1241,8 +1562,12 @@ fn extract_key_string(key: u64) -> Option<String> {
         let mut len = 0usize;
         while len < 256 {
             let byte = *p.add(len);
-            if byte == 0 { break; }
-            if byte > 127 { return None; }
+            if byte == 0 {
+                break;
+            }
+            if byte > 127 {
+                return None;
+            }
             len += 1;
         }
         if len > 0 && len < 256 {
@@ -1262,36 +1587,34 @@ fn lookup_service_property(service_handle: u32, key: &str) -> u64 {
     };
 
     match service.class_name {
-        "IOPlatformExpertDevice" | "AppleACPIPlatformExpert" => {
-            match key {
-                "IOPlatformSerialNumber" => {
-                    let serial = read_sysfs("/sys/class/dmi/id/product_serial")
-                        .unwrap_or_else(|| "BURDETTIE0001".to_string());
-                    alloc_cfstring(&serial)
-                }
-                "IOPlatformUUID" => {
-                    let uuid = read_sysfs("/sys/class/dmi/id/product_uuid")
-                        .unwrap_or_else(|| "00000000-0000-0000-0000-000000000000".to_string());
-                    alloc_cfstring(&uuid)
-                }
-                "model" => {
-                    let model = read_sysfs("/sys/class/dmi/id/product_name")
-                        .unwrap_or_else(|| "BurdettieOS Virtual Platform".to_string());
-                    alloc_cfstring(&model)
-                }
-                "board-id" => {
-                    let board = read_sysfs("/sys/class/dmi/id/board_name")
-                        .unwrap_or_else(|| "BurdettieOS".to_string());
-                    alloc_cfstring(&board)
-                }
-                "manufacturer" => {
-                    let mfg = read_sysfs("/sys/class/dmi/id/sys_vendor")
-                        .unwrap_or_else(|| "BurdettieOS".to_string());
-                    alloc_cfstring(&mfg)
-                }
-                _ => 0,
+        "IOPlatformExpertDevice" | "AppleACPIPlatformExpert" => match key {
+            "IOPlatformSerialNumber" => {
+                let serial = read_sysfs("/sys/class/dmi/id/product_serial")
+                    .unwrap_or_else(|| "BURDETTIE0001".to_string());
+                alloc_cfstring(&serial)
             }
-        }
+            "IOPlatformUUID" => {
+                let uuid = read_sysfs("/sys/class/dmi/id/product_uuid")
+                    .unwrap_or_else(|| "00000000-0000-0000-0000-000000000000".to_string());
+                alloc_cfstring(&uuid)
+            }
+            "model" => {
+                let model = read_sysfs("/sys/class/dmi/id/product_name")
+                    .unwrap_or_else(|| "BurdettieOS Virtual Platform".to_string());
+                alloc_cfstring(&model)
+            }
+            "board-id" => {
+                let board = read_sysfs("/sys/class/dmi/id/board_name")
+                    .unwrap_or_else(|| "BurdettieOS".to_string());
+                alloc_cfstring(&board)
+            }
+            "manufacturer" => {
+                let mfg = read_sysfs("/sys/class/dmi/id/sys_vendor")
+                    .unwrap_or_else(|| "BurdettieOS".to_string());
+                alloc_cfstring(&mfg)
+            }
+            _ => 0,
+        },
         "IOPMPowerSource" | "AppleSmartBattery" => {
             #[cfg(target_os = "linux")]
             if let Some(bat_path) = first_battery_path() {
@@ -1309,8 +1632,8 @@ fn lookup_service_property(service_handle: u32, key: &str) -> u64 {
                             .unwrap_or(0)
                     }
                     "IsCharging" | "Is Charging" => {
-                        let status = read_sysfs(&format!("{}/status", bat_path))
-                            .unwrap_or_default();
+                        let status =
+                            read_sysfs(&format!("{}/status", bat_path)).unwrap_or_default();
                         alloc_cfbool(status == "Charging")
                     }
                     "ExternalConnected" => {
@@ -1318,69 +1641,64 @@ fn lookup_service_property(service_handle: u32, key: &str) -> u64 {
                             .unwrap_or_else(|| "0".to_string());
                         alloc_cfbool(ac.trim() == "1")
                     }
-                    "DesignCapacity" => {
-                        read_sysfs_i64(&format!("{}/energy_full_design", bat_path))
-                            .or_else(|| read_sysfs_i64(&format!("{}/charge_full_design", bat_path)))
-                            .map(alloc_cfnumber_i64)
-                            .unwrap_or(0)
-                    }
-                    "CycleCount" => {
-                        read_sysfs_i64(&format!("{}/cycle_count", bat_path))
-                            .map(alloc_cfnumber_i64)
-                            .unwrap_or(0)
-                    }
-                    "Temperature" => {
-                        read_sysfs_i64(&format!("{}/temp", bat_path))
-                            .map(alloc_cfnumber_i64)
-                            .unwrap_or(0)
-                    }
+                    "DesignCapacity" => read_sysfs_i64(&format!("{}/energy_full_design", bat_path))
+                        .or_else(|| read_sysfs_i64(&format!("{}/charge_full_design", bat_path)))
+                        .map(alloc_cfnumber_i64)
+                        .unwrap_or(0),
+                    "CycleCount" => read_sysfs_i64(&format!("{}/cycle_count", bat_path))
+                        .map(alloc_cfnumber_i64)
+                        .unwrap_or(0),
+                    "Temperature" => read_sysfs_i64(&format!("{}/temp", bat_path))
+                        .map(alloc_cfnumber_i64)
+                        .unwrap_or(0),
                     _ => 0,
                 };
             }
             0
         }
-        "IOBlockStorageDevice" | "IOMedia" => {
-            match key {
-                "BSD Name" | "BSD name" => {
-                    #[cfg(target_os = "linux")]
-                    if let Ok(entries) = std::fs::read_dir("/sys/block") {
-                        for entry in entries.flatten() {
-                            let name = entry.file_name();
-                            let name = name.to_string_lossy();
-                            if name.starts_with("sd") || name.starts_with("vd")
-                                || name.starts_with("nvme") || name.starts_with("mmcblk")
-                            {
-                                return alloc_cfstring(&name);
-                            }
+        "IOBlockStorageDevice" | "IOMedia" => match key {
+            "BSD Name" | "BSD name" => {
+                #[cfg(target_os = "linux")]
+                if let Ok(entries) = std::fs::read_dir("/sys/block") {
+                    for entry in entries.flatten() {
+                        let name = entry.file_name();
+                        let name = name.to_string_lossy();
+                        if name.starts_with("sd")
+                            || name.starts_with("vd")
+                            || name.starts_with("nvme")
+                            || name.starts_with("mmcblk")
+                        {
+                            return alloc_cfstring(&name);
                         }
                     }
-                    alloc_cfstring("disk0")
                 }
-                "Size" | "size" => {
-                    #[cfg(target_os = "linux")]
-                    if let Ok(entries) = std::fs::read_dir("/sys/block") {
-                        for entry in entries.flatten() {
-                            let name = entry.file_name();
-                            let name = name.to_string_lossy();
-                            if name.starts_with("sd") || name.starts_with("vd")
-                                || name.starts_with("nvme") || name.starts_with("mmcblk")
-                            {
-                                if let Some(size) = read_sysfs_i64(
-                                    &format!("/sys/block/{}/size", name),
-                                ) {
-                                    return alloc_cfnumber_i64(size * 512);
-                                }
-                            }
-                        }
-                    }
-                    0
-                }
-                "Whole" => alloc_cfbool(true),
-                "Leaf" => alloc_cfbool(false),
-                "Content" => alloc_cfstring("GUID_partition_scheme"),
-                _ => 0,
+                alloc_cfstring("disk0")
             }
-        }
+            "Size" | "size" => {
+                #[cfg(target_os = "linux")]
+                if let Ok(entries) = std::fs::read_dir("/sys/block") {
+                    for entry in entries.flatten() {
+                        let name = entry.file_name();
+                        let name = name.to_string_lossy();
+                        if name.starts_with("sd")
+                            || name.starts_with("vd")
+                            || name.starts_with("nvme")
+                            || name.starts_with("mmcblk")
+                        {
+                            if let Some(size) = read_sysfs_i64(&format!("/sys/block/{}/size", name))
+                            {
+                                return alloc_cfnumber_i64(size * 512);
+                            }
+                        }
+                    }
+                }
+                0
+            }
+            "Whole" => alloc_cfbool(true),
+            "Leaf" => alloc_cfbool(false),
+            "Content" => alloc_cfstring("GUID_partition_scheme"),
+            _ => 0,
+        },
         "IONetworkInterface" | "IOEthernetInterface" => {
             match key {
                 "BSD Name" | "BSD name" => {
@@ -1403,9 +1721,9 @@ fn lookup_service_property(service_handle: u32, key: &str) -> u64 {
                             let name = entry.file_name();
                             let name = name.to_string_lossy();
                             if name != "lo" {
-                                if let Some(mac) = read_sysfs(
-                                    &format!("/sys/class/net/{}/address", name),
-                                ) {
+                                if let Some(mac) =
+                                    read_sysfs(&format!("/sys/class/net/{}/address", name))
+                                {
                                     return alloc_cfstring(&mac);
                                 }
                             }
@@ -1456,13 +1774,20 @@ fn lookup_service_property(service_handle: u32, key: &str) -> u64 {
 
 /// `IORegistryEntryCreateCFProperty(entry, key, alloc, opts) → CFTypeRef`
 pub extern "C" fn shim_io_registry_entry_create_cf_property(
-    entry: u32, key: u64, _allocator: u64, _options: u32,
+    entry: u32,
+    key: u64,
+    _allocator: u64,
+    _options: u32,
 ) -> u64 {
     let key_str = match extract_key_string(key) {
         Some(k) => k,
         None => return 0,
     };
-    log::debug!("IORegistryEntryCreateCFProperty({}, \"{}\")", entry, key_str);
+    log::debug!(
+        "IORegistryEntryCreateCFProperty({}, \"{}\")",
+        entry,
+        key_str
+    );
     lookup_service_property(entry, &key_str)
 }
 
@@ -1471,13 +1796,21 @@ pub extern "C" fn shim_io_registry_entry_create_cf_property(
 /// Searches the registry tree — we just delegate to CreateCFProperty since our
 /// tree is flat.
 pub extern "C" fn shim_io_registry_entry_search_cf_property(
-    entry: u32, _plane: *const u8, key: u64, _allocator: u64, _options: u32,
+    entry: u32,
+    _plane: *const u8,
+    key: u64,
+    _allocator: u64,
+    _options: u32,
 ) -> u64 {
     let key_str = match extract_key_string(key) {
         Some(k) => k,
         None => return 0,
     };
-    log::debug!("IORegistryEntrySearchCFProperty({}, \"{}\")", entry, key_str);
+    log::debug!(
+        "IORegistryEntrySearchCFProperty({}, \"{}\")",
+        entry,
+        key_str
+    );
 
     // Try the entry itself first
     let result = lookup_service_property(entry, &key_str);
@@ -1496,9 +1829,7 @@ pub extern "C" fn shim_io_registry_entry_search_cf_property(
 }
 
 /// `IORegistryEntryGetName(entry, name_buf) → kern_return_t`
-pub extern "C" fn shim_io_registry_entry_get_name(
-    entry: u32, name_buf: *mut u8,
-) -> i32 {
+pub extern "C" fn shim_io_registry_entry_get_name(entry: u32, name_buf: *mut u8) -> i32 {
     if name_buf.is_null() {
         return K_IO_RETURN_UNSUPPORTED;
     }
@@ -1521,7 +1852,9 @@ pub extern "C" fn shim_io_registry_entry_get_name(
 
 /// `IORegistryEntryGetPath(entry, plane, path_buf) → kern_return_t`
 pub extern "C" fn shim_io_registry_entry_get_path(
-    entry: u32, _plane: *const u8, path_buf: *mut u8,
+    entry: u32,
+    _plane: *const u8,
+    path_buf: *mut u8,
 ) -> i32 {
     if path_buf.is_null() {
         return K_IO_RETURN_UNSUPPORTED;
@@ -1539,7 +1872,10 @@ pub extern "C" fn shim_io_registry_entry_get_path(
 
 /// `IORegistryEntryCreateCFProperties(entry, &props, alloc, opts) → kern_return_t`
 pub extern "C" fn shim_io_registry_entry_create_cf_properties(
-    entry: u32, properties: *mut u64, _allocator: u64, _options: u32,
+    entry: u32,
+    properties: *mut u64,
+    _allocator: u64,
+    _options: u32,
 ) -> i32 {
     if properties.is_null() {
         return K_IO_RETURN_UNSUPPORTED;
@@ -1547,12 +1883,17 @@ pub extern "C" fn shim_io_registry_entry_create_cf_properties(
     let service = match find_service_by_handle(entry) {
         Some(s) => s,
         None => {
-            unsafe { *properties = 0; }
+            unsafe {
+                *properties = 0;
+            }
             return K_IO_RETURN_NOT_FOUND;
         }
     };
 
-    log::debug!("IORegistryEntryCreateCFProperties(\"{}\")", service.class_name);
+    log::debug!(
+        "IORegistryEntryCreateCFProperties(\"{}\")",
+        service.class_name
+    );
 
     let dict = match service.class_name {
         "IOPlatformExpertDevice" | "AppleACPIPlatformExpert" => build_platform_expert_props(),
@@ -1586,7 +1927,9 @@ pub extern "C" fn shim_io_registry_entry_create_cf_properties(
         }
     };
 
-    unsafe { *properties = dict; }
+    unsafe {
+        *properties = dict;
+    }
     K_IO_RETURN_SUCCESS
 }
 
@@ -1601,22 +1944,30 @@ pub extern "C" fn shim_io_registry_get_root_entry(_master_port: u32) -> u32 {
 
 /// `IORegistryEntryGetParentEntry(entry, plane, &parent) → kern_return_t`
 pub extern "C" fn shim_io_registry_entry_get_parent(
-    _entry: u32, _plane: *const u8, parent: *mut u32,
+    _entry: u32,
+    _plane: *const u8,
+    parent: *mut u32,
 ) -> i32 {
     if !parent.is_null() {
         // Return the root entry as the parent
-        unsafe { *parent = shim_io_registry_get_root_entry(0); }
+        unsafe {
+            *parent = shim_io_registry_get_root_entry(0);
+        }
     }
     K_IO_RETURN_SUCCESS
 }
 
 /// `IORegistryEntryGetChildIterator(entry, plane, &iter) → kern_return_t`
 pub extern "C" fn shim_io_registry_entry_get_child_iterator(
-    _entry: u32, _plane: *const u8, iter: *mut u32,
+    _entry: u32,
+    _plane: *const u8,
+    iter: *mut u32,
 ) -> i32 {
     if !iter.is_null() {
         // Empty iterator
-        unsafe { *iter = create_iterator(vec![]); }
+        unsafe {
+            *iter = create_iterator(vec![]);
+        }
     }
     K_IO_RETURN_SUCCESS
 }
@@ -1679,7 +2030,12 @@ pub extern "C" fn shim_iopm_assertion_create(
     let type_str = extract_key_string(assertion_type).unwrap_or_else(|| "unknown".to_string());
     let name_str = extract_key_string(assertion_name).unwrap_or_else(|| "unnamed".to_string());
 
-    log::debug!("IOPMAssertionCreate(type=\"{}\", name=\"{}\") → id={}", type_str, name_str, id);
+    log::debug!(
+        "IOPMAssertionCreate(type=\"{}\", name=\"{}\") → id={}",
+        type_str,
+        name_str,
+        id
+    );
 
     {
         let mut guard = ACTIVE_ASSERTIONS.lock().unwrap();
@@ -1688,14 +2044,17 @@ pub extern "C" fn shim_iopm_assertion_create(
     }
 
     if !assertion_id.is_null() {
-        unsafe { *assertion_id = id; }
+        unsafe {
+            *assertion_id = id;
+        }
     }
     K_IO_RETURN_SUCCESS
 }
 
 /// `IOPMAssertionCreateWithProperties(props, &id) → kern_return_t`
 pub extern "C" fn shim_iopm_assertion_create_with_props(
-    _props: u64, assertion_id: *mut u32,
+    _props: u64,
+    assertion_id: *mut u32,
 ) -> i32 {
     let id = NEXT_ASSERTION_ID.fetch_add(1, Ordering::Relaxed);
 
@@ -1708,7 +2067,9 @@ pub extern "C" fn shim_iopm_assertion_create_with_props(
     }
 
     if !assertion_id.is_null() {
-        unsafe { *assertion_id = id; }
+        unsafe {
+            *assertion_id = id;
+        }
     }
     K_IO_RETURN_SUCCESS
 }
@@ -1729,7 +2090,9 @@ pub extern "C" fn shim_iopm_copy_battery_info(_master_port: u32, info: *mut u64)
     if has_sysfs_battery() {
         let dict = build_power_source_dict();
         if dict != 0 && !info.is_null() {
-            unsafe { *info = dict; }
+            unsafe {
+                *info = dict;
+            }
             return K_IO_RETURN_SUCCESS;
         }
     }
@@ -1765,9 +2128,7 @@ pub extern "C" fn shim_iops_copy_power_sources_list(_info: u64) -> u64 {
 }
 
 /// `IOPSGetPowerSourceDescription(info, source) → CFDictionaryRef`
-pub extern "C" fn shim_iops_get_power_source_description(
-    _info: u64, _source: u64,
-) -> u64 {
+pub extern "C" fn shim_iops_get_power_source_description(_info: u64, _source: u64) -> u64 {
     build_power_source_dict()
 }
 
@@ -1793,23 +2154,21 @@ pub extern "C" fn shim_iops_get_providing_type(_snapshot: u64) -> u64 {
 ///
 /// Returns a unique 64-bit ID for each registry entry. The ID is stable
 /// across calls for the same handle.
-pub extern "C" fn shim_io_registry_entry_get_id(
-    entry: u32, entry_id: *mut u64,
-) -> i32 {
+pub extern "C" fn shim_io_registry_entry_get_id(entry: u32, entry_id: *mut u64) -> i32 {
     if entry_id.is_null() {
         return K_IO_RETURN_UNSUPPORTED;
     }
     let id = get_entry_id(entry);
-    unsafe { *entry_id = id; }
+    unsafe {
+        *entry_id = id;
+    }
     K_IO_RETURN_SUCCESS
 }
 
 /// `IORegistryEntryFromPath(masterPort, path) → io_registry_entry_t`
 ///
 /// Looks up a registry entry by absolute path (e.g. "IOService:/IOPlatformExpertDevice").
-pub extern "C" fn shim_io_registry_entry_from_path(
-    _master_port: u32, path: *const u8,
-) -> u32 {
+pub extern "C" fn shim_io_registry_entry_from_path(_master_port: u32, path: *const u8) -> u32 {
     if path.is_null() {
         return 0;
     }
@@ -1839,7 +2198,9 @@ pub extern "C" fn shim_io_registry_entry_from_path(
 
 /// `IORegistryEntryGetLocationInPlane(entry, plane, location_buf) → kern_return_t`
 pub extern "C" fn shim_io_registry_entry_get_location(
-    _entry: u32, _plane: *const u8, location: *mut u8,
+    _entry: u32,
+    _plane: *const u8,
+    location: *mut u8,
 ) -> i32 {
     if !location.is_null() {
         let loc = b"0\0";
@@ -1856,7 +2217,9 @@ pub extern "C" fn shim_io_registry_entry_get_location(
 ///
 /// Creates a matching dict for a BSD device name (e.g. "disk0", "en0").
 pub extern "C" fn shim_io_bsd_name_matching(
-    _master_port: u32, _options: u32, name: *const u8,
+    _master_port: u32,
+    _options: u32,
+    name: *const u8,
 ) -> u64 {
     if name.is_null() {
         return 0;
@@ -1872,11 +2235,11 @@ pub extern "C" fn shim_io_bsd_name_matching(
 }
 
 /// `IOKitGetBusyState(masterPort, &busyState) → kern_return_t`
-pub extern "C" fn shim_io_kit_get_busy_state(
-    _master_port: u32, busy_state: *mut u32,
-) -> i32 {
+pub extern "C" fn shim_io_kit_get_busy_state(_master_port: u32, busy_state: *mut u32) -> i32 {
     if !busy_state.is_null() {
-        unsafe { *busy_state = 0; } // not busy
+        unsafe {
+            *busy_state = 0;
+        } // not busy
     }
     K_IO_RETURN_SUCCESS
 }
@@ -1893,10 +2256,14 @@ pub extern "C" fn shim_io_create_plugin_interface(
     score: *mut i32,
 ) -> i32 {
     if !plugin.is_null() {
-        unsafe { *plugin = 0; }
+        unsafe {
+            *plugin = 0;
+        }
     }
     if !score.is_null() {
-        unsafe { *score = 0; }
+        unsafe {
+            *score = 0;
+        }
     }
     K_IO_RETURN_UNSUPPORTED
 }
@@ -1906,9 +2273,7 @@ pub extern "C" fn shim_io_create_plugin_interface(
 /// `IODisplayCreateInfoDictionary(service, options) → CFDictionaryRef`
 ///
 /// Returns a dict with display properties sourced from sysfs DRM.
-pub extern "C" fn shim_io_display_create_info_dict(
-    _service: u32, _options: u32,
-) -> u64 {
+pub extern "C" fn shim_io_display_create_info_dict(_service: u32, _options: u32) -> u64 {
     let dict = alloc_mutable_dict();
     if dict == 0 {
         return 0;
@@ -1928,14 +2293,20 @@ pub extern "C" fn shim_io_display_create_info_dict(
                 // Try to read the connector name and status
                 let path = format!("/sys/class/drm/{}", name_str);
                 if let Some(status) = read_sysfs(&format!("{}/status", path)) {
-                    dict_set(dict, alloc_cfstring("DisplayConnectorStatus"),
-                             alloc_cfstring(&status));
+                    dict_set(
+                        dict,
+                        alloc_cfstring("DisplayConnectorStatus"),
+                        alloc_cfstring(&status),
+                    );
                 }
                 if let Some(modes) = read_sysfs(&format!("{}/modes", path)) {
                     // First line is the preferred mode
                     if let Some(mode) = modes.lines().next() {
-                        dict_set(dict, alloc_cfstring("DisplayPreferredMode"),
-                                 alloc_cfstring(mode));
+                        dict_set(
+                            dict,
+                            alloc_cfstring("DisplayPreferredMode"),
+                            alloc_cfstring(mode),
+                        );
                     }
                 }
                 break;
@@ -1944,9 +2315,21 @@ pub extern "C" fn shim_io_display_create_info_dict(
     }
 
     // Fallback display info
-    dict_set(dict, alloc_cfstring("DisplayVendorID"), alloc_cfnumber_i64(0));
-    dict_set(dict, alloc_cfstring("DisplayProductID"), alloc_cfnumber_i64(0));
-    dict_set(dict, alloc_cfstring("DisplaySerialNumber"), alloc_cfnumber_i64(0));
+    dict_set(
+        dict,
+        alloc_cfstring("DisplayVendorID"),
+        alloc_cfnumber_i64(0),
+    );
+    dict_set(
+        dict,
+        alloc_cfstring("DisplayProductID"),
+        alloc_cfnumber_i64(0),
+    );
+    dict_set(
+        dict,
+        alloc_cfstring("DisplaySerialNumber"),
+        alloc_cfnumber_i64(0),
+    );
 
     dict
 }
@@ -1962,10 +2345,26 @@ pub extern "C" fn shim_iopm_assertion_copy_properties(assertion_id: u32) -> u64 
             if dict == 0 {
                 return 0;
             }
-            dict_set(dict, alloc_cfstring("AssertionType"), alloc_cfstring(type_str));
-            dict_set(dict, alloc_cfstring("AssertionName"), alloc_cfstring(name_str));
-            dict_set(dict, alloc_cfstring("AssertionID"), alloc_cfnumber_i64(assertion_id as i64));
-            dict_set(dict, alloc_cfstring("AssertionLevel"), alloc_cfnumber_i64(255));
+            dict_set(
+                dict,
+                alloc_cfstring("AssertionType"),
+                alloc_cfstring(type_str),
+            );
+            dict_set(
+                dict,
+                alloc_cfstring("AssertionName"),
+                alloc_cfstring(name_str),
+            );
+            dict_set(
+                dict,
+                alloc_cfstring("AssertionID"),
+                alloc_cfnumber_i64(assertion_id as i64),
+            );
+            dict_set(
+                dict,
+                alloc_cfstring("AssertionLevel"),
+                alloc_cfnumber_i64(255),
+            );
             return dict;
         }
     }
@@ -2036,13 +2435,25 @@ fn build_ethernet_props() -> u64 {
                 dict_set(dict, alloc_cfstring("IOMACAddress"), alloc_cfstring(&mac));
             }
             if let Some(mtu) = read_sysfs_i64(&format!("{}/mtu", path)) {
-                dict_set(dict, alloc_cfstring("IOMaxPacketSize"), alloc_cfnumber_i64(mtu));
+                dict_set(
+                    dict,
+                    alloc_cfstring("IOMaxPacketSize"),
+                    alloc_cfnumber_i64(mtu),
+                );
             }
             if let Some(speed) = read_sysfs_i64(&format!("{}/speed", path)) {
-                dict_set(dict, alloc_cfstring("IOLinkSpeed"), alloc_cfnumber_i64(speed * 1_000_000));
+                dict_set(
+                    dict,
+                    alloc_cfstring("IOLinkSpeed"),
+                    alloc_cfnumber_i64(speed * 1_000_000),
+                );
             }
             if let Some(state) = read_sysfs(&format!("{}/operstate", path)) {
-                dict_set(dict, alloc_cfstring("IOLinkStatus"), alloc_cfbool(state == "up"));
+                dict_set(
+                    dict,
+                    alloc_cfstring("IOLinkStatus"),
+                    alloc_cfbool(state == "up"),
+                );
             }
             break; // first real NIC
         }
@@ -2080,7 +2491,11 @@ fn build_block_storage_props() -> u64 {
                 dict_set(dict, alloc_cfstring("Vendor"), alloc_cfstring(&vendor));
             }
             if let Some(ro) = read_sysfs(&format!("{}/ro", path)) {
-                dict_set(dict, alloc_cfstring("Writable"), alloc_cfbool(ro.trim() == "0"));
+                dict_set(
+                    dict,
+                    alloc_cfstring("Writable"),
+                    alloc_cfbool(ro.trim() == "0"),
+                );
             }
             dict_set(dict, alloc_cfstring("Whole"), alloc_cfbool(true));
             break;
@@ -2109,27 +2524,48 @@ fn build_cpu_props() -> u64 {
                     s.starts_with("cpu") && s[3..].parse::<u32>().is_ok()
                 })
                 .count();
-            dict_set(dict, alloc_cfstring("CPUCount"), alloc_cfnumber_i64(count as i64));
+            dict_set(
+                dict,
+                alloc_cfstring("CPUCount"),
+                alloc_cfnumber_i64(count as i64),
+            );
         }
 
         // CPU frequency
-        if let Some(freq) = read_sysfs_i64("/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq") {
+        if let Some(freq) = read_sysfs_i64("/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq")
+        {
             // cpuinfo_max_freq is in kHz
-            dict_set(dict, alloc_cfstring("CPUFrequency"), alloc_cfnumber_i64(freq * 1000));
+            dict_set(
+                dict,
+                alloc_cfstring("CPUFrequency"),
+                alloc_cfnumber_i64(freq * 1000),
+            );
         }
 
         // Thermal zones
         if let Some(temp) = read_sysfs_i64("/sys/class/thermal/thermal_zone0/temp") {
             // temp is in millidegrees Celsius
-            dict_set(dict, alloc_cfstring("CPUTemperature"), alloc_cfnumber_i64(temp));
+            dict_set(
+                dict,
+                alloc_cfstring("CPUTemperature"),
+                alloc_cfnumber_i64(temp),
+            );
         }
     }
 
     // Architecture
     #[cfg(target_arch = "aarch64")]
-    dict_set(dict, alloc_cfstring("CPUArchitecture"), alloc_cfstring("arm64"));
+    dict_set(
+        dict,
+        alloc_cfstring("CPUArchitecture"),
+        alloc_cfstring("arm64"),
+    );
     #[cfg(target_arch = "x86_64")]
-    dict_set(dict, alloc_cfstring("CPUArchitecture"), alloc_cfstring("x86_64"));
+    dict_set(
+        dict,
+        alloc_cfstring("CPUArchitecture"),
+        alloc_cfstring("x86_64"),
+    );
 
     dict
 }
@@ -2188,7 +2624,9 @@ mod tests {
         let mut count = 1;
         while shim_io_iterator_next(iter) != 0 {
             count += 1;
-            if count > 100 { break; }
+            if count > 100 {
+                break;
+            }
         }
     }
 
@@ -2205,7 +2643,10 @@ mod tests {
 
         shim_io_iterator_reset(iter);
         let first_again = shim_io_iterator_next(iter);
-        assert_eq!(first, first_again, "reset should rewind to same first element");
+        assert_eq!(
+            first, first_again,
+            "reset should rewind to same first element"
+        );
     }
 
     #[test]
@@ -2229,8 +2670,14 @@ mod tests {
         let service = shim_io_service_get_matching_service(0, matching);
         assert_ne!(service, 0);
 
-        assert_eq!(shim_io_object_conforms_to(service, b"IOPlatformExpertDevice\0".as_ptr()), 1);
-        assert_eq!(shim_io_object_conforms_to(service, b"IOHIDDevice\0".as_ptr()), 0);
+        assert_eq!(
+            shim_io_object_conforms_to(service, b"IOPlatformExpertDevice\0".as_ptr()),
+            1
+        );
+        assert_eq!(
+            shim_io_object_conforms_to(service, b"IOHIDDevice\0".as_ptr()),
+            0
+        );
     }
 
     #[test]
@@ -2254,7 +2701,10 @@ mod tests {
         let ret = shim_io_registry_entry_get_path(service, std::ptr::null(), buf.as_mut_ptr());
         assert_eq!(ret, K_IO_RETURN_SUCCESS);
         let path = CStr::from_bytes_until_nul(&buf).unwrap().to_string_lossy();
-        assert!(path.starts_with("IOService:/"), "path should start with IOService:/");
+        assert!(
+            path.starts_with("IOService:/"),
+            "path should start with IOService:/"
+        );
     }
 
     #[test]
@@ -2310,11 +2760,21 @@ mod tests {
         let mut id1: u32 = 0;
         let mut id2: u32 = 0;
         assert_eq!(
-            shim_iopm_assertion_create(type_str.as_ptr() as u64, 255, name_str.as_ptr() as u64, &mut id1),
+            shim_iopm_assertion_create(
+                type_str.as_ptr() as u64,
+                255,
+                name_str.as_ptr() as u64,
+                &mut id1
+            ),
             K_IO_RETURN_SUCCESS
         );
         assert_eq!(
-            shim_iopm_assertion_create(type_str.as_ptr() as u64, 255, name_str.as_ptr() as u64, &mut id2),
+            shim_iopm_assertion_create(
+                type_str.as_ptr() as u64,
+                255,
+                name_str.as_ptr() as u64,
+                &mut id2
+            ),
             K_IO_RETURN_SUCCESS
         );
         assert_ne!(id1, id2, "assertion IDs should be unique");
@@ -2325,7 +2785,12 @@ mod tests {
         let type_str = b"Test\0";
         let name_str = b"test\0";
         let mut id: u32 = 0;
-        shim_iopm_assertion_create(type_str.as_ptr() as u64, 255, name_str.as_ptr() as u64, &mut id);
+        shim_iopm_assertion_create(
+            type_str.as_ptr() as u64,
+            255,
+            name_str.as_ptr() as u64,
+            &mut id,
+        );
 
         let ret = shim_iopm_assertion_release(id);
         assert_eq!(ret, K_IO_RETURN_SUCCESS);
@@ -2395,7 +2860,10 @@ mod tests {
         shim_io_service_open(1, 0, 0, &mut connect2);
         assert_ne!(connect1, 0);
         assert_ne!(connect2, 0);
-        assert_ne!(connect1, connect2, "each open should return a unique handle");
+        assert_ne!(
+            connect1, connect2,
+            "each open should return a unique handle"
+        );
     }
 
     #[test]
@@ -2413,7 +2881,11 @@ mod tests {
         assert_ne!(dict, 0, "power source dict should be non-NULL");
         // Should have at least the "Is Present" and "Power Source State" keys
         let count = unsafe { *((dict as usize + 8) as *const u64) };
-        assert!(count >= 2, "dict should have at least 2 keys, got {}", count);
+        assert!(
+            count >= 2,
+            "dict should have at least 2 keys, got {}",
+            count
+        );
     }
 
     // ── New tests for extended IOKit functions ──────────────────────────────
@@ -2507,12 +2979,18 @@ mod tests {
         let name_str = b"TestCopy\0";
         let mut id: u32 = 0;
         shim_iopm_assertion_create(
-            type_str.as_ptr() as u64, 255, name_str.as_ptr() as u64, &mut id,
+            type_str.as_ptr() as u64,
+            255,
+            name_str.as_ptr() as u64,
+            &mut id,
         );
         assert_ne!(id, 0);
 
         let dict = shim_iopm_assertion_copy_properties(id);
-        assert_ne!(dict, 0, "copy properties should return non-NULL for active assertion");
+        assert_ne!(
+            dict, 0,
+            "copy properties should return non-NULL for active assertion"
+        );
 
         // clean up
         shim_iopm_assertion_release(id);
@@ -2529,7 +3007,9 @@ mod tests {
         let result = shim_iops_get_time_remaining();
         // Must be either a positive time, -1 (unknown), or -2 (unlimited/AC)
         assert!(
-            result > 0.0 || result == IOPS_TIME_REMAINING_UNKNOWN || result == IOPS_TIME_REMAINING_UNLIMITED,
+            result > 0.0
+                || result == IOPS_TIME_REMAINING_UNKNOWN
+                || result == IOPS_TIME_REMAINING_UNLIMITED,
             "unexpected time remaining value: {}",
             result,
         );

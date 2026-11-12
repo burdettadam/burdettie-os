@@ -3,44 +3,44 @@
 //! Each `register_*_class()` function builds a `ClassInfo` with the
 //! correct method table and registers it in the ObjC runtime.
 
-mod string;
-mod object;
-mod collections;
-mod number;
-mod datetime;
-mod data_url;
-mod error;
-mod system;
-mod threading;
-mod invocation;
-mod text;
 mod advanced_collections;
 mod appkit;
+mod collections;
+mod data_url;
+mod datetime;
+mod error;
+mod framework_stubs;
 mod gap_data;
 mod gap_network;
 mod gap_streams;
-mod xcode_stubs;
+mod invocation;
 mod measurement;
-mod framework_stubs;
+mod number;
+mod object;
+mod string;
+mod system;
+mod text;
+mod threading;
+mod xcode_stubs;
 
-pub use string::*;
-pub use object::*;
-pub use collections::*;
-pub use number::*;
-pub use datetime::*;
-pub use data_url::*;
-pub use error::*;
-pub use system::*;
-pub use threading::*;
-pub use invocation::*;
-pub use text::*;
 pub use advanced_collections::*;
 pub use appkit::*;
+pub use collections::*;
+pub use data_url::*;
+pub use datetime::*;
+pub use error::*;
+pub use framework_stubs::*;
 pub use gap_data::*;
 pub use gap_network::*;
 pub use gap_streams::*;
+pub use invocation::*;
 pub use measurement::*;
-pub use framework_stubs::*;
+pub use number::*;
+pub use object::*;
+pub use string::*;
+pub use system::*;
+pub use text::*;
+pub use threading::*;
 
 use objc_runtime::MethodEntry;
 

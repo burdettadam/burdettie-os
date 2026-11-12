@@ -61,8 +61,11 @@ fn build_class_data() -> Vec<ClassSummary> {
     let mut classes: Vec<ClassSummary> = rt
         .classes_by_name_iter()
         .map(|(name, info)| {
-            let instance_methods: Vec<String> =
-                info.methods.iter().map(|m| m.selector.to_string()).collect();
+            let instance_methods: Vec<String> = info
+                .methods
+                .iter()
+                .map(|m| m.selector.to_string())
+                .collect();
             let class_methods: Vec<String> = info
                 .class_methods
                 .iter()

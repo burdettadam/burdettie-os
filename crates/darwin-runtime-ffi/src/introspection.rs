@@ -122,7 +122,10 @@ pub extern "C" fn darwin_objc_list_classes() -> DarwinClassList {
         };
     };
 
-    let mut names: Vec<String> = rt.classes_by_name_iter().map(|(n, _)| n.to_string()).collect();
+    let mut names: Vec<String> = rt
+        .classes_by_name_iter()
+        .map(|(n, _)| n.to_string())
+        .collect();
     names.sort();
 
     let mut c_names: Vec<*mut c_char> = Vec::with_capacity(names.len());

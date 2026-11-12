@@ -3,11 +3,15 @@
 use std::path::Path;
 
 use libsystem_shims::ShimConfig;
-use macho_exec::{ImageRegistry, StubResolver, DataSymbolStore};
+use macho_exec::{DataSymbolStore, ImageRegistry, StubResolver};
 
 use crate::config::RuntimeConfig;
 use crate::context::RuntimeContext;
 use crate::error::RuntimeError;
+use crate::platform_adapters::{
+    ProviderAllocator, ProviderHasher, ProviderHostSymbols, ProviderThreading,
+    ProviderUnwindRegistry,
+};
 use crate::resolver::CompositeResolver;
 use crate::tracer::RuntimeTracer;
 use crate::RuntimeResult;
@@ -21,44 +25,42 @@ pub(super) fn run_interpreted(
     binary_path: &Path,
     config: &RuntimeConfig,
 ) -> Result<RuntimeResult, RuntimeError> {
-    // Initialize platform hasher for code signature verification
-    #[cfg(target_os = "macos")]
-    macho_parse::set_platform_hasher(std::sync::Arc::new(platform_darwin_host::DarwinHasher));
-    #[cfg(target_os = "linux")]
-    macho_parse::set_platform_hasher(std::sync::Arc::new(platform_linux::LinuxHasher));
+    // Initialize platform hasher for code signature verification.
+    macho_parse::set_platform_hasher(std::sync::Arc::new(ProviderHasher::new(
+        config.platform.clone(),
+    )));
 
     // 1–2. Read + parse — fast path returns cached Arc<[u8]> + Arc<ParsedMachO>.
-    let (main_data, arc_parsed) =
-        if let Some(cached) = crate::parse_cache::lookup(binary_path) {
-            cached
+    let (main_data, arc_parsed) = if let Some(cached) = crate::parse_cache::lookup(binary_path) {
+        cached
+    } else {
+        let data = config
+            .platform
+            .fs()
+            .read(binary_path)
+            .map_err(|e| RuntimeError::Io {
+                path: binary_path.to_path_buf(),
+                source: e,
+            })?;
+        let parsed_result = macho_parse::parse_auto(&data, macho_types::CpuType::Arm64)?;
+        let main_data: std::sync::Arc<[u8]> = if macho_parse::is_fat(&data) {
+            let slice = macho_parse::fat_slice_for_cpu(&data, macho_types::CpuType::Arm64)?;
+            std::sync::Arc::from(slice)
         } else {
-            let data = config
-                .platform
-                .fs()
-                .read(binary_path)
-                .map_err(|e| RuntimeError::Io {
-                    path: binary_path.to_path_buf(),
-                    source: e,
-                })?;
-            let parsed_result = macho_parse::parse_auto(&data, macho_types::CpuType::Arm64)?;
-            let main_data: std::sync::Arc<[u8]> = if macho_parse::is_fat(&data) {
-                let slice =
-                    macho_parse::fat_slice_for_cpu(&data, macho_types::CpuType::Arm64)?;
-                std::sync::Arc::from(slice)
-            } else {
-                std::sync::Arc::from(data)
-            };
-            let arc_parsed = std::sync::Arc::new(parsed_result);
-            let canonical =
-                binary_path.canonicalize().unwrap_or_else(|_| binary_path.to_path_buf());
-            crate::parse_cache::insert_both(
-                binary_path,
-                canonical,
-                main_data.clone(),
-                arc_parsed.clone(),
-            );
-            (main_data, arc_parsed)
+            std::sync::Arc::from(data)
         };
+        let arc_parsed = std::sync::Arc::new(parsed_result);
+        let canonical = binary_path
+            .canonicalize()
+            .unwrap_or_else(|_| binary_path.to_path_buf());
+        crate::parse_cache::insert_both(
+            binary_path,
+            canonical,
+            main_data.clone(),
+            arc_parsed.clone(),
+        );
+        (main_data, arc_parsed)
+    };
 
     // 4. Build shim table
     let shim_config = ShimConfig {
@@ -71,42 +73,24 @@ pub(super) fn run_interpreted(
     let ctx = RuntimeContext::new(&shim_config, &config.shim_set);
 
     // 5. Build composite resolver
-    #[cfg(target_os = "macos")]
     let host_symbols: std::sync::Arc<dyn platform_core::symbols::HostSymbolResolver> =
-        std::sync::Arc::new(platform_darwin_host::DarwinSymbolResolver::new());
-    #[cfg(target_os = "linux")]
-    let host_symbols: std::sync::Arc<dyn platform_core::symbols::HostSymbolResolver> =
-        std::sync::Arc::new(platform_linux::LinuxSymbolResolver::new());
+        std::sync::Arc::new(ProviderHostSymbols::new(config.platform.clone()));
 
     objc_runtime::set_host_symbols(host_symbols.clone());
-    #[cfg(target_os = "macos")]
-    objc_runtime::set_allocator(
-        std::sync::Arc::new(platform_darwin_host::DarwinAllocator),
-    );
-    #[cfg(target_os = "linux")]
-    objc_runtime::set_allocator(
-        std::sync::Arc::new(platform_linux::LinuxAllocator),
-    );
-    #[cfg(target_os = "macos")]
-    objc_runtime::set_threading(
-        std::sync::Arc::new(platform_darwin_host::PosixThreading),
-    );
-    #[cfg(target_os = "linux")]
-    objc_runtime::set_threading(
-        std::sync::Arc::new(platform_linux::LinuxThreading),
-    );
+    objc_runtime::set_allocator(std::sync::Arc::new(ProviderAllocator::new(
+        config.platform.clone(),
+    )));
+    objc_runtime::set_threading(std::sync::Arc::new(ProviderThreading::new(
+        config.platform.clone(),
+    )));
 
     let stub_resolver = StubResolver::new(host_symbols);
     let data_symbols = DataSymbolStore::global();
     let composite = CompositeResolver::new(&ctx.shim_table, data_symbols, Some(&stub_resolver));
 
     // 6. Load + map
-    #[cfg(target_os = "macos")]
     let unwind_registry: std::sync::Arc<dyn platform_core::unwind::UnwindRegistry> =
-        std::sync::Arc::new(platform_darwin_host::DarwinUnwindRegistry);
-    #[cfg(target_os = "linux")]
-    let unwind_registry: std::sync::Arc<dyn platform_core::unwind::UnwindRegistry> =
-        std::sync::Arc::new(platform_linux::LinuxUnwindRegistry::new());
+        std::sync::Arc::new(ProviderUnwindRegistry::new(config.platform.clone()));
     let mut registry = ImageRegistry::new(config.platform.memory(), unwind_registry);
     let binary_dir = binary_path.parent().unwrap_or(Path::new("."));
 
@@ -126,7 +110,10 @@ pub(super) fn run_interpreted(
         if !insert_paths.is_empty() {
             let count =
                 loader::load_insert_libraries(&insert_paths, &mut registry, config.platform.fs());
-            log::info!("DYLD_INSERT_LIBRARIES: loaded {count}/{} libraries", insert_paths.len());
+            log::info!(
+                "DYLD_INSERT_LIBRARIES: loaded {count}/{} libraries",
+                insert_paths.len()
+            );
         }
     }
 
@@ -162,9 +149,11 @@ pub(super) fn run_interpreted(
         .images()
         .iter()
         .flat_map(|loaded| {
-            loaded.image.segments.iter().map(|s| {
-                (s.base as u64, s.base as u64 + s.size as u64)
-            })
+            loaded
+                .image
+                .segments
+                .iter()
+                .map(|s| (s.base as u64, s.base as u64 + s.size as u64))
         })
         .collect();
 
@@ -206,8 +195,8 @@ pub(super) fn run_interpreted(
 
             if !app_loads.is_empty() {
                 // Build segment list for the +load interpreter.
-                let mut load_segments: Vec<(u64, *mut u8, usize, bool)> = registry
-                    .images()[app_idx]
+                let mut load_segments: Vec<(u64, *mut u8, usize, bool)> = registry.images()
+                    [app_idx]
                     .image
                     .segments
                     .iter()
@@ -226,9 +215,7 @@ pub(super) fn run_interpreted(
                     );
                     let ffi = interp_bridge::build_interpreter_bridge(&guest_ranges);
                     // SAFETY: segments are valid for the duration of this block.
-                    let mut mem = unsafe {
-                        arm64_translate::Memory::from_segments(&load_segments)
-                    };
+                    let mut mem = unsafe { arm64_translate::Memory::from_segments(&load_segments) };
                     mem.host_passthrough = true;
                     let mut cpu = arm64_translate::CpuState::new();
                     cpu.pc = *imp;

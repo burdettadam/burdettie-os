@@ -86,8 +86,14 @@ impl FfiBridge {
     pub fn call(&self, addr: u64, args: &FfiCallArgs) -> Option<FfiResult> {
         let handler = self.handlers.get(&addr)?;
         let name = self.names.get(&addr).map(|s| s.as_str()).unwrap_or("???");
-        log::trace!("FFI call: {} ({:#x}) args=[{:#x}, {:#x}, {:#x}, ...]",
-            name, addr, args.x[0], args.x[1], args.x[2]);
+        log::trace!(
+            "FFI call: {} ({:#x}) args=[{:#x}, {:#x}, {:#x}, ...]",
+            name,
+            addr,
+            args.x[0],
+            args.x[1],
+            args.x[2]
+        );
         Some(handler(args))
     }
 
@@ -114,7 +120,8 @@ impl FfiBridge {
             // SAFETY: addr came from fixup resolution (CompositeResolver/StubResolver)
             // and is a valid host function pointer.
             unsafe {
-                let (x0, x1, d0, d1) = call_host_capturing(addr, &args.x, args.host_x8, args.guest_sp, &args.d);
+                let (x0, x1, d0, d1) =
+                    call_host_capturing(addr, &args.x, args.host_x8, args.guest_sp, &args.d);
                 return FfiResult::ReturnFull { x0, x1, d0, d1 };
             }
         }
@@ -227,9 +234,10 @@ pub unsafe fn call_host_capturing(
     _guest_sp: u64,
     _fp_args: &[u64; 8],
 ) -> (u64, u64, u64, u64) {
-    let f: extern "C" fn(u64, u64, u64, u64, u64, u64, u64, u64) -> u64 =
-        std::mem::transmute(addr);
-    let result = f(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7]);
+    let f: extern "C" fn(u64, u64, u64, u64, u64, u64, u64, u64) -> u64 = std::mem::transmute(addr);
+    let result = f(
+        args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7],
+    );
     (result, 0, 0, 0)
 }
 
@@ -253,36 +261,34 @@ pub fn register_libc_handlers(
     for (addr, name) in resolved {
         match name.as_str() {
             "_puts" | "puts" => {
-                bridge.register(addr, &name, Box::new(|_args| {
-                    FfiResult::Return(0)
-                }));
+                bridge.register(addr, &name, Box::new(|_args| FfiResult::Return(0)));
             }
             "_exit" | "exit" => {
-                bridge.register(addr, &name, Box::new(|args: &FfiCallArgs| {
-                    FfiResult::Exit(args.x[0])
-                }));
+                bridge.register(
+                    addr,
+                    &name,
+                    Box::new(|args: &FfiCallArgs| FfiResult::Exit(args.x[0])),
+                );
             }
             "_printf" | "printf" | "_fprintf" | "fprintf" => {
-                bridge.register(addr, &name, Box::new(|_args| {
-                    FfiResult::Return(0)
-                }));
+                bridge.register(addr, &name, Box::new(|_args| FfiResult::Return(0)));
             }
             "_strlen" | "strlen" => {
-                bridge.register(addr, &name, Box::new(|_args| {
-                    FfiResult::Return(0)
-                }));
+                bridge.register(addr, &name, Box::new(|_args| FfiResult::Return(0)));
             }
             "_malloc" | "malloc" | "_calloc" | "calloc" | "_free" | "free" => {
-                bridge.register(addr, &name, Box::new(|_args| {
-                    FfiResult::Return(0)
-                }));
+                bridge.register(addr, &name, Box::new(|_args| FfiResult::Return(0)));
             }
             _ => {
                 let sym = name.clone();
-                bridge.register(addr, &name, Box::new(move |_args| {
-                    log::debug!("FFI stub call: {} (returning 0)", sym);
-                    FfiResult::Return(0)
-                }));
+                bridge.register(
+                    addr,
+                    &name,
+                    Box::new(move |_args| {
+                        log::debug!("FFI stub call: {} (returning 0)", sym);
+                        FfiResult::Return(0)
+                    }),
+                );
             }
         }
     }

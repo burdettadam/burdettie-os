@@ -5,9 +5,8 @@
 use std::cell::UnsafeCell;
 
 use super::{
-    SyncArray, nsobject_class_addr, nsobject_metaclass_addr,
-    nsdictionary_class_addr, nsdictionary_metaclass_addr,
-    nsnumber_class_addr, nsnumber_metaclass_addr,
+    nsdictionary_class_addr, nsdictionary_metaclass_addr, nsnumber_class_addr,
+    nsnumber_metaclass_addr, nsobject_class_addr, nsobject_metaclass_addr, SyncArray,
 };
 
 // ── AppKit class pairs (Phase C5) ──────────────────────────────────
@@ -160,6 +159,13 @@ define_class_pair!(child NSNIB_CLASS_DATA, NSNIB_METACLASS_DATA, NSNIB_INIT,
 
 // ── AppKit Phase C8 GUI classes ────────────────────────────────
 
+define_class_pair!(child NSSTORYBOARD_CLASS_DATA, NSSTORYBOARD_METACLASS_DATA, NSSTORYBOARD_INIT,
+    ensure: ensure_nsstoryboard_init,
+    class_addr: nsstoryboard_class_addr,
+    meta_addr: nsstoryboard_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
 define_class_pair!(child NSVIEWCONTROLLER_CLASS_DATA, NSVIEWCONTROLLER_METACLASS_DATA, NSVIEWCONTROLLER_INIT,
     ensure: ensure_nsviewcontroller_init,
     class_addr: nsviewcontroller_class_addr,
@@ -173,6 +179,20 @@ define_class_pair!(child NSWINDOWCONTROLLER_CLASS_DATA, NSWINDOWCONTROLLER_METAC
     meta_addr: nswindowcontroller_metaclass_addr,
     parent_class: nsresponder_class_addr,
     parent_meta: nsresponder_metaclass_addr);
+
+define_class_pair!(child NSDOCUMENT_CLASS_DATA, NSDOCUMENT_METACLASS_DATA, NSDOCUMENT_INIT,
+    ensure: ensure_nsdocument_init,
+    class_addr: nsdocument_class_addr,
+    meta_addr: nsdocument_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSDOCUMENTCONTROLLER_CLASS_DATA, NSDOCUMENTCONTROLLER_METACLASS_DATA, NSDOCUMENTCONTROLLER_INIT,
+    ensure: ensure_nsdocumentcontroller_init,
+    class_addr: nsdocumentcontroller_class_addr,
+    meta_addr: nsdocumentcontroller_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
 
 define_class_pair!(child NSCONTROL_CLASS_DATA, NSCONTROL_METACLASS_DATA, NSCONTROL_INIT,
     ensure: ensure_nscontrol_init,
@@ -388,7 +408,7 @@ define_class_pair!(child NSOUTLINEVIEW_CLASS_DATA, NSOUTLINEVIEW_METACLASS_DATA,
     parent_class: nstableview_class_addr,
     parent_meta: nstableview_metaclass_addr);
 
-// ── CoreAnimation classes (CALayer, CATransaction, CADisplayLink) ──
+// ── CoreAnimation classes (CALayer, CAMetalLayer, CATransaction, CADisplayLink) ──
 
 define_class_pair!(child CALAYER_CLASS_DATA, CALAYER_METACLASS_DATA, CALAYER_INIT,
     ensure: ensure_calayer_init,
@@ -396,6 +416,13 @@ define_class_pair!(child CALAYER_CLASS_DATA, CALAYER_METACLASS_DATA, CALAYER_INI
     meta_addr: calayer_metaclass_addr,
     parent_class: nsobject_class_addr,
     parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child CAMETALLAYER_CLASS_DATA, CAMETALLAYER_METACLASS_DATA, CAMETALLAYER_INIT,
+    ensure: ensure_cametallayer_init,
+    class_addr: cametallayer_class_addr,
+    meta_addr: cametallayer_metaclass_addr,
+    parent_class: calayer_class_addr,
+    parent_meta: calayer_metaclass_addr);
 
 define_class_pair!(child CATRANSACTION_CLASS_DATA, CATRANSACTION_METACLASS_DATA, CATRANSACTION_INIT,
     ensure: ensure_catransaction_init,
@@ -418,7 +445,22 @@ define_class_pair!(child CAMEDIATIMINGFUNCTION_CLASS_DATA, CAMEDIATIMINGFUNCTION
     parent_class: nsobject_class_addr,
     parent_meta: nsobject_metaclass_addr);
 
-// ── Phase C14: NSGraphicsContext, NSBezierPath ─────────────────────
+// ── Phase C14: NSOpenGLPixelFormat, NSOpenGLContext,
+//    NSGraphicsContext, NSBezierPath ───────────────────────────────
+
+define_class_pair!(child NSOPENGLPIXELFORMAT_CLASS_DATA, NSOPENGLPIXELFORMAT_METACLASS_DATA, NSOPENGLPIXELFORMAT_INIT,
+    ensure: ensure_nsopenglpixelformat_init,
+    class_addr: nsopenglpixelformat_class_addr,
+    meta_addr: nsopenglpixelformat_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
+
+define_class_pair!(child NSOPENGLCONTEXT_CLASS_DATA, NSOPENGLCONTEXT_METACLASS_DATA, NSOPENGLCONTEXT_INIT,
+    ensure: ensure_nsopenglcontext_init,
+    class_addr: nsopenglcontext_class_addr,
+    meta_addr: nsopenglcontext_metaclass_addr,
+    parent_class: nsobject_class_addr,
+    parent_meta: nsobject_metaclass_addr);
 
 define_class_pair!(child NSGRAPHICSCONTEXT_CLASS_DATA, NSGRAPHICSCONTEXT_METACLASS_DATA, NSGRAPHICSCONTEXT_INIT,
     ensure: ensure_nsgraphicscontext_init,

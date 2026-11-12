@@ -139,8 +139,7 @@ fn main() {
     if cli.list {
         for sym in &matched {
             if cli.demangle {
-                let human = demangler::demangle(&sym.name)
-                    .unwrap_or_else(|| sym.name.clone());
+                let human = demangler::demangle(&sym.name).unwrap_or_else(|| sym.name.clone());
                 println!("{}\t{}", sym.name, human);
             } else {
                 println!("{}", sym.name);
@@ -150,24 +149,29 @@ fn main() {
     }
 
     // ── Code generation ─────────────────────────────────────────────────────
-    let struct_prefix = cli.struct_name.clone().unwrap_or_else(|| {
-        prefix_from_path(cli.inputs.first().map(|p| p.as_path()).unwrap())
-    });
+    let struct_prefix = cli
+        .struct_name
+        .clone()
+        .unwrap_or_else(|| prefix_from_path(cli.inputs.first().map(|p| p.as_path()).unwrap()));
 
     let date = {
         // Use the source file mtime if available; fall back to a placeholder
         // so the tool is deterministic in CI (no clock dependency).
-        let mtime = cli.inputs.first()
+        let mtime = cli
+            .inputs
+            .first()
             .and_then(|p| std::fs::metadata(p).ok())
             .and_then(|m| m.modified().ok())
             .and_then(|t| {
-                t.duration_since(std::time::UNIX_EPOCH).ok()
+                t.duration_since(std::time::UNIX_EPOCH)
+                    .ok()
                     .map(|d| d.as_secs())
             });
         format_date(mtime)
     };
 
-    let source_desc = cli.inputs
+    let source_desc = cli
+        .inputs
         .iter()
         .map(|p| p.display().to_string())
         .collect::<Vec<_>>()
@@ -220,9 +224,9 @@ fn format_date(unix_secs: Option<u64>) -> String {
     let d = (4 * c + 3) / 1461;
     let e = c - (1461 * d) / 4;
     let m = (5 * e + 2) / 153;
-    let day   = e - (153 * m + 2) / 5 + 1;
+    let day = e - (153 * m + 2) / 5 + 1;
     let month = m + 3 - 12 * (m / 10);
-    let year  = 100 * b + d - 4800 + m / 10;
+    let year = 100 * b + d - 4800 + m / 10;
     format!("{year:04}-{month:02}-{day:02}")
 }
 

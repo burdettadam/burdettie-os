@@ -110,4 +110,3 @@ pub(super) fn glyph_for(ch: char) -> &'static [u8; 7] {
         &BLOCK
     }
 }
-

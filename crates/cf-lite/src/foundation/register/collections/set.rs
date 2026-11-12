@@ -55,9 +55,21 @@ pub fn register_nsset_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nsset::shim_nsset_contains_object as *const () as u64,
                 "B@:@",
             ),
-            me("member:", nsset::shim_nsset_member as *const () as u64, "@@:@"),
-            me("allObjects", nsset::shim_nsset_all_objects as *const () as u64, "@@:"),
-            me("anyObject", nsset::shim_nsset_any_object as *const () as u64, "@@:"),
+            me(
+                "member:",
+                nsset::shim_nsset_member as *const () as u64,
+                "@@:@",
+            ),
+            me(
+                "allObjects",
+                nsset::shim_nsset_all_objects as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "anyObject",
+                nsset::shim_nsset_any_object as *const () as u64,
+                "@@:",
+            ),
             me(
                 "isSubsetOfSet:",
                 nsset::shim_nsset_is_subset_of_set as *const () as u64,
@@ -73,7 +85,11 @@ pub fn register_nsset_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nsset::shim_nsset_is_equal_to_set as *const () as u64,
                 "B@:@",
             ),
-            me("description", nsset::shim_nsset_description as *const () as u64, "@@:"),
+            me(
+                "description",
+                nsset::shim_nsset_description as *const () as u64,
+                "@@:",
+            ),
             me(
                 "enumerateObjectsUsingBlock:",
                 nsset::shim_nsset_enumerate_objects_using_block as *const () as u64,
@@ -122,9 +138,21 @@ pub fn register_nsmutableset_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nsset::shim_nsset_contains_object as *const () as u64,
                 "B@:@",
             ),
-            me("member:", nsset::shim_nsset_member as *const () as u64, "@@:@"),
-            me("allObjects", nsset::shim_nsset_all_objects as *const () as u64, "@@:"),
-            me("anyObject", nsset::shim_nsset_any_object as *const () as u64, "@@:"),
+            me(
+                "member:",
+                nsset::shim_nsset_member as *const () as u64,
+                "@@:@",
+            ),
+            me(
+                "allObjects",
+                nsset::shim_nsset_all_objects as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "anyObject",
+                nsset::shim_nsset_any_object as *const () as u64,
+                "@@:",
+            ),
             me(
                 "isSubsetOfSet:",
                 nsset::shim_nsset_is_subset_of_set as *const () as u64,
@@ -140,7 +168,11 @@ pub fn register_nsmutableset_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nsset::shim_nsset_is_equal_to_set as *const () as u64,
                 "B@:@",
             ),
-            me("description", nsset::shim_nsset_description as *const () as u64, "@@:"),
+            me(
+                "description",
+                nsset::shim_nsset_description as *const () as u64,
+                "@@:",
+            ),
             me(
                 "enumerateObjectsUsingBlock:",
                 nsset::shim_nsset_enumerate_objects_using_block as *const () as u64,
@@ -183,7 +215,11 @@ pub fn register_nsmutableset_class(rt: &mut objc_runtime::ObjcRuntime) {
             ),
         ],
         class_methods: vec![
-            me("set", nsmutableset::shim_nsmutableset_set as *const () as u64, "@@:"),
+            me(
+                "set",
+                nsmutableset::shim_nsmutableset_set as *const () as u64,
+                "@@:",
+            ),
             me(
                 "setWithCapacity:",
                 nsmutableset::shim_nsmutableset_set_with_capacity as *const () as u64,

@@ -29,9 +29,15 @@ fn dictionary_from_path(path: &str) -> u64 {
 
 /// Public accessors for dict layout helpers (used by NSJSONSerialization etc.).
 pub mod helpers_pub {
-    pub fn dict_count_pub(obj: u64) -> u64 { super::helpers::dict_count(obj) }
-    pub fn dict_keys_pub(obj: u64) -> u64 { super::helpers::dict_keys(obj) }
-    pub fn dict_vals_pub(obj: u64) -> u64 { super::helpers::dict_vals(obj) }
+    pub fn dict_count_pub(obj: u64) -> u64 {
+        super::helpers::dict_count(obj)
+    }
+    pub fn dict_keys_pub(obj: u64) -> u64 {
+        super::helpers::dict_keys(obj)
+    }
+    pub fn dict_vals_pub(obj: u64) -> u64 {
+        super::helpers::dict_vals(obj)
+    }
 }
 
 fn collect_pairs(obj: u64) -> (Vec<u64>, Vec<u64>) {
@@ -117,11 +123,7 @@ pub extern "C" fn shim_nsdictionary_with_objects_for_keys_count(
 }
 
 /// `+[NSDictionary dictionaryWithContentsOfFile:]`
-pub extern "C" fn shim_nsdictionary_with_contents_of_file(
-    _cls: u64,
-    _cmd: u64,
-    path: u64,
-) -> u64 {
+pub extern "C" fn shim_nsdictionary_with_contents_of_file(_cls: u64, _cmd: u64, path: u64) -> u64 {
     if path == 0 {
         return 0;
     }
@@ -134,11 +136,7 @@ pub extern "C" fn shim_nsdictionary_with_contents_of_file(
 }
 
 /// `+[NSDictionary dictionaryWithContentsOfURL:]`
-pub extern "C" fn shim_nsdictionary_with_contents_of_url(
-    _cls: u64,
-    _cmd: u64,
-    url: u64,
-) -> u64 {
+pub extern "C" fn shim_nsdictionary_with_contents_of_url(_cls: u64, _cmd: u64, url: u64) -> u64 {
     if url == 0 {
         return 0;
     }
@@ -362,11 +360,7 @@ pub extern "C" fn shim_nsdictionary_enumerate_keys_and_objects_using_block(
 /// `-[NSDictionary isEqualToDictionary:]` — compares two dictionaries.
 /// Returns 1 if both have the same count and identical key-value pairs
 /// (compared by pointer equality and string content), 0 otherwise.
-pub extern "C" fn shim_nsdictionary_is_equal_to_dictionary(
-    obj: u64,
-    _cmd: u64,
-    other: u64,
-) -> u8 {
+pub extern "C" fn shim_nsdictionary_is_equal_to_dictionary(obj: u64, _cmd: u64, other: u64) -> u8 {
     if obj == other {
         return 1;
     }

@@ -62,11 +62,7 @@ impl ServiceServer {
             .map(|a| a.to_string())
             .unwrap_or_else(|| config.bind_addr.clone());
 
-        let port = server
-            .server_addr()
-            .to_ip()
-            .map(|a| a.port())
-            .unwrap_or(0);
+        let port = server.server_addr().to_ip().map(|a| a.port()).unwrap_or(0);
 
         // Set up the request recorder
         let recorder = if config.record_requests {
@@ -113,11 +109,7 @@ impl ServiceServer {
 }
 
 /// Main server loop — processes requests until stopped.
-fn serve_loop(
-    server: tiny_http::Server,
-    router: Arc<Router>,
-    stop: Arc<AtomicBool>,
-) {
+fn serve_loop(server: tiny_http::Server, router: Arc<Router>, stop: Arc<AtomicBool>) {
     loop {
         if stop.load(Ordering::Acquire) {
             log::debug!("burdettie-services: stop signal received");
@@ -127,7 +119,7 @@ fn serve_loop(
         // Use recv_timeout so we can check the stop flag periodically.
         let mut request = match server.recv_timeout(std::time::Duration::from_millis(500)) {
             Ok(Some(req)) => req,
-            Ok(None) => continue,                  // timeout, check stop flag
+            Ok(None) => continue, // timeout, check stop flag
             Err(e) => {
                 log::warn!("burdettie-services: accept error: {e}");
                 continue;
@@ -139,7 +131,12 @@ fn serve_loop(
         let content_length = request
             .headers()
             .iter()
-            .find(|h| h.field.as_str().as_str().eq_ignore_ascii_case("content-length"))
+            .find(|h| {
+                h.field
+                    .as_str()
+                    .as_str()
+                    .eq_ignore_ascii_case("content-length")
+            })
             .and_then(|h| h.value.as_str().parse::<usize>().ok())
             .unwrap_or(0);
 
@@ -176,6 +173,8 @@ fn serve_loop(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use tempfile::tempdir;
 
     #[test]
     fn server_starts_and_stops() {
@@ -186,9 +185,16 @@ mod tests {
             replay_db_path: None,
             log_format: crate::config::LogFormat::Text,
             log_sink: crate::config::LogSink::Stdout,
-            admin: crate::config::AdminConfig { enabled: false, token: None },
-            remote: crate::config::RemoteConfig { endpoint: None, auth_token: None },
+            admin: crate::config::AdminConfig {
+                enabled: false,
+                token: None,
+            },
+            remote: crate::config::RemoteConfig {
+                endpoint: None,
+                auth_token: None,
+            },
             instance_id: "test".into(),
+            workspace_root: ".".into(),
         };
 
         let handle = ServiceServer::start(&config).expect("server should start");
@@ -202,7 +208,10 @@ mod tests {
             Ok(mut r) => {
                 assert_eq!(r.status().as_u16(), 200);
                 let body = r.body_mut().read_to_string().unwrap_or_default();
-                assert!(body.contains("Success"), "captive should return Success HTML");
+                assert!(
+                    body.contains("Success"),
+                    "captive should return Success HTML"
+                );
             }
             Err(e) => panic!("request failed: {e}"),
         }
@@ -231,9 +240,16 @@ mod tests {
             replay_db_path: None,
             log_format: crate::config::LogFormat::Text,
             log_sink: crate::config::LogSink::Stdout,
-            admin: crate::config::AdminConfig { enabled: false, token: None },
-            remote: crate::config::RemoteConfig { endpoint: None, auth_token: None },
+            admin: crate::config::AdminConfig {
+                enabled: false,
+                token: None,
+            },
+            remote: crate::config::RemoteConfig {
+                endpoint: None,
+                auth_token: None,
+            },
             instance_id: "test".into(),
+            workspace_root: ".".into(),
         };
 
         let handle = ServiceServer::start(&config).expect("server should start");
@@ -250,6 +266,78 @@ mod tests {
             }
             Err(e) => panic!("request failed: {e}"),
         }
+
+        handle.stop();
+    }
+
+    #[test]
+    fn server_exposes_memory_admin_status_and_sync() {
+        let temp = tempdir().expect("tempdir");
+        fs::write(
+            temp.path().join("mempalace.yaml"),
+            "wing: test\nrooms:\n  - name: memories\n    keywords:\n      - memories\n",
+        )
+        .expect("write room catalog");
+        fs::create_dir_all(temp.path().join("memories")).expect("create memories dir");
+        fs::write(
+            temp.path().join("memories/preferences.md"),
+            "- prefers terse output\n",
+        )
+        .expect("write memory source");
+
+        let config = ServiceConfig {
+            bind_addr: "127.0.0.1:0".into(),
+            record_requests: false,
+            record_db_path: String::new(),
+            replay_db_path: None,
+            log_format: crate::config::LogFormat::Text,
+            log_sink: crate::config::LogSink::Stdout,
+            admin: crate::config::AdminConfig {
+                enabled: true,
+                token: None,
+            },
+            remote: crate::config::RemoteConfig {
+                endpoint: None,
+                auth_token: None,
+            },
+            instance_id: "test".into(),
+            workspace_root: temp.path().display().to_string(),
+        };
+
+        let handle = ServiceServer::start(&config).expect("server should start");
+
+        let status_url = format!("http://{}/_burdettie/admin/memory/status", handle.addr);
+        let mut status = ureq::get(&status_url).call().expect("status request");
+        assert_eq!(status.status().as_u16(), 200);
+        let status_body = status.body_mut().read_to_string().expect("status body");
+        let status_json: serde_json::Value =
+            serde_json::from_str(&status_body).expect("status json");
+        assert_eq!(status_json["objects"]["active"], 0);
+        assert_eq!(status_json["last_sync_id"], 0);
+
+        let sync_url = format!("http://{}/_burdettie/admin/memory/sync", handle.addr);
+        let mut sync = ureq::post(&sync_url).send(b"").expect("sync request");
+        assert_eq!(sync.status().as_u16(), 200);
+        let sync_body = sync.body_mut().read_to_string().expect("sync body");
+        let sync_json: serde_json::Value = serde_json::from_str(&sync_body).expect("sync json");
+        assert_eq!(sync_json["sync"]["scanned_files"], 1);
+        assert_eq!(sync_json["sync"]["indexed_objects"], 1);
+
+        let mut status_after = ureq::get(&status_url).call().expect("status after sync");
+        assert_eq!(status_after.status().as_u16(), 200);
+        let status_after_body = status_after
+            .body_mut()
+            .read_to_string()
+            .expect("status after body");
+        let status_after_json: serde_json::Value =
+            serde_json::from_str(&status_after_body).expect("status after json");
+        assert_eq!(status_after_json["objects"]["active"], 1);
+        assert!(
+            status_after_json["chunks"]["active"]
+                .as_u64()
+                .unwrap_or_default()
+                >= 1
+        );
 
         handle.stop();
     }

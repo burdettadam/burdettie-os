@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
-const FOUNDATION_SYNTHETIC_CLASS_COUNT: usize = 95;
+const FOUNDATION_SYNTHETIC_CLASS_COUNT: usize = 98;
 const FOUNDATION_SELECTOR_RESERVE: usize = 512;
 const FOUNDATION_PROTOCOL_RESERVE: usize = 16;
 const FOUNDATION_CATEGORY_LOAD_RESERVE: usize = 16;
@@ -451,8 +451,11 @@ fn populate_foundation_runtime(objc_rt: &mut objc_runtime::ObjcRuntime) {
     cf_lite::FoundationShims::register_nsnib_class(objc_rt);
 
     // AppKit GUI classes (Phase C8)
+    cf_lite::FoundationShims::register_nsstoryboard_class(objc_rt);
     cf_lite::FoundationShims::register_nsviewcontroller_class(objc_rt);
     cf_lite::FoundationShims::register_nswindowcontroller_class(objc_rt);
+    cf_lite::FoundationShims::register_nsdocument_class(objc_rt);
+    cf_lite::FoundationShims::register_nsdocumentcontroller_class(objc_rt);
     cf_lite::FoundationShims::register_nscontrol_class(objc_rt);
     cf_lite::FoundationShims::register_nstextfield_class(objc_rt);
 
@@ -469,11 +472,8 @@ fn populate_foundation_runtime(objc_rt: &mut objc_runtime::ObjcRuntime) {
     cf_lite::FoundationShims::register_nstabviewitem_class(objc_rt);
     cf_lite::FoundationShims::register_nstoolbar_class(objc_rt);
     cf_lite::FoundationShims::register_nstoolbaritem_class(objc_rt);
-    #[cfg(target_os = "macos")]
-    {
-        cf_lite::FoundationShims::register_nssavepanel_class(objc_rt);
-        cf_lite::FoundationShims::register_nsopenpanel_class(objc_rt);
-    }
+    cf_lite::FoundationShims::register_nssavepanel_class(objc_rt);
+    cf_lite::FoundationShims::register_nsopenpanel_class(objc_rt);
     cf_lite::FoundationShims::register_nsclipview_class(objc_rt);
     cf_lite::FoundationShims::register_nstextview_class(objc_rt);
     cf_lite::FoundationShims::register_nstrackingarea_class(objc_rt);
@@ -591,13 +591,17 @@ fn populate_foundation_runtime(objc_rt: &mut objc_runtime::ObjcRuntime) {
     cf_lite::FoundationShims::register_nsundomanager_class(objc_rt);
     cf_lite::FoundationShims::register_nsview_safe_area_methods(objc_rt);
 
-    // Phase C13 — CoreAnimation (CALayer, CATransaction, CADisplayLink, CAMediaTimingFunction)
+    // Phase C13 — CoreAnimation (CALayer, CAMetalLayer, CATransaction, CADisplayLink, CAMediaTimingFunction)
     cf_lite::FoundationShims::register_calayer_class(objc_rt);
+    cf_lite::FoundationShims::register_cametallayer_class(objc_rt);
     cf_lite::FoundationShims::register_catransaction_class(objc_rt);
     cf_lite::FoundationShims::register_cadisplaylink_class(objc_rt);
     cf_lite::FoundationShims::register_camediatimingfunction_class(objc_rt);
 
-    // Phase C14 — Drawing (NSGraphicsContext, NSBezierPath)
+    // Phase C14 — Drawing (NSOpenGLPixelFormat, NSOpenGLContext,
+    // NSGraphicsContext, NSBezierPath)
+    cf_lite::FoundationShims::register_nsopenglpixelformat_class(objc_rt);
+    cf_lite::FoundationShims::register_nsopenglcontext_class(objc_rt);
     cf_lite::FoundationShims::register_nsgraphicscontext_class(objc_rt);
     cf_lite::FoundationShims::register_nsbezierpath_class(objc_rt);
 
@@ -670,9 +674,13 @@ pub fn register_guest_images_with_host_runtime(registry: &macho_exec::ImageRegis
             // Always overwrite: the binary's cache field may contain a
             // chained-fixup bind to a shared-cache preopt cache that was
             // resolved to an invalid address by our stub resolver.
-            unsafe { *cache_slot = empty_cache; }
+            unsafe {
+                *cache_slot = empty_cache;
+            }
             // Also zero the second qword of cache_t
-            unsafe { *((class_ptr as usize + CACHE_OFFSET + 8) as *mut u64) = 0; }
+            unsafe {
+                *((class_ptr as usize + CACHE_OFFSET + 8) as *mut u64) = 0;
+            }
             total_patched += 1;
 
             // Also patch the metaclass cache (ISA of the class → metaclass).
@@ -681,8 +689,12 @@ pub fn register_guest_images_with_host_runtime(registry: &macho_exec::ImageRegis
             let metaclass = raw_isa & 0x007ffffffffffff8;
             if metaclass != 0 && metaclass != class_ptr {
                 let meta_cache = (metaclass as usize + CACHE_OFFSET) as *mut u64;
-                unsafe { *meta_cache = empty_cache; }
-                unsafe { *((metaclass as usize + CACHE_OFFSET + 8) as *mut u64) = 0; }
+                unsafe {
+                    *meta_cache = empty_cache;
+                }
+                unsafe {
+                    *((metaclass as usize + CACHE_OFFSET + 8) as *mut u64) = 0;
+                }
                 total_patched += 1;
             }
         }

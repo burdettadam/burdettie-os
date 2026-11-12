@@ -4,8 +4,8 @@
 //! `UNUserNotificationCenter`.  Many older apps still reference it on
 //! launch.  All methods are safe no-ops.
 
-use std::sync::OnceLock;
 use crate::nsobj;
+use std::sync::OnceLock;
 
 static SHARED_CENTER: OnceLock<u64> = OnceLock::new();
 
@@ -21,11 +21,7 @@ pub extern "C" fn shim_nsusernotificationcenter_default(_cls: u64, _cmd: u64) ->
 }
 
 /// `-[NSUserNotificationCenter setDelegate:]` — no-op.
-pub extern "C" fn shim_nsusernotificationcenter_set_delegate(
-    _obj: u64,
-    _cmd: u64,
-    _delegate: u64,
-) {
+pub extern "C" fn shim_nsusernotificationcenter_set_delegate(_obj: u64, _cmd: u64, _delegate: u64) {
 }
 
 /// `-[NSUserNotificationCenter delegate]` → nil.
@@ -34,20 +30,10 @@ pub extern "C" fn shim_nsusernotificationcenter_delegate(_obj: u64, _cmd: u64) -
 }
 
 /// `-[NSUserNotificationCenter deliverNotification:]` — no-op.
-pub extern "C" fn shim_nsusernotificationcenter_deliver(
-    _obj: u64,
-    _cmd: u64,
-    _notification: u64,
-) {
-}
+pub extern "C" fn shim_nsusernotificationcenter_deliver(_obj: u64, _cmd: u64, _notification: u64) {}
 
 /// `-[NSUserNotificationCenter removeDeliveredNotification:]` — no-op.
-pub extern "C" fn shim_nsusernotificationcenter_remove(
-    _obj: u64,
-    _cmd: u64,
-    _notification: u64,
-) {
-}
+pub extern "C" fn shim_nsusernotificationcenter_remove(_obj: u64, _cmd: u64, _notification: u64) {}
 
 /// `-[NSUserNotificationCenter removeAllDeliveredNotifications]` — no-op.
 pub extern "C" fn shim_nsusernotificationcenter_remove_all(_obj: u64, _cmd: u64) {}
@@ -77,11 +63,7 @@ pub extern "C" fn shim_nsusernotificationcenter_set_scheduled(
 }
 
 /// `-[NSUserNotificationCenter scheduleNotification:]` — no-op.
-pub extern "C" fn shim_nsusernotificationcenter_schedule(
-    _obj: u64,
-    _cmd: u64,
-    _notification: u64,
-) {
+pub extern "C" fn shim_nsusernotificationcenter_schedule(_obj: u64, _cmd: u64, _notification: u64) {
 }
 
 #[cfg(test)]

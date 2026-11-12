@@ -1,4 +1,4 @@
-//! CoreAnimation shims: CALayer, CATransaction, CADisplayLink.
+//! CoreAnimation shims: CALayer, CAMetalLayer, CATransaction, CADisplayLink.
 //!
 //! Modern Cocoa apps expect layer-backed views (`wantsLayer = YES`).
 //! CALayer now provides a real sublayer tree and stores per-layer
@@ -44,10 +44,10 @@ pub(crate) struct LayerProps {
     pub hidden: bool,
     pub corner_radius: f64,
     pub border_width: f64,
-    pub border_color: u64,     // CGColorRef handle
+    pub border_color: u64, // CGColorRef handle
     pub shadow_opacity: f32,
     pub masks_to_bounds: bool,
-    pub contents: u64,         // CGImageRef handle
+    pub contents: u64, // CGImageRef handle
     pub contents_scale: f64,
     pub needs_display: bool,
     /// CATransform3D stored as a 4×4 column-major matrix.  Only the 2D affine
@@ -77,10 +77,7 @@ impl Default for LayerProps {
 
 /// 4×4 identity matrix in column-major order.
 const IDENTITY_TRANSFORM: [f64; 16] = [
-    1.0, 0.0, 0.0, 0.0,
-    0.0, 1.0, 0.0, 0.0,
-    0.0, 0.0, 1.0, 0.0,
-    0.0, 0.0, 0.0, 1.0,
+    1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
 ];
 
 /// Check whether a 4×4 matrix is the identity.
@@ -90,15 +87,60 @@ pub(crate) fn is_identity_transform(m: &[f64; 16]) -> bool {
 
 static LAYER_PROPS: Mutex<Option<HashMap<u64, LayerProps>>> = Mutex::new(None);
 
+#[derive(Clone, Debug)]
+struct MetalLayerProps {
+    device: u64,
+    pixel_format: u64,
+    framebuffer_only: bool,
+    drawable_width: f64,
+    drawable_height: f64,
+    opaque: bool,
+}
+
+impl Default for MetalLayerProps {
+    fn default() -> Self {
+        Self {
+            device: 0,
+            pixel_format: 0,
+            framebuffer_only: true,
+            drawable_width: 0.0,
+            drawable_height: 0.0,
+            opaque: true,
+        }
+    }
+}
+
+static METAL_LAYER_PROPS: Mutex<Option<HashMap<u64, MetalLayerProps>>> = Mutex::new(None);
+
 fn with_props<R>(layer: u64, f: impl FnOnce(&LayerProps) -> R) -> R {
     let guard = LAYER_PROPS.lock().unwrap_or_else(|e| e.into_inner());
     let default = LayerProps::default();
-    let props = guard.as_ref().and_then(|m| m.get(&layer)).unwrap_or(&default);
+    let props = guard
+        .as_ref()
+        .and_then(|m| m.get(&layer))
+        .unwrap_or(&default);
     f(props)
 }
 
 fn with_props_mut<R>(layer: u64, f: impl FnOnce(&mut LayerProps) -> R) -> R {
     let mut guard = LAYER_PROPS.lock().unwrap_or_else(|e| e.into_inner());
+    let map = guard.get_or_insert_with(HashMap::new);
+    let props = map.entry(layer).or_default();
+    f(props)
+}
+
+fn with_metal_props<R>(layer: u64, f: impl FnOnce(&MetalLayerProps) -> R) -> R {
+    let guard = METAL_LAYER_PROPS.lock().unwrap_or_else(|e| e.into_inner());
+    let default = MetalLayerProps::default();
+    let props = guard
+        .as_ref()
+        .and_then(|m| m.get(&layer))
+        .unwrap_or(&default);
+    f(props)
+}
+
+fn with_metal_props_mut<R>(layer: u64, f: impl FnOnce(&mut MetalLayerProps) -> R) -> R {
+    let mut guard = METAL_LAYER_PROPS.lock().unwrap_or_else(|e| e.into_inner());
     let map = guard.get_or_insert_with(HashMap::new);
     let props = map.entry(layer).or_default();
     f(props)
@@ -118,20 +160,34 @@ static LAYER_PARENT: Mutex<Option<HashMap<u64, u64>>> = Mutex::new(None);
 
 /// Get the children of a layer.
 pub(crate) fn layer_children(layer: u64) -> Vec<u64> {
-    if layer == 0 { return vec![]; }
+    if layer == 0 {
+        return vec![];
+    }
     let guard = LAYER_CHILDREN.lock().unwrap_or_else(|e| e.into_inner());
-    guard.as_ref().and_then(|m| m.get(&layer)).cloned().unwrap_or_default()
+    guard
+        .as_ref()
+        .and_then(|m| m.get(&layer))
+        .cloned()
+        .unwrap_or_default()
 }
 
 /// Get the superlayer of a layer.
 pub(crate) fn layer_superlayer(layer: u64) -> u64 {
-    if layer == 0 { return 0; }
+    if layer == 0 {
+        return 0;
+    }
     let guard = LAYER_PARENT.lock().unwrap_or_else(|e| e.into_inner());
-    guard.as_ref().and_then(|m| m.get(&layer)).copied().unwrap_or(0)
+    guard
+        .as_ref()
+        .and_then(|m| m.get(&layer))
+        .copied()
+        .unwrap_or(0)
 }
 
 fn add_sublayer_internal(parent: u64, child: u64) {
-    if parent == 0 || child == 0 || parent == child { return; }
+    if parent == 0 || child == 0 || parent == child {
+        return;
+    }
 
     // Remove child from its old parent first.
     remove_from_superlayer_internal(child);
@@ -152,7 +208,9 @@ fn add_sublayer_internal(parent: u64, child: u64) {
 }
 
 fn remove_from_superlayer_internal(child: u64) {
-    if child == 0 { return; }
+    if child == 0 {
+        return;
+    }
 
     let old_parent = {
         let mut guard = LAYER_PARENT.lock().unwrap_or_else(|e| e.into_inner());
@@ -173,6 +231,10 @@ fn remove_from_superlayer_internal(child: u64) {
 pub(crate) fn reset_layer_state() {
     {
         let mut guard = LAYER_PROPS.lock().unwrap_or_else(|e| e.into_inner());
+        *guard = None;
+    }
+    {
+        let mut guard = METAL_LAYER_PROPS.lock().unwrap_or_else(|e| e.into_inner());
         *guard = None;
     }
     {
@@ -202,6 +264,16 @@ pub(crate) fn alloc_layer() -> u64 {
     obj
 }
 
+pub(crate) fn alloc_metal_layer() -> u64 {
+    let obj = alloc_layer();
+    if obj != 0 {
+        unsafe {
+            *(obj as *mut u64) = crate::nsobj::cametallayer_class_addr();
+        }
+    }
+    obj
+}
+
 /// `-[CALayer init]`
 pub extern "C" fn shim_calayer_init(obj: u64, _cmd: u64) -> u64 {
     if obj == 0 {
@@ -219,10 +291,7 @@ pub extern "C" fn shim_calayer_bounds(obj: u64, _cmd: u64) -> f64 {
 }
 
 /// `-[CALayer setBounds:]`
-pub extern "C" fn shim_calayer_set_bounds(
-    obj: u64, _cmd: u64,
-    x: f64, y: f64, w: f64, h: f64,
-) {
+pub extern "C" fn shim_calayer_set_bounds(obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64) {
     if obj == 0 {
         return;
     }
@@ -240,10 +309,7 @@ pub extern "C" fn shim_calayer_frame(obj: u64, _cmd: u64) -> f64 {
 }
 
 /// `-[CALayer setFrame:]`
-pub extern "C" fn shim_calayer_set_frame(
-    obj: u64, _cmd: u64,
-    x: f64, y: f64, w: f64, h: f64,
-) {
+pub extern "C" fn shim_calayer_set_frame(obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64) {
     shim_calayer_set_bounds(obj, _cmd, x, y, w, h);
 }
 
@@ -277,18 +343,24 @@ pub extern "C" fn shim_calayer_set_background_color(obj: u64, _cmd: u64, color: 
     if obj == 0 {
         return;
     }
-    unsafe { *((obj as usize + BG_COLOR_OFF) as *mut u64) = color; }
+    unsafe {
+        *((obj as usize + BG_COLOR_OFF) as *mut u64) = color;
+    }
 }
 
 /// `-[CALayer setNeedsDisplay]`
 pub extern "C" fn shim_calayer_set_needs_display(obj: u64, _cmd: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     with_props_mut(obj, |p| p.needs_display = true);
 }
 
 /// `-[CALayer displayIfNeeded]`
 pub extern "C" fn shim_calayer_display_if_needed(obj: u64, _cmd: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     with_props_mut(obj, |p| p.needs_display = false);
 }
 
@@ -316,154 +388,335 @@ pub extern "C" fn shim_calayer_sublayers(obj: u64, _cmd: u64) -> u64 {
 
 /// `-[CALayer isHidden]`
 pub extern "C" fn shim_calayer_is_hidden(obj: u64, _cmd: u64) -> u8 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     u8::from(with_props(obj, |p| p.hidden))
 }
 
 /// `-[CALayer setHidden:]`
 pub extern "C" fn shim_calayer_set_hidden(obj: u64, _cmd: u64, hidden: u8) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     with_props_mut(obj, |p| p.hidden = hidden != 0);
 }
 
 /// `-[CALayer opacity]`
 pub extern "C" fn shim_calayer_opacity(obj: u64, _cmd: u64) -> f32 {
-    if obj == 0 { return 1.0; }
+    if obj == 0 {
+        return 1.0;
+    }
     with_props(obj, |p| p.opacity)
 }
 
 /// `-[CALayer setOpacity:]`
 pub extern "C" fn shim_calayer_set_opacity(obj: u64, _cmd: u64, opacity: f32) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     with_props_mut(obj, |p| p.opacity = opacity);
 }
 
 /// `-[CALayer cornerRadius]`
 pub extern "C" fn shim_calayer_corner_radius(obj: u64, _cmd: u64) -> f64 {
-    if obj == 0 { return 0.0; }
+    if obj == 0 {
+        return 0.0;
+    }
     with_props(obj, |p| p.corner_radius)
 }
 
 /// `-[CALayer setCornerRadius:]`
 pub extern "C" fn shim_calayer_set_corner_radius(obj: u64, _cmd: u64, r: f64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     with_props_mut(obj, |p| p.corner_radius = r);
 }
 
 /// `-[CALayer borderWidth]`
 pub extern "C" fn shim_calayer_border_width(obj: u64, _cmd: u64) -> f64 {
-    if obj == 0 { return 0.0; }
+    if obj == 0 {
+        return 0.0;
+    }
     with_props(obj, |p| p.border_width)
 }
 
 /// `-[CALayer setBorderWidth:]`
 pub extern "C" fn shim_calayer_set_border_width(obj: u64, _cmd: u64, w: f64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     with_props_mut(obj, |p| p.border_width = w);
 }
 
 /// `-[CALayer borderColor]`
 pub extern "C" fn shim_calayer_border_color(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     with_props(obj, |p| p.border_color)
 }
 
 /// `-[CALayer setBorderColor:]`
 pub extern "C" fn shim_calayer_set_border_color(obj: u64, _cmd: u64, color: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     with_props_mut(obj, |p| p.border_color = color);
 }
 
 /// `-[CALayer shadowOpacity]`
 pub extern "C" fn shim_calayer_shadow_opacity(obj: u64, _cmd: u64) -> f32 {
-    if obj == 0 { return 0.0; }
+    if obj == 0 {
+        return 0.0;
+    }
     with_props(obj, |p| p.shadow_opacity)
 }
 
 /// `-[CALayer setShadowOpacity:]`
 pub extern "C" fn shim_calayer_set_shadow_opacity(obj: u64, _cmd: u64, opacity: f32) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     with_props_mut(obj, |p| p.shadow_opacity = opacity);
 }
 
 /// `-[CALayer contents]`
 pub extern "C" fn shim_calayer_contents(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     with_props(obj, |p| p.contents)
 }
 
 /// `-[CALayer setContents:]`
 pub extern "C" fn shim_calayer_set_contents(obj: u64, _cmd: u64, contents: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     with_props_mut(obj, |p| p.contents = contents);
 }
 
 /// `-[CALayer contentsScale]`
 pub extern "C" fn shim_calayer_contents_scale(obj: u64, _cmd: u64) -> f64 {
-    if obj == 0 { return 1.0; }
+    if obj == 0 {
+        return 1.0;
+    }
     with_props(obj, |p| p.contents_scale)
 }
 
 /// `-[CALayer setContentsScale:]`
 pub extern "C" fn shim_calayer_set_contents_scale(obj: u64, _cmd: u64, scale: f64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     with_props_mut(obj, |p| p.contents_scale = scale);
 }
 
 /// `-[CALayer transform]` — returns CATransform3D (16 f64 values, 128 bytes).
 /// On ARM64 this is returned via x8 indirect-result pointer.
 pub extern "C" fn shim_calayer_transform(obj: u64, _cmd: u64) -> [f64; 16] {
-    if obj == 0 { return IDENTITY_TRANSFORM; }
+    if obj == 0 {
+        return IDENTITY_TRANSFORM;
+    }
     with_props(obj, |p| p.transform)
 }
 
 /// `-[CALayer setTransform:]`
 pub extern "C" fn shim_calayer_set_transform(
-    obj: u64, _cmd: u64,
-    m11: f64, m12: f64, m13: f64, m14: f64,
-    m21: f64, m22: f64, m23: f64, m24: f64,
-    m31: f64, m32: f64, m33: f64, m34: f64,
-    m41: f64, m42: f64, m43: f64, m44: f64,
+    obj: u64,
+    _cmd: u64,
+    m11: f64,
+    m12: f64,
+    m13: f64,
+    m14: f64,
+    m21: f64,
+    m22: f64,
+    m23: f64,
+    m24: f64,
+    m31: f64,
+    m32: f64,
+    m33: f64,
+    m34: f64,
+    m41: f64,
+    m42: f64,
+    m43: f64,
+    m44: f64,
 ) {
-    if obj == 0 { return; }
-    let t = [m11, m12, m13, m14, m21, m22, m23, m24, m31, m32, m33, m34, m41, m42, m43, m44];
+    if obj == 0 {
+        return;
+    }
+    let t = [
+        m11, m12, m13, m14, m21, m22, m23, m24, m31, m32, m33, m34, m41, m42, m43, m44,
+    ];
     with_props_mut(obj, |p| p.transform = t);
 }
 
 /// `-[CALayer sublayerTransform]`
 pub extern "C" fn shim_calayer_sublayer_transform(obj: u64, _cmd: u64) -> [f64; 16] {
-    if obj == 0 { return IDENTITY_TRANSFORM; }
+    if obj == 0 {
+        return IDENTITY_TRANSFORM;
+    }
     with_props(obj, |p| p.sublayer_transform)
 }
 
 /// `-[CALayer setSublayerTransform:]`
 pub extern "C" fn shim_calayer_set_sublayer_transform(
-    obj: u64, _cmd: u64,
-    m11: f64, m12: f64, m13: f64, m14: f64,
-    m21: f64, m22: f64, m23: f64, m24: f64,
-    m31: f64, m32: f64, m33: f64, m34: f64,
-    m41: f64, m42: f64, m43: f64, m44: f64,
+    obj: u64,
+    _cmd: u64,
+    m11: f64,
+    m12: f64,
+    m13: f64,
+    m14: f64,
+    m21: f64,
+    m22: f64,
+    m23: f64,
+    m24: f64,
+    m31: f64,
+    m32: f64,
+    m33: f64,
+    m34: f64,
+    m41: f64,
+    m42: f64,
+    m43: f64,
+    m44: f64,
 ) {
-    if obj == 0 { return; }
-    let t = [m11, m12, m13, m14, m21, m22, m23, m24, m31, m32, m33, m34, m41, m42, m43, m44];
+    if obj == 0 {
+        return;
+    }
+    let t = [
+        m11, m12, m13, m14, m21, m22, m23, m24, m31, m32, m33, m34, m41, m42, m43, m44,
+    ];
     with_props_mut(obj, |p| p.sublayer_transform = t);
 }
 
 /// `-[CALayer masksToBounds]`
 pub extern "C" fn shim_calayer_masks_to_bounds(obj: u64, _cmd: u64) -> u8 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     u8::from(with_props(obj, |p| p.masks_to_bounds))
 }
 
 /// `-[CALayer setMasksToBounds:]`
 pub extern "C" fn shim_calayer_set_masks_to_bounds(obj: u64, _cmd: u64, flag: u8) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     with_props_mut(obj, |p| p.masks_to_bounds = flag != 0);
 }
 
 /// `-[CALayer superlayer]`
 pub extern "C" fn shim_calayer_superlayer(obj: u64, _cmd: u64) -> u64 {
     layer_superlayer(obj)
+}
+
+// ── CAMetalLayer ───────────────────────────────────────────────
+
+/// `-[CAMetalLayer init]`
+pub extern "C" fn shim_cametallayer_init(obj: u64, _cmd: u64) -> u64 {
+    if obj == 0 {
+        return alloc_metal_layer();
+    }
+    unsafe {
+        *(obj as *mut u64) = crate::nsobj::cametallayer_class_addr();
+    }
+    obj
+}
+
+/// `-[CAMetalLayer device]`
+pub extern "C" fn shim_cametallayer_device(obj: u64, _cmd: u64) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
+    with_metal_props(obj, |props| props.device)
+}
+
+/// `-[CAMetalLayer setDevice:]`
+pub extern "C" fn shim_cametallayer_set_device(obj: u64, _cmd: u64, device: u64) {
+    if obj == 0 {
+        return;
+    }
+    with_metal_props_mut(obj, |props| props.device = device);
+}
+
+/// `-[CAMetalLayer pixelFormat]`
+pub extern "C" fn shim_cametallayer_pixel_format(obj: u64, _cmd: u64) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
+    with_metal_props(obj, |props| props.pixel_format)
+}
+
+/// `-[CAMetalLayer setPixelFormat:]`
+pub extern "C" fn shim_cametallayer_set_pixel_format(obj: u64, _cmd: u64, pixel_format: u64) {
+    if obj == 0 {
+        return;
+    }
+    with_metal_props_mut(obj, |props| props.pixel_format = pixel_format);
+}
+
+/// `-[CAMetalLayer framebufferOnly]`
+pub extern "C" fn shim_cametallayer_framebuffer_only(obj: u64, _cmd: u64) -> u8 {
+    if obj == 0 {
+        return 0;
+    }
+    with_metal_props(obj, |props| u8::from(props.framebuffer_only))
+}
+
+/// `-[CAMetalLayer setFramebufferOnly:]`
+pub extern "C" fn shim_cametallayer_set_framebuffer_only(
+    obj: u64,
+    _cmd: u64,
+    framebuffer_only: u8,
+) {
+    if obj == 0 {
+        return;
+    }
+    with_metal_props_mut(obj, |props| props.framebuffer_only = framebuffer_only != 0);
+}
+
+/// `-[CAMetalLayer setDrawableSize:]`
+pub extern "C" fn shim_cametallayer_set_drawable_size(
+    obj: u64,
+    _cmd: u64,
+    width: f64,
+    height: f64,
+) {
+    if obj == 0 {
+        return;
+    }
+    with_metal_props_mut(obj, |props| {
+        props.drawable_width = width;
+        props.drawable_height = height;
+    });
+}
+
+/// `-[CAMetalLayer opaque]`
+pub extern "C" fn shim_cametallayer_opaque(obj: u64, _cmd: u64) -> u8 {
+    if obj == 0 {
+        return 0;
+    }
+    with_metal_props(obj, |props| u8::from(props.opaque))
+}
+
+/// `-[CAMetalLayer isOpaque]`
+pub extern "C" fn shim_cametallayer_is_opaque(obj: u64, _cmd: u64) -> u8 {
+    shim_cametallayer_opaque(obj, _cmd)
+}
+
+/// `-[CAMetalLayer setOpaque:]`
+pub extern "C" fn shim_cametallayer_set_opaque(obj: u64, _cmd: u64, opaque: u8) {
+    if obj == 0 {
+        return;
+    }
+    with_metal_props_mut(obj, |props| props.opaque = opaque != 0);
+}
+
+/// `-[CAMetalLayer nextDrawable]` — returns nil until Metal drawable plumbing exists.
+pub extern "C" fn shim_cametallayer_next_drawable(_obj: u64, _cmd: u64) -> u64 {
+    0
 }
 
 // ── CATransaction ──────────────────────────────────────────────
@@ -504,7 +757,10 @@ pub extern "C" fn shim_catransaction_set_completion_block(_cls: u64, _cmd: u64, 
 
 /// `+[CADisplayLink displayLinkWithTarget:selector:]`
 pub extern "C" fn shim_cadisplaylink_create(
-    _cls: u64, _cmd: u64, target: u64, selector: u64,
+    _cls: u64,
+    _cmd: u64,
+    target: u64,
+    selector: u64,
 ) -> u64 {
     let obj = crate::pal_alloc().calloc(1, DISPLAYLINK_SIZE) as u64;
     if obj == 0 {
@@ -520,8 +776,12 @@ pub extern "C" fn shim_cadisplaylink_create(
 
 /// `-[CADisplayLink addToRunLoop:forMode:]` — no-op stub.
 pub extern "C" fn shim_cadisplaylink_add_to_run_loop(
-    _obj: u64, _cmd: u64, _run_loop: u64, _mode: u64,
-) {}
+    _obj: u64,
+    _cmd: u64,
+    _run_loop: u64,
+    _mode: u64,
+) {
+}
 
 /// `-[CADisplayLink invalidate]` — no-op stub.
 pub extern "C" fn shim_cadisplaylink_invalidate(_obj: u64, _cmd: u64) {}
@@ -748,6 +1008,59 @@ mod tests {
         remove_from_superlayer_internal(child);
         free_obj(parent);
         free_obj(child);
+    }
+
+    // --- CAMetalLayer ---
+
+    #[test]
+    fn metal_layer_alloc_has_subclass_isa() {
+        let layer = alloc_metal_layer();
+        assert_ne!(layer, 0);
+        let isa = unsafe { *(layer as *const u64) };
+        assert_eq!(isa, crate::nsobj::cametallayer_class_addr());
+        free_obj(layer);
+    }
+
+    #[test]
+    fn metal_layer_properties_roundtrip() {
+        let layer = alloc_metal_layer();
+
+        shim_cametallayer_set_device(layer, 0, 0xCAFE);
+        assert_eq!(shim_cametallayer_device(layer, 0), 0xCAFE);
+
+        shim_cametallayer_set_pixel_format(layer, 0, 80);
+        assert_eq!(shim_cametallayer_pixel_format(layer, 0), 80);
+
+        shim_cametallayer_set_framebuffer_only(layer, 0, 0);
+        assert_eq!(shim_cametallayer_framebuffer_only(layer, 0), 0);
+
+        shim_cametallayer_set_opaque(layer, 0, 0);
+        assert_eq!(shim_cametallayer_is_opaque(layer, 0), 0);
+        assert_eq!(shim_cametallayer_opaque(layer, 0), 0);
+
+        shim_cametallayer_set_drawable_size(layer, 0, 640.0, 480.0);
+        with_metal_props(layer, |props| {
+            assert!((props.drawable_width - 640.0).abs() < f64::EPSILON);
+            assert!((props.drawable_height - 480.0).abs() < f64::EPSILON);
+        });
+
+        assert_eq!(shim_cametallayer_next_drawable(layer, 0), 0);
+        free_obj(layer);
+    }
+
+    #[test]
+    fn metal_layer_nil_safety() {
+        assert_eq!(shim_cametallayer_device(0, 0), 0);
+        assert_eq!(shim_cametallayer_pixel_format(0, 0), 0);
+        assert_eq!(shim_cametallayer_framebuffer_only(0, 0), 0);
+        assert_eq!(shim_cametallayer_is_opaque(0, 0), 0);
+        assert_eq!(shim_cametallayer_next_drawable(0, 0), 0);
+
+        shim_cametallayer_set_device(0, 0, 0xCAFE);
+        shim_cametallayer_set_pixel_format(0, 0, 80);
+        shim_cametallayer_set_framebuffer_only(0, 0, 1);
+        shim_cametallayer_set_drawable_size(0, 0, 1.0, 1.0);
+        shim_cametallayer_set_opaque(0, 0, 1);
     }
 
     // --- CATransaction ---

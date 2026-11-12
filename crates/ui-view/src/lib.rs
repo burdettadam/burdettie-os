@@ -460,7 +460,7 @@ mod tests {
 
     #[test]
     fn view_apply_layout() {
-        use layout::{LayoutEngine, ViewId, LayoutConstraint, LayoutAttribute, LayoutRelation};
+        use layout::{LayoutAttribute, LayoutConstraint, LayoutEngine, LayoutRelation, ViewId};
 
         let mut root = View::new(Rect::new(0.0, 0.0, 400.0, 300.0));
         let mut child = View::new(Rect::new(0.0, 0.0, 0.0, 0.0));
@@ -469,23 +469,43 @@ mod tests {
 
         let mut engine = LayoutEngine::new(Rect::new(0.0, 0.0, 400.0, 300.0));
         engine.add_constraint(LayoutConstraint::constant(
-            ViewId(1), LayoutAttribute::Width, LayoutRelation::Equal, 100.0,
+            ViewId(1),
+            LayoutAttribute::Width,
+            LayoutRelation::Equal,
+            100.0,
         ));
         engine.add_constraint(LayoutConstraint::constant(
-            ViewId(1), LayoutAttribute::Height, LayoutRelation::Equal, 50.0,
+            ViewId(1),
+            LayoutAttribute::Height,
+            LayoutRelation::Equal,
+            50.0,
         ));
         engine.add_constraint(LayoutConstraint::constant(
-            ViewId(1), LayoutAttribute::Left, LayoutRelation::Equal, 10.0,
+            ViewId(1),
+            LayoutAttribute::Left,
+            LayoutRelation::Equal,
+            10.0,
         ));
         engine.add_constraint(LayoutConstraint::constant(
-            ViewId(1), LayoutAttribute::Top, LayoutRelation::Equal, 20.0,
+            ViewId(1),
+            LayoutAttribute::Top,
+            LayoutRelation::Equal,
+            20.0,
         ));
 
         root.apply_layout(&engine);
 
         let child_frame = root.subviews()[0].frame;
-        assert!((child_frame.width - 100.0).abs() < 2.0, "w={}", child_frame.width);
-        assert!((child_frame.height - 50.0).abs() < 2.0, "h={}", child_frame.height);
+        assert!(
+            (child_frame.width - 100.0).abs() < 2.0,
+            "w={}",
+            child_frame.width
+        );
+        assert!(
+            (child_frame.height - 50.0).abs() < 2.0,
+            "h={}",
+            child_frame.height
+        );
         assert!((child_frame.x - 10.0).abs() < 2.0, "x={}", child_frame.x);
         assert!((child_frame.y - 20.0).abs() < 2.0, "y={}", child_frame.y);
     }

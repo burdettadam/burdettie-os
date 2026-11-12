@@ -112,9 +112,7 @@ fn serial_worker_loop(q: &QueueInner) {
                 if q.shutdown.load(Ordering::Acquire) {
                     return;
                 }
-                fifo = q.fifo_condvar
-                    .wait(fifo)
-                    .unwrap_or_else(|e| e.into_inner());
+                fifo = q.fifo_condvar.wait(fifo).unwrap_or_else(|e| e.into_inner());
             }
             fifo.pop_front().unwrap()
         };
@@ -152,14 +150,24 @@ fn register_queue(q: Arc<QueueInner>) -> u64 {
 static MAIN_QUEUE: OnceLock<Arc<QueueInner>> = OnceLock::new();
 
 fn main_queue() -> &'static Arc<QueueInner> {
-    MAIN_QUEUE.get_or_init(|| Arc::new(QueueInner::new("com.apple.main-thread".into(), QueueKind::Main)))
+    MAIN_QUEUE.get_or_init(|| {
+        Arc::new(QueueInner::new(
+            "com.apple.main-thread".into(),
+            QueueKind::Main,
+        ))
+    })
 }
 
 /// Global concurrent queue singletons (one per QoS, but we use a single pool).
 static GLOBAL_QUEUE: OnceLock<Arc<QueueInner>> = OnceLock::new();
 
 fn global_queue() -> &'static Arc<QueueInner> {
-    GLOBAL_QUEUE.get_or_init(|| Arc::new(QueueInner::new("com.apple.root.default-qos".into(), QueueKind::Concurrent)))
+    GLOBAL_QUEUE.get_or_init(|| {
+        Arc::new(QueueInner::new(
+            "com.apple.root.default-qos".into(),
+            QueueKind::Concurrent,
+        ))
+    })
 }
 
 // ── Global thread pool for concurrent queues ───────────────────────
@@ -289,10 +297,7 @@ pub fn queue_sync(handle: u64, task: BoxedWork) {
         QueueKind::Serial => {
             // Check for deadlock: if we're the serial worker thread for this
             // queue, executing sync would deadlock.  Detect and run inline.
-            let current_name = std::thread::current()
-                .name()
-                .unwrap_or("")
-                .to_string();
+            let current_name = std::thread::current().name().unwrap_or("").to_string();
             let expected = format!("dispatch-serial:{}", q.label);
             if current_name == expected {
                 // Same thread — run inline to avoid deadlock
@@ -357,7 +362,8 @@ pub fn queue_barrier_async(handle: u64, task: BoxedWork) {
             {
                 let mut guard = q2.drain_mutex.lock().unwrap_or_else(|e| e.into_inner());
                 while q2.in_flight.load(Ordering::Acquire) > 0 {
-                    guard = q2.drain_condvar
+                    guard = q2
+                        .drain_condvar
                         .wait(guard)
                         .unwrap_or_else(|e| e.into_inner());
                 }
@@ -382,7 +388,8 @@ pub fn queue_barrier_sync(handle: u64, task: BoxedWork) {
     {
         let mut guard = q.drain_mutex.lock().unwrap_or_else(|e| e.into_inner());
         while q.in_flight.load(Ordering::Acquire) > 0 {
-            guard = q.drain_condvar
+            guard = q
+                .drain_condvar
                 .wait(guard)
                 .unwrap_or_else(|e| e.into_inner());
         }
@@ -454,20 +461,29 @@ mod tests {
 
         for i in 0..10 {
             let o = Arc::clone(&order);
-            queue_async(q, Box::new(move || {
-                o.lock().unwrap().push(i);
-            }));
+            queue_async(
+                q,
+                Box::new(move || {
+                    o.lock().unwrap().push(i);
+                }),
+            );
         }
 
         // Submit a sync block to flush the queue
         let o = Arc::clone(&order);
-        queue_sync(q, Box::new(move || {
-            o.lock().unwrap().push(999);
-        }));
+        queue_sync(
+            q,
+            Box::new(move || {
+                o.lock().unwrap().push(999);
+            }),
+        );
 
         let result = order.lock().unwrap();
         let expected: Vec<usize> = (0..10).chain(std::iter::once(999)).collect();
-        assert_eq!(*result, expected, "serial queue should execute in FIFO order");
+        assert_eq!(
+            *result, expected,
+            "serial queue should execute in FIFO order"
+        );
     }
 
     #[test]
@@ -476,10 +492,13 @@ mod tests {
         let counter = Arc::new(AtomicI32::new(0));
 
         let c = Arc::clone(&counter);
-        queue_sync(q, Box::new(move || {
-            std::thread::sleep(std::time::Duration::from_millis(10));
-            c.store(42, Ordering::SeqCst);
-        }));
+        queue_sync(
+            q,
+            Box::new(move || {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+                c.store(42, Ordering::SeqCst);
+            }),
+        );
 
         // After queue_sync returns, the value must already be set
         assert_eq!(counter.load(Ordering::SeqCst), 42);
@@ -496,12 +515,15 @@ mod tests {
             let s = Arc::clone(&started);
             let m = Arc::clone(&max_concurrent);
             let b = Arc::clone(&barrier);
-            queue_async(q, Box::new(move || {
-                let cur = s.fetch_add(1, Ordering::SeqCst) + 1;
-                m.fetch_max(cur, Ordering::SeqCst);
-                b.wait(); // all 4 must reach here
-                s.fetch_sub(1, Ordering::SeqCst);
-            }));
+            queue_async(
+                q,
+                Box::new(move || {
+                    let cur = s.fetch_add(1, Ordering::SeqCst) + 1;
+                    m.fetch_max(cur, Ordering::SeqCst);
+                    b.wait(); // all 4 must reach here
+                    s.fetch_sub(1, Ordering::SeqCst);
+                }),
+            );
         }
 
         // Wait for all to complete via sync
@@ -545,14 +567,20 @@ mod tests {
         let order = Arc::new(Mutex::new(Vec::<usize>::new()));
 
         let o = Arc::clone(&order);
-        queue_async(q, Box::new(move || {
-            o.lock().unwrap().push(1);
-        }));
+        queue_async(
+            q,
+            Box::new(move || {
+                o.lock().unwrap().push(1);
+            }),
+        );
 
         let o = Arc::clone(&order);
-        queue_barrier_sync(q, Box::new(move || {
-            o.lock().unwrap().push(2);
-        }));
+        queue_barrier_sync(
+            q,
+            Box::new(move || {
+                o.lock().unwrap().push(2);
+            }),
+        );
 
         let result = order.lock().unwrap();
         assert_eq!(*result, vec![1, 2]);
@@ -562,9 +590,12 @@ mod tests {
     fn sync_on_unknown_handle_runs_inline() {
         let called = Arc::new(AtomicBool::new(false));
         let c = Arc::clone(&called);
-        queue_sync(0xDEAD_BEEF, Box::new(move || {
-            c.store(true, Ordering::SeqCst);
-        }));
+        queue_sync(
+            0xDEAD_BEEF,
+            Box::new(move || {
+                c.store(true, Ordering::SeqCst);
+            }),
+        );
         assert!(called.load(Ordering::SeqCst));
     }
 
@@ -573,9 +604,12 @@ mod tests {
         let called = Arc::new(AtomicBool::new(false));
         let c = Arc::clone(&called);
         let main = main_queue_sentinel();
-        queue_async(main, Box::new(move || {
-            c.store(true, Ordering::SeqCst);
-        }));
+        queue_async(
+            main,
+            Box::new(move || {
+                c.store(true, Ordering::SeqCst);
+            }),
+        );
         assert!(called.load(Ordering::SeqCst));
     }
 
@@ -585,10 +619,13 @@ mod tests {
         let val = Arc::new(AtomicI32::new(0));
 
         let v = Arc::clone(&val);
-        queue_sync(q, Box::new(move || {
-            std::thread::sleep(std::time::Duration::from_millis(10));
-            v.store(99, Ordering::SeqCst);
-        }));
+        queue_sync(
+            q,
+            Box::new(move || {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+                v.store(99, Ordering::SeqCst);
+            }),
+        );
 
         assert_eq!(val.load(Ordering::SeqCst), 99);
     }
@@ -602,14 +639,20 @@ mod tests {
         let counter2 = Arc::new(AtomicI32::new(0));
 
         let c1 = Arc::clone(&counter1);
-        queue_sync(q1, Box::new(move || {
-            c1.store(1, Ordering::SeqCst);
-        }));
+        queue_sync(
+            q1,
+            Box::new(move || {
+                c1.store(1, Ordering::SeqCst);
+            }),
+        );
 
         let c2 = Arc::clone(&counter2);
-        queue_sync(q2, Box::new(move || {
-            c2.store(2, Ordering::SeqCst);
-        }));
+        queue_sync(
+            q2,
+            Box::new(move || {
+                c2.store(2, Ordering::SeqCst);
+            }),
+        );
 
         assert_eq!(counter1.load(Ordering::SeqCst), 1);
         assert_eq!(counter2.load(Ordering::SeqCst), 2);

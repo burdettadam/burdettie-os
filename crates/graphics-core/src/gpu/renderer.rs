@@ -218,40 +218,68 @@ impl GpuRenderer {
 
     /// Push a filled quad as two triangles.
     pub(super) fn push_quad(&mut self, x0: f32, y0: f32, x1: f32, y1: f32, color: Color) {
-        let [r, g, b, a] = [color.r as f32, color.g as f32, color.b as f32, color.a as f32];
+        let [r, g, b, a] = [
+            color.r as f32,
+            color.g as f32,
+            color.b as f32,
+            color.a as f32,
+        ];
         let tl = self.to_ndc(x0, y0);
         let tr = self.to_ndc(x1, y0);
         let bl = self.to_ndc(x0, y1);
         let br = self.to_ndc(x1, y1);
 
         // Two triangles: TL-TR-BL, TR-BR-BL
-        self.vertices.push(Vertex::colored(tl[0], tl[1], r, g, b, a));
-        self.vertices.push(Vertex::colored(tr[0], tr[1], r, g, b, a));
-        self.vertices.push(Vertex::colored(bl[0], bl[1], r, g, b, a));
-        self.vertices.push(Vertex::colored(tr[0], tr[1], r, g, b, a));
-        self.vertices.push(Vertex::colored(br[0], br[1], r, g, b, a));
-        self.vertices.push(Vertex::colored(bl[0], bl[1], r, g, b, a));
+        self.vertices
+            .push(Vertex::colored(tl[0], tl[1], r, g, b, a));
+        self.vertices
+            .push(Vertex::colored(tr[0], tr[1], r, g, b, a));
+        self.vertices
+            .push(Vertex::colored(bl[0], bl[1], r, g, b, a));
+        self.vertices
+            .push(Vertex::colored(tr[0], tr[1], r, g, b, a));
+        self.vertices
+            .push(Vertex::colored(br[0], br[1], r, g, b, a));
+        self.vertices
+            .push(Vertex::colored(bl[0], bl[1], r, g, b, a));
     }
 
     /// Push a textured quad for a glyph.
     pub(super) fn push_textured_quad(
         &mut self,
-        x0: f32, y0: f32, x1: f32, y1: f32,
-        u0: f32, v0: f32, u1: f32, v1: f32,
+        x0: f32,
+        y0: f32,
+        x1: f32,
+        y1: f32,
+        u0: f32,
+        v0: f32,
+        u1: f32,
+        v1: f32,
         color: Color,
     ) {
-        let [r, g, b, a] = [color.r as f32, color.g as f32, color.b as f32, color.a as f32];
+        let [r, g, b, a] = [
+            color.r as f32,
+            color.g as f32,
+            color.b as f32,
+            color.a as f32,
+        ];
         let tl = self.to_ndc(x0, y0);
         let tr = self.to_ndc(x1, y0);
         let bl = self.to_ndc(x0, y1);
         let br = self.to_ndc(x1, y1);
 
-        self.vertices.push(Vertex::textured(tl[0], tl[1], u0, v0, r, g, b, a));
-        self.vertices.push(Vertex::textured(tr[0], tr[1], u1, v0, r, g, b, a));
-        self.vertices.push(Vertex::textured(bl[0], bl[1], u0, v1, r, g, b, a));
-        self.vertices.push(Vertex::textured(tr[0], tr[1], u1, v0, r, g, b, a));
-        self.vertices.push(Vertex::textured(br[0], br[1], u1, v1, r, g, b, a));
-        self.vertices.push(Vertex::textured(bl[0], bl[1], u0, v1, r, g, b, a));
+        self.vertices
+            .push(Vertex::textured(tl[0], tl[1], u0, v0, r, g, b, a));
+        self.vertices
+            .push(Vertex::textured(tr[0], tr[1], u1, v0, r, g, b, a));
+        self.vertices
+            .push(Vertex::textured(bl[0], bl[1], u0, v1, r, g, b, a));
+        self.vertices
+            .push(Vertex::textured(tr[0], tr[1], u1, v0, r, g, b, a));
+        self.vertices
+            .push(Vertex::textured(br[0], br[1], u1, v1, r, g, b, a));
+        self.vertices
+            .push(Vertex::textured(bl[0], bl[1], u0, v1, r, g, b, a));
     }
 
     /// Flush all batched vertices to the GPU and render to a CPU Surface.

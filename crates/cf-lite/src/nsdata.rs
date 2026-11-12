@@ -14,7 +14,9 @@ const NSDATA_BYTES_OFF: usize = 16;
 /// Create an NSData from a byte slice.
 pub fn make_nsdata(bytes: &[u8]) -> u64 {
     let obj = crate::pal_alloc().calloc(1, 24) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *(obj as *mut u64) = crate::nsobj::nsdata_class_addr();
         *((obj as usize + NSDATA_LENGTH_OFF) as *mut u64) = bytes.len() as u64;
@@ -22,9 +24,13 @@ pub fn make_nsdata(bytes: &[u8]) -> u64 {
     if !bytes.is_empty() {
         let buf = crate::pal_alloc().malloc(bytes.len());
         if !buf.is_null() {
-            unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), buf, bytes.len()); }
+            unsafe {
+                std::ptr::copy_nonoverlapping(bytes.as_ptr(), buf, bytes.len());
+            }
         }
-        unsafe { *((obj as usize + NSDATA_BYTES_OFF) as *mut u64) = buf as u64; }
+        unsafe {
+            *((obj as usize + NSDATA_BYTES_OFF) as *mut u64) = buf as u64;
+        }
     }
     obj
 }
@@ -153,8 +159,7 @@ pub extern "C" fn shim_nsdata_write_to_file_atomically(
     let result = if atomically != 0 {
         // Write to a temp file then rename for atomicity
         let tmp_path = path.with_extension("tmp");
-        std::fs::write(&tmp_path, data)
-            .and_then(|_| std::fs::rename(&tmp_path, path))
+        std::fs::write(&tmp_path, data).and_then(|_| std::fs::rename(&tmp_path, path))
     } else {
         std::fs::write(path, data)
     };
@@ -199,8 +204,7 @@ pub extern "C" fn shim_nsdata_is_equal_to_data(obj: u64, _cmd: u64, other: u64) 
 
 // ── Base64 encode / decode ─────────────────────────────────────────
 
-const B64_ALPHABET: &[u8; 64] =
-    b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+const B64_ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 fn base64_encode(input: &[u8]) -> String {
     let mut out = String::with_capacity((input.len() + 2) / 3 * 4);
@@ -238,7 +242,10 @@ fn base64_decode_byte(c: u8) -> Option<u8> {
 
 fn base64_decode(input: &str) -> Option<Vec<u8>> {
     // Strip whitespace
-    let clean: Vec<u8> = input.bytes().filter(|&b| b != b'\n' && b != b'\r' && b != b' ' && b != b'\t').collect();
+    let clean: Vec<u8> = input
+        .bytes()
+        .filter(|&b| b != b'\n' && b != b'\r' && b != b' ' && b != b'\t')
+        .collect();
     if clean.is_empty() {
         return Some(Vec::new());
     }
@@ -329,10 +336,14 @@ pub extern "C" fn shim_nsdata_init_with_base64_encoded_string(
             unsafe {
                 std::ptr::copy_nonoverlapping(decoded.as_ptr(), buf, len);
             }
-            unsafe { *((obj as usize + NSDATA_BYTES_OFF) as *mut u64) = buf as u64; }
+            unsafe {
+                *((obj as usize + NSDATA_BYTES_OFF) as *mut u64) = buf as u64;
+            }
         }
     }
-    unsafe { *((obj as usize + NSDATA_LENGTH_OFF) as *mut u64) = len as u64; }
+    unsafe {
+        *((obj as usize + NSDATA_LENGTH_OFF) as *mut u64) = len as u64;
+    }
     obj
 }
 
@@ -369,12 +380,7 @@ pub extern "C" fn shim_nsdata_subdata_with_range(
 }
 
 /// `-[NSData getBytes:length:]`
-pub extern "C" fn shim_nsdata_get_bytes_length(
-    obj: u64,
-    _cmd: u64,
-    dest: u64,
-    length: u64,
-) -> u64 {
+pub extern "C" fn shim_nsdata_get_bytes_length(obj: u64, _cmd: u64, dest: u64, length: u64) -> u64 {
     if obj == 0 || dest == 0 {
         return 0;
     }
@@ -454,7 +460,11 @@ pub extern "C" fn shim_nsdata_write_to_file_options_error(
     match std::fs::write(path_str, data) {
         Ok(()) => 1,
         Err(e) => {
-            log::error!("NSData writeToFile:options:error: failed: {}: {}", path_str, e);
+            log::error!(
+                "NSData writeToFile:options:error: failed: {}: {}",
+                path_str,
+                e
+            );
             0
         }
     }

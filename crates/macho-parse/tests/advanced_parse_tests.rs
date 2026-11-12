@@ -82,12 +82,12 @@ fn export_stub_and_resolver_reads_resolver() {
     // Build a synthetic trie with STUB_AND_RESOLVER flag
     // Node: terminal_size=ULEB, flags=ULEB(0x10), stub_offset=ULEB, resolver_offset=ULEB
     let trie = vec![
-        6,                      // terminal size: 6 bytes (flags + stub + resolver ULEBs)
-        0x10,                   // flags = STUB_AND_RESOLVER
-        0x42,                   // stub_offset = 0x42
-        0x99u8 & 0x7F | 0x80,  // resolver_offset = 0x1099 (multi-byte ULEB)
-        0x21,                   // continuation
-        0,                      // 0 children
+        6,                    // terminal size: 6 bytes (flags + stub + resolver ULEBs)
+        0x10,                 // flags = STUB_AND_RESOLVER
+        0x42,                 // stub_offset = 0x42
+        0x99u8 & 0x7F | 0x80, // resolver_offset = 0x1099 (multi-byte ULEB)
+        0x21,                 // continuation
+        0,                    // 0 children
     ];
 
     let exports = macho_parse::parse_export_trie(&trie);

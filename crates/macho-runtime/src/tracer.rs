@@ -248,7 +248,10 @@ mod tests {
 
         let events = tracer.events_of(EventKind::Pipeline);
         assert_eq!(events.len(), 2);
-        assert_eq!(events[0].message, "perf|map_images|timing|deps_total_us|123");
+        assert_eq!(
+            events[0].message,
+            "perf|map_images|timing|deps_total_us|123"
+        );
         assert_eq!(events[1].message, "perf|map_images|counter|deps_loaded|7");
     }
 

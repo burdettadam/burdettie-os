@@ -55,7 +55,9 @@ fn with_stream_info<R>(f: impl FnOnce(&mut HashMap<u64, StreamScheduleInfo>) -> 
 
 /// Fire `stream:handleEvent:` on the delegate via the ObjC runtime.
 fn fire_stream_event(stream: u64, delegate: u64, event: u64) {
-    if delegate == 0 || stream == 0 { return; }
+    if delegate == 0 || stream == 0 {
+        return;
+    }
     // Dispatch stream:handleEvent: — 2-arg selector
     let isa = unsafe { *(delegate as *const u64) };
     let selector = "stream:handleEvent:";
@@ -63,8 +65,12 @@ fn fire_stream_event(stream: u64, delegate: u64, event: u64) {
         Ok(g) => g,
         Err(e) => e.into_inner(),
     };
-    let Some(rt) = guard.as_ref() else { return; };
-    let Some(imp) = rt.msg_lookup(isa, selector) else { return; };
+    let Some(rt) = guard.as_ref() else {
+        return;
+    };
+    let Some(imp) = rt.msg_lookup(isa, selector) else {
+        return;
+    };
     let sel_ptr = rt.selector_ptr(selector).unwrap_or(0) as u64;
     drop(guard);
     let func: extern "C" fn(u64, u64, u64, u64) = unsafe { std::mem::transmute(imp) };
@@ -74,7 +80,9 @@ fn fire_stream_event(stream: u64, delegate: u64, event: u64) {
 /// Fire EndEncountered on the delegate if the stream is scheduled.
 fn fire_end_event_if_scheduled(obj: u64) {
     let delegate = with_stream_info(|m| {
-        m.get(&obj).filter(|i| i.run_loop != 0).map_or(0, |i| i.delegate)
+        m.get(&obj)
+            .filter(|i| i.run_loop != 0)
+            .map_or(0, |i| i.delegate)
     });
     if delegate != 0 {
         fire_stream_event(obj, delegate, NS_STREAM_EVENT_END_ENCOUNTERED);
@@ -91,11 +99,16 @@ fn make_nsstring(s: &str) -> u64 {
 // ═══════════════════════════════════════════════════════════════
 
 pub extern "C" fn shim_nsstream_open(obj: u64, _cmd: u64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as usize + STATUS_OFF) as *mut u64) = NS_STREAM_STATUS_OPEN; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + STATUS_OFF) as *mut u64) = NS_STREAM_STATUS_OPEN;
+    }
     // Fire delegate events if scheduled in a run loop.
     let (delegate, is_scheduled) = with_stream_info(|m| {
-        m.get(&obj).map_or((0u64, false), |i| (i.delegate, i.run_loop != 0))
+        m.get(&obj)
+            .map_or((0u64, false), |i| (i.delegate, i.run_loop != 0))
     });
     if is_scheduled && delegate != 0 {
         fire_stream_event(obj, delegate, NS_STREAM_EVENT_OPEN_COMPLETED);
@@ -115,52 +128,85 @@ pub extern "C" fn shim_nsstream_open(obj: u64, _cmd: u64) {
 }
 
 pub extern "C" fn shim_nsstream_close(obj: u64, _cmd: u64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as usize + STATUS_OFF) as *mut u64) = NS_STREAM_STATUS_CLOSED; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + STATUS_OFF) as *mut u64) = NS_STREAM_STATUS_CLOSED;
+    }
     // Clean up scheduling info.
-    with_stream_info(|m| { m.remove(&obj); });
+    with_stream_info(|m| {
+        m.remove(&obj);
+    });
 }
 
 pub extern "C" fn shim_nsstream_stream_status(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return NS_STREAM_STATUS_NOT_OPEN; }
+    if obj == 0 {
+        return NS_STREAM_STATUS_NOT_OPEN;
+    }
     unsafe { *((obj as usize + STATUS_OFF) as *const u64) }
 }
 
 pub extern "C" fn shim_nsstream_stream_error(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + ERROR_OFF) as *const u64) }
 }
 
 pub extern "C" fn shim_nsstream_delegate(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     with_stream_info(|m| m.get(&obj).map_or(0, |i| i.delegate))
 }
 
 pub extern "C" fn shim_nsstream_set_delegate(obj: u64, _cmd: u64, delegate: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     with_stream_info(|m| {
         m.entry(obj)
             .and_modify(|i| i.delegate = delegate)
-            .or_insert(StreamScheduleInfo { delegate, run_loop: 0, mode: 0 });
+            .or_insert(StreamScheduleInfo {
+                delegate,
+                run_loop: 0,
+                mode: 0,
+            });
     });
 }
 
 pub extern "C" fn shim_nsstream_schedule_in_run_loop(obj: u64, _cmd: u64, rl: u64, mode: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     with_stream_info(|m| {
         m.entry(obj)
-            .and_modify(|i| { i.run_loop = rl; i.mode = mode; })
-            .or_insert(StreamScheduleInfo { delegate: 0, run_loop: rl, mode });
+            .and_modify(|i| {
+                i.run_loop = rl;
+                i.mode = mode;
+            })
+            .or_insert(StreamScheduleInfo {
+                delegate: 0,
+                run_loop: rl,
+                mode,
+            });
     });
 }
 
 pub extern "C" fn shim_nsstream_remove_from_run_loop(obj: u64, _cmd: u64, _rl: u64, _mode: u64) {
-    if obj == 0 { return; }
-    with_stream_info(|m| { m.remove(&obj); });
+    if obj == 0 {
+        return;
+    }
+    with_stream_info(|m| {
+        m.remove(&obj);
+    });
 }
 
 pub extern "C" fn shim_nsstream_description(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let status = unsafe { *((obj as usize + STATUS_OFF) as *const u64) };
     make_nsstring(&format!("<NSStream: status={status}>"))
 }
@@ -172,7 +218,9 @@ pub extern "C" fn shim_nsstream_description(obj: u64, _cmd: u64) -> u64 {
 /// `+[NSInputStream inputStreamWithData:]`
 pub extern "C" fn shim_nsinputstream_with_data(_cls: u64, _cmd: u64, data: u64) -> u64 {
     let obj = crate::pal_alloc().calloc(1, 40) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *(obj as *mut u64) = nsobj::nsinputstream_class_addr();
         *((obj as usize + DATA_OFF) as *mut u64) = data;
@@ -183,13 +231,26 @@ pub extern "C" fn shim_nsinputstream_with_data(_cls: u64, _cmd: u64, data: u64) 
 
 /// `+[NSInputStream inputStreamWithFileAtPath:]`
 pub extern "C" fn shim_nsinputstream_with_file(_cls: u64, _cmd: u64, path: u64) -> u64 {
-    if path == 0 { return 0; }
+    if path == 0 {
+        return 0;
+    }
     // Read file contents into NSData, store as backing
-    let Some(p) = cfstring::extract_cfstring_cstr(path) else { return 0; };
-    let Ok(bytes) = std::fs::read(p) else { return 0; };
-    let data = crate::nsdata::shim_nsdata_data_with_bytes_length(0, 0, bytes.as_ptr() as u64, bytes.len() as u64);
+    let Some(p) = cfstring::extract_cfstring_cstr(path) else {
+        return 0;
+    };
+    let Ok(bytes) = std::fs::read(p) else {
+        return 0;
+    };
+    let data = crate::nsdata::shim_nsdata_data_with_bytes_length(
+        0,
+        0,
+        bytes.as_ptr() as u64,
+        bytes.len() as u64,
+    );
     let obj = crate::pal_alloc().calloc(1, 40) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *(obj as *mut u64) = nsobj::nsinputstream_class_addr();
         *((obj as usize + DATA_OFF) as *mut u64) = data;
@@ -200,13 +261,19 @@ pub extern "C" fn shim_nsinputstream_with_file(_cls: u64, _cmd: u64, path: u64) 
 
 /// `-[NSInputStream read:maxLength:]`
 pub extern "C" fn shim_nsinputstream_read(obj: u64, _cmd: u64, buffer: u64, max_len: u64) -> i64 {
-    if obj == 0 || buffer == 0 { return -1; }
+    if obj == 0 || buffer == 0 {
+        return -1;
+    }
     let status = unsafe { *((obj as usize + STATUS_OFF) as *const u64) };
-    if status != NS_STREAM_STATUS_OPEN { return -1; }
+    if status != NS_STREAM_STATUS_OPEN {
+        return -1;
+    }
 
     let data_ptr = unsafe { *((obj as usize + DATA_OFF) as *const u64) };
     if data_ptr == 0 {
-        unsafe { *((obj as usize + STATUS_OFF) as *mut u64) = NS_STREAM_STATUS_AT_END; }
+        unsafe {
+            *((obj as usize + STATUS_OFF) as *mut u64) = NS_STREAM_STATUS_AT_END;
+        }
         fire_end_event_if_scheduled(obj);
         return 0;
     }
@@ -215,7 +282,9 @@ pub extern "C" fn shim_nsinputstream_read(obj: u64, _cmd: u64, buffer: u64, max_
     let read_pos = unsafe { *((obj as usize + READ_POS_OFF) as *const u64) };
 
     if read_pos >= total_len {
-        unsafe { *((obj as usize + STATUS_OFF) as *mut u64) = NS_STREAM_STATUS_AT_END; }
+        unsafe {
+            *((obj as usize + STATUS_OFF) as *mut u64) = NS_STREAM_STATUS_AT_END;
+        }
         fire_end_event_if_scheduled(obj);
         return 0;
     }
@@ -240,18 +309,26 @@ pub extern "C" fn shim_nsinputstream_read(obj: u64, _cmd: u64, buffer: u64, max_
 
 /// `-[NSInputStream hasBytesAvailable]`
 pub extern "C" fn shim_nsinputstream_has_bytes(obj: u64, _cmd: u64) -> u8 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let status = unsafe { *((obj as usize + STATUS_OFF) as *const u64) };
-    if status != NS_STREAM_STATUS_OPEN { return 0; }
+    if status != NS_STREAM_STATUS_OPEN {
+        return 0;
+    }
     let data_ptr = unsafe { *((obj as usize + DATA_OFF) as *const u64) };
-    if data_ptr == 0 { return 0; }
+    if data_ptr == 0 {
+        return 0;
+    }
     let total_len = crate::nsdata::shim_nsdata_length(data_ptr, 0);
     let read_pos = unsafe { *((obj as usize + READ_POS_OFF) as *const u64) };
     u8::from(read_pos < total_len)
 }
 
 pub extern "C" fn shim_nsinputstream_description(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let status = unsafe { *((obj as usize + STATUS_OFF) as *const u64) };
     make_nsstring(&format!("<NSInputStream: status={status}>"))
 }
@@ -263,7 +340,9 @@ pub extern "C" fn shim_nsinputstream_description(obj: u64, _cmd: u64) -> u64 {
 /// `+[NSOutputStream outputStreamToMemory]`
 pub extern "C" fn shim_nsoutputstream_to_memory(_cls: u64, _cmd: u64) -> u64 {
     let obj = crate::pal_alloc().calloc(1, 32) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     // Create a backing NSMutableData
     let md = crate::nsmutabledata::shim_nsmutabledata_data(0, 0);
     unsafe {
@@ -274,10 +353,17 @@ pub extern "C" fn shim_nsoutputstream_to_memory(_cls: u64, _cmd: u64) -> u64 {
 }
 
 /// `+[NSOutputStream outputStreamToFileAtPath:append:]`
-pub extern "C" fn shim_nsoutputstream_to_file(_cls: u64, _cmd: u64, _path: u64, _append: u8) -> u64 {
+pub extern "C" fn shim_nsoutputstream_to_file(
+    _cls: u64,
+    _cmd: u64,
+    _path: u64,
+    _append: u8,
+) -> u64 {
     // Create a memory-backed stream; flush to file on close
     let obj = crate::pal_alloc().calloc(1, 32) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let md = crate::nsmutabledata::shim_nsmutabledata_data(0, 0);
     unsafe {
         *(obj as *mut u64) = nsobj::nsoutputstream_class_addr();
@@ -288,29 +374,41 @@ pub extern "C" fn shim_nsoutputstream_to_file(_cls: u64, _cmd: u64, _path: u64, 
 
 /// `-[NSOutputStream write:maxLength:]`
 pub extern "C" fn shim_nsoutputstream_write(obj: u64, _cmd: u64, buffer: u64, len: u64) -> i64 {
-    if obj == 0 || buffer == 0 { return -1; }
+    if obj == 0 || buffer == 0 {
+        return -1;
+    }
     let status = unsafe { *((obj as usize + STATUS_OFF) as *const u64) };
-    if status != NS_STREAM_STATUS_OPEN { return -1; }
+    if status != NS_STREAM_STATUS_OPEN {
+        return -1;
+    }
 
     let md = unsafe { *((obj as usize + BUFFER_OFF) as *const u64) };
-    if md == 0 { return -1; }
+    if md == 0 {
+        return -1;
+    }
     crate::nsmutabledata::shim_nsmutabledata_append_bytes(md, 0, buffer, len);
     len as i64
 }
 
 /// `-[NSOutputStream hasSpaceAvailable]`
 pub extern "C" fn shim_nsoutputstream_has_space(obj: u64, _cmd: u64) -> u8 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let status = unsafe { *((obj as usize + STATUS_OFF) as *const u64) };
     u8::from(status == NS_STREAM_STATUS_OPEN)
 }
 
 /// `-[NSOutputStream propertyForKey:]` — returns the accumulated data for NSStreamDataWrittenToMemoryStreamKey.
 pub extern "C" fn shim_nsoutputstream_property_for_key(obj: u64, _cmd: u64, key: u64) -> u64 {
-    if obj == 0 || key == 0 { return 0; }
+    if obj == 0 || key == 0 {
+        return 0;
+    }
     // Pointer comparison first (Apple-aligned), then string fallback for literals
-    let is_data_key = key == crate::foundation_constants::nsstream_data_written_to_memory_key_addr()
-        || cfstring::extract_cfstring_cstr(key).as_deref() == Some("NSStreamDataWrittenToMemoryStreamKey");
+    let is_data_key = key
+        == crate::foundation_constants::nsstream_data_written_to_memory_key_addr()
+        || cfstring::extract_cfstring_cstr(key).as_deref()
+            == Some("NSStreamDataWrittenToMemoryStreamKey");
     if is_data_key {
         unsafe { *((obj as usize + BUFFER_OFF) as *const u64) }
     } else {
@@ -319,7 +417,9 @@ pub extern "C" fn shim_nsoutputstream_property_for_key(obj: u64, _cmd: u64, key:
 }
 
 pub extern "C" fn shim_nsoutputstream_description(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let status = unsafe { *((obj as usize + STATUS_OFF) as *const u64) };
     make_nsstring(&format!("<NSOutputStream: status={status}>"))
 }
@@ -370,7 +470,10 @@ mod tests {
     #[test]
     fn stream_status_returns_current() {
         let obj = make_stream();
-        assert_eq!(shim_nsstream_stream_status(obj, 0), NS_STREAM_STATUS_NOT_OPEN);
+        assert_eq!(
+            shim_nsstream_stream_status(obj, 0),
+            NS_STREAM_STATUS_NOT_OPEN
+        );
         shim_nsstream_open(obj, 0);
         assert_eq!(shim_nsstream_stream_status(obj, 0), NS_STREAM_STATUS_OPEN);
         shim_nsstream_close(obj, 0);
@@ -451,9 +554,8 @@ mod tests {
     #[test]
     fn inputstream_with_data_creates_object() {
         let bytes: [u8; 5] = [1, 2, 3, 4, 5];
-        let data = crate::nsdata::shim_nsdata_data_with_bytes_length(
-            0, 0, bytes.as_ptr() as u64, 5,
-        );
+        let data =
+            crate::nsdata::shim_nsdata_data_with_bytes_length(0, 0, bytes.as_ptr() as u64, 5);
         let obj = shim_nsinputstream_with_data(0, 0, data);
         assert_ne!(obj, 0);
         assert_eq!(read_field(obj, 0), nsobj::nsinputstream_class_addr());
@@ -470,9 +572,7 @@ mod tests {
     #[test]
     fn inputstream_read_basic() {
         let src: [u8; 4] = [10, 20, 30, 40];
-        let data = crate::nsdata::shim_nsdata_data_with_bytes_length(
-            0, 0, src.as_ptr() as u64, 4,
-        );
+        let data = crate::nsdata::shim_nsdata_data_with_bytes_length(0, 0, src.as_ptr() as u64, 4);
         let obj = shim_nsinputstream_with_data(0, 0, data);
         shim_nsstream_open(obj, 0);
 
@@ -489,9 +589,7 @@ mod tests {
     #[test]
     fn inputstream_read_partial() {
         let src: [u8; 6] = [1, 2, 3, 4, 5, 6];
-        let data = crate::nsdata::shim_nsdata_data_with_bytes_length(
-            0, 0, src.as_ptr() as u64, 6,
-        );
+        let data = crate::nsdata::shim_nsdata_data_with_bytes_length(0, 0, src.as_ptr() as u64, 6);
         let obj = shim_nsinputstream_with_data(0, 0, data);
         shim_nsstream_open(obj, 0);
 
@@ -514,9 +612,7 @@ mod tests {
     #[test]
     fn inputstream_read_past_end() {
         let src: [u8; 2] = [0xAA, 0xBB];
-        let data = crate::nsdata::shim_nsdata_data_with_bytes_length(
-            0, 0, src.as_ptr() as u64, 2,
-        );
+        let data = crate::nsdata::shim_nsdata_data_with_bytes_length(0, 0, src.as_ptr() as u64, 2);
         let obj = shim_nsinputstream_with_data(0, 0, data);
         shim_nsstream_open(obj, 0);
 
@@ -537,15 +633,16 @@ mod tests {
     #[test]
     fn inputstream_read_nil_obj() {
         let mut buf = [0u8; 4];
-        assert_eq!(shim_nsinputstream_read(0, 0, buf.as_mut_ptr() as u64, 4), -1);
+        assert_eq!(
+            shim_nsinputstream_read(0, 0, buf.as_mut_ptr() as u64, 4),
+            -1
+        );
     }
 
     #[test]
     fn inputstream_read_nil_buffer() {
         let src: [u8; 2] = [1, 2];
-        let data = crate::nsdata::shim_nsdata_data_with_bytes_length(
-            0, 0, src.as_ptr() as u64, 2,
-        );
+        let data = crate::nsdata::shim_nsdata_data_with_bytes_length(0, 0, src.as_ptr() as u64, 2);
         let obj = shim_nsinputstream_with_data(0, 0, data);
         shim_nsstream_open(obj, 0);
         assert_eq!(shim_nsinputstream_read(obj, 0, 0, 4), -1);
@@ -555,13 +652,14 @@ mod tests {
     #[test]
     fn inputstream_read_not_open() {
         let src: [u8; 2] = [1, 2];
-        let data = crate::nsdata::shim_nsdata_data_with_bytes_length(
-            0, 0, src.as_ptr() as u64, 2,
-        );
+        let data = crate::nsdata::shim_nsdata_data_with_bytes_length(0, 0, src.as_ptr() as u64, 2);
         let obj = shim_nsinputstream_with_data(0, 0, data);
         // Don't open — status is NOT_OPEN
         let mut buf = [0u8; 4];
-        assert_eq!(shim_nsinputstream_read(obj, 0, buf.as_mut_ptr() as u64, 4), -1);
+        assert_eq!(
+            shim_nsinputstream_read(obj, 0, buf.as_mut_ptr() as u64, 4),
+            -1
+        );
         free_obj(obj);
     }
 
@@ -580,9 +678,7 @@ mod tests {
     #[test]
     fn inputstream_has_bytes_when_open() {
         let src: [u8; 3] = [1, 2, 3];
-        let data = crate::nsdata::shim_nsdata_data_with_bytes_length(
-            0, 0, src.as_ptr() as u64, 3,
-        );
+        let data = crate::nsdata::shim_nsdata_data_with_bytes_length(0, 0, src.as_ptr() as u64, 3);
         let obj = shim_nsinputstream_with_data(0, 0, data);
         // Not open yet
         assert_eq!(shim_nsinputstream_has_bytes(obj, 0), 0);
@@ -622,7 +718,10 @@ mod tests {
         let desc = shim_nsinputstream_description(obj, 0);
         assert_ne!(desc, 0);
         let s = read_string(desc);
-        assert!(s.contains("NSInputStream"), "expected NSInputStream in: {s}");
+        assert!(
+            s.contains("NSInputStream"),
+            "expected NSInputStream in: {s}"
+        );
         assert!(s.contains("status=2"), "expected status=2 in: {s}");
         free_obj(obj);
     }
@@ -707,7 +806,10 @@ mod tests {
     fn outputstream_write_not_open() {
         let obj = shim_nsoutputstream_to_memory(0, 0);
         let src: [u8; 2] = [1, 2];
-        assert_eq!(shim_nsoutputstream_write(obj, 0, src.as_ptr() as u64, 2), -1);
+        assert_eq!(
+            shim_nsoutputstream_write(obj, 0, src.as_ptr() as u64, 2),
+            -1
+        );
         free_obj(obj);
     }
 
@@ -776,7 +878,10 @@ mod tests {
         let desc = shim_nsoutputstream_description(obj, 0);
         assert_ne!(desc, 0);
         let s = read_string(desc);
-        assert!(s.contains("NSOutputStream"), "expected NSOutputStream in: {s}");
+        assert!(
+            s.contains("NSOutputStream"),
+            "expected NSOutputStream in: {s}"
+        );
         assert!(s.contains("status=2"), "expected status=2 in: {s}");
         free_obj(obj);
     }
@@ -814,7 +919,7 @@ mod tests {
         let obj = make_stream();
         shim_nsstream_set_delegate(obj, 0, 0xBEEF);
         assert_eq!(shim_nsstream_delegate(obj, 0), 0xBEEF);
-        shim_nsstream_close(obj, 0);  // clears STREAM_INFO entry
+        shim_nsstream_close(obj, 0); // clears STREAM_INFO entry
         free_obj(obj);
     }
 
@@ -833,9 +938,7 @@ mod tests {
         let obj = make_stream();
         shim_nsstream_schedule_in_run_loop(obj, 0, 0xAA, 0xBB);
         // Verify through internal map
-        let info = with_stream_info(|m| {
-            m.get(&obj).map(|i| (i.run_loop, i.mode))
-        });
+        let info = with_stream_info(|m| m.get(&obj).map(|i| (i.run_loop, i.mode)));
         assert_eq!(info, Some((0xAA, 0xBB)));
         shim_nsstream_close(obj, 0);
         free_obj(obj);

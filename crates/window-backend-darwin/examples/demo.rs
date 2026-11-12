@@ -19,10 +19,7 @@ fn main() {
     app.set_background(Color::WHITE);
 
     // Title label
-    let mut title = Label::new(
-        Rect::new(40.0, 30.0, 400.0, 30.0),
-        "Hello, burdettie-os!",
-    );
+    let mut title = Label::new(Rect::new(40.0, 30.0, 400.0, 30.0), "Hello, burdettie-os!");
     title.set_text_color(Color::new(0.1, 0.1, 0.4, 1.0));
     app.add_label(title);
 

@@ -10,7 +10,11 @@ impl Interpreter {
                 let val = self.cpu.read_reg(rn);
                 let elem_bytes = 1u32 << size;
                 let elem_bits = elem_bytes * 8;
-                let mask = if elem_bits >= 64 { u64::MAX } else { (1u64 << elem_bits) - 1 };
+                let mask = if elem_bits >= 64 {
+                    u64::MAX
+                } else {
+                    (1u64 << elem_bits) - 1
+                };
                 let elem = val & mask;
                 let total_bytes = if q { 16 } else { 8 };
                 let count = total_bytes / elem_bytes;
@@ -25,7 +29,11 @@ impl Interpreter {
                 let (size, index) = simd_decode_imm5(imm5);
                 let src = self.cpu.v[rn as usize];
                 let elem_bits = (1u32 << size) * 8;
-                let mask = if elem_bits >= 128 { u128::MAX } else { (1u128 << elem_bits) - 1 };
+                let mask = if elem_bits >= 128 {
+                    u128::MAX
+                } else {
+                    (1u128 << elem_bits) - 1
+                };
                 let elem = (src >> (index * elem_bits)) & mask;
                 let total_bytes = if q { 16u32 } else { 8 };
                 let count = total_bytes / (1u32 << size);
@@ -40,7 +48,11 @@ impl Interpreter {
                 let (size, index) = simd_decode_imm5(imm5);
                 let val = self.cpu.read_reg(rn);
                 let elem_bits = (1u32 << size) * 8;
-                let mask = if elem_bits >= 128 { u128::MAX } else { (1u128 << elem_bits) - 1 };
+                let mask = if elem_bits >= 128 {
+                    u128::MAX
+                } else {
+                    (1u128 << elem_bits) - 1
+                };
                 let shift = index * elem_bits;
                 let mut v = self.cpu.v[rd as usize];
                 v &= !(mask << shift);
@@ -52,7 +64,11 @@ impl Interpreter {
                 let (size, dst_idx) = simd_decode_imm5(imm5);
                 let src_idx = imm4 as u32 >> size;
                 let elem_bits = (1u32 << size) * 8;
-                let mask = if elem_bits >= 128 { u128::MAX } else { (1u128 << elem_bits) - 1 };
+                let mask = if elem_bits >= 128 {
+                    u128::MAX
+                } else {
+                    (1u128 << elem_bits) - 1
+                };
                 let src_val = (self.cpu.v[rn as usize] >> (src_idx * elem_bits)) & mask;
                 let shift = dst_idx * elem_bits;
                 let mut v = self.cpu.v[rd as usize];
@@ -64,7 +80,11 @@ impl Interpreter {
             Instruction::SimdUmov { q: _, imm5, rd, rn } => {
                 let (size, index) = simd_decode_imm5(imm5);
                 let elem_bits = (1u32 << size) * 8;
-                let mask = if elem_bits >= 64 { u64::MAX } else { (1u64 << elem_bits) - 1 };
+                let mask = if elem_bits >= 64 {
+                    u64::MAX
+                } else {
+                    (1u64 << elem_bits) - 1
+                };
                 let val = ((self.cpu.v[rn as usize] >> (index * elem_bits)) as u64) & mask;
                 self.cpu.write_reg(rd, val);
                 self.cpu.pc = pc + 4;
@@ -72,7 +92,11 @@ impl Interpreter {
             Instruction::SimdSmov { q, imm5, rd, rn } => {
                 let (size, index) = simd_decode_imm5(imm5);
                 let elem_bits = (1u32 << size) * 8;
-                let mask = if elem_bits >= 64 { u64::MAX } else { (1u64 << elem_bits) - 1 };
+                let mask = if elem_bits >= 64 {
+                    u64::MAX
+                } else {
+                    (1u64 << elem_bits) - 1
+                };
                 let raw_val = ((self.cpu.v[rn as usize] >> (index * elem_bits)) as u64) & mask;
                 // Sign-extend
                 let sign_bit = 1u64 << (elem_bits - 1);
@@ -96,11 +120,23 @@ impl Interpreter {
                 self.cpu.write_v(rd, result, q);
                 self.cpu.pc = pc + 4;
             }
-            Instruction::SimdAdd { q, size, rd, rn, rm } => {
+            Instruction::SimdAdd {
+                q,
+                size,
+                rd,
+                rn,
+                rm,
+            } => {
                 simd_binop(self, q, size, rd, rn, rm, |a, b, _| a.wrapping_add(b));
                 self.cpu.pc = pc + 4;
             }
-            Instruction::SimdSub { q, size, rd, rn, rm } => {
+            Instruction::SimdSub {
+                q,
+                size,
+                rd,
+                rn,
+                rm,
+            } => {
                 simd_binop(self, q, size, rd, rn, rm, |a, b, _| a.wrapping_sub(b));
                 self.cpu.pc = pc + 4;
             }
@@ -125,26 +161,43 @@ impl Interpreter {
                 self.cpu.write_v(rd, result, q);
                 self.cpu.pc = pc + 4;
             }
-            Instruction::SimdCmp { q, size, rd, rn, rm, op } => {
+            Instruction::SimdCmp {
+                q,
+                size,
+                rd,
+                rn,
+                rm,
+                op,
+            } => {
                 simd_binop(self, q, size, rd, rn, rm, |a, b, elem_bits| {
-                    let mask = if elem_bits >= 128 { u128::MAX } else { (1u128 << elem_bits) - 1 };
+                    let mask = if elem_bits >= 128 {
+                        u128::MAX
+                    } else {
+                        (1u128 << elem_bits) - 1
+                    };
                     let result = match op {
-                        0 => a == b,           // CMEQ
-                        1 => {                 // CMGT (signed)
+                        0 => a == b, // CMEQ
+                        1 => {
+                            // CMGT (signed)
                             let sa = sign_extend_elem(a, elem_bits);
                             let sb = sign_extend_elem(b, elem_bits);
                             sa > sb
                         }
-                        2 => {                 // CMGE (signed)
+                        2 => {
+                            // CMGE (signed)
                             let sa = sign_extend_elem(a, elem_bits);
                             let sb = sign_extend_elem(b, elem_bits);
                             sa >= sb
                         }
-                        3 => a > b,            // CMHI (unsigned)
-                        4 => a >= b,           // CMHS (unsigned)
+                        3 => a > b,  // CMHI (unsigned)
+                        4 => a >= b, // CMHS (unsigned)
                         _ => false,
                     };
-                    if result { mask } else { 0 }
+                    if result {
+                        mask
+                    } else {
+                        0
+                    }
                 });
                 self.cpu.pc = pc + 4;
             }
@@ -163,7 +216,11 @@ impl Interpreter {
             Instruction::SimdAddv { q, size, rd, rn } => {
                 let src = self.cpu.v[rn as usize];
                 let elem_bits = (1u32 << size) * 8;
-                let mask = if elem_bits >= 128 { u128::MAX } else { (1u128 << elem_bits) - 1 };
+                let mask = if elem_bits >= 128 {
+                    u128::MAX
+                } else {
+                    (1u128 << elem_bits) - 1
+                };
                 let total_bytes = if q { 16u32 } else { 8 };
                 let count = total_bytes / (1u32 << size);
                 let mut sum = 0u128;
@@ -204,7 +261,9 @@ fn simd_decode_imm5(imm5: u8) -> (u32, u32) {
 
 /// Sign-extend a value from `bits` width to i128.
 fn sign_extend_elem(val: u128, bits: u32) -> i128 {
-    if bits >= 128 { return val as i128; }
+    if bits >= 128 {
+        return val as i128;
+    }
     let sign_bit = 1u128 << (bits - 1);
     if val & sign_bit != 0 {
         (val | !((1u128 << bits) - 1)) as i128
@@ -214,21 +273,18 @@ fn sign_extend_elem(val: u128, bits: u32) -> i128 {
 }
 
 /// Apply a binary operation element-wise across SIMD vectors.
-fn simd_binop<F>(
-    interp: &mut Interpreter,
-    q: bool,
-    size: u8,
-    rd: u8,
-    rn: u8,
-    rm: u8,
-    op: F,
-) where
+fn simd_binop<F>(interp: &mut Interpreter, q: bool, size: u8, rd: u8, rn: u8, rm: u8, op: F)
+where
     F: Fn(u128, u128, u32) -> u128,
 {
     let a = interp.cpu.v[rn as usize];
     let b = interp.cpu.v[rm as usize];
     let elem_bits = (1u32 << size) * 8;
-    let mask = if elem_bits >= 128 { u128::MAX } else { (1u128 << elem_bits) - 1 };
+    let mask = if elem_bits >= 128 {
+        u128::MAX
+    } else {
+        (1u128 << elem_bits) - 1
+    };
     let total_bytes = if q { 16u32 } else { 8 };
     let count = total_bytes / (1u32 << size);
     let mut result = 0u128;

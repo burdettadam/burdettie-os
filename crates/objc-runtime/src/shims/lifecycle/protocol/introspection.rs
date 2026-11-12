@@ -237,9 +237,7 @@ pub extern "C" fn shim_protocol_get_property(
         return 0;
     }
 
-    let name_str = unsafe { CStr::from_ptr(name) }
-        .to_str()
-        .unwrap_or("");
+    let name_str = unsafe { CStr::from_ptr(name) }.to_str().unwrap_or("");
 
     let guard = match OBJC_RUNTIME.read() {
         Ok(g) => g,
@@ -260,4 +258,3 @@ pub extern "C" fn shim_protocol_get_property(
         .map(|p| allocate_fake_property(&p.name, &p.attributes))
         .unwrap_or(0)
 }
-

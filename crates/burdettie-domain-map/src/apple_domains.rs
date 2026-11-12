@@ -67,7 +67,6 @@ pub static APPLE_DOMAINS: &[DomainEntry] = &[
         description: "Hardware diagnostics assets",
         category: Category::Diagnostics,
     },
-
     // ── Software Updates ────────────────────────────────────────
     DomainEntry {
         pattern: "swscan.apple.com",
@@ -165,7 +164,6 @@ pub static APPLE_DOMAINS: &[DomainEntry] = &[
         description: "macOS updates",
         category: Category::SoftwareUpdate,
     },
-
     // ── Xcode Specific ──────────────────────────────────────────
     DomainEntry {
         pattern: "devimages-cdn.apple.com",
@@ -185,7 +183,6 @@ pub static APPLE_DOMAINS: &[DomainEntry] = &[
         description: "Apple developer portal",
         category: Category::Xcode,
     },
-
     // ── Certificate Validation ──────────────────────────────────
     DomainEntry {
         pattern: "ocsp.apple.com",
@@ -217,7 +214,6 @@ pub static APPLE_DOMAINS: &[DomainEntry] = &[
         description: "Certificate validation",
         category: Category::Certificate,
     },
-
     // ── Device Activation / Setup ───────────────────────────────
     DomainEntry {
         pattern: "albert.apple.com",
@@ -243,7 +239,6 @@ pub static APPLE_DOMAINS: &[DomainEntry] = &[
         description: "Device setup",
         category: Category::DeviceActivation,
     },
-
     // ── Authentication ──────────────────────────────────────────
     DomainEntry {
         pattern: "gsa.apple.com",
@@ -269,7 +264,6 @@ pub static APPLE_DOMAINS: &[DomainEntry] = &[
         description: "Apple Account authentication CDN",
         category: Category::Authentication,
     },
-
     // ── Connectivity ────────────────────────────────────────────
     DomainEntry {
         pattern: "captive.apple.com",
@@ -289,7 +283,6 @@ pub static APPLE_DOMAINS: &[DomainEntry] = &[
         description: "iCloud connectivity test",
         category: Category::Connectivity,
     },
-
     // ── iCloud ──────────────────────────────────────────────────
     DomainEntry {
         pattern: "*.icloud.com",
@@ -315,7 +308,6 @@ pub static APPLE_DOMAINS: &[DomainEntry] = &[
         description: "CloudKit gateway (XProtect, Voice Control)",
         category: Category::ICloud,
     },
-
     // ── Content / App Store ─────────────────────────────────────
     DomainEntry {
         pattern: "*.itunes.apple.com",
@@ -341,7 +333,6 @@ pub static APPLE_DOMAINS: &[DomainEntry] = &[
         description: "App Store static content",
         category: Category::Content,
     },
-
     // ── DNS ─────────────────────────────────────────────────────
     DomainEntry {
         pattern: "doh.dns.apple.com",
@@ -349,7 +340,6 @@ pub static APPLE_DOMAINS: &[DomainEntry] = &[
         description: "DNS-over-HTTPS",
         category: Category::Dns,
     },
-
     // ── Push Notifications ──────────────────────────────────────
     DomainEntry {
         pattern: "*.push.apple.com",
@@ -357,7 +347,6 @@ pub static APPLE_DOMAINS: &[DomainEntry] = &[
         description: "Apple Push Notification service",
         category: Category::PushNotification,
     },
-
     // ── Content Caching ─────────────────────────────────────────
     DomainEntry {
         pattern: "lcdn-registration.apple.com",
@@ -377,7 +366,6 @@ pub static APPLE_DOMAINS: &[DomainEntry] = &[
         description: "Content caching configuration",
         category: Category::SoftwareUpdate,
     },
-
     // ── Time ────────────────────────────────────────────────────
     DomainEntry {
         pattern: "time.apple.com",

@@ -16,7 +16,8 @@ pub(crate) const DEJAVU_SANS_MONO: &[u8] = include_bytes!("../fonts/DejaVuSansMo
 /// Embedded DejaVu Sans Oblique (italic).
 pub(crate) const DEJAVU_SANS_OBLIQUE: &[u8] = include_bytes!("../fonts/DejaVuSans-Oblique.ttf");
 /// Embedded DejaVu Sans Bold Oblique (bold italic).
-pub(crate) const DEJAVU_SANS_BOLD_OBLIQUE: &[u8] = include_bytes!("../fonts/DejaVuSans-BoldOblique.ttf");
+pub(crate) const DEJAVU_SANS_BOLD_OBLIQUE: &[u8] =
+    include_bytes!("../fonts/DejaVuSans-BoldOblique.ttf");
 
 /// A loaded font face backed by `ab_glyph::FontVec`.
 pub struct FontFace {

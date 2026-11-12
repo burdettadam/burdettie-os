@@ -29,19 +29,21 @@ fn query_display_size() -> (f64, f64) {
 
         unsafe {
             let cg = libc::dlopen(
-                b"/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics\0".as_ptr() as *const _,
+                b"/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics\0".as_ptr()
+                    as *const _,
                 libc::RTLD_LAZY,
             );
             if !cg.is_null() {
-                let main_id: Option<CGMainDisplayIDFn> = std::mem::transmute(
-                    libc::dlsym(cg, b"CGMainDisplayID\0".as_ptr() as *const _),
-                );
-                let pixels_wide: Option<CGDisplayPixelsFn> = std::mem::transmute(
-                    libc::dlsym(cg, b"CGDisplayPixelsWide\0".as_ptr() as *const _),
-                );
-                let pixels_high: Option<CGDisplayPixelsFn> = std::mem::transmute(
-                    libc::dlsym(cg, b"CGDisplayPixelsHigh\0".as_ptr() as *const _),
-                );
+                let main_id: Option<CGMainDisplayIDFn> =
+                    std::mem::transmute(libc::dlsym(cg, b"CGMainDisplayID\0".as_ptr() as *const _));
+                let pixels_wide: Option<CGDisplayPixelsFn> = std::mem::transmute(libc::dlsym(
+                    cg,
+                    b"CGDisplayPixelsWide\0".as_ptr() as *const _,
+                ));
+                let pixels_high: Option<CGDisplayPixelsFn> = std::mem::transmute(libc::dlsym(
+                    cg,
+                    b"CGDisplayPixelsHigh\0".as_ptr() as *const _,
+                ));
                 if let (Some(mid), Some(pw), Some(ph)) = (main_id, pixels_wide, pixels_high) {
                     let display = mid();
                     let w = pw(display) as f64;
@@ -71,7 +73,9 @@ fn query_display_size() -> (f64, f64) {
 fn get_or_create_main_screen() -> u64 {
     *MAIN_SCREEN.get_or_init(|| {
         let obj = crate::pal_alloc().calloc(1, 24) as u64;
-        if obj == 0 { return 0; }
+        if obj == 0 {
+            return 0;
+        }
         let (w, h) = query_display_size();
         unsafe {
             *(obj as *mut u64) = crate::nsobj::nsscreen_class_addr();
@@ -95,7 +99,9 @@ pub extern "C" fn shim_nsscreen_screens(_cls: u64, _cmd: u64) -> u64 {
 
 /// `-[NSScreen frame]` — returns CGRect (32 bytes, x8 indirect return on ARM64).
 pub extern "C" fn shim_nsscreen_frame(obj: u64, _cmd: u64) -> crate::cg_types::CGRect {
-    if obj == 0 { return crate::cg_types::CGRect::ZERO; }
+    if obj == 0 {
+        return crate::cg_types::CGRect::ZERO;
+    }
     let w = unsafe { *((obj as usize + WIDTH_OFF) as *const f64) };
     let h = unsafe { *((obj as usize + HEIGHT_OFF) as *const f64) };
     crate::cg_types::CGRect::new(0.0, 0.0, w, h)
@@ -103,7 +109,9 @@ pub extern "C" fn shim_nsscreen_frame(obj: u64, _cmd: u64) -> crate::cg_types::C
 
 /// `-[NSScreen visibleFrame]` — frame minus menu bar height (25pt).
 pub extern "C" fn shim_nsscreen_visible_frame(obj: u64, _cmd: u64) -> crate::cg_types::CGRect {
-    if obj == 0 { return crate::cg_types::CGRect::ZERO; }
+    if obj == 0 {
+        return crate::cg_types::CGRect::ZERO;
+    }
     let w = unsafe { *((obj as usize + WIDTH_OFF) as *const f64) };
     let h = unsafe { *((obj as usize + HEIGHT_OFF) as *const f64) };
     crate::cg_types::CGRect::new(0.0, 25.0, w, h - 25.0)
@@ -112,9 +120,13 @@ pub extern "C" fn shim_nsscreen_visible_frame(obj: u64, _cmd: u64) -> crate::cg_
 /// `-[NSScreen backingScaleFactor]` — returns 2.0 (Retina) on macOS, 1.0 elsewhere.
 pub extern "C" fn shim_nsscreen_backing_scale_factor(_obj: u64, _cmd: u64) -> f64 {
     #[cfg(target_os = "macos")]
-    { 2.0 }
+    {
+        2.0
+    }
     #[cfg(not(target_os = "macos"))]
-    { 1.0 }
+    {
+        1.0
+    }
 }
 
 /// `-[NSScreen deviceDescription]` — returns empty NSDictionary.
@@ -124,13 +136,17 @@ pub extern "C" fn shim_nsscreen_device_description(_obj: u64, _cmd: u64) -> u64 
 
 /// Helper: read the stored width for a screen object.
 pub fn nsscreen_width(obj: u64) -> f64 {
-    if obj == 0 { return 0.0; }
+    if obj == 0 {
+        return 0.0;
+    }
     unsafe { *((obj as usize + WIDTH_OFF) as *const f64) }
 }
 
 /// Helper: read the stored height for a screen object.
 pub fn nsscreen_height(obj: u64) -> f64 {
-    if obj == 0 { return 0.0; }
+    if obj == 0 {
+        return 0.0;
+    }
     unsafe { *((obj as usize + HEIGHT_OFF) as *const f64) }
 }
 
@@ -180,7 +196,10 @@ mod tests {
         let elems_ptr = read_field(arr, 16); // NSARRAY_ELEMS_OFF = 16
         assert_ne!(elems_ptr, 0);
         let first_elem = unsafe { *(elems_ptr as *const u64) };
-        assert_eq!(first_elem, main, "first element should be the main screen singleton");
+        assert_eq!(
+            first_elem, main,
+            "first element should be the main screen singleton"
+        );
     }
 
     // --- shim_nsscreen_frame ---
@@ -189,8 +208,16 @@ mod tests {
     fn frame_returns_positive_width() {
         let screen = shim_nsscreen_main_screen(0, 0);
         let rect = shim_nsscreen_frame(screen, 0);
-        assert!(rect.size.width > 0.0, "frame width should be positive, got {}", rect.size.width);
-        assert!(rect.size.height > 0.0, "frame height should be positive, got {}", rect.size.height);
+        assert!(
+            rect.size.width > 0.0,
+            "frame width should be positive, got {}",
+            rect.size.width
+        );
+        assert!(
+            rect.size.height > 0.0,
+            "frame height should be positive, got {}",
+            rect.size.height
+        );
         assert_eq!(rect.origin.x, 0.0);
         assert_eq!(rect.origin.y, 0.0);
     }
@@ -207,7 +234,11 @@ mod tests {
     fn visible_frame_returns_positive_width() {
         let screen = shim_nsscreen_main_screen(0, 0);
         let rect = shim_nsscreen_visible_frame(screen, 0);
-        assert!(rect.size.width > 0.0, "visible frame width should be positive, got {}", rect.size.width);
+        assert!(
+            rect.size.width > 0.0,
+            "visible frame width should be positive, got {}",
+            rect.size.width
+        );
         assert!(rect.size.height > 0.0);
         // visibleFrame origin.y should be 25 (menu bar)
         assert_eq!(rect.origin.y, 25.0);

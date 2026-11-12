@@ -1,7 +1,7 @@
 //! Floating-point and SIMD data-processing instruction decoding.
 
-use crate::cpu::Condition;
 use super::Instruction;
+use crate::cpu::Condition;
 
 /// Decode floating-point and SIMD data processing instructions.
 ///
@@ -28,25 +28,27 @@ pub(super) fn decode_fp_dp(raw: u32) -> Instruction {
         };
     }
 
-    // Floating-point conditional select: type 11110 ftype 1 Rm cond 11 Rn Rd
-    // bits[23:21] = 100, bits[11:10] = 11
-    if (raw >> 21) & 0x7 == 0b100 && (raw >> 10) & 0x3 == 0b11
-        && (raw >> 24) & 0xFF == 0b00011110
-    {
+    // Floating-point conditional select: 0 0011110 ftype 1 Rm cond 11 Rn Rd
+    // The fixed bits are top byte 0x1E, bit21=1, and bits[11:10]=11.
+    if (raw >> 24) & 0xFF == 0b00011110 && (raw >> 21) & 0x1 == 1 && (raw >> 10) & 0x3 == 0b11 {
         let ftype = (raw >> 22) & 0x3;
         let sf = ftype == 0b01; // 00=S, 01=D
         let rm = ((raw >> 16) & 0x1F) as u8;
         let cond = Condition::from_bits((raw >> 12) & 0xF);
         let rn = ((raw >> 5) & 0x1F) as u8;
         let rd = (raw & 0x1F) as u8;
-        return Instruction::Fcsel { sf, rd, rn, rm, cond };
+        return Instruction::Fcsel {
+            sf,
+            rd,
+            rn,
+            rm,
+            cond,
+        };
     }
 
     // Floating-point compare: x 0011110 ftype 1 Rm 001000 Rn opcode2
     // bits[15:10] = 001000 (op=00, fixed=1000)
-    if (raw >> 24) & 0xFF == 0b00011110 && (raw >> 21) & 1 == 1
-        && (raw >> 10) & 0x3F == 0b001000
-    {
+    if (raw >> 24) & 0xFF == 0b00011110 && (raw >> 21) & 1 == 1 && (raw >> 10) & 0x3F == 0b001000 {
         let ftype = (raw >> 22) & 0x3;
         let sf = ftype == 0b01;
         let rm = ((raw >> 16) & 0x1F) as u8;
@@ -60,9 +62,7 @@ pub(super) fn decode_fp_dp(raw: u32) -> Instruction {
     }
 
     // Floating-point data-processing (2 source): 0 0011110 ftype 1 Rm opcode 10 Rn Rd
-    if (raw >> 24) & 0xFF == 0b00011110 && (raw >> 10) & 0x3 == 0b10
-        && (raw >> 21) & 0x1 == 1
-    {
+    if (raw >> 24) & 0xFF == 0b00011110 && (raw >> 10) & 0x3 == 0b10 && (raw >> 21) & 0x1 == 1 {
         let ftype = (raw >> 22) & 0x3;
         let sf = ftype == 0b01;
         let rm = ((raw >> 16) & 0x1F) as u8;
@@ -79,9 +79,8 @@ pub(super) fn decode_fp_dp(raw: u32) -> Instruction {
     }
 
     // Floating-point data-processing (1 source): 0 0011110 ftype 1 opcode 10000 Rn Rd
-    if (raw >> 24) & 0xFF == 0b00011110 && (raw >> 10) & 0x3F == 0b010000
-        && (raw >> 21) & 0x1 == 1
-    {
+    // Only bits[14:10] are fixed to 10000; bit15 is opcode[0] and may be 1.
+    if (raw >> 24) & 0xFF == 0b00011110 && (raw >> 10) & 0x1F == 0b10000 && (raw >> 21) & 0x1 == 1 {
         let ftype = (raw >> 22) & 0x3;
         let sf = ftype == 0b01;
         let opcode = (raw >> 15) & 0x3F;
@@ -96,27 +95,78 @@ pub(super) fn decode_fp_dp(raw: u32) -> Instruction {
             0b000100 => {
                 // ftype=00 (S→D) or ftype=01 (D→S)
                 if ftype == 0b00 {
-                    Instruction::Fcvt { rd, rn, to_double: true }
+                    Instruction::Fcvt {
+                        rd,
+                        rn,
+                        to_double: true,
+                    }
                 } else {
-                    Instruction::Fcvt { rd, rn, to_double: false }
+                    Instruction::Fcvt {
+                        rd,
+                        rn,
+                        to_double: false,
+                    }
                 }
             }
             0b000101 => {
                 // ftype=01 (D→S) or ftype=00 (S→D) — double→single
                 if ftype == 0b01 {
-                    Instruction::Fcvt { rd, rn, to_double: false }
+                    Instruction::Fcvt {
+                        rd,
+                        rn,
+                        to_double: false,
+                    }
                 } else {
-                    Instruction::Fcvt { rd, rn, to_double: true }
+                    Instruction::Fcvt {
+                        rd,
+                        rn,
+                        to_double: true,
+                    }
                 }
             }
             // FRINT* (rounding): opcode field encodes the rounding mode
-            0b001000 => Instruction::Frint { sf, rd, rn, mode: 0 }, // FRINTN (ties-even)
-            0b001001 => Instruction::Frint { sf, rd, rn, mode: 1 }, // FRINTP (+inf)
-            0b001010 => Instruction::Frint { sf, rd, rn, mode: 2 }, // FRINTM (-inf)
-            0b001011 => Instruction::Frint { sf, rd, rn, mode: 3 }, // FRINTZ (toward zero)
-            0b001100 => Instruction::Frint { sf, rd, rn, mode: 4 }, // FRINTA (ties-away)
-            0b001110 => Instruction::Frint { sf, rd, rn, mode: 6 }, // FRINTX (exact)
-            0b001111 => Instruction::Frint { sf, rd, rn, mode: 7 }, // FRINTI (current rounding)
+            0b001000 => Instruction::Frint {
+                sf,
+                rd,
+                rn,
+                mode: 0,
+            }, // FRINTN (ties-even)
+            0b001001 => Instruction::Frint {
+                sf,
+                rd,
+                rn,
+                mode: 1,
+            }, // FRINTP (+inf)
+            0b001010 => Instruction::Frint {
+                sf,
+                rd,
+                rn,
+                mode: 2,
+            }, // FRINTM (-inf)
+            0b001011 => Instruction::Frint {
+                sf,
+                rd,
+                rn,
+                mode: 3,
+            }, // FRINTZ (toward zero)
+            0b001100 => Instruction::Frint {
+                sf,
+                rd,
+                rn,
+                mode: 4,
+            }, // FRINTA (ties-away)
+            0b001110 => Instruction::Frint {
+                sf,
+                rd,
+                rn,
+                mode: 6,
+            }, // FRINTX (exact)
+            0b001111 => Instruction::Frint {
+                sf,
+                rd,
+                rn,
+                mode: 7,
+            }, // FRINTI (current rounding)
             _ => Instruction::Unknown { raw },
         };
     }
@@ -124,7 +174,7 @@ pub(super) fn decode_fp_dp(raw: u32) -> Instruction {
     // Floating-point<->integer conversion: sf 0011110 ftype 1 rmode opcode 000000 Rn Rd
     if (raw >> 24) & 0x7F == 0b0011110 && (raw >> 10) & 0x3F == 0b000000 {
         let sf_int = (raw >> 31) & 1 == 1; // 0=W, 1=X
-        let ftype = (raw >> 22) & 0x3;     // 00=S, 01=D
+        let ftype = (raw >> 22) & 0x3; // 00=S, 01=D
         let sf_fp = ftype == 0b01;
         let rmode = (raw >> 19) & 0x3;
         let opcode = (raw >> 16) & 0x7;
@@ -133,13 +183,33 @@ pub(super) fn decode_fp_dp(raw: u32) -> Instruction {
 
         return match (rmode, opcode) {
             // FCVTZS (FP→signed int, round toward zero)
-            (0b11, 0b000) => Instruction::Fcvtzs { sf_int, sf_fp, rd, rn },
+            (0b11, 0b000) => Instruction::Fcvtzs {
+                sf_int,
+                sf_fp,
+                rd,
+                rn,
+            },
             // FCVTZU (FP→unsigned int, round toward zero)
-            (0b11, 0b001) => Instruction::Fcvtzu { sf_int, sf_fp, rd, rn },
+            (0b11, 0b001) => Instruction::Fcvtzu {
+                sf_int,
+                sf_fp,
+                rd,
+                rn,
+            },
             // SCVTF (signed int→FP)
-            (0b00, 0b010) => Instruction::Scvtf { sf_fp, sf_int, rd, rn },
+            (0b00, 0b010) => Instruction::Scvtf {
+                sf_fp,
+                sf_int,
+                rd,
+                rn,
+            },
             // UCVTF (unsigned int→FP)
-            (0b00, 0b011) => Instruction::Ucvtf { sf_fp, sf_int, rd, rn },
+            (0b00, 0b011) => Instruction::Ucvtf {
+                sf_fp,
+                sf_int,
+                rd,
+                rn,
+            },
             // FMOV Xd, Dn (FP to GPR)
             (0b00, 0b110) => Instruction::FMovToGpr { sf: sf_fp, rd, rn },
             // FMOV Dn, Xd (GPR to FP)
@@ -149,7 +219,9 @@ pub(super) fn decode_fp_dp(raw: u32) -> Instruction {
     }
 
     // Floating-point immediate: 0 0011110 ftype 1 imm8 100 imm5=00000 Rd
-    if (raw >> 24) & 0xFF == 0b00011110 && (raw >> 5) & 0x1F == 0 && (raw >> 10) & 0x7 == 0b100
+    if (raw >> 24) & 0xFF == 0b00011110
+        && (raw >> 5) & 0x1F == 0
+        && (raw >> 10) & 0x7 == 0b100
         && (raw >> 21) & 0x1 == 1
     {
         let ftype = (raw >> 22) & 0x3;
@@ -161,10 +233,7 @@ pub(super) fn decode_fp_dp(raw: u32) -> Instruction {
     }
 
     // Advanced SIMD scalar FABD: 0 1 1 11110 sz 1 Rm 110101 Rn Rd
-    if (raw >> 24) & 0xFF == 0x7E
-        && (raw >> 21) & 0x3 == 0b11
-        && (raw >> 10) & 0x3F == 0b110101
-    {
+    if (raw >> 24) & 0xDF == 0x5E && (raw >> 21) & 0x1 == 1 && (raw >> 10) & 0x3F == 0b110101 {
         let sf = (raw >> 22) & 1 == 1;
         let rm = ((raw >> 16) & 0x1F) as u8;
         let rn = ((raw >> 5) & 0x1F) as u8;
@@ -184,9 +253,21 @@ pub(super) fn decode_fp_dp(raw: u32) -> Instruction {
 
         return match (u, opcode) {
             // ADD: U=0, opcode=10000
-            (0, 0b10000) => Instruction::SimdAdd { q, size, rd, rn, rm },
+            (0, 0b10000) => Instruction::SimdAdd {
+                q,
+                size,
+                rd,
+                rn,
+                rm,
+            },
             // SUB: U=1, opcode=10000
-            (1, 0b10000) => Instruction::SimdSub { q, size, rd, rn, rm },
+            (1, 0b10000) => Instruction::SimdSub {
+                q,
+                size,
+                rd,
+                rn,
+                rm,
+            },
             // AND: U=0, size=00, opcode=00011
             (0, 0b00011) if size == 0 => Instruction::SimdAnd { q, rd, rn, rm },
             // ORR: U=0, size=10, opcode=00011
@@ -194,21 +275,59 @@ pub(super) fn decode_fp_dp(raw: u32) -> Instruction {
             // EOR: U=1, size=00, opcode=00011
             (1, 0b00011) if size == 0 => Instruction::SimdEor { q, rd, rn, rm },
             // CMEQ: U=1, opcode=10001
-            (1, 0b10001) => Instruction::SimdCmp { q, size, rd, rn, rm, op: 0 },
+            (1, 0b10001) => Instruction::SimdCmp {
+                q,
+                size,
+                rd,
+                rn,
+                rm,
+                op: 0,
+            },
             // CMGT (signed >): U=0, opcode=00110
-            (0, 0b00110) => Instruction::SimdCmp { q, size, rd, rn, rm, op: 1 },
+            (0, 0b00110) => Instruction::SimdCmp {
+                q,
+                size,
+                rd,
+                rn,
+                rm,
+                op: 1,
+            },
             // CMGE (signed >=): U=0, opcode=00111
-            (0, 0b00111) => Instruction::SimdCmp { q, size, rd, rn, rm, op: 2 },
+            (0, 0b00111) => Instruction::SimdCmp {
+                q,
+                size,
+                rd,
+                rn,
+                rm,
+                op: 2,
+            },
             // CMHI (unsigned >): U=1, opcode=00110
-            (1, 0b00110) => Instruction::SimdCmp { q, size, rd, rn, rm, op: 3 },
+            (1, 0b00110) => Instruction::SimdCmp {
+                q,
+                size,
+                rd,
+                rn,
+                rm,
+                op: 3,
+            },
             // CMHS (unsigned >=): U=1, opcode=00111
-            (1, 0b00111) => Instruction::SimdCmp { q, size, rd, rn, rm, op: 4 },
+            (1, 0b00111) => Instruction::SimdCmp {
+                q,
+                size,
+                rd,
+                rn,
+                rm,
+                op: 4,
+            },
             _ => Instruction::Unknown { raw },
         };
     }
 
     // ── Advanced SIMD two-reg misc: 0 Q U 01110 size 10000 opcode 10 Rn Rd ──
-    if (raw >> 24) & 0x9F == 0b00001110 && (raw >> 17) & 0x1F == 0b10000 && (raw >> 10) & 0x3 == 0b10 {
+    if (raw >> 24) & 0x9F == 0b00001110
+        && (raw >> 17) & 0x1F == 0b10000
+        && (raw >> 10) & 0x3 == 0b10
+    {
         let q = (raw >> 30) & 1 == 1;
         let u = (raw >> 29) & 1;
         let size = ((raw >> 22) & 0x3) as u8;
@@ -224,7 +343,10 @@ pub(super) fn decode_fp_dp(raw: u32) -> Instruction {
     }
 
     // ── Advanced SIMD across lanes: 0 Q U 01110 size 11000 opcode 10 Rn Rd ──
-    if (raw >> 24) & 0x9F == 0b00001110 && (raw >> 17) & 0x1F == 0b11000 && (raw >> 10) & 0x3 == 0b10 {
+    if (raw >> 24) & 0x9F == 0b00001110
+        && (raw >> 17) & 0x1F == 0b11000
+        && (raw >> 10) & 0x3 == 0b10
+    {
         let q = (raw >> 30) & 1 == 1;
         let u = (raw >> 29) & 1;
         let size = ((raw >> 22) & 0x3) as u8;
@@ -316,8 +438,8 @@ pub(super) fn decode_fp_imm8(imm8: u8, is_double: bool) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_helpers::*;
     use crate::decode::{decode, Instruction};
+    use crate::test_helpers::*;
 
     // ── Local encoding helpers for instructions without correct test_helpers ──
 
@@ -370,11 +492,11 @@ mod tests {
             | (rd as u32 & 0x1F)
     }
 
-    /// FABD scalar (double only in current decoder): 0x7E 1 sz=1 1 Rm 110101 Rn Rd
-    fn enc_fabd_double(rd: u8, rn: u8, rm: u8) -> u32 {
-        (0x7E << 24)
+    /// FABD scalar: 0x5E/0x7E 1 sz 1 Rm 110101 Rn Rd
+    fn enc_fabd(sf: bool, rd: u8, rn: u8, rm: u8) -> u32 {
+        ((if sf { 0x7E } else { 0x5E }) << 24)
             | (1 << 23)
-            | (1 << 22) // sz=1 (double)
+            | (u32::from(sf) << 22)
             | (1 << 21)
             | ((rm as u32 & 0x1F) << 16)
             | (0b110101 << 10)
@@ -410,13 +532,27 @@ mod tests {
     #[test]
     fn test_decode_fmov_reg_double() {
         let insn = decode(enc_fmov_reg(true, 0, 1), 0x1000);
-        assert!(matches!(insn, Instruction::FMovReg { sf: true, rd: 0, rn: 1 }));
+        assert!(matches!(
+            insn,
+            Instruction::FMovReg {
+                sf: true,
+                rd: 0,
+                rn: 1
+            }
+        ));
     }
 
     #[test]
     fn test_decode_fmov_reg_single() {
         let insn = decode(enc_fmov_reg(false, 3, 5), 0x1000);
-        assert!(matches!(insn, Instruction::FMovReg { sf: false, rd: 3, rn: 5 }));
+        assert!(matches!(
+            insn,
+            Instruction::FMovReg {
+                sf: false,
+                rd: 3,
+                rn: 5
+            }
+        ));
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -427,7 +563,14 @@ mod tests {
     fn test_decode_fmov_to_fp_double() {
         // FMOV Dn, Xn (64-bit GPR → double FP)
         let insn = decode(enc_fmov_to_fp64(0, 1), 0x1000);
-        assert!(matches!(insn, Instruction::FMovToFp { sf: true, rd: 0, rn: 1 }));
+        assert!(matches!(
+            insn,
+            Instruction::FMovToFp {
+                sf: true,
+                rd: 0,
+                rn: 1
+            }
+        ));
     }
 
     #[test]
@@ -435,7 +578,14 @@ mod tests {
         // FMOV Sd, Wn: sf_int=0, ftype=00, rmode=00, opcode=111
         let raw = enc_fp_int_conv(false, false, 0b00, 0b111, 2, 3);
         let insn = decode(raw, 0x1000);
-        assert!(matches!(insn, Instruction::FMovToFp { sf: false, rd: 2, rn: 3 }));
+        assert!(matches!(
+            insn,
+            Instruction::FMovToFp {
+                sf: false,
+                rd: 2,
+                rn: 3
+            }
+        ));
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -446,7 +596,14 @@ mod tests {
     fn test_decode_fmov_to_gpr_double() {
         // FMOV Xd, Dn (double FP → 64-bit GPR)
         let insn = decode(enc_fmov_to_gpr64(0, 1), 0x1000);
-        assert!(matches!(insn, Instruction::FMovToGpr { sf: true, rd: 0, rn: 1 }));
+        assert!(matches!(
+            insn,
+            Instruction::FMovToGpr {
+                sf: true,
+                rd: 0,
+                rn: 1
+            }
+        ));
     }
 
     #[test]
@@ -454,7 +611,14 @@ mod tests {
         // FMOV Wd, Sn: sf_int=0, ftype=00, rmode=00, opcode=110
         let raw = enc_fp_int_conv(false, false, 0b00, 0b110, 4, 5);
         let insn = decode(raw, 0x1000);
-        assert!(matches!(insn, Instruction::FMovToGpr { sf: false, rd: 4, rn: 5 }));
+        assert!(matches!(
+            insn,
+            Instruction::FMovToGpr {
+                sf: false,
+                rd: 4,
+                rn: 5
+            }
+        ));
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -493,8 +657,10 @@ mod tests {
         // imm8=0x70 → +1.0 (single = 0x3F800000)
         let raw = enc_fmov_imm(false, 3, 0x70);
         let insn = decode(raw, 0x1000);
-        assert!(matches!(insn, Instruction::FMovImm { sf: false, rd: 3, imm }
-            if imm == 0x3F80_0000));
+        assert!(
+            matches!(insn, Instruction::FMovImm { sf: false, rd: 3, imm }
+            if imm == 0x3F80_0000)
+        );
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -504,27 +670,59 @@ mod tests {
     #[test]
     fn test_decode_scvtf_x_to_double() {
         let insn = decode(enc_scvtf(true, true, 0, 1), 0x1000);
-        assert!(matches!(insn, Instruction::Scvtf { sf_fp: true, sf_int: true, rd: 0, rn: 1 }));
+        assert!(matches!(
+            insn,
+            Instruction::Scvtf {
+                sf_fp: true,
+                sf_int: true,
+                rd: 0,
+                rn: 1
+            }
+        ));
     }
 
     #[test]
     fn test_decode_scvtf_w_to_single() {
         let insn = decode(enc_scvtf(false, false, 2, 3), 0x1000);
-        assert!(matches!(insn, Instruction::Scvtf { sf_fp: false, sf_int: false, rd: 2, rn: 3 }));
+        assert!(matches!(
+            insn,
+            Instruction::Scvtf {
+                sf_fp: false,
+                sf_int: false,
+                rd: 2,
+                rn: 3
+            }
+        ));
     }
 
     #[test]
     fn test_decode_scvtf_w_to_double() {
         // Mixed: 32-bit int → double
         let insn = decode(enc_scvtf(true, false, 4, 5), 0x1000);
-        assert!(matches!(insn, Instruction::Scvtf { sf_fp: true, sf_int: false, rd: 4, rn: 5 }));
+        assert!(matches!(
+            insn,
+            Instruction::Scvtf {
+                sf_fp: true,
+                sf_int: false,
+                rd: 4,
+                rn: 5
+            }
+        ));
     }
 
     #[test]
     fn test_decode_scvtf_x_to_single() {
         // Mixed: 64-bit int → single
         let insn = decode(enc_scvtf(false, true, 6, 7), 0x1000);
-        assert!(matches!(insn, Instruction::Scvtf { sf_fp: false, sf_int: true, rd: 6, rn: 7 }));
+        assert!(matches!(
+            insn,
+            Instruction::Scvtf {
+                sf_fp: false,
+                sf_int: true,
+                rd: 6,
+                rn: 7
+            }
+        ));
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -535,14 +733,30 @@ mod tests {
     fn test_decode_ucvtf_x_to_double() {
         let raw = enc_ucvtf(true, true, 0, 1);
         let insn = decode(raw, 0x1000);
-        assert!(matches!(insn, Instruction::Ucvtf { sf_fp: true, sf_int: true, rd: 0, rn: 1 }));
+        assert!(matches!(
+            insn,
+            Instruction::Ucvtf {
+                sf_fp: true,
+                sf_int: true,
+                rd: 0,
+                rn: 1
+            }
+        ));
     }
 
     #[test]
     fn test_decode_ucvtf_w_to_single() {
         let raw = enc_ucvtf(false, false, 2, 3);
         let insn = decode(raw, 0x1000);
-        assert!(matches!(insn, Instruction::Ucvtf { sf_fp: false, sf_int: false, rd: 2, rn: 3 }));
+        assert!(matches!(
+            insn,
+            Instruction::Ucvtf {
+                sf_fp: false,
+                sf_int: false,
+                rd: 2,
+                rn: 3
+            }
+        ));
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -552,20 +766,44 @@ mod tests {
     #[test]
     fn test_decode_fcvtzs_double_to_x() {
         let insn = decode(enc_fcvtzs(true, true, 0, 1), 0x1000);
-        assert!(matches!(insn, Instruction::Fcvtzs { sf_int: true, sf_fp: true, rd: 0, rn: 1 }));
+        assert!(matches!(
+            insn,
+            Instruction::Fcvtzs {
+                sf_int: true,
+                sf_fp: true,
+                rd: 0,
+                rn: 1
+            }
+        ));
     }
 
     #[test]
     fn test_decode_fcvtzs_single_to_w() {
         let insn = decode(enc_fcvtzs(false, false, 2, 3), 0x1000);
-        assert!(matches!(insn, Instruction::Fcvtzs { sf_int: false, sf_fp: false, rd: 2, rn: 3 }));
+        assert!(matches!(
+            insn,
+            Instruction::Fcvtzs {
+                sf_int: false,
+                sf_fp: false,
+                rd: 2,
+                rn: 3
+            }
+        ));
     }
 
     #[test]
     fn test_decode_fcvtzs_double_to_w() {
         // Mixed: double → 32-bit int
         let insn = decode(enc_fcvtzs(false, true, 4, 5), 0x1000);
-        assert!(matches!(insn, Instruction::Fcvtzs { sf_int: false, sf_fp: true, rd: 4, rn: 5 }));
+        assert!(matches!(
+            insn,
+            Instruction::Fcvtzs {
+                sf_int: false,
+                sf_fp: true,
+                rd: 4,
+                rn: 5
+            }
+        ));
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -576,14 +814,30 @@ mod tests {
     fn test_decode_fcvtzu_double_to_x() {
         let raw = enc_fcvtzu(true, true, 0, 1);
         let insn = decode(raw, 0x1000);
-        assert!(matches!(insn, Instruction::Fcvtzu { sf_int: true, sf_fp: true, rd: 0, rn: 1 }));
+        assert!(matches!(
+            insn,
+            Instruction::Fcvtzu {
+                sf_int: true,
+                sf_fp: true,
+                rd: 0,
+                rn: 1
+            }
+        ));
     }
 
     #[test]
     fn test_decode_fcvtzu_single_to_w() {
         let raw = enc_fcvtzu(false, false, 4, 5);
         let insn = decode(raw, 0x1000);
-        assert!(matches!(insn, Instruction::Fcvtzu { sf_int: false, sf_fp: false, rd: 4, rn: 5 }));
+        assert!(matches!(
+            insn,
+            Instruction::Fcvtzu {
+                sf_int: false,
+                sf_fp: false,
+                rd: 4,
+                rn: 5
+            }
+        ));
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -595,7 +849,14 @@ mod tests {
         // ftype=00 (source=single), opcode=000100
         let raw = enc_fp_1src(false, 0b000100, 0, 1);
         let insn = decode(raw, 0x1000);
-        assert!(matches!(insn, Instruction::Fcvt { rd: 0, rn: 1, to_double: true }));
+        assert!(matches!(
+            insn,
+            Instruction::Fcvt {
+                rd: 0,
+                rn: 1,
+                to_double: true
+            }
+        ));
     }
 
     #[test]
@@ -603,7 +864,28 @@ mod tests {
         // ftype=01 (source=double), opcode=000100
         let raw = enc_fp_1src(true, 0b000100, 2, 3);
         let insn = decode(raw, 0x1000);
-        assert!(matches!(insn, Instruction::Fcvt { rd: 2, rn: 3, to_double: false }));
+        assert!(matches!(
+            insn,
+            Instruction::Fcvt {
+                rd: 2,
+                rn: 3,
+                to_double: false
+            }
+        ));
+    }
+
+    #[test]
+    fn test_decode_fcvt_single_to_double_odd_opcode() {
+        let raw = enc_fp_1src(false, 0b000101, 4, 6);
+        let insn = decode(raw, 0x1000);
+        assert!(matches!(
+            insn,
+            Instruction::Fcvt {
+                rd: 4,
+                rn: 6,
+                to_double: true
+            }
+        ));
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -613,13 +895,27 @@ mod tests {
     #[test]
     fn test_decode_fcmp_double() {
         let insn = decode(enc_fcmp(true, 1, 2), 0x1000);
-        assert!(matches!(insn, Instruction::Fcmp { sf: true, rn: 1, rm: 2 }));
+        assert!(matches!(
+            insn,
+            Instruction::Fcmp {
+                sf: true,
+                rn: 1,
+                rm: 2
+            }
+        ));
     }
 
     #[test]
     fn test_decode_fcmp_single() {
         let insn = decode(enc_fcmp(false, 3, 4), 0x1000);
-        assert!(matches!(insn, Instruction::Fcmp { sf: false, rn: 3, rm: 4 }));
+        assert!(matches!(
+            insn,
+            Instruction::Fcmp {
+                sf: false,
+                rn: 3,
+                rm: 4
+            }
+        ));
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -647,13 +943,29 @@ mod tests {
     #[test]
     fn test_decode_fadd_double() {
         let insn = decode(enc_fadd(true, 0, 1, 2), 0x1000);
-        assert!(matches!(insn, Instruction::Fadd { sf: true, rd: 0, rn: 1, rm: 2 }));
+        assert!(matches!(
+            insn,
+            Instruction::Fadd {
+                sf: true,
+                rd: 0,
+                rn: 1,
+                rm: 2
+            }
+        ));
     }
 
     #[test]
     fn test_decode_fadd_single() {
         let insn = decode(enc_fadd(false, 3, 4, 5), 0x1000);
-        assert!(matches!(insn, Instruction::Fadd { sf: false, rd: 3, rn: 4, rm: 5 }));
+        assert!(matches!(
+            insn,
+            Instruction::Fadd {
+                sf: false,
+                rd: 3,
+                rn: 4,
+                rm: 5
+            }
+        ));
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -663,13 +975,29 @@ mod tests {
     #[test]
     fn test_decode_fsub_double() {
         let insn = decode(enc_fsub(true, 0, 1, 2), 0x1000);
-        assert!(matches!(insn, Instruction::Fsub { sf: true, rd: 0, rn: 1, rm: 2 }));
+        assert!(matches!(
+            insn,
+            Instruction::Fsub {
+                sf: true,
+                rd: 0,
+                rn: 1,
+                rm: 2
+            }
+        ));
     }
 
     #[test]
     fn test_decode_fsub_single() {
         let insn = decode(enc_fsub(false, 6, 7, 8), 0x1000);
-        assert!(matches!(insn, Instruction::Fsub { sf: false, rd: 6, rn: 7, rm: 8 }));
+        assert!(matches!(
+            insn,
+            Instruction::Fsub {
+                sf: false,
+                rd: 6,
+                rn: 7,
+                rm: 8
+            }
+        ));
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -679,13 +1007,29 @@ mod tests {
     #[test]
     fn test_decode_fmul_double() {
         let insn = decode(enc_fmul(true, 0, 1, 2), 0x1000);
-        assert!(matches!(insn, Instruction::Fmul { sf: true, rd: 0, rn: 1, rm: 2 }));
+        assert!(matches!(
+            insn,
+            Instruction::Fmul {
+                sf: true,
+                rd: 0,
+                rn: 1,
+                rm: 2
+            }
+        ));
     }
 
     #[test]
     fn test_decode_fmul_single() {
         let insn = decode(enc_fmul(false, 9, 10, 11), 0x1000);
-        assert!(matches!(insn, Instruction::Fmul { sf: false, rd: 9, rn: 10, rm: 11 }));
+        assert!(matches!(
+            insn,
+            Instruction::Fmul {
+                sf: false,
+                rd: 9,
+                rn: 10,
+                rm: 11
+            }
+        ));
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -695,13 +1039,29 @@ mod tests {
     #[test]
     fn test_decode_fdiv_double() {
         let insn = decode(enc_fdiv(true, 0, 1, 2), 0x1000);
-        assert!(matches!(insn, Instruction::Fdiv { sf: true, rd: 0, rn: 1, rm: 2 }));
+        assert!(matches!(
+            insn,
+            Instruction::Fdiv {
+                sf: true,
+                rd: 0,
+                rn: 1,
+                rm: 2
+            }
+        ));
     }
 
     #[test]
     fn test_decode_fdiv_single() {
         let insn = decode(enc_fdiv(false, 12, 13, 14), 0x1000);
-        assert!(matches!(insn, Instruction::Fdiv { sf: false, rd: 12, rn: 13, rm: 14 }));
+        assert!(matches!(
+            insn,
+            Instruction::Fdiv {
+                sf: false,
+                rd: 12,
+                rn: 13,
+                rm: 14
+            }
+        ));
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -710,9 +1070,32 @@ mod tests {
 
     #[test]
     fn test_decode_fabd_double() {
-        let raw = enc_fabd_double(0, 1, 2);
+        let raw = enc_fabd(true, 0, 1, 2);
         let insn = decode(raw, 0x1000);
-        assert!(matches!(insn, Instruction::Fabd { sf: true, rd: 0, rn: 1, rm: 2 }));
+        assert!(matches!(
+            insn,
+            Instruction::Fabd {
+                sf: true,
+                rd: 0,
+                rn: 1,
+                rm: 2
+            }
+        ));
+    }
+
+    #[test]
+    fn test_decode_fabd_single() {
+        let raw = enc_fabd(false, 3, 4, 5);
+        let insn = decode(raw, 0x1000);
+        assert!(matches!(
+            insn,
+            Instruction::Fabd {
+                sf: false,
+                rd: 3,
+                rn: 4,
+                rm: 5
+            }
+        ));
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -725,91 +1108,144 @@ mod tests {
     fn test_decode_fneg_double() {
         let raw = enc_fp_1src(true, 0b000010, 0, 1);
         let insn = decode(raw, 0x1000);
-        assert!(matches!(insn, Instruction::Fneg { sf: true, rd: 0, rn: 1 }));
+        assert!(matches!(
+            insn,
+            Instruction::Fneg {
+                sf: true,
+                rd: 0,
+                rn: 1
+            }
+        ));
     }
 
     #[test]
     fn test_decode_fneg_single() {
         let raw = enc_fp_1src(false, 0b000010, 3, 5);
         let insn = decode(raw, 0x1000);
-        assert!(matches!(insn, Instruction::Fneg { sf: false, rd: 3, rn: 5 }));
+        assert!(matches!(
+            insn,
+            Instruction::Fneg {
+                sf: false,
+                rd: 3,
+                rn: 5
+            }
+        ));
     }
 
     // ════════════════════════════════════════════════════════════════
     // Fabs — FP absolute value
-    // NOTE: The 1-source guard `(raw >> 10) & 0x3F == 0b010000` checks
-    // bits[15:10], requiring bit15=0. FABS opcode=000001 sets bit15=1,
-    // so correctly-encoded FABS never reaches the 1-source match block.
-    // These tests document the limitation; remove #[ignore] once fixed.
     // ════════════════════════════════════════════════════════════════
 
     #[test]
-    #[ignore = "decoder 1-source check requires bit15=0, blocking odd opcode FABS=1"]
     fn test_decode_fabs_double() {
         let raw = enc_fp_1src(true, 0b000001, 0, 1);
         let insn = decode(raw, 0x1000);
-        assert!(matches!(insn, Instruction::Fabs { sf: true, rd: 0, rn: 1 }));
+        assert!(matches!(
+            insn,
+            Instruction::Fabs {
+                sf: true,
+                rd: 0,
+                rn: 1
+            }
+        ));
     }
 
     #[test]
-    #[ignore = "decoder 1-source check requires bit15=0, blocking odd opcode FABS=1"]
     fn test_decode_fabs_single() {
         let raw = enc_fp_1src(false, 0b000001, 4, 6);
         let insn = decode(raw, 0x1000);
-        assert!(matches!(insn, Instruction::Fabs { sf: false, rd: 4, rn: 6 }));
+        assert!(matches!(
+            insn,
+            Instruction::Fabs {
+                sf: false,
+                rd: 4,
+                rn: 6
+            }
+        ));
     }
 
     // ════════════════════════════════════════════════════════════════
     // Fsqrt — FP square root
-    // Same bit15 issue as FABS: opcode=000011 has bit15=1.
     // ════════════════════════════════════════════════════════════════
 
     #[test]
-    #[ignore = "decoder 1-source check requires bit15=0, blocking odd opcode FSQRT=3"]
     fn test_decode_fsqrt_double() {
         let raw = enc_fp_1src(true, 0b000011, 0, 1);
         let insn = decode(raw, 0x1000);
-        assert!(matches!(insn, Instruction::Fsqrt { sf: true, rd: 0, rn: 1 }));
+        assert!(matches!(
+            insn,
+            Instruction::Fsqrt {
+                sf: true,
+                rd: 0,
+                rn: 1
+            }
+        ));
     }
 
     #[test]
-    #[ignore = "decoder 1-source check requires bit15=0, blocking odd opcode FSQRT=3"]
     fn test_decode_fsqrt_single() {
         let raw = enc_fp_1src(false, 0b000011, 7, 8);
         let insn = decode(raw, 0x1000);
-        assert!(matches!(insn, Instruction::Fsqrt { sf: false, rd: 7, rn: 8 }));
+        assert!(matches!(
+            insn,
+            Instruction::Fsqrt {
+                sf: false,
+                rd: 7,
+                rn: 8
+            }
+        ));
     }
 
     // ════════════════════════════════════════════════════════════════
     // Fcsel — FP conditional select
-    // NOTE: The FCSEL guard checks `(raw >> 21) & 0x7 == 0b100`, i.e.
-    // bits[23:21]=100. Valid FCSEL has bit21=1 and ftype∈{00,01}, so
-    // bits[23:21] is 001 or 011 — never 100. These tests document this;
-    // remove #[ignore] once the guard is corrected.
     // ════════════════════════════════════════════════════════════════
 
     #[test]
-    #[ignore = "decoder FCSEL guard bits[23:21]==100 is unreachable for valid ftype+bit21=1"]
     fn test_decode_fcsel_double_eq() {
         let raw = enc_fcsel(true, 0, 1, 2, 0); // cond=EQ
         let insn = decode(raw, 0x1000);
-        assert!(matches!(insn, Instruction::Fcsel { sf: true, rd: 0, rn: 1, rm: 2, cond: Condition::Eq }));
+        assert!(matches!(
+            insn,
+            Instruction::Fcsel {
+                sf: true,
+                rd: 0,
+                rn: 1,
+                rm: 2,
+                cond: Condition::Eq
+            }
+        ));
     }
 
     #[test]
-    #[ignore = "decoder FCSEL guard bits[23:21]==100 is unreachable for valid ftype+bit21=1"]
     fn test_decode_fcsel_single_ne() {
         let raw = enc_fcsel(false, 3, 4, 5, 1); // cond=NE
         let insn = decode(raw, 0x1000);
-        assert!(matches!(insn, Instruction::Fcsel { sf: false, rd: 3, rn: 4, rm: 5, cond: Condition::Ne }));
+        assert!(matches!(
+            insn,
+            Instruction::Fcsel {
+                sf: false,
+                rd: 3,
+                rn: 4,
+                rm: 5,
+                cond: Condition::Ne
+            }
+        ));
     }
 
     #[test]
-    #[ignore = "decoder FCSEL guard bits[23:21]==100 is unreachable for valid ftype+bit21=1"]
     fn test_decode_fcsel_double_ge() {
         let raw = enc_fcsel(true, 6, 7, 8, 10); // cond=GE
         let insn = decode(raw, 0x1000);
-        assert!(matches!(insn, Instruction::Fcsel { sf: true, rd: 6, rn: 7, rm: 8, cond: Condition::Ge }));
+        assert!(matches!(
+            insn,
+            Instruction::Fcsel {
+                sf: true,
+                rd: 6,
+                rn: 7,
+                rm: 8,
+                cond: Condition::Ge
+            }
+        ));
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -819,19 +1255,41 @@ mod tests {
     #[test]
     fn test_decode_fadd_max_register_numbers() {
         let insn = decode(enc_fadd(true, 31, 31, 31), 0x1000);
-        assert!(matches!(insn, Instruction::Fadd { sf: true, rd: 31, rn: 31, rm: 31 }));
+        assert!(matches!(
+            insn,
+            Instruction::Fadd {
+                sf: true,
+                rd: 31,
+                rn: 31,
+                rm: 31
+            }
+        ));
     }
 
     #[test]
     fn test_decode_fmov_reg_zero_to_zero() {
         let insn = decode(enc_fmov_reg(true, 0, 0), 0x1000);
-        assert!(matches!(insn, Instruction::FMovReg { sf: true, rd: 0, rn: 0 }));
+        assert!(matches!(
+            insn,
+            Instruction::FMovReg {
+                sf: true,
+                rd: 0,
+                rn: 0
+            }
+        ));
     }
 
     #[test]
     fn test_decode_fcmp_same_reg() {
         let insn = decode(enc_fcmp(true, 5, 5), 0x1000);
-        assert!(matches!(insn, Instruction::Fcmp { sf: true, rn: 5, rm: 5 }));
+        assert!(matches!(
+            insn,
+            Instruction::Fcmp {
+                sf: true,
+                rn: 5,
+                rm: 5
+            }
+        ));
     }
 
     // ════════════════════════════════════════════════════════════════

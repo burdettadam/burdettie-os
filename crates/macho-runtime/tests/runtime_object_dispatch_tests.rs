@@ -6,14 +6,18 @@ mod common;
 
 #[test]
 fn runtime_nsobject_methods_exit_zero() {
-    let Some(result) = common::run_fixture("nsobject_methods/app") else { return };
+    let Some(result) = common::run_fixture("nsobject_methods/app") else {
+        return;
+    };
 
     assert_eq!(result.exit_code, 0, "nsobject_methods should exit 0");
 }
 
 #[test]
 fn runtime_nsobject_methods_metaclass_dispatch() {
-    let Some(_result) = common::run_fixture("nsobject_methods/app") else { return };
+    let Some(_result) = common::run_fixture("nsobject_methods/app") else {
+        return;
+    };
 
     let guard = objc_runtime::OBJC_RUNTIME.read().unwrap();
     if let Some(rt) = guard.as_ref() {
@@ -71,14 +75,18 @@ fn runtime_nsobject_methods_metaclass_dispatch() {
 
 #[test]
 fn runtime_objc_super_exit_zero() {
-    let Some(result) = common::run_fixture("objc_super/app") else { return };
+    let Some(result) = common::run_fixture("objc_super/app") else {
+        return;
+    };
 
     assert_eq!(result.exit_code, 0, "objc_super should exit 0");
 }
 
 #[test]
 fn runtime_objc_super_class_hierarchy() {
-    let Some(_result) = common::run_fixture("objc_super/app") else { return };
+    let Some(_result) = common::run_fixture("objc_super/app") else {
+        return;
+    };
 
     let guard = objc_runtime::OBJC_RUNTIME.read().unwrap();
     if let Some(rt) = guard.as_ref() {
@@ -128,14 +136,18 @@ fn runtime_objc_super_class_hierarchy() {
 
 #[test]
 fn runtime_nsstring_dynamic_exit_zero() {
-    let Some(result) = common::run_fixture("nsstring_dynamic/app") else { return };
+    let Some(result) = common::run_fixture("nsstring_dynamic/app") else {
+        return;
+    };
 
     assert_eq!(result.exit_code, 0, "nsstring_dynamic should exit 0");
 }
 
 #[test]
 fn runtime_nsstring_class_hierarchy() {
-    let Some(_result) = common::run_fixture("nsstring_dynamic/app") else { return };
+    let Some(_result) = common::run_fixture("nsstring_dynamic/app") else {
+        return;
+    };
 
     let guard = objc_runtime::OBJC_RUNTIME.read().unwrap();
     if let Some(rt) = guard.as_ref() {

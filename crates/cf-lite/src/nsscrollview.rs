@@ -131,8 +131,12 @@ pub extern "C" fn shim_nsscrollview_content_size(obj: u64, _cmd: u64) -> u64 {
     if flags & FLAG_HAS_HORIZONTAL_SCROLLER != 0 {
         _h -= 15.0;
     }
-    if w < 0.0 { w = 0.0; }
-    if _h < 0.0 { _h = 0.0; }
+    if w < 0.0 {
+        w = 0.0;
+    }
+    if _h < 0.0 {
+        _h = 0.0;
+    }
     // Pack width as integer (callers needing full CGSize should use KVC).
     w as u64
 }
@@ -151,13 +155,19 @@ pub extern "C" fn shim_nsscrollview_content_view(obj: u64, _cmd: u64) -> u64 {
 ///
 /// The scroll delta comes from NSEvent's scrollingDeltaX/Y.
 pub extern "C" fn shim_nsscrollview_scroll_wheel(obj: u64, _cmd: u64, event: u64) {
-    if obj == 0 || event == 0 { return; }
+    if obj == 0 || event == 0 {
+        return;
+    }
 
     let (dx, dy) = crate::nsevent::event_scroll_deltas(event);
-    if dx == 0.0 && dy == 0.0 { return; }
+    if dx == 0.0 && dy == 0.0 {
+        return;
+    }
 
     let doc = read_u64(obj, DOC_VIEW_OFF);
-    if doc == 0 { return; }
+    if doc == 0 {
+        return;
+    }
 
     // Read the document view's current frame origin (scroll offset is negative origin).
     let cur_x = crate::nsview::view_frame_x(doc);
@@ -173,9 +183,13 @@ pub extern "C" fn shim_nsscrollview_scroll_wheel(obj: u64, _cmd: u64, event: u64
 
 /// `-[NSScrollView drawRect:]` — draws background and lets subviews render.
 pub extern "C" fn shim_nsscrollview_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let cg_ctx = crate::nsgraphicscontext::current_cg_context_handle();
-    if cg_ctx == 0 { return; }
+    if cg_ctx == 0 {
+        return;
+    }
 
     let flags = read_u64(obj, FLAGS_OFF);
     if flags & FLAG_DRAWS_BACKGROUND != 0 {

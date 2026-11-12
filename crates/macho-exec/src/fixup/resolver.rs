@@ -160,12 +160,22 @@ impl StubResolver {
             let path = std::ffi::CString::new(Self::APPLE_ABI_LIBCXX_PATH).ok();
             let h = path.and_then(|p| {
                 let h = unsafe { libc::dlopen(p.as_ptr(), libc::RTLD_LAZY | libc::RTLD_LOCAL) };
-                if h.is_null() { None } else { Some(h as *mut ()) }
+                if h.is_null() {
+                    None
+                } else {
+                    Some(h as *mut ())
+                }
             });
             if h.is_some() {
-                log::info!("StubResolver: loaded Apple-ABI libc++ from {} (RTLD_LOCAL)", Self::APPLE_ABI_LIBCXX_PATH);
+                log::info!(
+                    "StubResolver: loaded Apple-ABI libc++ from {} (RTLD_LOCAL)",
+                    Self::APPLE_ABI_LIBCXX_PATH
+                );
             } else {
-                log::debug!("StubResolver: Apple-ABI libc++ not found at {}, using system libc++", Self::APPLE_ABI_LIBCXX_PATH);
+                log::debug!(
+                    "StubResolver: Apple-ABI libc++ not found at {}, using system libc++",
+                    Self::APPLE_ABI_LIBCXX_PATH
+                );
             }
             h
         };
@@ -239,14 +249,21 @@ impl StubResolver {
         if name.starts_with("_Z") || name.starts_with("__Z") {
             return true;
         }
+        // Unwind entry points are needed when guest Rust/C++ panics or throws.
+        if name.starts_with("_Unwind_") || name.starts_with("__Unwind_") {
+            return true;
+        }
         // C++ guard / atexit / RTTI
         if name.starts_with("__cxa_") || name == "__dynamic_cast" {
             return true;
         }
         // libcompression / libz
-        if name.starts_with("compress") || name.starts_with("uncompress")
-            || name.starts_with("deflate") || name.starts_with("inflate")
-            || name.starts_with("crc32") || name.starts_with("adler32")
+        if name.starts_with("compress")
+            || name.starts_with("uncompress")
+            || name.starts_with("deflate")
+            || name.starts_with("inflate")
+            || name.starts_with("crc32")
+            || name.starts_with("adler32")
         {
             return true;
         }
@@ -283,8 +300,11 @@ impl StubResolver {
             return true;
         }
         // GeoKit / GameplayKit / GameKit / CloudKit / ARKit / RealityKit prefixes
-        if (name.starts_with("GK") || name.starts_with("CK") || name.starts_with("AR")
-            || name.starts_with("RK") || name.starts_with("MP"))
+        if (name.starts_with("GK")
+            || name.starts_with("CK")
+            || name.starts_with("AR")
+            || name.starts_with("RK")
+            || name.starts_with("MP"))
             && name.len() > 2
             && name.as_bytes()[2].is_ascii_uppercase()
         {
@@ -295,11 +315,18 @@ impl StubResolver {
             return true;
         }
         // ICU (International Components for Unicode) — uenum_*, ucol_*, u_*, etc.
-        if name.starts_with("uenum_") || name.starts_with("ucol_") || name.starts_with("uldn_")
-            || name.starts_with("uloc_") || name.starts_with("u_") || name.starts_with("ucnv_")
-            || name.starts_with("ubrk_") || name.starts_with("utext_")
-            || name.starts_with("unorm2_") || name.starts_with("udat_")
-            || name.starts_with("unum_") || name.starts_with("ucal_")
+        if name.starts_with("uenum_")
+            || name.starts_with("ucol_")
+            || name.starts_with("uldn_")
+            || name.starts_with("uloc_")
+            || name.starts_with("u_")
+            || name.starts_with("ucnv_")
+            || name.starts_with("ubrk_")
+            || name.starts_with("utext_")
+            || name.starts_with("unorm2_")
+            || name.starts_with("udat_")
+            || name.starts_with("unum_")
+            || name.starts_with("ucal_")
         {
             return true;
         }
@@ -371,8 +398,10 @@ impl StubResolver {
             return true;
         }
         // os_log / logging
-        if name.starts_with("os_log") || name.starts_with("_os_log")
-            || name.starts_with("os_signpost") || name.starts_with("_os_signpost")
+        if name.starts_with("os_log")
+            || name.starts_with("_os_log")
+            || name.starts_with("os_signpost")
+            || name.starts_with("_os_signpost")
         {
             return true;
         }
@@ -381,8 +410,10 @@ impl StubResolver {
             return true;
         }
         // Swift mangled symbols and runtime entry points
-        if name.starts_with("$s") || name.starts_with("$S")
-            || name.starts_with("_$s") || name.starts_with("_$S")
+        if name.starts_with("$s")
+            || name.starts_with("$S")
+            || name.starts_with("_$s")
+            || name.starts_with("_$S")
             || name.starts_with("swift_")
             || name.starts_with("_swift")
         {
@@ -398,32 +429,44 @@ impl StubResolver {
             return true;
         }
         // CommonCrypto
-        if name.starts_with("CC_SHA") || name.starts_with("CC_MD5")
-            || name.starts_with("CCCryptor") || name.starts_with("CCKey")
-            || name.starts_with("CCHmac") || name.starts_with("CCPbkdf")
-            || name.starts_with("CCDigest") || name.starts_with("CC_")
+        if name.starts_with("CC_SHA")
+            || name.starts_with("CC_MD5")
+            || name.starts_with("CCCryptor")
+            || name.starts_with("CCKey")
+            || name.starts_with("CCHmac")
+            || name.starts_with("CCPbkdf")
+            || name.starts_with("CCDigest")
+            || name.starts_with("CC_")
         {
             return true;
         }
         // Mach clock APIs (libSystem)
-        if name.starts_with("clock_get_time") || name.starts_with("host_get_clock_service")
-            || name.starts_with("mach_port_deallocate") || name.starts_with("mach_host_self")
+        if name.starts_with("clock_get_time")
+            || name.starts_with("host_get_clock_service")
+            || name.starts_with("mach_port_deallocate")
+            || name.starts_with("mach_host_self")
         {
             return true;
         }
         // DebugSymbols.framework private APIs (symbols, filtercalltree tool)
-        if name.starts_with("DBGCopy") || name.starts_with("DBGCreate")
-            || name.starts_with("aot_address_in") || name.starts_with("aot_get_")
+        if name.starts_with("DBGCopy")
+            || name.starts_with("DBGCreate")
+            || name.starts_with("aot_address_in")
+            || name.starts_with("aot_get_")
         {
             return true;
         }
         // DVTFoundation / IDEFoundation private frameworks
         // These are Xcode's internal frameworks; symbols are either stubbed
         // in our ShimTable or resolved via dlsym on macOS.
-        if name.starts_with("DVT") || name.starts_with("IDE")
-            || name.starts_with("kDVT") || name.starts_with("kIDE")
-            || name.starts_with("_DVT") || name.starts_with("_IDE")
-            || name.starts_with("_kDVT") || name.starts_with("_kIDE")
+        if name.starts_with("DVT")
+            || name.starts_with("IDE")
+            || name.starts_with("kDVT")
+            || name.starts_with("kIDE")
+            || name.starts_with("_DVT")
+            || name.starts_with("_IDE")
+            || name.starts_with("_kDVT")
+            || name.starts_with("_kIDE")
         {
             return true;
         }
@@ -432,8 +475,10 @@ impl StubResolver {
             return true;
         }
         // CFPreferences
-        if name.starts_with("CFPreferences") || name.starts_with("_CFPreferences")
-            || name.starts_with("_CFPref") || name.starts_with("_CFX")
+        if name.starts_with("CFPreferences")
+            || name.starts_with("_CFPreferences")
+            || name.starts_with("_CFPref")
+            || name.starts_with("_CFX")
         {
             return true;
         }
@@ -522,11 +567,18 @@ impl StubResolver {
             return true;
         }
         // Standalone OpenSSL symbols (not prefix-matched above)
-        if matches!(name,
-            "SSLeay" | "SSLeay_version" | "OpenSSLDie"
-            | "string_to_hex" | "hex_to_string"
-            | "explicit_bzero" | "freezero" | "recallocarray" | "reallocarray"
-            | "strtonum"
+        if matches!(
+            name,
+            "SSLeay"
+                | "SSLeay_version"
+                | "OpenSSLDie"
+                | "string_to_hex"
+                | "hex_to_string"
+                | "explicit_bzero"
+                | "freezero"
+                | "recallocarray"
+                | "reallocarray"
+                | "strtonum"
         ) {
             return true;
         }
@@ -643,7 +695,7 @@ impl StubResolver {
             | "lseek" | "pread" | "pwrite" | "creat"
             | "fstat" | "stat" | "lstat" | "access" | "unlink" | "rename" | "remove"
             | "mkdir" | "rmdir" | "chdir" | "fchdir" | "getcwd"
-            | "opendir" | "readdir" | "closedir" | "rewinddir"
+            | "opendir" | "readdir" | "readdir_r" | "closedir" | "rewinddir"
             | "dup" | "dup2" | "pipe"
             | "mktemp" | "mkstemp" | "mkdtemp" | "mkstemps"
             | "realpath$DARWIN_EXTSN" | "realpath"
@@ -675,10 +727,13 @@ impl StubResolver {
             | "isatty" | "atexit" | "_NSGetExecutablePath" | "_NSGetEnviron"
             | "_Exit" | "environ" | "rand" | "srand" | "rand_r"
             | "gethostname" | "getentropy"
+            | "getpgid" | "setpgid"
             | "sched_yield"
             | "qos_class_self" | "qos_class_main"
             | "random" | "srandom" | "srandomdev"
             | "system"
+            | "tcdrain" | "tcgetpgrp" | "ttyname_r"
+            | "iconv" | "iconv_open" | "iconv_close"
             // Environment mutation
             | "setenv" | "unsetenv" | "putenv"
             // Argument parsing
@@ -1293,9 +1348,16 @@ mod tests {
         assert!(StubResolver::is_safe_symbol("puts"));
         assert!(StubResolver::is_safe_symbol("malloc"));
         assert!(StubResolver::is_safe_symbol("free"));
+        assert!(StubResolver::is_safe_symbol("_Unwind_RaiseException"));
+        assert!(StubResolver::is_safe_symbol("__Unwind_RaiseException"));
+        assert!(StubResolver::is_safe_symbol("getpgid"));
+        assert!(StubResolver::is_safe_symbol("iconv_open"));
+        assert!(StubResolver::is_safe_symbol("readdir_r"));
         // `exit` is now shimmed (not on safe-list) to bypass atexit handlers
         assert!(StubResolver::is_safe_symbol("_exit"));
-        assert!(StubResolver::is_safe_symbol("$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF"));
+        assert!(StubResolver::is_safe_symbol(
+            "$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF"
+        ));
         assert!(StubResolver::is_safe_symbol("swift_task_isCurrentExecutor"));
     }
 

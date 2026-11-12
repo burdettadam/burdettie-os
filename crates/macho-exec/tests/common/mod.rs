@@ -9,9 +9,13 @@ pub use macho_fixtures::{fixtures_dir, read_fixture};
 
 pub fn default_mapper() -> Arc<dyn MemoryMapper> {
     #[cfg(target_os = "macos")]
-    { Arc::new(platform_darwin_host::DarwinMemoryMapper) }
+    {
+        Arc::new(platform_darwin_host::DarwinMemoryMapper)
+    }
     #[cfg(target_os = "linux")]
-    { Arc::new(platform_linux::LinuxMemoryMapper) }
+    {
+        Arc::new(platform_linux::LinuxMemoryMapper)
+    }
 }
 
 pub fn default_unwind() -> Arc<dyn UnwindRegistry> {

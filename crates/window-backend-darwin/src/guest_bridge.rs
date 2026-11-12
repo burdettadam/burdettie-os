@@ -8,12 +8,16 @@ use std::num::NonZeroU32;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
+use accesskit::TreeUpdate;
+use accesskit_winit::{
+    Adapter as AccessKitAdapter, Event as AccessKitEvent, WindowEvent as AccessKitWindowEvent,
+};
 use cf_lite::gui_bridge::{GuiBridge, GuiEvent, WindowDesc};
 
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
 use winit::event::{ElementState, WindowEvent};
-use winit::event_loop::{ActiveEventLoop, EventLoop};
+use winit::event_loop::{ActiveEventLoop, EventLoop, EventLoopProxy};
 use winit::keyboard::PhysicalKey;
 use winit::window::{Window, WindowId};
 
@@ -44,13 +48,18 @@ fn window_buffers() -> &'static Mutex<HashMap<u64, WindowPixelBuffer>> {
 /// Ensure a pixel buffer exists for the given guest window at the given size.
 fn ensure_buffer(guest: u64, w: u32, h: u32) {
     let mut map = lock(window_buffers());
-    let needs_resize = map.get(&guest).map_or(true, |b| b.width != w || b.height != h);
+    let needs_resize = map
+        .get(&guest)
+        .map_or(true, |b| b.width != w || b.height != h);
     if needs_resize {
-        map.insert(guest, WindowPixelBuffer {
-            data: vec![0x00FF_FFFFu32; (w as usize) * (h as usize)],
-            width: w,
-            height: h,
-        });
+        map.insert(
+            guest,
+            WindowPixelBuffer {
+                data: vec![0x00FF_FFFFu32; (w as usize) * (h as usize)],
+                width: w,
+                height: h,
+            },
+        );
     }
 }
 
@@ -67,7 +76,12 @@ fn redraw_requests() -> &'static Mutex<Vec<u64>> {
 ///
 /// Call `WinitGuiBridge::new()` then pass to `cf_lite::gui_bridge::set_gui_bridge()`.
 type FrameUpdate = (u64, f64, f64, f64, f64);
-type WindowEntry = (Arc<Window>, softbuffer::Surface<Arc<Window>, Arc<Window>>);
+
+struct WindowEntry {
+    window: Arc<Window>,
+    surface: softbuffer::Surface<Arc<Window>, Arc<Window>>,
+    accessibility: AccessKitAdapter,
+}
 
 pub struct WinitGuiBridge {
     /// Windows requested before the event loop starts.
@@ -80,6 +94,8 @@ pub struct WinitGuiBridge {
     hide_requests: Mutex<Vec<u64>>,
     /// Pending cursor type changes (NSCursor type tag).
     cursor_updates: Mutex<Vec<u64>>,
+    /// Pending AccessKit tree updates keyed by guest NSWindow address.
+    accessibility_updates: Mutex<Vec<(u64, TreeUpdate)>>,
     /// Whether `request_stop` has been called.
     stop: AtomicBool,
 }
@@ -92,8 +108,15 @@ impl WinitGuiBridge {
             frame_updates: Mutex::new(Vec::new()),
             hide_requests: Mutex::new(Vec::new()),
             cursor_updates: Mutex::new(Vec::new()),
+            accessibility_updates: Mutex::new(Vec::new()),
             stop: AtomicBool::new(false),
         }
+    }
+}
+
+impl Default for WinitGuiBridge {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -116,7 +139,10 @@ impl GuiBridge for WinitGuiBridge {
 
     #[allow(clippy::expect_used)] // Event loop creation/run is fatal if it fails
     fn run_event_loop(&self, event_callback: Box<dyn FnMut(u64, GuiEvent)>) {
-        let event_loop = EventLoop::new().expect("failed to create winit event loop");
+        let event_loop = EventLoop::<AccessKitEvent>::with_user_event()
+            .build()
+            .expect("failed to create winit event loop");
+        let accessibility_proxy = event_loop.create_proxy();
 
         // Drain pending show_window requests so the ApplicationHandler can create them.
         let pending = std::mem::take(&mut *lock(&self.pending));
@@ -129,9 +155,14 @@ impl GuiBridge for WinitGuiBridge {
             guest_to_winit: HashMap::new(),
             surfaces: HashMap::new(),
             cursor_pos: HashMap::new(),
+            modifier_flags: HashMap::new(),
+            accessibility_trees: HashMap::new(),
+            accessibility_proxy,
         };
 
-        event_loop.run_app(&mut state).expect("winit event loop error");
+        event_loop
+            .run_app(&mut state)
+            .expect("winit event loop error");
     }
 
     fn request_stop(&self) {
@@ -155,6 +186,11 @@ impl GuiBridge for WinitGuiBridge {
     fn set_cursor(&self, cursor_type: u64) {
         lock(&self.cursor_updates).push(cursor_type);
     }
+
+    fn update_accessibility(&self, guest_window: u64, content_view: u64) {
+        let update = cf_lite::accessibility_bridge::build_tree_update(content_view);
+        lock(&self.accessibility_updates).push((guest_window, update));
+    }
 }
 
 // ── Internal event-loop state ──────────────────────────────────────
@@ -167,10 +203,15 @@ struct BridgeState<'a> {
     windows: HashMap<WindowId, u64>,
     // guest u64 -> winit WindowId
     guest_to_winit: HashMap<u64, WindowId>,
-    // WindowId -> (Arc<Window>, softbuffer surface)
+    // WindowId -> native window, softbuffer surface, and AccessKit adapter.
     surfaces: HashMap<WindowId, WindowEntry>,
     // WindowId -> last cursor position (logical x, y)
     cursor_pos: HashMap<WindowId, (f64, f64)>,
+    // WindowId -> latest macOS NSEventModifierFlags value.
+    modifier_flags: HashMap<WindowId, u64>,
+    // guest u64 -> latest full AccessKit tree update
+    accessibility_trees: HashMap<u64, TreeUpdate>,
+    accessibility_proxy: EventLoopProxy<AccessKitEvent>,
 }
 
 impl<'a> BridgeState<'a> {
@@ -178,7 +219,8 @@ impl<'a> BridgeState<'a> {
         let attrs = Window::default_attributes()
             .with_title(&desc.title)
             .with_inner_size(LogicalSize::new(desc.width, desc.height))
-            .with_resizable(true);
+            .with_resizable(true)
+            .with_visible(false);
 
         let window = match event_loop.create_window(attrs) {
             Ok(w) => Arc::new(w),
@@ -203,15 +245,30 @@ impl<'a> BridgeState<'a> {
             }
         };
 
+        let accessibility = AccessKitAdapter::with_event_loop_proxy(
+            window.as_ref(),
+            self.accessibility_proxy.clone(),
+        );
+        window.set_visible(true);
+
         let wid = window.id();
         log::info!(
             "winit_bridge: created window {:?} for guest {:#x} \"{}\"",
-            wid, desc.guest_window, desc.title,
+            wid,
+            desc.guest_window,
+            desc.title,
         );
 
         self.windows.insert(wid, desc.guest_window);
         self.guest_to_winit.insert(desc.guest_window, wid);
-        self.surfaces.insert(wid, (window.clone(), surface));
+        self.surfaces.insert(
+            wid,
+            WindowEntry {
+                window: window.clone(),
+                surface,
+                accessibility,
+            },
+        );
 
         // Create a shared pixel buffer for guest drawing.
         let phys = window.inner_size();
@@ -236,8 +293,8 @@ impl<'a> BridgeState<'a> {
         let titles = std::mem::take(&mut *lock(&self.bridge.title_updates));
         for (guest, title) in titles {
             if let Some(&wid) = self.guest_to_winit.get(&guest) {
-                if let Some((ref w, _)) = self.surfaces.get(&wid) {
-                    w.set_title(&title);
+                if let Some(entry) = self.surfaces.get(&wid) {
+                    entry.window.set_title(&title);
                 }
             }
         }
@@ -246,8 +303,8 @@ impl<'a> BridgeState<'a> {
         let frames = std::mem::take(&mut *lock(&self.bridge.frame_updates));
         for (guest, _x, _y, w, h) in frames {
             if let Some(&wid) = self.guest_to_winit.get(&guest) {
-                if let Some((ref win, _)) = self.surfaces.get(&wid) {
-                    let _ = win.request_inner_size(LogicalSize::new(w, h));
+                if let Some(entry) = self.surfaces.get(&wid) {
+                    let _ = entry.window.request_inner_size(LogicalSize::new(w, h));
                 }
             }
         }
@@ -256,8 +313,8 @@ impl<'a> BridgeState<'a> {
         let hides = std::mem::take(&mut *lock(&self.bridge.hide_requests));
         for guest in hides {
             if let Some(&wid) = self.guest_to_winit.get(&guest) {
-                if let Some((ref w, _)) = self.surfaces.get(&wid) {
-                    w.set_visible(false);
+                if let Some(entry) = self.surfaces.get(&wid) {
+                    entry.window.set_visible(false);
                 }
             }
         }
@@ -266,8 +323,19 @@ impl<'a> BridgeState<'a> {
         let redraws = std::mem::take(&mut *lock(redraw_requests()));
         for guest in redraws {
             if let Some(&wid) = self.guest_to_winit.get(&guest) {
-                if let Some((ref w, _)) = self.surfaces.get(&wid) {
-                    w.request_redraw();
+                if let Some(entry) = self.surfaces.get(&wid) {
+                    entry.window.request_redraw();
+                }
+            }
+        }
+
+        // AccessKit tree updates from guest display/accessibility rebuilds.
+        let accessibility_updates = std::mem::take(&mut *lock(&self.bridge.accessibility_updates));
+        for (guest, update) in accessibility_updates {
+            self.accessibility_trees.insert(guest, update.clone());
+            if let Some(&wid) = self.guest_to_winit.get(&guest) {
+                if let Some(entry) = self.surfaces.get_mut(&wid) {
+                    entry.accessibility.update_if_active(|| update);
                 }
             }
         }
@@ -276,8 +344,8 @@ impl<'a> BridgeState<'a> {
         let cursors = std::mem::take(&mut *lock(&self.bridge.cursor_updates));
         if let Some(&cursor_type) = cursors.last() {
             let icon = nscursor_type_to_winit(cursor_type);
-            for (ref w, _) in self.surfaces.values() {
-                w.set_cursor(icon);
+            for entry in self.surfaces.values() {
+                entry.window.set_cursor(icon);
             }
         }
     }
@@ -285,17 +353,21 @@ impl<'a> BridgeState<'a> {
     /// Draw the window's content: trigger guest drawRect: cycle, then blit to softbuffer.
     fn redraw(&mut self, wid: WindowId) {
         let guest = self.guest_for(wid);
-        let Some((ref window, ref mut surface)) = self.surfaces.get_mut(&wid) else {
+        let Some(entry) = self.surfaces.get_mut(&wid) else {
             return;
         };
-        let phys = window.inner_size();
+        let phys = entry.window.inner_size();
         if phys.width == 0 || phys.height == 0 {
             return;
         }
-        let Some(nz_w) = NonZeroU32::new(phys.width) else { return };
-        let Some(nz_h) = NonZeroU32::new(phys.height) else { return };
+        let Some(nz_w) = NonZeroU32::new(phys.width) else {
+            return;
+        };
+        let Some(nz_h) = NonZeroU32::new(phys.height) else {
+            return;
+        };
 
-        if let Err(e) = surface.resize(nz_w, nz_h) {
+        if let Err(e) = entry.surface.resize(nz_w, nz_h) {
             log::warn!("winit_bridge: resize failed: {e}");
             return;
         }
@@ -309,7 +381,10 @@ impl<'a> BridgeState<'a> {
             (self.callback)(guest, GuiEvent::RedrawRequested);
         }
 
-        let Ok(mut buffer) = surface.buffer_mut() else {
+        let Some(entry) = self.surfaces.get_mut(&wid) else {
+            return;
+        };
+        let Ok(mut buffer) = entry.surface.buffer_mut() else {
             return;
         };
 
@@ -336,7 +411,7 @@ impl<'a> BridgeState<'a> {
     }
 }
 
-impl<'a> ApplicationHandler for BridgeState<'a> {
+impl<'a> ApplicationHandler<AccessKitEvent> for BridgeState<'a> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         // Create windows that were queued before the event loop started.
         let pending = std::mem::take(&mut self.pending);
@@ -348,6 +423,12 @@ impl<'a> ApplicationHandler for BridgeState<'a> {
     fn window_event(&mut self, event_loop: &ActiveEventLoop, wid: WindowId, event: WindowEvent) {
         let guest = self.guest_for(wid);
 
+        if let Some(entry) = self.surfaces.get_mut(&wid) {
+            entry
+                .accessibility
+                .process_event(entry.window.as_ref(), &event);
+        }
+
         match event {
             WindowEvent::CloseRequested => {
                 (self.callback)(guest, GuiEvent::WindowCloseRequested);
@@ -355,9 +436,11 @@ impl<'a> ApplicationHandler for BridgeState<'a> {
                 // If guest didn't cancel, remove the window.
                 if let Some(gw) = self.windows.remove(&wid) {
                     self.guest_to_winit.remove(&gw);
+                    self.accessibility_trees.remove(&gw);
                 }
                 self.surfaces.remove(&wid);
                 self.cursor_pos.remove(&wid);
+                self.modifier_flags.remove(&wid);
 
                 // If no windows remain, exit.
                 if self.windows.is_empty() {
@@ -374,22 +457,32 @@ impl<'a> ApplicationHandler for BridgeState<'a> {
                     // Resize the shared pixel buffer.
                     ensure_buffer(guest, size.width, size.height);
 
-                    let scale = self.surfaces.get(&wid)
-                        .map(|(w, _)| w.scale_factor())
+                    let scale = self
+                        .surfaces
+                        .get(&wid)
+                        .map(|entry| entry.window.scale_factor())
                         .unwrap_or(1.0);
                     let lw = f64::from(size.width) / scale;
                     let lh = f64::from(size.height) / scale;
-                    (self.callback)(guest, GuiEvent::WindowResized { width: lw, height: lh });
+                    (self.callback)(
+                        guest,
+                        GuiEvent::WindowResized {
+                            width: lw,
+                            height: lh,
+                        },
+                    );
 
-                    if let Some((ref w, _)) = self.surfaces.get(&wid) {
-                        w.request_redraw();
+                    if let Some(entry) = self.surfaces.get(&wid) {
+                        entry.window.request_redraw();
                     }
                 }
             }
 
             WindowEvent::CursorMoved { position, .. } => {
-                let scale = self.surfaces.get(&wid)
-                    .map(|(w, _)| w.scale_factor())
+                let scale = self
+                    .surfaces
+                    .get(&wid)
+                    .map(|entry| entry.window.scale_factor())
                     .unwrap_or(1.0);
                 let x = position.x / scale;
                 let y = position.y / scale;
@@ -418,8 +511,10 @@ impl<'a> ApplicationHandler for BridgeState<'a> {
                         (f64::from(x) * 20.0, f64::from(y) * 20.0)
                     }
                     winit::event::MouseScrollDelta::PixelDelta(pos) => {
-                        let scale = self.surfaces.get(&wid)
-                            .map(|(w, _)| w.scale_factor())
+                        let scale = self
+                            .surfaces
+                            .get(&wid)
+                            .map(|entry| entry.window.scale_factor())
                             .unwrap_or(1.0);
                         (pos.x / scale, pos.y / scale)
                     }
@@ -436,21 +531,25 @@ impl<'a> ApplicationHandler for BridgeState<'a> {
                     winit::keyboard::Key::Character(s) => s.to_string(),
                     _ => String::new(),
                 };
-                let modifiers = 0u64; // TODO: track modifier state
+                let modifiers = self.modifier_flags.get(&wid).copied().unwrap_or(0);
                 let evt = match event.state {
-                    ElementState::Pressed => GuiEvent::KeyDown { key_code, characters, modifiers },
-                    ElementState::Released => GuiEvent::KeyUp { key_code, characters, modifiers },
+                    ElementState::Pressed => GuiEvent::KeyDown {
+                        key_code,
+                        characters,
+                        modifiers,
+                    },
+                    ElementState::Released => GuiEvent::KeyUp {
+                        key_code,
+                        characters,
+                        modifiers,
+                    },
                 };
                 (self.callback)(guest, evt);
             }
 
             WindowEvent::ModifiersChanged(mods) => {
-                let state = mods.state();
-                let mut flags = 0u64;
-                if state.shift_key() { flags |= 1 << 17; }    // NSEventModifierFlagShift
-                if state.control_key() { flags |= 1 << 18; }   // NSEventModifierFlagControl
-                if state.alt_key() { flags |= 1 << 19; }       // NSEventModifierFlagOption
-                if state.super_key() { flags |= 1 << 20; }     // NSEventModifierFlagCommand
+                let flags = winit_modifiers_to_macos(mods.state());
+                self.modifier_flags.insert(wid, flags);
                 (self.callback)(guest, GuiEvent::FlagsChanged { modifiers: flags });
             }
 
@@ -466,7 +565,41 @@ impl<'a> ApplicationHandler for BridgeState<'a> {
         }
     }
 
+    fn user_event(&mut self, _event_loop: &ActiveEventLoop, event: AccessKitEvent) {
+        let wid = event.window_id;
+        let guest = self.guest_for(wid);
+        let Some(entry) = self.surfaces.get_mut(&wid) else {
+            return;
+        };
+
+        match event.window_event {
+            AccessKitWindowEvent::InitialTreeRequested => {
+                let update = self
+                    .accessibility_trees
+                    .get(&guest)
+                    .cloned()
+                    .unwrap_or_else(|| cf_lite::accessibility_bridge::build_tree_update(0));
+                entry.accessibility.update_if_active(|| update);
+            }
+            AccessKitWindowEvent::ActionRequested(request) => {
+                log::debug!(
+                    "winit_bridge: accessibility action {:?} for node {:?}",
+                    request.action,
+                    request.target,
+                );
+            }
+            AccessKitWindowEvent::AccessibilityDeactivated => {
+                log::debug!(
+                    "winit_bridge: accessibility deactivated for window {:?}",
+                    wid
+                );
+            }
+        }
+    }
+
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+        cf_lite::gui_bridge::pump_guest_run_loop_once();
+
         // Process queued operations between events.
         self.process_queued(event_loop);
 
@@ -559,25 +692,42 @@ fn winit_key_to_macos(key: winit::keyboard::KeyCode) -> u16 {
     }
 }
 
+fn winit_modifiers_to_macos(state: winit::keyboard::ModifiersState) -> u64 {
+    let mut flags = 0u64;
+    if state.shift_key() {
+        flags |= 1 << 17; // NSEventModifierFlagShift
+    }
+    if state.control_key() {
+        flags |= 1 << 18; // NSEventModifierFlagControl
+    }
+    if state.alt_key() {
+        flags |= 1 << 19; // NSEventModifierFlagOption
+    }
+    if state.super_key() {
+        flags |= 1 << 20; // NSEventModifierFlagCommand
+    }
+    flags
+}
+
 /// Map NSCursor type tag to winit CursorIcon.
 fn nscursor_type_to_winit(cursor_type: u64) -> winit::window::CursorIcon {
     use winit::window::CursorIcon;
     match cursor_type {
-        0 => CursorIcon::Default,     // ARROW
-        1 => CursorIcon::Text,        // IBEAM
-        2 => CursorIcon::Crosshair,   // CROSSHAIR
-        3 => CursorIcon::Pointer,     // POINTING_HAND
-        4 => CursorIcon::Grab,        // OPEN_HAND
-        5 => CursorIcon::Grabbing,    // CLOSED_HAND
-        6 => CursorIcon::EwResize,    // RESIZE_LEFT_RIGHT
-        7 => CursorIcon::NsResize,    // RESIZE_UP_DOWN
-        8 => CursorIcon::WResize,     // RESIZE_LEFT
-        9 => CursorIcon::EResize,     // RESIZE_RIGHT
-        10 => CursorIcon::NResize,    // RESIZE_UP
-        11 => CursorIcon::SResize,    // RESIZE_DOWN
-        13 => CursorIcon::NotAllowed, // OPERATION_NOT_ALLOWED
-        14 => CursorIcon::Alias,      // DRAG_LINK
-        15 => CursorIcon::Copy,       // DRAG_COPY
+        0 => CursorIcon::Default,      // ARROW
+        1 => CursorIcon::Text,         // IBEAM
+        2 => CursorIcon::Crosshair,    // CROSSHAIR
+        3 => CursorIcon::Pointer,      // POINTING_HAND
+        4 => CursorIcon::Grab,         // OPEN_HAND
+        5 => CursorIcon::Grabbing,     // CLOSED_HAND
+        6 => CursorIcon::EwResize,     // RESIZE_LEFT_RIGHT
+        7 => CursorIcon::NsResize,     // RESIZE_UP_DOWN
+        8 => CursorIcon::WResize,      // RESIZE_LEFT
+        9 => CursorIcon::EResize,      // RESIZE_RIGHT
+        10 => CursorIcon::NResize,     // RESIZE_UP
+        11 => CursorIcon::SResize,     // RESIZE_DOWN
+        13 => CursorIcon::NotAllowed,  // OPERATION_NOT_ALLOWED
+        14 => CursorIcon::Alias,       // DRAG_LINK
+        15 => CursorIcon::Copy,        // DRAG_COPY
         16 => CursorIcon::ContextMenu, // CONTEXTUAL_MENU
         _ => CursorIcon::Default,
     }

@@ -159,11 +159,7 @@ pub extern "C" fn shim_nsmutablestring_init_with_capacity(
 ) -> u64 {
     let obj = init_mutable_string_with_bytes(obj, b"");
     if obj != 0 {
-        log::debug!(
-            "NSMutableString initWithCapacity:{} → {:#x}",
-            capacity,
-            obj
-        );
+        log::debug!("NSMutableString initWithCapacity:{} → {:#x}", capacity, obj);
     }
     obj
 }
@@ -647,7 +643,8 @@ mod tests {
         let cls = nsobj::nsmutablestring_class_addr();
         let obj = shim_nsmutablestring_string(cls, 0);
 
-        let base = cfstring::shim_cf_string_create_with_cstring(0, c"foo bar foo baz foo".as_ptr(), 0);
+        let base =
+            cfstring::shim_cf_string_create_with_cstring(0, c"foo bar foo baz foo".as_ptr(), 0);
         shim_nsmutablestring_init_with_string(obj, 0, base);
 
         let target = cfstring::shim_cf_string_create_with_cstring(0, c"foo".as_ptr(), 0);
@@ -682,6 +679,9 @@ mod tests {
 
     #[test]
     fn mutable_string_replace_occurrences_nil_safe() {
-        assert_eq!(shim_nsmutablestring_replace_occurrences(0, 0, 0, 0, 0, 0, 0), 0);
+        assert_eq!(
+            shim_nsmutablestring_replace_occurrences(0, 0, 0, 0, 0, 0, 0),
+            0
+        );
     }
 }

@@ -490,10 +490,22 @@ mod tests {
     #[test]
     fn test_condition_from_bits_roundtrip() {
         let expected = [
-            Condition::Eq, Condition::Ne, Condition::Cs, Condition::Cc,
-            Condition::Mi, Condition::Pl, Condition::Vs, Condition::Vc,
-            Condition::Hi, Condition::Ls, Condition::Ge, Condition::Lt,
-            Condition::Gt, Condition::Le, Condition::Al, Condition::Nv,
+            Condition::Eq,
+            Condition::Ne,
+            Condition::Cs,
+            Condition::Cc,
+            Condition::Mi,
+            Condition::Pl,
+            Condition::Vs,
+            Condition::Vc,
+            Condition::Hi,
+            Condition::Ls,
+            Condition::Ge,
+            Condition::Lt,
+            Condition::Gt,
+            Condition::Le,
+            Condition::Al,
+            Condition::Nv,
         ];
         for (i, &cond) in expected.iter().enumerate() {
             assert_eq!(Condition::from_bits(i as u32), cond, "mismatch at bits={i}");
@@ -502,47 +514,97 @@ mod tests {
 
     #[test]
     fn test_condition_eval_eq_z_set() {
-        let flags = Nzcv { n: false, z: true, c: false, v: false };
+        let flags = Nzcv {
+            n: false,
+            z: true,
+            c: false,
+            v: false,
+        };
         assert!(Condition::Eq.eval(flags));
     }
 
     #[test]
     fn test_condition_eval_eq_z_clear() {
-        let flags = Nzcv { n: false, z: false, c: false, v: false };
+        let flags = Nzcv {
+            n: false,
+            z: false,
+            c: false,
+            v: false,
+        };
         assert!(!Condition::Eq.eval(flags));
     }
 
     #[test]
     fn test_condition_eval_ge_n_eq_v() {
         // N==V (both false) → GE true
-        let flags = Nzcv { n: false, z: false, c: false, v: false };
+        let flags = Nzcv {
+            n: false,
+            z: false,
+            c: false,
+            v: false,
+        };
         assert!(Condition::Ge.eval(flags));
         // N==V (both true) → GE true
-        let flags = Nzcv { n: true, z: false, c: false, v: true };
+        let flags = Nzcv {
+            n: true,
+            z: false,
+            c: false,
+            v: true,
+        };
         assert!(Condition::Ge.eval(flags));
         // N!=V → GE false
-        let flags = Nzcv { n: true, z: false, c: false, v: false };
+        let flags = Nzcv {
+            n: true,
+            z: false,
+            c: false,
+            v: false,
+        };
         assert!(!Condition::Ge.eval(flags));
     }
 
     #[test]
     fn test_condition_eval_gt() {
         // !Z && N==V → true
-        let flags = Nzcv { n: false, z: false, c: false, v: false };
+        let flags = Nzcv {
+            n: false,
+            z: false,
+            c: false,
+            v: false,
+        };
         assert!(Condition::Gt.eval(flags));
         // Z==1 → false even if N==V
-        let flags = Nzcv { n: false, z: true, c: false, v: false };
+        let flags = Nzcv {
+            n: false,
+            z: true,
+            c: false,
+            v: false,
+        };
         assert!(!Condition::Gt.eval(flags));
         // N!=V → false
-        let flags = Nzcv { n: true, z: false, c: false, v: false };
+        let flags = Nzcv {
+            n: true,
+            z: false,
+            c: false,
+            v: false,
+        };
         assert!(!Condition::Gt.eval(flags));
     }
 
     #[test]
     fn test_condition_eval_al_always_true() {
-        let flags = Nzcv { n: false, z: false, c: false, v: false };
+        let flags = Nzcv {
+            n: false,
+            z: false,
+            c: false,
+            v: false,
+        };
         assert!(Condition::Al.eval(flags));
-        let flags = Nzcv { n: true, z: true, c: true, v: true };
+        let flags = Nzcv {
+            n: true,
+            z: true,
+            c: true,
+            v: true,
+        };
         assert!(Condition::Al.eval(flags));
     }
 }

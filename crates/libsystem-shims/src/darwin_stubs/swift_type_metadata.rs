@@ -48,11 +48,23 @@ struct DummyVwt {
 
 static DUMMY_VWT: DummyVwt = DummyVwt {
     entries: [
-        0, 0, 0, 0, 0, 0, 0, 0,   // function pointers (all null — no ops needed)
-        0,                           // size
-        1,                           // stride (must be ≥1)
-        0x0001_0007,                 // flags: alignment mask=7, POD, bitwiseTakable, inline storage
-        0, 0, 0, 0, 0, 0,           // extra witnesses
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,           // function pointers (all null — no ops needed)
+        0,           // size
+        1,           // stride (must be ≥1)
+        0x0001_0007, // flags: alignment mask=7, POD, bitwiseTakable, inline storage
+        0,
+        0,
+        0,
+        0,
+        0,
+        0, // extra witnesses
     ],
 };
 
@@ -62,15 +74,15 @@ static DUMMY_VWT: DummyVwt = DummyVwt {
 /// Fields: kind (struct=1), name (null), access_fn (null), fieldDescriptor (null).
 #[repr(C)]
 struct DummyNominalDescriptor {
-    flags: u32,               // kind = struct (1 << 0)
-    parent: i32,              // relative offset to parent descriptor (0 = none)
-    name_offset: i32,         // relative offset to name string (0 = null)
-    access_fn_offset: i32,    // relative offset to metadata access fn (0)
-    field_descriptor: i32,    // relative offset to field descriptor (0)
+    flags: u32,            // kind = struct (1 << 0)
+    parent: i32,           // relative offset to parent descriptor (0 = none)
+    name_offset: i32,      // relative offset to name string (0 = null)
+    access_fn_offset: i32, // relative offset to metadata access fn (0)
+    field_descriptor: i32, // relative offset to field descriptor (0)
 }
 
 static DUMMY_DESCRIPTOR: DummyNominalDescriptor = DummyNominalDescriptor {
-    flags: 0x0000_0001,  // StructDescriptor kind
+    flags: 0x0000_0001, // StructDescriptor kind
     parent: 0,
     name_offset: 0,
     access_fn_offset: 0,
@@ -128,14 +140,20 @@ fn dummy_metadata_ptr() -> u64 {
 /// Signature: `(mangledName: *const u8, nameLength: u32,
 ///              genericContext: *const void, genericArgs: *const *const void) -> *const Metadata`
 extern "C" fn shim_swift_get_type_by_mangled_name(
-    _name: u64, _len: u32, _ctx: u64, _args: u64,
+    _name: u64,
+    _len: u32,
+    _ctx: u64,
+    _args: u64,
 ) -> u64 {
     dummy_metadata_ptr()
 }
 
 /// `swift_getTypeByMangledNameInEnvironment` → returns static struct metadata.
 extern "C" fn shim_swift_get_type_by_mangled_name_env(
-    _name: u64, _len: u32, _env: u64, _args: u64,
+    _name: u64,
+    _len: u32,
+    _env: u64,
+    _args: u64,
 ) -> u64 {
     dummy_metadata_ptr()
 }
@@ -150,21 +168,31 @@ extern "C" fn shim_swift_conforms_to_protocol(_metadata: u64, _protocol: u64) ->
 
 /// `swift_getExistentialTypeMetadata` → returns static metadata.
 extern "C" fn shim_swift_get_existential_type_metadata(
-    _kind: u64, _count: u64, _protocols: u64, _superclass: u64,
+    _kind: u64,
+    _count: u64,
+    _protocols: u64,
+    _superclass: u64,
 ) -> u64 {
     dummy_metadata_ptr()
 }
 
 /// `swift_getTupleTypeMetadata` → returns static metadata.
 extern "C" fn shim_swift_get_tuple_type_metadata(
-    _request: u64, _flags: u64, _elements: u64, _labels: u64, _proposal: u64,
+    _request: u64,
+    _flags: u64,
+    _elements: u64,
+    _labels: u64,
+    _proposal: u64,
 ) -> u64 {
     dummy_metadata_ptr()
 }
 
 /// `swift_getOpaqueTypeMetadata` → returns static metadata.
 extern "C" fn shim_swift_get_opaque_type_metadata(
-    _request: u64, _arguments: u64, _descriptor: u64, _index: u64,
+    _request: u64,
+    _arguments: u64,
+    _descriptor: u64,
+    _index: u64,
 ) -> u64 {
     dummy_metadata_ptr()
 }
@@ -174,7 +202,9 @@ extern "C" fn shim_swift_get_opaque_type_metadata(
 /// Swift passes `MetadataRequest` and expects `MetadataResponse`.
 /// We return the metadata as-is with state = 0 (Complete).
 extern "C" fn shim_swift_check_metadata_state(_request: u64, metadata: u64) -> u64 {
-    if metadata == 0 { return dummy_metadata_ptr(); }
+    if metadata == 0 {
+        return dummy_metadata_ptr();
+    }
     metadata
 }
 

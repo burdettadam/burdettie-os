@@ -16,13 +16,19 @@
 use crate::nsobj;
 
 fn read_u64(obj: u64, offset: usize) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as *const u8).add(offset) as *const u64) }
 }
 
 fn write_u64(obj: u64, offset: usize, val: u64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as *mut u8).add(offset) as *mut u64) = val; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as *mut u8).add(offset) as *mut u64) = val;
+    }
 }
 
 pub(crate) const PANEL_SIZE: usize = 104;
@@ -37,8 +43,8 @@ const FLAG_CAN_CREATE_DIRS: u64 = 1 << 3;
 const FLAG_SHOWS_HIDDEN: u64 = 1 << 4;
 
 // Modal response constants
-const NS_MODAL_RESPONSE_OK: u64 = 1;
-const NS_MODAL_RESPONSE_CANCEL: u64 = 0;
+pub(crate) const NS_MODAL_RESPONSE_OK: u64 = 1;
+pub(crate) const NS_MODAL_RESPONSE_CANCEL: u64 = 0;
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -59,9 +65,18 @@ fn store_urls(obj: u64, urls: Vec<u64>) {
     guard.get_or_insert_with(HashMap::new).insert(obj, urls);
 }
 
+#[cfg(test)]
+pub(crate) fn store_urls_for_tests(obj: u64, urls: Vec<u64>) {
+    store_urls(obj, urls);
+}
+
 fn get_urls(obj: u64) -> Vec<u64> {
     let guard = PANEL_URLS.lock().unwrap();
-    guard.as_ref().and_then(|m| m.get(&obj)).cloned().unwrap_or_default()
+    guard
+        .as_ref()
+        .and_then(|m| m.get(&obj))
+        .cloned()
+        .unwrap_or_default()
 }
 
 fn store_allowed_types(obj: u64, types: Vec<String>) {
@@ -71,7 +86,16 @@ fn store_allowed_types(obj: u64, types: Vec<String>) {
 
 fn get_allowed_types(obj: u64) -> Vec<String> {
     let guard = PANEL_ALLOWED_TYPES.lock().unwrap();
-    guard.as_ref().and_then(|m| m.get(&obj)).cloned().unwrap_or_default()
+    guard
+        .as_ref()
+        .and_then(|m| m.get(&obj))
+        .cloned()
+        .unwrap_or_default()
+}
+
+#[cfg(test)]
+pub(crate) fn allowed_types_for_tests(obj: u64) -> Vec<String> {
+    get_allowed_types(obj)
 }
 
 // ── NSSavePanel ──────────────────────────────────────────────────
@@ -79,7 +103,9 @@ fn get_allowed_types(obj: u64) -> Vec<String> {
 /// `+[NSSavePanel savePanel]`
 pub extern "C" fn shim_nssavepanel_save_panel(_cls: u64, _cmd: u64) -> u64 {
     let obj = crate::pal_alloc().calloc(1, PANEL_SIZE) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     write_u64(obj, 0, nsobj::nssavepanel_class_addr());
     write_u64(obj, FLAGS_OFF, FLAG_CAN_CREATE_DIRS);
     obj
@@ -102,9 +128,15 @@ pub extern "C" fn shim_nssavepanel_can_create_directories(obj: u64, _cmd: u64) -
 
 /// `-[NSSavePanel setCanCreateDirectories:]`
 pub extern "C" fn shim_nssavepanel_set_can_create_directories(obj: u64, _cmd: u64, flag: u8) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let mut flags = read_u64(obj, FLAGS_OFF);
-    if flag != 0 { flags |= FLAG_CAN_CREATE_DIRS; } else { flags &= !FLAG_CAN_CREATE_DIRS; }
+    if flag != 0 {
+        flags |= FLAG_CAN_CREATE_DIRS;
+    } else {
+        flags &= !FLAG_CAN_CREATE_DIRS;
+    }
     write_u64(obj, FLAGS_OFF, flags);
 }
 
@@ -115,24 +147,36 @@ pub extern "C" fn shim_nssavepanel_shows_hidden_files(obj: u64, _cmd: u64) -> u8
 
 /// `-[NSSavePanel setShowsHiddenFiles:]`
 pub extern "C" fn shim_nssavepanel_set_shows_hidden_files(obj: u64, _cmd: u64, flag: u8) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let mut flags = read_u64(obj, FLAGS_OFF);
-    if flag != 0 { flags |= FLAG_SHOWS_HIDDEN; } else { flags &= !FLAG_SHOWS_HIDDEN; }
+    if flag != 0 {
+        flags |= FLAG_SHOWS_HIDDEN;
+    } else {
+        flags &= !FLAG_SHOWS_HIDDEN;
+    }
     write_u64(obj, FLAGS_OFF, flags);
 }
 
 /// `-[NSSavePanel allowedContentTypes]` — stub returns nil.
 pub extern "C" fn shim_nssavepanel_allowed_content_types(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let types = get_allowed_types(obj);
-    if types.is_empty() { return 0; }
+    if types.is_empty() {
+        return 0;
+    }
     // Return an empty NSArray as a placeholder.
     crate::nsarray::make_nsarray(&[])
 }
 
 /// `-[NSSavePanel setAllowedContentTypes:]` — stores for filter info.
 pub extern "C" fn shim_nssavepanel_set_allowed_content_types(obj: u64, _cmd: u64, types: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     // Extract type strings from the NSArray for filtering.
     let count = crate::nsarray::shim_nsarray_count(types, 0) as usize;
     let mut type_strs = Vec::new();
@@ -152,7 +196,9 @@ pub extern "C" fn shim_nssavepanel_set_allowed_content_types(obj: u64, _cmd: u64
 
 /// `-[NSSavePanel URL]` — returns the first selected URL (or nil).
 pub extern "C" fn shim_nssavepanel_url(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let urls = get_urls(obj);
     urls.first().copied().unwrap_or(0)
 }
@@ -162,7 +208,9 @@ pub extern "C" fn shim_nssavepanel_url(obj: u64, _cmd: u64) -> u64 {
 /// Uses `rfd` (native file dialog) on macOS to show a real save panel.
 /// Falls back to NSModalResponseCancel on other platforms.
 pub extern "C" fn shim_nssavepanel_run_modal(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return NS_MODAL_RESPONSE_CANCEL; }
+    if obj == 0 {
+        return NS_MODAL_RESPONSE_CANCEL;
+    }
 
     #[cfg(target_os = "macos")]
     {
@@ -201,7 +249,9 @@ pub extern "C" fn shim_nssavepanel_run_modal(obj: u64, _cmd: u64) -> u64 {
 /// `+[NSOpenPanel openPanel]`
 pub extern "C" fn shim_nsopenpanel_open_panel(_cls: u64, _cmd: u64) -> u64 {
     let obj = crate::pal_alloc().calloc(1, PANEL_SIZE) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     write_u64(obj, 0, nsobj::nsopenpanel_class_addr());
     write_u64(obj, FLAGS_OFF, FLAG_CAN_CHOOSE_FILES);
     obj
@@ -214,9 +264,15 @@ pub extern "C" fn shim_nsopenpanel_can_choose_files(obj: u64, _cmd: u64) -> u8 {
 
 /// `-[NSOpenPanel setCanChooseFiles:]`
 pub extern "C" fn shim_nsopenpanel_set_can_choose_files(obj: u64, _cmd: u64, flag: u8) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let mut flags = read_u64(obj, FLAGS_OFF);
-    if flag != 0 { flags |= FLAG_CAN_CHOOSE_FILES; } else { flags &= !FLAG_CAN_CHOOSE_FILES; }
+    if flag != 0 {
+        flags |= FLAG_CAN_CHOOSE_FILES;
+    } else {
+        flags &= !FLAG_CAN_CHOOSE_FILES;
+    }
     write_u64(obj, FLAGS_OFF, flags);
 }
 
@@ -227,9 +283,15 @@ pub extern "C" fn shim_nsopenpanel_can_choose_directories(obj: u64, _cmd: u64) -
 
 /// `-[NSOpenPanel setCanChooseDirectories:]`
 pub extern "C" fn shim_nsopenpanel_set_can_choose_directories(obj: u64, _cmd: u64, flag: u8) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let mut flags = read_u64(obj, FLAGS_OFF);
-    if flag != 0 { flags |= FLAG_CAN_CHOOSE_DIRS; } else { flags &= !FLAG_CAN_CHOOSE_DIRS; }
+    if flag != 0 {
+        flags |= FLAG_CAN_CHOOSE_DIRS;
+    } else {
+        flags &= !FLAG_CAN_CHOOSE_DIRS;
+    }
     write_u64(obj, FLAGS_OFF, flags);
 }
 
@@ -240,15 +302,23 @@ pub extern "C" fn shim_nsopenpanel_allows_multiple_selection(obj: u64, _cmd: u64
 
 /// `-[NSOpenPanel setAllowsMultipleSelection:]`
 pub extern "C" fn shim_nsopenpanel_set_allows_multiple_selection(obj: u64, _cmd: u64, flag: u8) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let mut flags = read_u64(obj, FLAGS_OFF);
-    if flag != 0 { flags |= FLAG_ALLOWS_MULTIPLE; } else { flags &= !FLAG_ALLOWS_MULTIPLE; }
+    if flag != 0 {
+        flags |= FLAG_ALLOWS_MULTIPLE;
+    } else {
+        flags &= !FLAG_ALLOWS_MULTIPLE;
+    }
     write_u64(obj, FLAGS_OFF, flags);
 }
 
 /// `-[NSOpenPanel URLs]`
 pub extern "C" fn shim_nsopenpanel_urls(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let urls = get_urls(obj);
     crate::nsarray::make_nsarray(&urls)
 }
@@ -258,7 +328,9 @@ pub extern "C" fn shim_nsopenpanel_urls(obj: u64, _cmd: u64) -> u64 {
 /// Uses `rfd` (native file dialog) on macOS to show a real open panel.
 /// Falls back to NSModalResponseCancel on other platforms.
 pub extern "C" fn shim_nsopenpanel_run_modal(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return NS_MODAL_RESPONSE_CANCEL; }
+    if obj == 0 {
+        return NS_MODAL_RESPONSE_CANCEL;
+    }
 
     #[cfg(target_os = "macos")]
     {

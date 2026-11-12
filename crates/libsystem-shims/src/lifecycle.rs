@@ -40,7 +40,26 @@ impl LifecycleShims {
             shim_os_feature_enabled_impl as *const () as u64,
             "__os_feature_enabled_impl → conservative feature flag false",
         );
-        table.register("_exit", shim_exit as *const () as u64, "exit (clean shutdown)");
+        table.register(
+            "_exit",
+            shim_exit as *const () as u64,
+            "exit (clean shutdown)",
+        );
+        table.register(
+            "__exit",
+            shim_exit as *const () as u64,
+            "_exit (clean shutdown)",
+        );
+        table.register(
+            "_Exit",
+            shim_exit as *const () as u64,
+            "_Exit (clean shutdown)",
+        );
+        table.register(
+            "__Exit",
+            shim_exit as *const () as u64,
+            "_Exit (Darwin symbol, clean shutdown)",
+        );
         table.register(
             "_sigaction",
             shim_sigaction as *const () as u64,
@@ -94,42 +113,6 @@ impl LifecycleShims {
             shim_cxa_guard_abort as *const () as u64,
             "__cxa_guard_abort (single-threaded)",
         );
-        // std::mutex shims — delegate to pthread directly.
-        // Guest code's std::mutex has Apple-ABI layout; system libc++'s
-        // std::mutex::lock() expects different internal offsets.
-        // We bypass libc++ and call pthread directly.
-        table.register(
-            "__ZNSt3__15mutex4lockEv",
-            shim_std_mutex_lock as *const () as u64,
-            "std::mutex::lock (pthread delegate)",
-        );
-        table.register(
-            "__ZNSt3__15mutex6unlockEv",
-            shim_std_mutex_unlock as *const () as u64,
-            "std::mutex::unlock (pthread delegate)",
-        );
-        table.register(
-            "__ZNSt3__15mutex8try_lockEv",
-            shim_std_mutex_try_lock as *const () as u64,
-            "std::mutex::try_lock (pthread delegate)",
-        );
-        // pthread_mutex shims — reinitialize macOS-layout mutexes for Linux.
-        table.register(
-            "_pthread_mutex_lock",
-            shim_pthread_mutex_lock as *const () as u64,
-            "pthread_mutex_lock (macOS→Linux reinit)",
-        );
-        table.register(
-            "_pthread_mutex_unlock",
-            shim_pthread_mutex_unlock as *const () as u64,
-            "pthread_mutex_unlock",
-        );
-        table.register(
-            "_pthread_mutex_trylock",
-            shim_pthread_mutex_trylock as *const () as u64,
-            "pthread_mutex_trylock (macOS→Linux reinit)",
-        );
-
         // Signal mask shims — macOS sigset_t (4 bytes) vs Linux (128 bytes).
         table.register(
             "_pthread_sigmask",
@@ -152,7 +135,7 @@ impl LifecycleShims {
             "kill (diagnostic + signal translation)",
         );
 
-        log::debug!("LifecycleShims: registered 24 lifecycle shims");
+        log::debug!("LifecycleShims: registered 21 lifecycle shims");
     }
 
     /// Run all registered atexit handlers in LIFO order.
@@ -207,12 +190,13 @@ extern "C" fn shim_cxa_atexit(
     }
 }
 
-
 /// Single-threaded __cxa_guard_acquire.
 extern "C" fn shim_cxa_guard_acquire(guard: *mut u64) -> i32 {
     let byte0 = guard as *mut u8;
     let val = unsafe { byte0.read_volatile() };
-    if val != 0 { return 0; }
+    if val != 0 {
+        return 0;
+    }
     unsafe { byte0.write_volatile(0x10) };
     1
 }
@@ -259,6 +243,12 @@ extern "C" fn shim_std_mutex_try_lock(this: *mut libc::c_void) -> bool {
 /// We detect this signature (or any non-zero non-Linux pattern) and
 /// zero + reinitialize the mutex for Linux.
 fn reinit_mutex_if_needed(ptr: *mut libc::c_void) {
+    if (ptr as usize) < 0x10000 {
+        log::warn!(
+            "std::mutex: refusing to reinit mutex at bogus address {ptr:p} — possible TLS/heap corruption"
+        );
+        return;
+    }
     use std::collections::HashSet;
     use std::sync::Mutex;
     static INITIALIZED: std::sync::OnceLock<Mutex<HashSet<usize>>> = std::sync::OnceLock::new();
@@ -269,7 +259,11 @@ fn reinit_mutex_if_needed(ptr: *mut libc::c_void) {
         // First time seeing this mutex — zero-init as Linux pthread_mutex_t
         let mtx = ptr as *mut libc::pthread_mutex_t;
         unsafe {
-            std::ptr::write_bytes(mtx as *mut u8, 0, std::mem::size_of::<libc::pthread_mutex_t>());
+            std::ptr::write_bytes(
+                mtx as *mut u8,
+                0,
+                std::mem::size_of::<libc::pthread_mutex_t>(),
+            );
             libc::pthread_mutex_init(mtx, std::ptr::null());
         }
         log::trace!("Reinitialized mutex at {ptr:?} for Linux");
@@ -279,17 +273,26 @@ fn reinit_mutex_if_needed(ptr: *mut libc::c_void) {
 /// `int pthread_mutex_lock(pthread_mutex_t *mutex)` — with macOS→Linux reinit.
 extern "C" fn shim_pthread_mutex_lock(mutex: *mut libc::pthread_mutex_t) -> libc::c_int {
     reinit_mutex_if_needed(mutex as *mut libc::c_void);
+    if (mutex as usize) < 0x10000 {
+        return libc::EINVAL;
+    }
     unsafe { libc::pthread_mutex_lock(mutex) }
 }
 
 /// `int pthread_mutex_unlock(pthread_mutex_t *mutex)`
 extern "C" fn shim_pthread_mutex_unlock(mutex: *mut libc::pthread_mutex_t) -> libc::c_int {
+    if (mutex as usize) < 0x10000 {
+        return libc::EINVAL;
+    }
     unsafe { libc::pthread_mutex_unlock(mutex) }
 }
 
 /// `int pthread_mutex_trylock(pthread_mutex_t *mutex)` — with macOS→Linux reinit.
 extern "C" fn shim_pthread_mutex_trylock(mutex: *mut libc::pthread_mutex_t) -> libc::c_int {
     reinit_mutex_if_needed(mutex as *mut libc::c_void);
+    if (mutex as usize) < 0x10000 {
+        return libc::EINVAL;
+    }
     unsafe { libc::pthread_mutex_trylock(mutex) }
 }
 
@@ -297,10 +300,7 @@ extern "C" fn shim_pthread_mutex_trylock(mutex: *mut libc::pthread_mutex_t) -> l
 ///
 /// We conservatively report features as disabled, except for the Foundation
 /// `NSPLUtil2` gate used by modern `plutil` to enter its Swift implementation.
-extern "C" fn shim_os_feature_enabled_impl(
-    domain: *const c_char,
-    feature: *const c_char,
-) -> i32 {
+extern "C" fn shim_os_feature_enabled_impl(domain: *const c_char, feature: *const c_char) -> i32 {
     let domain_name = if domain.is_null() {
         "<null>".to_string()
     } else {
@@ -339,7 +339,9 @@ extern "C" fn shim_os_feature_enabled_impl(
 extern "C" fn shim_exit(status: i32) -> ! {
     log::trace!("exit({status}): bypassing atexit handlers, calling _exit");
     // Flush C stdio so guest printf output is not lost
-    unsafe { libc::fflush(std::ptr::null_mut()); }
+    unsafe {
+        libc::fflush(std::ptr::null_mut());
+    }
     // Flush Rust stdio
     use std::io::Write;
     let _ = std::io::stdout().flush();
@@ -356,9 +358,17 @@ extern "C" fn shim_exit(status: i32) -> ! {
 extern "C" fn shim_abort() -> ! {
     eprintln!("[DIAGNOSTIC] abort() called by guest code!");
     // Print a simple backtrace for context
-    let lr: u64;
-    unsafe { std::arch::asm!("mov {}, lr", out(reg) lr) };
-    eprintln!("[DIAGNOSTIC] abort caller LR = {lr:#x}");
+    #[cfg(target_arch = "aarch64")]
+    {
+        let lr: u64;
+        unsafe { std::arch::asm!("mov {}, lr", out(reg) lr) };
+        eprintln!("[DIAGNOSTIC] abort caller LR = {lr:#x}");
+    }
+    #[cfg(not(target_arch = "aarch64"))]
+    eprintln!(
+        "[DIAGNOSTIC] abort caller register unavailable on {}",
+        std::env::consts::ARCH
+    );
     use std::io::Write;
     let _ = std::io::stderr().flush();
     unsafe { libc::_exit(1) }
@@ -391,10 +401,10 @@ struct DarwinSigaction {
 ///   macOS SIGUSR2=31  → Linux SIGUSR2=12
 fn translate_darwin_signal(darwin_sig: i32) -> i32 {
     match darwin_sig {
-        10 => 7,   // SIGBUS
-        20 => 17,  // SIGCHLD
-        30 => 10,  // SIGUSR1
-        31 => 12,  // SIGUSR2
+        10 => 7,         // SIGBUS
+        20 => 17,        // SIGCHLD
+        30 => 10,        // SIGUSR1
+        31 => 12,        // SIGUSR2
         _ => darwin_sig, // SIGINT(2), SIGABRT(6), SIGSEGV(11), SIGPIPE(13), SIGALRM(14), SIGTERM(15) are same
     }
 }
@@ -402,10 +412,10 @@ fn translate_darwin_signal(darwin_sig: i32) -> i32 {
 /// Translate Linux signal number back to macOS signal number (reverse of above).
 fn translate_linux_signal(linux_sig: i32) -> i32 {
     match linux_sig {
-        7 => 10,   // SIGBUS
-        17 => 20,  // SIGCHLD
-        10 => 30,  // SIGUSR1
-        12 => 31,  // SIGUSR2
+        7 => 10,  // SIGBUS
+        17 => 20, // SIGCHLD
+        10 => 30, // SIGUSR1
+        12 => 31, // SIGUSR2
         _ => linux_sig,
     }
 }
@@ -420,6 +430,10 @@ fn is_allowed_signal(darwin_sig: i32) -> bool {
     matches!(darwin_sig, 2 | 6 | 10 | 11 | 13 | 14 | 15 | 20 | 30 | 31)
 }
 
+fn preserves_host_crash_handler(darwin_sig: i32) -> bool {
+    matches!(darwin_sig, 10 | 11)
+}
+
 /// If `oact` is non-null we zero it to indicate "no previous handler".
 extern "C" fn shim_sigaction(
     sig: i32,
@@ -430,6 +444,21 @@ extern "C" fn shim_sigaction(
         let handler = unsafe { (*act).sa_sigaction };
         let flags = unsafe { (*act).sa_flags };
         log::debug!("sigaction: intercepted sig={sig} handler={handler:#x} flags={flags:#x}");
+        if preserves_host_crash_handler(sig) {
+            log::debug!(
+                "sigaction: keeping host crash handler for sig={sig}; guest handler change not forwarded"
+            );
+            if !oact.is_null() {
+                unsafe {
+                    std::ptr::write_bytes(
+                        oact as *mut u8,
+                        0,
+                        std::mem::size_of::<DarwinSigaction>(),
+                    );
+                }
+            }
+            return 0;
+        }
         if is_allowed_signal(sig) {
             let linux_sig = translate_darwin_signal(sig);
             log::debug!("sigaction: ALLOWING sig={sig} (linux={linux_sig}) through to host");
@@ -437,9 +466,19 @@ extern "C" fn shim_sigaction(
             let mut linux_act: libc::sigaction = unsafe { std::mem::zeroed() };
             linux_act.sa_sigaction = handler as usize;
             linux_act.sa_flags = flags as libc::c_int;
-            extern "C" { fn sigaction(sig: i32, act: *const libc::sigaction, oact: *mut libc::sigaction) -> i32; }
+            extern "C" {
+                fn sigaction(
+                    sig: i32,
+                    act: *const libc::sigaction,
+                    oact: *mut libc::sigaction,
+                ) -> i32;
+            }
             let mut linux_oact: libc::sigaction = unsafe { std::mem::zeroed() };
-            let oact_ptr = if oact.is_null() { std::ptr::null_mut() } else { &mut linux_oact };
+            let oact_ptr = if oact.is_null() {
+                std::ptr::null_mut()
+            } else {
+                &mut linux_oact
+            };
             let ret = unsafe { sigaction(linux_sig, &linux_act, oact_ptr) };
             if !oact.is_null() {
                 // Convert Linux oact back to macOS layout
@@ -456,7 +495,9 @@ extern "C" fn shim_sigaction(
     }
     if !oact.is_null() {
         // Zero out only the macOS-sized struct (16 bytes, not Linux's 152!)
-        unsafe { std::ptr::write_bytes(oact as *mut u8, 0, std::mem::size_of::<DarwinSigaction>()) };
+        unsafe {
+            std::ptr::write_bytes(oact as *mut u8, 0, std::mem::size_of::<DarwinSigaction>())
+        };
     }
     0 // success
 }
@@ -471,7 +512,9 @@ extern "C" fn shim_signal(sig: i32, handler: usize) -> usize {
     if handler <= 1 {
         let linux_sig = translate_darwin_signal(sig);
         log::trace!("signal: passing through SIG_DFL/SIG_IGN for signal {sig} (linux={linux_sig})");
-        extern "C" { fn signal(sig: i32, handler: usize) -> usize; }
+        extern "C" {
+            fn signal(sig: i32, handler: usize) -> usize;
+        }
         return unsafe { signal(linux_sig, handler) };
     }
     log::trace!("signal: intercepted guest handler for signal {sig}");
@@ -483,10 +526,7 @@ extern "C" fn shim_signal(sig: i32, handler: usize) -> usize {
 /// Intercept alternate signal stack setup. Guest code may try to install
 /// an alt stack in guest-mapped memory — we must prevent that from
 /// reaching the OS since the memory may be invalid when a signal fires.
-extern "C" fn shim_sigaltstack(
-    _ss: *const libc::stack_t,
-    oss: *mut libc::stack_t,
-) -> i32 {
+extern "C" fn shim_sigaltstack(_ss: *const libc::stack_t, oss: *mut libc::stack_t) -> i32 {
     if !oss.is_null() {
         unsafe { std::ptr::write_bytes(oss, 0, 1) };
     }
@@ -581,9 +621,9 @@ unsafe fn strlen_real(s: *const u8) -> usize {
 #[cfg(target_os = "linux")]
 fn translate_sigmask_how(darwin_how: i32) -> i32 {
     match darwin_how {
-        1 => libc::SIG_BLOCK,    // macOS SIG_BLOCK=1 → Linux SIG_BLOCK=0
-        2 => libc::SIG_UNBLOCK,  // macOS SIG_UNBLOCK=2 → Linux SIG_UNBLOCK=1
-        3 => libc::SIG_SETMASK,  // macOS SIG_SETMASK=3 → Linux SIG_SETMASK=2
+        1 => libc::SIG_BLOCK,   // macOS SIG_BLOCK=1 → Linux SIG_BLOCK=0
+        2 => libc::SIG_UNBLOCK, // macOS SIG_UNBLOCK=2 → Linux SIG_UNBLOCK=1
+        3 => libc::SIG_SETMASK, // macOS SIG_SETMASK=3 → Linux SIG_SETMASK=2
         _ => darwin_how,
     }
 }
@@ -636,12 +676,18 @@ extern "C" fn shim_pthread_sigmask(how: i32, set: *const u32, oldset: *mut u32) 
         Some(darwin_sigset_to_linux(set))
     };
     let mut linux_oldset: libc::sigset_t = unsafe { std::mem::zeroed() };
-    let old_ptr = if oldset.is_null() { std::ptr::null_mut() } else { &mut linux_oldset };
+    let old_ptr = if oldset.is_null() {
+        std::ptr::null_mut()
+    } else {
+        &mut linux_oldset
+    };
 
     let ret = unsafe {
         libc::pthread_sigmask(
             linux_how,
-            linux_set.as_ref().map_or(std::ptr::null(), |s| s as *const _),
+            linux_set
+                .as_ref()
+                .map_or(std::ptr::null(), |s| s as *const _),
             old_ptr,
         )
     };
@@ -651,9 +697,20 @@ extern "C" fn shim_pthread_sigmask(how: i32, set: *const u32, oldset: *mut u32) 
         unsafe { oldset.write_unaligned(linux_sigset_to_darwin(&linux_oldset)) };
     }
 
-    let how_name = match how { 1 => "BLOCK", 2 => "UNBLOCK", 3 => "SETMASK", _ => "?" };
-    log::trace!("pthread_sigmask({how_name}, mac_set={:?}) → {ret}",
-        if set.is_null() { None } else { Some(unsafe { set.read_unaligned() }) });
+    let how_name = match how {
+        1 => "BLOCK",
+        2 => "UNBLOCK",
+        3 => "SETMASK",
+        _ => "?",
+    };
+    log::trace!(
+        "pthread_sigmask({how_name}, mac_set={:?}) → {ret}",
+        if set.is_null() {
+            None
+        } else {
+            Some(unsafe { set.read_unaligned() })
+        }
+    );
     ret
 }
 
@@ -674,12 +731,18 @@ extern "C" fn shim_sigprocmask(how: i32, set: *const u32, oldset: *mut u32) -> i
         Some(darwin_sigset_to_linux(set))
     };
     let mut linux_oldset: libc::sigset_t = unsafe { std::mem::zeroed() };
-    let old_ptr = if oldset.is_null() { std::ptr::null_mut() } else { &mut linux_oldset };
+    let old_ptr = if oldset.is_null() {
+        std::ptr::null_mut()
+    } else {
+        &mut linux_oldset
+    };
 
     let ret = unsafe {
         libc::sigprocmask(
             linux_how,
-            linux_set.as_ref().map_or(std::ptr::null(), |s| s as *const _),
+            linux_set
+                .as_ref()
+                .map_or(std::ptr::null(), |s| s as *const _),
             old_ptr,
         )
     };
@@ -704,7 +767,11 @@ extern "C" fn shim_sigprocmask(_how: i32, _set: *const u32, _oldset: *mut u32) -
 #[cfg(target_os = "linux")]
 extern "C" fn shim_sigwait(set: *const u32, sig: *mut i32) -> i32 {
     let linux_set = darwin_sigset_to_linux(set);
-    let mac_mask = if set.is_null() { 0 } else { unsafe { set.read_unaligned() } };
+    let mac_mask = if set.is_null() {
+        0
+    } else {
+        unsafe { set.read_unaligned() }
+    };
     log::trace!("sigwait: waiting (mac_mask={mac_mask:#x})");
     let ret = unsafe { libc::sigwait(&linux_set, sig) };
     if ret == 0 && !sig.is_null() {
@@ -726,9 +793,7 @@ extern "C" fn shim_sigwait(_set: *const u32, _sig: *mut i32) -> i32 {
 extern "C" fn shim_kill(pid: i32, sig: i32) -> i32 {
     let linux_sig = translate_darwin_signal(sig);
     log::debug!("kill(pid={pid}, sig={sig} → linux {linux_sig})");
-    unsafe {
-        libc::kill(pid, linux_sig)
-    }
+    unsafe { libc::kill(pid, linux_sig) }
 }
 
 #[cfg(test)]
@@ -800,7 +865,10 @@ mod tests {
         LifecycleShims::run_atexit_handlers();
 
         // LIFO: third registered last → called first
-        assert_eq!(*ORDER.lock().unwrap_or_else(|e| e.into_inner()), vec![3, 2, 1]);
+        assert_eq!(
+            *ORDER.lock().unwrap_or_else(|e| e.into_inner()),
+            vec![3, 2, 1]
+        );
     }
 
     #[test]
@@ -816,11 +884,17 @@ mod tests {
 
         // NSPLUtil2 gates plutil's Swift implementation. We return 0 (disabled)
         // so plutil uses the ObjC code path which is reliable under the shim runtime.
-        assert_eq!(shim_os_feature_enabled_impl(domain.as_ptr(), feature.as_ptr()), 0);
+        assert_eq!(
+            shim_os_feature_enabled_impl(domain.as_ptr(), feature.as_ptr()),
+            0
+        );
         assert_eq!(
             shim_os_feature_enabled_impl(domain.as_ptr(), other_feature.as_ptr()),
             0
         );
-        assert_eq!(shim_os_feature_enabled_impl(std::ptr::null(), std::ptr::null()), 0);
+        assert_eq!(
+            shim_os_feature_enabled_impl(std::ptr::null(), std::ptr::null()),
+            0
+        );
     }
 }

@@ -67,8 +67,7 @@ impl EntitlementEffects {
                     effects.debugger = true;
                     count += 1;
                 }
-                "com.apple.security.get-task-allow"
-                | "com.apple.security.cs.get-task-allow" => {
+                "com.apple.security.get-task-allow" | "com.apple.security.cs.get-task-allow" => {
                     effects.get_task_allow = true;
                     count += 1;
                 }

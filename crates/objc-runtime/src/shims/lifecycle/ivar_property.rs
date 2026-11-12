@@ -292,9 +292,7 @@ pub extern "C" fn shim_object_set_ivar(obj: u64, ivar: u64, value: u64) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::class::{
-        ClassInfo, IvarEntry, ObjcRuntime, PropertyEntry, OBJC_RUNTIME,
-    };
+    use crate::class::{ClassInfo, IvarEntry, ObjcRuntime, PropertyEntry, OBJC_RUNTIME};
     use std::collections::HashMap;
     use std::ffi::CString;
 

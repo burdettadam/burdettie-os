@@ -14,9 +14,21 @@ pub fn register_nsdata_class(rt: &mut objc_runtime::ObjcRuntime) {
         name: "NSData".to_string(),
         mapped_addr: class_addr,
         methods: vec![
-            me("length", nsdata::shim_nsdata_length as *const () as u64, "Q@:"),
-            me("bytes", nsdata::shim_nsdata_bytes as *const () as u64, "^v@:"),
-            me("description", nsdata::shim_nsdata_description as *const () as u64, "@@:"),
+            me(
+                "length",
+                nsdata::shim_nsdata_length as *const () as u64,
+                "Q@:",
+            ),
+            me(
+                "bytes",
+                nsdata::shim_nsdata_bytes as *const () as u64,
+                "^v@:",
+            ),
+            me(
+                "description",
+                nsdata::shim_nsdata_description as *const () as u64,
+                "@@:",
+            ),
             me(
                 "isEqualToData:",
                 nsdata::shim_nsdata_is_equal_to_data as *const () as u64,
@@ -125,11 +137,31 @@ pub fn register_nsurl_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nsurl::shim_nsurl_url_by_appending_path_component as *const () as u64,
                 "@@:@",
             ),
-            me("isFileURL", nsurl::shim_nsurl_is_file_url as *const () as u64, "B@:"),
-            me("scheme", nsurl::shim_nsurl_scheme as *const () as u64, "@@:"),
-            me("standardizedURL", nsurl::shim_nsurl_standardized_url as *const () as u64, "@@:"),
-            me("description", nsurl::shim_nsurl_description as *const () as u64, "@@:"),
-            me("absoluteURL", nsurl::shim_nsurl_absolute_url as *const () as u64, "@@:"),
+            me(
+                "isFileURL",
+                nsurl::shim_nsurl_is_file_url as *const () as u64,
+                "B@:",
+            ),
+            me(
+                "scheme",
+                nsurl::shim_nsurl_scheme as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "standardizedURL",
+                nsurl::shim_nsurl_standardized_url as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "description",
+                nsurl::shim_nsurl_description as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "absoluteURL",
+                nsurl::shim_nsurl_absolute_url as *const () as u64,
+                "@@:",
+            ),
             me(
                 "URLByDeletingLastPathComponent",
                 nsurl::shim_nsurl_url_by_deleting_last_path_component as *const () as u64,

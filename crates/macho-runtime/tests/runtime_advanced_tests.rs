@@ -7,13 +7,17 @@ mod common;
 
 #[test]
 fn runtime_collection_enum_exit_zero() {
-    let Some(result) = common::run_fixture("collection_enum/app") else { return };
+    let Some(result) = common::run_fixture("collection_enum/app") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0, "collection_enum should exit 0");
 }
 
 #[test]
 fn runtime_nsenumerator_class_registered() {
-    let Some(_result) = common::run_fixture("collection_enum/app") else { return };
+    let Some(_result) = common::run_fixture("collection_enum/app") else {
+        return;
+    };
 
     let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
@@ -35,13 +39,17 @@ fn runtime_nsenumerator_class_registered() {
 
 #[test]
 fn runtime_nsdate_basics_exit_zero() {
-    let Some(result) = common::run_fixture("nsdate_basics/app") else { return };
+    let Some(result) = common::run_fixture("nsdate_basics/app") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0, "nsdate_basics should exit 0");
 }
 
 #[test]
 fn runtime_nsdate_class_registered() {
-    let Some(_result) = common::run_fixture("nsdate_basics/app") else { return };
+    let Some(_result) = common::run_fixture("nsdate_basics/app") else {
+        return;
+    };
 
     let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
@@ -61,13 +69,17 @@ fn runtime_nsdate_class_registered() {
 
 #[test]
 fn runtime_nsuserdefaults_basics_exit_zero() {
-    let Some(result) = common::run_fixture("nsuserdefaults_basics/app") else { return };
+    let Some(result) = common::run_fixture("nsuserdefaults_basics/app") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0, "nsuserdefaults_basics should exit 0");
 }
 
 #[test]
 fn runtime_nsuserdefaults_class_registered() {
-    let Some(_result) = common::run_fixture("nsuserdefaults_basics/app") else { return };
+    let Some(_result) = common::run_fixture("nsuserdefaults_basics/app") else {
+        return;
+    };
 
     let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
@@ -86,13 +98,17 @@ fn runtime_nsuserdefaults_class_registered() {
 
 #[test]
 fn runtime_nsset_basics_exit_zero() {
-    let Some(result) = common::run_fixture("nsset_basics/app") else { return };
+    let Some(result) = common::run_fixture("nsset_basics/app") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0, "nsset_basics should exit 0");
 }
 
 #[test]
 fn runtime_nsset_class_registered() {
-    let Some(_result) = common::run_fixture("nsset_basics/app") else { return };
+    let Some(_result) = common::run_fixture("nsset_basics/app") else {
+        return;
+    };
 
     let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
@@ -114,13 +130,17 @@ fn runtime_nsset_class_registered() {
 
 #[test]
 fn runtime_nsurl_basics_exit_zero() {
-    let Some(result) = common::run_fixture("nsurl_basics/app") else { return };
+    let Some(result) = common::run_fixture("nsurl_basics/app") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0, "nsurl_basics should exit 0");
 }
 
 #[test]
 fn runtime_nsurl_class_registered() {
-    let Some(_result) = common::run_fixture("nsurl_basics/app") else { return };
+    let Some(_result) = common::run_fixture("nsurl_basics/app") else {
+        return;
+    };
 
     let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
@@ -135,13 +155,17 @@ fn runtime_nsurl_class_registered() {
 
 #[test]
 fn runtime_nsnull_basics_exit_zero() {
-    let Some(result) = common::run_fixture("nsnull_basics/app") else { return };
+    let Some(result) = common::run_fixture("nsnull_basics/app") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0, "nsnull_basics should exit 0");
 }
 
 #[test]
 fn runtime_nsnull_class_registered() {
-    let Some(_result) = common::run_fixture("nsnull_basics/app") else { return };
+    let Some(_result) = common::run_fixture("nsnull_basics/app") else {
+        return;
+    };
 
     let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
@@ -154,7 +178,9 @@ fn runtime_nsnull_class_registered() {
 
 #[test]
 fn runtime_nsdateformatter_class_registered() {
-    let Some(_result) = common::run_fixture("return42/app") else { return };
+    let Some(_result) = common::run_fixture("return42/app") else {
+        return;
+    };
 
     let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
@@ -167,7 +193,9 @@ fn runtime_nsdateformatter_class_registered() {
 
 #[test]
 fn runtime_nsdateformatter_basics_exit_zero() {
-    let Some(result) = common::run_fixture("nsdateformatter_basics/app") else { return };
+    let Some(result) = common::run_fixture("nsdateformatter_basics/app") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0, "nsdateformatter_basics should exit 0");
 }
 
@@ -175,7 +203,9 @@ fn runtime_nsdateformatter_basics_exit_zero() {
 
 #[test]
 fn runtime_nscharacterset_class_registered() {
-    let Some(_result) = common::run_fixture("return42/app") else { return };
+    let Some(_result) = common::run_fixture("return42/app") else {
+        return;
+    };
 
     let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
@@ -190,7 +220,9 @@ fn runtime_nscharacterset_class_registered() {
 
 #[test]
 fn runtime_nscharacterset_basics_exit_zero() {
-    let Some(result) = common::run_fixture("nscharacterset_basics/app") else { return };
+    let Some(result) = common::run_fixture("nscharacterset_basics/app") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0, "nscharacterset_basics should exit 0");
 }
 
@@ -198,7 +230,9 @@ fn runtime_nscharacterset_basics_exit_zero() {
 
 #[test]
 fn runtime_nsnotificationcenter_class_registered() {
-    let Some(_result) = common::run_fixture("return42/app") else { return };
+    let Some(_result) = common::run_fixture("return42/app") else {
+        return;
+    };
 
     let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
@@ -213,6 +247,8 @@ fn runtime_nsnotificationcenter_class_registered() {
 
 #[test]
 fn runtime_nsnotification_basics_exit_zero() {
-    let Some(result) = common::run_fixture("nsnotification_basics/app") else { return };
+    let Some(result) = common::run_fixture("nsnotification_basics/app") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0, "nsnotification_basics should exit 0");
 }

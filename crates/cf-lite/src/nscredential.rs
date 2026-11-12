@@ -33,10 +33,16 @@ const CRED_PERSIST_OFF: usize = 24;
 
 /// `+[NSURLCredential credentialWithUser:password:persistence:]`
 pub extern "C" fn shim_nsurlcredential_with_user(
-    _cls: u64, _cmd: u64, user: u64, password: u64, persistence: u64,
+    _cls: u64,
+    _cmd: u64,
+    user: u64,
+    password: u64,
+    persistence: u64,
 ) -> u64 {
     let obj = crate::pal_alloc().calloc(1, 32) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *(obj as *mut u64) = nsobj::nsurlcredential_class_addr();
         *((obj as usize + CRED_USER_OFF) as *mut u64) = user;
@@ -48,34 +54,44 @@ pub extern "C" fn shim_nsurlcredential_with_user(
 
 /// `-[NSURLCredential user]`
 pub extern "C" fn shim_nsurlcredential_user(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + CRED_USER_OFF) as *const u64) }
 }
 
 /// `-[NSURLCredential password]`
 pub extern "C" fn shim_nsurlcredential_password(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + CRED_PASS_OFF) as *const u64) }
 }
 
 /// `-[NSURLCredential persistence]`
 pub extern "C" fn shim_nsurlcredential_persistence(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + CRED_PERSIST_OFF) as *const u64) }
 }
 
 /// `-[NSURLCredential hasPassword]`
 pub extern "C" fn shim_nsurlcredential_has_password(obj: u64, _cmd: u64) -> u8 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let pass = unsafe { *((obj as usize + CRED_PASS_OFF) as *const u64) };
     u8::from(pass != 0)
 }
 
 pub extern "C" fn shim_nsurlcredential_description(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return make_nsstring("<NSURLCredential: nil>"); }
-    let user = cfstring::extract_cfstring_cstr(
-        unsafe { *((obj as usize + CRED_USER_OFF) as *const u64) }
-    ).unwrap_or("(nil)");
+    if obj == 0 {
+        return make_nsstring("<NSURLCredential: nil>");
+    }
+    let user =
+        cfstring::extract_cfstring_cstr(unsafe { *((obj as usize + CRED_USER_OFF) as *const u64) })
+            .unwrap_or("(nil)");
     make_nsstring(&format!("<NSURLCredential: user={user}>"))
 }
 
@@ -89,7 +105,9 @@ fn credential_storage_singleton() -> u64 {
     *SHARED_CREDENTIAL_STORAGE.get_or_init(|| {
         let obj = crate::pal_alloc().calloc(1, 8) as u64;
         if obj != 0 {
-            unsafe { *(obj as *mut u64) = nsobj::nsurlcredentialstorage_class_addr(); }
+            unsafe {
+                *(obj as *mut u64) = nsobj::nsurlcredentialstorage_class_addr();
+            }
         }
         obj
     })
@@ -110,21 +128,29 @@ pub extern "C" fn shim_nsurlcredentialstorage_all_credentials(_obj: u64, _cmd: u
 
 /// `-[NSURLCredentialStorage defaultCredentialForProtectionSpace:]` → nil
 pub extern "C" fn shim_nsurlcredentialstorage_default_credential(
-    _obj: u64, _cmd: u64, _space: u64,
+    _obj: u64,
+    _cmd: u64,
+    _space: u64,
 ) -> u64 {
     0
 }
 
 /// `-[NSURLCredentialStorage setDefaultCredential:forProtectionSpace:]`
 pub extern "C" fn shim_nsurlcredentialstorage_set_default_credential(
-    _obj: u64, _cmd: u64, _cred: u64, _space: u64,
+    _obj: u64,
+    _cmd: u64,
+    _cred: u64,
+    _space: u64,
 ) {
     log::debug!("NSURLCredentialStorage setDefaultCredential:forProtectionSpace: (stub)");
 }
 
 /// `-[NSURLCredentialStorage removeCredential:forProtectionSpace:]`
 pub extern "C" fn shim_nsurlcredentialstorage_remove_credential(
-    _obj: u64, _cmd: u64, _cred: u64, _space: u64,
+    _obj: u64,
+    _cmd: u64,
+    _cred: u64,
+    _space: u64,
 ) {
     log::debug!("NSURLCredentialStorage removeCredential:forProtectionSpace: (stub)");
 }
@@ -142,7 +168,9 @@ const COOKIE_PROPS_OFF: usize = 8;
 /// `+[NSHTTPCookie cookieWithProperties:]`
 pub extern "C" fn shim_nshttpcookie_with_properties(_cls: u64, _cmd: u64, props: u64) -> u64 {
     let obj = crate::pal_alloc().calloc(1, 24) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *(obj as *mut u64) = nsobj::nshttpcookie_class_addr();
         *((obj as usize + COOKIE_PROPS_OFF) as *mut u64) = props;
@@ -152,77 +180,123 @@ pub extern "C" fn shim_nshttpcookie_with_properties(_cls: u64, _cmd: u64, props:
 
 /// `-[NSHTTPCookie properties]`
 pub extern "C" fn shim_nshttpcookie_properties(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + COOKIE_PROPS_OFF) as *const u64) }
 }
 
 /// `-[NSHTTPCookie name]`
 pub extern "C" fn shim_nshttpcookie_name(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return make_nsstring(""); }
+    if obj == 0 {
+        return make_nsstring("");
+    }
     let props = unsafe { *((obj as usize + COOKIE_PROPS_OFF) as *const u64) };
-    if props == 0 { return make_nsstring(""); }
+    if props == 0 {
+        return make_nsstring("");
+    }
     let key = make_nsstring("Name");
     crate::nsdictionary::shim_nsdictionary_object_for_key(props, 0, key)
 }
 
 /// `-[NSHTTPCookie value]`
 pub extern "C" fn shim_nshttpcookie_value(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return make_nsstring(""); }
+    if obj == 0 {
+        return make_nsstring("");
+    }
     let props = unsafe { *((obj as usize + COOKIE_PROPS_OFF) as *const u64) };
-    if props == 0 { return make_nsstring(""); }
+    if props == 0 {
+        return make_nsstring("");
+    }
     let key = make_nsstring("Value");
     crate::nsdictionary::shim_nsdictionary_object_for_key(props, 0, key)
 }
 
 /// `-[NSHTTPCookie domain]`
 pub extern "C" fn shim_nshttpcookie_domain(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return make_nsstring(""); }
+    if obj == 0 {
+        return make_nsstring("");
+    }
     let props = unsafe { *((obj as usize + COOKIE_PROPS_OFF) as *const u64) };
-    if props == 0 { return make_nsstring(""); }
+    if props == 0 {
+        return make_nsstring("");
+    }
     let key = make_nsstring("Domain");
     crate::nsdictionary::shim_nsdictionary_object_for_key(props, 0, key)
 }
 
 /// `-[NSHTTPCookie path]`
 pub extern "C" fn shim_nshttpcookie_path(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return make_nsstring("/"); }
+    if obj == 0 {
+        return make_nsstring("/");
+    }
     let props = unsafe { *((obj as usize + COOKIE_PROPS_OFF) as *const u64) };
-    if props == 0 { return make_nsstring("/"); }
+    if props == 0 {
+        return make_nsstring("/");
+    }
     let key = make_nsstring("Path");
     let v = crate::nsdictionary::shim_nsdictionary_object_for_key(props, 0, key);
-    if v == 0 { make_nsstring("/") } else { v }
+    if v == 0 {
+        make_nsstring("/")
+    } else {
+        v
+    }
 }
 
 /// `-[NSHTTPCookie isSecure]` — reads "Secure" key from property dict.
 pub extern "C" fn shim_nshttpcookie_is_secure(obj: u64, _cmd: u64) -> u8 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let props = unsafe { *((obj as usize + COOKIE_PROPS_OFF) as *const u64) };
-    if props == 0 { return 0; }
+    if props == 0 {
+        return 0;
+    }
     let key = make_nsstring("Secure");
     let val = crate::nsdictionary::shim_nsdictionary_object_for_key(props, 0, key);
-    if val == 0 { return 0; }
+    if val == 0 {
+        return 0;
+    }
     // Any non-nil value for the key means the cookie is secure
     let s = cfstring::extract_cfstring_cstr(val).unwrap_or("");
-    u8::from(!s.eq_ignore_ascii_case("false") && !s.eq_ignore_ascii_case("no") && !s.eq_ignore_ascii_case("0"))
+    u8::from(
+        !s.eq_ignore_ascii_case("false")
+            && !s.eq_ignore_ascii_case("no")
+            && !s.eq_ignore_ascii_case("0"),
+    )
 }
 
 /// `-[NSHTTPCookie isHTTPOnly]` — reads "HttpOnly" key from property dict.
 pub extern "C" fn shim_nshttpcookie_is_http_only(obj: u64, _cmd: u64) -> u8 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let props = unsafe { *((obj as usize + COOKIE_PROPS_OFF) as *const u64) };
-    if props == 0 { return 0; }
+    if props == 0 {
+        return 0;
+    }
     let key = make_nsstring("HttpOnly");
     let val = crate::nsdictionary::shim_nsdictionary_object_for_key(props, 0, key);
-    if val == 0 { return 0; }
+    if val == 0 {
+        return 0;
+    }
     let s = cfstring::extract_cfstring_cstr(val).unwrap_or("");
-    u8::from(!s.eq_ignore_ascii_case("false") && !s.eq_ignore_ascii_case("no") && !s.eq_ignore_ascii_case("0"))
+    u8::from(
+        !s.eq_ignore_ascii_case("false")
+            && !s.eq_ignore_ascii_case("no")
+            && !s.eq_ignore_ascii_case("0"),
+    )
 }
 
 /// `-[NSHTTPCookie expiresDate]` → nil
-pub extern "C" fn shim_nshttpcookie_expires_date(_obj: u64, _cmd: u64) -> u64 { 0 }
+pub extern "C" fn shim_nshttpcookie_expires_date(_obj: u64, _cmd: u64) -> u64 {
+    0
+}
 
 pub extern "C" fn shim_nshttpcookie_description(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return make_nsstring("<NSHTTPCookie: nil>"); }
+    if obj == 0 {
+        return make_nsstring("<NSHTTPCookie: nil>");
+    }
     let name = cfstring::extract_cfstring_cstr(shim_nshttpcookie_name(obj, 0)).unwrap_or("?");
     make_nsstring(&format!("<NSHTTPCookie: {name}>"))
 }
@@ -237,7 +311,9 @@ fn cookie_storage_singleton() -> u64 {
     *SHARED_COOKIE_STORAGE.get_or_init(|| {
         let obj = crate::pal_alloc().calloc(1, 8) as u64;
         if obj != 0 {
-            unsafe { *(obj as *mut u64) = nsobj::nshttpcookiestorage_class_addr(); }
+            unsafe {
+                *(obj as *mut u64) = nsobj::nshttpcookiestorage_class_addr();
+            }
         }
         obj
     })
@@ -251,16 +327,20 @@ pub extern "C" fn shim_nshttpcookiestorage_shared(_cls: u64, _cmd: u64) -> u64 {
 /// `-[NSHTTPCookieStorage cookies]` → empty NSArray
 pub extern "C" fn shim_nshttpcookiestorage_cookies(_obj: u64, _cmd: u64) -> u64 {
     crate::nsarray::shim_nsarray_array_with_objects_count(
-        crate::nsobj::nsarray_class_addr(), 0, 0, 0,
+        crate::nsobj::nsarray_class_addr(),
+        0,
+        0,
+        0,
     )
 }
 
 /// `-[NSHTTPCookieStorage cookiesForURL:]` → empty NSArray
-pub extern "C" fn shim_nshttpcookiestorage_cookies_for_url(
-    _obj: u64, _cmd: u64, _url: u64,
-) -> u64 {
+pub extern "C" fn shim_nshttpcookiestorage_cookies_for_url(_obj: u64, _cmd: u64, _url: u64) -> u64 {
     crate::nsarray::shim_nsarray_array_with_objects_count(
-        crate::nsobj::nsarray_class_addr(), 0, 0, 0,
+        crate::nsobj::nsarray_class_addr(),
+        0,
+        0,
+        0,
     )
 }
 
@@ -275,7 +355,9 @@ pub extern "C" fn shim_nshttpcookiestorage_delete_cookie(_obj: u64, _cmd: u64, _
 }
 
 /// `-[NSHTTPCookieStorage cookieAcceptPolicy]` → 0 (NSHTTPCookieAcceptPolicyAlways)
-pub extern "C" fn shim_nshttpcookiestorage_accept_policy(_obj: u64, _cmd: u64) -> u64 { 0 }
+pub extern "C" fn shim_nshttpcookiestorage_accept_policy(_obj: u64, _cmd: u64) -> u64 {
+    0
+}
 
 /// `-[NSHTTPCookieStorage setCookieAcceptPolicy:]`
 pub extern "C" fn shim_nshttpcookiestorage_set_accept_policy(_obj: u64, _cmd: u64, _policy: u64) {}
@@ -457,7 +539,8 @@ mod tests {
 
     fn make_cookie_with_props(name: &str, value: &str, domain: &str, path: &str) -> u64 {
         let dict = crate::nsmutabledict::shim_nsmutabledict_dictionary(
-            crate::nsobj::nsmutabledictionary_class_addr(), 0,
+            crate::nsobj::nsmutabledictionary_class_addr(),
+            0,
         );
         let k_name = make_string("Name");
         let v_name = make_string(name);
@@ -544,7 +627,8 @@ mod tests {
     #[test]
     fn httpcookie_is_secure() {
         let dict = crate::nsmutabledict::shim_nsmutabledict_dictionary(
-            crate::nsobj::nsmutabledictionary_class_addr(), 0,
+            crate::nsobj::nsmutabledictionary_class_addr(),
+            0,
         );
         let k = make_string("Secure");
         let v = make_string("TRUE");
@@ -572,7 +656,8 @@ mod tests {
     #[test]
     fn httpcookie_is_http_only() {
         let dict = crate::nsmutabledict::shim_nsmutabledict_dictionary(
-            crate::nsobj::nsmutabledictionary_class_addr(), 0,
+            crate::nsobj::nsmutabledictionary_class_addr(),
+            0,
         );
         let k = make_string("HttpOnly");
         let v = make_string("YES");

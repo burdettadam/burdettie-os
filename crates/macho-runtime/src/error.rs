@@ -43,7 +43,10 @@ mod tests {
         };
         let msg = err.to_string();
         assert!(msg.contains("/tmp/test.bin"), "should contain path: {msg}");
-        assert!(msg.contains("file not found"), "should contain cause: {msg}");
+        assert!(
+            msg.contains("file not found"),
+            "should contain cause: {msg}"
+        );
     }
 
     #[test]
@@ -54,7 +57,10 @@ mod tests {
         let msg = err.to_string();
         assert!(msg.contains("unsigned"), "{msg}");
         assert!(msg.contains("no entitlements"), "{msg}");
-        assert!(msg.contains("; "), "reasons should be joined with '; ': {msg}");
+        assert!(
+            msg.contains("; "),
+            "reasons should be joined with '; ': {msg}"
+        );
     }
 
     #[test]

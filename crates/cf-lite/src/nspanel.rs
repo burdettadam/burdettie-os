@@ -119,4 +119,3 @@ mod tests {
         free_obj(panel);
     }
 }
-

@@ -3,13 +3,13 @@
 
 mod common;
 
-use macho_exec::{apply_chained_fixups, call_entry, call_entry_interpreted, checked_entry, MappedImage};
+use macho_exec::{
+    apply_chained_fixups, call_entry, call_entry_interpreted, checked_entry, MappedImage,
+};
 use macho_map::MappingPlan;
 use macho_parse::parse;
 
-use common::{
-    default_mapper, default_stub_resolver, default_unwind, fixtures_dir, read_fixture,
-};
+use common::{default_mapper, default_stub_resolver, default_unwind, fixtures_dir, read_fixture};
 
 // ── Security-gated execution tests ─────────────────────────────────
 

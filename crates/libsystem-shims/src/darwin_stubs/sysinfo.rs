@@ -13,32 +13,129 @@ pub struct SysInfoStubs;
 impl SysInfoStubs {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
-        register_shims!(table,
-            ("_getpwnam", shim_getpwnam as *const () as u64, "getpwnam user lookup by name"),
-            ("_getpwuid", shim_getpwuid as *const () as u64, "getpwuid user lookup by uid"),
-            ("_getpwnam_r", shim_getpwnam_r as *const () as u64, "getpwnam_r reentrant user lookup by name"),
-            ("_getpwuid_r", shim_getpwuid_r as *const () as u64, "getpwuid_r reentrant user lookup by uid"),
-            ("_getpwent", shim_getpwent as *const () as u64, "getpwent enumerate passwd entries"),
-            ("_setpwent", shim_setpwent as *const () as u64, "setpwent rewind passwd enumeration"),
-            ("_endpwent", shim_endpwent as *const () as u64, "endpwent close passwd enumeration"),
-            ("_getgrnam", shim_getgrnam as *const () as u64, "getgrnam group lookup by name"),
-            ("_getgrgid", shim_getgrgid as *const () as u64, "getgrgid group lookup by gid"),
-            ("_getgrnam_r", shim_getgrnam_r as *const () as u64, "getgrnam_r reentrant group lookup by name"),
-            ("_getgrgid_r", shim_getgrgid_r as *const () as u64, "getgrgid_r reentrant group lookup by gid"),
-            ("_getgrent", shim_getgrent as *const () as u64, "getgrent enumerate group entries"),
-            ("_setgrent", shim_setgrent as *const () as u64, "setgrent rewind group enumeration"),
-            ("_endgrent", shim_endgrent as *const () as u64, "endgrent close group enumeration"),
-            ("_gethostname", shim_gethostname as *const () as u64, "gethostname get system hostname"),
-            ("_sethostname", shim_sethostname as *const () as u64, "sethostname stub (returns EPERM)"),
-            ("_getgroups", shim_getgroups as *const () as u64, "getgroups get supplementary group IDs"),
-            ("_getgrouplist", shim_getgrouplist as *const () as u64, "getgrouplist get groups for user"),
-            ("_getgrouplist_2", shim_getgrouplist_2 as *const () as u64, "getgrouplist_2 macOS extended group list"),
-            ("_getaudit_addr", shim_getaudit_addr as *const () as u64, "getaudit_addr stub (returns ENOSYS)"),
+        register_shims!(
+            table,
+            (
+                "_getpwnam",
+                shim_getpwnam as *const () as u64,
+                "getpwnam user lookup by name"
+            ),
+            (
+                "_getpwuid",
+                shim_getpwuid as *const () as u64,
+                "getpwuid user lookup by uid"
+            ),
+            (
+                "_getpwnam_r",
+                shim_getpwnam_r as *const () as u64,
+                "getpwnam_r reentrant user lookup by name"
+            ),
+            (
+                "_getpwuid_r",
+                shim_getpwuid_r as *const () as u64,
+                "getpwuid_r reentrant user lookup by uid"
+            ),
+            (
+                "_getpwent",
+                shim_getpwent as *const () as u64,
+                "getpwent enumerate passwd entries"
+            ),
+            (
+                "_setpwent",
+                shim_setpwent as *const () as u64,
+                "setpwent rewind passwd enumeration"
+            ),
+            (
+                "_endpwent",
+                shim_endpwent as *const () as u64,
+                "endpwent close passwd enumeration"
+            ),
+            (
+                "_getgrnam",
+                shim_getgrnam as *const () as u64,
+                "getgrnam group lookup by name"
+            ),
+            (
+                "_getgrgid",
+                shim_getgrgid as *const () as u64,
+                "getgrgid group lookup by gid"
+            ),
+            (
+                "_getgrnam_r",
+                shim_getgrnam_r as *const () as u64,
+                "getgrnam_r reentrant group lookup by name"
+            ),
+            (
+                "_getgrgid_r",
+                shim_getgrgid_r as *const () as u64,
+                "getgrgid_r reentrant group lookup by gid"
+            ),
+            (
+                "_getgrent",
+                shim_getgrent as *const () as u64,
+                "getgrent enumerate group entries"
+            ),
+            (
+                "_setgrent",
+                shim_setgrent as *const () as u64,
+                "setgrent rewind group enumeration"
+            ),
+            (
+                "_endgrent",
+                shim_endgrent as *const () as u64,
+                "endgrent close group enumeration"
+            ),
+            (
+                "_gethostname",
+                shim_gethostname as *const () as u64,
+                "gethostname get system hostname"
+            ),
+            (
+                "_sethostname",
+                shim_sethostname as *const () as u64,
+                "sethostname stub (returns EPERM)"
+            ),
+            (
+                "_getgroups",
+                shim_getgroups as *const () as u64,
+                "getgroups get supplementary group IDs"
+            ),
+            (
+                "_getgrouplist",
+                shim_getgrouplist as *const () as u64,
+                "getgrouplist get groups for user"
+            ),
+            (
+                "_getgrouplist_2",
+                shim_getgrouplist_2 as *const () as u64,
+                "getgrouplist_2 macOS extended group list"
+            ),
+            (
+                "_getaudit_addr",
+                shim_getaudit_addr as *const () as u64,
+                "getaudit_addr stub (returns ENOSYS)"
+            ),
             // membership.h UUID functions (opendirectoryd replacement)
-            ("_mbr_uid_to_uuid", shim_mbr_uid_to_uuid as *const () as u64, "mbr_uid_to_uuid → synthetic UUID"),
-            ("_mbr_gid_to_uuid", shim_mbr_gid_to_uuid as *const () as u64, "mbr_gid_to_uuid → synthetic UUID"),
-            ("_mbr_uuid_to_id", shim_mbr_uuid_to_id as *const () as u64, "mbr_uuid_to_id → extract uid/gid"),
-            ("_mbr_check_membership", shim_mbr_check_membership as *const () as u64, "mbr_check_membership → stub"),
+            (
+                "_mbr_uid_to_uuid",
+                shim_mbr_uid_to_uuid as *const () as u64,
+                "mbr_uid_to_uuid → synthetic UUID"
+            ),
+            (
+                "_mbr_gid_to_uuid",
+                shim_mbr_gid_to_uuid as *const () as u64,
+                "mbr_gid_to_uuid → synthetic UUID"
+            ),
+            (
+                "_mbr_uuid_to_id",
+                shim_mbr_uuid_to_id as *const () as u64,
+                "mbr_uuid_to_id → extract uid/gid"
+            ),
+            (
+                "_mbr_check_membership",
+                shim_mbr_check_membership as *const () as u64,
+                "mbr_check_membership → stub"
+            ),
         );
         log::debug!("SysInfoStubs: registered 24 stubs");
     }
@@ -174,9 +271,13 @@ pub extern "C" fn shim_gethostname(name: u64, len: usize) -> i32 {
 
 pub extern "C" fn shim_sethostname(_name: u64, _len: usize) -> i32 {
     #[cfg(target_os = "macos")]
-    unsafe { *libc::__error() = libc::EPERM };
+    unsafe {
+        *libc::__error() = libc::EPERM
+    };
     #[cfg(not(target_os = "macos"))]
-    unsafe { *libc::__errno_location() = libc::EPERM };
+    unsafe {
+        *libc::__errno_location() = libc::EPERM
+    };
     -1
 }
 
@@ -204,24 +305,42 @@ pub extern "C" fn shim_getgrouplist_2(name: u64, basegid: u32, groups_out: u64) 
         let mut ngroups: libc::c_int = 64;
         let mut buf: Vec<libc::c_int> = vec![0; ngroups as usize];
         let rc = unsafe {
-            libc::getgrouplist(name as *const c_char, basegid as libc::c_int, buf.as_mut_ptr(), &mut ngroups)
+            libc::getgrouplist(
+                name as *const c_char,
+                basegid as libc::c_int,
+                buf.as_mut_ptr(),
+                &mut ngroups,
+            )
         };
         if rc < 0 {
             buf.resize(ngroups as usize, 0);
             let rc2 = unsafe {
-                libc::getgrouplist(name as *const c_char, basegid as libc::c_int, buf.as_mut_ptr(), &mut ngroups)
+                libc::getgrouplist(
+                    name as *const c_char,
+                    basegid as libc::c_int,
+                    buf.as_mut_ptr(),
+                    &mut ngroups,
+                )
             };
-            if rc2 < 0 { return -1; }
+            if rc2 < 0 {
+                return -1;
+            }
         }
         let alloc_size = (ngroups as usize) * std::mem::size_of::<u32>();
         let ptr = unsafe { libc::malloc(alloc_size) };
-        if ptr.is_null() { return -1; }
+        if ptr.is_null() {
+            return -1;
+        }
         // Copy as u32 (gid_t) for the macOS ABI caller
         let out = ptr as *mut u32;
         for i in 0..ngroups as usize {
-            unsafe { *out.add(i) = buf[i] as u32; }
+            unsafe {
+                *out.add(i) = buf[i] as u32;
+            }
         }
-        unsafe { *(groups_out as *mut u64) = ptr as u64; }
+        unsafe {
+            *(groups_out as *mut u64) = ptr as u64;
+        }
         ngroups
     }
     #[cfg(not(target_os = "macos"))]
@@ -229,18 +348,32 @@ pub extern "C" fn shim_getgrouplist_2(name: u64, basegid: u32, groups_out: u64) 
         let mut ngroups: libc::c_int = 64;
         let mut buf: Vec<libc::gid_t> = vec![0; ngroups as usize];
         let rc = unsafe {
-            libc::getgrouplist(name as *const c_char, basegid as libc::gid_t, buf.as_mut_ptr(), &mut ngroups)
+            libc::getgrouplist(
+                name as *const c_char,
+                basegid as libc::gid_t,
+                buf.as_mut_ptr(),
+                &mut ngroups,
+            )
         };
         if rc < 0 {
             buf.resize(ngroups as usize, 0);
             let rc2 = unsafe {
-                libc::getgrouplist(name as *const c_char, basegid as libc::gid_t, buf.as_mut_ptr(), &mut ngroups)
+                libc::getgrouplist(
+                    name as *const c_char,
+                    basegid as libc::gid_t,
+                    buf.as_mut_ptr(),
+                    &mut ngroups,
+                )
             };
-            if rc2 < 0 { return -1; }
+            if rc2 < 0 {
+                return -1;
+            }
         }
         let alloc_size = (ngroups as usize) * std::mem::size_of::<libc::gid_t>();
         let ptr = unsafe { libc::malloc(alloc_size) };
-        if ptr.is_null() { return -1; }
+        if ptr.is_null() {
+            return -1;
+        }
         unsafe {
             std::ptr::copy_nonoverlapping(buf.as_ptr() as *const u8, ptr as *mut u8, alloc_size);
             *(groups_out as *mut u64) = ptr as u64;
@@ -259,9 +392,13 @@ pub extern "C" fn shim_getgrouplist_2(name: u64, basegid: u32, groups_out: u64) 
 pub extern "C" fn shim_getaudit_addr(_info: u64, _length: i32) -> i32 {
     unsafe {
         #[cfg(target_os = "macos")]
-        { *libc::__error() = libc::ENOSYS; }
+        {
+            *libc::__error() = libc::ENOSYS;
+        }
         #[cfg(not(target_os = "macos"))]
-        { *libc::__errno_location() = libc::ENOSYS; }
+        {
+            *libc::__errno_location() = libc::ENOSYS;
+        }
     }
     -1
 }
@@ -271,12 +408,7 @@ pub extern "C" fn shim_getaudit_addr(_info: u64, _length: i32) -> i32 {
 // ---------------------------------------------------------------------------
 
 /// `int getgrouplist(const char *user, gid_t group, gid_t *groups, int *ngroups)`
-pub extern "C" fn shim_getgrouplist(
-    user: u64,
-    group: u32,
-    groups: u64,
-    ngroups: u64,
-) -> i32 {
+pub extern "C" fn shim_getgrouplist(user: u64, group: u32, groups: u64, ngroups: u64) -> i32 {
     if user == 0 || ngroups == 0 {
         return -1;
     }
@@ -379,15 +511,13 @@ pub extern "C" fn shim_mbr_uuid_to_id(uu: u64, id_out: u64, id_type_out: u64) ->
 /// `int mbr_check_membership(const uuid_t user, const uuid_t group, int *ismember)`
 ///
 /// Stub: always returns "is member" (ismember=1).
-pub extern "C" fn shim_mbr_check_membership(
-    _user: u64,
-    _group: u64,
-    ismember: u64,
-) -> i32 {
+pub extern "C" fn shim_mbr_check_membership(_user: u64, _group: u64, ismember: u64) -> i32 {
     if ismember == 0 {
         return -1;
     }
-    unsafe { *(ismember as *mut i32) = 1; }
+    unsafe {
+        *(ismember as *mut i32) = 1;
+    }
     0
 }
 
@@ -423,10 +553,11 @@ mod tests {
         let mut buf = [0u8; 256];
         let rc = shim_gethostname(buf.as_mut_ptr() as u64, buf.len());
         assert_eq!(rc, 0, "gethostname should succeed");
-        let hostname = unsafe {
-            std::ffi::CStr::from_ptr(buf.as_ptr() as *const c_char)
-        };
-        assert!(!hostname.to_bytes().is_empty(), "hostname should be non-empty");
+        let hostname = unsafe { std::ffi::CStr::from_ptr(buf.as_ptr() as *const c_char) };
+        assert!(
+            !hostname.to_bytes().is_empty(),
+            "hostname should be non-empty"
+        );
     }
 
     #[test]
@@ -447,7 +578,10 @@ mod tests {
             &mut result as *mut *mut libc::passwd as u64,
         );
         assert_eq!(rc, 0, "getpwuid_r for uid 0 should return 0");
-        assert!(!result.is_null(), "result pointer should be non-null for root");
+        assert!(
+            !result.is_null(),
+            "result pointer should be non-null for root"
+        );
     }
 
     #[test]
@@ -516,6 +650,9 @@ mod tests {
             &mut ngroups as *mut i32 as u64,
         );
         // rc >= 0 means success (returns number of groups or 0)
-        assert!(rc >= 0 || ngroups > 0, "getgrouplist for root should succeed or indicate needed size");
+        assert!(
+            rc >= 0 || ngroups > 0,
+            "getgrouplist for root should succeed or indicate needed size"
+        );
     }
 }

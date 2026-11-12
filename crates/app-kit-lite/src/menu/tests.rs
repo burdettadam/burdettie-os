@@ -107,10 +107,7 @@ fn menu_item_submenu() {
     file_menu.add_item(recent);
 
     assert!(file_menu.items()[0].has_submenu());
-    assert_eq!(
-        file_menu.items()[0].submenu().unwrap().item_count(),
-        2
-    );
+    assert_eq!(file_menu.items()[0].submenu().unwrap().item_count(), 2);
 }
 
 #[test]

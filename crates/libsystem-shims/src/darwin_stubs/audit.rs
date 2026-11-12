@@ -16,18 +16,63 @@ pub struct AuditStubs;
 impl AuditStubs {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
-        register_shims!(table,
-            ("_audit_token_to_pid", shim_audit_token_to_pid as *const () as u64, "audit_token_to_pid → field[5] or getpid()"),
-            ("_audit_token_to_euid", shim_audit_token_to_euid as *const () as u64, "audit_token_to_euid → field[1] or geteuid()"),
-            ("_audit_token_to_egid", shim_audit_token_to_egid as *const () as u64, "audit_token_to_egid → field[2] or getegid()"),
-            ("_audit_token_to_ruid", shim_audit_token_to_ruid as *const () as u64, "audit_token_to_ruid → field[3] or getuid()"),
-            ("_audit_token_to_rgid", shim_audit_token_to_rgid as *const () as u64, "audit_token_to_rgid → field[4] or getgid()"),
-            ("_audit_token_to_auid", shim_audit_token_to_auid as *const () as u64, "audit_token_to_auid → field[0] or getuid()"),
-            ("_audit_token_to_asid", shim_audit_token_to_asid as *const () as u64, "audit_token_to_asid → field[6] or getpid()"),
-            ("_audit_token_to_au32", shim_audit_token_to_au32 as *const () as u64, "audit_token_to_au32 → unpack all 8 fields"),
-            ("_audit_token_to_pidversion", shim_audit_token_to_pidversion as *const () as u64, "audit_token_to_pidversion → field[7] or 0"),
-            ("_audit_session_self", shim_audit_session_self as *const () as u64, "audit_session_self → 0"),
-            ("_audit_session_join", shim_audit_session_join as *const () as u64, "audit_session_join → 0")
+        register_shims!(
+            table,
+            (
+                "_audit_token_to_pid",
+                shim_audit_token_to_pid as *const () as u64,
+                "audit_token_to_pid → field[5] or getpid()"
+            ),
+            (
+                "_audit_token_to_euid",
+                shim_audit_token_to_euid as *const () as u64,
+                "audit_token_to_euid → field[1] or geteuid()"
+            ),
+            (
+                "_audit_token_to_egid",
+                shim_audit_token_to_egid as *const () as u64,
+                "audit_token_to_egid → field[2] or getegid()"
+            ),
+            (
+                "_audit_token_to_ruid",
+                shim_audit_token_to_ruid as *const () as u64,
+                "audit_token_to_ruid → field[3] or getuid()"
+            ),
+            (
+                "_audit_token_to_rgid",
+                shim_audit_token_to_rgid as *const () as u64,
+                "audit_token_to_rgid → field[4] or getgid()"
+            ),
+            (
+                "_audit_token_to_auid",
+                shim_audit_token_to_auid as *const () as u64,
+                "audit_token_to_auid → field[0] or getuid()"
+            ),
+            (
+                "_audit_token_to_asid",
+                shim_audit_token_to_asid as *const () as u64,
+                "audit_token_to_asid → field[6] or getpid()"
+            ),
+            (
+                "_audit_token_to_au32",
+                shim_audit_token_to_au32 as *const () as u64,
+                "audit_token_to_au32 → unpack all 8 fields"
+            ),
+            (
+                "_audit_token_to_pidversion",
+                shim_audit_token_to_pidversion as *const () as u64,
+                "audit_token_to_pidversion → field[7] or 0"
+            ),
+            (
+                "_audit_session_self",
+                shim_audit_session_self as *const () as u64,
+                "audit_session_self → 0"
+            ),
+            (
+                "_audit_session_join",
+                shim_audit_session_join as *const () as u64,
+                "audit_session_join → 0"
+            )
         );
         log::debug!("AuditStubs: registered 11 stubs");
     }
@@ -121,14 +166,14 @@ pub extern "C" fn shim_audit_token_to_au32(
     let vals: [u32; 8] = if token == 0 {
         unsafe {
             [
-                libc::getuid(),                // auid
-                libc::geteuid(),               // euid
-                libc::getegid(),               // egid
-                libc::getuid(),                // ruid
-                libc::getgid(),                // rgid
-                libc::getpid() as u32,         // pid
-                libc::getpid() as u32,         // asid (approximation)
-                0,                             // pidversion
+                libc::getuid(),        // auid
+                libc::geteuid(),       // euid
+                libc::getegid(),       // egid
+                libc::getuid(),        // ruid
+                libc::getgid(),        // rgid
+                libc::getpid() as u32, // pid
+                libc::getpid() as u32, // asid (approximation)
+                0,                     // pidversion
             ]
         }
     } else {
@@ -147,12 +192,20 @@ pub extern "C" fn shim_audit_token_to_au32(
     };
 
     let ptrs = [
-        auid_out, euid_out, egid_out, ruid_out,
-        rgid_out, pid_out, asid_out, pidversion_out,
+        auid_out,
+        euid_out,
+        egid_out,
+        ruid_out,
+        rgid_out,
+        pid_out,
+        asid_out,
+        pidversion_out,
     ];
     for (i, &p) in ptrs.iter().enumerate() {
         if p != 0 {
-            unsafe { *(p as *mut u32) = vals[i]; }
+            unsafe {
+                *(p as *mut u32) = vals[i];
+            }
         }
     }
 }

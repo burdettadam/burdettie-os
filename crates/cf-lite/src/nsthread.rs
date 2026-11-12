@@ -43,7 +43,7 @@ pub fn init_main_thread_id() {
 }
 
 /// Returns true if the calling thread is the main thread.
-fn is_current_main_thread() -> bool {
+pub(crate) fn is_current_main_thread() -> bool {
     let main_id = MAIN_THREAD_ID.get_or_init(|| thread::current().id());
     thread::current().id() == *main_id
 }
@@ -109,22 +109,12 @@ pub extern "C" fn shim_nsthread_is_multi_threaded(_cls: u64, _cmd: u64) -> u8 {
 }
 
 /// `+[NSThread sleepForTimeInterval:]` — sleeps the current thread.
-pub extern "C" fn shim_nsthread_sleep_for_time_interval(
-    _cls: u64,
-    _cmd: u64,
-    interval: f64,
-) {
+pub extern "C" fn shim_nsthread_sleep_for_time_interval(_cls: u64, _cmd: u64, interval: f64) {
     std::thread::sleep(std::time::Duration::from_secs_f64(interval));
 }
 
 /// `+[NSThread detachNewThreadSelector:toTarget:withObject:]` — spawn and start immediately.
-pub extern "C" fn shim_nsthread_detach(
-    _cls: u64,
-    _cmd: u64,
-    sel: u64,
-    target: u64,
-    arg: u64,
-) {
+pub extern "C" fn shim_nsthread_detach(_cls: u64, _cmd: u64, sel: u64, target: u64, arg: u64) {
     if target == 0 {
         return;
     }
@@ -149,7 +139,11 @@ pub extern "C" fn shim_nsthread_is_main_thread(obj: u64, _cmd: u64) -> u8 {
         return 0;
     }
     let flag = unsafe { *((obj as usize + IS_MAIN_OFF) as *const u64) };
-    if flag != 0 { 1 } else { 0 }
+    if flag != 0 {
+        1
+    } else {
+        0
+    }
 }
 
 /// `-[NSThread name]` — returns the thread name (NSString or nil).
@@ -211,7 +205,11 @@ pub extern "C" fn shim_nsthread_is_executing(obj: u64, _cmd: u64) -> u8 {
         return 0;
     }
     let state = unsafe { *((obj as usize + EXEC_OFF) as *const u64) };
-    if state == STATE_EXECUTING { 1 } else { 0 }
+    if state == STATE_EXECUTING {
+        1
+    } else {
+        0
+    }
 }
 
 /// `-[NSThread isFinished]` — returns YES if the thread has completed.
@@ -220,7 +218,11 @@ pub extern "C" fn shim_nsthread_is_finished(obj: u64, _cmd: u64) -> u8 {
         return 0;
     }
     let state = unsafe { *((obj as usize + EXEC_OFF) as *const u64) };
-    if state == STATE_FINISHED { 1 } else { 0 }
+    if state == STATE_FINISHED {
+        1
+    } else {
+        0
+    }
 }
 
 /// `-[NSThread description]` — returns a description string.
@@ -303,16 +305,38 @@ fn spawn_thread(obj: u64, target: u64, sel: u64, arg: u64) {
             // Safety: verify the pointer is in a mapped memory page before
             // dereferencing. Use mincore() to check page residency.
             let sel_name = if sel > 0x10000 {
-                let page_size = 0x4000u64;
-                let page_start = sel & !(page_size - 1);
-                let mut vec: u8 = 0;
-                let mapped = unsafe {
-                    libc::mincore(
-                        page_start as *mut libc::c_void,
-                        page_size as usize,
-                        &mut vec as *mut u8 as *mut libc::c_char,
-                    )
-                } == 0;
+                let mapped = {
+                    #[cfg(target_os = "linux")]
+                    {
+                        let page_size = 0x4000u64;
+                        let page_start = sel & !(page_size - 1);
+                        let mut vec: u8 = 0;
+                        (unsafe {
+                            libc::mincore(
+                                page_start as *mut libc::c_void,
+                                page_size as usize,
+                                (&mut vec as *mut u8).cast::<libc::c_uchar>(),
+                            )
+                        }) == 0
+                    }
+                    #[cfg(all(unix, not(target_os = "linux")))]
+                    {
+                        let page_size = 0x4000u64;
+                        let page_start = sel & !(page_size - 1);
+                        let mut vec: u8 = 0;
+                        (unsafe {
+                            libc::mincore(
+                                page_start as *mut libc::c_void,
+                                page_size as usize,
+                                (&mut vec as *mut u8).cast::<libc::c_char>(),
+                            )
+                        }) == 0
+                    }
+                    #[cfg(not(unix))]
+                    {
+                        true
+                    }
+                };
                 if mapped {
                     unsafe {
                         std::ffi::CStr::from_ptr(sel as *const std::ffi::c_char)
@@ -335,8 +359,7 @@ fn spawn_thread(obj: u64, target: u64, sel: u64, arg: u64) {
                     };
                     if let Some(rt) = guard.as_ref() {
                         if let Some(imp) = rt.msg_lookup(isa, sel_name) {
-                            let sel_ptr = rt.selector_ptr(sel_name)
-                                .unwrap_or(sel as usize) as u64;
+                            let sel_ptr = rt.selector_ptr(sel_name).unwrap_or(sel as usize) as u64;
                             drop(guard);
                             let func: extern "C" fn(u64, u64, u64) =
                                 unsafe { std::mem::transmute(imp) };
@@ -466,7 +489,10 @@ mod tests {
         // The spawned thread should mark the object as finished shortly
         std::thread::sleep(std::time::Duration::from_millis(50));
         let state = read_field(t, EXEC_OFF);
-        assert_eq!(state, STATE_FINISHED, "thread should be finished after sleep");
+        assert_eq!(
+            state, STATE_FINISHED,
+            "thread should be finished after sleep"
+        );
         free_obj(t);
     }
 

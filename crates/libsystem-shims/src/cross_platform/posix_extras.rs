@@ -12,91 +12,279 @@ pub struct PosixExtrasShims;
 impl PosixExtrasShims {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
-        register_shims!(table,
+        register_shims!(
+            table,
             // ── bit scanning ────────────────────────────────────
-            ("_flsl", shim_flsl as *const () as u64, "flsl (find last set bit, long)"),
-            ("_fls", shim_fls as *const () as u64, "fls (find last set bit, int)"),
-
+            (
+                "_flsl",
+                shim_flsl as *const () as u64,
+                "flsl (find last set bit, long)"
+            ),
+            (
+                "_fls",
+                shim_fls as *const () as u64,
+                "fls (find last set bit, int)"
+            ),
             // ── file/pty ────────────────────────────────────────
-            ("_mkostemp", shim_mkostemp as *const () as u64, "mkostemp (mkstemp + flags)"),
-            ("_openpty", shim_openpty as *const () as u64, "openpty (allocate pty)"),
-            ("_open", shim_open as *const () as u64, "open (macOS→Linux flag translation)"),
-            ("_open$NOCANCEL", shim_open as *const () as u64, "open$NOCANCEL (macOS→Linux flags)"),
-            ("_openat", shim_openat as *const () as u64, "openat (macOS→Linux flag translation)"),
-
+            (
+                "_mkostemp",
+                shim_mkostemp as *const () as u64,
+                "mkostemp (mkstemp + flags)"
+            ),
+            (
+                "_openpty",
+                shim_openpty as *const () as u64,
+                "openpty (allocate pty)"
+            ),
+            (
+                "_open",
+                shim_open as *const () as u64,
+                "open (macOS→Linux flag translation)"
+            ),
+            (
+                "_open$NOCANCEL",
+                shim_open as *const () as u64,
+                "open$NOCANCEL (macOS→Linux flags)"
+            ),
+            (
+                "_openat",
+                shim_openat as *const () as u64,
+                "openat (macOS→Linux flag translation)"
+            ),
             // ── process ─────────────────────────────────────────
-            ("_waitid", shim_waitid as *const () as u64, "waitid (wait for process state change)"),
-
+            (
+                "_waitid",
+                shim_waitid as *const () as u64,
+                "waitid (wait for process state change)"
+            ),
             // ── time ────────────────────────────────────────────
-            ("_timespec_get", shim_timespec_get as *const () as u64, "timespec_get (C11)"),
-
+            (
+                "_timespec_get",
+                shim_timespec_get as *const () as u64,
+                "timespec_get (C11)"
+            ),
             // ── backtrace ───────────────────────────────────────
-            ("_backtrace", shim_backtrace as *const () as u64, "backtrace (stack trace)"),
-            ("_backtrace_symbols", shim_backtrace_symbols as *const () as u64, "backtrace_symbols (symbolicate)"),
-            ("_backtrace_symbols_fd", shim_backtrace_symbols_fd as *const () as u64, "backtrace_symbols_fd (symbolicate to fd)"),
-
+            (
+                "_backtrace",
+                shim_backtrace as *const () as u64,
+                "backtrace (stack trace)"
+            ),
+            (
+                "_backtrace_symbols",
+                shim_backtrace_symbols as *const () as u64,
+                "backtrace_symbols (symbolicate)"
+            ),
+            (
+                "_backtrace_symbols_fd",
+                shim_backtrace_symbols_fd as *const () as u64,
+                "backtrace_symbols_fd (symbolicate to fd)"
+            ),
             // ── Apple-specific with safe defaults ───────────────
-            ("__availability_version_check", shim_availability_version_check as *const () as u64, "_availability_version_check (stub → 1, available)"),
-            ("_atexit_b", shim_atexit_b as *const () as u64, "atexit_b (block-based atexit)"),
-            ("_bootstrap_look_up", shim_bootstrap_look_up as *const () as u64, "bootstrap_look_up (stub → not privileged)"),
-
+            (
+                "__availability_version_check",
+                shim_availability_version_check as *const () as u64,
+                "_availability_version_check (stub → 1, available)"
+            ),
+            (
+                "_atexit_b",
+                shim_atexit_b as *const () as u64,
+                "atexit_b (block-based atexit)"
+            ),
+            (
+                "_bootstrap_look_up",
+                shim_bootstrap_look_up as *const () as u64,
+                "bootstrap_look_up (stub → not privileged)"
+            ),
             // ── posix_spawn core ────────────────────────────────
-            ("_posix_spawn", shim_posix_spawn as *const () as u64, "posix_spawn (thin wrapper → libc)"),
-            ("_posix_spawnp", shim_posix_spawnp as *const () as u64, "posix_spawnp (thin wrapper → libc)"),
-
+            (
+                "_posix_spawn",
+                shim_posix_spawn as *const () as u64,
+                "posix_spawn (thin wrapper → libc)"
+            ),
+            (
+                "_posix_spawnp",
+                shim_posix_spawnp as *const () as u64,
+                "posix_spawnp (thin wrapper → libc)"
+            ),
             // ── posix_spawn_file_actions ─────────────────────────
-            ("_posix_spawn_file_actions_init", shim_posix_spawn_file_actions_init as *const () as u64, "posix_spawn_file_actions_init"),
-            ("_posix_spawn_file_actions_destroy", shim_posix_spawn_file_actions_destroy as *const () as u64, "posix_spawn_file_actions_destroy"),
-            ("_posix_spawn_file_actions_addclose", shim_posix_spawn_file_actions_addclose as *const () as u64, "posix_spawn_file_actions_addclose"),
-            ("_posix_spawn_file_actions_adddup2", shim_posix_spawn_file_actions_adddup2 as *const () as u64, "posix_spawn_file_actions_adddup2"),
-            ("_posix_spawn_file_actions_addopen", shim_posix_spawn_file_actions_addopen as *const () as u64, "posix_spawn_file_actions_addopen"),
-            ("_posix_spawn_file_actions_addchdir_np", shim_posix_spawn_file_actions_addchdir_np as *const () as u64, "posix_spawn_file_actions_addchdir_np (stub → ENOSYS)"),
-            ("_posix_spawn_file_actions_addfchdir_np", shim_posix_spawn_file_actions_addfchdir_np as *const () as u64, "posix_spawn_file_actions_addfchdir_np (stub → ENOSYS)"),
-
+            (
+                "_posix_spawn_file_actions_init",
+                shim_posix_spawn_file_actions_init as *const () as u64,
+                "posix_spawn_file_actions_init"
+            ),
+            (
+                "_posix_spawn_file_actions_destroy",
+                shim_posix_spawn_file_actions_destroy as *const () as u64,
+                "posix_spawn_file_actions_destroy"
+            ),
+            (
+                "_posix_spawn_file_actions_addclose",
+                shim_posix_spawn_file_actions_addclose as *const () as u64,
+                "posix_spawn_file_actions_addclose"
+            ),
+            (
+                "_posix_spawn_file_actions_adddup2",
+                shim_posix_spawn_file_actions_adddup2 as *const () as u64,
+                "posix_spawn_file_actions_adddup2"
+            ),
+            (
+                "_posix_spawn_file_actions_addopen",
+                shim_posix_spawn_file_actions_addopen as *const () as u64,
+                "posix_spawn_file_actions_addopen"
+            ),
+            (
+                "_posix_spawn_file_actions_addchdir_np",
+                shim_posix_spawn_file_actions_addchdir_np as *const () as u64,
+                "posix_spawn_file_actions_addchdir_np (stub → ENOSYS)"
+            ),
+            (
+                "_posix_spawn_file_actions_addfchdir_np",
+                shim_posix_spawn_file_actions_addfchdir_np as *const () as u64,
+                "posix_spawn_file_actions_addfchdir_np (stub → ENOSYS)"
+            ),
             // ── posix_spawnattr extras ──────────────────────────
-            ("_posix_spawnattr_getflags", shim_posix_spawnattr_getflags as *const () as u64, "posix_spawnattr_getflags"),
-            ("_posix_spawnattr_setflags", shim_posix_spawnattr_setflags as *const () as u64, "posix_spawnattr_setflags"),
-            ("_posix_spawnattr_init", shim_posix_spawnattr_init as *const () as u64, "posix_spawnattr_init"),
-            ("_posix_spawnattr_destroy", shim_posix_spawnattr_destroy as *const () as u64, "posix_spawnattr_destroy"),
-            ("_posix_spawnattr_getsigmask", shim_posix_spawnattr_getsigmask as *const () as u64, "posix_spawnattr_getsigmask"),
-            ("_posix_spawnattr_setsigmask", shim_posix_spawnattr_setsigmask as *const () as u64, "posix_spawnattr_setsigmask"),
-            ("_posix_spawnattr_getsigdefault", shim_posix_spawnattr_getsigdefault as *const () as u64, "posix_spawnattr_getsigdefault"),
-            ("_posix_spawnattr_setsigdefault", shim_posix_spawnattr_setsigdefault as *const () as u64, "posix_spawnattr_setsigdefault"),
-            ("_posix_spawnattr_getpgroup", shim_posix_spawnattr_getpgroup as *const () as u64, "posix_spawnattr_getpgroup"),
-            ("_posix_spawnattr_setpgroup", shim_posix_spawnattr_setpgroup as *const () as u64, "posix_spawnattr_setpgroup"),
-            ("_posix_spawnattr_setbinpref_np", shim_posix_spawnattr_setbinpref_np as *const () as u64, "posix_spawnattr_setbinpref_np (stub → 0)"),
-            ("_posix_spawnattr_set_persona_np", shim_posix_spawnattr_set_persona_np as *const () as u64, "posix_spawnattr_set_persona_np (stub → 0)"),
-
+            (
+                "_posix_spawnattr_getflags",
+                shim_posix_spawnattr_getflags as *const () as u64,
+                "posix_spawnattr_getflags"
+            ),
+            (
+                "_posix_spawnattr_setflags",
+                shim_posix_spawnattr_setflags as *const () as u64,
+                "posix_spawnattr_setflags"
+            ),
+            (
+                "_posix_spawnattr_init",
+                shim_posix_spawnattr_init as *const () as u64,
+                "posix_spawnattr_init"
+            ),
+            (
+                "_posix_spawnattr_destroy",
+                shim_posix_spawnattr_destroy as *const () as u64,
+                "posix_spawnattr_destroy"
+            ),
+            (
+                "_posix_spawnattr_getsigmask",
+                shim_posix_spawnattr_getsigmask as *const () as u64,
+                "posix_spawnattr_getsigmask"
+            ),
+            (
+                "_posix_spawnattr_setsigmask",
+                shim_posix_spawnattr_setsigmask as *const () as u64,
+                "posix_spawnattr_setsigmask"
+            ),
+            (
+                "_posix_spawnattr_getsigdefault",
+                shim_posix_spawnattr_getsigdefault as *const () as u64,
+                "posix_spawnattr_getsigdefault"
+            ),
+            (
+                "_posix_spawnattr_setsigdefault",
+                shim_posix_spawnattr_setsigdefault as *const () as u64,
+                "posix_spawnattr_setsigdefault"
+            ),
+            (
+                "_posix_spawnattr_getpgroup",
+                shim_posix_spawnattr_getpgroup as *const () as u64,
+                "posix_spawnattr_getpgroup"
+            ),
+            (
+                "_posix_spawnattr_setpgroup",
+                shim_posix_spawnattr_setpgroup as *const () as u64,
+                "posix_spawnattr_setpgroup"
+            ),
+            (
+                "_posix_spawnattr_setbinpref_np",
+                shim_posix_spawnattr_setbinpref_np as *const () as u64,
+                "posix_spawnattr_setbinpref_np (stub → 0)"
+            ),
+            (
+                "_posix_spawnattr_set_persona_np",
+                shim_posix_spawnattr_set_persona_np as *const () as u64,
+                "posix_spawnattr_set_persona_np (stub → 0)"
+            ),
             // ── BSD extras ──────────────────────────────────────
-            ("_funopen", shim_funopen as *const () as u64, "funopen (stub → NULL)"),
-
+            (
+                "_funopen",
+                shim_funopen as *const () as u64,
+                "funopen (stub → NULL)"
+            ),
             // ── sandbox/security stubs ──────────────────────────
-            ("_chroot", shim_chroot as *const () as u64, "chroot (stub → EPERM)"),
-
+            (
+                "_chroot",
+                shim_chroot as *const () as u64,
+                "chroot (stub → EPERM)"
+            ),
             // ── mmap flag translation ───────────────────────────
-            ("_mmap", shim_mmap as *const () as u64, "mmap (macOS→Linux flag translation)"),
-
+            (
+                "_mmap",
+                shim_mmap as *const () as u64,
+                "mmap (macOS→Linux flag translation)"
+            ),
             // ── resource limits ─────────────────────────────────
-            ("_getrlimit", shim_getrlimit as *const () as u64, "getrlimit (macOS→Linux RLIMIT_ translation)"),
-            ("_setrlimit", shim_setrlimit as *const () as u64, "setrlimit (macOS→Linux RLIMIT_ translation)"),
-
+            (
+                "_getrlimit",
+                shim_getrlimit as *const () as u64,
+                "getrlimit (macOS→Linux RLIMIT_ translation)"
+            ),
+            (
+                "_setrlimit",
+                shim_setrlimit as *const () as u64,
+                "setrlimit (macOS→Linux RLIMIT_ translation)"
+            ),
             // ── sysconf constant translation ────────────────────
-            ("_sysconf", shim_sysconf as *const () as u64, "sysconf (macOS→Linux _SC_ translation)"),
-
+            (
+                "_sysconf",
+                shim_sysconf as *const () as u64,
+                "sysconf (macOS→Linux _SC_ translation)"
+            ),
             // ── getopt POSIX mode (BSD default) ─────────────────
-            ("_getopt", shim_getopt as *const () as u64, "getopt (POSIX mode — stop at first non-option)"),
-            ("_getopt_long", shim_getopt_long as *const () as u64, "getopt_long (POSIX mode)"),
-            ("_getopt_long_only", shim_getopt_long_only as *const () as u64, "getopt_long_only (POSIX mode)"),
-            ("_optreset", std::ptr::addr_of!(OPTRESET) as *const () as u64, "optreset (BSD compat data symbol)"),
+            (
+                "_getopt",
+                shim_getopt as *const () as u64,
+                "getopt (POSIX mode — stop at first non-option)"
+            ),
+            (
+                "_getopt_long",
+                shim_getopt_long as *const () as u64,
+                "getopt_long (POSIX mode)"
+            ),
+            (
+                "_getopt_long_only",
+                shim_getopt_long_only as *const () as u64,
+                "getopt_long_only (POSIX mode)"
+            ),
+            (
+                "_optreset",
+                std::ptr::addr_of!(OPTRESET) as *const () as u64,
+                "optreset (BSD compat data symbol)"
+            ),
         );
 
         // ── regex flag translation (Linux-only, glibc regex_t) ──
         #[cfg(target_os = "linux")]
-        register_shims!(table,
-            ("_regcomp", shim_regcomp as *const () as u64, "regcomp (macOS regex_t bridge + flag translation)"),
-            ("_regexec", shim_regexec as *const () as u64, "regexec (macOS regex_t bridge)"),
-            ("_regfree", shim_regfree as *const () as u64, "regfree (macOS regex_t bridge)"),
-            ("_regerror", shim_regerror as *const () as u64, "regerror (macOS regex_t bridge)"),
+        register_shims!(
+            table,
+            (
+                "_regcomp",
+                shim_regcomp as *const () as u64,
+                "regcomp (macOS regex_t bridge + flag translation)"
+            ),
+            (
+                "_regexec",
+                shim_regexec as *const () as u64,
+                "regexec (macOS regex_t bridge)"
+            ),
+            (
+                "_regfree",
+                shim_regfree as *const () as u64,
+                "regfree (macOS regex_t bridge)"
+            ),
+            (
+                "_regerror",
+                shim_regerror as *const () as u64,
+                "regerror (macOS regex_t bridge)"
+            ),
         );
 
         log::debug!("PosixExtrasShims: registered POSIX/libc extra shims");
@@ -147,16 +335,32 @@ fn translate_open_flags(mac_flags: c_int) -> c_int {
     let mut linux_flags = mac_flags & 0x3; // O_RDONLY / O_WRONLY / O_RDWR
 
     // Map each macOS flag bit to its Linux equivalent
-    if mac_flags & 0x0004 != 0 { linux_flags |= libc::O_NONBLOCK; }
-    if mac_flags & 0x0008 != 0 { linux_flags |= libc::O_APPEND; }
+    if mac_flags & 0x0004 != 0 {
+        linux_flags |= libc::O_NONBLOCK;
+    }
+    if mac_flags & 0x0008 != 0 {
+        linux_flags |= libc::O_APPEND;
+    }
     if mac_flags & 0x0010 != 0 { /* O_SHLOCK — no Linux equiv, ignore */ }
     if mac_flags & 0x0020 != 0 { /* O_EXLOCK — no Linux equiv, ignore */ }
-    if mac_flags & 0x0100 != 0 { linux_flags |= libc::O_NOFOLLOW; }
-    if mac_flags & 0x0200 != 0 { linux_flags |= libc::O_CREAT; }
-    if mac_flags & 0x0400 != 0 { linux_flags |= libc::O_TRUNC; }
-    if mac_flags & 0x0800 != 0 { linux_flags |= libc::O_EXCL; }
-    if mac_flags & 0x00100000 != 0 { linux_flags |= libc::O_DIRECTORY; }
-    if mac_flags & 0x01000000 != 0 { linux_flags |= libc::O_CLOEXEC; }
+    if mac_flags & 0x0100 != 0 {
+        linux_flags |= libc::O_NOFOLLOW;
+    }
+    if mac_flags & 0x0200 != 0 {
+        linux_flags |= libc::O_CREAT;
+    }
+    if mac_flags & 0x0400 != 0 {
+        linux_flags |= libc::O_TRUNC;
+    }
+    if mac_flags & 0x0800 != 0 {
+        linux_flags |= libc::O_EXCL;
+    }
+    if mac_flags & 0x00100000 != 0 {
+        linux_flags |= libc::O_DIRECTORY;
+    }
+    if mac_flags & 0x01000000 != 0 {
+        linux_flags |= libc::O_CLOEXEC;
+    }
 
     linux_flags
 }
@@ -164,11 +368,7 @@ fn translate_open_flags(mac_flags: c_int) -> c_int {
 /// `int open(const char *path, int oflag, ...)` — translate macOS open flags
 /// to Linux equivalents.  On AArch64 the optional mode_t argument is always
 /// in x2 whether or not O_CREAT is set, so we unconditionally accept it.
-extern "C" fn shim_open(
-    path: *const c_char,
-    mac_flags: c_int,
-    mode: libc::mode_t,
-) -> c_int {
+extern "C" fn shim_open(path: *const c_char, mac_flags: c_int, mode: libc::mode_t) -> c_int {
     let linux_flags = translate_open_flags(mac_flags);
     unsafe { libc::open(path, linux_flags, mode as libc::c_uint) }
 }
@@ -222,9 +422,7 @@ pub extern "C" fn shim_waitid(
     infop: *mut libc::siginfo_t,
     options: c_int,
 ) -> c_int {
-    unsafe {
-        libc::waitid(idtype as libc::idtype_t, id as libc::id_t, infop, options)
-    }
+    unsafe { libc::waitid(idtype as libc::idtype_t, id as libc::id_t, infop, options) }
 }
 
 // ── Time ────────────────────────────────────────────────────────────
@@ -235,7 +433,11 @@ pub extern "C" fn shim_timespec_get(ts: *mut libc::timespec, base: c_int) -> c_i
         return 0; // failure
     }
     let ret = unsafe { libc::clock_gettime(libc::CLOCK_REALTIME, ts) };
-    if ret == 0 { base } else { 0 }
+    if ret == 0 {
+        base
+    } else {
+        0
+    }
 }
 
 // ── Backtrace ───────────────────────────────────────────────────────
@@ -297,10 +499,7 @@ pub extern "C" fn shim_backtrace_symbols_fd(
 /// _availability_version_check: returns 1 (available) for all versions.
 /// On macOS this checks OS version availability; on Linux we assume
 /// all APIs are "available" since we're shimming everything.
-pub extern "C" fn shim_availability_version_check(
-    _count: u32,
-    _versions: u64,
-) -> i32 {
+pub extern "C" fn shim_availability_version_check(_count: u32, _versions: u64) -> i32 {
     1 // always available
 }
 
@@ -319,7 +518,10 @@ pub extern "C" fn shim_atexit_b(block: u64) -> c_int {
     }
     // We can't safely register an arbitrary block with libc::atexit
     // because the block may capture state. Log and ignore.
-    log::debug!("atexit_b: registered block at {:#x} (will not execute at exit)", invoke_ptr);
+    log::debug!(
+        "atexit_b: registered block at {:#x} (will not execute at exit)",
+        invoke_ptr
+    );
     0
 }
 
@@ -392,7 +594,9 @@ pub extern "C" fn shim_posix_spawnp(
 pub extern "C" fn shim_posix_spawn_file_actions_init(
     actions: *mut libc::posix_spawn_file_actions_t,
 ) -> c_int {
-    if actions.is_null() { return libc::EINVAL; }
+    if actions.is_null() {
+        return libc::EINVAL;
+    }
     unsafe { libc::posix_spawn_file_actions_init(actions) }
 }
 
@@ -400,7 +604,9 @@ pub extern "C" fn shim_posix_spawn_file_actions_init(
 pub extern "C" fn shim_posix_spawn_file_actions_destroy(
     actions: *mut libc::posix_spawn_file_actions_t,
 ) -> c_int {
-    if actions.is_null() { return libc::EINVAL; }
+    if actions.is_null() {
+        return libc::EINVAL;
+    }
     unsafe { libc::posix_spawn_file_actions_destroy(actions) }
 }
 
@@ -409,7 +615,9 @@ pub extern "C" fn shim_posix_spawn_file_actions_addclose(
     actions: *mut libc::posix_spawn_file_actions_t,
     fd: c_int,
 ) -> c_int {
-    if actions.is_null() { return libc::EINVAL; }
+    if actions.is_null() {
+        return libc::EINVAL;
+    }
     unsafe { libc::posix_spawn_file_actions_addclose(actions, fd) }
 }
 
@@ -419,7 +627,9 @@ pub extern "C" fn shim_posix_spawn_file_actions_adddup2(
     fd: c_int,
     newfd: c_int,
 ) -> c_int {
-    if actions.is_null() { return libc::EINVAL; }
+    if actions.is_null() {
+        return libc::EINVAL;
+    }
     unsafe { libc::posix_spawn_file_actions_adddup2(actions, fd, newfd) }
 }
 
@@ -431,21 +641,19 @@ pub extern "C" fn shim_posix_spawn_file_actions_addopen(
     oflag: c_int,
     mode: libc::mode_t,
 ) -> c_int {
-    if actions.is_null() || path.is_null() { return libc::EINVAL; }
+    if actions.is_null() || path.is_null() {
+        return libc::EINVAL;
+    }
     unsafe { libc::posix_spawn_file_actions_addopen(actions, fd, path, oflag, mode) }
 }
 
 /// `posix_spawn_file_actions_addchdir_np` — macOS extension; stub on Linux.
-pub extern "C" fn shim_posix_spawn_file_actions_addchdir_np(
-    _actions: u64, _path: u64,
-) -> c_int {
+pub extern "C" fn shim_posix_spawn_file_actions_addchdir_np(_actions: u64, _path: u64) -> c_int {
     libc::ENOSYS
 }
 
 /// `posix_spawn_file_actions_addfchdir_np` — macOS extension; stub on Linux.
-pub extern "C" fn shim_posix_spawn_file_actions_addfchdir_np(
-    _actions: u64, _fd: c_int,
-) -> c_int {
+pub extern "C" fn shim_posix_spawn_file_actions_addfchdir_np(_actions: u64, _fd: c_int) -> c_int {
     libc::ENOSYS
 }
 
@@ -453,13 +661,17 @@ pub extern "C" fn shim_posix_spawn_file_actions_addfchdir_np(
 
 /// `posix_spawnattr_init`.
 pub extern "C" fn shim_posix_spawnattr_init(attr: *mut libc::posix_spawnattr_t) -> c_int {
-    if attr.is_null() { return libc::EINVAL; }
+    if attr.is_null() {
+        return libc::EINVAL;
+    }
     unsafe { libc::posix_spawnattr_init(attr) }
 }
 
 /// `posix_spawnattr_destroy`.
 pub extern "C" fn shim_posix_spawnattr_destroy(attr: *mut libc::posix_spawnattr_t) -> c_int {
-    if attr.is_null() { return libc::EINVAL; }
+    if attr.is_null() {
+        return libc::EINVAL;
+    }
     unsafe { libc::posix_spawnattr_destroy(attr) }
 }
 
@@ -468,7 +680,9 @@ pub extern "C" fn shim_posix_spawnattr_getsigmask(
     attr: *const libc::posix_spawnattr_t,
     sigmask: *mut libc::sigset_t,
 ) -> c_int {
-    if attr.is_null() || sigmask.is_null() { return libc::EINVAL; }
+    if attr.is_null() || sigmask.is_null() {
+        return libc::EINVAL;
+    }
     unsafe { libc::posix_spawnattr_getsigmask(attr, sigmask) }
 }
 
@@ -477,7 +691,9 @@ pub extern "C" fn shim_posix_spawnattr_setsigmask(
     attr: *mut libc::posix_spawnattr_t,
     sigmask: *const libc::sigset_t,
 ) -> c_int {
-    if attr.is_null() || sigmask.is_null() { return libc::EINVAL; }
+    if attr.is_null() || sigmask.is_null() {
+        return libc::EINVAL;
+    }
     unsafe { libc::posix_spawnattr_setsigmask(attr, sigmask) }
 }
 
@@ -486,7 +702,9 @@ pub extern "C" fn shim_posix_spawnattr_getsigdefault(
     attr: *const libc::posix_spawnattr_t,
     sigdefault: *mut libc::sigset_t,
 ) -> c_int {
-    if attr.is_null() || sigdefault.is_null() { return libc::EINVAL; }
+    if attr.is_null() || sigdefault.is_null() {
+        return libc::EINVAL;
+    }
     unsafe { libc::posix_spawnattr_getsigdefault(attr, sigdefault) }
 }
 
@@ -495,7 +713,9 @@ pub extern "C" fn shim_posix_spawnattr_setsigdefault(
     attr: *mut libc::posix_spawnattr_t,
     sigdefault: *const libc::sigset_t,
 ) -> c_int {
-    if attr.is_null() || sigdefault.is_null() { return libc::EINVAL; }
+    if attr.is_null() || sigdefault.is_null() {
+        return libc::EINVAL;
+    }
     unsafe { libc::posix_spawnattr_setsigdefault(attr, sigdefault) }
 }
 
@@ -504,7 +724,9 @@ pub extern "C" fn shim_posix_spawnattr_getpgroup(
     attr: *const libc::posix_spawnattr_t,
     pgroup: *mut libc::pid_t,
 ) -> c_int {
-    if attr.is_null() || pgroup.is_null() { return libc::EINVAL; }
+    if attr.is_null() || pgroup.is_null() {
+        return libc::EINVAL;
+    }
     unsafe { libc::posix_spawnattr_getpgroup(attr, pgroup) }
 }
 
@@ -513,26 +735,22 @@ pub extern "C" fn shim_posix_spawnattr_setpgroup(
     attr: *mut libc::posix_spawnattr_t,
     pgroup: libc::pid_t,
 ) -> c_int {
-    if attr.is_null() { return libc::EINVAL; }
+    if attr.is_null() {
+        return libc::EINVAL;
+    }
     unsafe { libc::posix_spawnattr_setpgroup(attr, pgroup) }
 }
 
 // ── posix_spawn extras ──────────────────────────────────────────────
 
-pub extern "C" fn shim_posix_spawnattr_getflags(
-    attr: *const u8,
-    flags: *mut i16,
-) -> c_int {
+pub extern "C" fn shim_posix_spawnattr_getflags(attr: *const u8, flags: *mut i16) -> c_int {
     if attr.is_null() || flags.is_null() {
         return libc::EINVAL;
     }
     unsafe { libc::posix_spawnattr_getflags(attr as *const _, flags) }
 }
 
-pub extern "C" fn shim_posix_spawnattr_setflags(
-    attr: *mut u8,
-    flags: i16,
-) -> c_int {
+pub extern "C" fn shim_posix_spawnattr_setflags(attr: *mut u8, flags: i16) -> c_int {
     if attr.is_null() {
         return libc::EINVAL;
     }
@@ -584,9 +802,13 @@ pub extern "C" fn shim_funopen(
 pub extern "C" fn shim_chroot(_dirname: *const c_char) -> c_int {
     unsafe {
         #[cfg(target_os = "macos")]
-        { *libc::__error() = libc::EPERM; }
+        {
+            *libc::__error() = libc::EPERM;
+        }
         #[cfg(not(target_os = "macos"))]
-        { *libc::__errno_location() = libc::EPERM; }
+        {
+            *libc::__errno_location() = libc::EPERM;
+        }
     }
     -1
 }
@@ -632,7 +854,16 @@ pub extern "C" fn shim_mmap(
 ) -> u64 {
     let linux_flags = translate_mmap_flags(flags);
     log::trace!("mmap: flags {flags:#x} → {linux_flags:#x}, len={len}, prot={prot:#x}");
-    unsafe { libc::mmap(addr as *mut libc::c_void, len as usize, prot, linux_flags, fd, offset) as u64 }
+    unsafe {
+        libc::mmap(
+            addr as *mut libc::c_void,
+            len as usize,
+            prot,
+            linux_flags,
+            fd,
+            offset,
+        ) as u64
+    }
 }
 
 // ── Resource limit translation ──────────────────────────────────────
@@ -679,44 +910,44 @@ pub extern "C" fn shim_setrlimit(resource: c_int, rlp: *const libc::rlimit) -> c
 /// Every single value differs between the two platforms.
 fn translate_sysconf_name(darwin_name: c_int) -> c_int {
     match darwin_name {
-        1 => 0,    // _SC_ARG_MAX
-        2 => 1,    // _SC_CHILD_MAX
-        3 => 2,    // _SC_CLK_TCK
-        4 => 3,    // _SC_NGROUPS_MAX
-        5 => 4,    // _SC_OPEN_MAX
-        6 => 7,    // _SC_JOB_CONTROL
-        7 => 8,    // _SC_SAVED_IDS
-        8 => 29,   // _SC_VERSION
-        9 => 36,   // _SC_BC_BASE_MAX
-        10 => 37,  // _SC_BC_DIM_MAX
-        11 => 38,  // _SC_BC_SCALE_MAX
-        12 => 39,  // _SC_BC_STRING_MAX
-        13 => 40,  // _SC_COLL_WEIGHTS_MAX
-        14 => 42,  // _SC_EXPR_NEST_MAX
-        15 => 43,  // _SC_LINE_MAX
-        16 => 44,  // _SC_RE_DUP_MAX
-        17 => 46,  // _SC_2_VERSION
-        18 => 47,  // _SC_2_C_BIND
-        19 => 48,  // _SC_2_C_DEV
-        20 => 95,  // _SC_2_CHAR_TERM
-        21 => 49,  // _SC_2_FORT_DEV
-        22 => 50,  // _SC_2_FORT_RUN
-        23 => 52,  // _SC_2_LOCALEDEF
-        24 => 51,  // _SC_2_SW_DEV
-        25 => 97,  // _SC_2_UPE
-        26 => 5,   // _SC_STREAM_MAX
-        27 => 6,   // _SC_TZNAME_MAX
-        29 => 30,  // _SC_PAGESIZE / _SC_PAGE_SIZE
-        56 => 60,  // _SC_IOV_MAX
-        57 => 83,  // _SC_NPROCESSORS_CONF
-        58 => 84,  // _SC_NPROCESSORS_ONLN
-        70 => 69,  // _SC_GETGR_R_SIZE_MAX
-        71 => 70,  // _SC_GETPW_R_SIZE_MAX
-        72 => 180, // _SC_HOST_NAME_MAX
-        73 => 71,  // _SC_LOGIN_NAME_MAX
-        101 => 72, // _SC_TTY_NAME_MAX
+        1 => 0,     // _SC_ARG_MAX
+        2 => 1,     // _SC_CHILD_MAX
+        3 => 2,     // _SC_CLK_TCK
+        4 => 3,     // _SC_NGROUPS_MAX
+        5 => 4,     // _SC_OPEN_MAX
+        6 => 7,     // _SC_JOB_CONTROL
+        7 => 8,     // _SC_SAVED_IDS
+        8 => 29,    // _SC_VERSION
+        9 => 36,    // _SC_BC_BASE_MAX
+        10 => 37,   // _SC_BC_DIM_MAX
+        11 => 38,   // _SC_BC_SCALE_MAX
+        12 => 39,   // _SC_BC_STRING_MAX
+        13 => 40,   // _SC_COLL_WEIGHTS_MAX
+        14 => 42,   // _SC_EXPR_NEST_MAX
+        15 => 43,   // _SC_LINE_MAX
+        16 => 44,   // _SC_RE_DUP_MAX
+        17 => 46,   // _SC_2_VERSION
+        18 => 47,   // _SC_2_C_BIND
+        19 => 48,   // _SC_2_C_DEV
+        20 => 95,   // _SC_2_CHAR_TERM
+        21 => 49,   // _SC_2_FORT_DEV
+        22 => 50,   // _SC_2_FORT_RUN
+        23 => 52,   // _SC_2_LOCALEDEF
+        24 => 51,   // _SC_2_SW_DEV
+        25 => 97,   // _SC_2_UPE
+        26 => 5,    // _SC_STREAM_MAX
+        27 => 6,    // _SC_TZNAME_MAX
+        29 => 30,   // _SC_PAGESIZE / _SC_PAGE_SIZE
+        56 => 60,   // _SC_IOV_MAX
+        57 => 83,   // _SC_NPROCESSORS_CONF
+        58 => 84,   // _SC_NPROCESSORS_ONLN
+        70 => 69,   // _SC_GETGR_R_SIZE_MAX
+        71 => 70,   // _SC_GETPW_R_SIZE_MAX
+        72 => 180,  // _SC_HOST_NAME_MAX
+        73 => 71,   // _SC_LOGIN_NAME_MAX
+        101 => 72,  // _SC_TTY_NAME_MAX
         120 => 173, // _SC_SYMLOOP_MAX
-        200 => 85, // _SC_PHYS_PAGES
+        200 => 85,  // _SC_PHYS_PAGES
         other => {
             log::warn!("sysconf: unknown macOS _SC_ constant {other}, passing through");
             other
@@ -752,7 +983,9 @@ pub static mut OPTRESET: c_int = 0;
 /// Ensure optstring starts with `+` for POSIX behavior.
 /// Returns owned CString (caller must keep alive through getopt call).
 fn posix_optstring(optstring: *const c_char) -> Option<std::ffi::CString> {
-    if optstring.is_null() { return None; }
+    if optstring.is_null() {
+        return None;
+    }
     let s = unsafe { std::ffi::CStr::from_ptr(optstring) };
     let bytes = s.to_bytes();
     if bytes.first() == Some(&b'+') {
@@ -887,166 +1120,184 @@ fn translate_regcomp_flags(darwin_cflags: c_int) -> c_int {
 
 #[cfg(target_os = "linux")]
 mod regex_shims {
-use super::*;
-use std::sync::Mutex;
-use std::collections::HashMap;
+    use super::*;
+    use std::collections::HashMap;
+    use std::sync::Mutex;
 
-/// Safety: `libc::regex_t` contains raw pointers but we only access
-/// the map while holding the mutex, and the pointees live on the heap.
-struct RegexBox(Box<libc::regex_t>);
-unsafe impl Send for RegexBox {}
+    /// Safety: `libc::regex_t` contains raw pointers but we only access
+    /// the map while holding the mutex, and the pointees live on the heap.
+    struct RegexBox(Box<libc::regex_t>);
+    unsafe impl Send for RegexBox {}
 
-static REGEX_MAP: Mutex<Option<HashMap<u64, RegexBox>>> = Mutex::new(None);
+    static REGEX_MAP: Mutex<Option<HashMap<u64, RegexBox>>> = Mutex::new(None);
 
-fn regex_map_insert(darwin_ptr: u64, linux_re: Box<libc::regex_t>) {
-    let mut guard = REGEX_MAP.lock().unwrap();
-    let map = guard.get_or_insert_with(HashMap::new);
-    map.insert(darwin_ptr, RegexBox(linux_re));
-}
-
-fn regex_map_get(darwin_ptr: u64) -> Option<*const libc::regex_t> {
-    let guard = REGEX_MAP.lock().unwrap();
-    guard.as_ref()?.get(&darwin_ptr).map(|b| &*b.0 as *const libc::regex_t)
-}
-
-fn regex_map_remove(darwin_ptr: u64) -> Option<Box<libc::regex_t>> {
-    let mut guard = REGEX_MAP.lock().unwrap();
-    guard.as_mut()?.remove(&darwin_ptr).map(|b| b.0)
-}
-
-/// `int regcomp(regex_t *preg, const char *pattern, int cflags)`
-///
-/// Allocates a glibc-sized `regex_t`, calls glibc `regcomp`, and stores
-/// the result. The macOS `regex_t` at `preg` gets `re_nsub` written.
-pub extern "C" fn shim_regcomp(
-    preg: u64, // macOS regex_t* (32 bytes, can't fit glibc's ~64 bytes)
-    pattern: *const c_char,
-    cflags: c_int,
-) -> c_int {
-    let linux_cflags = translate_regcomp_flags(cflags);
-    log::trace!("regcomp: preg={preg:#x} flags {cflags:#x} → {linux_cflags:#x}");
-
-    let mut linux_re: Box<libc::regex_t> = Box::new(unsafe { std::mem::zeroed() });
-    let ret = unsafe { libc::regcomp(&mut *linux_re, pattern, linux_cflags) };
-    if ret == 0 {
-        // Write re_nsub into the macOS struct at offset 8
-        // Also write re_magic at offset 0 (0xF265 = BSD regex magic)
-        // Linux glibc regex_t stores re_nsub at offset 48 (size_t)
-        let nsub = unsafe {
-            let re_ptr = &*linux_re as *const libc::regex_t as *const u8;
-            *(re_ptr.add(48) as *const u64)
-        };
-        if preg != 0 {
-            unsafe {
-                // re_magic at offset 0 (i32)
-                let magic_ptr = preg as *mut i32;
-                *magic_ptr = 0xF265_u32 as i32; // BSD regex magic number
-                // re_nsub at offset 8 (u64 / size_t)
-                let nsub_ptr = (preg + 8) as *mut u64;
-                *nsub_ptr = nsub;
-            }
-        }
-        log::trace!("regcomp: success, re_nsub={nsub}");
-        regex_map_insert(preg, linux_re);
-    } else {
-        log::trace!("regcomp: failed with error {ret}");
+    fn regex_map_insert(darwin_ptr: u64, linux_re: Box<libc::regex_t>) {
+        let mut guard = REGEX_MAP.lock().unwrap();
+        let map = guard.get_or_insert_with(HashMap::new);
+        map.insert(darwin_ptr, RegexBox(linux_re));
     }
-    ret
-}
 
-/// `int regexec(const regex_t *preg, const char *string, size_t nmatch,
-///              regmatch_t *pmatch, int eflags)`
-///
-/// Looks up the glibc regex_t from our map and calls glibc regexec.
-/// macOS `regmatch_t` uses `regoff_t = int64_t` (8 bytes each)→ 16 bytes.
-/// Linux  `regmatch_t` uses `regoff_t = int`     (4 bytes each)→  8 bytes.
-#[repr(C)]
-struct DarwinRegmatch {
-    rm_so: i64,
-    rm_eo: i64,
-}
+    fn regex_map_get(darwin_ptr: u64) -> Option<*const libc::regex_t> {
+        let guard = REGEX_MAP.lock().unwrap();
+        guard
+            .as_ref()?
+            .get(&darwin_ptr)
+            .map(|b| &*b.0 as *const libc::regex_t)
+    }
 
-/// `int regexec(const regex_t *preg, const char *string, size_t nmatch,
-///              regmatch_t *pmatch, int eflags)`
-///
-/// Bridges between macOS 16-byte regmatch_t and Linux 8-byte regmatch_t.
-pub extern "C" fn shim_regexec(
-    preg: u64,
-    string: *const c_char,
-    nmatch: u64,
-    darwin_pmatch: u64, // actually *mut DarwinRegmatch (16 bytes each)
-    eflags: c_int,
-) -> c_int {
-    log::trace!("regexec: preg={preg:#x} nmatch={nmatch} eflags={eflags:#x}");
-    
-    if let Some(linux_re) = regex_map_get(preg) {
-        let nm = nmatch as usize;
-        let has_startend = eflags & 4 != 0 && darwin_pmatch != 0;
-        // REG_STARTEND requires at least 1 pmatch entry for the input range
-        let effective_nm = if has_startend { nm.max(1) } else { nm };
-        // Allocate Linux-sized pmatch array
-        let mut linux_pmatch: Vec<libc::regmatch_t> = vec![
-            libc::regmatch_t { rm_so: -1, rm_eo: -1 }; effective_nm.max(1)
-        ];
+    fn regex_map_remove(darwin_ptr: u64) -> Option<Box<libc::regex_t>> {
+        let mut guard = REGEX_MAP.lock().unwrap();
+        guard.as_mut()?.remove(&darwin_ptr).map(|b| b.0)
+    }
 
-        // If REG_STARTEND, convert input pmatch[0] from macOS (16-byte) to Linux (8-byte)
-        if has_startend {
-            let darwin = unsafe { &*(darwin_pmatch as *const DarwinRegmatch) };
-            linux_pmatch[0].rm_so = darwin.rm_so as i32;
-            linux_pmatch[0].rm_eo = darwin.rm_eo as i32;
-            log::trace!("regexec REG_STARTEND: range [{}, {})", linux_pmatch[0].rm_so, linux_pmatch[0].rm_eo);
-        }
+    /// `int regcomp(regex_t *preg, const char *pattern, int cflags)`
+    ///
+    /// Allocates a glibc-sized `regex_t`, calls glibc `regcomp`, and stores
+    /// the result. The macOS `regex_t` at `preg` gets `re_nsub` written.
+    pub extern "C" fn shim_regcomp(
+        preg: u64, // macOS regex_t* (32 bytes, can't fit glibc's ~64 bytes)
+        pattern: *const c_char,
+        cflags: c_int,
+    ) -> c_int {
+        let linux_cflags = translate_regcomp_flags(cflags);
+        log::trace!("regcomp: preg={preg:#x} flags {cflags:#x} → {linux_cflags:#x}");
 
-        let pmatch_ptr = if darwin_pmatch == 0 && !has_startend {
-            std::ptr::null_mut()
+        let mut linux_re: Box<libc::regex_t> = Box::new(unsafe { std::mem::zeroed() });
+        let ret = unsafe { libc::regcomp(&mut *linux_re, pattern, linux_cflags) };
+        if ret == 0 {
+            // Write re_nsub into the macOS struct at offset 8
+            // Also write re_magic at offset 0 (0xF265 = BSD regex magic)
+            // Linux glibc regex_t stores re_nsub at offset 48 (size_t)
+            let nsub = unsafe {
+                let re_ptr = &*linux_re as *const libc::regex_t as *const u8;
+                *(re_ptr.add(48) as *const u64)
+            };
+            if preg != 0 {
+                unsafe {
+                    // re_magic at offset 0 (i32)
+                    let magic_ptr = preg as *mut i32;
+                    *magic_ptr = 0xF265_u32 as i32; // BSD regex magic number
+                                                    // re_nsub at offset 8 (u64 / size_t)
+                    let nsub_ptr = (preg + 8) as *mut u64;
+                    *nsub_ptr = nsub;
+                }
+            }
+            log::trace!("regcomp: success, re_nsub={nsub}");
+            regex_map_insert(preg, linux_re);
         } else {
-            linux_pmatch.as_mut_ptr()
-        };
+            log::trace!("regcomp: failed with error {ret}");
+        }
+        ret
+    }
 
-        let ret = unsafe { libc::regexec(linux_re, string, effective_nm, pmatch_ptr, eflags) };
-        log::trace!("regexec: result={ret} (0=match, 1=nomatch)");
+    /// `int regexec(const regex_t *preg, const char *string, size_t nmatch,
+    ///              regmatch_t *pmatch, int eflags)`
+    ///
+    /// Looks up the glibc regex_t from our map and calls glibc regexec.
+    /// macOS `regmatch_t` uses `regoff_t = int64_t` (8 bytes each)→ 16 bytes.
+    /// Linux  `regmatch_t` uses `regoff_t = int`     (4 bytes each)→  8 bytes.
+    #[repr(C)]
+    struct DarwinRegmatch {
+        rm_so: i64,
+        rm_eo: i64,
+    }
 
-        // Convert output pmatch from Linux to macOS layout
-        if darwin_pmatch != 0 && ret == 0 {
-            for i in 0..nm {
-                let darwin = unsafe { &mut *((darwin_pmatch as *mut DarwinRegmatch).add(i)) };
-                darwin.rm_so = linux_pmatch[i].rm_so as i64;
-                darwin.rm_eo = linux_pmatch[i].rm_eo as i64;
+    /// `int regexec(const regex_t *preg, const char *string, size_t nmatch,
+    ///              regmatch_t *pmatch, int eflags)`
+    ///
+    /// Bridges between macOS 16-byte regmatch_t and Linux 8-byte regmatch_t.
+    pub extern "C" fn shim_regexec(
+        preg: u64,
+        string: *const c_char,
+        nmatch: u64,
+        darwin_pmatch: u64, // actually *mut DarwinRegmatch (16 bytes each)
+        eflags: c_int,
+    ) -> c_int {
+        log::trace!("regexec: preg={preg:#x} nmatch={nmatch} eflags={eflags:#x}");
+
+        if let Some(linux_re) = regex_map_get(preg) {
+            let nm = nmatch as usize;
+            let has_startend = eflags & 4 != 0 && darwin_pmatch != 0;
+            // REG_STARTEND requires at least 1 pmatch entry for the input range
+            let effective_nm = if has_startend { nm.max(1) } else { nm };
+            // Allocate Linux-sized pmatch array
+            let mut linux_pmatch: Vec<libc::regmatch_t> = vec![
+                libc::regmatch_t {
+                    rm_so: -1,
+                    rm_eo: -1
+                };
+                effective_nm.max(1)
+            ];
+
+            // If REG_STARTEND, convert input pmatch[0] from macOS (16-byte) to Linux (8-byte)
+            if has_startend {
+                let darwin = unsafe { &*(darwin_pmatch as *const DarwinRegmatch) };
+                linux_pmatch[0].rm_so = darwin.rm_so as i32;
+                linux_pmatch[0].rm_eo = darwin.rm_eo as i32;
+                log::trace!(
+                    "regexec REG_STARTEND: range [{}, {})",
+                    linux_pmatch[0].rm_so,
+                    linux_pmatch[0].rm_eo
+                );
+            }
+
+            let pmatch_ptr = if darwin_pmatch == 0 && !has_startend {
+                std::ptr::null_mut()
+            } else {
+                linux_pmatch.as_mut_ptr()
+            };
+
+            let ret = unsafe { libc::regexec(linux_re, string, effective_nm, pmatch_ptr, eflags) };
+            log::trace!("regexec: result={ret} (0=match, 1=nomatch)");
+
+            // Convert output pmatch from Linux to macOS layout
+            if darwin_pmatch != 0 && ret == 0 {
+                for i in 0..nm {
+                    let darwin = unsafe { &mut *((darwin_pmatch as *mut DarwinRegmatch).add(i)) };
+                    darwin.rm_so = linux_pmatch[i].rm_so as i64;
+                    darwin.rm_eo = linux_pmatch[i].rm_eo as i64;
+                }
+            }
+
+            ret
+        } else {
+            log::warn!(
+                "regexec: no compiled regex found for preg={preg:#x} (map has {} entries)",
+                {
+                    let guard = REGEX_MAP.lock().unwrap();
+                    guard.as_ref().map_or(0, |m| m.len())
+                }
+            );
+            1 // REG_NOMATCH
+        }
+    }
+
+    /// `void regfree(regex_t *preg)`
+    ///
+    /// Frees the glibc regex_t from our map.
+    pub extern "C" fn shim_regfree(preg: u64) {
+        if let Some(mut linux_re) = regex_map_remove(preg) {
+            unsafe {
+                libc::regfree(&mut *linux_re);
             }
         }
-
-        ret
-    } else {
-        log::warn!("regexec: no compiled regex found for preg={preg:#x} (map has {} entries)", {
-            let guard = REGEX_MAP.lock().unwrap();
-            guard.as_ref().map_or(0, |m| m.len())
-        });
-        1 // REG_NOMATCH
     }
-}
 
-/// `void regfree(regex_t *preg)`
-///
-/// Frees the glibc regex_t from our map.
-pub extern "C" fn shim_regfree(preg: u64) {
-    if let Some(mut linux_re) = regex_map_remove(preg) {
-        unsafe { libc::regfree(&mut *linux_re); }
+    /// `size_t regerror(int errcode, const regex_t *preg, char *errbuf, size_t errbuf_size)`
+    pub extern "C" fn shim_regerror(
+        errcode: c_int,
+        preg: u64,
+        errbuf: *mut c_char,
+        errbuf_size: u64,
+    ) -> u64 {
+        if let Some(linux_re) = regex_map_get(preg) {
+            unsafe { libc::regerror(errcode, linux_re, errbuf, errbuf_size as usize) as u64 }
+        } else {
+            unsafe {
+                libc::regerror(errcode, std::ptr::null(), errbuf, errbuf_size as usize) as u64
+            }
+        }
     }
-}
-
-/// `size_t regerror(int errcode, const regex_t *preg, char *errbuf, size_t errbuf_size)`
-pub extern "C" fn shim_regerror(
-    errcode: c_int,
-    preg: u64,
-    errbuf: *mut c_char,
-    errbuf_size: u64,
-) -> u64 {
-    if let Some(linux_re) = regex_map_get(preg) {
-        unsafe { libc::regerror(errcode, linux_re, errbuf, errbuf_size as usize) as u64 }
-    } else {
-        unsafe { libc::regerror(errcode, std::ptr::null(), errbuf, errbuf_size as usize) as u64 }
-    }
-}
 } // mod regex_shims
 
 #[cfg(target_os = "linux")]
@@ -1081,7 +1332,10 @@ mod tests {
     fn test_bootstrap_look_up() {
         // NULL service name + NULL sp → BOOTSTRAP_BAD_COUNT (1104)
         // (sp is checked first in launchd::bootstrap::bootstrap_look_up)
-        assert_eq!(shim_bootstrap_look_up(0, std::ptr::null(), std::ptr::null_mut()), 1104);
+        assert_eq!(
+            shim_bootstrap_look_up(0, std::ptr::null(), std::ptr::null_mut()),
+            1104
+        );
         // Valid service name → KERN_SUCCESS (0) + non-zero port
         let name = b"com.apple.test.service\0";
         let mut port: u32 = 0;
@@ -1098,13 +1352,27 @@ mod tests {
     #[test]
     fn test_posix_spawn_null_path_returns_einval() {
         let mut pid: libc::pid_t = 0;
-        let rc = shim_posix_spawn(&mut pid, std::ptr::null(), std::ptr::null(), std::ptr::null(), std::ptr::null(), std::ptr::null());
+        let rc = shim_posix_spawn(
+            &mut pid,
+            std::ptr::null(),
+            std::ptr::null(),
+            std::ptr::null(),
+            std::ptr::null(),
+            std::ptr::null(),
+        );
         assert_eq!(rc, libc::EINVAL);
     }
 
     #[test]
     fn test_posix_spawnp_null_file_returns_einval() {
-        let rc = shim_posix_spawnp(std::ptr::null_mut(), std::ptr::null(), std::ptr::null(), std::ptr::null(), std::ptr::null(), std::ptr::null());
+        let rc = shim_posix_spawnp(
+            std::ptr::null_mut(),
+            std::ptr::null(),
+            std::ptr::null(),
+            std::ptr::null(),
+            std::ptr::null(),
+            std::ptr::null(),
+        );
         assert_eq!(rc, libc::EINVAL);
     }
 
@@ -1134,8 +1402,14 @@ mod tests {
 
     #[test]
     fn test_posix_spawn_addchdir_returns_enosys() {
-        assert_eq!(shim_posix_spawn_file_actions_addchdir_np(0, 0), libc::ENOSYS);
-        assert_eq!(shim_posix_spawn_file_actions_addfchdir_np(0, 0), libc::ENOSYS);
+        assert_eq!(
+            shim_posix_spawn_file_actions_addchdir_np(0, 0),
+            libc::ENOSYS
+        );
+        assert_eq!(
+            shim_posix_spawn_file_actions_addfchdir_np(0, 0),
+            libc::ENOSYS
+        );
     }
 
     // ── mmap flag translation tests ─────────────────────────────
@@ -1177,23 +1451,23 @@ mod tests {
 
     #[test]
     fn test_rlimit_divergent_values() {
-        assert_eq!(translate_rlimit_resource(5), 9);  // RLIMIT_AS
-        assert_eq!(translate_rlimit_resource(6), 8);  // RLIMIT_MEMLOCK
-        assert_eq!(translate_rlimit_resource(7), 6);  // RLIMIT_NPROC
-        assert_eq!(translate_rlimit_resource(8), 7);  // RLIMIT_NOFILE
+        assert_eq!(translate_rlimit_resource(5), 9); // RLIMIT_AS
+        assert_eq!(translate_rlimit_resource(6), 8); // RLIMIT_MEMLOCK
+        assert_eq!(translate_rlimit_resource(7), 6); // RLIMIT_NPROC
+        assert_eq!(translate_rlimit_resource(8), 7); // RLIMIT_NOFILE
     }
 
     // ── sysconf translation tests ───────────────────────────────
 
     #[test]
     fn test_sysconf_pagesize() {
-        assert_eq!(translate_sysconf_name(29), 30);  // _SC_PAGESIZE
+        assert_eq!(translate_sysconf_name(29), 30); // _SC_PAGESIZE
     }
 
     #[test]
     fn test_sysconf_nprocessors() {
-        assert_eq!(translate_sysconf_name(57), 83);  // _SC_NPROCESSORS_CONF
-        assert_eq!(translate_sysconf_name(58), 84);  // _SC_NPROCESSORS_ONLN
+        assert_eq!(translate_sysconf_name(57), 83); // _SC_NPROCESSORS_CONF
+        assert_eq!(translate_sysconf_name(58), 84); // _SC_NPROCESSORS_ONLN
     }
 
     #[test]
@@ -1203,9 +1477,9 @@ mod tests {
 
     #[test]
     fn test_sysconf_common_values() {
-        assert_eq!(translate_sysconf_name(1), 0);    // _SC_ARG_MAX
-        assert_eq!(translate_sysconf_name(3), 2);    // _SC_CLK_TCK
-        assert_eq!(translate_sysconf_name(5), 4);    // _SC_OPEN_MAX
+        assert_eq!(translate_sysconf_name(1), 0); // _SC_ARG_MAX
+        assert_eq!(translate_sysconf_name(3), 2); // _SC_CLK_TCK
+        assert_eq!(translate_sysconf_name(5), 4); // _SC_OPEN_MAX
     }
 
     #[test]

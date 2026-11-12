@@ -147,7 +147,10 @@ mod tests {
 
         assert_string_eq(shim_xcstringsdataentry_key(obj, 0), "greeting");
         assert_string_eq(shim_xcstringsdataentry_value(obj, 0), "Hello");
-        assert_string_eq(shim_xcstringsdataentry_comment(obj, 0), "A greeting message");
+        assert_string_eq(
+            shim_xcstringsdataentry_comment(obj, 0),
+            "A greeting message",
+        );
 
         free_obj(obj);
     }
@@ -170,7 +173,10 @@ mod tests {
 
         let cm = make_string("some commentary");
         shim_xcstringsdataentry_set_commentary(obj, 0, cm);
-        assert_string_eq(shim_xcstringsdataentry_commentary(obj, 0), "some commentary");
+        assert_string_eq(
+            shim_xcstringsdataentry_commentary(obj, 0),
+            "some commentary",
+        );
 
         free_obj(obj);
     }

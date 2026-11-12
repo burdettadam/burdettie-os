@@ -59,6 +59,11 @@ pub extern "C" fn shim_nslocale_current_locale(_cls: u64, _cmd: u64) -> u64 {
     })
 }
 
+/// `+[NSLocale autoupdatingCurrentLocale]` — returns the current locale singleton.
+pub extern "C" fn shim_nslocale_autoupdating_current_locale(_cls: u64, _cmd: u64) -> u64 {
+    shim_nslocale_current_locale(_cls, _cmd)
+}
+
 /// `+[NSLocale systemLocale]` — returns the system locale (same as current for now).
 pub extern "C" fn shim_nslocale_system_locale(_cls: u64, _cmd: u64) -> u64 {
     shim_nslocale_current_locale(_cls, _cmd)
@@ -157,13 +162,21 @@ pub extern "C" fn shim_nslocale_display_name_for_key_value(
     if obj == 0 || key == 0 || value == 0 {
         return 0;
     }
-    let Some(key_str) = cfstring::extract_cfstring_cstr(key) else { return value; };
-    let Some(val_str) = cfstring::extract_cfstring_cstr(value) else { return value; };
+    let Some(key_str) = cfstring::extract_cfstring_cstr(key) else {
+        return value;
+    };
+    let Some(val_str) = cfstring::extract_cfstring_cstr(value) else {
+        return value;
+    };
 
     let display = match key_str {
         "NSLocaleIdentifier" | "kCFLocaleIdentifierKey" => locale_display_name(val_str),
-        "NSLocaleLanguageCode" | "kCFLocaleLanguageCodeKey" => language_display_name(val_str).map(String::from),
-        "NSLocaleCountryCode" | "kCFLocaleCountryCodeKey" => country_display_name(val_str).map(String::from),
+        "NSLocaleLanguageCode" | "kCFLocaleLanguageCodeKey" => {
+            language_display_name(val_str).map(String::from)
+        }
+        "NSLocaleCountryCode" | "kCFLocaleCountryCodeKey" => {
+            country_display_name(val_str).map(String::from)
+        }
         _ => None,
     };
 
@@ -178,36 +191,83 @@ pub extern "C" fn shim_nslocale_display_name_for_key_value(
 
 fn language_display_name(code: &str) -> Option<&'static str> {
     Some(match code {
-        "en" => "English", "es" => "Spanish", "fr" => "French",
-        "de" => "German", "it" => "Italian", "pt" => "Portuguese",
-        "zh" => "Chinese", "ja" => "Japanese", "ko" => "Korean",
-        "ru" => "Russian", "ar" => "Arabic", "hi" => "Hindi",
-        "nl" => "Dutch", "sv" => "Swedish", "da" => "Danish",
-        "fi" => "Finnish", "nb" => "Norwegian Bokmål", "pl" => "Polish",
-        "tr" => "Turkish", "uk" => "Ukrainian", "cs" => "Czech",
-        "el" => "Greek", "he" => "Hebrew", "th" => "Thai",
-        "id" => "Indonesian", "ms" => "Malay", "vi" => "Vietnamese",
-        "ro" => "Romanian", "hu" => "Hungarian", "ca" => "Catalan",
-        "hr" => "Croatian", "sk" => "Slovak", "bg" => "Bulgarian",
+        "en" => "English",
+        "es" => "Spanish",
+        "fr" => "French",
+        "de" => "German",
+        "it" => "Italian",
+        "pt" => "Portuguese",
+        "zh" => "Chinese",
+        "ja" => "Japanese",
+        "ko" => "Korean",
+        "ru" => "Russian",
+        "ar" => "Arabic",
+        "hi" => "Hindi",
+        "nl" => "Dutch",
+        "sv" => "Swedish",
+        "da" => "Danish",
+        "fi" => "Finnish",
+        "nb" => "Norwegian Bokmål",
+        "pl" => "Polish",
+        "tr" => "Turkish",
+        "uk" => "Ukrainian",
+        "cs" => "Czech",
+        "el" => "Greek",
+        "he" => "Hebrew",
+        "th" => "Thai",
+        "id" => "Indonesian",
+        "ms" => "Malay",
+        "vi" => "Vietnamese",
+        "ro" => "Romanian",
+        "hu" => "Hungarian",
+        "ca" => "Catalan",
+        "hr" => "Croatian",
+        "sk" => "Slovak",
+        "bg" => "Bulgarian",
         _ => return None,
     })
 }
 
 fn country_display_name(code: &str) -> Option<&'static str> {
     Some(match code {
-        "US" => "United States", "GB" => "United Kingdom", "CA" => "Canada",
-        "AU" => "Australia", "NZ" => "New Zealand", "IE" => "Ireland",
-        "DE" => "Germany", "FR" => "France", "ES" => "Spain",
-        "IT" => "Italy", "PT" => "Portugal", "BR" => "Brazil",
-        "MX" => "Mexico", "AR" => "Argentina", "CO" => "Colombia",
-        "JP" => "Japan", "CN" => "China", "TW" => "Taiwan",
-        "KR" => "South Korea", "IN" => "India", "RU" => "Russia",
-        "NL" => "Netherlands", "SE" => "Sweden", "NO" => "Norway",
-        "DK" => "Denmark", "FI" => "Finland", "PL" => "Poland",
-        "TR" => "Turkey", "SA" => "Saudi Arabia", "AE" => "United Arab Emirates",
-        "IL" => "Israel", "TH" => "Thailand", "SG" => "Singapore",
-        "CZ" | "CK" => "Czech Republic", "AT" => "Austria", "CH" => "Switzerland",
-        "BE" => "Belgium", "ZA" => "South Africa",
+        "US" => "United States",
+        "GB" => "United Kingdom",
+        "CA" => "Canada",
+        "AU" => "Australia",
+        "NZ" => "New Zealand",
+        "IE" => "Ireland",
+        "DE" => "Germany",
+        "FR" => "France",
+        "ES" => "Spain",
+        "IT" => "Italy",
+        "PT" => "Portugal",
+        "BR" => "Brazil",
+        "MX" => "Mexico",
+        "AR" => "Argentina",
+        "CO" => "Colombia",
+        "JP" => "Japan",
+        "CN" => "China",
+        "TW" => "Taiwan",
+        "KR" => "South Korea",
+        "IN" => "India",
+        "RU" => "Russia",
+        "NL" => "Netherlands",
+        "SE" => "Sweden",
+        "NO" => "Norway",
+        "DK" => "Denmark",
+        "FI" => "Finland",
+        "PL" => "Poland",
+        "TR" => "Turkey",
+        "SA" => "Saudi Arabia",
+        "AE" => "United Arab Emirates",
+        "IL" => "Israel",
+        "TH" => "Thailand",
+        "SG" => "Singapore",
+        "CZ" | "CK" => "Czech Republic",
+        "AT" => "Austria",
+        "CH" => "Switzerland",
+        "BE" => "Belgium",
+        "ZA" => "South Africa",
         _ => return None,
     })
 }
@@ -277,6 +337,14 @@ mod tests {
         // Calling again returns the same singleton
         let loc2 = shim_nslocale_current_locale(0, 0);
         assert_eq!(loc1, loc2);
+    }
+
+    #[test]
+    fn autoupdating_current_locale_matches_current_locale() {
+        let current = shim_nslocale_current_locale(0, 0);
+        let autoupdating = shim_nslocale_autoupdating_current_locale(0, 0);
+        assert_ne!(autoupdating, 0);
+        assert_eq!(autoupdating, current);
     }
 
     // ── shim_nslocale_locale_identifier ────────────────────────────
@@ -531,7 +599,10 @@ mod tests {
         assert_ne!(arr, 0);
         // Should have at least one element
         let count = crate::nsarray::shim_nsarray_count(arr, 0);
-        assert!(count >= 1, "preferredLanguages should return at least one language");
+        assert!(
+            count >= 1,
+            "preferredLanguages should return at least one language"
+        );
 
         // First element should be a non-empty string
         let first = crate::nsarray::shim_nsarray_object_at_index(arr, 0, 0);

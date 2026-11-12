@@ -84,7 +84,10 @@ impl NSApplication {
 
     /// Add an event handler (for testing / headless use).
     pub fn add_event_handler(&self, handler: impl FnMut(&Event) + Send + 'static) {
-        self.event_handlers.lock().unwrap_or_else(|e| e.into_inner()).push(Box::new(handler));
+        self.event_handlers
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .push(Box::new(handler));
     }
 
     /// Set the main menu bar.
@@ -126,7 +129,12 @@ impl NSApplication {
         self.running.store(true, Ordering::SeqCst);
 
         // Notify delegate
-        if let Some(delegate) = self.delegate.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
+        if let Some(delegate) = self
+            .delegate
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .as_ref()
+        {
             delegate.application_did_finish_launching();
         }
 
@@ -142,7 +150,12 @@ impl NSApplication {
         }
 
         // Notify delegate
-        if let Some(delegate) = self.delegate.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
+        if let Some(delegate) = self
+            .delegate
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .as_ref()
+        {
             delegate.application_will_terminate();
         }
     }
@@ -198,10 +211,16 @@ impl NSApplication {
                 }
                 WindowEvent::ModifiersChanged(_, mods) => {
                     let flags = ModifierFlags::from_backend_modifiers(&mods);
-                    *self.tracked_modifiers.lock().unwrap_or_else(|e| e.into_inner()) = flags;
+                    *self
+                        .tracked_modifiers
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner()) = flags;
                 }
                 WindowEvent::KeyDown(_, key) => {
-                    let modifiers = *self.tracked_modifiers.lock().unwrap_or_else(|e| e.into_inner());
+                    let modifiers = *self
+                        .tracked_modifiers
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner());
                     // Try menu key equivalents first
                     if !self.perform_key_equivalent(key, modifiers) {
                         let event = Event::KeyDown { key, modifiers };
@@ -209,11 +228,11 @@ impl NSApplication {
                     }
                 }
                 WindowEvent::KeyUp(_, key) => {
-                    let modifiers = *self.tracked_modifiers.lock().unwrap_or_else(|e| e.into_inner());
-                    let event = Event::KeyUp {
-                        key,
-                        modifiers,
-                    };
+                    let modifiers = *self
+                        .tracked_modifiers
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner());
+                    let event = Event::KeyUp { key, modifiers };
                     self.dispatch_event(&event);
                 }
                 WindowEvent::CharacterInput(_, text) => {
@@ -241,7 +260,10 @@ impl NSApplication {
                     self.dispatch_event(&event);
                 }
                 WindowEvent::ScrollWheel(_, dx, dy) => {
-                    let event = Event::ScrollWheel { delta_x: dx, delta_y: dy };
+                    let event = Event::ScrollWheel {
+                        delta_x: dx,
+                        delta_y: dy,
+                    };
                     self.dispatch_event(&event);
                 }
                 WindowEvent::Resized(_, _, _) | WindowEvent::RedrawRequested(_) => {
@@ -255,7 +277,10 @@ impl NSApplication {
     }
 
     fn dispatch_event(&self, event: &Event) {
-        let mut handlers = self.event_handlers.lock().unwrap_or_else(|e| e.into_inner());
+        let mut handlers = self
+            .event_handlers
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         for handler in handlers.iter_mut() {
             handler(event);
         }
@@ -321,7 +346,12 @@ mod tests {
 
         // Manually run the app lifecycle instead of app.run()
         app.running.store(true, Ordering::SeqCst);
-        if let Some(delegate) = app.delegate.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
+        if let Some(delegate) = app
+            .delegate
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .as_ref()
+        {
             delegate.application_did_finish_launching();
         }
 
@@ -331,7 +361,12 @@ mod tests {
         }
 
         app.running.store(false, Ordering::SeqCst);
-        if let Some(delegate) = app.delegate.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
+        if let Some(delegate) = app
+            .delegate
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .as_ref()
+        {
             delegate.application_will_terminate();
         }
 
@@ -431,10 +466,8 @@ mod tests {
         ));
         app.set_main_menu(menu);
 
-        let handled = app.perform_key_equivalent(
-            window_backend::KeyCode::Q,
-            ModifierFlags::COMMAND,
-        );
+        let handled =
+            app.perform_key_equivalent(window_backend::KeyCode::Q, ModifierFlags::COMMAND);
         assert!(handled);
         assert!(fired.load(Ordering::SeqCst));
     }
@@ -450,10 +483,8 @@ mod tests {
         ));
         app.set_main_menu(menu);
 
-        let handled = app.perform_key_equivalent(
-            window_backend::KeyCode::W,
-            ModifierFlags::COMMAND,
-        );
+        let handled =
+            app.perform_key_equivalent(window_backend::KeyCode::W, ModifierFlags::COMMAND);
         assert!(!handled);
     }
 
@@ -643,7 +674,10 @@ mod tests {
         assert_eq!(Appearance::Aqua, Appearance::Aqua);
         assert_eq!(Appearance::DarkAqua, Appearance::DarkAqua);
         assert_ne!(Appearance::Aqua, Appearance::DarkAqua);
-        assert_ne!(Appearance::HighContrastAqua, Appearance::HighContrastDarkAqua);
+        assert_ne!(
+            Appearance::HighContrastAqua,
+            Appearance::HighContrastDarkAqua
+        );
     }
 
     #[test]

@@ -19,13 +19,19 @@ const ATTR_OFF: usize = 16;
 pub(crate) const ANCHOR_SIZE: usize = 24;
 
 fn read_u64(obj: u64, offset: usize) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + offset) as *const u64) }
 }
 
 fn write_u64(obj: u64, offset: usize, value: u64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as usize + offset) as *mut u64) = value; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + offset) as *mut u64) = value;
+    }
 }
 
 // ── Relation constants ─────────────────────────────────────────
@@ -46,16 +52,27 @@ fn make_constraint(
     constant: f64,
 ) -> u64 {
     crate::nslayoutconstraint::shim_nslayoutconstraint_create(
-        0, 0, first_item, first_attr, relation,
-        second_item, second_attr, multiplier, constant,
+        0,
+        0,
+        first_item,
+        first_attr,
+        relation,
+        second_item,
+        second_attr,
+        multiplier,
+        constant,
     )
 }
 
 /// Allocate a new anchor object storing the owning view and attribute.
 pub(crate) fn make_anchor(item: u64, attribute: u64) -> u64 {
     let obj = crate::pal_alloc().calloc(1, ANCHOR_SIZE) as u64;
-    if obj == 0 { return 0; }
-    unsafe { *(obj as *mut u64) = crate::nsobj::nslayoutanchor_class_addr(); }
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *(obj as *mut u64) = crate::nsobj::nslayoutanchor_class_addr();
+    }
     write_u64(obj, ITEM_OFF, item);
     write_u64(obj, ATTR_OFF, attribute);
     obj
@@ -65,86 +82,234 @@ pub(crate) fn make_anchor(item: u64, attribute: u64) -> u64 {
 
 /// `-[NSLayoutAnchor constraintEqualToAnchor:]`
 pub extern "C" fn shim_nslayoutanchor_constraint_eq(obj: u64, _cmd: u64, other: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let other_item = read_u64(other, ITEM_OFF);
     let other_attr = read_u64(other, ATTR_OFF);
-    make_constraint(read_u64(obj, ITEM_OFF), read_u64(obj, ATTR_OFF), REL_EQ, other_item, other_attr, 1.0, 0.0)
+    make_constraint(
+        read_u64(obj, ITEM_OFF),
+        read_u64(obj, ATTR_OFF),
+        REL_EQ,
+        other_item,
+        other_attr,
+        1.0,
+        0.0,
+    )
 }
 
 /// `-[NSLayoutAnchor constraintEqualToAnchor:constant:]`
-pub extern "C" fn shim_nslayoutanchor_constraint_eq_constant(obj: u64, _cmd: u64, other: u64, constant: f64) -> u64 {
-    if obj == 0 { return 0; }
+pub extern "C" fn shim_nslayoutanchor_constraint_eq_constant(
+    obj: u64,
+    _cmd: u64,
+    other: u64,
+    constant: f64,
+) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
     let other_item = read_u64(other, ITEM_OFF);
     let other_attr = read_u64(other, ATTR_OFF);
-    make_constraint(read_u64(obj, ITEM_OFF), read_u64(obj, ATTR_OFF), REL_EQ, other_item, other_attr, 1.0, constant)
+    make_constraint(
+        read_u64(obj, ITEM_OFF),
+        read_u64(obj, ATTR_OFF),
+        REL_EQ,
+        other_item,
+        other_attr,
+        1.0,
+        constant,
+    )
 }
 
 /// `-[NSLayoutAnchor constraintGreaterThanOrEqualToAnchor:]`
 pub extern "C" fn shim_nslayoutanchor_constraint_ge(obj: u64, _cmd: u64, other: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let other_item = read_u64(other, ITEM_OFF);
     let other_attr = read_u64(other, ATTR_OFF);
-    make_constraint(read_u64(obj, ITEM_OFF), read_u64(obj, ATTR_OFF), REL_GE, other_item, other_attr, 1.0, 0.0)
+    make_constraint(
+        read_u64(obj, ITEM_OFF),
+        read_u64(obj, ATTR_OFF),
+        REL_GE,
+        other_item,
+        other_attr,
+        1.0,
+        0.0,
+    )
 }
 
 /// `-[NSLayoutAnchor constraintGreaterThanOrEqualToAnchor:constant:]`
-pub extern "C" fn shim_nslayoutanchor_constraint_ge_constant(obj: u64, _cmd: u64, other: u64, constant: f64) -> u64 {
-    if obj == 0 { return 0; }
+pub extern "C" fn shim_nslayoutanchor_constraint_ge_constant(
+    obj: u64,
+    _cmd: u64,
+    other: u64,
+    constant: f64,
+) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
     let other_item = read_u64(other, ITEM_OFF);
     let other_attr = read_u64(other, ATTR_OFF);
-    make_constraint(read_u64(obj, ITEM_OFF), read_u64(obj, ATTR_OFF), REL_GE, other_item, other_attr, 1.0, constant)
+    make_constraint(
+        read_u64(obj, ITEM_OFF),
+        read_u64(obj, ATTR_OFF),
+        REL_GE,
+        other_item,
+        other_attr,
+        1.0,
+        constant,
+    )
 }
 
 /// `-[NSLayoutAnchor constraintLessThanOrEqualToAnchor:]`
 pub extern "C" fn shim_nslayoutanchor_constraint_le(obj: u64, _cmd: u64, other: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let other_item = read_u64(other, ITEM_OFF);
     let other_attr = read_u64(other, ATTR_OFF);
-    make_constraint(read_u64(obj, ITEM_OFF), read_u64(obj, ATTR_OFF), REL_LE, other_item, other_attr, 1.0, 0.0)
+    make_constraint(
+        read_u64(obj, ITEM_OFF),
+        read_u64(obj, ATTR_OFF),
+        REL_LE,
+        other_item,
+        other_attr,
+        1.0,
+        0.0,
+    )
 }
 
 /// `-[NSLayoutAnchor constraintLessThanOrEqualToAnchor:constant:]`
-pub extern "C" fn shim_nslayoutanchor_constraint_le_constant(obj: u64, _cmd: u64, other: u64, constant: f64) -> u64 {
-    if obj == 0 { return 0; }
+pub extern "C" fn shim_nslayoutanchor_constraint_le_constant(
+    obj: u64,
+    _cmd: u64,
+    other: u64,
+    constant: f64,
+) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
     let other_item = read_u64(other, ITEM_OFF);
     let other_attr = read_u64(other, ATTR_OFF);
-    make_constraint(read_u64(obj, ITEM_OFF), read_u64(obj, ATTR_OFF), REL_LE, other_item, other_attr, 1.0, constant)
+    make_constraint(
+        read_u64(obj, ITEM_OFF),
+        read_u64(obj, ATTR_OFF),
+        REL_LE,
+        other_item,
+        other_attr,
+        1.0,
+        constant,
+    )
 }
 
 // ── NSLayoutDimension extra methods ────────────────────────────
 
 /// `-[NSLayoutDimension constraintEqualToConstant:]`
-pub extern "C" fn shim_nslayoutdimension_constraint_eq_constant(obj: u64, _cmd: u64, constant: f64) -> u64 {
-    if obj == 0 { return 0; }
-    make_constraint(read_u64(obj, ITEM_OFF), read_u64(obj, ATTR_OFF), REL_EQ, 0, 0, 1.0, constant)
+pub extern "C" fn shim_nslayoutdimension_constraint_eq_constant(
+    obj: u64,
+    _cmd: u64,
+    constant: f64,
+) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
+    make_constraint(
+        read_u64(obj, ITEM_OFF),
+        read_u64(obj, ATTR_OFF),
+        REL_EQ,
+        0,
+        0,
+        1.0,
+        constant,
+    )
 }
 
 /// `-[NSLayoutDimension constraintGreaterThanOrEqualToConstant:]`
-pub extern "C" fn shim_nslayoutdimension_constraint_ge_constant(obj: u64, _cmd: u64, constant: f64) -> u64 {
-    if obj == 0 { return 0; }
-    make_constraint(read_u64(obj, ITEM_OFF), read_u64(obj, ATTR_OFF), REL_GE, 0, 0, 1.0, constant)
+pub extern "C" fn shim_nslayoutdimension_constraint_ge_constant(
+    obj: u64,
+    _cmd: u64,
+    constant: f64,
+) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
+    make_constraint(
+        read_u64(obj, ITEM_OFF),
+        read_u64(obj, ATTR_OFF),
+        REL_GE,
+        0,
+        0,
+        1.0,
+        constant,
+    )
 }
 
 /// `-[NSLayoutDimension constraintLessThanOrEqualToConstant:]`
-pub extern "C" fn shim_nslayoutdimension_constraint_le_constant(obj: u64, _cmd: u64, constant: f64) -> u64 {
-    if obj == 0 { return 0; }
-    make_constraint(read_u64(obj, ITEM_OFF), read_u64(obj, ATTR_OFF), REL_LE, 0, 0, 1.0, constant)
+pub extern "C" fn shim_nslayoutdimension_constraint_le_constant(
+    obj: u64,
+    _cmd: u64,
+    constant: f64,
+) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
+    make_constraint(
+        read_u64(obj, ITEM_OFF),
+        read_u64(obj, ATTR_OFF),
+        REL_LE,
+        0,
+        0,
+        1.0,
+        constant,
+    )
 }
 
 /// `-[NSLayoutDimension constraintEqualToAnchor:multiplier:]`
-pub extern "C" fn shim_nslayoutdimension_constraint_eq_anchor_multiplier(obj: u64, _cmd: u64, other: u64, multiplier: f64) -> u64 {
-    if obj == 0 { return 0; }
+pub extern "C" fn shim_nslayoutdimension_constraint_eq_anchor_multiplier(
+    obj: u64,
+    _cmd: u64,
+    other: u64,
+    multiplier: f64,
+) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
     let other_item = read_u64(other, ITEM_OFF);
     let other_attr = read_u64(other, ATTR_OFF);
-    make_constraint(read_u64(obj, ITEM_OFF), read_u64(obj, ATTR_OFF), REL_EQ, other_item, other_attr, multiplier, 0.0)
+    make_constraint(
+        read_u64(obj, ITEM_OFF),
+        read_u64(obj, ATTR_OFF),
+        REL_EQ,
+        other_item,
+        other_attr,
+        multiplier,
+        0.0,
+    )
 }
 
 /// `-[NSLayoutDimension constraintEqualToAnchor:multiplier:constant:]`
-pub extern "C" fn shim_nslayoutdimension_constraint_eq_anchor_multiplier_constant(obj: u64, _cmd: u64, other: u64, multiplier: f64, constant: f64) -> u64 {
-    if obj == 0 { return 0; }
+pub extern "C" fn shim_nslayoutdimension_constraint_eq_anchor_multiplier_constant(
+    obj: u64,
+    _cmd: u64,
+    other: u64,
+    multiplier: f64,
+    constant: f64,
+) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
     let other_item = read_u64(other, ITEM_OFF);
     let other_attr = read_u64(other, ATTR_OFF);
-    make_constraint(read_u64(obj, ITEM_OFF), read_u64(obj, ATTR_OFF), REL_EQ, other_item, other_attr, multiplier, constant)
+    make_constraint(
+        read_u64(obj, ITEM_OFF),
+        read_u64(obj, ATTR_OFF),
+        REL_EQ,
+        other_item,
+        other_attr,
+        multiplier,
+        constant,
+    )
 }
 
 // ── Accessor shims ─────────────────────────────────────────────
@@ -158,61 +323,81 @@ pub extern "C" fn shim_nslayoutanchor_item(obj: u64, _cmd: u64) -> u64 {
 
 /// `-[NSView leadingAnchor]`
 pub extern "C" fn shim_nsview_leading_anchor(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     make_anchor(obj, 5)
 }
 
 /// `-[NSView trailingAnchor]`
 pub extern "C" fn shim_nsview_trailing_anchor(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     make_anchor(obj, 6)
 }
 
 /// `-[NSView leftAnchor]`
 pub extern "C" fn shim_nsview_left_anchor(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     make_anchor(obj, 1)
 }
 
 /// `-[NSView rightAnchor]`
 pub extern "C" fn shim_nsview_right_anchor(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     make_anchor(obj, 2)
 }
 
 /// `-[NSView topAnchor]`
 pub extern "C" fn shim_nsview_top_anchor(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     make_anchor(obj, 3)
 }
 
 /// `-[NSView bottomAnchor]`
 pub extern "C" fn shim_nsview_bottom_anchor(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     make_anchor(obj, 4)
 }
 
 /// `-[NSView widthAnchor]`
 pub extern "C" fn shim_nsview_width_anchor(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     make_anchor(obj, 7)
 }
 
 /// `-[NSView heightAnchor]`
 pub extern "C" fn shim_nsview_height_anchor(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     make_anchor(obj, 8)
 }
 
 /// `-[NSView centerXAnchor]`
 pub extern "C" fn shim_nsview_center_x_anchor(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     make_anchor(obj, 9)
 }
 
 /// `-[NSView centerYAnchor]`
 pub extern "C" fn shim_nsview_center_y_anchor(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     make_anchor(obj, 10)
 }
 
@@ -264,7 +449,7 @@ mod tests {
         // Read constraint fields at known offsets (from nslayoutconstraint.rs)
         let first_item = unsafe { *((c as usize + 8) as *const u64) };
         let first_attr = unsafe { *((c as usize + 16) as *const u64) };
-        let relation   = unsafe { *((c as usize + 24) as *const u64) };
+        let relation = unsafe { *((c as usize + 24) as *const u64) };
         let second_item = unsafe { *((c as usize + 32) as *const u64) };
         let second_attr = unsafe { *((c as usize + 40) as *const u64) };
 
@@ -291,10 +476,10 @@ mod tests {
         let c = shim_nslayoutdimension_constraint_eq_constant(anchor, 0, 200.0);
         assert_ne!(c, 0);
 
-        let first_item  = unsafe { *((c as usize + 8) as *const u64) };
-        let first_attr  = unsafe { *((c as usize + 16) as *const u64) };
+        let first_item = unsafe { *((c as usize + 8) as *const u64) };
+        let first_attr = unsafe { *((c as usize + 16) as *const u64) };
         let second_item = unsafe { *((c as usize + 32) as *const u64) };
-        let constant    = unsafe { *((c as usize + 56) as *const f64) };
+        let constant = unsafe { *((c as usize + 56) as *const f64) };
 
         assert_eq!(first_item, view);
         assert_eq!(first_attr, 7); // width
@@ -328,8 +513,16 @@ mod tests {
         for &(accessor, expected_attr) in cases {
             let anchor = accessor(view, 0);
             assert_ne!(anchor, 0, "anchor for attr {expected_attr} was nil");
-            assert_eq!(read_u64(anchor, ITEM_OFF), view, "item mismatch for attr {expected_attr}");
-            assert_eq!(read_u64(anchor, ATTR_OFF), expected_attr, "attr mismatch for attr {expected_attr}");
+            assert_eq!(
+                read_u64(anchor, ITEM_OFF),
+                view,
+                "item mismatch for attr {expected_attr}"
+            );
+            assert_eq!(
+                read_u64(anchor, ATTR_OFF),
+                expected_attr,
+                "attr mismatch for attr {expected_attr}"
+            );
             free_obj(anchor);
         }
 
@@ -349,11 +542,26 @@ mod tests {
         assert_eq!(shim_nslayoutanchor_constraint_le_constant(0, 0, 0, 10.0), 0);
 
         // NSLayoutDimension methods
-        assert_eq!(shim_nslayoutdimension_constraint_eq_constant(0, 0, 100.0), 0);
-        assert_eq!(shim_nslayoutdimension_constraint_ge_constant(0, 0, 100.0), 0);
-        assert_eq!(shim_nslayoutdimension_constraint_le_constant(0, 0, 100.0), 0);
-        assert_eq!(shim_nslayoutdimension_constraint_eq_anchor_multiplier(0, 0, 0, 2.0), 0);
-        assert_eq!(shim_nslayoutdimension_constraint_eq_anchor_multiplier_constant(0, 0, 0, 2.0, 10.0), 0);
+        assert_eq!(
+            shim_nslayoutdimension_constraint_eq_constant(0, 0, 100.0),
+            0
+        );
+        assert_eq!(
+            shim_nslayoutdimension_constraint_ge_constant(0, 0, 100.0),
+            0
+        );
+        assert_eq!(
+            shim_nslayoutdimension_constraint_le_constant(0, 0, 100.0),
+            0
+        );
+        assert_eq!(
+            shim_nslayoutdimension_constraint_eq_anchor_multiplier(0, 0, 0, 2.0),
+            0
+        );
+        assert_eq!(
+            shim_nslayoutdimension_constraint_eq_anchor_multiplier_constant(0, 0, 0, 2.0, 10.0),
+            0
+        );
 
         // Accessor
         assert_eq!(shim_nslayoutanchor_item(0, 0), 0);

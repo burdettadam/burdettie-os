@@ -100,8 +100,15 @@ pub extern "C" fn shim_nsprocessinfo_is_operating_system_at_least_version(
 
     let current = current_os_version();
     u8::from(
-        (current.major_version, current.minor_version, current.patch_version)
-            >= (version.major_version, version.minor_version, version.patch_version),
+        (
+            current.major_version,
+            current.minor_version,
+            current.patch_version,
+        ) >= (
+            version.major_version,
+            version.minor_version,
+            version.patch_version,
+        ),
     )
 }
 
@@ -112,11 +119,9 @@ pub extern "C" fn shim_nsprocessinfo_arguments(obj: u64, _cmd: u64) -> u64 {
     }
 
     let args = libsystem_shims::process::process_args().unwrap_or_else(|| {
-        vec![
-            libsystem_shims::process::process_name()
-                .map(|s| s.to_string())
-                .unwrap_or_else(|| "burdettie-os".to_string()),
-        ]
+        vec![libsystem_shims::process::process_name()
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "burdettie-os".to_string())]
     });
 
     let ns_args: Vec<u64> = args
@@ -138,6 +143,7 @@ pub extern "C" fn shim_nsprocessinfo_environment(_obj: u64, _cmd: u64) -> u64 {
     // Safety: `environ` is a null-terminated array of "KEY=VALUE\0" C strings.
     // We read it once, building NSString pairs before returning.
     let mut pairs: Vec<(String, String)> = Vec::new();
+    #[cfg(unix)]
     unsafe {
         extern "C" {
             static environ: *const *const libc::c_char;
@@ -145,7 +151,9 @@ pub extern "C" fn shim_nsprocessinfo_environment(_obj: u64, _cmd: u64) -> u64 {
         let mut ptr = environ;
         while !ptr.is_null() {
             let entry = *ptr;
-            if entry.is_null() { break; }
+            if entry.is_null() {
+                break;
+            }
             let s = std::ffi::CStr::from_ptr(entry).to_string_lossy();
             if let Some(eq) = s.find('=') {
                 pairs.push((s[..eq].to_string(), s[eq + 1..].to_string()));
@@ -154,12 +162,21 @@ pub extern "C" fn shim_nsprocessinfo_environment(_obj: u64, _cmd: u64) -> u64 {
         }
     }
 
+    #[cfg(not(unix))]
+    {
+        pairs.extend(std::env::vars());
+    }
+
     // Build an NSMutableDictionary using the existing public shims.
     let cls = crate::nsobj::nsmutabledictionary_class_addr();
     let dict = crate::nsmutabledict::shim_nsmutabledict_dictionary_with_capacity(
-        cls, 0, pairs.len() as u64,
+        cls,
+        0,
+        pairs.len() as u64,
     );
-    if dict == 0 { return 0; }
+    if dict == 0 {
+        return 0;
+    }
 
     for (k, v) in &pairs {
         let ck = std::ffi::CString::new(k.as_str()).unwrap_or_default();
@@ -336,7 +353,10 @@ mod tests {
         assert_ne!(args, 0);
         // NSArray layout: count at offset 8
         let count = read_field(args, 8);
-        assert!(count >= 1, "arguments should include at least argv[0], got {count}");
+        assert!(
+            count >= 1,
+            "arguments should include at least argv[0], got {count}"
+        );
     }
 
     #[test]

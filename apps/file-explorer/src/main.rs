@@ -194,12 +194,7 @@ fn main() {
 
     // ── Path bar (label 0) ─────────────────────────────
     let mut path_label = Label::new(
-        Rect::new(
-            FILE_LIST_X,
-            MENU_H + 4.0,
-            FILE_LIST_W,
-            PATH_BAR_H - 4.0,
-        ),
+        Rect::new(FILE_LIST_X, MENU_H + 4.0, FILE_LIST_W, PATH_BAR_H - 4.0),
         &format!("  {}", current_dir.display()),
     );
     path_label.set_text_color(Color::new(0.2, 0.2, 0.3, 1.0));
@@ -286,11 +281,21 @@ fn main() {
         }
         app.add_label(name_lbl);
         app.add_label(Label::new(
-            Rect::new(FILE_LIST_X + FILE_LIST_W * 0.55, y, FILE_LIST_W * 0.2, ROW_H),
+            Rect::new(
+                FILE_LIST_X + FILE_LIST_W * 0.55,
+                y,
+                FILE_LIST_W * 0.2,
+                ROW_H,
+            ),
             &size_str,
         ));
         app.add_label(Label::new(
-            Rect::new(FILE_LIST_X + FILE_LIST_W * 0.75, y, FILE_LIST_W * 0.25, ROW_H),
+            Rect::new(
+                FILE_LIST_X + FILE_LIST_W * 0.75,
+                y,
+                FILE_LIST_W * 0.25,
+                ROW_H,
+            ),
             &kind_str,
         ));
     }
@@ -308,10 +313,7 @@ fn main() {
 
     // ── Navigation buttons ─────────────────────────────
     let nav_y = WIN_H - 36.0;
-    app.add_button(Button::new(
-        Rect::new(FILE_LIST_X, nav_y, 60.0, 26.0),
-        "Up",
-    ));
+    app.add_button(Button::new(Rect::new(FILE_LIST_X, nav_y, 60.0, 26.0), "Up"));
     app.add_button(Button::new(
         Rect::new(FILE_LIST_X + 70.0, nav_y, 70.0, 26.0),
         "Scroll ^",
@@ -385,20 +387,14 @@ fn main() {
 
                 if file_idx < entries.len() {
                     let e = &entries[file_idx];
-                    labels[name_label_idx]
-                        .set_text(format!("  {} {}", e.icon(), e.name));
+                    labels[name_label_idx].set_text(format!("  {} {}", e.icon(), e.name));
                     if e.is_dir {
-                        labels[name_label_idx]
-                            .set_text_color(Color::new(0.1, 0.3, 0.7, 1.0));
+                        labels[name_label_idx].set_text_color(Color::new(0.1, 0.3, 0.7, 1.0));
                     } else {
                         labels[name_label_idx].set_text_color(Color::BLACK);
                     }
                     labels[size_label_idx].set_text(e.size_display());
-                    labels[kind_label_idx].set_text(if e.is_dir {
-                        "Folder"
-                    } else {
-                        "File"
-                    });
+                    labels[kind_label_idx].set_text(if e.is_dir { "Folder" } else { "File" });
                 } else {
                     labels[name_label_idx].set_text("");
                     labels[size_label_idx].set_text("");

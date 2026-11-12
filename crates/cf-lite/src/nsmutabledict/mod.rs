@@ -129,21 +129,13 @@ pub extern "C" fn shim_nsmutabledict_dictionary_with_capacity(
 
 /// `-[NSMutableDictionary initWithCapacity:]` — initializes an allocated
 /// mutable dictionary instance with storage for the requested capacity.
-pub extern "C" fn shim_nsmutabledict_init_with_capacity(
-    obj: u64,
-    _cmd: u64,
-    capacity: u64,
-) -> u64 {
+pub extern "C" fn shim_nsmutabledict_init_with_capacity(obj: u64, _cmd: u64, capacity: u64) -> u64 {
     init_dictionary_storage(obj, capacity)
 }
 
 /// `-[NSMutableDictionary initWithDictionary:]` — initializes an allocated
 /// mutable dictionary instance by copying all key-value pairs from the source.
-pub extern "C" fn shim_nsmutabledict_init_with_dictionary(
-    obj: u64,
-    _cmd: u64,
-    source: u64,
-) -> u64 {
+pub extern "C" fn shim_nsmutabledict_init_with_dictionary(obj: u64, _cmd: u64, source: u64) -> u64 {
     if obj == 0 {
         return 0;
     }
@@ -392,11 +384,7 @@ pub extern "C" fn shim_nsmutabledict_remove_objects_for_keys(
 
 /// `-[NSMutableDictionary setDictionary:]` — replace all contents with entries
 /// from `other`.  Clears current entries then copies from `other`.
-pub extern "C" fn shim_nsmutabledict_set_dictionary(
-    obj: u64,
-    _cmd: u64,
-    other: u64,
-) -> u64 {
+pub extern "C" fn shim_nsmutabledict_set_dictionary(obj: u64, _cmd: u64, other: u64) -> u64 {
     if obj == 0 {
         return 0;
     }

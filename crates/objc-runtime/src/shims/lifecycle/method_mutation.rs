@@ -2,8 +2,8 @@
 
 use std::ffi::{c_char, CStr};
 
-use crate::class::OBJC_RUNTIME;
 use super::dynamic_class::add_method_to_staged_class;
+use crate::class::OBJC_RUNTIME;
 
 /// `BOOL class_addMethod(Class cls, SEL name, IMP imp, const char *types)`
 pub extern "C" fn shim_class_add_method(cls: u64, sel: u64, imp: u64, types: *const c_char) -> u8 {
@@ -94,7 +94,10 @@ pub extern "C" fn shim_class_replace_method(
         entry.type_encoding = type_enc.into();
         log::debug!(
             "class_replaceMethod: cls={:#x} sel='{}' old_imp={:#x} new_imp={:#x}",
-            cls, sel_str, old_imp, imp
+            cls,
+            sel_str,
+            old_imp,
+            imp
         );
         old_imp
     } else {
@@ -109,7 +112,9 @@ pub extern "C" fn shim_class_replace_method(
         class.method_index.insert(sel_owned.into(), idx);
         log::debug!(
             "class_replaceMethod: cls={:#x} sel='{}' added new method imp={:#x}",
-            cls, sel_str, imp
+            cls,
+            sel_str,
+            imp
         );
         0
     }
@@ -160,7 +165,9 @@ pub extern "C" fn shim_method_set_implementation(method: u64, imp: u64) -> u64 {
 
     log::debug!(
         "method_setImplementation: method={:#x} old_imp={:#x} new_imp={:#x}",
-        method, old_imp, imp
+        method,
+        old_imp,
+        imp
     );
     old_imp
 }
@@ -233,7 +240,8 @@ pub extern "C" fn shim_method_exchange_implementations(m1: u64, m2: u64) {
 
     log::debug!(
         "method_exchangeImplementations: swapped imp1={:#x} ↔ imp2={:#x}",
-        imp1, imp2
+        imp1,
+        imp2
     );
 }
 
@@ -314,12 +322,8 @@ mod tests {
         register_empty_class("MutTestA", 0xB001_0000);
         let sel = CString::new("foo").unwrap();
         let types = CString::new("v@:").unwrap();
-        let result = shim_class_add_method(
-            0xB001_0000,
-            sel.as_ptr() as u64,
-            0x1000,
-            types.as_ptr(),
-        );
+        let result =
+            shim_class_add_method(0xB001_0000, sel.as_ptr() as u64, 0x1000, types.as_ptr());
         assert_eq!(result, 1);
     }
 
@@ -336,7 +340,9 @@ mod tests {
 
     #[test]
     fn add_method_to_staged_class_pair_before_register() {
-        use crate::shims::lifecycle::dynamic_class::{shim_objc_allocate_class_pair, shim_objc_register_class_pair};
+        use crate::shims::lifecycle::dynamic_class::{
+            shim_objc_allocate_class_pair, shim_objc_register_class_pair,
+        };
 
         let name = CString::new("MutTestStaged").unwrap();
         let cls = shim_objc_allocate_class_pair(0, name.as_ptr(), 0);
@@ -354,7 +360,9 @@ mod tests {
         let guard = OBJC_RUNTIME.read().unwrap();
         let rt = guard.as_ref().unwrap();
         let registered = rt.get_class("MutTestStaged").unwrap();
-        assert!(registered.find_method("applicationDidFinishLaunching:").is_some());
+        assert!(registered
+            .find_method("applicationDidFinishLaunching:")
+            .is_some());
     }
 
     #[test]
@@ -362,12 +370,8 @@ mod tests {
         register_empty_class("MutTestC", 0xB001_0002);
         let sel = CString::new("baz").unwrap();
         let types = CString::new("v@:").unwrap();
-        let old = shim_class_replace_method(
-            0xB001_0002,
-            sel.as_ptr() as u64,
-            0x4000,
-            types.as_ptr(),
-        );
+        let old =
+            shim_class_replace_method(0xB001_0002, sel.as_ptr() as u64, 0x4000, types.as_ptr());
         assert_eq!(old, 0);
     }
 
@@ -376,12 +380,8 @@ mod tests {
         register_class_with_method("MutTestD", 0xB001_0003, "qux", 0x5000);
         let sel = CString::new("qux").unwrap();
         let types = CString::new("v@:").unwrap();
-        let old = shim_class_replace_method(
-            0xB001_0003,
-            sel.as_ptr() as u64,
-            0x6000,
-            types.as_ptr(),
-        );
+        let old =
+            shim_class_replace_method(0xB001_0003, sel.as_ptr() as u64, 0x6000, types.as_ptr());
         assert_eq!(old, 0x5000);
     }
 

@@ -16,9 +16,13 @@ use tiny_http::Request;
 pub struct ContentHandler;
 
 impl Handler for ContentHandler {
-    fn handle(&self, path: &str, _method: &str, _body: &[u8], _request: &Request)
-        -> Option<HandlerResponse>
-    {
+    fn handle(
+        &self,
+        path: &str,
+        _method: &str,
+        _body: &[u8],
+        _request: &Request,
+    ) -> Option<HandlerResponse> {
         let is_content = path.starts_with("/api/v1/content/");
         let is_validate = path.starts_with("/api/v1/apps/validate");
 

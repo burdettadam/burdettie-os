@@ -1,8 +1,5 @@
 use graphics_core::{Rect, Renderer};
-use ui_view::layout::{
-    self as constraint, LayoutAttribute, LayoutEngine, ViewId,
-    SUPERVIEW,
-};
+use ui_view::layout::{self as constraint, LayoutAttribute, LayoutEngine, ViewId, SUPERVIEW};
 use ui_view::View;
 
 use super::{Axis, Distribution, StackView};
@@ -104,134 +101,150 @@ impl StackView {
         self.child_frames.clear();
 
         match self.axis {
-            Axis::Vertical => {
-                match self.distribution {
-                    Distribution::FillEqually => {
-                        let child_h =
-                            ((inner_h - total_spacing) / count as f64).max(0.0);
-                        let mut y = inner_y;
-                        for _ in 0..count {
-                            self.child_frames.push(Rect::new(
-                                inner_x, y, inner_w, child_h,
-                            ));
-                            y += child_h + self.spacing;
-                        }
-                    }
-                    Distribution::Natural => {
-                        let mut y = inner_y;
-                        let subviews = self.view.subviews();
-                        for sv in subviews {
-                            let child_h = sv.frame.height;
-                            self.child_frames.push(Rect::new(
-                                inner_x, y, inner_w, child_h,
-                            ));
-                            y += child_h + self.spacing;
-                        }
-                    }
-                    Distribution::FillProportionally => {
-                        let subviews = self.view.subviews();
-                        let total_intrinsic: f64 = subviews.iter().map(|sv| sv.frame.height).sum();
-                        let available = inner_h - total_spacing;
-                        let mut y = inner_y;
-                        for sv in subviews {
-                            let child_h = if total_intrinsic > 0.0 {
-                                (sv.frame.height / total_intrinsic * available).max(0.0)
-                            } else {
-                                (available / count as f64).max(0.0)
-                            };
-                            self.child_frames.push(Rect::new(inner_x, y, inner_w, child_h));
-                            y += child_h + self.spacing;
-                        }
-                    }
-                    Distribution::EqualSpacing => {
-                        let subviews = self.view.subviews();
-                        let total_child: f64 = subviews.iter().map(|sv| sv.frame.height).sum();
-                        let remaining = (inner_h - total_child).max(0.0);
-                        let gap = if count > 1 { remaining / (count as f64 - 1.0) } else { 0.0 };
-                        let mut y = inner_y;
-                        for sv in subviews {
-                            let child_h = sv.frame.height;
-                            self.child_frames.push(Rect::new(inner_x, y, inner_w, child_h));
-                            y += child_h + gap;
-                        }
-                    }
-                    Distribution::EqualCentering => {
-                        let subviews = self.view.subviews();
-                        let center_spacing = if count > 1 { inner_h / count as f64 } else { inner_h };
-                        for (i, sv) in subviews.iter().enumerate() {
-                            let child_h = sv.frame.height;
-                            let center_y = inner_y + center_spacing * (i as f64 + 0.5);
-                            self.child_frames.push(Rect::new(
-                                inner_x, center_y - child_h / 2.0, inner_w, child_h,
-                            ));
-                        }
+            Axis::Vertical => match self.distribution {
+                Distribution::FillEqually => {
+                    let child_h = ((inner_h - total_spacing) / count as f64).max(0.0);
+                    let mut y = inner_y;
+                    for _ in 0..count {
+                        self.child_frames
+                            .push(Rect::new(inner_x, y, inner_w, child_h));
+                        y += child_h + self.spacing;
                     }
                 }
-            }
-            Axis::Horizontal => {
-                match self.distribution {
-                    Distribution::FillEqually => {
-                        let child_w =
-                            ((inner_w - total_spacing) / count as f64).max(0.0);
-                        let mut x = inner_x;
-                        for _ in 0..count {
-                            self.child_frames.push(Rect::new(
-                                x, inner_y, child_w, inner_h,
-                            ));
-                            x += child_w + self.spacing;
-                        }
-                    }
-                    Distribution::Natural => {
-                        let mut x = inner_x;
-                        let subviews = self.view.subviews();
-                        for sv in subviews {
-                            let child_w = sv.frame.width;
-                            self.child_frames.push(Rect::new(
-                                x, inner_y, child_w, inner_h,
-                            ));
-                            x += child_w + self.spacing;
-                        }
-                    }
-                    Distribution::FillProportionally => {
-                        let subviews = self.view.subviews();
-                        let total_intrinsic: f64 = subviews.iter().map(|sv| sv.frame.width).sum();
-                        let available = inner_w - total_spacing;
-                        let mut x = inner_x;
-                        for sv in subviews {
-                            let child_w = if total_intrinsic > 0.0 {
-                                (sv.frame.width / total_intrinsic * available).max(0.0)
-                            } else {
-                                (available / count as f64).max(0.0)
-                            };
-                            self.child_frames.push(Rect::new(x, inner_y, child_w, inner_h));
-                            x += child_w + self.spacing;
-                        }
-                    }
-                    Distribution::EqualSpacing => {
-                        let subviews = self.view.subviews();
-                        let total_child: f64 = subviews.iter().map(|sv| sv.frame.width).sum();
-                        let remaining = (inner_w - total_child).max(0.0);
-                        let gap = if count > 1 { remaining / (count as f64 - 1.0) } else { 0.0 };
-                        let mut x = inner_x;
-                        for sv in subviews {
-                            let child_w = sv.frame.width;
-                            self.child_frames.push(Rect::new(x, inner_y, child_w, inner_h));
-                            x += child_w + gap;
-                        }
-                    }
-                    Distribution::EqualCentering => {
-                        let subviews = self.view.subviews();
-                        let center_spacing = if count > 1 { inner_w / count as f64 } else { inner_w };
-                        for (i, sv) in subviews.iter().enumerate() {
-                            let child_w = sv.frame.width;
-                            let center_x = inner_x + center_spacing * (i as f64 + 0.5);
-                            self.child_frames.push(Rect::new(
-                                center_x - child_w / 2.0, inner_y, child_w, inner_h,
-                            ));
-                        }
+                Distribution::Natural => {
+                    let mut y = inner_y;
+                    let subviews = self.view.subviews();
+                    for sv in subviews {
+                        let child_h = sv.frame.height;
+                        self.child_frames
+                            .push(Rect::new(inner_x, y, inner_w, child_h));
+                        y += child_h + self.spacing;
                     }
                 }
-            }
+                Distribution::FillProportionally => {
+                    let subviews = self.view.subviews();
+                    let total_intrinsic: f64 = subviews.iter().map(|sv| sv.frame.height).sum();
+                    let available = inner_h - total_spacing;
+                    let mut y = inner_y;
+                    for sv in subviews {
+                        let child_h = if total_intrinsic > 0.0 {
+                            (sv.frame.height / total_intrinsic * available).max(0.0)
+                        } else {
+                            (available / count as f64).max(0.0)
+                        };
+                        self.child_frames
+                            .push(Rect::new(inner_x, y, inner_w, child_h));
+                        y += child_h + self.spacing;
+                    }
+                }
+                Distribution::EqualSpacing => {
+                    let subviews = self.view.subviews();
+                    let total_child: f64 = subviews.iter().map(|sv| sv.frame.height).sum();
+                    let remaining = (inner_h - total_child).max(0.0);
+                    let gap = if count > 1 {
+                        remaining / (count as f64 - 1.0)
+                    } else {
+                        0.0
+                    };
+                    let mut y = inner_y;
+                    for sv in subviews {
+                        let child_h = sv.frame.height;
+                        self.child_frames
+                            .push(Rect::new(inner_x, y, inner_w, child_h));
+                        y += child_h + gap;
+                    }
+                }
+                Distribution::EqualCentering => {
+                    let subviews = self.view.subviews();
+                    let center_spacing = if count > 1 {
+                        inner_h / count as f64
+                    } else {
+                        inner_h
+                    };
+                    for (i, sv) in subviews.iter().enumerate() {
+                        let child_h = sv.frame.height;
+                        let center_y = inner_y + center_spacing * (i as f64 + 0.5);
+                        self.child_frames.push(Rect::new(
+                            inner_x,
+                            center_y - child_h / 2.0,
+                            inner_w,
+                            child_h,
+                        ));
+                    }
+                }
+            },
+            Axis::Horizontal => match self.distribution {
+                Distribution::FillEqually => {
+                    let child_w = ((inner_w - total_spacing) / count as f64).max(0.0);
+                    let mut x = inner_x;
+                    for _ in 0..count {
+                        self.child_frames
+                            .push(Rect::new(x, inner_y, child_w, inner_h));
+                        x += child_w + self.spacing;
+                    }
+                }
+                Distribution::Natural => {
+                    let mut x = inner_x;
+                    let subviews = self.view.subviews();
+                    for sv in subviews {
+                        let child_w = sv.frame.width;
+                        self.child_frames
+                            .push(Rect::new(x, inner_y, child_w, inner_h));
+                        x += child_w + self.spacing;
+                    }
+                }
+                Distribution::FillProportionally => {
+                    let subviews = self.view.subviews();
+                    let total_intrinsic: f64 = subviews.iter().map(|sv| sv.frame.width).sum();
+                    let available = inner_w - total_spacing;
+                    let mut x = inner_x;
+                    for sv in subviews {
+                        let child_w = if total_intrinsic > 0.0 {
+                            (sv.frame.width / total_intrinsic * available).max(0.0)
+                        } else {
+                            (available / count as f64).max(0.0)
+                        };
+                        self.child_frames
+                            .push(Rect::new(x, inner_y, child_w, inner_h));
+                        x += child_w + self.spacing;
+                    }
+                }
+                Distribution::EqualSpacing => {
+                    let subviews = self.view.subviews();
+                    let total_child: f64 = subviews.iter().map(|sv| sv.frame.width).sum();
+                    let remaining = (inner_w - total_child).max(0.0);
+                    let gap = if count > 1 {
+                        remaining / (count as f64 - 1.0)
+                    } else {
+                        0.0
+                    };
+                    let mut x = inner_x;
+                    for sv in subviews {
+                        let child_w = sv.frame.width;
+                        self.child_frames
+                            .push(Rect::new(x, inner_y, child_w, inner_h));
+                        x += child_w + gap;
+                    }
+                }
+                Distribution::EqualCentering => {
+                    let subviews = self.view.subviews();
+                    let center_spacing = if count > 1 {
+                        inner_w / count as f64
+                    } else {
+                        inner_w
+                    };
+                    for (i, sv) in subviews.iter().enumerate() {
+                        let child_w = sv.frame.width;
+                        let center_x = inner_x + center_spacing * (i as f64 + 0.5);
+                        self.child_frames.push(Rect::new(
+                            center_x - child_w / 2.0,
+                            inner_y,
+                            child_w,
+                            inner_h,
+                        ));
+                    }
+                }
+            },
         }
 
         // Apply computed frames
@@ -281,33 +294,43 @@ impl StackView {
                 Axis::Vertical => {
                     // Pin left/right to superview with padding.
                     engine.add_constraint(constraint::equal(
-                        vid, LayoutAttribute::Left,
-                        SUPERVIEW, LayoutAttribute::Left,
+                        vid,
+                        LayoutAttribute::Left,
+                        SUPERVIEW,
+                        LayoutAttribute::Left,
                         self.padding,
                     ));
                     engine.add_constraint(constraint::equal(
-                        vid, LayoutAttribute::Right,
-                        SUPERVIEW, LayoutAttribute::Right,
+                        vid,
+                        LayoutAttribute::Right,
+                        SUPERVIEW,
+                        LayoutAttribute::Right,
                         -self.padding,
                     ));
                     // Chain vertically.
                     if i == 0 {
                         engine.add_constraint(constraint::equal(
-                            vid, LayoutAttribute::Top,
-                            SUPERVIEW, LayoutAttribute::Top,
+                            vid,
+                            LayoutAttribute::Top,
+                            SUPERVIEW,
+                            LayoutAttribute::Top,
                             self.padding,
                         ));
                     } else {
                         engine.add_constraint(constraint::equal(
-                            vid, LayoutAttribute::Top,
-                            ids[i - 1], LayoutAttribute::Bottom,
+                            vid,
+                            LayoutAttribute::Top,
+                            ids[i - 1],
+                            LayoutAttribute::Bottom,
                             self.spacing,
                         ));
                     }
                     if self.distribution == Distribution::FillEqually && i > 0 {
                         engine.add_constraint(constraint::equal(
-                            vid, LayoutAttribute::Height,
-                            ids[0], LayoutAttribute::Height,
+                            vid,
+                            LayoutAttribute::Height,
+                            ids[0],
+                            LayoutAttribute::Height,
                             0.0,
                         ));
                     }
@@ -315,33 +338,43 @@ impl StackView {
                 Axis::Horizontal => {
                     // Pin top/bottom to superview with padding.
                     engine.add_constraint(constraint::equal(
-                        vid, LayoutAttribute::Top,
-                        SUPERVIEW, LayoutAttribute::Top,
+                        vid,
+                        LayoutAttribute::Top,
+                        SUPERVIEW,
+                        LayoutAttribute::Top,
                         self.padding,
                     ));
                     engine.add_constraint(constraint::equal(
-                        vid, LayoutAttribute::Bottom,
-                        SUPERVIEW, LayoutAttribute::Bottom,
+                        vid,
+                        LayoutAttribute::Bottom,
+                        SUPERVIEW,
+                        LayoutAttribute::Bottom,
                         -self.padding,
                     ));
                     // Chain horizontally.
                     if i == 0 {
                         engine.add_constraint(constraint::equal(
-                            vid, LayoutAttribute::Left,
-                            SUPERVIEW, LayoutAttribute::Left,
+                            vid,
+                            LayoutAttribute::Left,
+                            SUPERVIEW,
+                            LayoutAttribute::Left,
                             self.padding,
                         ));
                     } else {
                         engine.add_constraint(constraint::equal(
-                            vid, LayoutAttribute::Left,
-                            ids[i - 1], LayoutAttribute::Right,
+                            vid,
+                            LayoutAttribute::Left,
+                            ids[i - 1],
+                            LayoutAttribute::Right,
                             self.spacing,
                         ));
                     }
                     if self.distribution == Distribution::FillEqually && i > 0 {
                         engine.add_constraint(constraint::equal(
-                            vid, LayoutAttribute::Width,
-                            ids[0], LayoutAttribute::Width,
+                            vid,
+                            LayoutAttribute::Width,
+                            ids[0],
+                            LayoutAttribute::Width,
                             0.0,
                         ));
                     }
@@ -355,15 +388,19 @@ impl StackView {
             match self.axis {
                 Axis::Vertical => {
                     engine.add_constraint(constraint::equal(
-                        last, LayoutAttribute::Bottom,
-                        SUPERVIEW, LayoutAttribute::Bottom,
+                        last,
+                        LayoutAttribute::Bottom,
+                        SUPERVIEW,
+                        LayoutAttribute::Bottom,
                         -self.padding,
                     ));
                 }
                 Axis::Horizontal => {
                     engine.add_constraint(constraint::equal(
-                        last, LayoutAttribute::Right,
-                        SUPERVIEW, LayoutAttribute::Right,
+                        last,
+                        LayoutAttribute::Right,
+                        SUPERVIEW,
+                        LayoutAttribute::Right,
                         -self.padding,
                     ));
                 }
@@ -388,4 +425,3 @@ impl StackView {
         }
     }
 }
-

@@ -427,9 +427,7 @@ impl RealAmfi {
             SecurityVerdict::Allow
         } else if cs_info.has_cms_signature {
             SecurityVerdict::AllowWithWarning {
-                warning: format!(
-                    "CMS present but chain-to-Apple not confirmed: {cms_summary}"
-                ),
+                warning: format!("CMS present but chain-to-Apple not confirmed: {cms_summary}"),
             }
         } else {
             SecurityVerdict::AllowWithWarning {
@@ -637,9 +635,8 @@ impl RealQuarantine {
         let attr_name = b"com.apple.quarantine\0".as_ptr() as *const libc::c_char;
 
         // First call: get the size
-        let size = unsafe {
-            libc::getxattr(c_path.as_ptr(), attr_name, std::ptr::null_mut(), 0, 0, 0)
-        };
+        let size =
+            unsafe { libc::getxattr(c_path.as_ptr(), attr_name, std::ptr::null_mut(), 0, 0, 0) };
         if size <= 0 {
             return None;
         }
@@ -670,14 +667,7 @@ impl RealQuarantine {
         // Linux uses "user." namespace for quarantine simulation
         let attr_name = b"user.quarantine\0".as_ptr() as *const libc::c_char;
 
-        let size = unsafe {
-            libc::getxattr(
-                c_path.as_ptr(),
-                attr_name,
-                std::ptr::null_mut(),
-                0,
-            )
-        };
+        let size = unsafe { libc::getxattr(c_path.as_ptr(), attr_name, std::ptr::null_mut(), 0) };
         if size <= 0 {
             return None;
         }
@@ -729,41 +719,39 @@ impl QuarantinePolicy for RealQuarantine {
                 // No quarantine xattr — binary was not downloaded from the internet
                 SecurityVerdict::Allow
             }
-            Some(ref xattr) => {
-                match crate::quarantine::QuarantineInfo::parse(xattr) {
-                    None => self.mode.apply(SecurityVerdict::AllowWithWarning {
-                        warning: format!("malformed quarantine xattr: {xattr:?}"),
-                    }),
-                    Some(qi) => {
-                        if qi.is_user_approved() {
-                            SecurityVerdict::AllowWithWarning {
-                                warning: format!(
-                                    "quarantined binary (user-approved, agent={})",
-                                    qi.agent_name
-                                ),
-                            }
-                        } else if self.block_unapproved {
-                            self.mode.apply(SecurityVerdict::Deny {
-                                reason: format!(
-                                    "quarantined binary not user-approved \
+            Some(ref xattr) => match crate::quarantine::QuarantineInfo::parse(xattr) {
+                None => self.mode.apply(SecurityVerdict::AllowWithWarning {
+                    warning: format!("malformed quarantine xattr: {xattr:?}"),
+                }),
+                Some(qi) => {
+                    if qi.is_user_approved() {
+                        SecurityVerdict::AllowWithWarning {
+                            warning: format!(
+                                "quarantined binary (user-approved, agent={})",
+                                qi.agent_name
+                            ),
+                        }
+                    } else if self.block_unapproved {
+                        self.mode.apply(SecurityVerdict::Deny {
+                            reason: format!(
+                                "quarantined binary not user-approved \
                                      (agent={}, flags=0x{:04x}). Remove quarantine: \
                                      xattr -d com.apple.quarantine <path>",
-                                    qi.agent_name,
-                                    qi.flags.bits()
-                                ),
-                            })
-                        } else {
-                            SecurityVerdict::AllowWithWarning {
-                                warning: format!(
-                                    "quarantined binary (agent={}, flags=0x{:04x})",
-                                    qi.agent_name,
-                                    qi.flags.bits()
-                                ),
-                            }
+                                qi.agent_name,
+                                qi.flags.bits()
+                            ),
+                        })
+                    } else {
+                        SecurityVerdict::AllowWithWarning {
+                            warning: format!(
+                                "quarantined binary (agent={}, flags=0x{:04x})",
+                                qi.agent_name,
+                                qi.flags.bits()
+                            ),
                         }
                     }
                 }
-            }
+            },
         }
     }
 }

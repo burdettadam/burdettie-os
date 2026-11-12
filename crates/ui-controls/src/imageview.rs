@@ -169,13 +169,11 @@ impl ImageView {
             let mut rgba = Vec::with_capacity(pixels.len() * 4);
             for &px in pixels {
                 rgba.push(((px >> 16) & 0xFF) as u8); // R
-                rgba.push(((px >> 8) & 0xFF) as u8);  // G
-                rgba.push((px & 0xFF) as u8);          // B
-                rgba.push(((px >> 24) & 0xFF) as u8);  // A
+                rgba.push(((px >> 8) & 0xFF) as u8); // G
+                rgba.push((px & 0xFF) as u8); // B
+                rgba.push(((px >> 24) & 0xFF) as u8); // A
             }
-            if let Some(buf) =
-                ImageBuffer::from_rgba(self.image_width, self.image_height, rgba)
-            {
+            if let Some(buf) = ImageBuffer::from_rgba(self.image_width, self.image_height, rgba) {
                 renderer.draw_image(&buf, dest);
             }
         }

@@ -107,10 +107,18 @@ impl<'a> SoftwareRenderer<'a> {
         let mut max_y = f64::MIN;
         for c in &corners {
             let t = self.transform_point(*c);
-            if t.x < min_x { min_x = t.x; }
-            if t.y < min_y { min_y = t.y; }
-            if t.x > max_x { max_x = t.x; }
-            if t.y > max_y { max_y = t.y; }
+            if t.x < min_x {
+                min_x = t.x;
+            }
+            if t.y < min_y {
+                min_y = t.y;
+            }
+            if t.x > max_x {
+                max_x = t.x;
+            }
+            if t.y > max_y {
+                max_y = t.y;
+            }
         }
         Rect::new(min_x, min_y, max_x - min_x, max_y - min_y)
     }
@@ -161,7 +169,6 @@ impl<'a> SoftwareRenderer<'a> {
     }
 }
 
-
 impl SoftwareRenderer<'_> {
     /// Get the effective clip rect (intersection of all clips in the stack).
     /// Returns None if no clips are active.
@@ -188,7 +195,13 @@ impl SoftwareRenderer<'_> {
 
 impl SoftwareRenderer<'_> {
     /// Legacy 5×7 bitmap font rendering (used when no FontManager is set).
-    pub(super) fn draw_text_bitmap(&mut self, text: &str, origin: Point, font: &Font, color: Color) {
+    pub(super) fn draw_text_bitmap(
+        &mut self,
+        text: &str,
+        origin: Point,
+        font: &Font,
+        color: Color,
+    ) {
         let c = color.to_argb32();
         let scale = (font.size / 7.0).max(1.0).round() as i32;
         let char_w = 5 * scale;
@@ -256,17 +269,21 @@ impl SoftwareRenderer<'_> {
 
             // Combining marks: position at same x as last base, no advance
             if is_combining_mark(ch) {
-                let glyph = glyph_id.with_scale_and_position(
-                    size,
-                    ab_glyph::point(last_base_x, baseline_y),
-                );
+                let glyph = glyph_id
+                    .with_scale_and_position(size, ab_glyph::point(last_base_x, baseline_y));
                 if let Some(outlined) = ab_font.outline_glyph(glyph) {
                     let bounds = outlined.px_bounds();
                     outlined.draw(|rx, ry, coverage| {
                         self.blend_pixel(
                             bounds.min.x as i32 + rx as i32,
                             bounds.min.y as i32 + ry as i32,
-                            coverage, cr, cg, cb, ca, sw, sh,
+                            coverage,
+                            cr,
+                            cg,
+                            cb,
+                            ca,
+                            sw,
+                            sh,
                         );
                     });
                 }
@@ -290,10 +307,8 @@ impl SoftwareRenderer<'_> {
                 continue;
             }
 
-            let glyph = glyph_id.with_scale_and_position(
-                size,
-                ab_glyph::point(cursor_x, baseline_y),
-            );
+            let glyph =
+                glyph_id.with_scale_and_position(size, ab_glyph::point(cursor_x, baseline_y));
 
             // Rasterize and blend
             if let Some(outlined) = ab_font.outline_glyph(glyph) {
@@ -302,7 +317,13 @@ impl SoftwareRenderer<'_> {
                     self.blend_pixel(
                         bounds.min.x as i32 + rx as i32,
                         bounds.min.y as i32 + ry as i32,
-                        coverage, cr, cg, cb, ca, sw, sh,
+                        coverage,
+                        cr,
+                        cg,
+                        cb,
+                        ca,
+                        sw,
+                        sh,
                     );
                 });
             }
@@ -315,10 +336,15 @@ impl SoftwareRenderer<'_> {
     /// Alpha-blend a single pixel at (px, py).
     pub(super) fn blend_pixel(
         &mut self,
-        px: i32, py: i32,
+        px: i32,
+        py: i32,
         coverage: f32,
-        cr: u32, cg: u32, cb: u32, ca: u32,
-        sw: i32, sh: i32,
+        cr: u32,
+        cg: u32,
+        cb: u32,
+        ca: u32,
+        sw: i32,
+        sh: i32,
     ) {
         if coverage <= 0.0 || px < 0 || py < 0 || px >= sw || py >= sh {
             return;

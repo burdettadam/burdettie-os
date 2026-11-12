@@ -8,9 +8,13 @@ use tiny_http::Request;
 pub struct CatchallHandler;
 
 impl Handler for CatchallHandler {
-    fn handle(&self, path: &str, method: &str, body: &[u8], _request: &Request)
-        -> Option<HandlerResponse>
-    {
+    fn handle(
+        &self,
+        path: &str,
+        method: &str,
+        body: &[u8],
+        _request: &Request,
+    ) -> Option<HandlerResponse> {
         // Accept everything that starts with /api/v1/
         if !path.starts_with("/api/v1/") {
             return None;

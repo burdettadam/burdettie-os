@@ -33,7 +33,9 @@ pub extern "C" fn shim_maptable_with_options(
     val_opts: u64,
 ) -> u64 {
     let obj = crate::pal_alloc().calloc(1, INSTANCE_SIZE as usize) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *(obj as *mut u64) = nsobj::nsmaptable_class_addr();
         *((obj + 8) as *mut u64) = key_opts;
@@ -62,42 +64,54 @@ pub extern "C" fn shim_maptable_strong_weak(_cls: u64, _cmd: u64) -> u64 {
 
 /// `-[NSMapTable objectForKey:]`
 pub extern "C" fn shim_maptable_object_for_key(obj: u64, _cmd: u64, key: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let map = unsafe { &mut *get_map(obj) };
     map.get(&key).copied().unwrap_or(0)
 }
 
 /// `-[NSMapTable setObject:forKey:]`
 pub extern "C" fn shim_maptable_set_object(obj: u64, _cmd: u64, value: u64, key: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let map = unsafe { &mut *get_map(obj) };
     map.insert(key, value);
 }
 
 /// `-[NSMapTable removeObjectForKey:]`
 pub extern "C" fn shim_maptable_remove_object(obj: u64, _cmd: u64, key: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let map = unsafe { &mut *get_map(obj) };
     map.remove(&key);
 }
 
 /// `-[NSMapTable removeAllObjects]`
 pub extern "C" fn shim_maptable_remove_all(obj: u64, _cmd: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let map = unsafe { &mut *get_map(obj) };
     map.clear();
 }
 
 /// `-[NSMapTable count]`
 pub extern "C" fn shim_maptable_count(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let map = unsafe { &mut *get_map(obj) };
     map.len() as u64
 }
 
 /// `-[NSMapTable description]`
 pub extern "C" fn shim_maptable_description(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let map = unsafe { &mut *get_map(obj) };
     let desc = format!("<NSMapTable: {} entries>", map.len());
     let c_desc = std::ffi::CString::new(desc).unwrap_or_default();
@@ -121,7 +135,7 @@ mod tests {
         let t = shim_maptable_with_options(0, 0, 5, 7);
         assert_ne!(t, 0);
         // Verify options stored
-        assert_eq!(read_field(t, 8), 5);  // key_options
+        assert_eq!(read_field(t, 8), 5); // key_options
         assert_eq!(read_field(t, 16), 7); // val_options
         free_obj(t);
     }

@@ -398,7 +398,10 @@ impl RealQuarantinePolicy {
         cs_info: &CodeSignatureInfo,
     ) -> (SecurityVerdict, GatekeeperAssessment) {
         let qinfo = read_quarantine_xattr(binary_path);
-        let notarization = if qinfo.as_ref().is_some_and(QuarantineInfo::is_notarized_stapled) {
+        let notarization = if qinfo
+            .as_ref()
+            .is_some_and(QuarantineInfo::is_notarized_stapled)
+        {
             NotarizationResult::stapled(&cs_info.cd_hash)
         } else {
             NotarizationResult::not_notarized()
@@ -474,7 +477,12 @@ mod tests {
     fn parse_quarantine_xattr_safari() {
         let raw = "0083;5f3be4c0;Safari;12345678-1234-1234-1234-123456789012";
         let info = QuarantineInfo::parse(raw).unwrap();
-        assert_eq!(info.flags, QuarantineFlags::FROM_WEB | QuarantineFlags::LAUNCH_SERVICES | QuarantineFlags::USER_APPROVED);
+        assert_eq!(
+            info.flags,
+            QuarantineFlags::FROM_WEB
+                | QuarantineFlags::LAUNCH_SERVICES
+                | QuarantineFlags::USER_APPROVED
+        );
         assert_eq!(info.timestamp, "5f3be4c0");
         assert_eq!(info.agent_name, "Safari");
         assert_eq!(info.uuid, "12345678-1234-1234-1234-123456789012");

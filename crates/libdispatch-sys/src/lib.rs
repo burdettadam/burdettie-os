@@ -19,7 +19,9 @@ pub type dispatch_object_t = *mut dispatch_object_s;
 
 /// Dispatch queue.
 #[repr(C)]
-pub struct dispatch_queue_s { _opaque: [u8; 0] }
+pub struct dispatch_queue_s {
+    _opaque: [u8; 0],
+}
 pub type dispatch_queue_t = *mut dispatch_queue_s;
 
 /// Dispatch queue attributes.
@@ -40,7 +42,9 @@ pub type dispatch_source_t = *mut dispatch_source_s;
 
 /// Dispatch source type.
 #[repr(C)]
-pub struct dispatch_source_type_s { _opaque: [u8; 0] }
+pub struct dispatch_source_type_s {
+    _opaque: [u8; 0],
+}
 pub type dispatch_source_type_t = *const dispatch_source_type_s;
 
 /// Dispatch data.
@@ -81,10 +85,7 @@ extern "C" {
         attr: dispatch_queue_attr_t,
     ) -> dispatch_queue_t;
 
-    pub fn dispatch_get_global_queue(
-        identifier: c_long,
-        flags: c_ulong,
-    ) -> dispatch_queue_t;
+    pub fn dispatch_get_global_queue(identifier: c_long, flags: c_ulong) -> dispatch_queue_t;
 
     /// `dispatch_get_main_queue()` is a macro on macOS expanding to
     /// `&_dispatch_main_q`. We expose the actual symbol.
@@ -92,10 +93,7 @@ extern "C" {
 
     pub fn dispatch_queue_get_label(queue: dispatch_queue_t) -> *const c_char;
 
-    pub fn dispatch_set_target_queue(
-        object: dispatch_object_t,
-        queue: dispatch_queue_t,
-    );
+    pub fn dispatch_set_target_queue(object: dispatch_object_t, queue: dispatch_queue_t);
 
     // ── Async / Sync ────────────────────────────────────────────
 
@@ -113,11 +111,7 @@ extern "C" {
     );
     pub fn dispatch_barrier_async(queue: dispatch_queue_t, block: dispatch_block_t);
     pub fn dispatch_barrier_sync(queue: dispatch_queue_t, block: dispatch_block_t);
-    pub fn dispatch_after(
-        when: dispatch_time_t,
-        queue: dispatch_queue_t,
-        block: dispatch_block_t,
-    );
+    pub fn dispatch_after(when: dispatch_time_t, queue: dispatch_queue_t, block: dispatch_block_t);
 
     // ── Once ────────────────────────────────────────────────────
 
@@ -136,10 +130,7 @@ extern "C" {
         queue: dispatch_queue_t,
         block: dispatch_block_t,
     );
-    pub fn dispatch_group_wait(
-        group: dispatch_group_t,
-        timeout: dispatch_time_t,
-    ) -> c_long;
+    pub fn dispatch_group_wait(group: dispatch_group_t, timeout: dispatch_time_t) -> c_long;
     pub fn dispatch_group_notify(
         group: dispatch_group_t,
         queue: dispatch_queue_t,
@@ -151,19 +142,14 @@ extern "C" {
     // ── Semaphores ──────────────────────────────────────────────
 
     pub fn dispatch_semaphore_create(value: c_long) -> dispatch_semaphore_t;
-    pub fn dispatch_semaphore_wait(
-        dsema: dispatch_semaphore_t,
-        timeout: dispatch_time_t,
-    ) -> c_long;
+    pub fn dispatch_semaphore_wait(dsema: dispatch_semaphore_t, timeout: dispatch_time_t)
+        -> c_long;
     pub fn dispatch_semaphore_signal(dsema: dispatch_semaphore_t) -> c_long;
 
     // ── Time ────────────────────────────────────────────────────
 
     pub fn dispatch_time(when: dispatch_time_t, delta: i64) -> dispatch_time_t;
-    pub fn dispatch_walltime(
-        when: *const libc::timespec,
-        delta: i64,
-    ) -> dispatch_time_t;
+    pub fn dispatch_walltime(when: *const libc::timespec, delta: i64) -> dispatch_time_t;
 
     // ── Object lifecycle ────────────────────────────────────────
 
@@ -181,14 +167,8 @@ extern "C" {
         mask: c_ulong,
         queue: dispatch_queue_t,
     ) -> dispatch_source_t;
-    pub fn dispatch_source_set_event_handler(
-        source: dispatch_source_t,
-        handler: dispatch_block_t,
-    );
-    pub fn dispatch_source_set_cancel_handler(
-        source: dispatch_source_t,
-        handler: dispatch_block_t,
-    );
+    pub fn dispatch_source_set_event_handler(source: dispatch_source_t, handler: dispatch_block_t);
+    pub fn dispatch_source_set_cancel_handler(source: dispatch_source_t, handler: dispatch_block_t);
     pub fn dispatch_source_cancel(source: dispatch_source_t);
     pub fn dispatch_source_get_data(source: dispatch_source_t) -> c_ulong;
     pub fn dispatch_source_get_handle(source: dispatch_source_t) -> usize;
@@ -232,10 +212,7 @@ extern "C" {
         context: *mut c_void,
         destructor: Option<unsafe extern "C" fn(*mut c_void)>,
     );
-    pub fn dispatch_queue_get_specific(
-        queue: dispatch_queue_t,
-        key: *const c_void,
-    ) -> *mut c_void;
+    pub fn dispatch_queue_get_specific(queue: dispatch_queue_t, key: *const c_void) -> *mut c_void;
     pub fn dispatch_get_specific(key: *const c_void) -> *mut c_void;
 }
 

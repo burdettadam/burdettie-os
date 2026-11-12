@@ -570,7 +570,8 @@ subpath = "/tmp/"
     fn sandbox_engine_inactive_allows() {
         let engine = SandboxEngine::inactive();
         assert!(!engine.is_active());
-        let verdict = engine.evaluate_operation(SandboxOperation::FileRead, Path::new("/etc/passwd"));
+        let verdict =
+            engine.evaluate_operation(SandboxOperation::FileRead, Path::new("/etc/passwd"));
         assert!(verdict.is_allow());
     }
 
@@ -578,7 +579,8 @@ subpath = "/tmp/"
     fn sandbox_engine_active_denies() {
         let engine = SandboxEngine::with_profile(SandboxProfile::deny_all());
         assert!(engine.is_active());
-        let verdict = engine.evaluate_operation(SandboxOperation::FileRead, Path::new("/etc/passwd"));
+        let verdict =
+            engine.evaluate_operation(SandboxOperation::FileRead, Path::new("/etc/passwd"));
         assert!(verdict.is_deny());
     }
 
@@ -604,10 +606,8 @@ subpath = "/tmp/"
     #[test]
     fn evaluate_operation_network() {
         let engine = SandboxEngine::app_sandbox();
-        let verdict = engine.evaluate_operation(
-            SandboxOperation::NetworkOutbound,
-            Path::new("0.0.0.0:443"),
-        );
+        let verdict =
+            engine.evaluate_operation(SandboxOperation::NetworkOutbound, Path::new("0.0.0.0:443"));
         assert!(verdict.is_deny());
     }
 

@@ -201,7 +201,9 @@ mod tests {
         // If the policy denies this, verify the SecurityDenied error shape
         if !report.allowed {
             let reasons = report.denied_reasons.join("; ");
-            let err = ExecError::SecurityDenied { reason: reasons.clone() };
+            let err = ExecError::SecurityDenied {
+                reason: reasons.clone(),
+            };
             match &err {
                 ExecError::SecurityDenied { reason } => assert!(!reason.is_empty()),
                 other => panic!("expected SecurityDenied, got: {other:?}"),
@@ -222,7 +224,10 @@ mod tests {
             .map(CodeSignatureInfo::from_parsed)
             .unwrap_or_default();
         let report = policy.evaluate_binary_parsed(path, parsed.header.flags, &cs_info);
-        assert!(report.allowed, "permissive policy should allow unsigned binary");
+        assert!(
+            report.allowed,
+            "permissive policy should allow unsigned binary"
+        );
     }
 
     #[test]

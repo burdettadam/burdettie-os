@@ -1,7 +1,7 @@
 //! Real locale shims backed by icu_locale.
 
-use libsystem_shims::table::ShimTable;
 use libsystem_shims::register_shims;
+use libsystem_shims::table::ShimTable;
 
 /// uloc_getDefault() — returns "en_US\0" as a C string pointer.
 /// In a full implementation this would query the system locale.
@@ -10,12 +10,33 @@ static EN_LANG: &[u8] = b"en\0";
 static US_COUNTRY: &[u8] = b"US\0";
 
 pub fn install(table: &mut ShimTable) {
-    register_shims!(table,
-        ("_uloc_getDefault", shim_uloc_get_default as *const () as u64, "uloc_getDefault (icu4x → en_US)"),
-        ("_uloc_getName", shim_uloc_get_name as *const () as u64, "uloc_getName (icu4x)"),
-        ("_uloc_getLanguage", shim_uloc_get_language as *const () as u64, "uloc_getLanguage (icu4x)"),
-        ("_uloc_getCountry", shim_uloc_get_country as *const () as u64, "uloc_getCountry (icu4x)"),
-        ("_uloc_canonicalize", shim_uloc_canonicalize as *const () as u64, "uloc_canonicalize (icu4x)")
+    register_shims!(
+        table,
+        (
+            "_uloc_getDefault",
+            shim_uloc_get_default as *const () as u64,
+            "uloc_getDefault (icu4x → en_US)"
+        ),
+        (
+            "_uloc_getName",
+            shim_uloc_get_name as *const () as u64,
+            "uloc_getName (icu4x)"
+        ),
+        (
+            "_uloc_getLanguage",
+            shim_uloc_get_language as *const () as u64,
+            "uloc_getLanguage (icu4x)"
+        ),
+        (
+            "_uloc_getCountry",
+            shim_uloc_get_country as *const () as u64,
+            "uloc_getCountry (icu4x)"
+        ),
+        (
+            "_uloc_canonicalize",
+            shim_uloc_canonicalize as *const () as u64,
+            "uloc_canonicalize (icu4x)"
+        )
     );
 }
 
@@ -25,38 +46,56 @@ pub extern "C" fn shim_uloc_get_default() -> u64 {
 
 /// uloc_getName(localeID, name, nameCapacity, err) → int32_t (length)
 pub extern "C" fn shim_uloc_get_name(
-    locale_id: u64, name_buf: *mut u8, name_capacity: i32, status: *mut i32,
+    locale_id: u64,
+    name_buf: *mut u8,
+    name_capacity: i32,
+    status: *mut i32,
 ) -> i32 {
     copy_locale_component(locale_id, name_buf, name_capacity, status, DEFAULT_LOCALE)
 }
 
 /// uloc_getLanguage(localeID, language, languageCapacity, err) → int32_t
 pub extern "C" fn shim_uloc_get_language(
-    _locale_id: u64, lang_buf: *mut u8, lang_capacity: i32, status: *mut i32,
+    _locale_id: u64,
+    lang_buf: *mut u8,
+    lang_capacity: i32,
+    status: *mut i32,
 ) -> i32 {
     copy_locale_component(0, lang_buf, lang_capacity, status, EN_LANG)
 }
 
 /// uloc_getCountry(localeID, country, countryCapacity, err) → int32_t
 pub extern "C" fn shim_uloc_get_country(
-    _locale_id: u64, country_buf: *mut u8, country_capacity: i32, status: *mut i32,
+    _locale_id: u64,
+    country_buf: *mut u8,
+    country_capacity: i32,
+    status: *mut i32,
 ) -> i32 {
     copy_locale_component(0, country_buf, country_capacity, status, US_COUNTRY)
 }
 
 /// uloc_canonicalize(localeID, name, nameCapacity, err) → int32_t
 pub extern "C" fn shim_uloc_canonicalize(
-    locale_id: u64, name_buf: *mut u8, name_capacity: i32, status: *mut i32,
+    locale_id: u64,
+    name_buf: *mut u8,
+    name_capacity: i32,
+    status: *mut i32,
 ) -> i32 {
     // For now, just copy the default locale as canonical form
     copy_locale_component(locale_id, name_buf, name_capacity, status, DEFAULT_LOCALE)
 }
 
 fn copy_locale_component(
-    _locale_id: u64, buf: *mut u8, capacity: i32, status: *mut i32, source: &[u8],
+    _locale_id: u64,
+    buf: *mut u8,
+    capacity: i32,
+    status: *mut i32,
+    source: &[u8],
 ) -> i32 {
     if !status.is_null() {
-        unsafe { *status = 0; } // U_ZERO_ERROR
+        unsafe {
+            *status = 0;
+        } // U_ZERO_ERROR
     }
     let len = source.len() - 1; // exclude null terminator from length
     if !buf.is_null() && capacity > 0 {

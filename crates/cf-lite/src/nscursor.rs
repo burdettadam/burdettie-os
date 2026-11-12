@@ -39,7 +39,9 @@ static CURSOR_VISIBLE: Mutex<bool> = Mutex::new(true);
 
 fn alloc_cursor(cursor_type: u64) -> u64 {
     let obj = crate::pal_alloc().calloc(1, CURSOR_SIZE) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *(obj as *mut u64) = crate::nsobj::nscursor_class_addr();
         *((obj as usize + CURSOR_TYPE_OFF) as *mut u64) = cursor_type;
@@ -50,44 +52,81 @@ fn alloc_cursor(cursor_type: u64) -> u64 {
 // ── Class methods (cursor factories) ───────────────────────────
 
 /// `+[NSCursor arrowCursor]`
-pub extern "C" fn shim_nscursor_arrow_cursor(_cls: u64, _cmd: u64) -> u64 { alloc_cursor(CURSOR_ARROW) }
+pub extern "C" fn shim_nscursor_arrow_cursor(_cls: u64, _cmd: u64) -> u64 {
+    alloc_cursor(CURSOR_ARROW)
+}
 /// `+[NSCursor IBeamCursor]`
-pub extern "C" fn shim_nscursor_ibeam_cursor(_cls: u64, _cmd: u64) -> u64 { alloc_cursor(CURSOR_IBEAM) }
+pub extern "C" fn shim_nscursor_ibeam_cursor(_cls: u64, _cmd: u64) -> u64 {
+    alloc_cursor(CURSOR_IBEAM)
+}
 /// `+[NSCursor crosshairCursor]`
-pub extern "C" fn shim_nscursor_crosshair_cursor(_cls: u64, _cmd: u64) -> u64 { alloc_cursor(CURSOR_CROSSHAIR) }
+pub extern "C" fn shim_nscursor_crosshair_cursor(_cls: u64, _cmd: u64) -> u64 {
+    alloc_cursor(CURSOR_CROSSHAIR)
+}
 /// `+[NSCursor pointingHandCursor]`
-pub extern "C" fn shim_nscursor_pointing_hand_cursor(_cls: u64, _cmd: u64) -> u64 { alloc_cursor(CURSOR_POINTING_HAND) }
+pub extern "C" fn shim_nscursor_pointing_hand_cursor(_cls: u64, _cmd: u64) -> u64 {
+    alloc_cursor(CURSOR_POINTING_HAND)
+}
 /// `+[NSCursor openHandCursor]`
-pub extern "C" fn shim_nscursor_open_hand_cursor(_cls: u64, _cmd: u64) -> u64 { alloc_cursor(CURSOR_OPEN_HAND) }
+pub extern "C" fn shim_nscursor_open_hand_cursor(_cls: u64, _cmd: u64) -> u64 {
+    alloc_cursor(CURSOR_OPEN_HAND)
+}
 /// `+[NSCursor closedHandCursor]`
-pub extern "C" fn shim_nscursor_closed_hand_cursor(_cls: u64, _cmd: u64) -> u64 { alloc_cursor(CURSOR_CLOSED_HAND) }
+pub extern "C" fn shim_nscursor_closed_hand_cursor(_cls: u64, _cmd: u64) -> u64 {
+    alloc_cursor(CURSOR_CLOSED_HAND)
+}
 /// `+[NSCursor resizeLeftRightCursor]`
-pub extern "C" fn shim_nscursor_resize_left_right_cursor(_cls: u64, _cmd: u64) -> u64 { alloc_cursor(CURSOR_RESIZE_LEFT_RIGHT) }
+pub extern "C" fn shim_nscursor_resize_left_right_cursor(_cls: u64, _cmd: u64) -> u64 {
+    alloc_cursor(CURSOR_RESIZE_LEFT_RIGHT)
+}
 /// `+[NSCursor resizeUpDownCursor]`
-pub extern "C" fn shim_nscursor_resize_up_down_cursor(_cls: u64, _cmd: u64) -> u64 { alloc_cursor(CURSOR_RESIZE_UP_DOWN) }
+pub extern "C" fn shim_nscursor_resize_up_down_cursor(_cls: u64, _cmd: u64) -> u64 {
+    alloc_cursor(CURSOR_RESIZE_UP_DOWN)
+}
 /// `+[NSCursor resizeLeftCursor]`
-pub extern "C" fn shim_nscursor_resize_left_cursor(_cls: u64, _cmd: u64) -> u64 { alloc_cursor(CURSOR_RESIZE_LEFT) }
+pub extern "C" fn shim_nscursor_resize_left_cursor(_cls: u64, _cmd: u64) -> u64 {
+    alloc_cursor(CURSOR_RESIZE_LEFT)
+}
 /// `+[NSCursor resizeRightCursor]`
-pub extern "C" fn shim_nscursor_resize_right_cursor(_cls: u64, _cmd: u64) -> u64 { alloc_cursor(CURSOR_RESIZE_RIGHT) }
+pub extern "C" fn shim_nscursor_resize_right_cursor(_cls: u64, _cmd: u64) -> u64 {
+    alloc_cursor(CURSOR_RESIZE_RIGHT)
+}
 /// `+[NSCursor resizeUpCursor]`
-pub extern "C" fn shim_nscursor_resize_up_cursor(_cls: u64, _cmd: u64) -> u64 { alloc_cursor(CURSOR_RESIZE_UP) }
+pub extern "C" fn shim_nscursor_resize_up_cursor(_cls: u64, _cmd: u64) -> u64 {
+    alloc_cursor(CURSOR_RESIZE_UP)
+}
 /// `+[NSCursor resizeDownCursor]`
-pub extern "C" fn shim_nscursor_resize_down_cursor(_cls: u64, _cmd: u64) -> u64 { alloc_cursor(CURSOR_RESIZE_DOWN) }
+pub extern "C" fn shim_nscursor_resize_down_cursor(_cls: u64, _cmd: u64) -> u64 {
+    alloc_cursor(CURSOR_RESIZE_DOWN)
+}
 /// `+[NSCursor disappearingItemCursor]`
-pub extern "C" fn shim_nscursor_disappearing_item_cursor(_cls: u64, _cmd: u64) -> u64 { alloc_cursor(CURSOR_DISAPPEARING_ITEM) }
+pub extern "C" fn shim_nscursor_disappearing_item_cursor(_cls: u64, _cmd: u64) -> u64 {
+    alloc_cursor(CURSOR_DISAPPEARING_ITEM)
+}
 /// `+[NSCursor operationNotAllowedCursor]`
-pub extern "C" fn shim_nscursor_operation_not_allowed_cursor(_cls: u64, _cmd: u64) -> u64 { alloc_cursor(CURSOR_OPERATION_NOT_ALLOWED) }
+pub extern "C" fn shim_nscursor_operation_not_allowed_cursor(_cls: u64, _cmd: u64) -> u64 {
+    alloc_cursor(CURSOR_OPERATION_NOT_ALLOWED)
+}
 /// `+[NSCursor dragLinkCursor]`
-pub extern "C" fn shim_nscursor_drag_link_cursor(_cls: u64, _cmd: u64) -> u64 { alloc_cursor(CURSOR_DRAG_LINK) }
+pub extern "C" fn shim_nscursor_drag_link_cursor(_cls: u64, _cmd: u64) -> u64 {
+    alloc_cursor(CURSOR_DRAG_LINK)
+}
 /// `+[NSCursor dragCopyCursor]`
-pub extern "C" fn shim_nscursor_drag_copy_cursor(_cls: u64, _cmd: u64) -> u64 { alloc_cursor(CURSOR_DRAG_COPY) }
+pub extern "C" fn shim_nscursor_drag_copy_cursor(_cls: u64, _cmd: u64) -> u64 {
+    alloc_cursor(CURSOR_DRAG_COPY)
+}
 /// `+[NSCursor contextualMenuCursor]`
-pub extern "C" fn shim_nscursor_contextual_menu_cursor(_cls: u64, _cmd: u64) -> u64 { alloc_cursor(CURSOR_CONTEXTUAL_MENU) }
+pub extern "C" fn shim_nscursor_contextual_menu_cursor(_cls: u64, _cmd: u64) -> u64 {
+    alloc_cursor(CURSOR_CONTEXTUAL_MENU)
+}
 
 /// `+[NSCursor currentCursor]` — returns the top of the stack or arrow.
 pub extern "C" fn shim_nscursor_current_cursor(_cls: u64, _cmd: u64) -> u64 {
     let guard = CURSOR_STACK.lock().unwrap_or_else(|e| e.into_inner());
-    guard.last().copied().unwrap_or_else(|| alloc_cursor(CURSOR_ARROW))
+    guard
+        .last()
+        .copied()
+        .unwrap_or_else(|| alloc_cursor(CURSOR_ARROW))
 }
 
 /// `+[NSCursor hide]`
@@ -104,7 +143,9 @@ pub extern "C" fn shim_nscursor_unhide(_cls: u64, _cmd: u64) {
 
 /// `-[NSCursor set]` — make this cursor the active cursor.
 pub extern "C" fn shim_nscursor_set(obj: u64, _cmd: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let cursor_type = unsafe { *((obj as usize + CURSOR_TYPE_OFF) as *const u64) };
     if let Some(bridge) = crate::gui_bridge::gui_bridge() {
         bridge.set_cursor(cursor_type);
@@ -113,8 +154,13 @@ pub extern "C" fn shim_nscursor_set(obj: u64, _cmd: u64) {
 
 /// `-[NSCursor push]` — push onto the cursor stack.
 pub extern "C" fn shim_nscursor_push(obj: u64, _cmd: u64) {
-    if obj == 0 { return; }
-    CURSOR_STACK.lock().unwrap_or_else(|e| e.into_inner()).push(obj);
+    if obj == 0 {
+        return;
+    }
+    CURSOR_STACK
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .push(obj);
     let cursor_type = unsafe { *((obj as usize + CURSOR_TYPE_OFF) as *const u64) };
     if let Some(bridge) = crate::gui_bridge::gui_bridge() {
         bridge.set_cursor(cursor_type);
@@ -127,7 +173,9 @@ pub extern "C" fn shim_nscursor_pop(_cls: u64, _cmd: u64) {
     stack.pop();
     // Restore previous cursor or default to arrow
     let cursor_type = stack.last().map_or(CURSOR_ARROW, |&obj| {
-        if obj == 0 { CURSOR_ARROW } else {
+        if obj == 0 {
+            CURSOR_ARROW
+        } else {
             unsafe { *((obj as usize + CURSOR_TYPE_OFF) as *const u64) }
         }
     });
@@ -138,7 +186,9 @@ pub extern "C" fn shim_nscursor_pop(_cls: u64, _cmd: u64) {
 }
 
 /// `-[NSCursor image]` — returns nil (no image backing).
-pub extern "C" fn shim_nscursor_image(_obj: u64, _cmd: u64) -> u64 { 0 }
+pub extern "C" fn shim_nscursor_image(_obj: u64, _cmd: u64) -> u64 {
+    0
+}
 
 /// `-[NSCursor hotSpot]` — returns zero point.
 pub extern "C" fn shim_nscursor_hot_spot(_obj: u64, _cmd: u64, _out_x: *mut f64, _out_y: *mut f64) {
@@ -147,7 +197,10 @@ pub extern "C" fn shim_nscursor_hot_spot(_obj: u64, _cmd: u64, _out_x: *mut f64,
 
 #[cfg(test)]
 pub(crate) fn reset_cursor_state() {
-    CURSOR_STACK.lock().unwrap_or_else(|e| e.into_inner()).clear();
+    CURSOR_STACK
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .clear();
     *CURSOR_VISIBLE.lock().unwrap_or_else(|e| e.into_inner()) = true;
 }
 
@@ -274,7 +327,10 @@ mod tests {
             let c = f(0, 0);
             assert_ne!(c, 0, "cursor factory {i} returned null");
             let cursor_type = unsafe { *((c as usize + CURSOR_TYPE_OFF) as *const u64) };
-            assert_eq!(cursor_type, i as u64, "cursor type mismatch for factory {i}");
+            assert_eq!(
+                cursor_type, i as u64,
+                "cursor type mismatch for factory {i}"
+            );
             free_obj(c);
         }
     }

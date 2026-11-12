@@ -37,6 +37,7 @@ impl Router {
             handler_list.push(Box::new(handlers::admin::AdminHandler::new(
                 config.admin.token.clone(),
                 config.instance_id.clone(),
+                config.workspace_root.clone(),
             )));
         }
 
@@ -68,7 +69,10 @@ impl Router {
         // Catch-all must be last
         handler_list.push(Box::new(handlers::catchall::CatchallHandler));
 
-        Self { handlers: handler_list, recorder }
+        Self {
+            handlers: handler_list,
+            recorder,
+        }
     }
 
     /// Route a request and return a response.
@@ -96,7 +100,10 @@ impl Router {
                         request_headers: format_request_headers(request),
                         request_body: body.to_vec(),
                         response_status: i32::from(response.status_code),
-                        response_headers: format!("{{\"content-type\":\"{}\"}}", response.content_type),
+                        response_headers: format!(
+                            "{{\"content-type\":\"{}\"}}",
+                            response.content_type
+                        ),
                         response_body: response.body.clone(),
                         guest_binary: crate::guest_binary().to_string(),
                         duration_ms: duration.as_millis() as i64,

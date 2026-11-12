@@ -51,14 +51,43 @@ pub struct CompressionStubs;
 impl CompressionStubs {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
-        register_shims!(table,
-            ("_compression_encode_buffer", shim_compression_encode_buffer as *const () as u64, "compression_encode_buffer"),
-            ("_compression_decode_buffer", shim_compression_decode_buffer as *const () as u64, "compression_decode_buffer"),
-            ("_compression_stream_init", shim_compression_stream_init as *const () as u64, "compression_stream_init"),
-            ("_compression_stream_process", shim_compression_stream_process as *const () as u64, "compression_stream_process"),
-            ("_compression_stream_destroy", shim_compression_stream_destroy as *const () as u64, "compression_stream_destroy"),
-            ("_compression_encode_scratch_buffer_size", shim_compression_encode_scratch_buffer_size as *const () as u64, "compression_encode_scratch_buffer_size"),
-            ("_compression_decode_scratch_buffer_size", shim_compression_decode_scratch_buffer_size as *const () as u64, "compression_decode_scratch_buffer_size"),
+        register_shims!(
+            table,
+            (
+                "_compression_encode_buffer",
+                shim_compression_encode_buffer as *const () as u64,
+                "compression_encode_buffer"
+            ),
+            (
+                "_compression_decode_buffer",
+                shim_compression_decode_buffer as *const () as u64,
+                "compression_decode_buffer"
+            ),
+            (
+                "_compression_stream_init",
+                shim_compression_stream_init as *const () as u64,
+                "compression_stream_init"
+            ),
+            (
+                "_compression_stream_process",
+                shim_compression_stream_process as *const () as u64,
+                "compression_stream_process"
+            ),
+            (
+                "_compression_stream_destroy",
+                shim_compression_stream_destroy as *const () as u64,
+                "compression_stream_destroy"
+            ),
+            (
+                "_compression_encode_scratch_buffer_size",
+                shim_compression_encode_scratch_buffer_size as *const () as u64,
+                "compression_encode_scratch_buffer_size"
+            ),
+            (
+                "_compression_decode_scratch_buffer_size",
+                shim_compression_decode_scratch_buffer_size as *const () as u64,
+                "compression_decode_scratch_buffer_size"
+            ),
         );
         log::debug!("CompressionStubs: registered 7 stubs");
     }
@@ -298,16 +327,13 @@ unsafe fn write_stream_field<T: Copy>(stream: u64, offset: usize, val: T) {
     ptr.write_unaligned(val);
 }
 
-pub extern "C" fn shim_compression_stream_init(
-    stream: u64,
-    operation: i32,
-    algo: u32,
-) -> i32 {
+pub extern "C" fn shim_compression_stream_init(stream: u64, operation: i32, algo: u32) -> i32 {
     if stream == 0 {
         return COMPRESSION_STATUS_ERROR;
     }
     match algo {
-        COMPRESSION_ZLIB | COMPRESSION_LZ4 | COMPRESSION_LZ4_RAW | COMPRESSION_LZMA | COMPRESSION_LZFSE => {}
+        COMPRESSION_ZLIB | COMPRESSION_LZ4 | COMPRESSION_LZ4_RAW | COMPRESSION_LZMA
+        | COMPRESSION_LZFSE => {}
         _ => {
             log::debug!("compression_stream_init: unsupported algo 0x{:x}", algo);
             return COMPRESSION_STATUS_ERROR;
@@ -486,9 +512,18 @@ mod tests {
 
     #[test]
     fn test_scratch_buffer_sizes() {
-        assert_eq!(shim_compression_encode_scratch_buffer_size(COMPRESSION_ZLIB), 0);
-        assert_eq!(shim_compression_decode_scratch_buffer_size(COMPRESSION_LZ4), 0);
-        assert_eq!(shim_compression_encode_scratch_buffer_size(COMPRESSION_LZFSE), 0);
+        assert_eq!(
+            shim_compression_encode_scratch_buffer_size(COMPRESSION_ZLIB),
+            0
+        );
+        assert_eq!(
+            shim_compression_decode_scratch_buffer_size(COMPRESSION_LZ4),
+            0
+        );
+        assert_eq!(
+            shim_compression_encode_scratch_buffer_size(COMPRESSION_LZFSE),
+            0
+        );
     }
 
     #[test]
@@ -525,7 +560,8 @@ mod tests {
         };
         let stream_addr = &mut stream as *mut FakeStream as u64;
 
-        let ret = shim_compression_stream_init(stream_addr, COMPRESSION_STREAM_ENCODE, COMPRESSION_ZLIB);
+        let ret =
+            shim_compression_stream_init(stream_addr, COMPRESSION_STREAM_ENCODE, COMPRESSION_ZLIB);
         assert_eq!(ret, COMPRESSION_STATUS_OK);
         assert_ne!(stream.state, 0, "state should be allocated");
 
@@ -553,7 +589,8 @@ mod tests {
         };
         let stream_addr = &mut stream as *mut FakeStream as u64;
 
-        let ret = shim_compression_stream_init(stream_addr, COMPRESSION_STREAM_ENCODE, COMPRESSION_LZMA);
+        let ret =
+            shim_compression_stream_init(stream_addr, COMPRESSION_STREAM_ENCODE, COMPRESSION_LZMA);
         // LZMA is now accepted for streaming (decode supported)
         assert_eq!(ret, COMPRESSION_STATUS_OK);
         shim_compression_stream_destroy(stream_addr);
@@ -642,7 +679,10 @@ mod tests {
         let input: Vec<u8> = (0..50_000).map(|i| (i % 251) as u8).collect();
         let encoded = lzfse_encode(&input);
         assert!(!encoded.is_empty());
-        assert!(encoded.len() < input.len(), "should compress patterned data");
+        assert!(
+            encoded.len() < input.len(),
+            "should compress patterned data"
+        );
         let decoded = lzfse_decode(&encoded).expect("lzfse decode large failed");
         assert_eq!(decoded, input);
     }
@@ -731,9 +771,18 @@ mod tests {
         let mut encoded = vec![0u8; 4096];
 
         // Encode
-        let mut stream = FakeStream { src_ptr: 0, src_size: 0, dst_ptr: 0, dst_size: 0, state: 0 };
+        let mut stream = FakeStream {
+            src_ptr: 0,
+            src_size: 0,
+            dst_ptr: 0,
+            dst_size: 0,
+            state: 0,
+        };
         let s = &mut stream as *mut FakeStream as u64;
-        assert_eq!(shim_compression_stream_init(s, COMPRESSION_STREAM_ENCODE, COMPRESSION_LZFSE), COMPRESSION_STATUS_OK);
+        assert_eq!(
+            shim_compression_stream_init(s, COMPRESSION_STREAM_ENCODE, COMPRESSION_LZFSE),
+            COMPRESSION_STATUS_OK
+        );
         stream.src_ptr = input.as_ptr() as u64;
         stream.src_size = input.len() as u64;
         stream.dst_ptr = encoded.as_mut_ptr() as u64;
@@ -746,9 +795,18 @@ mod tests {
 
         // Decode
         let mut decoded = vec![0u8; 4096];
-        let mut stream2 = FakeStream { src_ptr: 0, src_size: 0, dst_ptr: 0, dst_size: 0, state: 0 };
+        let mut stream2 = FakeStream {
+            src_ptr: 0,
+            src_size: 0,
+            dst_ptr: 0,
+            dst_size: 0,
+            state: 0,
+        };
         let s2 = &mut stream2 as *mut FakeStream as u64;
-        assert_eq!(shim_compression_stream_init(s2, COMPRESSION_STREAM_DECODE, COMPRESSION_LZFSE), COMPRESSION_STATUS_OK);
+        assert_eq!(
+            shim_compression_stream_init(s2, COMPRESSION_STREAM_DECODE, COMPRESSION_LZFSE),
+            COMPRESSION_STATUS_OK
+        );
         stream2.src_ptr = encoded.as_ptr() as u64;
         stream2.src_size = enc_len as u64;
         stream2.dst_ptr = decoded.as_mut_ptr() as u64;

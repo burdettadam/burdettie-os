@@ -129,12 +129,19 @@ impl MappedImage {
         }
 
         // Compute the virtual address range
-        let min_vmaddr = regions.iter().map(|r| r.vmaddr).min()
-            .ok_or_else(|| ExecError::MmapFailed {
-                segment: "contiguous_region".to_string(),
-                source: std::io::Error::other("no loadable segments found"),
-            })?;
-        let max_vm_end = regions.iter().map(|r| r.vmaddr + r.vmsize).max()
+        let min_vmaddr =
+            regions
+                .iter()
+                .map(|r| r.vmaddr)
+                .min()
+                .ok_or_else(|| ExecError::MmapFailed {
+                    segment: "contiguous_region".to_string(),
+                    source: std::io::Error::other("no loadable segments found"),
+                })?;
+        let max_vm_end = regions
+            .iter()
+            .map(|r| r.vmaddr + r.vmsize)
+            .max()
             .ok_or_else(|| ExecError::MmapFailed {
                 segment: "contiguous_region".to_string(),
                 source: std::io::Error::other("no loadable segments found"),
@@ -279,12 +286,12 @@ impl MappedImage {
         for seg in &self.segments {
             let declared = vmprot_to_protection(seg.protection);
             if declared.execute {
-                self.mapper.protect(seg.base, seg.size, declared).map_err(|e| {
-                    ExecError::MprotectFailed {
+                self.mapper
+                    .protect(seg.base, seg.size, declared)
+                    .map_err(|e| ExecError::MprotectFailed {
                         segment: seg.name.clone(),
                         source: std::io::Error::other(e.to_string()),
-                    }
-                })?;
+                    })?;
             }
         }
         Ok(())
@@ -314,8 +321,12 @@ impl Drop for MappedImage {
 
         if !self.alloc_base.is_null() && self.alloc_size > 0 {
             if let Err(e) = self.mapper.unmap(self.alloc_base, self.alloc_size) {
-                log::warn!("MappedImage Drop: failed to unmap {:#x} ({} bytes): {}",
-                    self.alloc_base as usize, self.alloc_size, e);
+                log::warn!(
+                    "MappedImage Drop: failed to unmap {:#x} ({} bytes): {}",
+                    self.alloc_base as usize,
+                    self.alloc_size,
+                    e
+                );
             }
         }
     }

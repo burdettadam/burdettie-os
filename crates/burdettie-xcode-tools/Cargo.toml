@@ -1,0 +1,26 @@
+[package]
+name = "burdettie-xcode-tools"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Native Rust implementation of foundational Xcode developer tools"
+
+[[bin]]
+name = "xcrun"
+path = "src/bin/xcrun.rs"
+
+[[bin]]
+name = "xcode-select"
+path = "src/bin/xcode_select.rs"
+
+[[bin]]
+name = "xcodebuild"
+path = "src/bin/xcodebuild.rs"
+
+[dependencies]
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

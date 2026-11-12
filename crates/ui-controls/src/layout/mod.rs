@@ -40,7 +40,6 @@ pub struct StackView {
     child_frames: Vec<Rect>,
 }
 
-
 mod impl_stack_view;
 
 // ── Utility functions ──────────────────────────────────────────────
@@ -205,10 +204,22 @@ mod tests {
 
         let subs = stack.view().subviews();
         // 300 - 10 spacing = 290, 290 / 2 = 145 each
-        assert!((subs[0].frame.width - 145.0).abs() < 2.0, "a.w={}", subs[0].frame.width);
-        assert!((subs[1].frame.width - 145.0).abs() < 2.0, "b.w={}", subs[1].frame.width);
+        assert!(
+            (subs[0].frame.width - 145.0).abs() < 2.0,
+            "a.w={}",
+            subs[0].frame.width
+        );
+        assert!(
+            (subs[1].frame.width - 145.0).abs() < 2.0,
+            "b.w={}",
+            subs[1].frame.width
+        );
         assert!((subs[0].frame.x).abs() < 2.0, "a.x={}", subs[0].frame.x);
-        assert!((subs[1].frame.x - 155.0).abs() < 2.0, "b.x={}", subs[1].frame.x);
+        assert!(
+            (subs[1].frame.x - 155.0).abs() < 2.0,
+            "b.x={}",
+            subs[1].frame.x
+        );
     }
 
     #[test]
@@ -242,9 +253,21 @@ mod tests {
 
         let subs = stack.view().subviews();
         assert_eq!(subs.len(), 3);
-        assert!((subs[0].frame.width - 100.0).abs() < 0.01, "w0={}", subs[0].frame.width);
-        assert!((subs[1].frame.width - 100.0).abs() < 0.01, "w1={}", subs[1].frame.width);
-        assert!((subs[2].frame.width - 100.0).abs() < 0.01, "w2={}", subs[2].frame.width);
+        assert!(
+            (subs[0].frame.width - 100.0).abs() < 0.01,
+            "w0={}",
+            subs[0].frame.width
+        );
+        assert!(
+            (subs[1].frame.width - 100.0).abs() < 0.01,
+            "w1={}",
+            subs[1].frame.width
+        );
+        assert!(
+            (subs[2].frame.width - 100.0).abs() < 0.01,
+            "w2={}",
+            subs[2].frame.width
+        );
     }
 
     #[test]
@@ -265,8 +288,16 @@ mod tests {
         assert!((subs[1].frame.width - 50.0).abs() < 0.01);
         assert!((subs[2].frame.width - 50.0).abs() < 0.01);
         assert!((subs[0].frame.x - 0.0).abs() < 0.01);
-        assert!((subs[1].frame.x - 125.0).abs() < 0.01, "x1={}", subs[1].frame.x);
-        assert!((subs[2].frame.x - 250.0).abs() < 0.01, "x2={}", subs[2].frame.x);
+        assert!(
+            (subs[1].frame.x - 125.0).abs() < 0.01,
+            "x1={}",
+            subs[1].frame.x
+        );
+        assert!(
+            (subs[2].frame.x - 250.0).abs() < 0.01,
+            "x2={}",
+            subs[2].frame.x
+        );
     }
 
     #[test]

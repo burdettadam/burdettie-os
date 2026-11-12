@@ -233,7 +233,10 @@ fn protocol_basics_fixture_has_protocols() {
     assert!(greeter.is_some(), "Greeter protocol should be parsed");
     let greeter = greeter.unwrap();
     assert!(
-        greeter.instance_methods.iter().any(|m| m.selector == "greet"),
+        greeter
+            .instance_methods
+            .iter()
+            .any(|m| m.selector == "greet"),
         "Greeter should require 'greet' method"
     );
 

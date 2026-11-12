@@ -19,7 +19,11 @@ pub fn register_nsarray_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nsarray::shim_nsarray_init_with_objects as *const () as u64,
                 "@@:@",
             ),
-            me("count", nsarray::shim_nsarray_count as *const () as u64, "Q@:"),
+            me(
+                "count",
+                nsarray::shim_nsarray_count as *const () as u64,
+                "Q@:",
+            ),
             me(
                 "objectAtIndex:",
                 nsarray::shim_nsarray_object_at_index as *const () as u64,
@@ -100,7 +104,11 @@ pub fn register_nsarray_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nsarray::ops::shim_nsarray_filtered_using_predicate as *const () as u64,
                 "@@:@",
             ),
-            me("copy", nsarray::ops::shim_nsarray_copy as *const () as u64, "@@:"),
+            me(
+                "copy",
+                nsarray::ops::shim_nsarray_copy as *const () as u64,
+                "@@:",
+            ),
             me(
                 "mutableCopy",
                 nsarray::ops::shim_nsarray_mutable_copy as *const () as u64,
@@ -182,7 +190,11 @@ pub fn register_nsmutablearray_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nsmutablearray::shim_nsmutablearray_init_with_array as *const () as u64,
                 "@@:@",
             ),
-            me("count", nsarray::shim_nsarray_count as *const () as u64, "Q@:"),
+            me(
+                "count",
+                nsarray::shim_nsarray_count as *const () as u64,
+                "Q@:",
+            ),
             me(
                 "objectAtIndex:",
                 nsarray::shim_nsarray_object_at_index as *const () as u64,
@@ -235,7 +247,8 @@ pub fn register_nsmutablearray_class(rt: &mut objc_runtime::ObjcRuntime) {
             ),
             me(
                 "setObject:atIndexedSubscript:",
-                nsmutablearray::shim_nsmutablearray_set_object_at_indexed_subscript as *const () as u64,
+                nsmutablearray::shim_nsmutablearray_set_object_at_indexed_subscript as *const ()
+                    as u64,
                 "v@:@Q",
             ),
             me(
@@ -285,7 +298,8 @@ pub fn register_nsmutablearray_class(rt: &mut objc_runtime::ObjcRuntime) {
             ),
             me(
                 "removeObjectsAtIndexes:",
-                nsmutablearray::ops::shim_nsmutablearray_remove_objects_at_indexes as *const () as u64,
+                nsmutablearray::ops::shim_nsmutablearray_remove_objects_at_indexes as *const ()
+                    as u64,
                 "v@:@",
             ),
             me(
@@ -295,12 +309,14 @@ pub fn register_nsmutablearray_class(rt: &mut objc_runtime::ObjcRuntime) {
             ),
             me(
                 "exchangeObjectAtIndex:withObjectAtIndex:",
-                nsmutablearray::ops::shim_nsmutablearray_exchange_object_at_index as *const () as u64,
+                nsmutablearray::ops::shim_nsmutablearray_exchange_object_at_index as *const ()
+                    as u64,
                 "v@:QQ",
             ),
             me(
                 "removeObjectsInRange:",
-                nsmutablearray::ops::shim_nsmutablearray_remove_objects_in_range as *const () as u64,
+                nsmutablearray::ops::shim_nsmutablearray_remove_objects_in_range as *const ()
+                    as u64,
                 "v@:QQ",
             ),
             me(
@@ -318,7 +334,11 @@ pub fn register_nsmutablearray_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nsarray::shim_nsarray_count_by_enumerating_with_state as *const () as u64,
                 "Q@:^Q^@Q",
             ),
-            me("copy", nsarray::ops::shim_nsmutablearray_copy as *const () as u64, "@@:"),
+            me(
+                "copy",
+                nsarray::ops::shim_nsmutablearray_copy as *const () as u64,
+                "@@:",
+            ),
             me(
                 "mutableCopy",
                 nsarray::ops::shim_nsmutablearray_mutable_copy as *const () as u64,

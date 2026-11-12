@@ -18,12 +18,14 @@ const SKIPSET_OFF: usize = 32;
 
 fn alloc_scanner(string: u64) -> u64 {
     let obj = crate::pal_alloc().calloc(1, 40) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *(obj as *mut u64) = nsobj::nsscanner_class_addr();
         *((obj as usize + STRING_OFF) as *mut u64) = string;
         *((obj as usize + CASESENS_OFF) as *mut u64) = 1; // default: case sensitive
-        // Default: skip whitespace (matching Apple's default)
+                                                          // Default: skip whitespace (matching Apple's default)
         let ws = nscharacterset::shim_nscharacterset_whitespace_and_newline(0, 0);
         *((obj as usize + SKIPSET_OFF) as *mut u64) = ws;
     }
@@ -33,9 +35,7 @@ fn alloc_scanner(string: u64) -> u64 {
 // ── Class methods ──────────────────────────────────────────────────
 
 /// `+[NSScanner scannerWithString:]`
-pub extern "C" fn shim_nsscanner_scanner_with_string(
-    _cls: u64, _cmd: u64, string: u64,
-) -> u64 {
+pub extern "C" fn shim_nsscanner_scanner_with_string(_cls: u64, _cmd: u64, string: u64) -> u64 {
     alloc_scanner(string)
 }
 
@@ -43,55 +43,85 @@ pub extern "C" fn shim_nsscanner_scanner_with_string(
 
 /// `-[NSScanner string]`
 pub extern "C" fn shim_nsscanner_string(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + STRING_OFF) as *const u64) }
 }
 
 /// `-[NSScanner scanLocation]`
 pub extern "C" fn shim_nsscanner_scan_location(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + SCANLOC_OFF) as *const u64) }
 }
 
 /// `-[NSScanner setScanLocation:]`
 pub extern "C" fn shim_nsscanner_set_scan_location(obj: u64, _cmd: u64, loc: u64) -> u64 {
-    if obj == 0 { return 0; }
-    unsafe { *((obj as usize + SCANLOC_OFF) as *mut u64) = loc; }
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *((obj as usize + SCANLOC_OFF) as *mut u64) = loc;
+    }
     0
 }
 
 /// `-[NSScanner isAtEnd]`
 pub extern "C" fn shim_nsscanner_is_at_end(obj: u64, _cmd: u64) -> u8 {
-    if obj == 0 { return 1; }
+    if obj == 0 {
+        return 1;
+    }
     let string = unsafe { *((obj as usize + STRING_OFF) as *const u64) };
     let loc = unsafe { *((obj as usize + SCANLOC_OFF) as *const u64) };
-    let len = if string != 0 { cfstring::shim_nsstring_length(string, 0) } else { 0 };
+    let len = if string != 0 {
+        cfstring::shim_nsstring_length(string, 0)
+    } else {
+        0
+    };
     u8::from(loc >= len)
 }
 
 /// `-[NSScanner setCaseSensitive:]`
 pub extern "C" fn shim_nsscanner_set_case_sensitive(obj: u64, _cmd: u64, flag: u64) -> u64 {
-    if obj == 0 { return 0; }
-    unsafe { *((obj as usize + CASESENS_OFF) as *mut u64) = flag; }
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *((obj as usize + CASESENS_OFF) as *mut u64) = flag;
+    }
     0
 }
 
 /// `-[NSScanner caseSensitive]`
 pub extern "C" fn shim_nsscanner_case_sensitive(obj: u64, _cmd: u64) -> u8 {
-    if obj == 0 { return 1; }
+    if obj == 0 {
+        return 1;
+    }
     unsafe { *((obj as usize + CASESENS_OFF) as *const u64) as u8 }
 }
 
 /// `-[NSScanner setCharactersToBeSkipped:]`
-pub extern "C" fn shim_nsscanner_set_characters_to_be_skipped(obj: u64, _cmd: u64, set: u64) -> u64 {
-    if obj == 0 { return 0; }
-    unsafe { *((obj as usize + SKIPSET_OFF) as *mut u64) = set; }
+pub extern "C" fn shim_nsscanner_set_characters_to_be_skipped(
+    obj: u64,
+    _cmd: u64,
+    set: u64,
+) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *((obj as usize + SKIPSET_OFF) as *mut u64) = set;
+    }
     0
 }
 
 /// `-[NSScanner charactersToBeSkipped]`
 pub extern "C" fn shim_nsscanner_characters_to_be_skipped(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + SKIPSET_OFF) as *const u64) }
 }
 
@@ -100,14 +130,20 @@ fn remaining_str(obj: u64) -> Option<(String, u64)> {
     let string = unsafe { *((obj as usize + STRING_OFF) as *const u64) };
     let loc = unsafe { *((obj as usize + SCANLOC_OFF) as *const u64) };
     let full = cfstring::extract_cfstring_cstr(string)?;
-    if loc as usize >= full.len() { return None; }
+    if loc as usize >= full.len() {
+        return None;
+    }
     Some((full[loc as usize..].to_string(), loc))
 }
 
 /// `-[NSScanner scanInt:]` — scans an integer, writes to pointer if non-null.
 pub extern "C" fn shim_nsscanner_scan_int(obj: u64, _cmd: u64, result_ptr: u64) -> u8 {
-    if obj == 0 { return 0; }
-    let Some((rem, loc)) = remaining_str(obj) else { return 0; };
+    if obj == 0 {
+        return 0;
+    }
+    let Some((rem, loc)) = remaining_str(obj) else {
+        return 0;
+    };
     let trimmed = rem.trim_start();
     let skipped = rem.len() - trimmed.len();
 
@@ -120,10 +156,16 @@ pub extern "C" fn shim_nsscanner_scan_int(obj: u64, _cmd: u64, result_ptr: u64) 
             break;
         }
     }
-    if end == 0 { return 0; }
-    let Ok(val) = trimmed[..end].parse::<i32>() else { return 0; };
+    if end == 0 {
+        return 0;
+    }
+    let Ok(val) = trimmed[..end].parse::<i32>() else {
+        return 0;
+    };
     if result_ptr != 0 {
-        unsafe { *(result_ptr as *mut i32) = val; }
+        unsafe {
+            *(result_ptr as *mut i32) = val;
+        }
     }
     unsafe {
         *((obj as usize + SCANLOC_OFF) as *mut u64) = loc + (skipped + end) as u64;
@@ -133,8 +175,12 @@ pub extern "C" fn shim_nsscanner_scan_int(obj: u64, _cmd: u64, result_ptr: u64) 
 
 /// `-[NSScanner scanDouble:]`
 pub extern "C" fn shim_nsscanner_scan_double(obj: u64, _cmd: u64, result_ptr: u64) -> u8 {
-    if obj == 0 { return 0; }
-    let Some((rem, loc)) = remaining_str(obj) else { return 0; };
+    if obj == 0 {
+        return 0;
+    }
+    let Some((rem, loc)) = remaining_str(obj) else {
+        return 0;
+    };
     let trimmed = rem.trim_start();
     let skipped = rem.len() - trimmed.len();
 
@@ -150,10 +196,16 @@ pub extern "C" fn shim_nsscanner_scan_double(obj: u64, _cmd: u64, result_ptr: u6
             break;
         }
     }
-    if end == 0 { return 0; }
-    let Ok(val) = trimmed[..end].parse::<f64>() else { return 0; };
+    if end == 0 {
+        return 0;
+    }
+    let Ok(val) = trimmed[..end].parse::<f64>() else {
+        return 0;
+    };
     if result_ptr != 0 {
-        unsafe { *(result_ptr as *mut f64) = val; }
+        unsafe {
+            *(result_ptr as *mut f64) = val;
+        }
     }
     unsafe {
         *((obj as usize + SCANLOC_OFF) as *mut u64) = loc + (skipped + end) as u64;
@@ -163,14 +215,27 @@ pub extern "C" fn shim_nsscanner_scan_double(obj: u64, _cmd: u64, result_ptr: u6
 
 /// `-[NSScanner scanString:intoString:]`
 pub extern "C" fn shim_nsscanner_scan_string(
-    obj: u64, _cmd: u64, target: u64, result_ptr: u64,
+    obj: u64,
+    _cmd: u64,
+    target: u64,
+    result_ptr: u64,
 ) -> u8 {
-    if obj == 0 || target == 0 { return 0; }
-    let Some((rem, loc)) = remaining_str(obj) else { return 0; };
-    let Some(target_str) = cfstring::extract_cfstring_cstr(target) else { return 0; };
-    if !rem.starts_with(target_str) { return 0; }
+    if obj == 0 || target == 0 {
+        return 0;
+    }
+    let Some((rem, loc)) = remaining_str(obj) else {
+        return 0;
+    };
+    let Some(target_str) = cfstring::extract_cfstring_cstr(target) else {
+        return 0;
+    };
+    if !rem.starts_with(target_str) {
+        return 0;
+    }
     if result_ptr != 0 {
-        unsafe { *(result_ptr as *mut u64) = target; }
+        unsafe {
+            *(result_ptr as *mut u64) = target;
+        }
     }
     unsafe {
         *((obj as usize + SCANLOC_OFF) as *mut u64) = loc + target_str.len() as u64;
@@ -180,13 +245,24 @@ pub extern "C" fn shim_nsscanner_scan_string(
 
 /// `-[NSScanner scanUpToString:intoString:]`
 pub extern "C" fn shim_nsscanner_scan_up_to_string(
-    obj: u64, _cmd: u64, stop_str: u64, result_ptr: u64,
+    obj: u64,
+    _cmd: u64,
+    stop_str: u64,
+    result_ptr: u64,
 ) -> u8 {
-    if obj == 0 || stop_str == 0 { return 0; }
-    let Some((rem, loc)) = remaining_str(obj) else { return 0; };
-    let Some(stop) = cfstring::extract_cfstring_cstr(stop_str) else { return 0; };
+    if obj == 0 || stop_str == 0 {
+        return 0;
+    }
+    let Some((rem, loc)) = remaining_str(obj) else {
+        return 0;
+    };
+    let Some(stop) = cfstring::extract_cfstring_cstr(stop_str) else {
+        return 0;
+    };
     let found_pos = rem.find(stop).unwrap_or(rem.len());
-    if found_pos == 0 { return 0; }
+    if found_pos == 0 {
+        return 0;
+    }
     if result_ptr != 0 {
         let scanned = &rem[..found_pos];
         let c_str = std::ffi::CString::new(scanned).unwrap_or_default();
@@ -203,21 +279,32 @@ pub extern "C" fn shim_nsscanner_scan_up_to_string(
 
 /// `-[NSScanner scanUpToCharactersFromSet:intoString:]`
 pub extern "C" fn shim_nsscanner_scan_up_to_characters_from_set(
-    obj: u64, _cmd: u64, char_set: u64, result_ptr: u64,
+    obj: u64,
+    _cmd: u64,
+    char_set: u64,
+    result_ptr: u64,
 ) -> u8 {
-    if obj == 0 || char_set == 0 { return 0; }
-    let Some((rem, loc)) = remaining_str(obj) else { return 0; };
+    if obj == 0 || char_set == 0 {
+        return 0;
+    }
+    let Some((rem, loc)) = remaining_str(obj) else {
+        return 0;
+    };
     let found_pos = rem
         .char_indices()
         .find(|(_, ch)| nscharacterset::character_set_contains(char_set, *ch))
         .map(|(i, _)| i)
         .unwrap_or(rem.len());
-    if found_pos == 0 { return 0; }
+    if found_pos == 0 {
+        return 0;
+    }
     if result_ptr != 0 {
         let scanned = &rem[..found_pos];
         let c_str = std::ffi::CString::new(scanned).unwrap_or_default();
         let ns = cfstring::shim_cf_string_create_with_cstring(0, c_str.as_ptr(), 0);
-        unsafe { *(result_ptr as *mut u64) = ns; }
+        unsafe {
+            *(result_ptr as *mut u64) = ns;
+        }
     }
     unsafe {
         *((obj as usize + SCANLOC_OFF) as *mut u64) = loc + found_pos as u64;
@@ -227,21 +314,32 @@ pub extern "C" fn shim_nsscanner_scan_up_to_characters_from_set(
 
 /// `-[NSScanner scanCharactersFromSet:intoString:]`
 pub extern "C" fn shim_nsscanner_scan_characters_from_set(
-    obj: u64, _cmd: u64, char_set: u64, result_ptr: u64,
+    obj: u64,
+    _cmd: u64,
+    char_set: u64,
+    result_ptr: u64,
 ) -> u8 {
-    if obj == 0 || char_set == 0 { return 0; }
-    let Some((rem, loc)) = remaining_str(obj) else { return 0; };
+    if obj == 0 || char_set == 0 {
+        return 0;
+    }
+    let Some((rem, loc)) = remaining_str(obj) else {
+        return 0;
+    };
     let end_pos = rem
         .char_indices()
         .find(|(_, ch)| !nscharacterset::character_set_contains(char_set, *ch))
         .map(|(i, _)| i)
         .unwrap_or(rem.len());
-    if end_pos == 0 { return 0; }
+    if end_pos == 0 {
+        return 0;
+    }
     if result_ptr != 0 {
         let scanned = &rem[..end_pos];
         let c_str = std::ffi::CString::new(scanned).unwrap_or_default();
         let ns = cfstring::shim_cf_string_create_with_cstring(0, c_str.as_ptr(), 0);
-        unsafe { *(result_ptr as *mut u64) = ns; }
+        unsafe {
+            *(result_ptr as *mut u64) = ns;
+        }
     }
     unsafe {
         *((obj as usize + SCANLOC_OFF) as *mut u64) = loc + end_pos as u64;
@@ -251,7 +349,9 @@ pub extern "C" fn shim_nsscanner_scan_characters_from_set(
 
 /// `-[NSScanner description]`
 pub extern "C" fn shim_nsscanner_description(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let loc = unsafe { *((obj as usize + SCANLOC_OFF) as *const u64) };
     let desc = format!("<NSScanner: scanLocation={loc}>");
     let c_str = std::ffi::CString::new(desc).unwrap_or_default();

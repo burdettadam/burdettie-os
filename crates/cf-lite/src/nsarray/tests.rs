@@ -371,9 +371,21 @@ fn description_with_mixed_elements() {
     let desc = shim_nsarray_description(arr, 0);
     assert_ne!(desc, 0);
     let desc_text = read_string(desc);
-    assert!(desc_text.starts_with('('), "desc should start with '(': {}", desc_text);
-    assert!(desc_text.contains("test"), "desc should contain element: {}", desc_text);
-    assert!(desc_text.ends_with(')'), "desc should end with ')': {}", desc_text);
+    assert!(
+        desc_text.starts_with('('),
+        "desc should start with '(': {}",
+        desc_text
+    );
+    assert!(
+        desc_text.contains("test"),
+        "desc should contain element: {}",
+        desc_text
+    );
+    assert!(
+        desc_text.ends_with(')'),
+        "desc should end with ')': {}",
+        desc_text
+    );
     free_buf(read_field(arr, NSARRAY_ELEMS_OFF));
     free_obj(arr);
 }
@@ -400,11 +412,23 @@ fn roundtrip_with_elements() {
 
 #[test]
 fn fast_enumeration_nil_inputs_return_zero() {
-    assert_eq!(shim_nsarray_count_by_enumerating_with_state(0, 0, 1, 1, 1), 0);
+    assert_eq!(
+        shim_nsarray_count_by_enumerating_with_state(0, 0, 1, 1, 1),
+        0
+    );
     let arr = make_nsarray(&[0xAAA]);
-    assert_eq!(shim_nsarray_count_by_enumerating_with_state(arr, 0, 0, 1, 1), 0);
-    assert_eq!(shim_nsarray_count_by_enumerating_with_state(arr, 0, 1, 0, 1), 0);
-    assert_eq!(shim_nsarray_count_by_enumerating_with_state(arr, 0, 1, 1, 0), 0);
+    assert_eq!(
+        shim_nsarray_count_by_enumerating_with_state(arr, 0, 0, 1, 1),
+        0
+    );
+    assert_eq!(
+        shim_nsarray_count_by_enumerating_with_state(arr, 0, 1, 0, 1),
+        0
+    );
+    assert_eq!(
+        shim_nsarray_count_by_enumerating_with_state(arr, 0, 1, 1, 0),
+        0
+    );
     free_buf(read_field(arr, NSARRAY_ELEMS_OFF));
     free_obj(arr);
 }

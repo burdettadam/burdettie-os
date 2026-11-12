@@ -77,33 +77,27 @@ fn is_member_predefined(kind: u64, ch: char) -> bool {
         }
         KIND_URL_QUERY_ALLOWED => {
             // RFC 3986 unreserved + query-allowed: A-Z a-z 0-9 - . _ ~ ! $ & ' ( ) * + , ; = : @ / ?
-            ch.is_ascii_alphanumeric()
-                || "-._~!$&'()*+,;=:@/?".contains(ch)
+            ch.is_ascii_alphanumeric() || "-._~!$&'()*+,;=:@/?".contains(ch)
         }
         KIND_URL_PATH_ALLOWED => {
             // RFC 3986 unreserved + pchar: A-Z a-z 0-9 - . _ ~ ! $ & ' ( ) * + , ; = : @ /
-            ch.is_ascii_alphanumeric()
-                || "-._~!$&'()*+,;=:@/".contains(ch)
+            ch.is_ascii_alphanumeric() || "-._~!$&'()*+,;=:@/".contains(ch)
         }
         KIND_URL_HOST_ALLOWED => {
             // RFC 3986 unreserved + host chars: A-Z a-z 0-9 - . _ ~ ! $ & ' ( ) * + , ; = [ ] :
-            ch.is_ascii_alphanumeric()
-                || "-._~!$&'()*+,;=[]:".contains(ch)
+            ch.is_ascii_alphanumeric() || "-._~!$&'()*+,;=[]:".contains(ch)
         }
         KIND_URL_FRAGMENT_ALLOWED => {
             // RFC 3986 unreserved + fragment: A-Z a-z 0-9 - . _ ~ ! $ & ' ( ) * + , ; = : @ / ?
-            ch.is_ascii_alphanumeric()
-                || "-._~!$&'()*+,;=:@/?".contains(ch)
+            ch.is_ascii_alphanumeric() || "-._~!$&'()*+,;=:@/?".contains(ch)
         }
         KIND_URL_USER_ALLOWED => {
             // RFC 3986 unreserved + userinfo: A-Z a-z 0-9 - . _ ~ ! $ & ' ( ) * + , ; =
-            ch.is_ascii_alphanumeric()
-                || "-._~!$&'()*+,;=".contains(ch)
+            ch.is_ascii_alphanumeric() || "-._~!$&'()*+,;=".contains(ch)
         }
         KIND_URL_PASSWORD_ALLOWED => {
             // RFC 3986 unreserved + password: A-Z a-z 0-9 - . _ ~ ! $ & ' ( ) * + , ; =
-            ch.is_ascii_alphanumeric()
-                || "-._~!$&'()*+,;=".contains(ch)
+            ch.is_ascii_alphanumeric() || "-._~!$&'()*+,;=".contains(ch)
         }
         _ => false,
     }
@@ -452,8 +446,14 @@ mod tests {
     #[test]
     fn character_is_member_predefined() {
         let obj = shim_nscharacterset_decimal_digit(0, 0);
-        assert_eq!(shim_nscharacterset_character_is_member(obj, 0, '3' as u64), 1);
-        assert_eq!(shim_nscharacterset_character_is_member(obj, 0, 'a' as u64), 0);
+        assert_eq!(
+            shim_nscharacterset_character_is_member(obj, 0, '3' as u64),
+            1
+        );
+        assert_eq!(
+            shim_nscharacterset_character_is_member(obj, 0, 'a' as u64),
+            0
+        );
         free_obj(obj);
     }
 
@@ -461,8 +461,14 @@ mod tests {
     fn character_is_member_custom() {
         let s = make_string("xyz");
         let obj = shim_nscharacterset_with_characters_in_string(0, 0, s);
-        assert_eq!(shim_nscharacterset_character_is_member(obj, 0, 'x' as u64), 1);
-        assert_eq!(shim_nscharacterset_character_is_member(obj, 0, 'w' as u64), 0);
+        assert_eq!(
+            shim_nscharacterset_character_is_member(obj, 0, 'x' as u64),
+            1
+        );
+        assert_eq!(
+            shim_nscharacterset_character_is_member(obj, 0, 'w' as u64),
+            0
+        );
         free_obj(s);
         free_obj(obj);
     }

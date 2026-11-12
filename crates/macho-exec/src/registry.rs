@@ -132,13 +132,18 @@ impl ImageRegistry {
     /// Apply fixups (chained or classic rebases/binds) to every loaded image,
     /// resolving cross-image symbols via export tries and falling back to
     /// the provided system resolver.
-    pub fn apply_all_fixups(&mut self, system_resolver: &dyn SymbolResolver) -> Result<(), ExecError> {
+    pub fn apply_all_fixups(
+        &mut self,
+        system_resolver: &dyn SymbolResolver,
+    ) -> Result<(), ExecError> {
         let composite = RegistryResolver {
             registry: self,
             fallback: system_resolver,
         };
         for loaded in &self.images {
-            let fixups = extract_fixups(&loaded.parsed, &loaded.data);
+            let raw_fixups = extract_fixups(&loaded.parsed, &loaded.data);
+            let fixups =
+                normalize_classic_fixups_for_mapping(&loaded.parsed, &loaded.image, &raw_fixups);
             match &fixups.model {
                 FixupModel::Chained { .. } => {
                     let (rebase_count, bind_count) = crate::apply_chained_fixups(
@@ -149,7 +154,9 @@ impl ImageRegistry {
                     )?;
                     log::debug!(
                         "chained fixups for {}: {} rebases, {} binds",
-                        loaded.install_name, rebase_count, bind_count
+                        loaded.install_name,
+                        rebase_count,
+                        bind_count
                     );
                 }
                 FixupModel::Classic => {
@@ -246,8 +253,8 @@ impl<'a> SymbolResolver for RegistryResolver<'a> {
                 // (preferred load address). Compute the in-memory address:
                 //   preferred_base + offset + slide
                 let preferred_base = loaded.image.preferred_base();
-                let addr = (preferred_base.wrapping_add(exp.address) as i64
-                    + loaded.image.slide) as u64;
+                let addr =
+                    (preferred_base.wrapping_add(exp.address) as i64 + loaded.image.slide) as u64;
                 return Some(addr);
             }
         }
@@ -282,8 +289,8 @@ impl<'a> RegistryResolver<'a> {
                 return None;
             }
             let preferred_base = target.image.preferred_base();
-            let addr = (preferred_base.wrapping_add(exp.address) as i64
-                + target.image.slide) as u64;
+            let addr =
+                (preferred_base.wrapping_add(exp.address) as i64 + target.image.slide) as u64;
             return Some(addr);
         }
         None
@@ -302,16 +309,32 @@ fn apply_classic_binds_with_resolver(
     let mut count = 0;
 
     for bind in fixups.binds.iter().chain(fixups.lazy_binds.iter()) {
-        let seg =
-            image
-                .segments
-                .get(bind.segment_index)
-                .ok_or(ExecError::FixupSegmentOutOfRange {
-                    index: bind.segment_index,
-                    count: image.segments.len(),
-                })?;
+        let Some(seg) = image.segments.get(bind.segment_index) else {
+            if bind.is_lazy {
+                log::debug!(
+                    "skipping lazy bind '{}' with out-of-range segment {}",
+                    bind.symbol_name,
+                    bind.segment_index
+                );
+                continue;
+            }
+            return Err(ExecError::FixupSegmentOutOfRange {
+                index: bind.segment_index,
+                count: image.segments.len(),
+            });
+        };
 
         if bind.segment_offset + 8 > seg.size as u64 {
+            if bind.is_lazy {
+                log::debug!(
+                    "skipping lazy bind '{}' with out-of-bounds offset {:#x} in {} (size {:#x})",
+                    bind.symbol_name,
+                    bind.segment_offset,
+                    seg.name,
+                    seg.size
+                );
+                continue;
+            }
             return Err(ExecError::FixupOffsetOutOfBounds {
                 segment: seg.name.clone(),
                 offset: bind.segment_offset,
@@ -337,18 +360,62 @@ fn apply_classic_binds_with_resolver(
             // Unresolved strong bind — install trap so calling through
             // this slot lands in a diagnostic handler instead of crashing
             // on raw fixup data.
-            log::debug!("classic bind: unresolved '{}', installing trap", bind.symbol_name);
+            log::debug!(
+                "classic bind: unresolved '{}', installing trap",
+                bind.symbol_name
+            );
+            crate::fixup::note_unresolved_bind();
             unsafe {
                 let ptr = seg.base.add(bind.segment_offset as usize) as *mut u64;
-                ptr.write_unaligned(
-                    crate::fixup::unresolved_bind_trap_addr(),
-                );
+                ptr.write_unaligned(crate::fixup::unresolved_bind_trap_addr());
             }
             count += 1;
         }
     }
 
     Ok(count)
+}
+
+fn normalize_classic_fixups_for_mapping(
+    parsed: &macho_parse::ParsedMachO,
+    image: &crate::MappedImage,
+    fixups: &macho_parse::Fixups,
+) -> macho_parse::Fixups {
+    if !matches!(fixups.model, FixupModel::Classic) {
+        return fixups.clone();
+    }
+
+    let parsed_has_pagezero = parsed
+        .segments
+        .first()
+        .is_some_and(|segment| segment.name == "__PAGEZERO");
+    let mapped_has_pagezero = image
+        .segments
+        .first()
+        .is_some_and(|segment| segment.name == "__PAGEZERO");
+
+    if !parsed_has_pagezero || mapped_has_pagezero {
+        return fixups.clone();
+    }
+
+    let mut adjusted = fixups.clone();
+    for rebase in &mut adjusted.rebases {
+        rebase.segment_index = classic_segment_index_for_mapping(rebase.segment_index);
+    }
+    for bind in &mut adjusted.binds {
+        bind.segment_index = classic_segment_index_for_mapping(bind.segment_index);
+    }
+    for bind in &mut adjusted.weak_binds {
+        bind.segment_index = classic_segment_index_for_mapping(bind.segment_index);
+    }
+    for bind in &mut adjusted.lazy_binds {
+        bind.segment_index = classic_segment_index_for_mapping(bind.segment_index);
+    }
+    adjusted
+}
+
+fn classic_segment_index_for_mapping(segment_index: usize) -> usize {
+    segment_index.saturating_sub(1)
 }
 
 #[cfg(test)]
@@ -443,5 +510,13 @@ mod tests {
             normalize_install_name("@rpath/./lib_Foo.dylib"),
             "@rpath/lib_Foo.dylib"
         );
+    }
+
+    #[test]
+    fn classic_segment_index_for_mapping_skips_pagezero() {
+        assert_eq!(classic_segment_index_for_mapping(0), 0);
+        assert_eq!(classic_segment_index_for_mapping(1), 0);
+        assert_eq!(classic_segment_index_for_mapping(2), 1);
+        assert_eq!(classic_segment_index_for_mapping(4), 3);
     }
 }

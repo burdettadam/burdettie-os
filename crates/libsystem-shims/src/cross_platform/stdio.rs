@@ -73,11 +73,9 @@ extern "C" {
         fmt: *const libc::c_char,
         ap: *mut libc::c_void,
     ) -> libc::c_int;
-    fn vfscanf(
-        fp: *mut libc::FILE,
-        fmt: *const libc::c_char,
-        ap: *mut libc::c_void,
-    ) -> libc::c_int;
+    fn fprintf(fp: *mut libc::FILE, fmt: *const libc::c_char, ...) -> libc::c_int;
+    fn vfscanf(fp: *mut libc::FILE, fmt: *const libc::c_char, ap: *mut libc::c_void)
+        -> libc::c_int;
 
     // glibc's actual standard stream pointers — must use these instead of
     // fdopen() to avoid creating duplicate FILE objects with separate buffers.
@@ -93,58 +91,246 @@ impl StdioShims {
         #[cfg(not(target_os = "macos"))]
         {
             use crate::register_shims;
-            register_shims!(table,
+            register_shims!(
+                table,
                 // FILE-returning functions — wrap glibc FILE* in DarwinFile shadow
-                ("_fopen", shim_fopen as *const () as u64, "fopen → shadow FILE"),
-                ("_fopen$DARWIN_EXTSN", shim_fopen as *const () as u64, "fopen$DARWIN_EXTSN → shadow FILE"),
-                ("_fdopen", shim_fdopen as *const () as u64, "fdopen → shadow FILE"),
-                ("_freopen", shim_freopen as *const () as u64, "freopen → shadow FILE"),
-                ("_tmpfile", shim_tmpfile as *const () as u64, "tmpfile → shadow FILE"),
-                ("_open_memstream", shim_open_memstream as *const () as u64, "open_memstream → shadow FILE"),
+                (
+                    "_fopen",
+                    shim_fopen as *const () as u64,
+                    "fopen → shadow FILE"
+                ),
+                (
+                    "_fopen$DARWIN_EXTSN",
+                    shim_fopen as *const () as u64,
+                    "fopen$DARWIN_EXTSN → shadow FILE"
+                ),
+                (
+                    "_fdopen",
+                    shim_fdopen as *const () as u64,
+                    "fdopen → shadow FILE"
+                ),
+                (
+                    "_freopen",
+                    shim_freopen as *const () as u64,
+                    "freopen → shadow FILE"
+                ),
+                (
+                    "_tmpfile",
+                    shim_tmpfile as *const () as u64,
+                    "tmpfile → shadow FILE"
+                ),
+                (
+                    "_open_memstream",
+                    shim_open_memstream as *const () as u64,
+                    "open_memstream → shadow FILE"
+                ),
                 // FILE-consuming functions — extract glibc FILE* from shadow
-                ("_fclose", shim_fclose as *const () as u64, "fclose shadow→glibc"),
-                ("_fread", shim_fread as *const () as u64, "fread shadow→glibc"),
-                ("_fwrite", shim_fwrite as *const () as u64, "fwrite shadow→glibc"),
-                ("_fflush", shim_fflush as *const () as u64, "fflush shadow→glibc"),
+                (
+                    "_fclose",
+                    shim_fclose as *const () as u64,
+                    "fclose shadow→glibc"
+                ),
+                (
+                    "_fread",
+                    shim_fread as *const () as u64,
+                    "fread shadow→glibc"
+                ),
+                (
+                    "_fwrite",
+                    shim_fwrite as *const () as u64,
+                    "fwrite shadow→glibc"
+                ),
+                (
+                    "_fflush",
+                    shim_fflush as *const () as u64,
+                    "fflush shadow→glibc"
+                ),
                 ("_feof", shim_feof as *const () as u64, "feof shadow→glibc"),
-                ("_ferror", shim_ferror as *const () as u64, "ferror shadow→glibc"),
-                ("_fileno", shim_fileno as *const () as u64, "fileno shadow→glibc"),
-                ("_clearerr", shim_clearerr as *const () as u64, "clearerr shadow→glibc"),
-                ("_fseek", shim_fseek as *const () as u64, "fseek shadow→glibc"),
-                ("_fseeko", shim_fseeko as *const () as u64, "fseeko shadow→glibc"),
-                ("_ftell", shim_ftell as *const () as u64, "ftell shadow→glibc"),
-                ("_ftello", shim_ftello as *const () as u64, "ftello shadow→glibc"),
-                ("_rewind", shim_rewind as *const () as u64, "rewind shadow→glibc"),
-                ("_fgetc", shim_fgetc as *const () as u64, "fgetc shadow→glibc"),
-                ("_fputc", shim_fputc as *const () as u64, "fputc shadow→glibc"),
+                (
+                    "_ferror",
+                    shim_ferror as *const () as u64,
+                    "ferror shadow→glibc"
+                ),
+                (
+                    "_fileno",
+                    shim_fileno as *const () as u64,
+                    "fileno shadow→glibc"
+                ),
+                (
+                    "_clearerr",
+                    shim_clearerr as *const () as u64,
+                    "clearerr shadow→glibc"
+                ),
+                (
+                    "_fseek",
+                    shim_fseek as *const () as u64,
+                    "fseek shadow→glibc"
+                ),
+                (
+                    "_fseeko",
+                    shim_fseeko as *const () as u64,
+                    "fseeko shadow→glibc"
+                ),
+                (
+                    "_ftell",
+                    shim_ftell as *const () as u64,
+                    "ftell shadow→glibc"
+                ),
+                (
+                    "_ftello",
+                    shim_ftello as *const () as u64,
+                    "ftello shadow→glibc"
+                ),
+                (
+                    "_rewind",
+                    shim_rewind as *const () as u64,
+                    "rewind shadow→glibc"
+                ),
+                (
+                    "_fgetc",
+                    shim_fgetc as *const () as u64,
+                    "fgetc shadow→glibc"
+                ),
+                (
+                    "_fputc",
+                    shim_fputc as *const () as u64,
+                    "fputc shadow→glibc"
+                ),
                 ("_getc", shim_fgetc as *const () as u64, "getc shadow→glibc"),
                 ("_putc", shim_fputc as *const () as u64, "putc shadow→glibc"),
-                ("_ungetc", shim_ungetc as *const () as u64, "ungetc shadow→glibc"),
-                ("_fgets", shim_fgets as *const () as u64, "fgets shadow→glibc"),
-                ("_fputs", shim_fputs as *const () as u64, "fputs shadow→glibc"),
-                ("_flockfile", shim_flockfile as *const () as u64, "flockfile shadow→glibc"),
-                ("_funlockfile", shim_funlockfile as *const () as u64, "funlockfile shadow→glibc"),
-                ("_ftrylockfile", shim_ftrylockfile as *const () as u64, "ftrylockfile shadow→glibc"),
-                ("_setvbuf", shim_setvbuf as *const () as u64, "setvbuf shadow→glibc"),
-                ("_setbuf", shim_setbuf as *const () as u64, "setbuf shadow→glibc"),
-                ("_setlinebuf", shim_setlinebuf as *const () as u64, "setlinebuf shadow→glibc"),
-                ("_getline", shim_getline as *const () as u64, "getline shadow→glibc"),
-                ("_getdelim", shim_getdelim as *const () as u64, "getdelim shadow→glibc"),
-                ("_putchar", shim_putchar as *const () as u64, "putchar → stdout"),
-                ("_getchar", shim_getchar as *const () as u64, "getchar → stdin"),
+                (
+                    "_ungetc",
+                    shim_ungetc as *const () as u64,
+                    "ungetc shadow→glibc"
+                ),
+                (
+                    "_fgets",
+                    shim_fgets as *const () as u64,
+                    "fgets shadow→glibc"
+                ),
+                (
+                    "_fputs",
+                    shim_fputs as *const () as u64,
+                    "fputs shadow→glibc"
+                ),
+                (
+                    "_flockfile",
+                    shim_flockfile as *const () as u64,
+                    "flockfile shadow→glibc"
+                ),
+                (
+                    "_funlockfile",
+                    shim_funlockfile as *const () as u64,
+                    "funlockfile shadow→glibc"
+                ),
+                (
+                    "_ftrylockfile",
+                    shim_ftrylockfile as *const () as u64,
+                    "ftrylockfile shadow→glibc"
+                ),
+                (
+                    "_setvbuf",
+                    shim_setvbuf as *const () as u64,
+                    "setvbuf shadow→glibc"
+                ),
+                (
+                    "_setbuf",
+                    shim_setbuf as *const () as u64,
+                    "setbuf shadow→glibc"
+                ),
+                (
+                    "_setlinebuf",
+                    shim_setlinebuf as *const () as u64,
+                    "setlinebuf shadow→glibc"
+                ),
+                (
+                    "_getline",
+                    shim_getline as *const () as u64,
+                    "getline shadow→glibc"
+                ),
+                (
+                    "_getdelim",
+                    shim_getdelim as *const () as u64,
+                    "getdelim shadow→glibc"
+                ),
+                (
+                    "_putchar",
+                    shim_putchar as *const () as u64,
+                    "putchar → stdout"
+                ),
+                (
+                    "_getchar",
+                    shim_getchar as *const () as u64,
+                    "getchar → stdin"
+                ),
                 // macOS internal __srget/__swbuf
-                ("___srget", shim_srget as *const () as u64, "__srget shadow→fgetc"),
-                ("___swbuf", shim_swbuf as *const () as u64, "__swbuf shadow→fputc"),
+                (
+                    "___srget",
+                    shim_srget as *const () as u64,
+                    "__srget shadow→fgetc"
+                ),
+                (
+                    "___swbuf",
+                    shim_swbuf as *const () as u64,
+                    "__swbuf shadow→fputc"
+                ),
                 // getc_unlocked/putc_unlocked — same as getc/putc
-                ("_getc_unlocked", shim_fgetc as *const () as u64, "getc_unlocked shadow→glibc"),
-                ("_putc_unlocked", shim_fputc as *const () as u64, "putc_unlocked shadow→glibc"),
+                (
+                    "_getc_unlocked",
+                    shim_fgetc as *const () as u64,
+                    "getc_unlocked shadow→glibc"
+                ),
+                (
+                    "_putc_unlocked",
+                    shim_fputc as *const () as u64,
+                    "putc_unlocked shadow→glibc"
+                ),
                 // OpenSSL/LibreSSL BIO functions that receive FILE* from guest code.
                 // Native LibreSSL stores the FILE* internally and later calls glibc's
                 // fwrite/fread on it — so we must translate shadow → real before handoff.
-                ("_BIO_new_fp", shim_bio_new_fp as *const () as u64, "BIO_new_fp shadow→real FILE"),
-                ("_BIO_ctrl", shim_bio_ctrl as *const () as u64, "BIO_ctrl intercept FILE_PTR"),
-                ("_BIO_dump_fp", shim_bio_dump_fp as *const () as u64, "BIO_dump_fp shadow→real FILE"),
-                ("_BIO_dump_indent_fp", shim_bio_dump_indent_fp as *const () as u64, "BIO_dump_indent_fp shadow→real FILE"),
+                (
+                    "_BIO_new_fp",
+                    shim_bio_new_fp as *const () as u64,
+                    "BIO_new_fp shadow→real FILE"
+                ),
+                (
+                    "_BIO_ctrl",
+                    shim_bio_ctrl as *const () as u64,
+                    "BIO_ctrl intercept FILE_PTR"
+                ),
+                (
+                    "_BIO_dump_fp",
+                    shim_bio_dump_fp as *const () as u64,
+                    "BIO_dump_fp shadow→real FILE"
+                ),
+                (
+                    "_BIO_dump_indent_fp",
+                    shim_bio_dump_indent_fp as *const () as u64,
+                    "BIO_dump_indent_fp shadow→real FILE"
+                ),
+            );
+            #[cfg(target_arch = "x86_64")]
+            register_shims!(
+                table,
+                (
+                    "_fprintf",
+                    shim_fprintf_x86_64 as *const () as u64,
+                    "fprintf shadow→glibc"
+                ),
+            );
+            #[cfg(not(target_arch = "aarch64"))]
+            register_shims!(
+                table,
+                (
+                    "_vfprintf",
+                    shim_vfprintf_non_aarch64 as *const () as u64,
+                    "vfprintf shadow→glibc"
+                ),
+                (
+                    "___vfprintf_chk",
+                    shim_vfprintf_chk_non_aarch64 as *const () as u64,
+                    "vfprintf_chk shadow→glibc"
+                ),
             );
         }
         #[cfg(target_os = "macos")]
@@ -166,11 +352,11 @@ const SHADOW_MAGIC: i16 = 0x5348; // 'SH' for shadow
 /// Offsets into macOS `struct __sFILE` on arm64.
 #[cfg(not(target_os = "macos"))]
 mod offsets {
-    pub const P: usize = 0;       // _p: *mut u8
-    pub const R: usize = 8;       // _r: i32
-    pub const W: usize = 12;      // _w: i32
-    pub const FLAGS: usize = 16;  // _flags: i16
-    pub const FILE: usize = 18;   // _file: i16 (fd)
+    pub const P: usize = 0; // _p: *mut u8
+    pub const R: usize = 8; // _r: i32
+    pub const W: usize = 12; // _w: i32
+    pub const FLAGS: usize = 16; // _flags: i16
+    pub const FILE: usize = 18; // _file: i16 (fd)
     pub const COOKIE: usize = 48; // _cookie: *mut void (stores glibc FILE*)
 }
 
@@ -317,10 +503,7 @@ pub fn stdio_shadow_ptr_addr(stream: u8) -> *const () {
 // ── FILE-returning shims ────────────────────────────────────────────
 
 #[cfg(not(target_os = "macos"))]
-extern "C" fn shim_fopen(
-    path: *const libc::c_char,
-    mode: *const libc::c_char,
-) -> *mut u8 {
+extern "C" fn shim_fopen(path: *const libc::c_char, mode: *const libc::c_char) -> *mut u8 {
     let real = unsafe { libc::fopen(path, mode) };
     if real.is_null() {
         return std::ptr::null_mut();
@@ -348,13 +531,17 @@ extern "C" fn shim_freopen(
     if new_real.is_null() {
         // freopen failed — the original stream is closed
         if is_shadow(darwin_fp) {
-            unsafe { free_shadow(darwin_fp); }
+            unsafe {
+                free_shadow(darwin_fp);
+            }
         }
         return std::ptr::null_mut();
     }
     // If it was a shadow, update it in place
     if is_shadow(darwin_fp) {
-        unsafe { init_shadow(darwin_fp, new_real); }
+        unsafe {
+            init_shadow(darwin_fp, new_real);
+        }
         darwin_fp
     } else {
         unsafe { alloc_shadow(new_real) }
@@ -392,7 +579,9 @@ extern "C" fn shim_fclose(darwin_fp: *mut u8) -> libc::c_int {
     let real_fp = unsafe { extract_real_fp(darwin_fp) };
     let result = unsafe { libc::fclose(real_fp) };
     if is_shadow(darwin_fp) {
-        unsafe { free_shadow(darwin_fp); }
+        unsafe {
+            free_shadow(darwin_fp);
+        }
     }
     result
 }
@@ -647,7 +836,7 @@ extern "C" fn shim_swbuf(c: libc::c_int, darwin_fp: *mut u8) -> libc::c_int {
 pub extern "C" fn vfprintf_shadow(
     darwin_fp: *mut u8,
     fmt: *const libc::c_char,
-    ap: *mut libc::c_void,  // va_list
+    ap: *mut libc::c_void, // va_list
 ) -> libc::c_int {
     let real_fp = unsafe { extract_real_fp(darwin_fp) };
     unsafe { vfprintf(real_fp, fmt, ap as _) }
@@ -660,7 +849,7 @@ pub extern "C" fn vfprintf_shadow(
 pub extern "C" fn vfscanf_shadow(
     darwin_fp: *mut u8,
     fmt: *const libc::c_char,
-    ap: *mut libc::c_void,  // va_list
+    ap: *mut libc::c_void, // va_list
 ) -> libc::c_int {
     let real_fp = unsafe { extract_real_fp(darwin_fp) };
     unsafe { vfscanf(real_fp, fmt, ap as _) }
@@ -674,12 +863,79 @@ pub extern "C" fn vfprintf_chk_shadow(
     darwin_fp: *mut u8,
     flag: libc::c_int,
     fmt: *const libc::c_char,
-    ap: *mut libc::c_void,  // va_list
+    ap: *mut libc::c_void, // va_list
 ) -> libc::c_int {
     let real_fp = unsafe { extract_real_fp(darwin_fp) };
     // __vfprintf_chk is just vfprintf with a flag; fall through to vfprintf
     let _ = flag;
     unsafe { vfprintf(real_fp, fmt, ap as _) }
+}
+
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+extern "C" fn translate_shadow_fp_x86_64(darwin_fp: *mut u8) -> *mut libc::FILE {
+    unsafe { extract_real_fp(darwin_fp) }
+}
+
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+#[unsafe(naked)]
+extern "C" fn shim_fprintf_x86_64() -> libc::c_int {
+    core::arch::naked_asm!(
+        "sub rsp, 184",
+        "mov [rsp + 0], rax",
+        "mov [rsp + 8], rsi",
+        "mov [rsp + 16], rdx",
+        "mov [rsp + 24], rcx",
+        "mov [rsp + 32], r8",
+        "mov [rsp + 40], r9",
+        "movdqu [rsp + 48], xmm0",
+        "movdqu [rsp + 64], xmm1",
+        "movdqu [rsp + 80], xmm2",
+        "movdqu [rsp + 96], xmm3",
+        "movdqu [rsp + 112], xmm4",
+        "movdqu [rsp + 128], xmm5",
+        "movdqu [rsp + 144], xmm6",
+        "movdqu [rsp + 160], xmm7",
+        "call {translate}",
+        "mov r11, rax",
+        "mov rax, [rsp + 0]",
+        "mov rsi, [rsp + 8]",
+        "mov rdx, [rsp + 16]",
+        "mov rcx, [rsp + 24]",
+        "mov r8, [rsp + 32]",
+        "mov r9, [rsp + 40]",
+        "movdqu xmm0, [rsp + 48]",
+        "movdqu xmm1, [rsp + 64]",
+        "movdqu xmm2, [rsp + 80]",
+        "movdqu xmm3, [rsp + 96]",
+        "movdqu xmm4, [rsp + 112]",
+        "movdqu xmm5, [rsp + 128]",
+        "movdqu xmm6, [rsp + 144]",
+        "movdqu xmm7, [rsp + 160]",
+        "mov rdi, r11",
+        "add rsp, 184",
+        "jmp {fprintf_fn}",
+        translate = sym translate_shadow_fp_x86_64,
+        fprintf_fn = sym fprintf,
+    )
+}
+
+#[cfg(all(not(target_os = "macos"), not(target_arch = "aarch64")))]
+extern "C" fn shim_vfprintf_non_aarch64(
+    darwin_fp: *mut u8,
+    fmt: *const libc::c_char,
+    ap: *mut libc::c_void,
+) -> libc::c_int {
+    vfprintf_shadow(darwin_fp, fmt, ap)
+}
+
+#[cfg(all(not(target_os = "macos"), not(target_arch = "aarch64")))]
+extern "C" fn shim_vfprintf_chk_non_aarch64(
+    darwin_fp: *mut u8,
+    flag: libc::c_int,
+    fmt: *const libc::c_char,
+    ap: *mut libc::c_void,
+) -> libc::c_int {
+    vfprintf_chk_shadow(darwin_fp, flag, fmt, ap)
 }
 
 // ── BIO_new_fp / BIO_dump_fp shims ──────────────────────────────────
@@ -690,10 +946,7 @@ pub extern "C" fn vfprintf_chk_shadow(
 // real glibc FILE* before handing off.
 
 #[cfg(not(target_os = "macos"))]
-extern "C" fn shim_bio_new_fp(
-    darwin_fp: *mut u8,
-    close_flag: libc::c_int,
-) -> *mut libc::c_void {
+extern "C" fn shim_bio_new_fp(darwin_fp: *mut u8, close_flag: libc::c_int) -> *mut libc::c_void {
     let real_fp = unsafe { extract_real_fp(darwin_fp) };
     // Resolve BIO_new_fp at runtime — it's in the preloaded LibreSSL .so
     let sym = unsafe { libc::dlsym(libc::RTLD_DEFAULT, b"BIO_new_fp\0".as_ptr().cast()) };
@@ -726,7 +979,10 @@ extern "C" fn shim_bio_ctrl(
         return -1;
     }
     let real_bio_ctrl: extern "C" fn(
-        *mut libc::c_void, libc::c_int, libc::c_long, *mut libc::c_void,
+        *mut libc::c_void,
+        libc::c_int,
+        libc::c_long,
+        *mut libc::c_void,
     ) -> libc::c_long = unsafe { std::mem::transmute(sym) };
 
     if cmd == BIO_C_SET_FILE_PTR && !parg.is_null() {
@@ -766,7 +1022,38 @@ extern "C" fn shim_bio_dump_indent_fp(
     if sym.is_null() {
         return -1;
     }
-    let func: extern "C" fn(*mut libc::FILE, *const libc::c_char, libc::c_int, libc::c_int) -> libc::c_int =
-        unsafe { std::mem::transmute(sym) };
+    let func: extern "C" fn(
+        *mut libc::FILE,
+        *const libc::c_char,
+        libc::c_int,
+        libc::c_int,
+    ) -> libc::c_int = unsafe { std::mem::transmute(sym) };
     func(real_fp, s, len, indent)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(all(not(target_os = "macos"), not(target_arch = "aarch64")))]
+    #[test]
+    fn install_registers_non_aarch64_vfprintf_wrappers() {
+        let mut table = ShimTable::new();
+
+        StdioShims::install(&mut table);
+
+        #[cfg(target_arch = "x86_64")]
+        assert_eq!(
+            table.resolve("_fprintf"),
+            Some(shim_fprintf_x86_64 as *const () as u64)
+        );
+        assert_eq!(
+            table.resolve("_vfprintf"),
+            Some(shim_vfprintf_non_aarch64 as *const () as u64)
+        );
+        assert_eq!(
+            table.resolve("___vfprintf_chk"),
+            Some(shim_vfprintf_chk_non_aarch64 as *const () as u64)
+        );
+    }
 }

@@ -31,9 +31,13 @@ const NXDOMAIN_PATTERNS: &[&str] = &[
 pub struct DnsHandler;
 
 impl Handler for DnsHandler {
-    fn handle(&self, path: &str, method: &str, _body: &[u8], request: &Request)
-        -> Option<HandlerResponse>
-    {
+    fn handle(
+        &self,
+        path: &str,
+        method: &str,
+        _body: &[u8],
+        request: &Request,
+    ) -> Option<HandlerResponse> {
         if !path.starts_with("/api/v1/dns/") {
             return None;
         }
@@ -42,8 +46,8 @@ impl Handler for DnsHandler {
 
         log::info!("burdettie-services: dns {method} {path}");
 
-        let name = extract_query_param(request.url(), "name")
-            .unwrap_or_else(|| "localhost".to_string());
+        let name =
+            extract_query_param(request.url(), "name").unwrap_or_else(|| "localhost".to_string());
 
         let qtype: u32 = extract_query_param(request.url(), "type")
             .and_then(|t| t.parse().ok())
@@ -62,7 +66,10 @@ impl Handler for DnsHandler {
 fn build_dns_response(name: &str, qtype: u32) -> serde_json::Value {
     // Check NXDOMAIN first
     let lower = name.to_ascii_lowercase();
-    if NXDOMAIN_PATTERNS.iter().any(|p| lower == *p || lower.ends_with(&format!(".{p}"))) {
+    if NXDOMAIN_PATTERNS
+        .iter()
+        .any(|p| lower == *p || lower.ends_with(&format!(".{p}")))
+    {
         return build_nxdomain(name, qtype);
     }
 
@@ -233,9 +240,6 @@ mod tests {
             extract_query_param("/resolve?name=foo.com&type=28", "type"),
             Some("28".to_string())
         );
-        assert_eq!(
-            extract_query_param("/resolve?name=foo.com", "type"),
-            None
-        );
+        assert_eq!(extract_query_param("/resolve?name=foo.com", "type"), None);
     }
 }

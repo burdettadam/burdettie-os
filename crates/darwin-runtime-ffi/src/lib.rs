@@ -16,14 +16,14 @@
 //! ```
 
 mod error;
-mod run;
 mod introspection;
 mod memory;
+mod run;
 
 pub use error::darwin_runtime_last_error;
-pub use run::*;
 pub use introspection::*;
 pub use memory::*;
+pub use run::*;
 
 // ---------------------------------------------------------------------------
 // Version

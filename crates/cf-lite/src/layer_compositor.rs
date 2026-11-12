@@ -109,9 +109,10 @@ pub(crate) fn composite_layer(
     let mut src_rgba = vec![0u8; (src_w as usize) * (src_h as usize) * 4];
     argb32_to_premul_rgba(src_pixels, &mut src_rgba);
 
-    let Some(mut src_pixmap) =
-        tiny_skia::Pixmap::from_vec(src_rgba, tiny_skia::IntSize::from_wh(src_w, src_h).expect("nonzero source size"))
-    else {
+    let Some(mut src_pixmap) = tiny_skia::Pixmap::from_vec(
+        src_rgba,
+        tiny_skia::IntSize::from_wh(src_w, src_h).expect("nonzero source size"),
+    ) else {
         return;
     };
 
@@ -143,14 +144,7 @@ pub(crate) fn composite_layer(
             &props.transform,
         );
     } else {
-        blit_pixmap_to_argb32(
-            &src_pixmap,
-            dst_pixels,
-            dst_w,
-            dst_h,
-            view_x,
-            view_y,
-        );
+        blit_pixmap_to_argb32(&src_pixmap, dst_pixels, dst_w, dst_h, view_x, view_y);
     }
 }
 
@@ -218,10 +212,8 @@ pub(crate) fn render_layer_contents(
                 let or_ch = ((r * a + 128) / 255) + ((dr * inv_a + 128) / 255);
                 let og = ((g * a + 128) / 255) + ((dg * inv_a + 128) / 255);
                 let ob = ((b * a + 128) / 255) + ((db * inv_a + 128) / 255);
-                dst_pixels[di] = (oa.min(255) << 24)
-                    | (or_ch.min(255) << 16)
-                    | (og.min(255) << 8)
-                    | ob.min(255);
+                dst_pixels[di] =
+                    (oa.min(255) << 24) | (or_ch.min(255) << 16) | (og.min(255) << 8) | ob.min(255);
             }
         }
     }
@@ -367,7 +359,9 @@ fn draw_border(pixmap: &mut tiny_skia::Pixmap, props: &LayerProps) {
         pb.quad_to(inset, inset, inset + r, inset);
         pb.close();
     } else {
-        let Some(rect) = tiny_skia::Rect::from_xywh(inset, inset, w - bw, h - bw) else { return };
+        let Some(rect) = tiny_skia::Rect::from_xywh(inset, inset, w - bw, h - bw) else {
+            return;
+        };
         pb.push_rect(rect);
     }
     let Some(path) = pb.finish() else { return };
@@ -433,10 +427,8 @@ fn blit_pixmap_to_argb32(
                 let og = sg + ((dg * inv_sa + 128) / 255);
                 let ob = sb + ((db * inv_sa + 128) / 255);
 
-                dst[di] = (oa.min(255) << 24)
-                    | (or.min(255) << 16)
-                    | (og.min(255) << 8)
-                    | ob.min(255);
+                dst[di] =
+                    (oa.min(255) << 24) | (or.min(255) << 16) | (og.min(255) << 8) | ob.min(255);
             }
         }
     }
@@ -470,12 +462,25 @@ fn blit_pixmap_transformed(
         .post_concat(tiny_skia::Transform::from_translate(-sw / 2.0, -sh / 2.0));
 
     // Build a destination pixmap covering the full window.
-    let Some(mut dst_pixmap) = tiny_skia::Pixmap::new(dst_w, dst_h) else { return };
+    let Some(mut dst_pixmap) = tiny_skia::Pixmap::new(dst_w, dst_h) else {
+        return;
+    };
     // Copy existing destination into the pixmap.
     let mut dst_rgba = vec![0u8; (dst_w as usize) * (dst_h as usize) * 4];
     argb32_to_premul_rgba(dst, &mut dst_rgba);
-    let Some(bg) = tiny_skia::Pixmap::from_vec(dst_rgba, tiny_skia::IntSize::from_wh(dst_w, dst_h).unwrap()) else { return };
-    dst_pixmap.draw_pixmap(0, 0, bg.as_ref(), &tiny_skia::PixmapPaint::default(), tiny_skia::Transform::identity(), None);
+    let Some(bg) =
+        tiny_skia::Pixmap::from_vec(dst_rgba, tiny_skia::IntSize::from_wh(dst_w, dst_h).unwrap())
+    else {
+        return;
+    };
+    dst_pixmap.draw_pixmap(
+        0,
+        0,
+        bg.as_ref(),
+        &tiny_skia::PixmapPaint::default(),
+        tiny_skia::Transform::identity(),
+        None,
+    );
 
     // Draw the source with the transform applied.
     let paint = tiny_skia::PixmapPaint {
@@ -524,7 +529,9 @@ pub(crate) fn draw_layer_background(
     let cr = props.corner_radius as f32;
     if cr > 0.0 {
         // Use tiny-skia to render a filled rounded rect.
-        let Some(mut pixmap) = tiny_skia::Pixmap::new(view_w, view_h) else { return };
+        let Some(mut pixmap) = tiny_skia::Pixmap::new(view_w, view_h) else {
+            return;
+        };
         let mut paint = tiny_skia::Paint::default();
         paint.set_color_rgba8(r, g, b, a);
         paint.anti_alias = true;
@@ -619,7 +626,7 @@ mod tests {
         argb32_to_premul_rgba(&src, &mut rgba);
         // Premultiplied: R=0, G=255*128/255≈128, B=0, A=128
         assert_eq!(rgba[3], 128); // alpha preserved
-        assert_eq!(rgba[0], 0);   // red=0
+        assert_eq!(rgba[0], 0); // red=0
         assert!(rgba[1] >= 127 && rgba[1] <= 129); // green≈128
 
         let mut dst = [0u32; 1];
@@ -684,7 +691,10 @@ mod tests {
     fn composite_hidden_layer_is_noop() {
         let mut dst = vec![0xFFFF_FFFFu32; 4]; // 2x2 white
         let src = vec![0xFF_FF_00_00u32; 4]; // 2x2 red
-        let props = LayerProps { hidden: true, ..Default::default() };
+        let props = LayerProps {
+            hidden: true,
+            ..Default::default()
+        };
         composite_layer(&src, 2, 2, &mut dst, 2, 2, 0, 0, &props);
         // Destination should be unchanged.
         assert!(dst.iter().all(|&p| p == 0xFFFF_FFFF));
@@ -707,7 +717,10 @@ mod tests {
     fn composite_half_opacity_blends() {
         let mut dst = vec![0xFF_FF_FF_FFu32; 4]; // 2x2 white
         let src = vec![0xFF_00_00_00u32; 4]; // 2x2 opaque black
-        let props = LayerProps { opacity: 0.5, ..Default::default() };
+        let props = LayerProps {
+            opacity: 0.5,
+            ..Default::default()
+        };
         composite_layer(&src, 2, 2, &mut dst, 2, 2, 0, 0, &props);
         // Should be roughly gray (blended black at 50% over white).
         for &p in &dst {

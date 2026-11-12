@@ -242,7 +242,10 @@ pub extern "C" fn shim_nsstring_range_of_string_options_range(
 
     if case_insensitive {
         let hay_lower: Vec<u8> = haystack.bytes().map(|b| b.to_ascii_lowercase()).collect();
-        let needle_lower: Vec<u8> = needle_bytes.iter().map(|b| b.to_ascii_lowercase()).collect();
+        let needle_lower: Vec<u8> = needle_bytes
+            .iter()
+            .map(|b| b.to_ascii_lowercase())
+            .collect();
         if backwards {
             if let Some(pos) = hay_lower
                 .windows(needle_lower.len())

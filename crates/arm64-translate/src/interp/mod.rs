@@ -16,11 +16,11 @@
 
 mod exec_branch;
 mod exec_dp;
+mod exec_dp_extended;
 mod exec_fp;
+mod exec_fp_dp;
 mod exec_ls;
 mod exec_ls_extended;
-mod exec_fp_dp;
-mod exec_dp_extended;
 mod exec_simd;
 
 use std::collections::HashMap;
@@ -32,7 +32,13 @@ macro_rules! mem_read_u64 {
     ($self:expr, $addr:expr, $pc:expr) => {
         match $self.mem.read_u64($addr) {
             Some(v) => v,
-            None => return StepResult::Exit(ExitReason::MemoryFault { pc: $pc, addr: $addr, is_write: false }),
+            None => {
+                return StepResult::Exit(ExitReason::MemoryFault {
+                    pc: $pc,
+                    addr: $addr,
+                    is_write: false,
+                })
+            }
         }
     };
 }
@@ -43,7 +49,13 @@ macro_rules! mem_read_u32 {
     ($self:expr, $addr:expr, $pc:expr) => {
         match $self.mem.read_u32($addr) {
             Some(v) => v,
-            None => return StepResult::Exit(ExitReason::MemoryFault { pc: $pc, addr: $addr, is_write: false }),
+            None => {
+                return StepResult::Exit(ExitReason::MemoryFault {
+                    pc: $pc,
+                    addr: $addr,
+                    is_write: false,
+                })
+            }
         }
     };
 }
@@ -54,7 +66,13 @@ macro_rules! mem_read_u16 {
     ($self:expr, $addr:expr, $pc:expr) => {
         match $self.mem.read_u16($addr) {
             Some(v) => v,
-            None => return StepResult::Exit(ExitReason::MemoryFault { pc: $pc, addr: $addr, is_write: false }),
+            None => {
+                return StepResult::Exit(ExitReason::MemoryFault {
+                    pc: $pc,
+                    addr: $addr,
+                    is_write: false,
+                })
+            }
         }
     };
 }
@@ -65,7 +83,13 @@ macro_rules! mem_read_u8 {
     ($self:expr, $addr:expr, $pc:expr) => {
         match $self.mem.read_u8($addr) {
             Some(v) => v,
-            None => return StepResult::Exit(ExitReason::MemoryFault { pc: $pc, addr: $addr, is_write: false }),
+            None => {
+                return StepResult::Exit(ExitReason::MemoryFault {
+                    pc: $pc,
+                    addr: $addr,
+                    is_write: false,
+                })
+            }
         }
     };
 }
@@ -125,13 +149,21 @@ pub struct BlockCache {
 
 impl BlockCache {
     fn new() -> Self {
-        Self { blocks: HashMap::new(), hits: 0, misses: 0 }
+        Self {
+            blocks: HashMap::new(),
+            hits: 0,
+            misses: 0,
+        }
     }
 
     /// Return the cache hit rate in [0, 1].
     pub fn hit_rate(&self) -> f64 {
         let total = self.hits + self.misses;
-        if total == 0 { 0.0 } else { self.hits as f64 / total as f64 }
+        if total == 0 {
+            0.0
+        } else {
+            self.hits as f64 / total as f64
+        }
     }
 
     /// Decode instructions from `mem` starting at `start_pc` until a block
@@ -214,7 +246,14 @@ impl Interpreter {
     pub fn new(cpu: CpuState, mem: Memory, ffi: FfiBridge) -> Self {
         // JIT: 4MB code buffer, compile after 50 visits to a block
         let jit = JitCache::new(4 * 1024 * 1024, 50);
-        Self { cpu, mem, ffi, instruction_count: 0, block_cache: BlockCache::new(), jit_cache: jit }
+        Self {
+            cpu,
+            mem,
+            ffi,
+            instruction_count: 0,
+            block_cache: BlockCache::new(),
+            jit_cache: jit,
+        }
     }
 
     /// Run from the current PC until exit.
@@ -234,7 +273,8 @@ impl Interpreter {
 
             // ── Tier 2: JIT execution for hot blocks ──────────────────────
             if let Some(jit_fn) = self.jit_cache.get(pc) {
-                let insn_count = unsafe { jit_fn(&mut self.cpu as *mut _, &mut self.mem as *mut _) };
+                let insn_count =
+                    unsafe { jit_fn(&mut self.cpu as *mut _, &mut self.mem as *mut _) };
                 count += insn_count;
                 self.jit_cache.exec_count += 1;
                 // JIT block updates cpu.pc internally on success.
@@ -260,7 +300,8 @@ impl Interpreter {
             if self.jit_cache.is_hot(pc) {
                 if let Some(jit_fn) = self.jit_cache.compile(pc, &block) {
                     log::debug!("JIT compiled block at {pc:#x} ({} insns)", block.len());
-                    let insn_count = unsafe { jit_fn(&mut self.cpu as *mut _, &mut self.mem as *mut _) };
+                    let insn_count =
+                        unsafe { jit_fn(&mut self.cpu as *mut _, &mut self.mem as *mut _) };
                     count += insn_count;
                     self.jit_cache.exec_count += 1;
                     if insn_count > 0 {
@@ -298,83 +339,195 @@ impl Interpreter {
         use Instruction::*;
         match insn {
             // ── Data processing (integer) ─────────────────────────
-            Nop | Svc { .. }
-            | AddImm { .. } | AddsImm { .. } | SubImm { .. } | SubsImm { .. }
-            | Movz { .. } | Movk { .. } | Movn { .. }
-            | Adrp { .. } | Adr { .. } | LogicalImm { .. }
-            | AddReg { .. } | AddsReg { .. } | SubReg { .. } | SubsReg { .. }
-            | LogicalReg { .. } | Madd { .. } | Msub { .. } | Div { .. }
-            | Csel { .. } | Csinc { .. } | Csinv { .. } | Csneg { .. }
-            | Ccmp { .. } | Ccmn { .. } | ShiftVar { .. } | Bitfield { .. }
-            | Rev { .. } | Rev16 { .. } | Rev32 { .. }
-            | Clz { .. } | Cls { .. } | Rbit { .. }
-            | Extr { .. } | Crc32 { .. } => {
-                self.exec_dp(insn, pc)
-            }
+            Nop
+            | Svc { .. }
+            | AddImm { .. }
+            | AddsImm { .. }
+            | SubImm { .. }
+            | SubsImm { .. }
+            | Movz { .. }
+            | Movk { .. }
+            | Movn { .. }
+            | Adrp { .. }
+            | Adr { .. }
+            | LogicalImm { .. }
+            | AddReg { .. }
+            | AddsReg { .. }
+            | SubReg { .. }
+            | SubsReg { .. }
+            | LogicalReg { .. }
+            | Madd { .. }
+            | Msub { .. }
+            | Div { .. }
+            | Csel { .. }
+            | Csinc { .. }
+            | Csinv { .. }
+            | Csneg { .. }
+            | Ccmp { .. }
+            | Ccmn { .. }
+            | ShiftVar { .. }
+            | Bitfield { .. }
+            | Rev { .. }
+            | Rev16 { .. }
+            | Rev32 { .. }
+            | Clz { .. }
+            | Cls { .. }
+            | Rbit { .. }
+            | Extr { .. }
+            | Crc32 { .. } => self.exec_dp(insn, pc),
 
             // ── Load / Store ──────────────────────────────────────
-            LdrImm { .. } | StrImm { .. } | Ldur { .. } | Stur { .. }
-            | LdrPre { .. } | StrPre { .. } | LdrPost { .. } | StrPost { .. }
-            | LdrbPre { .. } | StrbPre { .. } | LdrhPre { .. } | StrhPre { .. }
-            | LdrsbPre { .. } | LdrshPre { .. } | LdrswPre { .. }
-            | LdrbPost { .. } | StrbPost { .. } | LdrhPost { .. } | StrhPost { .. }
-            | LdrsbPost { .. } | LdrshPost { .. } | LdrswPost { .. }
-            | Ldp { .. } | Stp { .. } | LdpPre { .. } | StpPre { .. }
-            | LdpPost { .. } | StpPost { .. }
-            | Ldrb { .. } | Strb { .. } | Ldrh { .. } | Strh { .. }
-            | Ldrsw { .. } | Ldrsb { .. } | Ldrsh { .. }
-            | LdrReg { .. } | StrReg { .. } | LdrbReg { .. } | StrbReg { .. }
-            | LdrhReg { .. } | StrhReg { .. }
-            | LdrsbReg { .. } | LdrshReg { .. } | LdrswReg { .. }
+            LdrImm { .. }
+            | StrImm { .. }
+            | Ldur { .. }
+            | Stur { .. }
+            | LdrPre { .. }
+            | StrPre { .. }
+            | LdrPost { .. }
+            | StrPost { .. }
+            | LdrbPre { .. }
+            | StrbPre { .. }
+            | LdrhPre { .. }
+            | StrhPre { .. }
+            | LdrsbPre { .. }
+            | LdrshPre { .. }
+            | LdrswPre { .. }
+            | LdrbPost { .. }
+            | StrbPost { .. }
+            | LdrhPost { .. }
+            | StrhPost { .. }
+            | LdrsbPost { .. }
+            | LdrshPost { .. }
+            | LdrswPost { .. }
+            | Ldp { .. }
+            | Stp { .. }
+            | LdpPre { .. }
+            | StpPre { .. }
+            | LdpPost { .. }
+            | StpPost { .. }
+            | Ldrb { .. }
+            | Strb { .. }
+            | Ldrh { .. }
+            | Strh { .. }
+            | Ldrsw { .. }
+            | Ldrsb { .. }
+            | Ldrsh { .. }
+            | LdrReg { .. }
+            | StrReg { .. }
+            | LdrbReg { .. }
+            | StrbReg { .. }
+            | LdrhReg { .. }
+            | StrhReg { .. }
+            | LdrsbReg { .. }
+            | LdrshReg { .. }
+            | LdrswReg { .. }
             | LdrLiteral { .. }
-            | Prfm => {
-                self.exec_ls(insn, pc)
-            }
+            | Prfm => self.exec_ls(insn, pc),
 
             // ── Branch / Call / Return ────────────────────────────
-            B { .. } | Bl { .. } | Br { .. } | Blr { .. } | Ret { .. }
-            | Bcond { .. } | Cbz { .. } | Cbnz { .. } | Tbz { .. } | Tbnz { .. }
-            | Mrs { .. } | Msr { .. } | Brk { .. }
-            | PacIA { .. } | PacIB { .. } | PacDA { .. } | PacDB { .. }
-            | AutIA { .. } | AutIB { .. } | AutDA { .. } | AutDB { .. }
-            | Xpaci { .. } | Xpacd { .. } => {
-                self.exec_branch(insn, pc)
-            }
+            B { .. }
+            | Bl { .. }
+            | Br { .. }
+            | Blr { .. }
+            | Ret { .. }
+            | Bcond { .. }
+            | Cbz { .. }
+            | Cbnz { .. }
+            | Tbz { .. }
+            | Tbnz { .. }
+            | Mrs { .. }
+            | Msr { .. }
+            | Brk { .. }
+            | PacIA { .. }
+            | PacIB { .. }
+            | PacDA { .. }
+            | PacDB { .. }
+            | AutIA { .. }
+            | AutIB { .. }
+            | AutDA { .. }
+            | AutDB { .. }
+            | Xpaci { .. }
+            | Xpacd { .. } => self.exec_branch(insn, pc),
 
             // ── Load / Store (extended: exclusive, acquire-release, atomics) ─
-            Ldar { .. } | Ldapr { .. } | Stlr { .. }
-            | Ldarb { .. } | Stlrb { .. } | Ldarh { .. } | Stlrh { .. }
-            | LoadExclusive { .. } | LoadExclusiveByte { .. } | LoadExclusiveHalf { .. }
-            | StoreExclusive { .. } | StoreExclusiveByte { .. } | StoreExclusiveHalf { .. }
-            | Clrex | LseLoad { .. } | Swp { .. } | Cas { .. } => {
-                self.exec_ls_extended(insn, pc)
-            }
+            Ldar { .. }
+            | Ldapr { .. }
+            | Stlr { .. }
+            | Ldarb { .. }
+            | Stlrb { .. }
+            | Ldarh { .. }
+            | Stlrh { .. }
+            | LoadExclusive { .. }
+            | LoadExclusiveByte { .. }
+            | LoadExclusiveHalf { .. }
+            | StoreExclusive { .. }
+            | StoreExclusiveByte { .. }
+            | StoreExclusiveHalf { .. }
+            | Clrex
+            | LseLoad { .. }
+            | Swp { .. }
+            | Cas { .. } => self.exec_ls_extended(insn, pc),
 
             // ── FP / SIMD data processing ─────────────────────────
-            FpLdrImm { .. } | FpStrImm { .. } | FpLdur { .. } | FpStur { .. }
-            | FpLdrPre { .. } | FpStrPre { .. } | FpLdrPost { .. } | FpStrPost { .. }
-            | FpLdp { .. } | FpStp { .. } | FpLdpPre { .. } | FpStpPre { .. }
-            | FpLdpPost { .. } | FpStpPost { .. }
-            | FpLdrReg { .. } | FpStrReg { .. } | FpLdrLiteral { .. }
-            | FMovReg { .. } | FMovToFp { .. } | FMovToGpr { .. } | FMovImm { .. }
-            | Scvtf { .. } | Ucvtf { .. } | Fcvtzs { .. } | Fcvtzu { .. }
-            | Fcvt { .. } | Fcmp { .. } | FcmpZero { .. }
-            | Fadd { .. } | Fsub { .. } | Fmul { .. } | Fdiv { .. }
-            | Fabd { .. } | Fneg { .. } | Fabs { .. } | Fsqrt { .. } | Fcsel { .. }
-            | Fmadd { .. } | Fmsub { .. } | Fnmadd { .. } | Fnmsub { .. }
-            | Frint { .. } => {
-                self.exec_fp(insn, pc)
-            }
+            FpLdrImm { .. }
+            | FpStrImm { .. }
+            | FpLdur { .. }
+            | FpStur { .. }
+            | FpLdrPre { .. }
+            | FpStrPre { .. }
+            | FpLdrPost { .. }
+            | FpStrPost { .. }
+            | FpLdp { .. }
+            | FpStp { .. }
+            | FpLdpPre { .. }
+            | FpStpPre { .. }
+            | FpLdpPost { .. }
+            | FpStpPost { .. }
+            | FpLdrReg { .. }
+            | FpStrReg { .. }
+            | FpLdrLiteral { .. }
+            | FMovReg { .. }
+            | FMovToFp { .. }
+            | FMovToGpr { .. }
+            | FMovImm { .. }
+            | Scvtf { .. }
+            | Ucvtf { .. }
+            | Fcvtzs { .. }
+            | Fcvtzu { .. }
+            | Fcvt { .. }
+            | Fcmp { .. }
+            | FcmpZero { .. }
+            | Fadd { .. }
+            | Fsub { .. }
+            | Fmul { .. }
+            | Fdiv { .. }
+            | Fabd { .. }
+            | Fneg { .. }
+            | Fabs { .. }
+            | Fsqrt { .. }
+            | Fcsel { .. }
+            | Fmadd { .. }
+            | Fmsub { .. }
+            | Fnmadd { .. }
+            | Fnmsub { .. }
+            | Frint { .. } => self.exec_fp(insn, pc),
 
             // ── SIMD vector ───────────────────────────────────────
-            SimdDupGeneral { .. } | SimdDupElement { .. }
-            | SimdInsGeneral { .. } | SimdInsElement { .. }
-            | SimdUmov { .. } | SimdSmov { .. } | SimdMovi { .. }
-            | SimdAdd { .. } | SimdSub { .. }
-            | SimdAnd { .. } | SimdOrr { .. } | SimdEor { .. }
-            | SimdCmp { .. } | SimdCnt { .. } | SimdAddv { .. } => {
-                self.exec_simd(insn, pc)
-            }
+            SimdDupGeneral { .. }
+            | SimdDupElement { .. }
+            | SimdInsGeneral { .. }
+            | SimdInsElement { .. }
+            | SimdUmov { .. }
+            | SimdSmov { .. }
+            | SimdMovi { .. }
+            | SimdAdd { .. }
+            | SimdSub { .. }
+            | SimdAnd { .. }
+            | SimdOrr { .. }
+            | SimdEor { .. }
+            | SimdCmp { .. }
+            | SimdCnt { .. }
+            | SimdAddv { .. } => self.exec_simd(insn, pc),
 
             // ── Unknown ───────────────────────────────────────────
             Unknown { raw: r } => {
@@ -387,7 +540,11 @@ impl Interpreter {
 
 /// Shift a 12-bit immediate by 0 or 12.
 pub(super) fn shift_imm12(imm: u32, shift: u8) -> u32 {
-    if shift == 1 { imm << 12 } else { imm }
+    if shift == 1 {
+        imm << 12
+    } else {
+        imm
+    }
 }
 
 /// Set up an interpreter to run a Mach-O binary's main().
@@ -416,9 +573,7 @@ pub fn setup_for_main(
 #[cfg(test)]
 mod block_cache_tests {
     use super::*;
-    use crate::test_helpers::{
-        enc_bcond, enc_movz, enc_subs_imm, test_interp,
-    };
+    use crate::test_helpers::{enc_bcond, enc_movz, enc_subs_imm, test_interp};
 
     /// Verify the block cache accumulates hits on a tight countdown loop.
     ///
@@ -438,9 +593,9 @@ mod block_cache_tests {
     fn block_cache_hit_rate_for_hot_loop() {
         // NE condition encoding is 1 (cond=0b0001).
         let insns = [
-            enc_movz(true, 0, 100, 0),    // MOVZ X0, #100
+            enc_movz(true, 0, 100, 0),          // MOVZ X0, #100
             enc_subs_imm(true, 0, 0, 1, false), // SUBS X0, X0, #1
-            enc_bcond(1, -4),              // B.NE -4  (back to SUBS)
+            enc_bcond(1, -4),                   // B.NE -4  (back to SUBS)
         ];
         let mut t = test_interp(&insns);
         t.run_ok(); // asserts clean Returned exit

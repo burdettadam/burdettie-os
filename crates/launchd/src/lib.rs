@@ -73,13 +73,25 @@ mod tests {
         // Submit a job with a unique label
         use launch_data::*;
         let job_dict = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(job_dict, new_string(c"com.test.lifecycle.integ".as_ptr()), c"Label".as_ptr());
-        dict_insert(job_dict, new_string(c"/bin/sleep".as_ptr()), c"Program".as_ptr());
+        dict_insert(
+            job_dict,
+            new_string(c"com.test.lifecycle.integ".as_ptr()),
+            c"Label".as_ptr(),
+        );
+        dict_insert(
+            job_dict,
+            new_string(c"/bin/sleep".as_ptr()),
+            c"Program".as_ptr(),
+        );
         dict_insert(job_dict, new_bool(true), c"RunAtLoad".as_ptr());
 
         // Add MachServices
         let mach_dict = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(mach_dict, new_bool(true), c"com.test.lifecycle.integ.port".as_ptr());
+        dict_insert(
+            mach_dict,
+            new_bool(true),
+            c"com.test.lifecycle.integ.port".as_ptr(),
+        );
         dict_insert(job_dict, mach_dict, c"MachServices".as_ptr());
 
         let req = alloc(LaunchDataType::Dictionary as u32);
@@ -93,7 +105,11 @@ mod tests {
 
         // Check in the mach service via bootstrap (always succeeds even if auto-created)
         let mut svc_port: u32 = 0;
-        let r = bootstrap::bootstrap_check_in(0, c"com.test.lifecycle.integ.port".as_ptr(), &mut svc_port);
+        let r = bootstrap::bootstrap_check_in(
+            0,
+            c"com.test.lifecycle.integ.port".as_ptr(),
+            &mut svc_port,
+        );
         // Might already be checked in from another run
         assert!(r == constants::BOOTSTRAP_SUCCESS || r == constants::BOOTSTRAP_SERVICE_ACTIVE);
 

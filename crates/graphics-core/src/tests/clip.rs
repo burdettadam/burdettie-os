@@ -60,7 +60,7 @@ fn clip_nested_clips_intersect() {
     // Outside intersection but inside one clip: should be BLACK
     assert_eq!(px(&surface, 15, 15), BLACK_ARGB); // inside clip1 only
     assert_eq!(px(&surface, 95, 95), BLACK_ARGB); // inside clip2 only
-    // Outside both clips
+                                                  // Outside both clips
     assert_eq!(px(&surface, 5, 5), BLACK_ARGB);
 }
 

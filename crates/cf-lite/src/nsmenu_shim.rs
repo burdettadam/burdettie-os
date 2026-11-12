@@ -5,7 +5,7 @@
 //!   offset  8: title_ptr     (u64 — NSString)
 //!   offset 16: items_vec_ptr (u64 — Box<Vec<u64>> of NSMenuItem*)
 //!
-//! NSMenuItem object layout (72 bytes):
+//! NSMenuItem object layout (96 bytes):
 //!   offset  0: ISA pointer   (u64)
 //!   offset  8: title_ptr     (u64 — NSString)
 //!   offset 16: target_ptr    (u64)
@@ -15,6 +15,9 @@
 //!   offset 48: key_equiv_ptr (u64 — NSString)
 //!   offset 56: key_equiv_mod (u64 — modifier mask, default NSCommandKeyMask)
 //!   offset 64: state         (u64 — NSControlStateValue: 0=off, 1=on, -1=mixed)
+//!   offset 72: tooltip_ptr   (u64 — NSString, nullable)
+//!   offset 80: represented_object_ptr (u64 — id, nullable)
+//!   offset 88: tag           (u64 — NSInteger payload)
 
 const MENU_TITLE_OFF: usize = 8;
 const MENU_ITEMS_OFF: usize = 16;
@@ -28,7 +31,10 @@ const ITEM_ENABLED_OFF: usize = 40;
 const ITEM_KEY_EQUIV_OFF: usize = 48;
 const ITEM_KEY_EQUIV_MOD_OFF: usize = 56;
 const ITEM_STATE_OFF: usize = 64;
-const ITEM_SIZE: usize = 72;
+const ITEM_TOOLTIP_OFF: usize = 72;
+const ITEM_REPRESENTED_OBJECT_OFF: usize = 80;
+const ITEM_TAG_OFF: usize = 88;
+const ITEM_SIZE: usize = 96;
 
 fn menu_items_ptr(obj: u64) -> *mut Vec<u64> {
     if obj == 0 {
@@ -68,13 +74,17 @@ fn alloc_menu_item() -> u64 {
 
 /// `-[NSMenu initWithTitle:]`
 pub extern "C" fn shim_nsmenu_init_with_title(obj: u64, _cmd: u64, title: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *((obj as usize + MENU_TITLE_OFF) as *mut u64) = title;
     }
     let items_ptr = ensure_menu_items_ptr(obj);
     if !items_ptr.is_null() {
-        unsafe { (*items_ptr).clear(); }
+        unsafe {
+            (*items_ptr).clear();
+        }
     }
     obj
 }
@@ -149,6 +159,70 @@ pub extern "C" fn shim_nsmenu_item_at_index(obj: u64, _cmd: u64, index: u64) -> 
     unsafe { (&*items_ptr).get(index as usize).copied().unwrap_or(0) }
 }
 
+/// `-[NSMenu itemWithTitle:]`
+pub extern "C" fn shim_nsmenu_item_with_title(obj: u64, _cmd: u64, title: u64) -> u64 {
+    if obj == 0 || title == 0 {
+        return 0;
+    }
+
+    let items_ptr = menu_items_ptr(obj);
+    if items_ptr.is_null() {
+        return 0;
+    }
+
+    unsafe {
+        (&*items_ptr)
+            .iter()
+            .copied()
+            .find(|item| {
+                let item_title = shim_nsmenuitem_title(*item, 0);
+                item_title != 0
+                    && crate::cfstring::shim_nsstring_is_equal_to_string(item_title, 0, title) != 0
+            })
+            .unwrap_or(0)
+    }
+}
+
+/// `-[NSMenu indexOfItemWithRepresentedObject:]`
+pub extern "C" fn shim_nsmenu_index_of_item_with_represented_object(
+    obj: u64,
+    _cmd: u64,
+    represented_object: u64,
+) -> i64 {
+    if obj == 0 {
+        return -1;
+    }
+
+    let items_ptr = menu_items_ptr(obj);
+    if items_ptr.is_null() {
+        return -1;
+    }
+
+    unsafe {
+        (&*items_ptr)
+            .iter()
+            .position(|item| {
+                represented_objects_equal(
+                    shim_nsmenuitem_represented_object(*item, 0),
+                    represented_object,
+                )
+            })
+            .map(|index| index as i64)
+            .unwrap_or(-1)
+    }
+}
+
+fn represented_objects_equal(lhs: u64, rhs: u64) -> bool {
+    if lhs == rhs {
+        return true;
+    }
+    if lhs == 0 || rhs == 0 {
+        return false;
+    }
+
+    crate::nsapplication::dispatch_bool_selector_named_to_target(lhs, "isEqual:", rhs)
+}
+
 /// `-[NSMenu itemArray]`
 pub extern "C" fn shim_nsmenu_item_array(obj: u64, _cmd: u64) -> u64 {
     if obj == 0 {
@@ -171,15 +245,21 @@ pub extern "C" fn shim_nsmenu_remove_all_items(obj: u64, _cmd: u64) {
 
     let items_ptr = menu_items_ptr(obj);
     if !items_ptr.is_null() {
-        unsafe { (*items_ptr).clear(); }
+        unsafe {
+            (*items_ptr).clear();
+        }
     }
 }
 
 /// `-[NSMenu insertItem:atIndex:]`
 pub extern "C" fn shim_nsmenu_insert_item(obj: u64, _cmd: u64, item: u64, index: i64) {
-    if obj == 0 || item == 0 { return; }
+    if obj == 0 || item == 0 {
+        return;
+    }
     let items_ptr = ensure_menu_items_ptr(obj);
-    if items_ptr.is_null() { return; }
+    if items_ptr.is_null() {
+        return;
+    }
     unsafe {
         let items = &mut *items_ptr;
         let idx = (index as usize).min(items.len());
@@ -189,9 +269,13 @@ pub extern "C" fn shim_nsmenu_insert_item(obj: u64, _cmd: u64, item: u64, index:
 
 /// `-[NSMenu removeItemAtIndex:]`
 pub extern "C" fn shim_nsmenu_remove_item_at_index(obj: u64, _cmd: u64, index: i64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let items_ptr = menu_items_ptr(obj);
-    if items_ptr.is_null() { return; }
+    if items_ptr.is_null() {
+        return;
+    }
     unsafe {
         let items = &mut *items_ptr;
         let idx = index as usize;
@@ -203,15 +287,25 @@ pub extern "C" fn shim_nsmenu_remove_item_at_index(obj: u64, _cmd: u64, index: i
 
 /// `-[NSMenu title]`
 pub extern "C" fn shim_nsmenu_title(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return crate::cfstring::alloc_nsstring_from_cstr(c"".as_ptr()); }
+    if obj == 0 {
+        return crate::cfstring::alloc_nsstring_from_cstr(c"".as_ptr());
+    }
     let ptr = unsafe { *((obj as usize + MENU_TITLE_OFF) as *const u64) };
-    if ptr == 0 { crate::cfstring::alloc_nsstring_from_cstr(c"".as_ptr()) } else { ptr }
+    if ptr == 0 {
+        crate::cfstring::alloc_nsstring_from_cstr(c"".as_ptr())
+    } else {
+        ptr
+    }
 }
 
 /// `-[NSMenu setTitle:]`
 pub extern "C" fn shim_nsmenu_set_title(obj: u64, _cmd: u64, title: u64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as usize + MENU_TITLE_OFF) as *mut u64) = title; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + MENU_TITLE_OFF) as *mut u64) = title;
+    }
 }
 
 /// `-[NSMenu setSubmenu:forItem:]`
@@ -257,7 +351,9 @@ pub extern "C" fn shim_nsmenuitem_init_with_title(
     action: u64,
     key_equiv: u64,
 ) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *((obj as usize + ITEM_TITLE_OFF) as *mut u64) = title;
         *((obj as usize + ITEM_TARGET_OFF) as *mut u64) = 0;
@@ -267,110 +363,227 @@ pub extern "C" fn shim_nsmenuitem_init_with_title(
         *((obj as usize + ITEM_KEY_EQUIV_OFF) as *mut u64) = key_equiv;
         *((obj as usize + ITEM_KEY_EQUIV_MOD_OFF) as *mut u64) = NS_COMMAND_KEY_MASK;
         *((obj as usize + ITEM_STATE_OFF) as *mut u64) = 0; // NSControlStateValueOff
+        *((obj as usize + ITEM_TOOLTIP_OFF) as *mut u64) = 0;
+        *((obj as usize + ITEM_REPRESENTED_OBJECT_OFF) as *mut u64) = 0;
+        *((obj as usize + ITEM_TAG_OFF) as *mut u64) = 0;
     }
     obj
 }
 
 /// `-[NSMenuItem setSubmenu:]`
 pub extern "C" fn shim_nsmenuitem_set_submenu(obj: u64, _cmd: u64, submenu: u64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as usize + ITEM_SUBMENU_OFF) as *mut u64) = submenu; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + ITEM_SUBMENU_OFF) as *mut u64) = submenu;
+    }
 }
 
 /// `-[NSMenuItem submenu]`
 pub extern "C" fn shim_nsmenuitem_submenu(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + ITEM_SUBMENU_OFF) as *const u64) }
 }
 
 /// `-[NSMenuItem title]`
 pub extern "C" fn shim_nsmenuitem_title(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return crate::cfstring::alloc_nsstring_from_cstr(c"".as_ptr()); }
+    if obj == 0 {
+        return crate::cfstring::alloc_nsstring_from_cstr(c"".as_ptr());
+    }
     let ptr = unsafe { *((obj as usize + ITEM_TITLE_OFF) as *const u64) };
-    if ptr == 0 { crate::cfstring::alloc_nsstring_from_cstr(c"".as_ptr()) } else { ptr }
+    if ptr == 0 {
+        crate::cfstring::alloc_nsstring_from_cstr(c"".as_ptr())
+    } else {
+        ptr
+    }
 }
 
 /// `-[NSMenuItem setTitle:]`
 pub extern "C" fn shim_nsmenuitem_set_title(obj: u64, _cmd: u64, title: u64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as usize + ITEM_TITLE_OFF) as *mut u64) = title; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + ITEM_TITLE_OFF) as *mut u64) = title;
+    }
 }
 
 /// `-[NSMenuItem setTarget:]`
 pub extern "C" fn shim_nsmenuitem_set_target(obj: u64, _cmd: u64, target: u64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as usize + ITEM_TARGET_OFF) as *mut u64) = target; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + ITEM_TARGET_OFF) as *mut u64) = target;
+    }
 }
 
 /// `-[NSMenuItem target]`
 pub extern "C" fn shim_nsmenuitem_target(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + ITEM_TARGET_OFF) as *const u64) }
 }
 
 /// `-[NSMenuItem setAction:]`
 pub extern "C" fn shim_nsmenuitem_set_action(obj: u64, _cmd: u64, action: u64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as usize + ITEM_ACTION_OFF) as *mut u64) = action; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + ITEM_ACTION_OFF) as *mut u64) = action;
+    }
 }
 
 /// `-[NSMenuItem action]`
 pub extern "C" fn shim_nsmenuitem_action(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + ITEM_ACTION_OFF) as *const u64) }
 }
 
 /// `-[NSMenuItem isEnabled]`
 pub extern "C" fn shim_nsmenuitem_is_enabled(obj: u64, _cmd: u64) -> u8 {
-    if obj == 0 { return 1; }
+    if obj == 0 {
+        return 1;
+    }
     let val = unsafe { *((obj as usize + ITEM_ENABLED_OFF) as *const u64) };
     val as u8
 }
 
 /// `-[NSMenuItem setEnabled:]`
 pub extern "C" fn shim_nsmenuitem_set_enabled(obj: u64, _cmd: u64, enabled: u8) {
-    if obj == 0 { return; }
-    unsafe { *((obj as usize + ITEM_ENABLED_OFF) as *mut u64) = enabled as u64; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + ITEM_ENABLED_OFF) as *mut u64) = enabled as u64;
+    }
 }
 
 /// `-[NSMenuItem keyEquivalent]`
 pub extern "C" fn shim_nsmenuitem_key_equivalent(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return crate::cfstring::alloc_nsstring_from_cstr(c"".as_ptr()); }
+    if obj == 0 {
+        return crate::cfstring::alloc_nsstring_from_cstr(c"".as_ptr());
+    }
     let ptr = unsafe { *((obj as usize + ITEM_KEY_EQUIV_OFF) as *const u64) };
-    if ptr == 0 { crate::cfstring::alloc_nsstring_from_cstr(c"".as_ptr()) } else { ptr }
+    if ptr == 0 {
+        crate::cfstring::alloc_nsstring_from_cstr(c"".as_ptr())
+    } else {
+        ptr
+    }
 }
 
 /// `-[NSMenuItem setKeyEquivalent:]`
 pub extern "C" fn shim_nsmenuitem_set_key_equivalent(obj: u64, _cmd: u64, key_equiv: u64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as usize + ITEM_KEY_EQUIV_OFF) as *mut u64) = key_equiv; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + ITEM_KEY_EQUIV_OFF) as *mut u64) = key_equiv;
+    }
 }
 
 /// NSEventModifierFlags constants for key equivalent matching.
-const NS_COMMAND_KEY_MASK: u64 = 1 << 20;  // NSEventModifierFlagCommand
+const NS_COMMAND_KEY_MASK: u64 = 1 << 20; // NSEventModifierFlagCommand
 
 /// `-[NSMenuItem keyEquivalentModifierMask]`
 pub extern "C" fn shim_nsmenuitem_key_equivalent_modifier_mask(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return NS_COMMAND_KEY_MASK; }
+    if obj == 0 {
+        return NS_COMMAND_KEY_MASK;
+    }
     unsafe { *((obj as usize + ITEM_KEY_EQUIV_MOD_OFF) as *const u64) }
 }
 
 /// `-[NSMenuItem setKeyEquivalentModifierMask:]`
 pub extern "C" fn shim_nsmenuitem_set_key_equivalent_modifier_mask(obj: u64, _cmd: u64, mask: u64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as usize + ITEM_KEY_EQUIV_MOD_OFF) as *mut u64) = mask; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + ITEM_KEY_EQUIV_MOD_OFF) as *mut u64) = mask;
+    }
 }
 
 /// `-[NSMenuItem state]` — returns NSControlStateValue (0=off, 1=on, -1=mixed).
 pub extern "C" fn shim_nsmenuitem_state(obj: u64, _cmd: u64) -> i64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + ITEM_STATE_OFF) as *const u64) as i64 }
 }
 
 /// `-[NSMenuItem setState:]`
 pub extern "C" fn shim_nsmenuitem_set_state(obj: u64, _cmd: u64, state: i64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as usize + ITEM_STATE_OFF) as *mut u64) = state as u64; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + ITEM_STATE_OFF) as *mut u64) = state as u64;
+    }
+}
+
+/// `-[NSMenuItem toolTip]`
+pub extern "C" fn shim_nsmenuitem_tool_tip(obj: u64, _cmd: u64) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
+    unsafe { *((obj as usize + ITEM_TOOLTIP_OFF) as *const u64) }
+}
+
+/// `-[NSMenuItem setToolTip:]`
+pub extern "C" fn shim_nsmenuitem_set_tool_tip(obj: u64, _cmd: u64, tooltip: u64) {
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + ITEM_TOOLTIP_OFF) as *mut u64) = tooltip;
+    }
+}
+
+/// `-[NSMenuItem representedObject]`
+pub extern "C" fn shim_nsmenuitem_represented_object(obj: u64, _cmd: u64) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
+    unsafe { *((obj as usize + ITEM_REPRESENTED_OBJECT_OFF) as *const u64) }
+}
+
+/// `-[NSMenuItem setRepresentedObject:]`
+pub extern "C" fn shim_nsmenuitem_set_represented_object(
+    obj: u64,
+    _cmd: u64,
+    represented_object: u64,
+) {
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + ITEM_REPRESENTED_OBJECT_OFF) as *mut u64) = represented_object;
+    }
+}
+
+/// `-[NSMenuItem tag]`
+pub extern "C" fn shim_nsmenuitem_tag(obj: u64, _cmd: u64) -> i64 {
+    if obj == 0 {
+        return 0;
+    }
+    unsafe { *((obj as usize + ITEM_TAG_OFF) as *const u64) as i64 }
+}
+
+/// `-[NSMenuItem setTag:]`
+pub extern "C" fn shim_nsmenuitem_set_tag(obj: u64, _cmd: u64, tag: i64) {
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + ITEM_TAG_OFF) as *mut u64) = tag as u64;
+    }
 }
 
 // ── Action dispatch ────────────────────────────────────────────
@@ -379,18 +592,26 @@ pub extern "C" fn shim_nsmenuitem_set_state(obj: u64, _cmd: u64, state: i64) {
 ///
 /// Returns 1 (YES) if a matching item was found and its action dispatched.
 pub extern "C" fn shim_nsmenu_perform_key_equivalent(obj: u64, _cmd: u64, event: u64) -> u8 {
-    if obj == 0 || event == 0 { return 0; }
+    if obj == 0 || event == 0 {
+        return 0;
+    }
 
     // Get the event's characters string
     let event_chars = crate::nsevent::shim_nsevent_characters(event, 0);
-    if event_chars == 0 { return 0; }
+    if event_chars == 0 {
+        return 0;
+    }
 
     let items_ptr = menu_items_ptr(obj);
-    if items_ptr.is_null() { return 0; }
+    if items_ptr.is_null() {
+        return 0;
+    }
 
     let items = unsafe { &*items_ptr };
     for &item in items {
-        if item == 0 { continue; }
+        if item == 0 {
+            continue;
+        }
 
         // Check submenu first (recursive)
         let submenu = unsafe { *((item as usize + ITEM_SUBMENU_OFF) as *const u64) };
@@ -402,10 +623,14 @@ pub extern "C" fn shim_nsmenu_perform_key_equivalent(obj: u64, _cmd: u64, event:
 
         // Check this item's key equivalent
         let enabled = unsafe { *((item as usize + ITEM_ENABLED_OFF) as *const u64) };
-        if enabled == 0 { continue; }
+        if enabled == 0 {
+            continue;
+        }
 
         let key_equiv = unsafe { *((item as usize + ITEM_KEY_EQUIV_OFF) as *const u64) };
-        if key_equiv == 0 { continue; }
+        if key_equiv == 0 {
+            continue;
+        }
 
         // Compare key equivalent string with event characters
         let key_str = crate::cfstring::extract_cfstring_cstr(key_equiv);
@@ -434,7 +659,9 @@ pub extern "C" fn shim_nsmenu_perform_key_equivalent(obj: u64, _cmd: u64, event:
 
 /// Dispatch an action selector to a target or via the responder chain.
 fn dispatch_menu_action(target: u64, action_sel: u64, sender: u64) {
-    if action_sel == 0 { return; }
+    if action_sel == 0 {
+        return;
+    }
 
     // If we have a concrete target, call the action on it
     let effective_target = if target != 0 {
@@ -470,9 +697,13 @@ fn dispatch_menu_action(target: u64, action_sel: u64, sender: u64) {
 
 /// `-[NSMenuItem performClick:]` — programmatically invoke this menu item's action.
 pub extern "C" fn shim_nsmenuitem_perform_click(obj: u64, _cmd: u64, _sender: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let enabled = unsafe { *((obj as usize + ITEM_ENABLED_OFF) as *const u64) };
-    if enabled == 0 { return; }
+    if enabled == 0 {
+        return;
+    }
     let action = unsafe { *((obj as usize + ITEM_ACTION_OFF) as *const u64) };
     let target = unsafe { *((obj as usize + ITEM_TARGET_OFF) as *const u64) };
     if action != 0 {
@@ -483,7 +714,11 @@ pub extern "C" fn shim_nsmenuitem_perform_click(obj: u64, _cmd: u64, _sender: u6
 /// `+[NSMenu popUpContextMenu:withEvent:forView:]` — stub that walks menu items
 /// and dispatches the first enabled item's action (simulates showing a context menu).
 pub extern "C" fn shim_nsmenu_popup_context_menu(
-    _cls: u64, _cmd: u64, menu: u64, _event: u64, _view: u64,
+    _cls: u64,
+    _cmd: u64,
+    menu: u64,
+    _event: u64,
+    _view: u64,
 ) {
     // In a real implementation this would display a popup. We simply log and
     // return without crashing — callers invoking this won't get an unrecognized
@@ -495,6 +730,68 @@ pub extern "C" fn shim_nsmenu_popup_context_menu(
 mod tests {
     use super::*;
     use crate::shim_test_helpers::*;
+    use std::collections::HashMap;
+
+    const MENU_REP_PROBE_CLASS_ADDR: u64 = 0xBEEF_1000;
+    const MENU_REP_PROBE_SIZE: usize = 16;
+    const MENU_REP_KEY_OFF: usize = 8;
+
+    extern "C" fn menu_rep_probe_is_equal(obj: u64, _cmd: u64, other: u64) -> u8 {
+        if obj == 0 || other == 0 {
+            return 0;
+        }
+        let lhs = read_field(obj, MENU_REP_KEY_OFF);
+        let rhs = read_field(other, MENU_REP_KEY_OFF);
+        u8::from(lhs == rhs)
+    }
+
+    fn install_menu_rep_probe_class(rt: &mut objc_runtime::ObjcRuntime) {
+        let mut info = objc_runtime::ClassInfo {
+            name: "MenuRepProbe".to_string(),
+            mapped_addr: MENU_REP_PROBE_CLASS_ADDR,
+            methods: vec![objc_runtime::MethodEntry {
+                selector: "isEqual:".into(),
+                imp: menu_rep_probe_is_equal as *const () as u64,
+                type_encoding: "B@:@".into(),
+            }],
+            class_methods: vec![],
+            ivars: vec![],
+            properties: vec![],
+            protocol_names: vec![],
+            instance_size: MENU_REP_PROBE_SIZE as u32,
+            is_root: false,
+            is_meta: false,
+            superclass_addr: Some(crate::nsobj::nsobject_class_addr()),
+            method_index: HashMap::new(),
+            class_method_index: HashMap::new(),
+        };
+        info.rebuild_indices();
+        rt.register_synthetic_class(info);
+    }
+
+    fn with_menu_rep_probe_runtime<R>(f: impl FnOnce() -> R) -> R {
+        let saved_runtime = {
+            let mut guard = objc_runtime::OBJC_RUNTIME
+                .write()
+                .unwrap_or_else(|e| e.into_inner());
+            let saved = std::mem::take(&mut *guard);
+
+            let mut rt = objc_runtime::ObjcRuntime::new();
+            crate::FoundationShims::register_nsobject_class(&mut rt);
+            install_menu_rep_probe_class(&mut rt);
+
+            *guard = Some(rt);
+            saved
+        };
+
+        let result = f();
+
+        let mut guard = objc_runtime::OBJC_RUNTIME
+            .write()
+            .unwrap_or_else(|e| e.into_inner());
+        *guard = saved_runtime;
+        result
+    }
 
     // These shims are minimal AppKit stubs. None dereference obj, so
     // ISA doesn't matter — we use alloc_obj_fake for the few tests
@@ -571,12 +868,90 @@ mod tests {
 
         let items = shim_nsmenu_item_array(menu, 0);
         assert_eq!(crate::nsarray::shim_nsarray_count(items, 0), 2);
-        assert_eq!(crate::nsarray::shim_nsarray_object_at_index(items, 0, 0), first);
-        assert_eq!(crate::nsarray::shim_nsarray_object_at_index(items, 0, 1), second);
+        assert_eq!(
+            crate::nsarray::shim_nsarray_object_at_index(items, 0, 0),
+            first
+        );
+        assert_eq!(
+            crate::nsarray::shim_nsarray_object_at_index(items, 0, 1),
+            second
+        );
 
         free_obj(second);
         free_obj(first);
         free_obj(menu);
+    }
+
+    #[test]
+    fn item_with_title_returns_matching_item() {
+        let menu = alloc_obj_fake(MENU_SIZE);
+        let first = alloc_menu_item();
+        let second = alloc_menu_item();
+        let first_title = make_string("Copy");
+        let second_title = make_string("Paste");
+
+        shim_nsmenuitem_init_with_title(first, 0, first_title, 0, 0);
+        shim_nsmenuitem_init_with_title(second, 0, second_title, 0, 0);
+        shim_nsmenu_add_item(menu, 0, first);
+        shim_nsmenu_add_item(menu, 0, second);
+
+        assert_eq!(shim_nsmenu_item_with_title(menu, 0, second_title), second);
+        assert_eq!(
+            shim_nsmenu_item_with_title(menu, 0, make_string("Missing")),
+            0
+        );
+
+        free_obj(menu);
+    }
+
+    #[test]
+    fn index_of_item_with_represented_object_returns_match() {
+        let menu = alloc_obj_fake(MENU_SIZE);
+        let first = alloc_menu_item();
+        let second = alloc_menu_item();
+
+        shim_nsmenuitem_init_with_title(first, 0, make_string("Copy"), 0, 0);
+        shim_nsmenuitem_init_with_title(second, 0, make_string("Paste"), 0, 0);
+        shim_nsmenuitem_set_represented_object(first, 0, 0xAAA0);
+        shim_nsmenuitem_set_represented_object(second, 0, 0xBBB0);
+        shim_nsmenu_add_item(menu, 0, first);
+        shim_nsmenu_add_item(menu, 0, second);
+
+        assert_eq!(
+            shim_nsmenu_index_of_item_with_represented_object(menu, 0, 0xBBB0),
+            1
+        );
+        assert_eq!(
+            shim_nsmenu_index_of_item_with_represented_object(menu, 0, 0xCCC0),
+            -1
+        );
+
+        free_obj(menu);
+    }
+
+    #[test]
+    fn index_of_item_with_represented_object_uses_is_equal() {
+        with_menu_rep_probe_runtime(|| {
+            let menu = alloc_obj_fake(MENU_SIZE);
+            let item = alloc_menu_item();
+            let stored = alloc_obj(MENU_REP_PROBE_SIZE, MENU_REP_PROBE_CLASS_ADDR);
+            let query = alloc_obj(MENU_REP_PROBE_SIZE, MENU_REP_PROBE_CLASS_ADDR);
+
+            write_field(stored, MENU_REP_KEY_OFF, 7);
+            write_field(query, MENU_REP_KEY_OFF, 7);
+            shim_nsmenuitem_init_with_title(item, 0, make_string("Item"), 0, 0);
+            shim_nsmenuitem_set_represented_object(item, 0, stored);
+            shim_nsmenu_add_item(menu, 0, item);
+
+            assert_eq!(
+                shim_nsmenu_index_of_item_with_represented_object(menu, 0, query),
+                0
+            );
+
+            free_obj(query);
+            free_obj(stored);
+            free_obj(menu);
+        });
     }
 
     #[test]
@@ -777,6 +1152,52 @@ mod tests {
     #[test]
     fn menuitem_set_enabled_nil() {
         shim_nsmenuitem_set_enabled(0, 0, 1);
+    }
+
+    #[test]
+    fn menuitem_set_tool_tip_persists() {
+        let item = alloc_obj_fake(ITEM_SIZE);
+        let tooltip = make_string("Open a workspace");
+
+        shim_nsmenuitem_set_tool_tip(item, 0, tooltip);
+
+        assert_eq!(shim_nsmenuitem_tool_tip(item, 0), tooltip);
+        free_obj(item);
+    }
+
+    #[test]
+    fn menuitem_tool_tip_nil_receiver_returns_zero() {
+        assert_eq!(shim_nsmenuitem_tool_tip(0, 0), 0);
+    }
+
+    #[test]
+    fn menuitem_set_represented_object_persists() {
+        let item = alloc_obj_fake(ITEM_SIZE);
+
+        shim_nsmenuitem_set_represented_object(item, 0, 0x1234_5678);
+
+        assert_eq!(shim_nsmenuitem_represented_object(item, 0), 0x1234_5678);
+        free_obj(item);
+    }
+
+    #[test]
+    fn menuitem_represented_object_nil_receiver_returns_zero() {
+        assert_eq!(shim_nsmenuitem_represented_object(0, 0), 0);
+    }
+
+    #[test]
+    fn menuitem_set_tag_persists() {
+        let item = alloc_obj_fake(ITEM_SIZE);
+
+        shim_nsmenuitem_set_tag(item, 0, 42);
+
+        assert_eq!(shim_nsmenuitem_tag(item, 0), 42);
+        free_obj(item);
+    }
+
+    #[test]
+    fn menuitem_tag_nil_receiver_returns_zero() {
+        assert_eq!(shim_nsmenuitem_tag(0, 0), 0);
     }
 
     // ── New: mutation persistence tests ────────────────────────

@@ -17,9 +17,13 @@ use tiny_http::Request;
 pub struct CertsHandler;
 
 impl Handler for CertsHandler {
-    fn handle(&self, path: &str, method: &str, body: &[u8], _request: &Request)
-        -> Option<HandlerResponse>
-    {
+    fn handle(
+        &self,
+        path: &str,
+        method: &str,
+        body: &[u8],
+        _request: &Request,
+    ) -> Option<HandlerResponse> {
         if !path.starts_with("/api/v1/certs/") {
             return None;
         }
@@ -177,7 +181,8 @@ fn build_ocsp_good_response(request_body: &[u8]) -> Vec<u8> {
     let response_type = der_oid(&[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x30, 0x01, 0x01]);
     let response_octets = der_octet_string(&basic);
 
-    let response_bytes = der_sequence(&[response_type.as_slice(), response_octets.as_slice()].concat());
+    let response_bytes =
+        der_sequence(&[response_type.as_slice(), response_octets.as_slice()].concat());
     let response_bytes_tagged = der_context(0, &response_bytes);
 
     let status = der_enumerated(0); // successful
@@ -230,7 +235,12 @@ fn build_response_data(request_body: &[u8]) -> Vec<u8> {
     let responses = der_sequence(&single);
 
     der_sequence(
-        &[responder_id.as_slice(), produced_at.as_slice(), responses.as_slice()].concat(),
+        &[
+            responder_id.as_slice(),
+            produced_at.as_slice(),
+            responses.as_slice(),
+        ]
+        .concat(),
     )
 }
 
@@ -245,8 +255,8 @@ fn build_response_data(request_body: &[u8]) -> Vec<u8> {
 /// }
 /// ```
 fn build_single_response_good(request_body: &[u8]) -> Vec<u8> {
-    let cert_id = extract_cert_id_from_request(request_body)
-        .unwrap_or_else(build_cert_id_placeholder);
+    let cert_id =
+        extract_cert_id_from_request(request_body).unwrap_or_else(build_cert_id_placeholder);
 
     // certStatus: good = [0] IMPLICIT NULL (tag 0x80, length 0)
     let cert_status_good: &[u8] = &[0x80, 0x00];
@@ -287,49 +297,65 @@ fn extract_cert_id_from_request(body: &[u8]) -> Option<Vec<u8>> {
     let hlen = der_header_len(request_content)?;
     let clen = der_content_len(request_content)?;
     let total = hlen + clen;
-    if total > request_content.len() { return None; }
+    if total > request_content.len() {
+        return None;
+    }
     Some(request_content[..total].to_vec())
 }
 
 /// Unwrap the contents of a DER SEQUENCE (tag 0x30).
 fn der_unwrap_sequence(data: &[u8]) -> Option<&[u8]> {
-    if data.is_empty() || data[0] != 0x30 { return None; }
+    if data.is_empty() || data[0] != 0x30 {
+        return None;
+    }
     let (content, _) = der_read_tlv(data)?;
     Some(content)
 }
 
 /// Read a DER TLV: returns (content_slice, rest_after_tlv).
 fn der_read_tlv(data: &[u8]) -> Option<(&[u8], &[u8])> {
-    if data.is_empty() { return None; }
+    if data.is_empty() {
+        return None;
+    }
     let hlen = der_header_len(data)?;
     let content_len = der_content_len(data)?;
     let total = hlen + content_len;
-    if total > data.len() { return None; }
+    if total > data.len() {
+        return None;
+    }
     Some((&data[hlen..total], &data[total..]))
 }
 
 /// Compute the header length (tag + length bytes) of a DER element.
 fn der_header_len(data: &[u8]) -> Option<usize> {
-    if data.len() < 2 { return None; }
+    if data.len() < 2 {
+        return None;
+    }
     let len_byte = data[1];
     if len_byte < 0x80 {
         Some(2)
     } else {
         let num_len_bytes = (len_byte & 0x7f) as usize;
-        if data.len() < 2 + num_len_bytes { return None; }
+        if data.len() < 2 + num_len_bytes {
+            return None;
+        }
         Some(2 + num_len_bytes)
     }
 }
 
 /// Compute the content length from DER length encoding.
 fn der_content_len(data: &[u8]) -> Option<usize> {
-    if data.len() < 2 { return None; }
+    if data.len() < 2 {
+        return None;
+    }
     let len_byte = data[1];
     if len_byte < 0x80 {
         Some(len_byte as usize)
     } else {
         let num_len_bytes = (len_byte & 0x7f) as usize;
-        if num_len_bytes > 4 || data.len() < 2 + num_len_bytes { return None; }
+        if num_len_bytes > 4 || data.len() < 2 + num_len_bytes {
+            return None;
+        }
         let mut len = 0usize;
         for i in 0..num_len_bytes {
             len = (len << 8) | data[2 + i] as usize;
@@ -417,17 +443,27 @@ mod tests {
         // Must start with SEQUENCE tag
         assert_eq!(resp[0], 0x30, "OCSP response must be a SEQUENCE");
         // Must contain ENUMERATED 0 (successful)
-        assert!(resp.windows(3).any(|w| w == [0x0a, 0x01, 0x00]),
-            "must contain responseStatus=successful");
+        assert!(
+            resp.windows(3).any(|w| w == [0x0a, 0x01, 0x00]),
+            "must contain responseStatus=successful"
+        );
         // Must contain id-pkix-ocsp-basic OID
         let basic_oid = [0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x30, 0x01, 0x01];
-        assert!(resp.windows(basic_oid.len()).any(|w| w == basic_oid),
-            "must contain id-pkix-ocsp-basic OID");
+        assert!(
+            resp.windows(basic_oid.len()).any(|w| w == basic_oid),
+            "must contain id-pkix-ocsp-basic OID"
+        );
         // Must contain certStatus=good ([0] IMPLICIT NULL = 0x80, 0x00)
-        assert!(resp.windows(2).any(|w| w == [0x80, 0x00]),
-            "must contain certStatus=good");
+        assert!(
+            resp.windows(2).any(|w| w == [0x80, 0x00]),
+            "must contain certStatus=good"
+        );
         // Sanity: should be > 100 bytes (a real response, not a 5-byte stub)
-        assert!(resp.len() > 100, "OCSP response should be substantial: {} bytes", resp.len());
+        assert!(
+            resp.len() > 100,
+            "OCSP response should be substantial: {} bytes",
+            resp.len()
+        );
     }
 
     #[test]
@@ -435,13 +471,21 @@ mod tests {
         let crl = build_empty_crl();
         assert_eq!(crl[0], 0x30, "CRL must be a SEQUENCE");
         // Must contain version v2 (INTEGER 1)
-        assert!(crl.windows(3).any(|w| w == [0x02, 0x01, 0x01]),
-            "CRL must contain version=v2");
+        assert!(
+            crl.windows(3).any(|w| w == [0x02, 0x01, 0x01]),
+            "CRL must contain version=v2"
+        );
         // Must contain sha256WithRSAEncryption OID
         let sha256rsa_oid = [0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x0b];
-        assert!(crl.windows(sha256rsa_oid.len()).any(|w| w == sha256rsa_oid),
-            "CRL must contain sha256WithRSAEncryption OID");
-        assert!(crl.len() > 50, "CRL should be substantial: {} bytes", crl.len());
+        assert!(
+            crl.windows(sha256rsa_oid.len()).any(|w| w == sha256rsa_oid),
+            "CRL must contain sha256WithRSAEncryption OID"
+        );
+        assert!(
+            crl.len() > 50,
+            "CRL should be substantial: {} bytes",
+            crl.len()
+        );
     }
 
     #[test]
@@ -465,7 +509,13 @@ mod tests {
         let sha256_oid = der_oid(&[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01]);
         let hash_alg = der_sequence(&[sha256_oid.as_slice(), &[0x05, 0x00]].concat());
         let cert_id = der_sequence(
-            &[hash_alg.as_slice(), issuer_name_hash.as_slice(), issuer_key_hash.as_slice(), serial.as_slice()].concat(),
+            &[
+                hash_alg.as_slice(),
+                issuer_name_hash.as_slice(),
+                issuer_key_hash.as_slice(),
+                serial.as_slice(),
+            ]
+            .concat(),
         );
         let request = der_sequence(&cert_id);
         let request_list = der_sequence(&request);
@@ -474,21 +524,29 @@ mod tests {
 
         let resp = build_ocsp_good_response(&ocsp_request);
         // The response should contain the issuer hashes from the request, not 0xAA/0xBB
-        assert!(resp.windows(32).any(|w| w == [0x11; 32]),
-            "response must contain echoed issuerNameHash 0x11");
-        assert!(resp.windows(32).any(|w| w == [0x22; 32]),
-            "response must contain echoed issuerKeyHash 0x22");
+        assert!(
+            resp.windows(32).any(|w| w == [0x11; 32]),
+            "response must contain echoed issuerNameHash 0x11"
+        );
+        assert!(
+            resp.windows(32).any(|w| w == [0x22; 32]),
+            "response must contain echoed issuerKeyHash 0x22"
+        );
         // Should NOT contain placeholder hashes
-        assert!(!resp.windows(32).any(|w| w == [0xAA; 32]),
-            "response must NOT contain placeholder 0xAA hash");
+        assert!(
+            !resp.windows(32).any(|w| w == [0xAA; 32]),
+            "response must NOT contain placeholder 0xAA hash"
+        );
     }
 
     #[test]
     fn ocsp_falls_back_to_placeholder_on_bad_request() {
         let resp = build_ocsp_good_response(&[0xFF, 0xFF]); // garbage input
-        // Should still be valid DER with placeholder hashes
+                                                            // Should still be valid DER with placeholder hashes
         assert_eq!(resp[0], 0x30);
-        assert!(resp.windows(32).any(|w| w == [0xAA; 32]),
-            "bad request should produce placeholder 0xAA hash");
+        assert!(
+            resp.windows(32).any(|w| w == [0xAA; 32]),
+            "bad request should produce placeholder 0xAA hash"
+        );
     }
 }

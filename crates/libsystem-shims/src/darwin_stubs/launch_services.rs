@@ -19,75 +19,276 @@ impl LaunchServicesStubs {
         use crate::register_shims;
 
         // ── LaunchServices ──────────────────────────────────────────
-        register_shims!(table,
-            ("_LSCopyDefaultApplicationURLForURL", shim_ls_null_stub as *const () as u64, "LSCopyDefaultApplicationURLForURL (stub → NULL)"),
-            ("_LSCopyDefaultApplicationURLForContentType", shim_ls_null_stub as *const () as u64, "LSCopyDefaultApplicationURLForContentType (stub → NULL)"),
-            ("_LSCopyApplicationURLsForBundleIdentifier", shim_ls_null_stub as *const () as u64, "LSCopyApplicationURLsForBundleIdentifier (stub → NULL)"),
-            ("_LSCopyApplicationURLsForURL", shim_ls_null_stub as *const () as u64, "LSCopyApplicationURLsForURL (stub → NULL)"),
-            ("_LSCanURLAcceptURL", shim_ls_false_stub as *const () as u64, "LSCanURLAcceptURL (stub → false)"),
-            ("_LSOpenCFURLRef", shim_ls_err_stub as *const () as u64, "LSOpenCFURLRef (stub → error)"),
-            ("_LSOpenFromURLSpec", shim_ls_err_stub as *const () as u64, "LSOpenFromURLSpec (stub → error)"),
-            ("_LSRegisterURL", shim_ls_err_stub as *const () as u64, "LSRegisterURL (stub → error)"),
-            ("_LSGetApplicationForInfo", shim_ls_err_stub as *const () as u64, "LSGetApplicationForInfo (stub → error)"),
-            ("_LSGetApplicationForURL", shim_ls_err_stub as *const () as u64, "LSGetApplicationForURL (stub → error)"),
-            ("_LSCopyItemInfoForURL", shim_ls_err_stub as *const () as u64, "LSCopyItemInfoForURL (stub → error)"),
-            ("_LSCopyDisplayNameForURL", shim_ls_null_stub as *const () as u64, "LSCopyDisplayNameForURL (stub → NULL)"),
-            ("_LSCopyKindStringForURL", shim_ls_null_stub as *const () as u64, "LSCopyKindStringForURL (stub → NULL)"),
-            ("_LSCopyAllRoleHandlersForContentType", shim_ls_null_stub as *const () as u64, "LSCopyAllRoleHandlersForContentType (stub → NULL)"),
-            ("_LSSetDefaultRoleHandlerForContentType", shim_ls_err_stub as *const () as u64, "LSSetDefaultRoleHandlerForContentType (stub → error)"),
-            ("_LSCopyDefaultHandlerForURLScheme", shim_ls_null_stub as *const () as u64, "LSCopyDefaultHandlerForURLScheme (stub → NULL)"),
-            ("_LSSetDefaultHandlerForURLScheme", shim_ls_err_stub as *const () as u64, "LSSetDefaultHandlerForURLScheme (stub → error)"),
-            ("__LSCopyApplicationArrayInFrontToBackOrder", shim_ls_null_stub as *const () as u64, "_LSCopyApplicationArrayInFrontToBackOrder (stub → NULL)"),
+        register_shims!(
+            table,
+            (
+                "_LSCopyDefaultApplicationURLForURL",
+                shim_ls_null_stub as *const () as u64,
+                "LSCopyDefaultApplicationURLForURL (stub → NULL)"
+            ),
+            (
+                "_LSCopyDefaultApplicationURLForContentType",
+                shim_ls_null_stub as *const () as u64,
+                "LSCopyDefaultApplicationURLForContentType (stub → NULL)"
+            ),
+            (
+                "_LSCopyApplicationURLsForBundleIdentifier",
+                shim_ls_null_stub as *const () as u64,
+                "LSCopyApplicationURLsForBundleIdentifier (stub → NULL)"
+            ),
+            (
+                "_LSCopyApplicationURLsForURL",
+                shim_ls_null_stub as *const () as u64,
+                "LSCopyApplicationURLsForURL (stub → NULL)"
+            ),
+            (
+                "_LSCanURLAcceptURL",
+                shim_ls_false_stub as *const () as u64,
+                "LSCanURLAcceptURL (stub → false)"
+            ),
+            (
+                "_LSOpenCFURLRef",
+                shim_ls_err_stub as *const () as u64,
+                "LSOpenCFURLRef (stub → error)"
+            ),
+            (
+                "_LSOpenFromURLSpec",
+                shim_ls_err_stub as *const () as u64,
+                "LSOpenFromURLSpec (stub → error)"
+            ),
+            (
+                "_LSRegisterURL",
+                shim_ls_err_stub as *const () as u64,
+                "LSRegisterURL (stub → error)"
+            ),
+            (
+                "_LSGetApplicationForInfo",
+                shim_ls_err_stub as *const () as u64,
+                "LSGetApplicationForInfo (stub → error)"
+            ),
+            (
+                "_LSGetApplicationForURL",
+                shim_ls_err_stub as *const () as u64,
+                "LSGetApplicationForURL (stub → error)"
+            ),
+            (
+                "_LSCopyItemInfoForURL",
+                shim_ls_err_stub as *const () as u64,
+                "LSCopyItemInfoForURL (stub → error)"
+            ),
+            (
+                "_LSCopyDisplayNameForURL",
+                shim_ls_null_stub as *const () as u64,
+                "LSCopyDisplayNameForURL (stub → NULL)"
+            ),
+            (
+                "_LSCopyKindStringForURL",
+                shim_ls_null_stub as *const () as u64,
+                "LSCopyKindStringForURL (stub → NULL)"
+            ),
+            (
+                "_LSCopyAllRoleHandlersForContentType",
+                shim_ls_null_stub as *const () as u64,
+                "LSCopyAllRoleHandlersForContentType (stub → NULL)"
+            ),
+            (
+                "_LSSetDefaultRoleHandlerForContentType",
+                shim_ls_err_stub as *const () as u64,
+                "LSSetDefaultRoleHandlerForContentType (stub → error)"
+            ),
+            (
+                "_LSCopyDefaultHandlerForURLScheme",
+                shim_ls_null_stub as *const () as u64,
+                "LSCopyDefaultHandlerForURLScheme (stub → NULL)"
+            ),
+            (
+                "_LSSetDefaultHandlerForURLScheme",
+                shim_ls_err_stub as *const () as u64,
+                "LSSetDefaultHandlerForURLScheme (stub → error)"
+            ),
+            (
+                "__LSCopyApplicationArrayInFrontToBackOrder",
+                shim_ls_null_stub as *const () as u64,
+                "_LSCopyApplicationArrayInFrontToBackOrder (stub → NULL)"
+            ),
         );
 
         // ── Uniform Type Identifiers ────────────────────────────────
-        register_shims!(table,
-            ("_UTTypeCreatePreferredIdentifierForTag", shim_ut_type_create_preferred_identifier as *const () as u64, "UTTypeCreatePreferredIdentifierForTag (extension→UTI)"),
-            ("_UTTypeCopyPreferredTagWithClass", shim_ut_type_copy_preferred_tag as *const () as u64, "UTTypeCopyPreferredTagWithClass (UTI→extension)"),
-            ("_UTTypeConformsTo", shim_ut_type_conforms_to as *const () as u64, "UTTypeConformsTo (stub → false)"),
-            ("_UTTypeCopyDescription", shim_ls_null_stub as *const () as u64, "UTTypeCopyDescription (stub → NULL)"),
-            ("_UTTypeCopyDeclaration", shim_ls_null_stub as *const () as u64, "UTTypeCopyDeclaration (stub → NULL)"),
-            ("_UTTypeCreateAllIdentifiersForTag", shim_ls_null_stub as *const () as u64, "UTTypeCreateAllIdentifiersForTag (stub → NULL)"),
-            ("_UTTypeEqual", shim_ut_type_equal as *const () as u64, "UTTypeEqual (CFString pointer compare)"),
+        register_shims!(
+            table,
+            (
+                "_UTTypeCreatePreferredIdentifierForTag",
+                shim_ut_type_create_preferred_identifier as *const () as u64,
+                "UTTypeCreatePreferredIdentifierForTag (extension→UTI)"
+            ),
+            (
+                "_UTTypeCopyPreferredTagWithClass",
+                shim_ut_type_copy_preferred_tag as *const () as u64,
+                "UTTypeCopyPreferredTagWithClass (UTI→extension)"
+            ),
+            (
+                "_UTTypeConformsTo",
+                shim_ut_type_conforms_to as *const () as u64,
+                "UTTypeConformsTo (stub → false)"
+            ),
+            (
+                "_UTTypeCopyDescription",
+                shim_ls_null_stub as *const () as u64,
+                "UTTypeCopyDescription (stub → NULL)"
+            ),
+            (
+                "_UTTypeCopyDeclaration",
+                shim_ls_null_stub as *const () as u64,
+                "UTTypeCopyDeclaration (stub → NULL)"
+            ),
+            (
+                "_UTTypeCreateAllIdentifiersForTag",
+                shim_ls_null_stub as *const () as u64,
+                "UTTypeCreateAllIdentifiersForTag (stub → NULL)"
+            ),
+            (
+                "_UTTypeEqual",
+                shim_ut_type_equal as *const () as u64,
+                "UTTypeEqual (CFString pointer compare)"
+            ),
         );
 
         // ── kUTTagClass constants (CFString pointers) ───────────────
-        register_shims!(table,
-            ("_kUTTagClassFilenameExtension", &KUT_TAG_FILENAME_EXT as *const _ as u64, "kUTTagClassFilenameExtension data"),
-            ("_kUTTagClassMIMEType", &KUT_TAG_MIME_TYPE as *const _ as u64, "kUTTagClassMIMEType data"),
+        register_shims!(
+            table,
+            (
+                "_kUTTagClassFilenameExtension",
+                &KUT_TAG_FILENAME_EXT as *const _ as u64,
+                "kUTTagClassFilenameExtension data"
+            ),
+            (
+                "_kUTTagClassMIMEType",
+                &KUT_TAG_MIME_TYPE as *const _ as u64,
+                "kUTTagClassMIMEType data"
+            ),
         );
 
         // ── kUTType constants (CFString pointers) ───────────────────
-        register_shims!(table,
-            ("_kUTTypeItem", &KUT_TYPE_ITEM as *const _ as u64, "kUTTypeItem data"),
-            ("_kUTTypeContent", &KUT_TYPE_CONTENT as *const _ as u64, "kUTTypeContent data"),
-            ("_kUTTypeData", &KUT_TYPE_DATA as *const _ as u64, "kUTTypeData data"),
-            ("_kUTTypeText", &KUT_TYPE_TEXT as *const _ as u64, "kUTTypeText data"),
-            ("_kUTTypePlainText", &KUT_TYPE_PLAIN_TEXT as *const _ as u64, "kUTTypePlainText data"),
-            ("_kUTTypeUTF8PlainText", &KUT_TYPE_UTF8_PLAIN_TEXT as *const _ as u64, "kUTTypeUTF8PlainText data"),
-            ("_kUTTypeImage", &KUT_TYPE_IMAGE as *const _ as u64, "kUTTypeImage data"),
-            ("_kUTTypePNG", &KUT_TYPE_PNG as *const _ as u64, "kUTTypePNG data"),
-            ("_kUTTypeJPEG", &KUT_TYPE_JPEG as *const _ as u64, "kUTTypeJPEG data"),
-            ("_kUTTypePDF", &KUT_TYPE_PDF as *const _ as u64, "kUTTypePDF data"),
-            ("_kUTTypeURL", &KUT_TYPE_URL as *const _ as u64, "kUTTypeURL data"),
-            ("_kUTTypeFileURL", &KUT_TYPE_FILE_URL as *const _ as u64, "kUTTypeFileURL data"),
-            ("_kUTTypeDirectory", &KUT_TYPE_DIRECTORY as *const _ as u64, "kUTTypeDirectory data"),
-            ("_kUTTypeFolder", &KUT_TYPE_FOLDER as *const _ as u64, "kUTTypeFolder data"),
-            ("_kUTTypeSourceCode", &KUT_TYPE_SOURCE_CODE as *const _ as u64, "kUTTypeSourceCode data"),
-            ("_kUTTypePropertyList", &KUT_TYPE_PLIST as *const _ as u64, "kUTTypePropertyList data"),
-            ("_kUTTypeXMLPropertyList", &KUT_TYPE_XML_PLIST as *const _ as u64, "kUTTypeXMLPropertyList data"),
-            ("_kUTTypeBinaryPropertyList", &KUT_TYPE_BINARY_PLIST as *const _ as u64, "kUTTypeBinaryPropertyList data"),
-            ("_kUTTypeJSON", &KUT_TYPE_JSON as *const _ as u64, "kUTTypeJSON data"),
-            ("_kUTTypeXML", &KUT_TYPE_XML as *const _ as u64, "kUTTypeXML data"),
+        register_shims!(
+            table,
+            (
+                "_kUTTypeItem",
+                &KUT_TYPE_ITEM as *const _ as u64,
+                "kUTTypeItem data"
+            ),
+            (
+                "_kUTTypeContent",
+                &KUT_TYPE_CONTENT as *const _ as u64,
+                "kUTTypeContent data"
+            ),
+            (
+                "_kUTTypeData",
+                &KUT_TYPE_DATA as *const _ as u64,
+                "kUTTypeData data"
+            ),
+            (
+                "_kUTTypeText",
+                &KUT_TYPE_TEXT as *const _ as u64,
+                "kUTTypeText data"
+            ),
+            (
+                "_kUTTypePlainText",
+                &KUT_TYPE_PLAIN_TEXT as *const _ as u64,
+                "kUTTypePlainText data"
+            ),
+            (
+                "_kUTTypeUTF8PlainText",
+                &KUT_TYPE_UTF8_PLAIN_TEXT as *const _ as u64,
+                "kUTTypeUTF8PlainText data"
+            ),
+            (
+                "_kUTTypeImage",
+                &KUT_TYPE_IMAGE as *const _ as u64,
+                "kUTTypeImage data"
+            ),
+            (
+                "_kUTTypePNG",
+                &KUT_TYPE_PNG as *const _ as u64,
+                "kUTTypePNG data"
+            ),
+            (
+                "_kUTTypeJPEG",
+                &KUT_TYPE_JPEG as *const _ as u64,
+                "kUTTypeJPEG data"
+            ),
+            (
+                "_kUTTypePDF",
+                &KUT_TYPE_PDF as *const _ as u64,
+                "kUTTypePDF data"
+            ),
+            (
+                "_kUTTypeURL",
+                &KUT_TYPE_URL as *const _ as u64,
+                "kUTTypeURL data"
+            ),
+            (
+                "_kUTTypeFileURL",
+                &KUT_TYPE_FILE_URL as *const _ as u64,
+                "kUTTypeFileURL data"
+            ),
+            (
+                "_kUTTypeDirectory",
+                &KUT_TYPE_DIRECTORY as *const _ as u64,
+                "kUTTypeDirectory data"
+            ),
+            (
+                "_kUTTypeFolder",
+                &KUT_TYPE_FOLDER as *const _ as u64,
+                "kUTTypeFolder data"
+            ),
+            (
+                "_kUTTypeSourceCode",
+                &KUT_TYPE_SOURCE_CODE as *const _ as u64,
+                "kUTTypeSourceCode data"
+            ),
+            (
+                "_kUTTypePropertyList",
+                &KUT_TYPE_PLIST as *const _ as u64,
+                "kUTTypePropertyList data"
+            ),
+            (
+                "_kUTTypeXMLPropertyList",
+                &KUT_TYPE_XML_PLIST as *const _ as u64,
+                "kUTTypeXMLPropertyList data"
+            ),
+            (
+                "_kUTTypeBinaryPropertyList",
+                &KUT_TYPE_BINARY_PLIST as *const _ as u64,
+                "kUTTypeBinaryPropertyList data"
+            ),
+            (
+                "_kUTTypeJSON",
+                &KUT_TYPE_JSON as *const _ as u64,
+                "kUTTypeJSON data"
+            ),
+            (
+                "_kUTTypeXML",
+                &KUT_TYPE_XML as *const _ as u64,
+                "kUTTypeXML data"
+            ),
         );
 
-        log::debug!("LaunchServicesStubs: registered {} LS + UTType stubs", 18 + 7 + 2 + 20);
+        log::debug!(
+            "LaunchServicesStubs: registered {} LS + UTType stubs",
+            18 + 7 + 2 + 20
+        );
     }
 }
 
-pub extern "C" fn shim_ls_null_stub(_arg0: u64, _arg1: u64, _arg2: u64) -> u64 { 0 }
-pub extern "C" fn shim_ls_false_stub(_arg0: u64, _arg1: u64, _arg2: u64, _arg3: u64) -> u8 { 0 }
-pub extern "C" fn shim_ls_err_stub(_arg0: u64, _arg1: u64, _arg2: u64) -> i32 { LS_APP_NOT_FOUND }
+pub extern "C" fn shim_ls_null_stub(_arg0: u64, _arg1: u64, _arg2: u64) -> u64 {
+    0
+}
+pub extern "C" fn shim_ls_false_stub(_arg0: u64, _arg1: u64, _arg2: u64, _arg3: u64) -> u8 {
+    0
+}
+pub extern "C" fn shim_ls_err_stub(_arg0: u64, _arg1: u64, _arg2: u64) -> i32 {
+    LS_APP_NOT_FOUND
+}
 
 // ── UTType function implementations ────────────────────────────────
 //
@@ -165,12 +366,14 @@ pub extern "C" fn shim_ut_type_create_preferred_identifier(
     let is_mime = is_mime_tag_class(tag_class);
 
     let uti = if is_mime {
-        MIME_TO_UTI.iter()
+        MIME_TO_UTI
+            .iter()
             .find(|(mime, _)| mime.eq_ignore_ascii_case(&tag_str))
             .map(|(_, uti)| *uti)
     } else {
         // Default: filename extension
-        EXTENSION_TO_UTI.iter()
+        EXTENSION_TO_UTI
+            .iter()
             .find(|(ext, _)| ext.eq_ignore_ascii_case(&tag_str))
             .map(|(_, uti)| *uti)
     };
@@ -225,7 +428,11 @@ pub extern "C" fn shim_ut_type_conforms_to(_uti: u64, _conforms_to: u64) -> u8 {
     }
     let a = extract_cfstring(_uti);
     let b = extract_cfstring(_conforms_to);
-    if a == b { 1 } else { 0 }
+    if a == b {
+        1
+    } else {
+        0
+    }
 }
 
 /// `Boolean UTTypeEqual(CFStringRef uti1, CFStringRef uti2)`
@@ -235,7 +442,11 @@ pub extern "C" fn shim_ut_type_equal(uti1: u64, uti2: u64) -> u8 {
     }
     let a = extract_cfstring(uti1);
     let b = extract_cfstring(uti2);
-    if a.eq_ignore_ascii_case(&b) { 1 } else { 0 }
+    if a.eq_ignore_ascii_case(&b) {
+        1
+    } else {
+        0
+    }
 }
 
 // ── UTType constant strings ────────────────────────────────────────
@@ -313,15 +524,21 @@ fn extract_cfstring(ptr: u64) -> String {
         // Check if it looks like a NUL-terminated ASCII string
         while len < 256 {
             let byte = *p.add(len);
-            if byte == 0 { break; }
-            if byte > 127 { break; } // not ASCII — might be ISA pointer
+            if byte == 0 {
+                break;
+            }
+            if byte > 127 {
+                break;
+            } // not ASCII — might be ISA pointer
             len += 1;
         }
         if len > 0 && len < 256 {
             let slice = std::slice::from_raw_parts(p, len);
             if let Ok(s) = std::str::from_utf8(slice) {
                 // Sanity: if it looks like a real string (not a pointer), return it
-                if s.chars().all(|c| c.is_ascii_graphic() || c == ' ' || c == '.' || c == '-' || c == '/') {
+                if s.chars()
+                    .all(|c| c.is_ascii_graphic() || c == ' ' || c == '.' || c == '-' || c == '/')
+                {
                     return s.to_string();
                 }
             }
@@ -337,7 +554,9 @@ fn extract_cfstring(ptr: u64) -> String {
             let dp = data_ptr as *const u8;
             let mut dlen = 0;
             while dlen < 256 {
-                if *dp.add(dlen) == 0 { break; }
+                if *dp.add(dlen) == 0 {
+                    break;
+                }
                 dlen += 1;
             }
             if dlen > 0 {
@@ -372,7 +591,9 @@ mod tests {
     fn launch_services_stubs_registered() {
         let mut table = ShimTable::new();
         LaunchServicesStubs::install(&mut table);
-        assert!(table.resolve("_LSCopyDefaultApplicationURLForURL").is_some());
+        assert!(table
+            .resolve("_LSCopyDefaultApplicationURLForURL")
+            .is_some());
         assert!(table.resolve("_LSOpenCFURLRef").is_some());
         assert!(table.resolve("_LSGetApplicationForInfo").is_some());
     }
@@ -393,7 +614,9 @@ mod tests {
     fn ut_type_stubs_registered() {
         let mut table = ShimTable::new();
         LaunchServicesStubs::install(&mut table);
-        assert!(table.resolve("_UTTypeCreatePreferredIdentifierForTag").is_some());
+        assert!(table
+            .resolve("_UTTypeCreatePreferredIdentifierForTag")
+            .is_some());
         assert!(table.resolve("_UTTypeCopyPreferredTagWithClass").is_some());
         assert!(table.resolve("_UTTypeConformsTo").is_some());
         assert!(table.resolve("_UTTypeEqual").is_some());
@@ -420,7 +643,9 @@ mod tests {
         let uti = unsafe { std::ffi::CStr::from_ptr(result as *const std::ffi::c_char) };
         assert_eq!(uti.to_str().unwrap(), "public.plain-text");
         // Clean up leaked CString
-        unsafe { drop(std::ffi::CString::from_raw(result as *mut std::ffi::c_char)); }
+        unsafe {
+            drop(std::ffi::CString::from_raw(result as *mut std::ffi::c_char));
+        }
     }
 
     #[test]
@@ -431,7 +656,9 @@ mod tests {
         assert_ne!(result, 0);
         let uti = unsafe { std::ffi::CStr::from_ptr(result as *const std::ffi::c_char) };
         assert_eq!(uti.to_str().unwrap(), "dyn.xyz123");
-        unsafe { drop(std::ffi::CString::from_raw(result as *mut std::ffi::c_char)); }
+        unsafe {
+            drop(std::ffi::CString::from_raw(result as *mut std::ffi::c_char));
+        }
     }
 
     #[test]
@@ -442,7 +669,9 @@ mod tests {
         assert_ne!(result, 0);
         let uti = unsafe { std::ffi::CStr::from_ptr(result as *const std::ffi::c_char) };
         assert_eq!(uti.to_str().unwrap(), "public.png");
-        unsafe { drop(std::ffi::CString::from_raw(result as *mut std::ffi::c_char)); }
+        unsafe {
+            drop(std::ffi::CString::from_raw(result as *mut std::ffi::c_char));
+        }
     }
 
     #[test]
@@ -453,7 +682,9 @@ mod tests {
         assert_ne!(result, 0);
         let ext = unsafe { std::ffi::CStr::from_ptr(result as *const std::ffi::c_char) };
         assert_eq!(ext.to_str().unwrap(), "jpeg");
-        unsafe { drop(std::ffi::CString::from_raw(result as *mut std::ffi::c_char)); }
+        unsafe {
+            drop(std::ffi::CString::from_raw(result as *mut std::ffi::c_char));
+        }
     }
 
     #[test]
@@ -473,7 +704,10 @@ mod tests {
     #[test]
     fn ut_type_conforms_exact_match() {
         let a = b"public.png\0";
-        assert_eq!(shim_ut_type_conforms_to(a.as_ptr() as u64, a.as_ptr() as u64), 1);
+        assert_eq!(
+            shim_ut_type_conforms_to(a.as_ptr() as u64, a.as_ptr() as u64),
+            1
+        );
     }
 
     #[test]

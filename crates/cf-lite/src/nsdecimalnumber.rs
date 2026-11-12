@@ -20,7 +20,9 @@ const VALUE_OFF: usize = 16;
 /// Allocate an NSDecimalNumber backed by an f64 value.
 pub fn alloc_decimal(val: f64) -> u64 {
     let obj = crate::pal_alloc().calloc(1, SIZE) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *(obj as *mut u64) = crate::nsobj::nsdecimalnumber_class_addr();
         *((obj as usize + TYPE_TAG_OFF) as *mut u64) = TAG_DOUBLE;
@@ -30,7 +32,9 @@ pub fn alloc_decimal(val: f64) -> u64 {
 }
 
 fn read_double(obj: u64) -> f64 {
-    if obj == 0 { return 0.0; }
+    if obj == 0 {
+        return 0.0;
+    }
     let bits = unsafe { *((obj as usize + VALUE_OFF) as *const u64) };
     f64::from_bits(bits)
 }
@@ -44,7 +48,9 @@ pub extern "C" fn shim_nsdecimalnumber_alloc(_cls: u64, _cmd: u64) -> u64 {
 
 /// `+[NSDecimalNumber decimalNumberWithString:]`
 pub extern "C" fn shim_nsdecimalnumber_with_string(_cls: u64, _cmd: u64, string: u64) -> u64 {
-    if string == 0 { return alloc_decimal(0.0); }
+    if string == 0 {
+        return alloc_decimal(0.0);
+    }
     let Some(s) = cfstring::extract_cfstring_cstr(string) else {
         return alloc_decimal(0.0);
     };
@@ -54,10 +60,16 @@ pub extern "C" fn shim_nsdecimalnumber_with_string(_cls: u64, _cmd: u64, string:
 
 /// `+[NSDecimalNumber decimalNumberWithMantissa:exponent:isNegative:]`
 pub extern "C" fn shim_nsdecimalnumber_with_mantissa(
-    _cls: u64, _cmd: u64, mantissa: u64, exponent: i16, is_negative: u8,
+    _cls: u64,
+    _cmd: u64,
+    mantissa: u64,
+    exponent: i16,
+    is_negative: u8,
 ) -> u64 {
     let mut val = mantissa as f64 * 10.0_f64.powi(exponent as i32);
-    if is_negative != 0 { val = -val; }
+    if is_negative != 0 {
+        val = -val;
+    }
     alloc_decimal(val)
 }
 
@@ -80,7 +92,9 @@ pub extern "C" fn shim_nsdecimalnumber_nan(_cls: u64, _cmd: u64) -> u64 {
 
 /// `-[NSDecimalNumber initWithString:]`
 pub extern "C" fn shim_nsdecimalnumber_init_with_string(obj: u64, _cmd: u64, string: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let val = if string == 0 {
         0.0
     } else {
@@ -97,11 +111,19 @@ pub extern "C" fn shim_nsdecimalnumber_init_with_string(obj: u64, _cmd: u64, str
 
 /// `-[NSDecimalNumber initWithMantissa:exponent:isNegative:]`
 pub extern "C" fn shim_nsdecimalnumber_init_with_mantissa(
-    obj: u64, _cmd: u64, mantissa: u64, exponent: i16, is_negative: u8,
+    obj: u64,
+    _cmd: u64,
+    mantissa: u64,
+    exponent: i16,
+    is_negative: u8,
 ) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let mut val = mantissa as f64 * 10.0_f64.powi(exponent as i32);
-    if is_negative != 0 { val = -val; }
+    if is_negative != 0 {
+        val = -val;
+    }
     unsafe {
         *((obj as usize + TYPE_TAG_OFF) as *mut u64) = TAG_DOUBLE;
         *((obj as usize + VALUE_OFF) as *mut u64) = val.to_bits();
@@ -142,7 +164,13 @@ pub extern "C" fn shim_nsdecimalnumber_by_raising_to_power(obj: u64, _cmd: u64, 
 pub extern "C" fn shim_nsdecimalnumber_compare(obj: u64, _cmd: u64, other: u64) -> i64 {
     let a = read_double(obj);
     let b = read_double(other);
-    if a < b { -1 } else if a > b { 1 } else { 0 }
+    if a < b {
+        -1
+    } else if a > b {
+        1
+    } else {
+        0
+    }
 }
 
 /// `-[NSDecimalNumber doubleValue]`
@@ -156,7 +184,11 @@ pub extern "C" fn shim_nsdecimalnumber_string_value(obj: u64, _cmd: u64) -> u64 
 }
 
 /// `-[NSDecimalNumber descriptionWithLocale:]`
-pub extern "C" fn shim_nsdecimalnumber_description_with_locale(obj: u64, _cmd: u64, _locale: u64) -> u64 {
+pub extern "C" fn shim_nsdecimalnumber_description_with_locale(
+    obj: u64,
+    _cmd: u64,
+    _locale: u64,
+) -> u64 {
     shim_nsdecimalnumber_string_value(obj, _cmd)
 }
 
@@ -172,8 +204,12 @@ pub extern "C" fn shim_nsdecimalnumber_objc_type(_obj: u64, _cmd: u64) -> u64 {
 
 /// `-[NSDecimalNumber isEqual:]` — uses NSNumber comparison path.
 pub extern "C" fn shim_nsdecimalnumber_is_equal(obj: u64, _cmd: u64, other: u64) -> u8 {
-    if obj == 0 && other == 0 { return 1; }
-    if obj == 0 || other == 0 { return 0; }
+    if obj == 0 && other == 0 {
+        return 1;
+    }
+    if obj == 0 || other == 0 {
+        return 0;
+    }
     u8::from(shim_nsdecimalnumber_compare(obj, 0, other) == 0)
 }
 

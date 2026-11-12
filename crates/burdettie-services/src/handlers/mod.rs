@@ -1,27 +1,27 @@
 //! Request handlers for BurdettieOS service endpoints.
 
-pub mod telemetry;
-pub mod captive;
-pub mod device;
-pub mod swupdate;
-pub mod certs;
-pub mod xcode;
+pub mod admin;
 pub mod auth;
+pub mod cache;
+pub mod captive;
+pub mod catchall;
+pub mod certs;
 pub mod config;
+pub mod content;
+pub mod device;
+pub mod diagnostics;
 pub mod dns;
+pub mod forward;
+pub mod icloud;
 pub mod notarize;
+pub mod push;
+pub mod recovery;
 pub mod replay;
 pub mod status;
-pub mod icloud;
-pub mod push;
-pub mod cache;
+pub mod swupdate;
+pub mod telemetry;
 pub mod time;
-pub mod diagnostics;
-pub mod recovery;
-pub mod content;
-pub mod catchall;
-pub mod admin;
-pub mod forward;
+pub mod xcode;
 
 use tiny_http::{Request, Response};
 
@@ -30,8 +30,13 @@ pub trait Handler: Send + Sync {
     /// Handle a request and return a response.
     ///
     /// Returns `None` if this handler does not handle the given path.
-    fn handle(&self, path: &str, method: &str, body: &[u8], request: &Request)
-        -> Option<HandlerResponse>;
+    fn handle(
+        &self,
+        path: &str,
+        method: &str,
+        body: &[u8],
+        request: &Request,
+    ) -> Option<HandlerResponse>;
 }
 
 /// A handler response ready to send back.
@@ -79,7 +84,11 @@ impl HandlerResponse {
     }
 
     /// Create a response with a custom status code.
-    pub fn with_status(status: u16, content_type: impl Into<String>, body: impl Into<Vec<u8>>) -> Self {
+    pub fn with_status(
+        status: u16,
+        content_type: impl Into<String>,
+        body: impl Into<Vec<u8>>,
+    ) -> Self {
         Self {
             status_code: status,
             content_type: content_type.into(),
@@ -101,8 +110,7 @@ impl HandlerResponse {
                     .expect("valid header"),
             )
             .with_header(
-                tiny_http::Header::from_bytes(b"Server", b"BurdettieOS/1.0")
-                    .expect("valid header"),
+                tiny_http::Header::from_bytes(b"Server", b"BurdettieOS/1.0").expect("valid header"),
             )
     }
 }

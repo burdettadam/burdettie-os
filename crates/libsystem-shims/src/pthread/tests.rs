@@ -1,6 +1,6 @@
 use super::shims::*;
-use crate::table::ShimTable;
 use super::PthreadShims;
+use crate::table::ShimTable;
 
 #[test]
 fn pthread_shims_registered() {
@@ -20,13 +20,23 @@ fn pthread_shims_registered() {
     assert!(table.resolve("_pthread_once").is_some());
     assert!(table.resolve("_sched_yield").is_some());
     assert!(table.resolve("_pthread_main_np").is_some());
-    assert_eq!(table.len(), 45);
+    assert!(table.resolve("_pthread_get_stackaddr_np").is_some());
+    assert!(table.resolve("_pthread_get_stacksize_np").is_some());
+    assert_eq!(table.len(), 47);
 }
 
 #[test]
 fn pthread_self_returns_nonzero() {
     let val = shim_pthread_self();
     assert_ne!(val as usize, 0);
+}
+
+#[test]
+fn pthread_stack_queries_return_nonzero() {
+    let thread = shim_pthread_self();
+
+    assert!(!shim_pthread_get_stackaddr_np(thread).is_null());
+    assert!(shim_pthread_get_stacksize_np(thread) > 0);
 }
 
 #[test]
@@ -47,6 +57,37 @@ fn pthread_create_and_join() {
         assert_eq!(shim_pthread_join(thread, &mut retval), 0);
         assert_eq!(retval as usize, 42);
     }
+}
+
+#[test]
+fn pthread_create_with_virtualized_guest_attr_buffer() {
+    extern "C" fn thread_func(arg: *mut libc::c_void) -> *mut libc::c_void {
+        arg
+    }
+
+    let mut guest_attr = [0u8; 8];
+    let attr = guest_attr.as_mut_ptr().cast::<libc::pthread_attr_t>();
+
+    assert_eq!(shim_pthread_attr_init(attr), 0);
+    assert_eq!(shim_pthread_attr_setstacksize(attr, 1 << 20), 0);
+
+    let mut stacksize: libc::size_t = 0;
+    assert_eq!(shim_pthread_attr_getstacksize(attr, &mut stacksize), 0);
+    assert!(stacksize >= (1 << 20));
+
+    unsafe {
+        let mut thread: libc::pthread_t = std::mem::zeroed();
+        let arg = 0x1234usize as *mut libc::c_void;
+        assert_eq!(
+            shim_pthread_create(&mut thread, attr, Some(thread_func), arg),
+            0
+        );
+        let mut retval: *mut libc::c_void = std::ptr::null_mut();
+        assert_eq!(shim_pthread_join(thread, &mut retval), 0);
+        assert_eq!(retval, arg);
+    }
+
+    assert_eq!(shim_pthread_attr_destroy(attr), 0);
 }
 
 #[test]
@@ -135,6 +176,18 @@ fn pthread_rwlock_roundtrip() {
 }
 
 #[test]
+fn pthread_rwlock_lazy_init_roundtrip() {
+    unsafe {
+        let mut rwlock: libc::pthread_rwlock_t = std::mem::zeroed();
+        assert_eq!(shim_pthread_rwlock_wrlock(&mut rwlock), 0);
+        assert_eq!(shim_pthread_rwlock_unlock(&mut rwlock), 0);
+        assert_eq!(shim_pthread_rwlock_rdlock(&mut rwlock), 0);
+        assert_eq!(shim_pthread_rwlock_unlock(&mut rwlock), 0);
+        assert_eq!(shim_pthread_rwlock_destroy(&mut rwlock), 0);
+    }
+}
+
+#[test]
 fn pthread_cond_roundtrip() {
     unsafe {
         let mut cond: libc::pthread_cond_t = std::mem::zeroed();
@@ -194,6 +247,51 @@ fn pthread_cond_signal_thread() {
         libc::pthread_cond_destroy(cond_ptr);
         libc::pthread_mutex_destroy(mutex_ptr);
         libc::free(cond_ptr as *mut libc::c_void);
+        libc::free(mutex_ptr as *mut libc::c_void);
+    }
+}
+
+#[test]
+fn pthread_cond_lazy_guest_buffer_signal_thread() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+
+    let ready = Arc::new(AtomicBool::new(false));
+    let mut guest_cond = [0u8; 8];
+    let cond_ptr = guest_cond.as_mut_ptr().cast::<libc::pthread_cond_t>();
+
+    let mutex_ptr = unsafe { libc::calloc(1, std::mem::size_of::<libc::pthread_mutex_t>()) }
+        as *mut libc::pthread_mutex_t;
+    unsafe {
+        libc::pthread_mutex_init(mutex_ptr, std::ptr::null());
+    }
+
+    let m = mutex_ptr as usize;
+    let c = cond_ptr as usize;
+    let ready2 = ready.clone();
+
+    let waiter = std::thread::spawn(move || {
+        let mutex = m as *mut libc::pthread_mutex_t;
+        let cond = c as *mut libc::pthread_cond_t;
+        shim_pthread_mutex_lock(mutex);
+        while !ready2.load(Ordering::Acquire) {
+            shim_pthread_cond_wait(cond, mutex);
+        }
+        shim_pthread_mutex_unlock(mutex);
+    });
+
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
+    shim_pthread_mutex_lock(mutex_ptr);
+    ready.store(true, Ordering::Release);
+    shim_pthread_cond_signal(cond_ptr);
+    shim_pthread_mutex_unlock(mutex_ptr);
+
+    waiter.join().unwrap();
+
+    assert_eq!(shim_pthread_cond_destroy(cond_ptr), 0);
+    unsafe {
+        libc::pthread_mutex_destroy(mutex_ptr);
         libc::free(mutex_ptr as *mut libc::c_void);
     }
 }

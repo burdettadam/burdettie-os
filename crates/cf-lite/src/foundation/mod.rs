@@ -258,7 +258,8 @@ impl FoundationShims {
             rt.register_metaclass_addr(meta_addr, "DVTSystemPrerequisitesPaths");
             log::debug!(
                 "FoundationShims: registered DVTSystemPrerequisitesPaths at {:#x} / meta {:#x}",
-                class_addr, meta_addr,
+                class_addr,
+                meta_addr,
             );
         }
 
@@ -266,7 +267,8 @@ impl FoundationShims {
             rt,
             "DVTSystemPrerequisitesPaths",
             "licenseHostAppInfoPlistPath",
-            shim_dvt_system_prerequisites_paths_license_host_app_info_plist_path as *const () as u64,
+            shim_dvt_system_prerequisites_paths_license_host_app_info_plist_path as *const ()
+                as u64,
             "@@:",
         );
         install_guest_class_method(
@@ -286,15 +288,13 @@ impl FoundationShims {
     }
 }
 
-mod impl_foundation;
 mod impl_appkit;
-
+mod impl_foundation;
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::collections::HashMap;
-    
 
     #[derive(Default)]
     struct TestSymbolResolver {
@@ -303,7 +303,10 @@ mod tests {
 
     impl platform_core::symbols::HostSymbolResolver for TestSymbolResolver {
         fn resolve(&self, name: &str) -> Option<*const ()> {
-            self.symbols.get(name).copied().map(|addr| addr as *const ())
+            self.symbols
+                .get(name)
+                .copied()
+                .map(|addr| addr as *const ())
         }
 
         fn resolve_in(&self, _handle: *mut (), name: &str) -> Option<*const ()> {
@@ -419,9 +422,17 @@ mod tests {
         assert!(table.resolve("_OBJC_METACLASS_$_NSInvocation").is_some());
         // Symbol count grows as shims are added; assert it doesn't regress below a known minimum.
         #[cfg(target_os = "macos")]
-        assert!(table.len() >= 172, "expected ≥172 symbols, got {}", table.len());
+        assert!(
+            table.len() >= 172,
+            "expected ≥172 symbols, got {}",
+            table.len()
+        );
         #[cfg(not(target_os = "macos"))]
-        assert!(table.len() >= 162, "expected ≥162 symbols, got {}", table.len());
+        assert!(
+            table.len() >= 162,
+            "expected ≥162 symbols, got {}",
+            table.len()
+        );
     }
 
     #[test]
@@ -468,17 +479,13 @@ mod tests {
         let class = rt
             .get_class("DVTSystemPrerequisitesPaths")
             .expect("compat class should stay registered");
-        assert!(
-            class
-                .find_class_method("licenseHostAppInfoPlistPath")
-                .is_some()
-        );
+        assert!(class
+            .find_class_method("licenseHostAppInfoPlistPath")
+            .is_some());
         assert!(class.find_class_method("hostAppVersionPlistPath").is_some());
-        assert!(
-            class
-                .find_class_method("hostAppProductBuildVersion")
-                .is_some()
-        );
+        assert!(class
+            .find_class_method("hostAppProductBuildVersion")
+            .is_some());
     }
 
     #[test]
@@ -487,15 +494,10 @@ mod tests {
         resolver
             .symbols
             .insert("OBJC_CLASS_$_NSConstantArray", 0x1000);
-        resolver
-            .symbols
-            .insert("OBJC_CLASS_$_NSException", 0x2000);
+        resolver.symbols.insert("OBJC_CLASS_$_NSException", 0x2000);
 
         let aliases = resolve_host_isa_aliases(&resolver);
 
-        assert_eq!(
-            aliases,
-            vec![(0x1000, "NSArray"), (0x2000, "NSException")]
-        );
+        assert_eq!(aliases, vec![(0x1000, "NSArray"), (0x2000, "NSException")]);
     }
 }

@@ -134,14 +134,14 @@ define_class_pair!(root NSOBJECT_CLASS_DATA, NSOBJECT_METACLASS_DATA, NSOBJECT_I
     meta_addr: nsobject_metaclass_addr);
 
 // The macro must be visible to submodules (macro defined before mod declarations).
-mod class_pairs_foundation;
 mod class_pairs_appkit;
+mod class_pairs_foundation;
 mod class_pairs_gap;
 mod class_pairs_xcode;
 mod methods;
 
-pub use class_pairs_foundation::*;
 pub use class_pairs_appkit::*;
+pub use class_pairs_foundation::*;
 pub use class_pairs_gap::*;
 pub use class_pairs_xcode::*;
 pub use methods::*;

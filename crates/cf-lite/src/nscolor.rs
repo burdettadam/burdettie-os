@@ -12,7 +12,9 @@
 
 fn alloc_color(r: f64, g: f64, b: f64, a: f64) -> u64 {
     let obj = crate::pal_alloc().calloc(1, 40) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *(obj as *mut u64) = crate::nsobj::nscolor_class_addr();
         *((obj as usize + 8) as *mut f64) = r;
@@ -24,124 +26,217 @@ fn alloc_color(r: f64, g: f64, b: f64, a: f64) -> u64 {
 }
 
 /// `+[NSColor whiteColor]`
-pub extern "C" fn shim_nscolor_white_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(1.0, 1.0, 1.0, 1.0) }
+pub extern "C" fn shim_nscolor_white_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(1.0, 1.0, 1.0, 1.0)
+}
 
 /// `+[NSColor blackColor]`
-pub extern "C" fn shim_nscolor_black_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.0, 0.0, 0.0, 1.0) }
+pub extern "C" fn shim_nscolor_black_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(0.0, 0.0, 0.0, 1.0)
+}
 
 /// `+[NSColor redColor]`
-pub extern "C" fn shim_nscolor_red_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(1.0, 0.0, 0.0, 1.0) }
+pub extern "C" fn shim_nscolor_red_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(1.0, 0.0, 0.0, 1.0)
+}
 
 /// `+[NSColor greenColor]`
-pub extern "C" fn shim_nscolor_green_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.0, 1.0, 0.0, 1.0) }
+pub extern "C" fn shim_nscolor_green_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(0.0, 1.0, 0.0, 1.0)
+}
 
 /// `+[NSColor blueColor]`
-pub extern "C" fn shim_nscolor_blue_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.0, 0.0, 1.0, 1.0) }
+pub extern "C" fn shim_nscolor_blue_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(0.0, 0.0, 1.0, 1.0)
+}
 
 /// `+[NSColor clearColor]`
-pub extern "C" fn shim_nscolor_clear_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.0, 0.0, 0.0, 0.0) }
+pub extern "C" fn shim_nscolor_clear_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(0.0, 0.0, 0.0, 0.0)
+}
 
 /// `+[NSColor grayColor]`
-pub extern "C" fn shim_nscolor_gray_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.5, 0.5, 0.5, 1.0) }
+pub extern "C" fn shim_nscolor_gray_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(0.5, 0.5, 0.5, 1.0)
+}
 
 /// `+[NSColor colorWithRed:green:blue:alpha:]`
-pub extern "C" fn shim_nscolor_with_rgba(_cls: u64, _cmd: u64, r: f64, g: f64, b: f64, a: f64) -> u64 {
+pub extern "C" fn shim_nscolor_with_rgba(
+    _cls: u64,
+    _cmd: u64,
+    r: f64,
+    g: f64,
+    b: f64,
+    a: f64,
+) -> u64 {
     alloc_color(r, g, b, a)
 }
 
 /// `-[NSColor redComponent]`
 pub extern "C" fn shim_nscolor_red_component(obj: u64, _cmd: u64) -> f64 {
-    if obj == 0 { return 0.0; }
+    if obj == 0 {
+        return 0.0;
+    }
     unsafe { *((obj as usize + 8) as *const f64) }
 }
 
 /// `-[NSColor greenComponent]`
 pub extern "C" fn shim_nscolor_green_component(obj: u64, _cmd: u64) -> f64 {
-    if obj == 0 { return 0.0; }
+    if obj == 0 {
+        return 0.0;
+    }
     unsafe { *((obj as usize + 16) as *const f64) }
 }
 
 /// `-[NSColor blueComponent]`
 pub extern "C" fn shim_nscolor_blue_component(obj: u64, _cmd: u64) -> f64 {
-    if obj == 0 { return 0.0; }
+    if obj == 0 {
+        return 0.0;
+    }
     unsafe { *((obj as usize + 24) as *const f64) }
 }
 
 /// `-[NSColor alphaComponent]`
 pub extern "C" fn shim_nscolor_alpha_component(obj: u64, _cmd: u64) -> f64 {
-    if obj == 0 { return 0.0; }
+    if obj == 0 {
+        return 0.0;
+    }
     unsafe { *((obj as usize + 32) as *const f64) }
 }
 
 // ── System / semantic colors (AppKit Dark Mode–aware) ──────────
 
 /// `+[NSColor controlColor]`
-pub extern "C" fn shim_nscolor_control_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(1.0, 1.0, 1.0, 1.0) }
+pub extern "C" fn shim_nscolor_control_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(1.0, 1.0, 1.0, 1.0)
+}
 /// `+[NSColor controlBackgroundColor]`
-pub extern "C" fn shim_nscolor_control_background_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(1.0, 1.0, 1.0, 1.0) }
+pub extern "C" fn shim_nscolor_control_background_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(1.0, 1.0, 1.0, 1.0)
+}
 /// `+[NSColor controlTextColor]`
-pub extern "C" fn shim_nscolor_control_text_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.0, 0.0, 0.0, 1.0) }
+pub extern "C" fn shim_nscolor_control_text_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(0.0, 0.0, 0.0, 1.0)
+}
 /// `+[NSColor disabledControlTextColor]`
-pub extern "C" fn shim_nscolor_disabled_control_text_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.5, 0.5, 0.5, 1.0) }
+pub extern "C" fn shim_nscolor_disabled_control_text_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(0.5, 0.5, 0.5, 1.0)
+}
 /// `+[NSColor selectedControlColor]`
-pub extern "C" fn shim_nscolor_selected_control_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.0, 0.48, 1.0, 1.0) }
+pub extern "C" fn shim_nscolor_selected_control_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(0.0, 0.48, 1.0, 1.0)
+}
 /// `+[NSColor selectedTextBackgroundColor]`
-pub extern "C" fn shim_nscolor_selected_text_background_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.71, 0.84, 1.0, 1.0) }
+pub extern "C" fn shim_nscolor_selected_text_background_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(0.71, 0.84, 1.0, 1.0)
+}
 /// `+[NSColor selectedTextColor]`
-pub extern "C" fn shim_nscolor_selected_text_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.0, 0.0, 0.0, 1.0) }
+pub extern "C" fn shim_nscolor_selected_text_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(0.0, 0.0, 0.0, 1.0)
+}
 /// `+[NSColor textColor]`
-pub extern "C" fn shim_nscolor_text_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.0, 0.0, 0.0, 1.0) }
+pub extern "C" fn shim_nscolor_text_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(0.0, 0.0, 0.0, 1.0)
+}
 /// `+[NSColor textBackgroundColor]`
-pub extern "C" fn shim_nscolor_text_background_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(1.0, 1.0, 1.0, 1.0) }
+pub extern "C" fn shim_nscolor_text_background_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(1.0, 1.0, 1.0, 1.0)
+}
 /// `+[NSColor windowBackgroundColor]`
-pub extern "C" fn shim_nscolor_window_background_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.93, 0.93, 0.93, 1.0) }
+pub extern "C" fn shim_nscolor_window_background_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(0.93, 0.93, 0.93, 1.0)
+}
 /// `+[NSColor windowFrameTextColor]`
-pub extern "C" fn shim_nscolor_window_frame_text_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.0, 0.0, 0.0, 1.0) }
+pub extern "C" fn shim_nscolor_window_frame_text_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(0.0, 0.0, 0.0, 1.0)
+}
 /// `+[NSColor labelColor]`
-pub extern "C" fn shim_nscolor_label_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.0, 0.0, 0.0, 1.0) }
+pub extern "C" fn shim_nscolor_label_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(0.0, 0.0, 0.0, 1.0)
+}
 /// `+[NSColor secondaryLabelColor]`
-pub extern "C" fn shim_nscolor_secondary_label_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.24, 0.24, 0.26, 0.6) }
+pub extern "C" fn shim_nscolor_secondary_label_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(0.24, 0.24, 0.26, 0.6)
+}
 /// `+[NSColor tertiaryLabelColor]`
-pub extern "C" fn shim_nscolor_tertiary_label_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.24, 0.24, 0.26, 0.3) }
+pub extern "C" fn shim_nscolor_tertiary_label_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(0.24, 0.24, 0.26, 0.3)
+}
 /// `+[NSColor quaternaryLabelColor]`
-pub extern "C" fn shim_nscolor_quaternary_label_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.24, 0.24, 0.26, 0.18) }
+pub extern "C" fn shim_nscolor_quaternary_label_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(0.24, 0.24, 0.26, 0.18)
+}
 /// `+[NSColor separatorColor]`
-pub extern "C" fn shim_nscolor_separator_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.0, 0.0, 0.0, 0.1) }
+pub extern "C" fn shim_nscolor_separator_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(0.0, 0.0, 0.0, 0.1)
+}
 /// `+[NSColor gridColor]`
-pub extern "C" fn shim_nscolor_grid_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.85, 0.85, 0.85, 1.0) }
+pub extern "C" fn shim_nscolor_grid_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(0.85, 0.85, 0.85, 1.0)
+}
 /// `+[NSColor highlightColor]`
-pub extern "C" fn shim_nscolor_highlight_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(1.0, 1.0, 1.0, 1.0) }
+pub extern "C" fn shim_nscolor_highlight_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(1.0, 1.0, 1.0, 1.0)
+}
 /// `+[NSColor shadowColor]`
-pub extern "C" fn shim_nscolor_shadow_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.0, 0.0, 0.0, 1.0) }
+pub extern "C" fn shim_nscolor_shadow_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(0.0, 0.0, 0.0, 1.0)
+}
 
 // ── System tint colors (macOS 10.10+) ──────────────────────────
 
 /// `+[NSColor systemRedColor]`
-pub extern "C" fn shim_nscolor_system_red_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(1.0, 0.23, 0.19, 1.0) }
+pub extern "C" fn shim_nscolor_system_red_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(1.0, 0.23, 0.19, 1.0)
+}
 /// `+[NSColor systemGreenColor]`
-pub extern "C" fn shim_nscolor_system_green_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.20, 0.78, 0.35, 1.0) }
+pub extern "C" fn shim_nscolor_system_green_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(0.20, 0.78, 0.35, 1.0)
+}
 /// `+[NSColor systemBlueColor]`
-pub extern "C" fn shim_nscolor_system_blue_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.0, 0.48, 1.0, 1.0) }
+pub extern "C" fn shim_nscolor_system_blue_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(0.0, 0.48, 1.0, 1.0)
+}
 /// `+[NSColor systemOrangeColor]`
-pub extern "C" fn shim_nscolor_system_orange_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(1.0, 0.58, 0.0, 1.0) }
+pub extern "C" fn shim_nscolor_system_orange_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(1.0, 0.58, 0.0, 1.0)
+}
 /// `+[NSColor systemYellowColor]`
-pub extern "C" fn shim_nscolor_system_yellow_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(1.0, 0.80, 0.0, 1.0) }
+pub extern "C" fn shim_nscolor_system_yellow_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(1.0, 0.80, 0.0, 1.0)
+}
 /// `+[NSColor systemPinkColor]`
-pub extern "C" fn shim_nscolor_system_pink_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(1.0, 0.18, 0.33, 1.0) }
+pub extern "C" fn shim_nscolor_system_pink_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(1.0, 0.18, 0.33, 1.0)
+}
 /// `+[NSColor systemPurpleColor]`
-pub extern "C" fn shim_nscolor_system_purple_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.69, 0.32, 0.87, 1.0) }
+pub extern "C" fn shim_nscolor_system_purple_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(0.69, 0.32, 0.87, 1.0)
+}
 /// `+[NSColor systemTealColor]`
-pub extern "C" fn shim_nscolor_system_teal_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.35, 0.78, 0.98, 1.0) }
+pub extern "C" fn shim_nscolor_system_teal_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(0.35, 0.78, 0.98, 1.0)
+}
 /// `+[NSColor systemIndigoColor]`
-pub extern "C" fn shim_nscolor_system_indigo_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.35, 0.34, 0.84, 1.0) }
+pub extern "C" fn shim_nscolor_system_indigo_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(0.35, 0.34, 0.84, 1.0)
+}
 /// `+[NSColor systemBrownColor]`
-pub extern "C" fn shim_nscolor_system_brown_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.64, 0.52, 0.37, 1.0) }
+pub extern "C" fn shim_nscolor_system_brown_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(0.64, 0.52, 0.37, 1.0)
+}
 /// `+[NSColor systemMintColor]`
-pub extern "C" fn shim_nscolor_system_mint_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.0, 0.78, 0.75, 1.0) }
+pub extern "C" fn shim_nscolor_system_mint_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(0.0, 0.78, 0.75, 1.0)
+}
 /// `+[NSColor systemCyanColor]`
-pub extern "C" fn shim_nscolor_system_cyan_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.33, 0.67, 0.93, 1.0) }
+pub extern "C" fn shim_nscolor_system_cyan_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(0.33, 0.67, 0.93, 1.0)
+}
 /// `+[NSColor systemGrayColor]`
-pub extern "C" fn shim_nscolor_system_gray_color(_cls: u64, _cmd: u64) -> u64 { alloc_color(0.56, 0.56, 0.58, 1.0) }
+pub extern "C" fn shim_nscolor_system_gray_color(_cls: u64, _cmd: u64) -> u64 {
+    alloc_color(0.56, 0.56, 0.58, 1.0)
+}
 
 /// `+[NSColor colorWithWhite:alpha:]`
 pub extern "C" fn shim_nscolor_with_white_alpha(_cls: u64, _cmd: u64, w: f64, a: f64) -> u64 {
@@ -149,7 +244,14 @@ pub extern "C" fn shim_nscolor_with_white_alpha(_cls: u64, _cmd: u64, w: f64, a:
 }
 
 /// `+[NSColor colorWithHue:saturation:brightness:alpha:]`
-pub extern "C" fn shim_nscolor_with_hsba(_cls: u64, _cmd: u64, h: f64, s: f64, b: f64, a: f64) -> u64 {
+pub extern "C" fn shim_nscolor_with_hsba(
+    _cls: u64,
+    _cmd: u64,
+    h: f64,
+    s: f64,
+    b: f64,
+    a: f64,
+) -> u64 {
     let (r, g, bl) = hsb_to_rgb(h, s, b);
     alloc_color(r, g, bl, a)
 }
@@ -158,7 +260,9 @@ pub extern "C" fn shim_nscolor_with_hsba(_cls: u64, _cmd: u64, h: f64, s: f64, b
 
 /// `-[NSColor hueComponent]`
 pub extern "C" fn shim_nscolor_hue_component(obj: u64, _cmd: u64) -> f64 {
-    if obj == 0 { return 0.0; }
+    if obj == 0 {
+        return 0.0;
+    }
     let r = unsafe { *((obj as usize + 8) as *const f64) };
     let g = unsafe { *((obj as usize + 16) as *const f64) };
     let b = unsafe { *((obj as usize + 24) as *const f64) };
@@ -168,7 +272,9 @@ pub extern "C" fn shim_nscolor_hue_component(obj: u64, _cmd: u64) -> f64 {
 
 /// `-[NSColor saturationComponent]`
 pub extern "C" fn shim_nscolor_saturation_component(obj: u64, _cmd: u64) -> f64 {
-    if obj == 0 { return 0.0; }
+    if obj == 0 {
+        return 0.0;
+    }
     let r = unsafe { *((obj as usize + 8) as *const f64) };
     let g = unsafe { *((obj as usize + 16) as *const f64) };
     let b = unsafe { *((obj as usize + 24) as *const f64) };
@@ -178,7 +284,9 @@ pub extern "C" fn shim_nscolor_saturation_component(obj: u64, _cmd: u64) -> f64 
 
 /// `-[NSColor brightnessComponent]`
 pub extern "C" fn shim_nscolor_brightness_component(obj: u64, _cmd: u64) -> f64 {
-    if obj == 0 { return 0.0; }
+    if obj == 0 {
+        return 0.0;
+    }
     let r = unsafe { *((obj as usize + 8) as *const f64) };
     let g = unsafe { *((obj as usize + 16) as *const f64) };
     let b = unsafe { *((obj as usize + 24) as *const f64) };
@@ -192,13 +300,30 @@ pub extern "C" fn shim_nscolor_color_using_color_space(obj: u64, _cmd: u64, _cs:
 }
 
 /// `-[NSColor getRed:green:blue:alpha:]` — writes components into out-pointers.
-pub extern "C" fn shim_nscolor_get_rgba(obj: u64, _cmd: u64, r: *mut f64, g: *mut f64, b: *mut f64, a: *mut f64) {
-    if obj == 0 { return; }
+pub extern "C" fn shim_nscolor_get_rgba(
+    obj: u64,
+    _cmd: u64,
+    r: *mut f64,
+    g: *mut f64,
+    b: *mut f64,
+    a: *mut f64,
+) {
+    if obj == 0 {
+        return;
+    }
     unsafe {
-        if !r.is_null() { *r = *((obj as usize + 8) as *const f64); }
-        if !g.is_null() { *g = *((obj as usize + 16) as *const f64); }
-        if !b.is_null() { *b = *((obj as usize + 24) as *const f64); }
-        if !a.is_null() { *a = *((obj as usize + 32) as *const f64); }
+        if !r.is_null() {
+            *r = *((obj as usize + 8) as *const f64);
+        }
+        if !g.is_null() {
+            *g = *((obj as usize + 16) as *const f64);
+        }
+        if !b.is_null() {
+            *b = *((obj as usize + 24) as *const f64);
+        }
+        if !a.is_null() {
+            *a = *((obj as usize + 32) as *const f64);
+        }
     }
 }
 
@@ -226,7 +351,9 @@ fn rgb_to_hsb(r: f64, g: f64, b: f64) -> (f64, f64, f64) {
 // ── Drawing context integration ────────────────────────────────
 
 fn color_components(obj: u64) -> (f64, f64, f64, f64) {
-    if obj == 0 { return (0.0, 0.0, 0.0, 1.0); }
+    if obj == 0 {
+        return (0.0, 0.0, 0.0, 1.0);
+    }
     unsafe {
         (
             *((obj as usize + 8) as *const f64),
@@ -246,7 +373,9 @@ pub extern "C" fn shim_nscolor_set(obj: u64, _cmd: u64) {
 /// `-[NSColor setFill]` — set fill color in the current CGContext.
 pub extern "C" fn shim_nscolor_set_fill(obj: u64, _cmd: u64) {
     let cg_ctx = crate::nsgraphicscontext::current_cg_context_handle();
-    if cg_ctx == 0 || obj == 0 { return; }
+    if cg_ctx == 0 || obj == 0 {
+        return;
+    }
     let (r, g, b, a) = color_components(obj);
     cg_shims::bridge::with_context(cg_ctx, |c| {
         c.fill_color = graphics_core::Color::new(r, g, b, a);
@@ -256,7 +385,9 @@ pub extern "C" fn shim_nscolor_set_fill(obj: u64, _cmd: u64) {
 /// `-[NSColor setStroke]` — set stroke color in the current CGContext.
 pub extern "C" fn shim_nscolor_set_stroke(obj: u64, _cmd: u64) {
     let cg_ctx = crate::nsgraphicscontext::current_cg_context_handle();
-    if cg_ctx == 0 || obj == 0 { return; }
+    if cg_ctx == 0 || obj == 0 {
+        return;
+    }
     let (r, g, b, a) = color_components(obj);
     cg_shims::bridge::with_context(cg_ctx, |c| {
         c.stroke_color = graphics_core::Color::new(r, g, b, a);

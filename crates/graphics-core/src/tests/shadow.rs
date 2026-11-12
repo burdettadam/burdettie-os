@@ -41,10 +41,18 @@ fn shadow_produces_offset_pixels() {
     let shadow_px = surface.pixels()[(32 * 100 + 32) as usize];
     let shadow_a = (shadow_px >> 24) & 0xFF;
     // Should have some shadow alpha composited onto white
-    assert!(shadow_a > 0, "expected shadow pixel at (32,32), got 0x{:08X}", shadow_px);
+    assert!(
+        shadow_a > 0,
+        "expected shadow pixel at (32,32), got 0x{:08X}",
+        shadow_px
+    );
     // The pixel should be darker than pure white (0xFFFFFFFF)
     let shadow_r = (shadow_px >> 16) & 0xFF;
-    assert!(shadow_r < 255, "expected darkened pixel from shadow, got 0x{:08X}", shadow_px);
+    assert!(
+        shadow_r < 255,
+        "expected darkened pixel from shadow, got 0x{:08X}",
+        shadow_px
+    );
 }
 
 #[test]
@@ -64,9 +72,17 @@ fn shadow_no_blur_sharp_edge() {
     let outside = surface.pixels()[(35 * 100 + 29) as usize];
     // Inside should be black (shadow color with alpha=1.0)
     let inside_r = (inside >> 16) & 0xFF;
-    assert!(inside_r < 10, "expected dark shadow pixel at (35,35), got 0x{:08X}", inside);
+    assert!(
+        inside_r < 10,
+        "expected dark shadow pixel at (35,35), got 0x{:08X}",
+        inside
+    );
     // Outside should be white (untouched)
-    assert_eq!(outside, 0xFFFFFFFF, "expected white outside shadow, got 0x{:08X}", outside);
+    assert_eq!(
+        outside, 0xFFFFFFFF,
+        "expected white outside shadow, got 0x{:08X}",
+        outside
+    );
 }
 
 #[test]
@@ -85,7 +101,11 @@ fn shadow_blur_softens() {
     let extended = surface.pixels()[(35 * 100 + 42) as usize];
     let ext_r = (extended >> 16) & 0xFF;
     // Should be somewhat darkened (less than pure white 255)
-    assert!(ext_r < 255, "expected blur to extend shadow, pixel at (42,35) = 0x{:08X}", extended);
+    assert!(
+        ext_r < 255,
+        "expected blur to extend shadow, pixel at (42,35) = 0x{:08X}",
+        extended
+    );
 }
 
 #[test]
@@ -122,5 +142,9 @@ fn shadow_zero_offset_zero_blur() {
 
     // Outside content area should be white (shadow with zero offset/blur overlaps content exactly)
     let outside = surface.pixels()[(5 * 60 + 5) as usize];
-    assert_eq!(outside, 0xFFFFFFFF, "expected white outside, got 0x{:08X}", outside);
+    assert_eq!(
+        outside, 0xFFFFFFFF,
+        "expected white outside, got 0x{:08X}",
+        outside
+    );
 }

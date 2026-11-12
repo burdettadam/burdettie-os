@@ -1,11 +1,21 @@
 use crate::color::Color;
 use crate::geometry::{Point, Rect};
 use crate::renderer::Renderer;
-use crate::surface::Surface;
 use crate::software::SoftwareRenderer;
+use crate::surface::Surface;
 
-const RED: Color = Color { r: 1.0, g: 0.0, b: 0.0, a: 1.0 };
-const WHITE: Color = Color { r: 1.0, g: 1.0, b: 1.0, a: 1.0 };
+const RED: Color = Color {
+    r: 1.0,
+    g: 0.0,
+    b: 0.0,
+    a: 1.0,
+};
+const WHITE: Color = Color {
+    r: 1.0,
+    g: 1.0,
+    b: 1.0,
+    a: 1.0,
+};
 
 fn red_argb() -> u32 {
     RED.to_argb32()

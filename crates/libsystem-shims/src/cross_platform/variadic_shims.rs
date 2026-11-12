@@ -47,61 +47,238 @@ impl VariadicShims {
         #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
         {
             use crate::register_shims;
-            register_shims!(table,
+            register_shims!(
+                table,
                 // ── printf family ───────────────────────────────
-                ("_fprintf",  shim_fprintf  as *const () as u64, "fprintf (Apple variadic ABI)"),
-                ("_printf",   shim_printf   as *const () as u64, "printf (Apple variadic ABI)"),
-                ("_snprintf", shim_snprintf as *const () as u64, "snprintf (Apple variadic ABI)"),
-                ("_sprintf",  shim_sprintf  as *const () as u64, "sprintf (Apple variadic ABI)"),
-                ("_dprintf",  shim_dprintf  as *const () as u64, "dprintf (Apple variadic ABI)"),
-                ("_asprintf", shim_asprintf as *const () as u64, "asprintf (Apple variadic ABI)"),
+                (
+                    "_fprintf",
+                    shim_fprintf as *const () as u64,
+                    "fprintf (Apple variadic ABI)"
+                ),
+                (
+                    "_printf",
+                    shim_printf as *const () as u64,
+                    "printf (Apple variadic ABI)"
+                ),
+                (
+                    "_snprintf",
+                    shim_snprintf as *const () as u64,
+                    "snprintf (Apple variadic ABI)"
+                ),
+                (
+                    "_sprintf",
+                    shim_sprintf as *const () as u64,
+                    "sprintf (Apple variadic ABI)"
+                ),
+                (
+                    "_dprintf",
+                    shim_dprintf as *const () as u64,
+                    "dprintf (Apple variadic ABI)"
+                ),
+                (
+                    "_asprintf",
+                    shim_asprintf as *const () as u64,
+                    "asprintf (Apple variadic ABI)"
+                ),
                 // ── scanf family ────────────────────────────────
-                ("_sscanf",   shim_sscanf   as *const () as u64, "sscanf (Apple variadic ABI)"),
-                ("_fscanf",   shim_fscanf   as *const () as u64, "fscanf (Apple variadic ABI)"),
-                ("_scanf",    shim_scanf    as *const () as u64, "scanf (Apple variadic ABI)"),
+                (
+                    "_sscanf",
+                    shim_sscanf as *const () as u64,
+                    "sscanf (Apple variadic ABI)"
+                ),
+                (
+                    "_fscanf",
+                    shim_fscanf as *const () as u64,
+                    "fscanf (Apple variadic ABI)"
+                ),
+                (
+                    "_scanf",
+                    shim_scanf as *const () as u64,
+                    "scanf (Apple variadic ABI)"
+                ),
                 // ── err / warn family ───────────────────────────
-                ("_err",      shim_err      as *const () as u64, "err (Apple variadic ABI)"),
-                ("_errx",     shim_errx     as *const () as u64, "errx (Apple variadic ABI)"),
-                ("_errc",     shim_errc     as *const () as u64, "errc (Apple variadic ABI)"),
-                ("_warn",     shim_warn     as *const () as u64, "warn (Apple variadic ABI)"),
-                ("_warnx",    shim_warnx    as *const () as u64, "warnx (Apple variadic ABI)"),
+                (
+                    "_err",
+                    shim_err as *const () as u64,
+                    "err (Apple variadic ABI)"
+                ),
+                (
+                    "_errx",
+                    shim_errx as *const () as u64,
+                    "errx (Apple variadic ABI)"
+                ),
+                (
+                    "_errc",
+                    shim_errc as *const () as u64,
+                    "errc (Apple variadic ABI)"
+                ),
+                (
+                    "_warn",
+                    shim_warn as *const () as u64,
+                    "warn (Apple variadic ABI)"
+                ),
+                (
+                    "_warnx",
+                    shim_warnx as *const () as u64,
+                    "warnx (Apple variadic ABI)"
+                ),
                 // ── syslog ──────────────────────────────────────
-                ("_syslog",   shim_syslog   as *const () as u64, "syslog (Apple variadic ABI)"),
+                (
+                    "_syslog",
+                    shim_syslog as *const () as u64,
+                    "syslog (Apple variadic ABI)"
+                ),
                 // ── additional BSD err/warn variants ────────────
-                ("_warnc",    shim_warnc    as *const () as u64, "warnc (Apple variadic ABI)"),
+                (
+                    "_warnc",
+                    shim_warnc as *const () as u64,
+                    "warnc (Apple variadic ABI)"
+                ),
                 // ── v-variant family (Apple va_list → Linux va_list) ──
-                ("_vfprintf",  shim_vfprintf  as *const () as u64, "vfprintf (Apple va_list→Linux)"),
-                ("_vprintf",   shim_vprintf   as *const () as u64, "vprintf (Apple va_list→Linux)"),
-                ("_vsnprintf", shim_vsnprintf as *const () as u64, "vsnprintf (Apple va_list→Linux)"),
-                ("_vsprintf",  shim_vsprintf  as *const () as u64, "vsprintf (Apple va_list→Linux)"),
-                ("_vdprintf",  shim_vdprintf  as *const () as u64, "vdprintf (Apple va_list→Linux)"),
-                ("_vasprintf", shim_vasprintf as *const () as u64, "vasprintf (Apple va_list→Linux)"),
-                ("_vsscanf",   shim_vsscanf   as *const () as u64, "vsscanf (Apple va_list→Linux)"),
-                ("_vfscanf",   shim_vfscanf   as *const () as u64, "vfscanf (Apple va_list→Linux)"),
-                ("_vscanf",    shim_vscanf    as *const () as u64, "vscanf (Apple va_list→Linux)"),
-                ("_vsyslog",   shim_vsyslog   as *const () as u64, "vsyslog (Apple va_list→Linux)"),
+                (
+                    "_vfprintf",
+                    shim_vfprintf as *const () as u64,
+                    "vfprintf (Apple va_list→Linux)"
+                ),
+                (
+                    "_vprintf",
+                    shim_vprintf as *const () as u64,
+                    "vprintf (Apple va_list→Linux)"
+                ),
+                (
+                    "_vsnprintf",
+                    shim_vsnprintf as *const () as u64,
+                    "vsnprintf (Apple va_list→Linux)"
+                ),
+                (
+                    "_vsprintf",
+                    shim_vsprintf as *const () as u64,
+                    "vsprintf (Apple va_list→Linux)"
+                ),
+                (
+                    "_vdprintf",
+                    shim_vdprintf as *const () as u64,
+                    "vdprintf (Apple va_list→Linux)"
+                ),
+                (
+                    "_vasprintf",
+                    shim_vasprintf as *const () as u64,
+                    "vasprintf (Apple va_list→Linux)"
+                ),
+                (
+                    "_vsscanf",
+                    shim_vsscanf as *const () as u64,
+                    "vsscanf (Apple va_list→Linux)"
+                ),
+                (
+                    "_vfscanf",
+                    shim_vfscanf as *const () as u64,
+                    "vfscanf (Apple va_list→Linux)"
+                ),
+                (
+                    "_vscanf",
+                    shim_vscanf as *const () as u64,
+                    "vscanf (Apple va_list→Linux)"
+                ),
+                (
+                    "_vsyslog",
+                    shim_vsyslog as *const () as u64,
+                    "vsyslog (Apple va_list→Linux)"
+                ),
                 // ── v-variant err/warn (Apple va_list → Linux va_list) ──
-                ("_vwarn",     shim_vwarn     as *const () as u64, "vwarn (Apple va_list→Linux)"),
-                ("_vwarnx",    shim_vwarnx    as *const () as u64, "vwarnx (Apple va_list→Linux)"),
-                ("_vwarnc",    shim_vwarnc    as *const () as u64, "vwarnc (Apple va_list→Linux)"),
-                ("_verr",      shim_verr      as *const () as u64, "verr (Apple va_list→Linux)"),
-                ("_verrx",     shim_verrx     as *const () as u64, "verrx (Apple va_list→Linux)"),
-                ("_verrc",     shim_verrc     as *const () as u64, "verrc (Apple va_list→Linux)"),
+                (
+                    "_vwarn",
+                    shim_vwarn as *const () as u64,
+                    "vwarn (Apple va_list→Linux)"
+                ),
+                (
+                    "_vwarnx",
+                    shim_vwarnx as *const () as u64,
+                    "vwarnx (Apple va_list→Linux)"
+                ),
+                (
+                    "_vwarnc",
+                    shim_vwarnc as *const () as u64,
+                    "vwarnc (Apple va_list→Linux)"
+                ),
+                (
+                    "_verr",
+                    shim_verr as *const () as u64,
+                    "verr (Apple va_list→Linux)"
+                ),
+                (
+                    "_verrx",
+                    shim_verrx as *const () as u64,
+                    "verrx (Apple va_list→Linux)"
+                ),
+                (
+                    "_verrc",
+                    shim_verrc as *const () as u64,
+                    "verrc (Apple va_list→Linux)"
+                ),
                 // ── fortified (_chk) variadic family ────────────
-                ("___snprintf_chk", shim_snprintf_chk as *const () as u64, "snprintf_chk (Apple variadic ABI)"),
-                ("___sprintf_chk",  shim_sprintf_chk  as *const () as u64, "sprintf_chk (Apple variadic ABI)"),
-                ("___fprintf_chk",  shim_fprintf_chk  as *const () as u64, "fprintf_chk (Apple variadic ABI)"),
-                ("___printf_chk",   shim_printf_chk   as *const () as u64, "printf_chk (Apple variadic ABI)"),
+                (
+                    "___snprintf_chk",
+                    shim_snprintf_chk as *const () as u64,
+                    "snprintf_chk (Apple variadic ABI)"
+                ),
+                (
+                    "___sprintf_chk",
+                    shim_sprintf_chk as *const () as u64,
+                    "sprintf_chk (Apple variadic ABI)"
+                ),
+                (
+                    "___fprintf_chk",
+                    shim_fprintf_chk as *const () as u64,
+                    "fprintf_chk (Apple variadic ABI)"
+                ),
+                (
+                    "___printf_chk",
+                    shim_printf_chk as *const () as u64,
+                    "printf_chk (Apple variadic ABI)"
+                ),
                 // ── fortified v-variant family ──────────────────
-                ("___vsnprintf_chk", shim_vsnprintf_chk as *const () as u64, "vsnprintf_chk (Apple va_list→Linux)"),
-                ("___vsprintf_chk",  shim_vsprintf_chk  as *const () as u64, "vsprintf_chk (Apple va_list→Linux)"),
-                ("___vfprintf_chk",  shim_vfprintf_chk  as *const () as u64, "vfprintf_chk (Apple va_list→Linux)"),
-                ("___vprintf_chk",   shim_vprintf_chk   as *const () as u64, "vprintf_chk (Apple va_list→Linux)"),
+                (
+                    "___vsnprintf_chk",
+                    shim_vsnprintf_chk as *const () as u64,
+                    "vsnprintf_chk (Apple va_list→Linux)"
+                ),
+                (
+                    "___vsprintf_chk",
+                    shim_vsprintf_chk as *const () as u64,
+                    "vsprintf_chk (Apple va_list→Linux)"
+                ),
+                (
+                    "___vfprintf_chk",
+                    shim_vfprintf_chk as *const () as u64,
+                    "vfprintf_chk (Apple va_list→Linux)"
+                ),
+                (
+                    "___vprintf_chk",
+                    shim_vprintf_chk as *const () as u64,
+                    "vprintf_chk (Apple va_list→Linux)"
+                ),
                 // ── LibreSSL BIO printf family (runtime-resolved) ───
-                ("_BIO_printf",   shim_bio_printf   as *const () as u64, "BIO_printf (Apple variadic ABI)"),
-                ("_BIO_vprintf",  shim_bio_vprintf  as *const () as u64, "BIO_vprintf (Apple va_list→Linux)"),
-                ("_BIO_snprintf", shim_bio_snprintf as *const () as u64, "BIO_snprintf (Apple variadic ABI)"),
-                ("_BIO_vsnprintf",shim_bio_vsnprintf as *const () as u64, "BIO_vsnprintf (Apple va_list→Linux)"),
+                (
+                    "_BIO_printf",
+                    shim_bio_printf as *const () as u64,
+                    "BIO_printf (Apple variadic ABI)"
+                ),
+                (
+                    "_BIO_vprintf",
+                    shim_bio_vprintf as *const () as u64,
+                    "BIO_vprintf (Apple va_list→Linux)"
+                ),
+                (
+                    "_BIO_snprintf",
+                    shim_bio_snprintf as *const () as u64,
+                    "BIO_snprintf (Apple variadic ABI)"
+                ),
+                (
+                    "_BIO_vsnprintf",
+                    shim_bio_vsnprintf as *const () as u64,
+                    "BIO_vsnprintf (Apple va_list→Linux)"
+                ),
             );
 
             log::info!("VariadicShims: registered 45 Apple→Linux ABI shims");
@@ -157,11 +334,7 @@ mod inner {
             format: *const libc::c_char,
             ap: *const u8,
         ) -> libc::c_int;
-        fn vdprintf(
-            fd: libc::c_int,
-            format: *const libc::c_char,
-            ap: *const u8,
-        ) -> libc::c_int;
+        fn vdprintf(fd: libc::c_int, format: *const libc::c_char, ap: *const u8) -> libc::c_int;
         fn vasprintf(
             ret: *mut *mut libc::c_char,
             format: *const libc::c_char,
@@ -1133,19 +1306,14 @@ mod inner {
             CACHE
                 .get_or_init(|| {
                     let name = crate::process::process_name().unwrap_or("?");
-                    std::ffi::CString::new(name).unwrap_or_else(|_| {
-                        std::ffi::CString::new("?").unwrap()
-                    })
+                    std::ffi::CString::new(name)
+                        .unwrap_or_else(|_| std::ffi::CString::new("?").unwrap())
                 })
                 .as_ptr()
         }
 
         extern "C" {
-            fn fprintf(
-                stream: *mut libc::FILE,
-                format: *const libc::c_char,
-                ...
-            ) -> libc::c_int;
+            fn fprintf(stream: *mut libc::FILE, format: *const libc::c_char, ...) -> libc::c_int;
         }
 
         /// `err(eval, fmt, ap)` — print "progname: <msg>: <errno>\n" and exit.
@@ -1165,11 +1333,7 @@ mod inner {
         }
 
         /// `errx(eval, fmt, ap)` — print "progname: <msg>\n" and exit.
-        extern "C" fn errx_inner(
-            eval: libc::c_int,
-            fmt: *const libc::c_char,
-            ap: *const u8,
-        ) -> ! {
+        extern "C" fn errx_inner(eval: libc::c_int, fmt: *const libc::c_char, ap: *const u8) -> ! {
             unsafe {
                 let se = host_stderr();
                 let pn = progname_cstr();

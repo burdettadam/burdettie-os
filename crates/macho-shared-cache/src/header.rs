@@ -4,7 +4,7 @@ use crate::error::SharedCacheError;
 
 /// Known shared cache magic strings.
 const MAGIC_ARM64E: &[u8; 16] = b"dyld_v1  arm64e\0";
-const MAGIC_ARM64: &[u8; 16]  = b"dyld_v1   arm64\0";
+const MAGIC_ARM64: &[u8; 16] = b"dyld_v1   arm64\0";
 const MAGIC_X86_64: &[u8; 16] = b"dyld_v1  x86_64\0";
 const MAGIC_X86_64H: &[u8; 16] = b"dyld_v1 x86_64h\0";
 
@@ -47,13 +47,12 @@ impl CacheHeader {
             return Err(SharedCacheError::InvalidMagic(magic_str));
         }
 
-        let mapping_count  = u32::from_le_bytes([data[16], data[17], data[18], data[19]]);
+        let mapping_count = u32::from_le_bytes([data[16], data[17], data[18], data[19]]);
         let mapping_offset = u32::from_le_bytes([data[20], data[21], data[22], data[23]]);
-        let images_count   = u32::from_le_bytes([data[24], data[25], data[26], data[27]]);
-        let images_offset  = u32::from_le_bytes([data[28], data[29], data[30], data[31]]);
+        let images_count = u32::from_le_bytes([data[24], data[25], data[26], data[27]]);
+        let images_offset = u32::from_le_bytes([data[28], data[29], data[30], data[31]]);
         let dyld_base_address = u64::from_le_bytes([
-            data[32], data[33], data[34], data[35],
-            data[36], data[37], data[38], data[39],
+            data[32], data[33], data[34], data[35], data[36], data[37], data[38], data[39],
         ]);
 
         Ok(Self {
@@ -135,11 +134,13 @@ impl MappingInfo {
             let d = &data[base..base + Self::SIZE];
 
             mappings.push(Self {
-                address:     u64::from_le_bytes([d[0],  d[1],  d[2],  d[3],  d[4],  d[5],  d[6],  d[7]]),
-                size:        u64::from_le_bytes([d[8],  d[9],  d[10], d[11], d[12], d[13], d[14], d[15]]),
-                file_offset: u64::from_le_bytes([d[16], d[17], d[18], d[19], d[20], d[21], d[22], d[23]]),
-                max_prot:    u32::from_le_bytes([d[24], d[25], d[26], d[27]]),
-                init_prot:   u32::from_le_bytes([d[28], d[29], d[30], d[31]]),
+                address: u64::from_le_bytes([d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7]]),
+                size: u64::from_le_bytes([d[8], d[9], d[10], d[11], d[12], d[13], d[14], d[15]]),
+                file_offset: u64::from_le_bytes([
+                    d[16], d[17], d[18], d[19], d[20], d[21], d[22], d[23],
+                ]),
+                max_prot: u32::from_le_bytes([d[24], d[25], d[26], d[27]]),
+                init_prot: u32::from_le_bytes([d[28], d[29], d[30], d[31]]),
             });
         }
 
@@ -168,24 +169,24 @@ mod tests {
 
         // Mapping at offset 48: addr=0x180000000, size=0x1000, fileOffset=0, maxProt=5, initProt=5
         let m = 48;
-        data[m..m+8].copy_from_slice(&0x0001_8000_0000u64.to_le_bytes());
-        data[m+8..m+16].copy_from_slice(&0x1000u64.to_le_bytes());
-        data[m+16..m+24].copy_from_slice(&0u64.to_le_bytes());
-        data[m+24..m+28].copy_from_slice(&5u32.to_le_bytes());
-        data[m+28..m+32].copy_from_slice(&5u32.to_le_bytes());
+        data[m..m + 8].copy_from_slice(&0x0001_8000_0000u64.to_le_bytes());
+        data[m + 8..m + 16].copy_from_slice(&0x1000u64.to_le_bytes());
+        data[m + 16..m + 24].copy_from_slice(&0u64.to_le_bytes());
+        data[m + 24..m + 28].copy_from_slice(&5u32.to_le_bytes());
+        data[m + 28..m + 32].copy_from_slice(&5u32.to_le_bytes());
 
         // Image at offset 80: addr=0x180000000, modTime=0, inode=0, pathFileOffset=112
         let i = 80;
-        data[i..i+8].copy_from_slice(&0x0001_8000_0000u64.to_le_bytes());
-        data[i+8..i+16].copy_from_slice(&0u64.to_le_bytes()); // modTime
-        data[i+16..i+24].copy_from_slice(&0u64.to_le_bytes()); // inode
-        data[i+24..i+28].copy_from_slice(&112u32.to_le_bytes()); // pathFileOffset
-        // pad
-        data[i+28..i+32].copy_from_slice(&0u32.to_le_bytes());
+        data[i..i + 8].copy_from_slice(&0x0001_8000_0000u64.to_le_bytes());
+        data[i + 8..i + 16].copy_from_slice(&0u64.to_le_bytes()); // modTime
+        data[i + 16..i + 24].copy_from_slice(&0u64.to_le_bytes()); // inode
+        data[i + 24..i + 28].copy_from_slice(&112u32.to_le_bytes()); // pathFileOffset
+                                                                     // pad
+        data[i + 28..i + 32].copy_from_slice(&0u32.to_le_bytes());
 
         // Path at offset 112
         let path = b"/usr/lib/libSystem.B.dylib\0";
-        data[112..112+path.len()].copy_from_slice(path);
+        data[112..112 + path.len()].copy_from_slice(path);
 
         data
     }

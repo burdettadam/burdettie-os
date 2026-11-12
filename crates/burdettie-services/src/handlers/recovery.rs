@@ -14,9 +14,13 @@ use tiny_http::Request;
 pub struct RecoveryHandler;
 
 impl Handler for RecoveryHandler {
-    fn handle(&self, path: &str, _method: &str, _body: &[u8], _request: &Request)
-        -> Option<HandlerResponse>
-    {
+    fn handle(
+        &self,
+        path: &str,
+        _method: &str,
+        _body: &[u8],
+        _request: &Request,
+    ) -> Option<HandlerResponse> {
         if !path.starts_with("/api/v1/recovery") {
             return None;
         }

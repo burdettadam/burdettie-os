@@ -10,9 +10,13 @@ use tiny_http::Request;
 pub struct ConfigHandler;
 
 impl Handler for ConfigHandler {
-    fn handle(&self, path: &str, _method: &str, _body: &[u8], _request: &Request)
-        -> Option<HandlerResponse>
-    {
+    fn handle(
+        &self,
+        path: &str,
+        _method: &str,
+        _body: &[u8],
+        _request: &Request,
+    ) -> Option<HandlerResponse> {
         if !path.starts_with("/api/v1/config") {
             return None;
         }

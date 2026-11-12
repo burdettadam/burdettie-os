@@ -21,7 +21,9 @@ thread_local! {
 
 fn alloc_graphics_context(cg_ctx: u64) -> u64 {
     let obj = crate::pal_alloc().calloc(1, GRAPHICS_CONTEXT_SIZE) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *(obj as *mut u64) = crate::nsobj::nsgraphicscontext_class_addr();
         *((obj as usize + CG_CONTEXT_OFF) as *mut u64) = cg_ctx;
@@ -48,7 +50,9 @@ pub fn pop_current_context(prev: u64) {
 /// Get the CGContextRef handle of the current context (for `UIGraphicsGetCurrentContext`).
 pub fn current_cg_context_handle() -> u64 {
     let gc = CURRENT_CONTEXT.get();
-    if gc == 0 { return 0; }
+    if gc == 0 {
+        return 0;
+    }
     unsafe { *((gc as usize + CG_CONTEXT_OFF) as *const u64) }
 }
 
@@ -61,7 +65,10 @@ pub extern "C" fn shim_nsgraphicscontext_current_context(_cls: u64, _cmd: u64) -
 
 /// `+[NSGraphicsContext graphicsContextWithCGContext:flipped:]`
 pub extern "C" fn shim_nsgraphicscontext_with_cg_context(
-    _cls: u64, _cmd: u64, cg_ctx: u64, _flipped: u8,
+    _cls: u64,
+    _cmd: u64,
+    cg_ctx: u64,
+    _flipped: u8,
 ) -> u64 {
     alloc_graphics_context(cg_ctx)
 }
@@ -83,9 +90,7 @@ pub extern "C" fn shim_nsgraphicscontext_restore_state(_cls: u64, _cmd: u64) {
 }
 
 /// `+[NSGraphicsContext setCurrentContext:]`
-pub extern "C" fn shim_nsgraphicscontext_set_current_context(
-    _cls: u64, _cmd: u64, ctx: u64,
-) {
+pub extern "C" fn shim_nsgraphicscontext_set_current_context(_cls: u64, _cmd: u64, ctx: u64) {
     CURRENT_CONTEXT.set(ctx);
 }
 
@@ -93,7 +98,9 @@ pub extern "C" fn shim_nsgraphicscontext_set_current_context(
 
 /// `-[NSGraphicsContext CGContext]`
 pub extern "C" fn shim_nsgraphicscontext_cg_context(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + CG_CONTEXT_OFF) as *const u64) }
 }
 
@@ -109,7 +116,9 @@ pub extern "C" fn shim_nsgraphicscontext_is_flipped(_obj: u64, _cmd: u64) -> u8 
 
 /// `-[NSGraphicsContext saveGraphicsState]` (instance)
 pub extern "C" fn shim_nsgraphicscontext_instance_save(obj: u64, _cmd: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let cg_ctx = unsafe { *((obj as usize + CG_CONTEXT_OFF) as *const u64) };
     if cg_ctx != 0 {
         cg_shims::bridge::with_context(cg_ctx, |c| c.save_state());
@@ -118,7 +127,9 @@ pub extern "C" fn shim_nsgraphicscontext_instance_save(obj: u64, _cmd: u64) {
 
 /// `-[NSGraphicsContext restoreGraphicsState]` (instance)
 pub extern "C" fn shim_nsgraphicscontext_instance_restore(obj: u64, _cmd: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let cg_ctx = unsafe { *((obj as usize + CG_CONTEXT_OFF) as *const u64) };
     if cg_ctx != 0 {
         cg_shims::bridge::with_context(cg_ctx, |c| c.restore_state());
@@ -133,9 +144,9 @@ mod tests {
     #[test]
     fn current_context_default_nil() {
         // In a fresh thread, current context should be nil
-        let handle = std::thread::spawn(|| {
-            shim_nsgraphicscontext_current_context(0, 0)
-        }).join().unwrap();
+        let handle = std::thread::spawn(|| shim_nsgraphicscontext_current_context(0, 0))
+            .join()
+            .unwrap();
         assert_eq!(handle, 0);
     }
 
@@ -186,7 +197,9 @@ mod tests {
             assert_eq!(shim_nsgraphicscontext_current_context(0, 0), gc);
             assert_eq!(current_cg_context_handle(), 0x5555);
             free_obj(gc);
-        }).join().unwrap();
+        })
+        .join()
+        .unwrap();
     }
 
     #[test]

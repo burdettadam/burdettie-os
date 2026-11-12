@@ -23,7 +23,9 @@ const ATTR_RUN_SIZE: usize = 24;
 /// `+[NSAttributedString alloc]` + `-[NSAttributedString initWithString:]`
 /// Simplified: `initWithString:` as class-level convenience.
 pub extern "C" fn shim_attrstr_init_with_string(obj: u64, _cmd: u64, string: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *(obj as *mut u64) = nsobj::nsattributedstring_class_addr();
         *((obj + 8) as *mut u64) = string;
@@ -39,7 +41,9 @@ pub extern "C" fn shim_attrstr_init_with_string_attributes(
     string: u64,
     attrs: u64,
 ) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
 
     let str_len = if string != 0 {
         cfstring::shim_nsstring_length(string, 0)
@@ -56,11 +60,11 @@ pub extern "C" fn shim_attrstr_init_with_string_attributes(
         // Single run spanning the whole string
         let run_buf = crate::pal_alloc().calloc(1, ATTR_RUN_SIZE) as u64;
         unsafe {
-            *(run_buf as *mut u64) = 0;                   // location
+            *(run_buf as *mut u64) = 0; // location
             *((run_buf + 8) as *mut u64) = str_len; // length
-            *((run_buf + 16) as *mut u64) = attrs;        // dict
-            *((obj + 16) as *mut u64) = 1;                // attrs_count
-            *((obj + 24) as *mut u64) = run_buf;          // attrs_ptr
+            *((run_buf + 16) as *mut u64) = attrs; // dict
+            *((obj + 16) as *mut u64) = 1; // attrs_count
+            *((obj + 24) as *mut u64) = run_buf; // attrs_ptr
         }
     }
 
@@ -71,7 +75,9 @@ pub extern "C" fn shim_attrstr_init_with_string_attributes(
 pub extern "C" fn shim_attrstr_alloc(_cls: u64, _cmd: u64) -> u64 {
     let obj = crate::pal_alloc().calloc(1, INSTANCE_SIZE as usize) as u64;
     if obj != 0 {
-        unsafe { *(obj as *mut u64) = nsobj::nsattributedstring_class_addr(); }
+        unsafe {
+            *(obj as *mut u64) = nsobj::nsattributedstring_class_addr();
+        }
     }
     obj
 }
@@ -80,7 +86,9 @@ pub extern "C" fn shim_attrstr_alloc(_cls: u64, _cmd: u64) -> u64 {
 pub extern "C" fn shim_mutable_attrstr_alloc(_cls: u64, _cmd: u64) -> u64 {
     let obj = crate::pal_alloc().calloc(1, INSTANCE_SIZE as usize) as u64;
     if obj != 0 {
-        unsafe { *(obj as *mut u64) = nsobj::nsmutableattributedstring_class_addr(); }
+        unsafe {
+            *(obj as *mut u64) = nsobj::nsmutableattributedstring_class_addr();
+        }
     }
     obj
 }
@@ -89,15 +97,21 @@ pub extern "C" fn shim_mutable_attrstr_alloc(_cls: u64, _cmd: u64) -> u64 {
 
 /// `-[NSAttributedString string]`
 pub extern "C" fn shim_attrstr_string(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj + 8) as *const u64) }
 }
 
 /// `-[NSAttributedString length]`
 pub extern "C" fn shim_attrstr_length(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let string = unsafe { *((obj + 8) as *const u64) };
-    if string == 0 { return 0; }
+    if string == 0 {
+        return 0;
+    }
     cfstring::shim_nsstring_length(string, 0)
 }
 
@@ -111,7 +125,9 @@ pub extern "C" fn shim_attrstr_attributes_at_index(
     index: u64,
     _effective_range: u64,
 ) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let count = unsafe { *((obj + 16) as *const u64) } as usize;
     let runs_ptr = unsafe { *((obj + 24) as *const u64) };
 
@@ -134,7 +150,9 @@ pub extern "C" fn shim_attrstr_attributes_at_index(
 
 /// `-[NSAttributedString description]`
 pub extern "C" fn shim_attrstr_description(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let string = unsafe { *((obj + 8) as *const u64) };
     let s = cfstring::extract_cfstring_cstr(string).unwrap_or("");
     let count = unsafe { *((obj + 16) as *const u64) };
@@ -147,7 +165,9 @@ pub extern "C" fn shim_attrstr_description(obj: u64, _cmd: u64) -> u64 {
 
 /// `-[NSMutableAttributedString initWithString:]`
 pub extern "C" fn shim_mutable_attrstr_init_with_string(obj: u64, _cmd: u64, string: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *(obj as *mut u64) = nsobj::nsmutableattributedstring_class_addr();
         *((obj + 8) as *mut u64) = string;
@@ -166,7 +186,9 @@ pub extern "C" fn shim_mutable_attrstr_add_attribute(
     range_loc: u64,
     range_len: u64,
 ) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
 
     let keys = [attr_name];
     let vals = [value];
@@ -176,7 +198,9 @@ pub extern "C" fn shim_mutable_attrstr_add_attribute(
     let old_ptr = unsafe { *((obj + 24) as *const u64) };
     let new_count = old_count + 1;
     let new_buf = crate::pal_alloc().calloc(new_count, ATTR_RUN_SIZE) as u64;
-    if new_buf == 0 { return; }
+    if new_buf == 0 {
+        return;
+    }
 
     // Copy existing runs
     if old_count > 0 && old_ptr != 0 {
@@ -211,7 +235,9 @@ pub extern "C" fn shim_mutable_attrstr_replace_chars(
     range_len: u64,
     replacement: u64,
 ) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let old_str = unsafe { *((obj + 8) as *const u64) };
     let old_cstr = cfstring::extract_cfstring_cstr(old_str).unwrap_or("");
     let rep_cstr = if replacement != 0 {
@@ -241,7 +267,9 @@ pub extern "C" fn shim_mutable_attrstr_replace_chars(
 
     let c_str = std::ffi::CString::new(result).unwrap_or_default();
     let new_nsstr = cfstring::shim_cf_string_create_with_cstring(0, c_str.as_ptr(), 0);
-    unsafe { *((obj + 8) as *mut u64) = new_nsstr; }
+    unsafe {
+        *((obj + 8) as *mut u64) = new_nsstr;
+    }
 }
 
 #[cfg(test)]
@@ -263,7 +291,10 @@ mod tests {
     fn mutable_alloc_returns_nonzero_with_correct_isa() {
         let obj = shim_mutable_attrstr_alloc(0, 0);
         assert_ne!(obj, 0);
-        assert_eq!(read_field(obj, 0), nsobj::nsmutableattributedstring_class_addr());
+        assert_eq!(
+            read_field(obj, 0),
+            nsobj::nsmutableattributedstring_class_addr()
+        );
         free_obj(obj);
     }
 
@@ -459,8 +490,14 @@ mod tests {
         let desc = shim_attrstr_description(obj, 0);
         assert_ne!(desc, 0);
         let desc_str = read_string(desc);
-        assert!(desc_str.contains("hello"), "description should contain the string: {desc_str}");
-        assert!(desc_str.contains("0 attr runs"), "description should show attr count: {desc_str}");
+        assert!(
+            desc_str.contains("hello"),
+            "description should contain the string: {desc_str}"
+        );
+        assert!(
+            desc_str.contains("0 attr runs"),
+            "description should show attr count: {desc_str}"
+        );
         free_obj(obj);
     }
 
@@ -477,7 +514,10 @@ mod tests {
         let s = make_string("mutable");
         let ret = shim_mutable_attrstr_init_with_string(obj, 0, s);
         assert_eq!(ret, obj);
-        assert_eq!(read_field(obj, 0), nsobj::nsmutableattributedstring_class_addr());
+        assert_eq!(
+            read_field(obj, 0),
+            nsobj::nsmutableattributedstring_class_addr()
+        );
         assert_eq!(read_field(obj, 8), s);
         free_obj(obj);
     }
@@ -499,7 +539,7 @@ mod tests {
         shim_mutable_attrstr_add_attribute(obj, 0, attr_name, value, 0, 5);
         assert_eq!(read_field(obj, 16), 1); // attrs_count = 1
         assert_ne!(read_field(obj, 24), 0); // attrs_ptr set
-        // Verify the run via attributes_at_index
+                                            // Verify the run via attributes_at_index
         let dict = shim_attrstr_attributes_at_index(obj, 0, 0, 0);
         assert_ne!(dict, 0);
         free_obj(obj);

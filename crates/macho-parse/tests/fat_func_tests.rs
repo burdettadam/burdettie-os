@@ -2,7 +2,7 @@
 
 mod common;
 
-use common::{read_fixture, fixture_path};
+use common::{fixture_path, read_fixture};
 use macho_parse::parse;
 use macho_types::header::*;
 

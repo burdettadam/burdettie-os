@@ -3,7 +3,10 @@ use std::collections::HashMap;
 use objc_runtime::ClassInfo;
 
 use super::me;
-use crate::{nsattributedstring, nscharacterset, nsdistributednotificationcenter, nsnotificationcenter, nsobj, nspredicate, nsregularexpression};
+use crate::{
+    nsattributedstring, nscharacterset, nsdistributednotificationcenter, nsnotificationcenter,
+    nsobj, nspredicate, nsregularexpression,
+};
 
 /// Register `NSCharacterSet` with character membership methods.
 pub fn register_nscharacterset_class(rt: &mut objc_runtime::ObjcRuntime) {
@@ -164,15 +167,34 @@ pub fn register_nsnotification_class(rt: &mut objc_runtime::ObjcRuntime) {
         name: "NSNotification".to_string(),
         mapped_addr: class_addr,
         methods: vec![
-            me("name", nsnotificationcenter::shim_nsnotification_name as *const () as u64, "@@:"),
-            me("object", nsnotificationcenter::shim_nsnotification_object as *const () as u64, "@@:"),
-            me("userInfo", nsnotificationcenter::shim_nsnotification_userinfo as *const () as u64, "@@:"),
+            me(
+                "name",
+                nsnotificationcenter::shim_nsnotification_name as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "object",
+                nsnotificationcenter::shim_nsnotification_object as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "userInfo",
+                nsnotificationcenter::shim_nsnotification_userinfo as *const () as u64,
+                "@@:",
+            ),
         ],
         class_methods: vec![
-            me("notificationWithName:object:userInfo:",
-                nsnotificationcenter::shim_nsnotification_with_name_object_userinfo as *const () as u64, "@@:@@@"),
-            me("notificationWithName:object:",
-                nsnotificationcenter::shim_nsnotification_with_name_object as *const () as u64, "@@:@@"),
+            me(
+                "notificationWithName:object:userInfo:",
+                nsnotificationcenter::shim_nsnotification_with_name_object_userinfo as *const ()
+                    as u64,
+                "@@:@@@",
+            ),
+            me(
+                "notificationWithName:object:",
+                nsnotificationcenter::shim_nsnotification_with_name_object as *const () as u64,
+                "@@:@@",
+            ),
         ],
         ivars: vec![],
         properties: vec![],
@@ -247,20 +269,68 @@ pub fn register_nsregularexpression_class(rt: &mut objc_runtime::ObjcRuntime) {
         name: "NSRegularExpression".to_string(),
         mapped_addr: class_addr,
         methods: vec![
-            me("initWithPattern:options:error:", nsregularexpression::shim_regex_init_with_pattern as *const () as u64, "@@:@Q^@"),
-            me("pattern", nsregularexpression::shim_regex_pattern as *const () as u64, "@@:"),
-            me("options", nsregularexpression::shim_regex_options as *const () as u64, "Q@:"),
-            me("numberOfMatchesInString:options:range:", nsregularexpression::shim_regex_number_of_matches as *const () as u64, "Q@:@Q{_NSRange=QQ}"),
-            me("firstMatchInString:options:range:", nsregularexpression::shim_regex_first_match as *const () as u64, "@@:@Q{_NSRange=QQ}"),
-            me("matchesInString:options:range:", nsregularexpression::shim_regex_matches_in_string as *const () as u64, "@@:@Q{_NSRange=QQ}"),
-            me("enumerateMatchesInString:options:range:usingBlock:", nsregularexpression::shim_regex_enumerate_matches as *const () as u64, "v@:@Q{_NSRange=QQ}@?"),
-            me("stringByReplacingMatchesInString:options:range:withTemplate:", nsregularexpression::shim_regex_replace as *const () as u64, "@@:@Q{_NSRange=QQ}@"),
-            me("description", nsregularexpression::shim_regex_description as *const () as u64, "@@:"),
-            me("replacementStringForResult:inString:offset:template:", nsregularexpression::shim_nsregex_replacement_string_for_result as *const () as u64, "@@:@@q@"),
+            me(
+                "initWithPattern:options:error:",
+                nsregularexpression::shim_regex_init_with_pattern as *const () as u64,
+                "@@:@Q^@",
+            ),
+            me(
+                "pattern",
+                nsregularexpression::shim_regex_pattern as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "options",
+                nsregularexpression::shim_regex_options as *const () as u64,
+                "Q@:",
+            ),
+            me(
+                "numberOfMatchesInString:options:range:",
+                nsregularexpression::shim_regex_number_of_matches as *const () as u64,
+                "Q@:@Q{_NSRange=QQ}",
+            ),
+            me(
+                "firstMatchInString:options:range:",
+                nsregularexpression::shim_regex_first_match as *const () as u64,
+                "@@:@Q{_NSRange=QQ}",
+            ),
+            me(
+                "matchesInString:options:range:",
+                nsregularexpression::shim_regex_matches_in_string as *const () as u64,
+                "@@:@Q{_NSRange=QQ}",
+            ),
+            me(
+                "enumerateMatchesInString:options:range:usingBlock:",
+                nsregularexpression::shim_regex_enumerate_matches as *const () as u64,
+                "v@:@Q{_NSRange=QQ}@?",
+            ),
+            me(
+                "stringByReplacingMatchesInString:options:range:withTemplate:",
+                nsregularexpression::shim_regex_replace as *const () as u64,
+                "@@:@Q{_NSRange=QQ}@",
+            ),
+            me(
+                "description",
+                nsregularexpression::shim_regex_description as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "replacementStringForResult:inString:offset:template:",
+                nsregularexpression::shim_nsregex_replacement_string_for_result as *const () as u64,
+                "@@:@@q@",
+            ),
         ],
         class_methods: vec![
-            me("regularExpressionWithPattern:options:error:", nsregularexpression::shim_regex_with_pattern as *const () as u64, "@@:@Q^@"),
-            me("escapedPatternForString:", nsregularexpression::shim_nsregex_escaped_pattern_for_string as *const () as u64, "@@:@"),
+            me(
+                "regularExpressionWithPattern:options:error:",
+                nsregularexpression::shim_regex_with_pattern as *const () as u64,
+                "@@:@Q^@",
+            ),
+            me(
+                "escapedPatternForString:",
+                nsregularexpression::shim_nsregex_escaped_pattern_for_string as *const () as u64,
+                "@@:@",
+            ),
         ],
         ivars: vec![],
         properties: vec![],
@@ -285,9 +355,21 @@ pub fn register_nstextcheckingresult_class(rt: &mut objc_runtime::ObjcRuntime) {
         name: "NSTextCheckingResult".to_string(),
         mapped_addr: class_addr,
         methods: vec![
-            me("range", nsregularexpression::shim_textcheckingresult_range as *const () as u64, "{_NSRange=QQ}@:"),
-            me("rangeAtIndex:", nsregularexpression::shim_textcheckingresult_range_at_index as *const () as u64, "{_NSRange=QQ}@:Q"),
-            me("numberOfRanges", nsregularexpression::shim_textcheckingresult_number_of_ranges as *const () as u64, "Q@:"),
+            me(
+                "range",
+                nsregularexpression::shim_textcheckingresult_range as *const () as u64,
+                "{_NSRange=QQ}@:",
+            ),
+            me(
+                "rangeAtIndex:",
+                nsregularexpression::shim_textcheckingresult_range_at_index as *const () as u64,
+                "{_NSRange=QQ}@:Q",
+            ),
+            me(
+                "numberOfRanges",
+                nsregularexpression::shim_textcheckingresult_number_of_ranges as *const () as u64,
+                "Q@:",
+            ),
         ],
         class_methods: vec![],
         ivars: vec![],
@@ -313,14 +395,38 @@ pub fn register_nspredicate_class(rt: &mut objc_runtime::ObjcRuntime) {
         name: "NSPredicate".to_string(),
         mapped_addr: class_addr,
         methods: vec![
-            me("evaluateWithObject:", nspredicate::shim_predicate_evaluate as *const () as u64, "B@:@"),
-            me("predicateFormat", nspredicate::shim_predicate_format as *const () as u64, "@@:"),
-            me("description", nspredicate::shim_predicate_description as *const () as u64, "@@:"),
+            me(
+                "evaluateWithObject:",
+                nspredicate::shim_predicate_evaluate as *const () as u64,
+                "B@:@",
+            ),
+            me(
+                "predicateFormat",
+                nspredicate::shim_predicate_format as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "description",
+                nspredicate::shim_predicate_description as *const () as u64,
+                "@@:",
+            ),
         ],
         class_methods: vec![
-            me("predicateWithFormat:", nspredicate::shim_predicate_with_format as *const () as u64, "@@:@"),
-            me("predicateWithValue:", nspredicate::shim_predicate_with_value as *const () as u64, "@@:B"),
-            me("predicateWithBlock:", nspredicate::shim_predicate_with_block as *const () as u64, "@@:@?"),
+            me(
+                "predicateWithFormat:",
+                nspredicate::shim_predicate_with_format as *const () as u64,
+                "@@:@",
+            ),
+            me(
+                "predicateWithValue:",
+                nspredicate::shim_predicate_with_value as *const () as u64,
+                "@@:B",
+            ),
+            me(
+                "predicateWithBlock:",
+                nspredicate::shim_predicate_with_block as *const () as u64,
+                "@@:@?",
+            ),
         ],
         ivars: vec![],
         properties: vec![],
@@ -345,16 +451,42 @@ pub fn register_nsattributedstring_class(rt: &mut objc_runtime::ObjcRuntime) {
         name: "NSAttributedString".to_string(),
         mapped_addr: class_addr,
         methods: vec![
-            me("initWithString:", nsattributedstring::shim_attrstr_init_with_string as *const () as u64, "@@:@"),
-            me("initWithString:attributes:", nsattributedstring::shim_attrstr_init_with_string_attributes as *const () as u64, "@@:@@"),
-            me("string", nsattributedstring::shim_attrstr_string as *const () as u64, "@@:"),
-            me("length", nsattributedstring::shim_attrstr_length as *const () as u64, "Q@:"),
-            me("attributesAtIndex:effectiveRange:", nsattributedstring::shim_attrstr_attributes_at_index as *const () as u64, "@@:Q^{_NSRange=QQ}"),
-            me("description", nsattributedstring::shim_attrstr_description as *const () as u64, "@@:"),
+            me(
+                "initWithString:",
+                nsattributedstring::shim_attrstr_init_with_string as *const () as u64,
+                "@@:@",
+            ),
+            me(
+                "initWithString:attributes:",
+                nsattributedstring::shim_attrstr_init_with_string_attributes as *const () as u64,
+                "@@:@@",
+            ),
+            me(
+                "string",
+                nsattributedstring::shim_attrstr_string as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "length",
+                nsattributedstring::shim_attrstr_length as *const () as u64,
+                "Q@:",
+            ),
+            me(
+                "attributesAtIndex:effectiveRange:",
+                nsattributedstring::shim_attrstr_attributes_at_index as *const () as u64,
+                "@@:Q^{_NSRange=QQ}",
+            ),
+            me(
+                "description",
+                nsattributedstring::shim_attrstr_description as *const () as u64,
+                "@@:",
+            ),
         ],
-        class_methods: vec![
-            me("alloc", nsattributedstring::shim_attrstr_alloc as *const () as u64, "@@:"),
-        ],
+        class_methods: vec![me(
+            "alloc",
+            nsattributedstring::shim_attrstr_alloc as *const () as u64,
+            "@@:",
+        )],
         ivars: vec![],
         properties: vec![],
         protocol_names: Vec::new(),
@@ -378,16 +510,42 @@ pub fn register_nsmutableattributedstring_class(rt: &mut objc_runtime::ObjcRunti
         name: "NSMutableAttributedString".to_string(),
         mapped_addr: class_addr,
         methods: vec![
-            me("initWithString:", nsattributedstring::shim_mutable_attrstr_init_with_string as *const () as u64, "@@:@"),
-            me("string", nsattributedstring::shim_attrstr_string as *const () as u64, "@@:"),
-            me("length", nsattributedstring::shim_attrstr_length as *const () as u64, "Q@:"),
-            me("addAttribute:value:range:", nsattributedstring::shim_mutable_attrstr_add_attribute as *const () as u64, "v@:@@{_NSRange=QQ}"),
-            me("replaceCharactersInRange:withString:", nsattributedstring::shim_mutable_attrstr_replace_chars as *const () as u64, "v@:{_NSRange=QQ}@"),
-            me("description", nsattributedstring::shim_attrstr_description as *const () as u64, "@@:"),
+            me(
+                "initWithString:",
+                nsattributedstring::shim_mutable_attrstr_init_with_string as *const () as u64,
+                "@@:@",
+            ),
+            me(
+                "string",
+                nsattributedstring::shim_attrstr_string as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "length",
+                nsattributedstring::shim_attrstr_length as *const () as u64,
+                "Q@:",
+            ),
+            me(
+                "addAttribute:value:range:",
+                nsattributedstring::shim_mutable_attrstr_add_attribute as *const () as u64,
+                "v@:@@{_NSRange=QQ}",
+            ),
+            me(
+                "replaceCharactersInRange:withString:",
+                nsattributedstring::shim_mutable_attrstr_replace_chars as *const () as u64,
+                "v@:{_NSRange=QQ}@",
+            ),
+            me(
+                "description",
+                nsattributedstring::shim_attrstr_description as *const () as u64,
+                "@@:",
+            ),
         ],
-        class_methods: vec![
-            me("alloc", nsattributedstring::shim_mutable_attrstr_alloc as *const () as u64, "@@:"),
-        ],
+        class_methods: vec![me(
+            "alloc",
+            nsattributedstring::shim_mutable_attrstr_alloc as *const () as u64,
+            "@@:",
+        )],
         ivars: vec![],
         properties: vec![],
         protocol_names: Vec::new(),

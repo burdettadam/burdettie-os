@@ -29,9 +29,17 @@ pub enum GuiEvent {
     /// Mouse scroll with delta.
     ScrollWheel { dx: f64, dy: f64 },
     /// Key pressed with macOS virtual key code + characters.
-    KeyDown { key_code: u16, characters: String, modifiers: u64 },
+    KeyDown {
+        key_code: u16,
+        characters: String,
+        modifiers: u64,
+    },
     /// Key released.
-    KeyUp { key_code: u16, characters: String, modifiers: u64 },
+    KeyUp {
+        key_code: u16,
+        characters: String,
+        modifiers: u64,
+    },
     /// Modifier flags changed.
     FlagsChanged { modifiers: u64 },
     /// Window was resized to new dimensions.
@@ -98,7 +106,9 @@ pub trait GuiBridge: Send + Sync {
 
     /// Set the OS cursor to match the NSCursor type tag.
     /// The `cursor_type` values are defined in `nscursor.rs` (0=Arrow, 1=IBeam, etc.).
-    fn set_cursor(&self, cursor_type: u64) { let _ = cursor_type; }
+    fn set_cursor(&self, cursor_type: u64) {
+        let _ = cursor_type;
+    }
 
     /// Push an accessibility tree update for a guest window's content view.
     /// Called after view hierarchy changes or on redraw.
@@ -150,22 +160,48 @@ pub fn dispatch_gui_event(guest_window: u64, event: &GuiEvent) {
         GuiEvent::ScrollWheel { dx, dy } => {
             crate::nsevent::alloc_scroll_event(*dx, *dy, 0, guest_window)
         }
-        GuiEvent::KeyDown { key_code, ref characters, modifiers } => {
+        GuiEvent::KeyDown {
+            key_code,
+            ref characters,
+            modifiers,
+        } => {
             let chars = crate::cfstring::alloc_nsstring_from_cstr(
-                std::ffi::CString::new(characters.as_str()).unwrap_or_default().as_ptr(),
+                std::ffi::CString::new(characters.as_str())
+                    .unwrap_or_default()
+                    .as_ptr(),
             );
-            crate::nsevent::alloc_key_event(10, u64::from(*key_code), chars, *modifiers, guest_window) // NSEventTypeKeyDown
+            crate::nsevent::alloc_key_event(
+                10,
+                u64::from(*key_code),
+                chars,
+                *modifiers,
+                guest_window,
+            ) // NSEventTypeKeyDown
         }
-        GuiEvent::KeyUp { key_code, ref characters, modifiers } => {
+        GuiEvent::KeyUp {
+            key_code,
+            ref characters,
+            modifiers,
+        } => {
             let chars = crate::cfstring::alloc_nsstring_from_cstr(
-                std::ffi::CString::new(characters.as_str()).unwrap_or_default().as_ptr(),
+                std::ffi::CString::new(characters.as_str())
+                    .unwrap_or_default()
+                    .as_ptr(),
             );
-            crate::nsevent::alloc_key_event(11, u64::from(*key_code), chars, *modifiers, guest_window) // NSEventTypeKeyUp
+            crate::nsevent::alloc_key_event(
+                11,
+                u64::from(*key_code),
+                chars,
+                *modifiers,
+                guest_window,
+            ) // NSEventTypeKeyUp
         }
         GuiEvent::FlagsChanged { modifiers } => {
             crate::nsevent::alloc_key_event(12, 0, 0, *modifiers, guest_window) // NSEventTypeFlagsChanged
         }
-        GuiEvent::WindowResized { .. } | GuiEvent::WindowCloseRequested | GuiEvent::AppTerminate => {
+        GuiEvent::WindowResized { .. }
+        | GuiEvent::WindowCloseRequested
+        | GuiEvent::AppTerminate => {
             return; // handled separately
         }
         GuiEvent::RedrawRequested => {
@@ -190,6 +226,12 @@ pub fn dispatch_gui_event(guest_window: u64, event: &GuiEvent) {
             event_addr,
         );
     }
+}
+
+/// Run one non-blocking pass of the guest main run loop.
+pub fn pump_guest_run_loop_once() {
+    let run_loop = crate::nsrunloop::shim_nsrunloop_main_run_loop(0, 0);
+    crate::nsrunloop::shim_nsrunloop_accept_input(run_loop, 0, 0, 0);
 }
 
 #[cfg(test)]
@@ -219,7 +261,11 @@ mod tests {
 
     #[test]
     fn gui_event_debug() {
-        let evt = GuiEvent::MouseDown { x: 10.0, y: 20.0, button: 0 };
+        let evt = GuiEvent::MouseDown {
+            x: 10.0,
+            y: 20.0,
+            button: 0,
+        };
         let dbg = format!("{:?}", evt);
         assert!(dbg.contains("MouseDown"));
     }
@@ -227,9 +273,21 @@ mod tests {
     #[test]
     fn dispatch_gui_event_nil_window_no_crash() {
         // Without a bridge set, dispatch should still create NSEvents
-        dispatch_gui_event(0, &GuiEvent::MouseDown { x: 0.0, y: 0.0, button: 0 });
-        dispatch_gui_event(0, &GuiEvent::KeyDown {
-            key_code: 0, characters: "a".to_string(), modifiers: 0,
-        });
+        dispatch_gui_event(
+            0,
+            &GuiEvent::MouseDown {
+                x: 0.0,
+                y: 0.0,
+                button: 0,
+            },
+        );
+        dispatch_gui_event(
+            0,
+            &GuiEvent::KeyDown {
+                key_code: 0,
+                characters: "a".to_string(),
+                modifiers: 0,
+            },
+        );
     }
 }

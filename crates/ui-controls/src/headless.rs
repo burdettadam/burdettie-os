@@ -114,6 +114,26 @@ impl HeadlessApp {
         self.scene.on_button_click(handler);
     }
 
+    pub fn on_button_click_with_buttons(
+        &mut self,
+        handler: impl FnMut(usize, &mut Vec<Label>, &mut Vec<Button>, &mut Vec<TextField>) + 'static,
+    ) {
+        self.scene.on_button_click_with_buttons(handler);
+    }
+
+    pub fn on_key_down(
+        &mut self,
+        handler: impl FnMut(
+                window_backend::KeyCode,
+                &mut Vec<Label>,
+                &mut Vec<Button>,
+                &mut Vec<TextField>,
+            ) -> bool
+            + 'static,
+    ) {
+        self.scene.on_key_down(handler);
+    }
+
     // ── Test driver API ───────────────────────────────
 
     /// Simulate clicking button at `idx`. Fires `perform_click()` on the
@@ -128,7 +148,12 @@ impl HeadlessApp {
         );
         self.scene.buttons[idx].perform_click();
         if let Some(ref mut handler) = self.scene.on_button_click {
-            handler(idx, &mut self.scene.labels, &mut self.scene.textfields);
+            handler(
+                idx,
+                &mut self.scene.labels,
+                &mut self.scene.buttons,
+                &mut self.scene.textfields,
+            );
         }
     }
 
@@ -288,8 +313,8 @@ impl HeadlessApp {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use graphics_core::Rect;
     use crate::{Checkbox, ComboBox, ImageView, ProgressBar, RadioButton, Slider, TabView};
+    use graphics_core::Rect;
 
     #[test]
     fn add_controls() {
@@ -508,7 +533,11 @@ mod tests {
     #[test]
     fn add_radiobutton_and_count() {
         let mut app = HeadlessApp::new();
-        app.add_radiobutton(RadioButton::new(Rect::new(0.0, 0.0, 120.0, 20.0), "Choice A", 1));
+        app.add_radiobutton(RadioButton::new(
+            Rect::new(0.0, 0.0, 120.0, 20.0),
+            "Choice A",
+            1,
+        ));
         assert_eq!(app.radiobutton_count(), 1);
         assert_eq!(app.radiobuttons()[0].title(), "Choice A");
         assert_eq!(app.radiobuttons()[0].group_id(), 1);
@@ -521,7 +550,11 @@ mod tests {
         app.add_button(Button::new(Rect::new(0.0, 25.0, 80.0, 25.0), "Btn"));
         app.add_textfield(TextField::new(Rect::new(0.0, 55.0, 200.0, 24.0)));
         app.add_checkbox(Checkbox::new(Rect::new(0.0, 85.0, 120.0, 20.0), "CB"));
-        app.add_radiobutton(RadioButton::new(Rect::new(0.0, 110.0, 120.0, 20.0), "RB", 0));
+        app.add_radiobutton(RadioButton::new(
+            Rect::new(0.0, 110.0, 120.0, 20.0),
+            "RB",
+            0,
+        ));
         app.add_slider(Slider::new(Rect::new(0.0, 135.0, 200.0, 20.0), 0.0, 1.0));
         app.add_progressbar(ProgressBar::new(Rect::new(0.0, 160.0, 200.0, 8.0)));
         app.add_combobox(ComboBox::new(Rect::new(0.0, 175.0, 150.0, 25.0)));

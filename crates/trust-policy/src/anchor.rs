@@ -318,7 +318,12 @@ impl LibraryValidator for TeamIdLibraryValidator {
 mod tests {
     use super::*;
 
-    fn make_cs_info(cd_hash: &str, team_id: &str, identity: &str, present: bool) -> CodeSignatureInfo {
+    fn make_cs_info(
+        cd_hash: &str,
+        team_id: &str,
+        identity: &str,
+        present: bool,
+    ) -> CodeSignatureInfo {
         CodeSignatureInfo {
             present,
             cd_hash: cd_hash.to_string(),

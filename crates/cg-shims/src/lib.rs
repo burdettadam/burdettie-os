@@ -13,14 +13,14 @@
 // Function pointers are cast to u64 addresses for the emulated Mach-O address space.
 #![allow(dead_code, clippy::fn_to_numeric_cast)]
 
-mod context;
-mod colorspace;
-mod image;
-mod path;
 mod affine;
+pub mod bridge;
+mod colorspace;
+mod context;
 mod data_provider;
 mod gradient;
-pub mod bridge;
+mod image;
+mod path;
 
 use libsystem_shims::table::ShimTable;
 
@@ -52,12 +52,17 @@ pub fn register_cg_shims(table: &mut ShimTable) {
 /// Now receives font name so it can resolve to the correct FontFace.
 extern "C" fn ct_line_draw_impl(
     ctx: u64,
-    text_ptr: *const u8, text_len: usize,
-    font_name_ptr: *const u8, font_name_len: usize,
+    text_ptr: *const u8,
+    text_len: usize,
+    font_name_ptr: *const u8,
+    font_name_len: usize,
     font_size: f64,
 ) {
-    let text = unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(text_ptr, text_len)) };
-    let font_name = unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(font_name_ptr, font_name_len)) };
+    let text =
+        unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(text_ptr, text_len)) };
+    let font_name = unsafe {
+        std::str::from_utf8_unchecked(std::slice::from_raw_parts(font_name_ptr, font_name_len))
+    };
     bridge::with_context(ctx, |c| {
         let old_size = c.font_size;
         if font_size > 0.0 {
@@ -72,11 +77,14 @@ extern "C" fn ct_line_draw_impl(
 
 /// Font metrics callback: returns real ascent/descent/leading from ab_glyph.
 extern "C" fn ct_font_metrics_impl(
-    name_ptr: *const u8, name_len: usize, size: f64,
+    name_ptr: *const u8,
+    name_len: usize,
+    size: f64,
 ) -> libsystem_shims::darwin_stubs::core_text::FontMetricsResult {
     use libsystem_shims::darwin_stubs::core_text::FontMetricsResult;
 
-    let name = unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(name_ptr, name_len)) };
+    let name =
+        unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(name_ptr, name_len)) };
     let fm = bridge::font_manager();
     let face = fm.get(name);
     let m = face.metrics(size);
@@ -94,12 +102,16 @@ extern "C" fn ct_font_metrics_impl(
 
 /// Text measurement callback: returns the advance width of a text string.
 extern "C" fn ct_text_measure_impl(
-    text_ptr: *const u8, text_len: usize,
-    name_ptr: *const u8, name_len: usize,
+    text_ptr: *const u8,
+    text_len: usize,
+    name_ptr: *const u8,
+    name_len: usize,
     size: f64,
 ) -> f64 {
-    let text = unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(text_ptr, text_len)) };
-    let name = unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(name_ptr, name_len)) };
+    let text =
+        unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(text_ptr, text_len)) };
+    let name =
+        unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(name_ptr, name_len)) };
     let m = graphics_core::text_system::measure_shaped_text(text, size, name, None);
     m.width
 }
@@ -107,10 +119,12 @@ extern "C" fn ct_text_measure_impl(
 /// Per-character advance callback: returns the advance width for a Unicode codepoint.
 extern "C" fn ct_char_advance_impl(
     ch: u32,
-    name_ptr: *const u8, name_len: usize,
+    name_ptr: *const u8,
+    name_len: usize,
     size: f64,
 ) -> f64 {
-    let name = unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(name_ptr, name_len)) };
+    let name =
+        unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(name_ptr, name_len)) };
     let fm = bridge::font_manager();
     let face = fm.get(name);
     let c = char::from_u32(ch).unwrap_or(' ');
@@ -135,9 +149,13 @@ extern "C" fn ct_font_families_impl(out: *mut *mut u8, cap: usize) -> usize {
         let bytes = c_string.as_bytes_with_nul();
         let ptr = unsafe { libc::malloc(bytes.len()) as *mut u8 };
         if !ptr.is_null() {
-            unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len()); }
+            unsafe {
+                std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len());
+            }
         }
-        unsafe { out.add(i).write(ptr); }
+        unsafe {
+            out.add(i).write(ptr);
+        }
     }
     n
 }

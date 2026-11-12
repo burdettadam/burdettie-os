@@ -227,10 +227,7 @@ impl Renderer for SoftwareRenderer<'_> {
             let ab_font = face.inner();
             let glyph = g.glyph_id.with_scale_and_position(
                 g.size as f32,
-                ab_glyph::point(
-                    (origin.x + g.x) as f32,
-                    (origin.y + g.y) as f32,
-                ),
+                ab_glyph::point((origin.x + g.x) as f32, (origin.y + g.y) as f32),
             );
 
             if let Some(outlined) = ab_font.outline_glyph(glyph) {
@@ -239,7 +236,13 @@ impl Renderer for SoftwareRenderer<'_> {
                     self.blend_pixel(
                         bounds.min.x as i32 + rx as i32,
                         bounds.min.y as i32 + ry as i32,
-                        coverage, cr, cg, cb, ca, sw, sh,
+                        coverage,
+                        cr,
+                        cg,
+                        cb,
+                        ca,
+                        sw,
+                        sh,
                     );
                 });
             }
@@ -359,9 +362,12 @@ impl Renderer for SoftwareRenderer<'_> {
                 }
                 PathElement::CubicTo { ctrl1, ctrl2, end } => {
                     pb.cubic_to(
-                        ctrl1.x as f32, ctrl1.y as f32,
-                        ctrl2.x as f32, ctrl2.y as f32,
-                        end.x as f32, end.y as f32,
+                        ctrl1.x as f32,
+                        ctrl1.y as f32,
+                        ctrl2.x as f32,
+                        ctrl2.y as f32,
+                        end.x as f32,
+                        end.y as f32,
                     );
                 }
                 PathElement::Close => pb.close(),
@@ -387,7 +393,9 @@ impl Renderer for SoftwareRenderer<'_> {
         }
 
         // Render into a temporary pixmap, then composite onto our ARGB32 surface.
-        let Some(mut pixmap) = tiny_skia::Pixmap::new(sw, sh) else { return };
+        let Some(mut pixmap) = tiny_skia::Pixmap::new(sw, sh) else {
+            return;
+        };
 
         // Build clip mask pixmap if needed.
         let mask = clip_mask.and_then(|cr| {
@@ -397,7 +405,12 @@ impl Renderer for SoftwareRenderer<'_> {
             let mut p = tiny_skia::PathBuilder::new();
             p.push_rect(cr);
             let path = p.finish()?;
-            m.fill_path(&path, tiny_skia::FillRule::Winding, false, tiny_skia::Transform::identity());
+            m.fill_path(
+                &path,
+                tiny_skia::FillRule::Winding,
+                false,
+                tiny_skia::Transform::identity(),
+            );
             Some(m)
         });
 
@@ -415,7 +428,9 @@ impl Renderer for SoftwareRenderer<'_> {
         for i in 0..pixels.len() {
             let base = i * 4;
             let sa = ts_data[base + 3] as u32;
-            if sa == 0 { continue; }
+            if sa == 0 {
+                continue;
+            }
             let sr = ts_data[base] as u32;
             let sg = ts_data[base + 1] as u32;
             let sb = ts_data[base + 2] as u32;
@@ -434,8 +449,8 @@ impl Renderer for SoftwareRenderer<'_> {
                 let or_ch = sr + ((dr * inv_sa + 128) / 255);
                 let og = sg + ((dg * inv_sa + 128) / 255);
                 let ob = sb + ((db * inv_sa + 128) / 255);
-                pixels[i] = (oa.min(255) << 24) | (or_ch.min(255) << 16)
-                    | (og.min(255) << 8) | ob.min(255);
+                pixels[i] =
+                    (oa.min(255) << 24) | (or_ch.min(255) << 16) | (og.min(255) << 8) | ob.min(255);
             }
         }
     }
@@ -463,9 +478,12 @@ impl Renderer for SoftwareRenderer<'_> {
                 }
                 PathElement::CubicTo { ctrl1, ctrl2, end } => {
                     pb.cubic_to(
-                        ctrl1.x as f32, ctrl1.y as f32,
-                        ctrl2.x as f32, ctrl2.y as f32,
-                        end.x as f32, end.y as f32,
+                        ctrl1.x as f32,
+                        ctrl1.y as f32,
+                        ctrl2.x as f32,
+                        ctrl2.y as f32,
+                        end.x as f32,
+                        end.y as f32,
                     );
                 }
                 PathElement::Close => pb.close(),
@@ -507,7 +525,9 @@ impl Renderer for SoftwareRenderer<'_> {
             return;
         }
 
-        let Some(mut pixmap) = tiny_skia::Pixmap::new(sw, sh) else { return };
+        let Some(mut pixmap) = tiny_skia::Pixmap::new(sw, sh) else {
+            return;
+        };
 
         let mask = clip_mask.and_then(|cr| {
             let mut m = tiny_skia::Mask::new(sw, sh)?;
@@ -516,7 +536,12 @@ impl Renderer for SoftwareRenderer<'_> {
             let mut p = tiny_skia::PathBuilder::new();
             p.push_rect(cr);
             let path = p.finish()?;
-            m.fill_path(&path, tiny_skia::FillRule::Winding, false, tiny_skia::Transform::identity());
+            m.fill_path(
+                &path,
+                tiny_skia::FillRule::Winding,
+                false,
+                tiny_skia::Transform::identity(),
+            );
             Some(m)
         });
 
@@ -534,7 +559,9 @@ impl Renderer for SoftwareRenderer<'_> {
         for i in 0..pixels.len() {
             let base = i * 4;
             let sa = ts_data[base + 3] as u32;
-            if sa == 0 { continue; }
+            if sa == 0 {
+                continue;
+            }
             let sr = ts_data[base] as u32;
             let sg = ts_data[base + 1] as u32;
             let sb = ts_data[base + 2] as u32;
@@ -551,8 +578,8 @@ impl Renderer for SoftwareRenderer<'_> {
                 let or_ch = sr + ((dr * inv_sa + 128) / 255);
                 let og = sg + ((dg * inv_sa + 128) / 255);
                 let ob = sb + ((db * inv_sa + 128) / 255);
-                pixels[i] = (oa.min(255) << 24) | (or_ch.min(255) << 16)
-                    | (og.min(255) << 8) | ob.min(255);
+                pixels[i] =
+                    (oa.min(255) << 24) | (or_ch.min(255) << 16) | (og.min(255) << 8) | ob.min(255);
             }
         }
     }
@@ -582,7 +609,9 @@ impl Renderer for SoftwareRenderer<'_> {
                 let color = gradient.color_at(px as f64 + 0.5, py as f64 + 0.5);
                 let c = color.to_argb32();
                 let ca = (c >> 24) & 0xFF;
-                if ca == 0 { continue; }
+                if ca == 0 {
+                    continue;
+                }
                 let idx = (py * sw + px) as usize;
                 if ca >= 255 {
                     pixels[idx] = c;
@@ -746,7 +775,9 @@ impl Renderer for SoftwareRenderer<'_> {
         for i in 0..len {
             let sp = shadow_buf[i];
             let sa = (sp >> 24) & 0xFF;
-            if sa == 0 { continue; }
+            if sa == 0 {
+                continue;
+            }
             let inv = 255 - sa;
             let sr = (sp >> 16) & 0xFF;
             let sg = (sp >> 8) & 0xFF;
@@ -767,7 +798,9 @@ impl Renderer for SoftwareRenderer<'_> {
         for i in 0..len {
             let cp = content_mask[i];
             let ca = (cp >> 24) & 0xFF;
-            if ca == 0 { continue; }
+            if ca == 0 {
+                continue;
+            }
             if ca >= 255 {
                 pixels[i] = cp;
             } else {
@@ -895,19 +928,18 @@ impl Renderer for SoftwareRenderer<'_> {
         color: Color,
     ) {
         let c = color.to_argb32();
-        let (clip_x0, clip_y0, clip_x1, clip_y1) =
-            if let Some(clip) = self.effective_clip() {
-                (clip.x, clip.y, clip.x + clip.width, clip.y + clip.height)
-            } else if !self.clip_stack.is_empty() {
-                return;
-            } else {
-                (
-                    0.0,
-                    0.0,
-                    self.surface.width() as f64,
-                    self.surface.height() as f64,
-                )
-            };
+        let (clip_x0, clip_y0, clip_x1, clip_y1) = if let Some(clip) = self.effective_clip() {
+            (clip.x, clip.y, clip.x + clip.width, clip.y + clip.height)
+        } else if !self.clip_stack.is_empty() {
+            return;
+        } else {
+            (
+                0.0,
+                0.0,
+                self.surface.width() as f64,
+                self.surface.height() as f64,
+            )
+        };
         let x0 = ((center.x - radius).max(clip_x0)) as i32;
         let x1 = ((center.x + radius).min(clip_x1)) as i32;
         let y0 = ((center.y - radius).max(clip_y0)) as i32;
@@ -959,19 +991,18 @@ impl Renderer for SoftwareRenderer<'_> {
         let r_inner2 = r_inner * r_inner;
         let r_outer2 = r_outer * r_outer;
 
-        let (clip_x0, clip_y0, clip_x1, clip_y1) =
-            if let Some(clip) = self.effective_clip() {
-                (clip.x, clip.y, clip.x + clip.width, clip.y + clip.height)
-            } else if !self.clip_stack.is_empty() {
-                return;
-            } else {
-                (
-                    0.0,
-                    0.0,
-                    self.surface.width() as f64,
-                    self.surface.height() as f64,
-                )
-            };
+        let (clip_x0, clip_y0, clip_x1, clip_y1) = if let Some(clip) = self.effective_clip() {
+            (clip.x, clip.y, clip.x + clip.width, clip.y + clip.height)
+        } else if !self.clip_stack.is_empty() {
+            return;
+        } else {
+            (
+                0.0,
+                0.0,
+                self.surface.width() as f64,
+                self.surface.height() as f64,
+            )
+        };
         let x0 = ((center.x - r_outer).max(clip_x0)) as i32;
         let x1 = ((center.x + r_outer).min(clip_x1)) as i32;
         let y0 = ((center.y - r_outer).max(clip_y0)) as i32;

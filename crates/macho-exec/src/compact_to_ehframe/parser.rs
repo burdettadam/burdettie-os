@@ -3,10 +3,7 @@
 use std::collections::HashMap;
 
 use super::constants::*;
-use super::emitter::{
-    emit_cie_arm64, emit_fde_arm64,
-    read_u16, read_u32,
-};
+use super::emitter::{emit_cie_arm64, emit_fde_arm64, read_u16, read_u32};
 
 pub struct CompactEntry {
     /// Function start offset relative to `__TEXT` base.
@@ -83,12 +80,8 @@ pub fn parse_compact_unwind(data: &[u8]) -> Vec<CompactEntry> {
             data.len()
         };
 
-        let lsda_map = parse_lsda_descriptors(
-            data,
-            lsda_index_off,
-            next_lsda_index_off,
-            next_func_offset,
-        );
+        let lsda_map =
+            parse_lsda_descriptors(data, lsda_index_off, next_lsda_index_off, next_func_offset);
 
         if second_level_off == 0 || second_level_off + 4 > data.len() {
             continue;
@@ -191,14 +184,14 @@ where
     let resolved_entries: Vec<ResolvedEntry> = entries
         .iter()
         .filter_map(|entry| {
-        let mode = entry.encoding & UNWIND_ARM64_MODE_MASK;
-        if entry.encoding == 0 || entry.func_length == 0 {
+            let mode = entry.encoding & UNWIND_ARM64_MODE_MASK;
+            if entry.encoding == 0 || entry.func_length == 0 {
                 return None; // no unwind info for this function
-        }
-        // Skip DWARF-mode entries (would need original __eh_frame data).
-        if mode == UNWIND_ARM64_MODE_DWARF {
+            }
+            // Skip DWARF-mode entries (would need original __eh_frame data).
+            if mode == UNWIND_ARM64_MODE_DWARF {
                 return None;
-        }
+            }
 
             Some(ResolvedEntry {
                 func_addr: text_base + entry.func_offset as usize,
@@ -228,15 +221,19 @@ where
 
     // ── CIE/FDEs ───────────────────────────────────────────────────
     for entry in &resolved_entries {
-        let cie_start = *cie_offsets.entry(entry.personality_addr).or_insert_with(|| {
-            let cie_start = buf.len();
-            emit_cie_arm64(
-                &mut buf,
-                entry.personality_addr,
-                *group_uses_lsda.get(&entry.personality_addr).unwrap_or(&false),
-            );
-            cie_start
-        });
+        let cie_start = *cie_offsets
+            .entry(entry.personality_addr)
+            .or_insert_with(|| {
+                let cie_start = buf.len();
+                emit_cie_arm64(
+                    &mut buf,
+                    entry.personality_addr,
+                    *group_uses_lsda
+                        .get(&entry.personality_addr)
+                        .unwrap_or(&false),
+                );
+                cie_start
+            });
 
         emit_fde_arm64(
             &mut buf,
@@ -397,4 +394,3 @@ fn lsda_offset_for_entry(
     }
     lsda_map.get(&func_offset).copied()
 }
-

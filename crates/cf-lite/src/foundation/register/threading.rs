@@ -14,9 +14,21 @@ pub fn register_nstimer_class(rt: &mut objc_runtime::ObjcRuntime) {
         name: "NSTimer".to_string(),
         mapped_addr: class_addr,
         methods: vec![
-            me("fire", nstimer::shim_nstimer_fire as *const () as u64, "v@:"),
-            me("invalidate", nstimer::shim_nstimer_invalidate as *const () as u64, "v@:"),
-            me("isValid", nstimer::shim_nstimer_is_valid as *const () as u64, "B@:"),
+            me(
+                "fire",
+                nstimer::shim_nstimer_fire as *const () as u64,
+                "v@:",
+            ),
+            me(
+                "invalidate",
+                nstimer::shim_nstimer_invalidate as *const () as u64,
+                "v@:",
+            ),
+            me(
+                "isValid",
+                nstimer::shim_nstimer_is_valid as *const () as u64,
+                "B@:",
+            ),
             me(
                 "timeInterval",
                 nstimer::shim_nstimer_time_interval as *const () as u64,
@@ -27,10 +39,26 @@ pub fn register_nstimer_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nstimer::shim_nstimer_description as *const () as u64,
                 "@@:",
             ),
-            me("fireDate", nstimer::shim_nstimer_fire_date as *const () as u64, "@@:"),
-            me("setFireDate:", nstimer::shim_nstimer_set_fire_date as *const () as u64, "v@:@"),
-            me("tolerance", nstimer::shim_nstimer_tolerance as *const () as u64, "d@:"),
-            me("setTolerance:", nstimer::shim_nstimer_set_tolerance as *const () as u64, "v@:d"),
+            me(
+                "fireDate",
+                nstimer::shim_nstimer_fire_date as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "setFireDate:",
+                nstimer::shim_nstimer_set_fire_date as *const () as u64,
+                "v@:@",
+            ),
+            me(
+                "tolerance",
+                nstimer::shim_nstimer_tolerance as *const () as u64,
+                "d@:",
+            ),
+            me(
+                "setTolerance:",
+                nstimer::shim_nstimer_set_tolerance as *const () as u64,
+                "v@:d",
+            ),
         ],
         class_methods: vec![
             me(
@@ -77,8 +105,16 @@ pub fn register_nsthread_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nsthread::shim_nsthread_is_main_thread as *const () as u64,
                 "B@:",
             ),
-            me("name", nsthread::shim_nsthread_name as *const () as u64, "@@:"),
-            me("setName:", nsthread::shim_nsthread_set_name as *const () as u64, "v@:@"),
+            me(
+                "name",
+                nsthread::shim_nsthread_name as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "setName:",
+                nsthread::shim_nsthread_set_name as *const () as u64,
+                "v@:@",
+            ),
             me(
                 "description",
                 nsthread::shim_nsthread_description as *const () as u64,
@@ -89,7 +125,11 @@ pub fn register_nsthread_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nsthread::shim_nsthread_init_with_target as *const () as u64,
                 "@@:@:@",
             ),
-            me("start", nsthread::shim_nsthread_start as *const () as u64, "v@:"),
+            me(
+                "start",
+                nsthread::shim_nsthread_start as *const () as u64,
+                "v@:",
+            ),
             me(
                 "isExecuting",
                 nsthread::shim_nsthread_is_executing as *const () as u64,
@@ -193,14 +233,38 @@ pub fn register_nslock_class(rt: &mut objc_runtime::ObjcRuntime) {
         methods: vec![
             me("init", nslock::shim_nslock_init as *const () as u64, "@@:"),
             me("lock", nslock::shim_nslock_lock as *const () as u64, "v@:"),
-            me("unlock", nslock::shim_nslock_unlock as *const () as u64, "v@:"),
-            me("tryLock", nslock::shim_nslock_try_lock as *const () as u64, "B@:"),
+            me(
+                "unlock",
+                nslock::shim_nslock_unlock as *const () as u64,
+                "v@:",
+            ),
+            me(
+                "tryLock",
+                nslock::shim_nslock_try_lock as *const () as u64,
+                "B@:",
+            ),
             me("name", nslock::shim_nslock_name as *const () as u64, "@@:"),
-            me("setName:", nslock::shim_nslock_set_name as *const () as u64, "v@:@"),
-            me("dealloc", nslock::shim_nslock_dealloc as *const () as u64, "v@:"),
-            me("description", nslock::shim_nslock_description as *const () as u64, "@@:"),
+            me(
+                "setName:",
+                nslock::shim_nslock_set_name as *const () as u64,
+                "v@:@",
+            ),
+            me(
+                "dealloc",
+                nslock::shim_nslock_dealloc as *const () as u64,
+                "v@:",
+            ),
+            me(
+                "description",
+                nslock::shim_nslock_description as *const () as u64,
+                "@@:",
+            ),
         ],
-        class_methods: vec![me("alloc", nslock::shim_nslock_alloc as *const () as u64, "@@:")],
+        class_methods: vec![me(
+            "alloc",
+            nslock::shim_nslock_alloc as *const () as u64,
+            "@@:",
+        )],
         ivars: vec![],
         properties: vec![],
         protocol_names: Vec::new(),
@@ -224,9 +288,21 @@ pub fn register_nsrecursivelock_class(rt: &mut objc_runtime::ObjcRuntime) {
         name: "NSRecursiveLock".to_string(),
         mapped_addr: class_addr,
         methods: vec![
-            me("init", nslock::shim_nsrecursivelock_init as *const () as u64, "@@:"),
-            me("lock", nslock::shim_nsrecursivelock_lock as *const () as u64, "v@:"),
-            me("unlock", nslock::shim_nsrecursivelock_unlock as *const () as u64, "v@:"),
+            me(
+                "init",
+                nslock::shim_nsrecursivelock_init as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "lock",
+                nslock::shim_nsrecursivelock_lock as *const () as u64,
+                "v@:",
+            ),
+            me(
+                "unlock",
+                nslock::shim_nsrecursivelock_unlock as *const () as u64,
+                "v@:",
+            ),
             me(
                 "tryLock",
                 nslock::shim_nsrecursivelock_try_lock as *const () as u64,
@@ -266,11 +342,31 @@ pub fn register_nscondition_class(rt: &mut objc_runtime::ObjcRuntime) {
         name: "NSCondition".to_string(),
         mapped_addr: class_addr,
         methods: vec![
-            me("init", nslock::shim_nscondition_init as *const () as u64, "@@:"),
-            me("lock", nslock::shim_nscondition_lock as *const () as u64, "v@:"),
-            me("unlock", nslock::shim_nscondition_unlock as *const () as u64, "v@:"),
-            me("wait", nslock::shim_nscondition_wait as *const () as u64, "v@:"),
-            me("signal", nslock::shim_nscondition_signal as *const () as u64, "v@:"),
+            me(
+                "init",
+                nslock::shim_nscondition_init as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "lock",
+                nslock::shim_nscondition_lock as *const () as u64,
+                "v@:",
+            ),
+            me(
+                "unlock",
+                nslock::shim_nscondition_unlock as *const () as u64,
+                "v@:",
+            ),
+            me(
+                "wait",
+                nslock::shim_nscondition_wait as *const () as u64,
+                "v@:",
+            ),
+            me(
+                "signal",
+                nslock::shim_nscondition_signal as *const () as u64,
+                "v@:",
+            ),
             me(
                 "broadcast",
                 nslock::shim_nscondition_broadcast as *const () as u64,
@@ -281,11 +377,27 @@ pub fn register_nscondition_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nslock::shim_nscondition_wait_until_date as *const () as u64,
                 "c@:@",
             ),
-            me("name", nslock::shim_nscondition_name as *const () as u64, "@@:"),
-            me("setName:", nslock::shim_nscondition_set_name as *const () as u64, "v@:@"),
-            me("dealloc", nslock::shim_nscondition_dealloc as *const () as u64, "v@:"),
+            me(
+                "name",
+                nslock::shim_nscondition_name as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "setName:",
+                nslock::shim_nscondition_set_name as *const () as u64,
+                "v@:@",
+            ),
+            me(
+                "dealloc",
+                nslock::shim_nscondition_dealloc as *const () as u64,
+                "v@:",
+            ),
         ],
-        class_methods: vec![me("alloc", nslock::shim_nscondition_alloc as *const () as u64, "@@:")],
+        class_methods: vec![me(
+            "alloc",
+            nslock::shim_nscondition_alloc as *const () as u64,
+            "@@:",
+        )],
         ivars: vec![],
         properties: vec![],
         protocol_names: Vec::new(),
@@ -309,7 +421,11 @@ pub fn register_nsconditionlock_class(rt: &mut objc_runtime::ObjcRuntime) {
         name: "NSConditionLock".to_string(),
         mapped_addr: class_addr,
         methods: vec![
-            me("init", nslock::shim_nsconditionlock_init as *const () as u64, "@@:"),
+            me(
+                "init",
+                nslock::shim_nsconditionlock_init as *const () as u64,
+                "@@:",
+            ),
             me(
                 "initWithCondition:",
                 nslock::shim_nsconditionlock_init_with_condition as *const () as u64,
@@ -320,8 +436,16 @@ pub fn register_nsconditionlock_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nslock::shim_nsconditionlock_condition as *const () as u64,
                 "q@:",
             ),
-            me("lock", nslock::shim_nsconditionlock_lock as *const () as u64, "v@:"),
-            me("unlock", nslock::shim_nsconditionlock_unlock as *const () as u64, "v@:"),
+            me(
+                "lock",
+                nslock::shim_nsconditionlock_lock as *const () as u64,
+                "v@:",
+            ),
+            me(
+                "unlock",
+                nslock::shim_nsconditionlock_unlock as *const () as u64,
+                "v@:",
+            ),
             me(
                 "lockWhenCondition:",
                 nslock::shim_nsconditionlock_lock_when_condition as *const () as u64,
@@ -337,7 +461,11 @@ pub fn register_nsconditionlock_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nslock::shim_nsconditionlock_try_lock as *const () as u64,
                 "B@:",
             ),
-            me("name", nslock::shim_nsconditionlock_name as *const () as u64, "@@:"),
+            me(
+                "name",
+                nslock::shim_nsconditionlock_name as *const () as u64,
+                "@@:",
+            ),
             me(
                 "setName:",
                 nslock::shim_nsconditionlock_set_name as *const () as u64,
@@ -377,16 +505,42 @@ pub fn register_nsoperation_class(rt: &mut objc_runtime::ObjcRuntime) {
         name: "NSOperation".to_string(),
         mapped_addr: class_addr,
         methods: vec![
-            me("init", nsoperation::shim_nsoperation_init as *const () as u64, "@@:"),
-            me("start", nsoperation::shim_nsoperation_start as *const () as u64, "v@:"),
-            me("main", nsoperation::shim_nsoperation_main as *const () as u64, "v@:"),
-            me("cancel", nsoperation::shim_nsoperation_cancel as *const () as u64, "v@:"),
-            me("isCancelled", nsoperation::shim_nsoperation_is_cancelled as *const () as u64, "B@:"),
-            me("isFinished", nsoperation::shim_nsoperation_is_finished as *const () as u64, "B@:"),
+            me(
+                "init",
+                nsoperation::shim_nsoperation_init as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "start",
+                nsoperation::shim_nsoperation_start as *const () as u64,
+                "v@:",
+            ),
+            me(
+                "main",
+                nsoperation::shim_nsoperation_main as *const () as u64,
+                "v@:",
+            ),
+            me(
+                "cancel",
+                nsoperation::shim_nsoperation_cancel as *const () as u64,
+                "v@:",
+            ),
+            me(
+                "isCancelled",
+                nsoperation::shim_nsoperation_is_cancelled as *const () as u64,
+                "B@:",
+            ),
+            me(
+                "isFinished",
+                nsoperation::shim_nsoperation_is_finished as *const () as u64,
+                "B@:",
+            ),
         ],
-        class_methods: vec![
-            me("alloc", nsoperation::shim_nsoperation_alloc as *const () as u64, "@@:"),
-        ],
+        class_methods: vec![me(
+            "alloc",
+            nsoperation::shim_nsoperation_alloc as *const () as u64,
+            "@@:",
+        )],
         ivars: vec![],
         properties: vec![],
         protocol_names: Vec::new(),
@@ -410,14 +564,32 @@ pub fn register_nsblockoperation_class(rt: &mut objc_runtime::ObjcRuntime) {
         name: "NSBlockOperation".to_string(),
         mapped_addr: class_addr,
         methods: vec![
-            me("start", nsoperation::shim_block_op_start as *const () as u64, "v@:"),
-            me("cancel", nsoperation::shim_nsoperation_cancel as *const () as u64, "v@:"),
-            me("isCancelled", nsoperation::shim_nsoperation_is_cancelled as *const () as u64, "B@:"),
-            me("isFinished", nsoperation::shim_nsoperation_is_finished as *const () as u64, "B@:"),
+            me(
+                "start",
+                nsoperation::shim_block_op_start as *const () as u64,
+                "v@:",
+            ),
+            me(
+                "cancel",
+                nsoperation::shim_nsoperation_cancel as *const () as u64,
+                "v@:",
+            ),
+            me(
+                "isCancelled",
+                nsoperation::shim_nsoperation_is_cancelled as *const () as u64,
+                "B@:",
+            ),
+            me(
+                "isFinished",
+                nsoperation::shim_nsoperation_is_finished as *const () as u64,
+                "B@:",
+            ),
         ],
-        class_methods: vec![
-            me("blockOperationWithBlock:", nsoperation::shim_block_op_with_block as *const () as u64, "@@:@?"),
-        ],
+        class_methods: vec![me(
+            "blockOperationWithBlock:",
+            nsoperation::shim_block_op_with_block as *const () as u64,
+            "@@:@?",
+        )],
         ivars: vec![],
         properties: vec![],
         protocol_names: Vec::new(),
@@ -441,22 +613,72 @@ pub fn register_nsoperationqueue_class(rt: &mut objc_runtime::ObjcRuntime) {
         name: "NSOperationQueue".to_string(),
         mapped_addr: class_addr,
         methods: vec![
-            me("init", nsoperation::shim_queue_init as *const () as u64, "@@:"),
-            me("addOperation:", nsoperation::shim_queue_add_operation as *const () as u64, "v@:@"),
-            me("addOperationWithBlock:", nsoperation::shim_queue_add_block as *const () as u64, "v@:@?"),
-            me("setSuspended:", nsoperation::shim_queue_set_suspended as *const () as u64, "v@:B"),
-            me("isSuspended", nsoperation::shim_queue_is_suspended as *const () as u64, "B@:"),
-            me("setName:", nsoperation::shim_queue_set_name as *const () as u64, "v@:@"),
-            me("name", nsoperation::shim_queue_name as *const () as u64, "@@:"),
-            me("setMaxConcurrentOperationCount:", nsoperation::shim_queue_set_max_concurrent as *const () as u64, "v@:q"),
-            me("maxConcurrentOperationCount", nsoperation::shim_queue_max_concurrent as *const () as u64, "q@:"),
-            me("description", nsoperation::shim_queue_description as *const () as u64, "@@:"),
-            me("qualityOfService", nsoperation::shim_queue_quality_of_service as *const () as u64, "q@:"),
-            me("setQualityOfService:", nsoperation::shim_queue_set_quality_of_service as *const () as u64, "v@:q"),
+            me(
+                "init",
+                nsoperation::shim_queue_init as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "addOperation:",
+                nsoperation::shim_queue_add_operation as *const () as u64,
+                "v@:@",
+            ),
+            me(
+                "addOperationWithBlock:",
+                nsoperation::shim_queue_add_block as *const () as u64,
+                "v@:@?",
+            ),
+            me(
+                "setSuspended:",
+                nsoperation::shim_queue_set_suspended as *const () as u64,
+                "v@:B",
+            ),
+            me(
+                "isSuspended",
+                nsoperation::shim_queue_is_suspended as *const () as u64,
+                "B@:",
+            ),
+            me(
+                "setName:",
+                nsoperation::shim_queue_set_name as *const () as u64,
+                "v@:@",
+            ),
+            me(
+                "name",
+                nsoperation::shim_queue_name as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "setMaxConcurrentOperationCount:",
+                nsoperation::shim_queue_set_max_concurrent as *const () as u64,
+                "v@:q",
+            ),
+            me(
+                "maxConcurrentOperationCount",
+                nsoperation::shim_queue_max_concurrent as *const () as u64,
+                "q@:",
+            ),
+            me(
+                "description",
+                nsoperation::shim_queue_description as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "qualityOfService",
+                nsoperation::shim_queue_quality_of_service as *const () as u64,
+                "q@:",
+            ),
+            me(
+                "setQualityOfService:",
+                nsoperation::shim_queue_set_quality_of_service as *const () as u64,
+                "v@:q",
+            ),
         ],
-        class_methods: vec![
-            me("alloc", nsoperation::shim_queue_alloc as *const () as u64, "@@:"),
-        ],
+        class_methods: vec![me(
+            "alloc",
+            nsoperation::shim_queue_alloc as *const () as u64,
+            "@@:",
+        )],
         ivars: vec![],
         properties: vec![],
         protocol_names: Vec::new(),

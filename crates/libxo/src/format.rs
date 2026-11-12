@@ -448,32 +448,41 @@ mod tests {
     fn wc_format_string() {
         // Simplified wc output: " {:lines/%7llu} {:words/%7llu}\n"
         let segs = parse_xo_format(" {:lines/%7llu} {:words/%7llu}\n");
-        assert_eq!(segs, vec![
-            Segment::Literal(" ".into()),
-            Segment::PrintfField("%7llu".into()),
-            Segment::Literal(" ".into()),
-            Segment::PrintfField("%7llu".into()),
-            Segment::Literal("\n".into()),
-        ]);
+        assert_eq!(
+            segs,
+            vec![
+                Segment::Literal(" ".into()),
+                Segment::PrintfField("%7llu".into()),
+                Segment::Literal(" ".into()),
+                Segment::PrintfField("%7llu".into()),
+                Segment::Literal("\n".into()),
+            ]
+        );
     }
 
     #[test]
     fn wc_star_width_format() {
         // Real wc uses: "{:lines/%*llu}" where %* consumes width + value
         let segs = parse_xo_format(" {:lines/%*llu}");
-        assert_eq!(segs, vec![
-            Segment::Literal(" ".into()),
-            Segment::PrintfField("%*llu".into()),
-        ]);
+        assert_eq!(
+            segs,
+            vec![
+                Segment::Literal(" ".into()),
+                Segment::PrintfField("%*llu".into()),
+            ]
+        );
     }
 
     #[test]
     fn label_with_colon_and_whitespace() {
         let segs = parse_xo_format("{Lwc:In stock}{:qty/%u}");
-        assert_eq!(segs, vec![
-            Segment::Literal("In stock: ".into()),
-            Segment::PrintfField("%u".into()),
-        ]);
+        assert_eq!(
+            segs,
+            vec![
+                Segment::Literal("In stock: ".into()),
+                Segment::PrintfField("%u".into()),
+            ]
+        );
     }
 
     #[test]
@@ -497,38 +506,50 @@ mod tests {
     #[test]
     fn units_with_whitespace_before() {
         let segs = parse_xo_format("{:distance/%u}{Uw:miles}");
-        assert_eq!(segs, vec![
-            Segment::PrintfField("%u".into()),
-            Segment::Literal(" miles".into()),
-        ]);
+        assert_eq!(
+            segs,
+            vec![
+                Segment::PrintfField("%u".into()),
+                Segment::Literal(" miles".into()),
+            ]
+        );
     }
 
     #[test]
     fn note_role() {
         let segs = parse_xo_format("{:cost/%u} {N:per year}");
-        assert_eq!(segs, vec![
-            Segment::PrintfField("%u".into()),
-            Segment::Literal(" ".into()),
-            Segment::Literal("per year".into()),
-        ]);
+        assert_eq!(
+            segs,
+            vec![
+                Segment::PrintfField("%u".into()),
+                Segment::Literal(" ".into()),
+                Segment::Literal("per year".into()),
+            ]
+        );
     }
 
     #[test]
     fn title_static() {
         let segs = parse_xo_format("{T:Interface Statistics}\n");
-        assert_eq!(segs, vec![
-            Segment::Literal("Interface Statistics".into()),
-            Segment::Literal("\n".into()),
-        ]);
+        assert_eq!(
+            segs,
+            vec![
+                Segment::Literal("Interface Statistics".into()),
+                Segment::Literal("\n".into()),
+            ]
+        );
     }
 
     #[test]
     fn title_dynamic() {
         let segs = parse_xo_format("{T:/%20.20s}{T:/%6.6s}");
-        assert_eq!(segs, vec![
-            Segment::PrintfField("%20.20s".into()),
-            Segment::PrintfField("%6.6s".into()),
-        ]);
+        assert_eq!(
+            segs,
+            vec![
+                Segment::PrintfField("%20.20s".into()),
+                Segment::PrintfField("%6.6s".into()),
+            ]
+        );
     }
 
     #[test]
@@ -536,10 +557,13 @@ mod tests {
         // Title with both content and format: content is used as the value,
         // no vararg consumed.
         let segs = parse_xo_format("{T:Name/%20s}{T:Count/%6s}");
-        assert_eq!(segs, vec![
-            Segment::Literal("Name".into()),
-            Segment::Literal("Count".into()),
-        ]);
+        assert_eq!(
+            segs,
+            vec![
+                Segment::Literal("Name".into()),
+                Segment::Literal("Count".into()),
+            ]
+        );
     }
 
     #[test]
@@ -589,15 +613,18 @@ mod tests {
     fn complex_combined() {
         let input = "{L:Free}{D::}{P:   }{:free/%u} {U:Blocks}\n";
         let segs = parse_xo_format(input);
-        assert_eq!(segs, vec![
-            Segment::Literal("Free".into()),
-            Segment::Literal(":".into()),
-            Segment::Literal("   ".into()),
-            Segment::PrintfField("%u".into()),
-            Segment::Literal(" ".into()),
-            Segment::Literal("Blocks".into()),
-            Segment::Literal("\n".into()),
-        ]);
+        assert_eq!(
+            segs,
+            vec![
+                Segment::Literal("Free".into()),
+                Segment::Literal(":".into()),
+                Segment::Literal("   ".into()),
+                Segment::PrintfField("%u".into()),
+                Segment::Literal(" ".into()),
+                Segment::Literal("Blocks".into()),
+                Segment::Literal("\n".into()),
+            ]
+        );
     }
 
     #[test]
@@ -642,7 +669,8 @@ mod tests {
 
     #[test]
     fn rewrite_wc_pattern() {
-        let result = rewrite_to_printf(" {:lines/%*llu} {:words/%*llu} {:chars/%*llu} {:filename/%s}\n");
+        let result =
+            rewrite_to_printf(" {:lines/%*llu} {:words/%*llu} {:chars/%*llu} {:filename/%s}\n");
         assert_eq!(result, " %*llu %*llu %*llu %s\n");
     }
 

@@ -1,9 +1,9 @@
 //! Protocol introspection shims.
 
-mod helpers;
-mod query;
 mod creation;
+mod helpers;
 mod introspection;
+mod query;
 
 pub use creation::*;
 pub use introspection::*;

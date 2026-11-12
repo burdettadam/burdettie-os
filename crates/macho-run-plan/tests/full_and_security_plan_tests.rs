@@ -178,8 +178,7 @@ fn basic_plan_has_none_for_new_fields() {
         return;
     };
     let parsed = parse(&data).unwrap();
-    let plan =
-        ExecutionPlan::from_parsed(&parsed, common::fixtures_dir().join("simple_cli/app"));
+    let plan = ExecutionPlan::from_parsed(&parsed, common::fixtures_dir().join("simple_cli/app"));
     assert!(
         plan.symbol_bindings.is_none(),
         "basic plan should not have bindings"

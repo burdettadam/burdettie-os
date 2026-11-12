@@ -130,16 +130,24 @@ pub extern "C" fn shim_nsslider_set_orientation(obj: u64, _cmd: u64, orientation
 
 /// `-[NSSlider drawRect:]` — renders slider track and knob.
 pub extern "C" fn shim_nsslider_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let cg_ctx = crate::nsgraphicscontext::current_cg_context_handle();
-    if cg_ctx == 0 { return; }
+    if cg_ctx == 0 {
+        return;
+    }
 
     let min = read_f64(obj, MIN_VALUE_OFF);
     let max = read_f64(obj, MAX_VALUE_OFF);
     let val = read_f64(obj, CURRENT_VALUE_OFF);
     let flags = read_u64(obj, FLAGS_OFF);
     let is_vertical = flags & FLAG_VERTICAL != 0;
-    let range = if (max - min).abs() < f64::EPSILON { 1.0 } else { max - min };
+    let range = if (max - min).abs() < f64::EPSILON {
+        1.0
+    } else {
+        max - min
+    };
     let ratio = ((val - min) / range).clamp(0.0, 1.0);
 
     cg_shims::bridge::with_context(cg_ctx, |c| {
@@ -185,7 +193,9 @@ pub extern "C" fn shim_nsslider_set_action(obj: u64, _cmd: u64, sel: u64) {
 
 /// `-[NSSlider mouseDown:]` — track mouse position, update value, fire action.
 pub extern "C" fn shim_nsslider_mouse_down(obj: u64, _cmd: u64, event: u64) {
-    if obj == 0 || event == 0 { return; }
+    if obj == 0 || event == 0 {
+        return;
+    }
 
     let (loc_x, loc_y) = crate::nsevent::event_location_in_window(event);
     let frame = crate::nsview::view_frame(obj);
@@ -216,8 +226,10 @@ pub extern "C" fn shim_nsslider_mouse_down(obj: u64, _cmd: u64, event: u64) {
 fn fire_action(obj: u64) {
     let action = read_u64(obj, ACTION_OFF);
     let target = read_u64(obj, TARGET_OFF);
-    if action == 0 { return; }
-    let nsapp = crate::nsapplication::nsapp_global_addr();
+    if action == 0 {
+        return;
+    }
+    let nsapp = crate::nsapplication::shim_nsapplication_shared_application(0, 0);
     crate::nsapplication::shim_nsapplication_send_action_to_from(nsapp, 0, action, target, obj);
 }
 
@@ -294,7 +306,10 @@ mod tests {
         assert_eq!(shim_nsslider_is_continuous(slider, 0), 0);
         shim_nsslider_set_continuous(slider, 0, 1);
         assert_eq!(shim_nsslider_is_continuous(slider, 0), 1);
-        assert_eq!(read_field(slider, FLAGS_OFF) & FLAG_CONTINUOUS, FLAG_CONTINUOUS);
+        assert_eq!(
+            read_field(slider, FLAGS_OFF) & FLAG_CONTINUOUS,
+            FLAG_CONTINUOUS
+        );
         shim_nsslider_set_continuous(slider, 0, 0);
         assert_eq!(shim_nsslider_is_continuous(slider, 0), 0);
         assert_eq!(read_field(slider, FLAGS_OFF) & FLAG_CONTINUOUS, 0);

@@ -85,7 +85,8 @@ fn preferences_defaults_for_app(app: u64) -> u64 {
         return 0;
     }
 
-    let suite_defaults = crate::nsuserdefaults::shim_nsuserdefaults_init_with_suite_name(defaults, 0, app);
+    let suite_defaults =
+        crate::nsuserdefaults::shim_nsuserdefaults_init_with_suite_name(defaults, 0, app);
     if suite_defaults != 0 {
         suite_defaults
     } else {
@@ -331,7 +332,7 @@ pub extern "C" fn shim_cf_string_convert_encoding_to_nsstring_encoding(enc: u32)
     //   kCFStringEncodingASCII        = 0x0600 → NSASCIIStringEncoding       = 1
     match enc {
         0x0800_0100 => 4,           // UTF-8
-        0 => 30,                     // MacRoman
+        0 => 30,                    // MacRoman
         0x0500 => 12,               // WindowsLatin1/CP1252
         0x0201 => 5,                // ISOLatin1
         0x0100 => 10,               // UTF-16
@@ -340,7 +341,7 @@ pub extern "C" fn shim_cf_string_convert_encoding_to_nsstring_encoding(enc: u32)
         0x0600 => 1,                // ASCII
         0x0C00_0100 => 0x8C00_0100, // UTF-32
         0xFFFF_FFFF => 0,           // kCFStringEncodingInvalidId → 0 (not found)
-        other => other as u64,       // pass-through for unknown
+        other => other as u64,      // pass-through for unknown
     }
 }
 
@@ -385,9 +386,7 @@ static NSARRAY0_DATA: std::sync::OnceLock<[u64; 4]> = std::sync::OnceLock::new()
 
 /// Returns the address of the `___NSArray0__struct` singleton.
 pub fn nsarray0_struct_addr() -> u64 {
-    let data = NSARRAY0_DATA.get_or_init(|| {
-        [nsobj::nsarray_class_addr(), 0, 0, 0]
-    });
+    let data = NSARRAY0_DATA.get_or_init(|| [nsobj::nsarray_class_addr(), 0, 0, 0]);
     data.as_ptr() as u64
 }
 
@@ -399,7 +398,10 @@ mod tests {
     #[test]
     fn type_id_constants_distinct() {
         assert_ne!(shim_cf_string_get_type_id(), shim_cf_array_get_type_id());
-        assert_ne!(shim_cf_array_get_type_id(), shim_cf_dictionary_get_type_id());
+        assert_ne!(
+            shim_cf_array_get_type_id(),
+            shim_cf_dictionary_get_type_id()
+        );
         assert_ne!(shim_cf_data_get_type_id(), shim_cf_null_get_type_id());
         assert_ne!(shim_cf_boolean_get_type_id(), shim_cf_number_get_type_id());
     }
@@ -494,7 +496,9 @@ mod tests {
         let suite_name = make_string("com.example.testsuite");
         let defaults = alloc_user_defaults();
         assert_ne!(defaults, 0);
-        let defaults = crate::nsuserdefaults::shim_nsuserdefaults_init_with_suite_name(defaults, 0, suite_name);
+        let defaults = crate::nsuserdefaults::shim_nsuserdefaults_init_with_suite_name(
+            defaults, 0, suite_name,
+        );
         assert_ne!(defaults, 0);
 
         let key = make_string("Greeting");
@@ -525,43 +529,64 @@ mod tests {
 
     #[test]
     fn convert_encoding_utf8() {
-        assert_eq!(shim_cf_string_convert_encoding_to_nsstring_encoding(0x0800_0100), 4);
+        assert_eq!(
+            shim_cf_string_convert_encoding_to_nsstring_encoding(0x0800_0100),
+            4
+        );
     }
 
     #[test]
     fn convert_encoding_ascii() {
-        assert_eq!(shim_cf_string_convert_encoding_to_nsstring_encoding(0x0600), 1);
+        assert_eq!(
+            shim_cf_string_convert_encoding_to_nsstring_encoding(0x0600),
+            1
+        );
     }
 
     #[test]
     fn convert_encoding_invalid() {
-        assert_eq!(shim_cf_string_convert_encoding_to_nsstring_encoding(0xFFFF_FFFF), 0);
+        assert_eq!(
+            shim_cf_string_convert_encoding_to_nsstring_encoding(0xFFFF_FFFF),
+            0
+        );
     }
 
     #[test]
     fn iana_charset_utf8() {
         let name = make_string("utf-8");
-        assert_eq!(shim_cf_string_convert_iana_charset_name_to_encoding(name), 0x0800_0100);
+        assert_eq!(
+            shim_cf_string_convert_iana_charset_name_to_encoding(name),
+            0x0800_0100
+        );
         free_obj(name);
     }
 
     #[test]
     fn iana_charset_ascii() {
         let name = make_string("us-ascii");
-        assert_eq!(shim_cf_string_convert_iana_charset_name_to_encoding(name), 0x0600);
+        assert_eq!(
+            shim_cf_string_convert_iana_charset_name_to_encoding(name),
+            0x0600
+        );
         free_obj(name);
     }
 
     #[test]
     fn iana_charset_unknown() {
         let name = make_string("totally-unknown");
-        assert_eq!(shim_cf_string_convert_iana_charset_name_to_encoding(name), 0xFFFF_FFFF);
+        assert_eq!(
+            shim_cf_string_convert_iana_charset_name_to_encoding(name),
+            0xFFFF_FFFF
+        );
         free_obj(name);
     }
 
     #[test]
     fn iana_charset_nil() {
-        assert_eq!(shim_cf_string_convert_iana_charset_name_to_encoding(0), 0xFFFF_FFFF);
+        assert_eq!(
+            shim_cf_string_convert_iana_charset_name_to_encoding(0),
+            0xFFFF_FFFF
+        );
     }
 
     #[test]
@@ -575,4 +600,3 @@ mod tests {
         assert_eq!(count, 0);
     }
 }
-

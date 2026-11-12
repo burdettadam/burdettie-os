@@ -16,7 +16,9 @@ const SIZE_OFF: usize = 16;
 
 fn alloc_font(name: &str, size: f64) -> u64 {
     let obj = crate::pal_alloc().calloc(1, 24) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let cstr = std::ffi::CString::new(name).unwrap_or_default();
     let nsstr = crate::cfstring::alloc_nsstring_from_cstr(cstr.as_ptr());
     unsafe {
@@ -34,7 +36,9 @@ pub fn alloc_font_pub(name: &str, size: f64) -> u64 {
 
 /// Read the pointSize from a font object (or default to 13.0 for nil).
 fn font_size(obj: u64) -> f64 {
-    if obj == 0 { return 0.0; }
+    if obj == 0 {
+        return 0.0;
+    }
     unsafe { *((obj as usize + SIZE_OFF) as *const f64) }
 }
 
@@ -60,13 +64,17 @@ pub extern "C" fn shim_nsfont_system_font_size(_cls: u64, _cmd: u64) -> f64 {
 
 /// `-[NSFont fontName]`
 pub extern "C" fn shim_nsfont_font_name(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + NAME_OFF) as *const u64) }
 }
 
 /// `-[NSFont pointSize]`
 pub extern "C" fn shim_nsfont_point_size(obj: u64, _cmd: u64) -> f64 {
-    if obj == 0 { return 0.0; }
+    if obj == 0 {
+        return 0.0;
+    }
     unsafe { *((obj as usize + SIZE_OFF) as *const f64) }
 }
 
@@ -77,7 +85,10 @@ pub extern "C" fn shim_nsfont_family_name(obj: u64, cmd: u64) -> u64 {
 
 /// `+[NSFont fontWithName:size:]`
 pub extern "C" fn shim_nsfont_font_with_name_size(
-    _cls: u64, _cmd: u64, name: u64, size: f64,
+    _cls: u64,
+    _cmd: u64,
+    name: u64,
+    size: f64,
 ) -> u64 {
     let s = crate::cfstring::extract_cfstring_cstr(name);
     alloc_font(s.unwrap_or(".AppleSystemUIFont"), size)
@@ -85,21 +96,30 @@ pub extern "C" fn shim_nsfont_font_with_name_size(
 
 /// `+[NSFont monospacedDigitSystemFontOfSize:weight:]`
 pub extern "C" fn shim_nsfont_monospaced_digit_system_font(
-    _cls: u64, _cmd: u64, size: f64, _weight: f64,
+    _cls: u64,
+    _cmd: u64,
+    size: f64,
+    _weight: f64,
 ) -> u64 {
     alloc_font(".AppleSystemUIFontMonospacedDigit", size)
 }
 
 /// `+[NSFont monospacedSystemFontOfSize:weight:]`
 pub extern "C" fn shim_nsfont_monospaced_system_font(
-    _cls: u64, _cmd: u64, size: f64, _weight: f64,
+    _cls: u64,
+    _cmd: u64,
+    size: f64,
+    _weight: f64,
 ) -> u64 {
     alloc_font("Menlo-Regular", size)
 }
 
 /// `+[NSFont systemFontOfSize:weight:]`
 pub extern "C" fn shim_nsfont_system_font_of_size_weight(
-    _cls: u64, _cmd: u64, size: f64, _weight: f64,
+    _cls: u64,
+    _cmd: u64,
+    size: f64,
+    _weight: f64,
 ) -> u64 {
     alloc_font(".AppleSystemUIFont", size)
 }
@@ -146,7 +166,9 @@ pub extern "C" fn shim_nsfont_underline_thickness(obj: u64, _cmd: u64) -> f64 {
 
 /// `-[NSFont isFixedPitch]`
 pub extern "C" fn shim_nsfont_is_fixed_pitch(obj: u64, _cmd: u64) -> u8 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let name = unsafe { *((obj as usize + NAME_OFF) as *const u64) };
     let s = crate::cfstring::extract_cfstring_cstr(name);
     u8::from(s.is_some_and(|n| n.contains("Mono") || n.contains("Courier") || n.contains("Menlo")))

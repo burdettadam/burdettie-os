@@ -357,10 +357,7 @@ mod tests {
 
     #[test]
     fn load_command_type_main() {
-        assert_eq!(
-            LoadCommandType::from(0x8000_0028),
-            LoadCommandType::Main
-        );
+        assert_eq!(LoadCommandType::from(0x8000_0028), LoadCommandType::Main);
     }
 
     #[test]

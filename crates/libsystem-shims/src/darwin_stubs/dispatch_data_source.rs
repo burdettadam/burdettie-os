@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
+use super::blocks_runtime::{invoke_block0, OwnedBlock};
 use crate::table::ShimTable;
 
 // ── Public helpers for dispatch_io ─────────────────────────────
@@ -70,8 +71,8 @@ struct Source {
     _handle: u64,
     _mask: u64,
     _queue: u64,
-    event_handler: Mutex<Option<u64>>,
-    cancel_handler: Mutex<Option<u64>>,
+    event_handler: Mutex<Option<OwnedBlock>>,
+    cancel_handler: Mutex<Option<OwnedBlock>>,
     timer: Mutex<Option<TimerConfig>>,
     cancelled: AtomicBool,
     suspended: AtomicBool,
@@ -107,17 +108,6 @@ static SOURCE_TYPE_DATA_REPLACE: u8 = 12;
 // ---------------------------------------------------------------------------
 
 /// Invoke a GCD block.  Block layout: `isa(8) + flags(4) + reserved(4) + invoke(8)`.
-unsafe fn invoke_block(block: u64) {
-    if block == 0 {
-        return;
-    }
-    let block_ptr = block as *const u8;
-    let invoke_ptr = unsafe { *(block_ptr.add(16) as *const usize) };
-    let invoke: extern "C" fn(*const u8) = unsafe { std::mem::transmute(invoke_ptr) };
-    invoke(block_ptr);
-}
-
-// ---------------------------------------------------------------------------
 // dispatch_data shims
 // ---------------------------------------------------------------------------
 
@@ -151,11 +141,7 @@ extern "C" fn shim_dispatch_data_get_size(data: u64) -> usize {
     }
 }
 
-extern "C" fn shim_dispatch_data_create_map(
-    data: u64,
-    buffer_out: u64,
-    size_out: u64,
-) -> u64 {
+extern "C" fn shim_dispatch_data_create_map(data: u64, buffer_out: u64, size_out: u64) -> u64 {
     let reg = data_registry().lock().unwrap();
     let arc = match reg.get(&data) {
         Some(v) => Arc::clone(v),
@@ -182,10 +168,7 @@ extern "C" fn shim_dispatch_data_create_map(
 
     // Register a new handle sharing the same data.
     let new_handle = alloc_handle();
-    data_registry()
-        .lock()
-        .unwrap()
-        .insert(new_handle, arc);
+    data_registry().lock().unwrap().insert(new_handle, arc);
     new_handle
 }
 
@@ -214,8 +197,14 @@ extern "C" fn shim_dispatch_data_apply(data: u64, applier: u64) -> u8 {
 
 extern "C" fn shim_dispatch_data_create_concat(data1: u64, data2: u64) -> u64 {
     let reg = data_registry().lock().unwrap();
-    let v1 = reg.get(&data1).map(|v| v.as_ref().clone()).unwrap_or_default();
-    let v2 = reg.get(&data2).map(|v| v.as_ref().clone()).unwrap_or_default();
+    let v1 = reg
+        .get(&data1)
+        .map(|v| v.as_ref().clone())
+        .unwrap_or_default();
+    let v2 = reg
+        .get(&data2)
+        .map(|v| v.as_ref().clone())
+        .unwrap_or_default();
     drop(reg);
 
     let mut combined = v1;
@@ -229,11 +218,7 @@ extern "C" fn shim_dispatch_data_create_concat(data1: u64, data2: u64) -> u64 {
     handle
 }
 
-extern "C" fn shim_dispatch_data_create_subrange(
-    data: u64,
-    offset: usize,
-    length: usize,
-) -> u64 {
+extern "C" fn shim_dispatch_data_create_subrange(data: u64, offset: usize, length: usize) -> u64 {
     let reg = data_registry().lock().unwrap();
     let sub = match reg.get(&data) {
         Some(v) => {
@@ -284,23 +269,18 @@ extern "C" fn shim_dispatch_source_create(
 extern "C" fn shim_dispatch_source_set_event_handler(source: u64, handler: u64) {
     let reg = source_registry().lock().unwrap();
     if let Some(src) = reg.get(&source) {
-        *src.event_handler.lock().unwrap() = if handler != 0 { Some(handler) } else { None };
+        *src.event_handler.lock().unwrap() = OwnedBlock::from_block(handler);
     }
 }
 
 extern "C" fn shim_dispatch_source_set_cancel_handler(source: u64, handler: u64) {
     let reg = source_registry().lock().unwrap();
     if let Some(src) = reg.get(&source) {
-        *src.cancel_handler.lock().unwrap() = if handler != 0 { Some(handler) } else { None };
+        *src.cancel_handler.lock().unwrap() = OwnedBlock::from_block(handler);
     }
 }
 
-extern "C" fn shim_dispatch_source_set_timer(
-    source: u64,
-    start: u64,
-    interval: u64,
-    leeway: u64,
-) {
+extern "C" fn shim_dispatch_source_set_timer(source: u64, start: u64, interval: u64, leeway: u64) {
     let reg = source_registry().lock().unwrap();
     if let Some(src) = reg.get(&source) {
         *src.timer.lock().unwrap() = Some(TimerConfig {
@@ -317,8 +297,7 @@ extern "C" fn shim_dispatch_source_cancel(source: u64) {
         src.cancelled.store(true, Ordering::Release);
         let cancel_block = src.cancel_handler.lock().unwrap().take();
         if let Some(block) = cancel_block {
-            // SAFETY: caller guaranteed valid block layout.
-            unsafe { invoke_block(block) };
+            unsafe { invoke_block0(block.addr()) };
         }
     }
 }
@@ -354,8 +333,8 @@ extern "C" fn shim_dispatch_resume(object: u64) {
                         {
                             break;
                         }
-                        if let Some(handler) = *src_arc.event_handler.lock().unwrap() {
-                            unsafe { invoke_block(handler) };
+                        if let Some(handler) = src_arc.event_handler.lock().unwrap().clone() {
+                            unsafe { invoke_block0(handler.addr()) };
                         }
                     }
                 });
@@ -438,11 +417,12 @@ fn source_poll_fd(src: Arc<Source>, fd: i32, events: i16) {
             if events == libc::POLLIN as i16 {
                 let mut available: i32 = 0;
                 unsafe { libc::ioctl(fd, libc::FIONREAD, &mut available) };
-                src.pending_data.store(available.max(0) as u64, Ordering::Release);
+                src.pending_data
+                    .store(available.max(0) as u64, Ordering::Release);
             }
 
-            if let Some(handler) = *src.event_handler.lock().unwrap() {
-                unsafe { invoke_block(handler) };
+            if let Some(handler) = src.event_handler.lock().unwrap().clone() {
+                unsafe { invoke_block0(handler.addr()) };
             }
         }
     }
@@ -472,8 +452,8 @@ fn source_wait_signal(src: Arc<Source>, signum: i32) {
                 let ret = libc::sigtimedwait(&set, std::ptr::null_mut(), &timeout);
                 if ret == signum {
                     src.pending_data.fetch_add(1, Ordering::Release);
-                    if let Some(handler) = *src.event_handler.lock().unwrap() {
-                        invoke_block(handler);
+                    if let Some(handler) = src.event_handler.lock().unwrap().clone() {
+                        invoke_block0(handler.addr());
                     }
                 }
                 // ret == -1 with EAGAIN means timeout — loop and check cancellation
@@ -562,7 +542,7 @@ extern "C" fn shim_dispatch_source_merge_data(source: u64, value: u64) {
             }
 
             if !src.suspended.load(Ordering::Acquire) && !src.cancelled.load(Ordering::Acquire) {
-                *src.event_handler.lock().unwrap()
+                src.event_handler.lock().unwrap().clone()
             } else {
                 None
             }
@@ -572,7 +552,7 @@ extern "C" fn shim_dispatch_source_merge_data(source: u64, value: u64) {
     };
 
     if let Some(handler) = handler {
-        unsafe { invoke_block(handler) };
+        unsafe { invoke_block0(handler.addr()) };
     }
 }
 
@@ -595,8 +575,8 @@ extern "C" fn shim_dispatch_source_set_cancel_handler_f(_source: u64, _handler: 
 extern "C" fn shim_dispatch_source_set_registration_handler(_source: u64, _handler: u64) {
     // Registration handlers fire when a source is resumed for the first time.
     // For now, stub — fire inline if the handler is provided.
-    if _handler != 0 {
-        unsafe { invoke_block(_handler) };
+    if let Some(handler) = OwnedBlock::from_block(_handler) {
+        unsafe { invoke_block0(handler.addr()) };
     }
 }
 
@@ -621,47 +601,192 @@ pub struct DispatchDataSourceStubs;
 impl DispatchDataSourceStubs {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
-        register_shims!(table,
+        register_shims!(
+            table,
             // dispatch_data
-            ("_dispatch_data_create", shim_dispatch_data_create as *const () as u64, "dispatch_data_create (real)"),
-            ("_dispatch_data_get_size", shim_dispatch_data_get_size as *const () as u64, "dispatch_data_get_size (real)"),
-            ("_dispatch_data_create_map", shim_dispatch_data_create_map as *const () as u64, "dispatch_data_create_map (real)"),
-            ("_dispatch_data_apply", shim_dispatch_data_apply as *const () as u64, "dispatch_data_apply (real)"),
-            ("_dispatch_data_create_concat", shim_dispatch_data_create_concat as *const () as u64, "dispatch_data_create_concat (real)"),
-            ("_dispatch_data_create_subrange", shim_dispatch_data_create_subrange as *const () as u64, "dispatch_data_create_subrange (real)"),
-            ("__dispatch_data_empty", &DISPATCH_DATA_EMPTY as *const u64 as u64, "dispatch_data_empty data symbol"),
+            (
+                "_dispatch_data_create",
+                shim_dispatch_data_create as *const () as u64,
+                "dispatch_data_create (real)"
+            ),
+            (
+                "_dispatch_data_get_size",
+                shim_dispatch_data_get_size as *const () as u64,
+                "dispatch_data_get_size (real)"
+            ),
+            (
+                "_dispatch_data_create_map",
+                shim_dispatch_data_create_map as *const () as u64,
+                "dispatch_data_create_map (real)"
+            ),
+            (
+                "_dispatch_data_apply",
+                shim_dispatch_data_apply as *const () as u64,
+                "dispatch_data_apply (real)"
+            ),
+            (
+                "_dispatch_data_create_concat",
+                shim_dispatch_data_create_concat as *const () as u64,
+                "dispatch_data_create_concat (real)"
+            ),
+            (
+                "_dispatch_data_create_subrange",
+                shim_dispatch_data_create_subrange as *const () as u64,
+                "dispatch_data_create_subrange (real)"
+            ),
+            (
+                "__dispatch_data_empty",
+                &DISPATCH_DATA_EMPTY as *const u64 as u64,
+                "dispatch_data_empty data symbol"
+            ),
             // dispatch_source
-            ("_dispatch_source_create", shim_dispatch_source_create as *const () as u64, "dispatch_source_create (real)"),
-            ("_dispatch_source_set_event_handler", shim_dispatch_source_set_event_handler as *const () as u64, "dispatch_source_set_event_handler (real)"),
-            ("_dispatch_source_set_cancel_handler", shim_dispatch_source_set_cancel_handler as *const () as u64, "dispatch_source_set_cancel_handler (real)"),
-            ("_dispatch_source_set_timer", shim_dispatch_source_set_timer as *const () as u64, "dispatch_source_set_timer (real)"),
-            ("_dispatch_source_cancel", shim_dispatch_source_cancel as *const () as u64, "dispatch_source_cancel (real)"),
-            ("_dispatch_resume", shim_dispatch_resume as *const () as u64, "dispatch_resume (real)"),
-            ("_dispatch_suspend", shim_dispatch_suspend as *const () as u64, "dispatch_suspend (real)"),
-            ("_dispatch_set_target_queue", shim_dispatch_set_target_queue as *const () as u64, "dispatch_set_target_queue (stub → void)"),
-            ("_dispatch_release", shim_dispatch_release as *const () as u64, "dispatch_release (real)"),
-            ("_dispatch_retain", shim_dispatch_retain as *const () as u64, "dispatch_retain (stub → no-op)"),
+            (
+                "_dispatch_source_create",
+                shim_dispatch_source_create as *const () as u64,
+                "dispatch_source_create (real)"
+            ),
+            (
+                "_dispatch_source_set_event_handler",
+                shim_dispatch_source_set_event_handler as *const () as u64,
+                "dispatch_source_set_event_handler (real)"
+            ),
+            (
+                "_dispatch_source_set_cancel_handler",
+                shim_dispatch_source_set_cancel_handler as *const () as u64,
+                "dispatch_source_set_cancel_handler (real)"
+            ),
+            (
+                "_dispatch_source_set_timer",
+                shim_dispatch_source_set_timer as *const () as u64,
+                "dispatch_source_set_timer (real)"
+            ),
+            (
+                "_dispatch_source_cancel",
+                shim_dispatch_source_cancel as *const () as u64,
+                "dispatch_source_cancel (real)"
+            ),
+            (
+                "_dispatch_resume",
+                shim_dispatch_resume as *const () as u64,
+                "dispatch_resume (real)"
+            ),
+            (
+                "_dispatch_suspend",
+                shim_dispatch_suspend as *const () as u64,
+                "dispatch_suspend (real)"
+            ),
+            (
+                "_dispatch_set_target_queue",
+                shim_dispatch_set_target_queue as *const () as u64,
+                "dispatch_set_target_queue (stub → void)"
+            ),
+            (
+                "_dispatch_release",
+                shim_dispatch_release as *const () as u64,
+                "dispatch_release (real)"
+            ),
+            (
+                "_dispatch_retain",
+                shim_dispatch_retain as *const () as u64,
+                "dispatch_retain (stub → no-op)"
+            ),
             // dispatch_source data/handle/mask accessors
-            ("_dispatch_source_get_data", shim_dispatch_source_get_data as *const () as u64, "dispatch_source_get_data (real)"),
-            ("_dispatch_source_get_handle", shim_dispatch_source_get_handle as *const () as u64, "dispatch_source_get_handle (real)"),
-            ("_dispatch_source_get_mask", shim_dispatch_source_get_mask as *const () as u64, "dispatch_source_get_mask (real)"),
-            ("_dispatch_source_merge_data", shim_dispatch_source_merge_data as *const () as u64, "dispatch_source_merge_data (real)"),
-            ("_dispatch_source_set_event_handler_f", shim_dispatch_source_set_event_handler_f as *const () as u64, "dispatch_source_set_event_handler_f (stub)"),
-            ("_dispatch_source_set_cancel_handler_f", shim_dispatch_source_set_cancel_handler_f as *const () as u64, "dispatch_source_set_cancel_handler_f (stub)"),
-            ("_dispatch_source_set_registration_handler", shim_dispatch_source_set_registration_handler as *const () as u64, "dispatch_source_set_registration_handler (stub)"),
+            (
+                "_dispatch_source_get_data",
+                shim_dispatch_source_get_data as *const () as u64,
+                "dispatch_source_get_data (real)"
+            ),
+            (
+                "_dispatch_source_get_handle",
+                shim_dispatch_source_get_handle as *const () as u64,
+                "dispatch_source_get_handle (real)"
+            ),
+            (
+                "_dispatch_source_get_mask",
+                shim_dispatch_source_get_mask as *const () as u64,
+                "dispatch_source_get_mask (real)"
+            ),
+            (
+                "_dispatch_source_merge_data",
+                shim_dispatch_source_merge_data as *const () as u64,
+                "dispatch_source_merge_data (real)"
+            ),
+            (
+                "_dispatch_source_set_event_handler_f",
+                shim_dispatch_source_set_event_handler_f as *const () as u64,
+                "dispatch_source_set_event_handler_f (stub)"
+            ),
+            (
+                "_dispatch_source_set_cancel_handler_f",
+                shim_dispatch_source_set_cancel_handler_f as *const () as u64,
+                "dispatch_source_set_cancel_handler_f (stub)"
+            ),
+            (
+                "_dispatch_source_set_registration_handler",
+                shim_dispatch_source_set_registration_handler as *const () as u64,
+                "dispatch_source_set_registration_handler (stub)"
+            ),
             // dispatch_source type sentinels
-            ("__dispatch_source_type_timer", &SOURCE_TYPE_TIMER as *const u8 as u64, "dispatch_source_type_timer sentinel"),
-            ("__dispatch_source_type_read", &SOURCE_TYPE_READ as *const u8 as u64, "dispatch_source_type_read sentinel"),
-            ("__dispatch_source_type_write", &SOURCE_TYPE_WRITE as *const u8 as u64, "dispatch_source_type_write sentinel"),
-            ("__dispatch_source_type_signal", &SOURCE_TYPE_SIGNAL as *const u8 as u64, "dispatch_source_type_signal sentinel"),
-            ("__dispatch_source_type_proc", &SOURCE_TYPE_PROC as *const u8 as u64, "dispatch_source_type_proc sentinel"),
-            ("__dispatch_source_type_data_add", &SOURCE_TYPE_DATA_ADD as *const u8 as u64, "dispatch_source_type_data_add sentinel"),
-            ("__dispatch_source_type_data_or", &SOURCE_TYPE_DATA_OR as *const u8 as u64, "dispatch_source_type_data_or sentinel"),
-            ("__dispatch_source_type_data_replace", &SOURCE_TYPE_DATA_REPLACE as *const u8 as u64, "dispatch_source_type_data_replace sentinel"),
-            ("__dispatch_source_type_vnode", &SOURCE_TYPE_VNODE as *const u8 as u64, "dispatch_source_type_vnode sentinel"),
-            ("__dispatch_source_type_mach_send", &SOURCE_TYPE_MACH_SEND as *const u8 as u64, "dispatch_source_type_mach_send sentinel"),
-            ("__dispatch_source_type_mach_recv", &SOURCE_TYPE_MACH_RECV as *const u8 as u64, "dispatch_source_type_mach_recv sentinel"),
-            ("__dispatch_source_type_memorypressure", &SOURCE_TYPE_MEMORYPRESSURE as *const u8 as u64, "dispatch_source_type_memorypressure sentinel"),
+            (
+                "__dispatch_source_type_timer",
+                &SOURCE_TYPE_TIMER as *const u8 as u64,
+                "dispatch_source_type_timer sentinel"
+            ),
+            (
+                "__dispatch_source_type_read",
+                &SOURCE_TYPE_READ as *const u8 as u64,
+                "dispatch_source_type_read sentinel"
+            ),
+            (
+                "__dispatch_source_type_write",
+                &SOURCE_TYPE_WRITE as *const u8 as u64,
+                "dispatch_source_type_write sentinel"
+            ),
+            (
+                "__dispatch_source_type_signal",
+                &SOURCE_TYPE_SIGNAL as *const u8 as u64,
+                "dispatch_source_type_signal sentinel"
+            ),
+            (
+                "__dispatch_source_type_proc",
+                &SOURCE_TYPE_PROC as *const u8 as u64,
+                "dispatch_source_type_proc sentinel"
+            ),
+            (
+                "__dispatch_source_type_data_add",
+                &SOURCE_TYPE_DATA_ADD as *const u8 as u64,
+                "dispatch_source_type_data_add sentinel"
+            ),
+            (
+                "__dispatch_source_type_data_or",
+                &SOURCE_TYPE_DATA_OR as *const u8 as u64,
+                "dispatch_source_type_data_or sentinel"
+            ),
+            (
+                "__dispatch_source_type_data_replace",
+                &SOURCE_TYPE_DATA_REPLACE as *const u8 as u64,
+                "dispatch_source_type_data_replace sentinel"
+            ),
+            (
+                "__dispatch_source_type_vnode",
+                &SOURCE_TYPE_VNODE as *const u8 as u64,
+                "dispatch_source_type_vnode sentinel"
+            ),
+            (
+                "__dispatch_source_type_mach_send",
+                &SOURCE_TYPE_MACH_SEND as *const u8 as u64,
+                "dispatch_source_type_mach_send sentinel"
+            ),
+            (
+                "__dispatch_source_type_mach_recv",
+                &SOURCE_TYPE_MACH_RECV as *const u8 as u64,
+                "dispatch_source_type_mach_recv sentinel"
+            ),
+            (
+                "__dispatch_source_type_memorypressure",
+                &SOURCE_TYPE_MEMORYPRESSURE as *const u8 as u64,
+                "dispatch_source_type_memorypressure sentinel"
+            ),
         );
         log::debug!("DispatchDataSourceStubs: registered 36 stubs");
     }
@@ -678,12 +803,7 @@ mod tests {
     #[test]
     fn test_data_create_and_get_size() {
         let buf: [u8; 5] = [1, 2, 3, 4, 5];
-        let h = shim_dispatch_data_create(
-            buf.as_ptr() as u64,
-            buf.len(),
-            0,
-            0,
-        );
+        let h = shim_dispatch_data_create(buf.as_ptr() as u64, buf.len(), 0, 0);
         assert_ne!(h, 0);
         assert_eq!(shim_dispatch_data_get_size(h), 5);
     }

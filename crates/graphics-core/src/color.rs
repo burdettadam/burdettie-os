@@ -46,9 +46,24 @@ impl Color {
         b: 0.0,
         a: 0.0,
     };
-    pub const GRAY: Color = Color { r: 0.5, g: 0.5, b: 0.5, a: 1.0 };
-    pub const LIGHT_GRAY: Color = Color { r: 0.75, g: 0.75, b: 0.75, a: 1.0 };
-    pub const DARK_GRAY: Color = Color { r: 0.25, g: 0.25, b: 0.25, a: 1.0 };
+    pub const GRAY: Color = Color {
+        r: 0.5,
+        g: 0.5,
+        b: 0.5,
+        a: 1.0,
+    };
+    pub const LIGHT_GRAY: Color = Color {
+        r: 0.75,
+        g: 0.75,
+        b: 0.75,
+        a: 1.0,
+    };
+    pub const DARK_GRAY: Color = Color {
+        r: 0.25,
+        g: 0.25,
+        b: 0.25,
+        a: 1.0,
+    };
 
     pub const fn new(r: f64, g: f64, b: f64, a: f64) -> Self {
         Self { r, g, b, a }
@@ -78,7 +93,12 @@ impl Color {
 
     /// Return a copy with the given alpha value.
     pub const fn with_alpha(self, a: f64) -> Self {
-        Self { r: self.r, g: self.g, b: self.b, a }
+        Self {
+            r: self.r,
+            g: self.g,
+            b: self.b,
+            a,
+        }
     }
 
     /// Linearly interpolate between two colors.
@@ -113,7 +133,12 @@ impl Color {
         } else {
             (c, 0.0, x)
         };
-        Self { r: r1 + m, g: g1 + m, b: b1 + m, a: 1.0 }
+        Self {
+            r: r1 + m,
+            g: g1 + m,
+            b: b1 + m,
+            a: 1.0,
+        }
     }
 
     /// Convert to HSV (hue 0–360, saturation 0–1, value 0–1).
@@ -223,31 +248,51 @@ mod tests {
     #[test]
     fn from_hsv_red() {
         let c = Color::from_hsv(0.0, 1.0, 1.0);
-        assert!(color_approx_eq(&c, &Color::RED), "expected RED, got {:?}", c);
+        assert!(
+            color_approx_eq(&c, &Color::RED),
+            "expected RED, got {:?}",
+            c
+        );
     }
 
     #[test]
     fn from_hsv_green() {
         let c = Color::from_hsv(120.0, 1.0, 1.0);
-        assert!(color_approx_eq(&c, &Color::GREEN), "expected GREEN, got {:?}", c);
+        assert!(
+            color_approx_eq(&c, &Color::GREEN),
+            "expected GREEN, got {:?}",
+            c
+        );
     }
 
     #[test]
     fn from_hsv_blue() {
         let c = Color::from_hsv(240.0, 1.0, 1.0);
-        assert!(color_approx_eq(&c, &Color::BLUE), "expected BLUE, got {:?}", c);
+        assert!(
+            color_approx_eq(&c, &Color::BLUE),
+            "expected BLUE, got {:?}",
+            c
+        );
     }
 
     #[test]
     fn from_hsv_white() {
         let c = Color::from_hsv(0.0, 0.0, 1.0);
-        assert!(color_approx_eq(&c, &Color::WHITE), "expected WHITE, got {:?}", c);
+        assert!(
+            color_approx_eq(&c, &Color::WHITE),
+            "expected WHITE, got {:?}",
+            c
+        );
     }
 
     #[test]
     fn from_hsv_black() {
         let c = Color::from_hsv(0.0, 0.0, 0.0);
-        assert!(color_approx_eq(&c, &Color::BLACK), "expected BLACK, got {:?}", c);
+        assert!(
+            color_approx_eq(&c, &Color::BLACK),
+            "expected BLACK, got {:?}",
+            c
+        );
     }
 
     #[test]
@@ -255,20 +300,33 @@ mod tests {
         let original = Color::rgb(0.8, 0.3, 0.6);
         let (h, s, v) = original.to_hsv();
         let reconstructed = Color::from_hsv(h, s, v);
-        assert!(color_approx_eq(&original, &reconstructed),
-            "round-trip failed: {:?} -> ({}, {}, {}) -> {:?}", original, h, s, v, reconstructed);
+        assert!(
+            color_approx_eq(&original, &reconstructed),
+            "round-trip failed: {:?} -> ({}, {}, {}) -> {:?}",
+            original,
+            h,
+            s,
+            v,
+            reconstructed
+        );
     }
 
     #[test]
     fn lighter_white() {
         let c = Color::WHITE.lighter(0.5);
-        assert!(color_approx_eq(&c, &Color::WHITE), "WHITE.lighter should remain WHITE");
+        assert!(
+            color_approx_eq(&c, &Color::WHITE),
+            "WHITE.lighter should remain WHITE"
+        );
     }
 
     #[test]
     fn darker_black() {
         let c = Color::BLACK.darker(0.5);
-        assert!(color_approx_eq(&c, &Color::BLACK), "BLACK.darker should remain BLACK");
+        assert!(
+            color_approx_eq(&c, &Color::BLACK),
+            "BLACK.darker should remain BLACK"
+        );
     }
 
     #[test]
@@ -288,19 +346,30 @@ mod tests {
     fn to_hex_with_alpha() {
         let hex = Color::RED.with_alpha(0.5).to_hex();
         assert_eq!(hex.len(), 9, "should be #RRGGBBAA format");
-        assert!(hex.starts_with("#FF0000"), "should start with red components");
+        assert!(
+            hex.starts_with("#FF0000"),
+            "should start with red components"
+        );
     }
 
     #[test]
     fn from_hex_valid() {
         let c = Color::from_hex("#FF0000").unwrap();
-        assert!(color_approx_eq(&c, &Color::RED), "expected RED, got {:?}", c);
+        assert!(
+            color_approx_eq(&c, &Color::RED),
+            "expected RED, got {:?}",
+            c
+        );
     }
 
     #[test]
     fn from_hex_short() {
         let c = Color::from_hex("#F00").unwrap();
-        assert!(color_approx_eq(&c, &Color::RED), "expected RED, got {:?}", c);
+        assert!(
+            color_approx_eq(&c, &Color::RED),
+            "expected RED, got {:?}",
+            c
+        );
     }
 
     #[test]

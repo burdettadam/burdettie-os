@@ -49,8 +49,8 @@ pub trait Responder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Event;
     use crate::menu::ModifierFlags;
+    use crate::Event;
     use std::cell::Cell;
     use std::rc::Rc;
     use window_backend::KeyCode;

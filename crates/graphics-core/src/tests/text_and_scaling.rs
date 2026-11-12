@@ -16,7 +16,10 @@ fn measure_text_non_zero() {
     let r = SoftwareRenderer::new(&mut surface);
     let font = Font::new("System", 14.0);
     let size = RendererTrait::measure_text(&r, "Hello", &font);
-    assert!(size.width > 0.0, "width should be non-zero for non-empty string");
+    assert!(
+        size.width > 0.0,
+        "width should be non-zero for non-empty string"
+    );
     assert!(size.height > 0.0, "height should be non-zero");
 }
 
@@ -63,7 +66,12 @@ fn draw_text_in_rect_wraps() {
         let mut r = SoftwareRenderer::new(&mut surface);
         let font = Font::new("System", 14.0);
         // Rect is 50px wide — "Hello World" doesn't fit on one line
-        r.draw_text_in_rect("Hello World", Rect::new(0.0, 0.0, 50.0, 200.0), &font, Color::RED);
+        r.draw_text_in_rect(
+            "Hello World",
+            Rect::new(0.0, 0.0, 50.0, 200.0),
+            &font,
+            Color::RED,
+        );
     }
     // First line should have some red pixels in the top area (y < 17)
     let mut first_line_pixels = 0;
@@ -85,7 +93,10 @@ fn draw_text_in_rect_wraps() {
         }
     }
     assert!(first_line_pixels > 0, "first line should have drawn pixels");
-    assert!(second_line_pixels > 0, "second line should have drawn pixels (text wrapped)");
+    assert!(
+        second_line_pixels > 0,
+        "second line should have drawn pixels (text wrapped)"
+    );
 }
 
 #[test]
@@ -97,7 +108,7 @@ fn draw_text_in_rect_clips_bottom() {
         let mut r = SoftwareRenderer::new(&mut surface);
         let font = Font::new("System", 14.0);
         let line_height = 14.0 * 1.2; // ~16.8
-        // Only room for 1 line
+                                      // Only room for 1 line
         r.draw_text_in_rect(
             "AAA BBB CCC",
             Rect::new(0.0, 0.0, 30.0, line_height),
@@ -163,8 +174,10 @@ fn bilinear_sample_identity() {
             let expected = img.argb32_at(x, y);
             let got = px(&surface, x, y);
             // Allow small rounding difference
-            let diff_r = (((expected >> 16) & 0xFF) as i32 - ((got >> 16) & 0xFF) as i32).unsigned_abs();
-            let diff_g = (((expected >> 8) & 0xFF) as i32 - ((got >> 8) & 0xFF) as i32).unsigned_abs();
+            let diff_r =
+                (((expected >> 16) & 0xFF) as i32 - ((got >> 16) & 0xFF) as i32).unsigned_abs();
+            let diff_g =
+                (((expected >> 8) & 0xFF) as i32 - ((got >> 8) & 0xFF) as i32).unsigned_abs();
             let diff_b = ((expected & 0xFF) as i32 - (got & 0xFF) as i32).unsigned_abs();
             assert!(
                 diff_r <= 2 && diff_g <= 2 && diff_b <= 2,
@@ -194,6 +207,12 @@ fn bilinear_sample_upscale() {
     let cr = (center >> 16) & 0xFF;
     let cg = (center >> 8) & 0xFF;
     // With bilinear interpolation, center should have intermediate R and G values
-    assert!(cr > 0 && cr < 255, "red channel should be interpolated: {cr}");
-    assert!(cg > 0 && cg < 255, "green channel should be interpolated: {cg}");
+    assert!(
+        cr > 0 && cr < 255,
+        "red channel should be interpolated: {cr}"
+    );
+    assert!(
+        cg > 0 && cg < 255,
+        "green channel should be interpolated: {cg}"
+    );
 }

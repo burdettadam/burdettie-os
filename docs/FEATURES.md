@@ -33,6 +33,7 @@ that prioritizes correctness, observability, and portability.
 | [SECURITY.md](SECURITY.md) | 8-gate security model, `TrustPolicy` composition, platform support matrix, known limitations |
 | [APPLE_STACK_COMPARISON.md](APPLE_STACK_COMPARISON.md) | Layer-by-layer Apple stack comparison, coverage summary, parity roadmap |
 | [roadmap.md](roadmap.md) | Near-term milestones, medium-term goals, long-term vision |
+| [SEMANTIC_MEMORY_BUILD_BRIEF.md](SEMANTIC_MEMORY_BUILD_BRIEF.md) | Repo-scoped semantic memory subsystem plan: placement, crates, APIs, phases, acceptance criteria |
 
 ---
 

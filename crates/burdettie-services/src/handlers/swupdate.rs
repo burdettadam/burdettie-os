@@ -46,9 +46,13 @@ const CONFIG_PLIST: &[u8] = br#"<?xml version="1.0" encoding="UTF-8"?>
 pub struct SwupdateHandler;
 
 impl Handler for SwupdateHandler {
-    fn handle(&self, path: &str, method: &str, body: &[u8], _request: &Request)
-        -> Option<HandlerResponse>
-    {
+    fn handle(
+        &self,
+        path: &str,
+        method: &str,
+        body: &[u8],
+        _request: &Request,
+    ) -> Option<HandlerResponse> {
         if path.starts_with("/api/v1/swupdate/") {
             log::info!(
                 "burdettie-services: swupdate {method} {path} ({} bytes)",

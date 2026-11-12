@@ -8,6 +8,7 @@ use crate::class::OBJC_RUNTIME;
 ///
 /// Only safe to call for addresses that reside in the dyld shared cache (host framework classes).
 /// Guest binary addresses are NOT valid host ObjC class pointers and would crash `class_getName`.
+#[cfg(unix)]
 fn host_class_name(cls: u64) -> Option<String> {
     // Determine shared cache bounds to validate the address.
     type GetCacheRangeFn = unsafe extern "C" fn(*mut usize) -> *const u8;
@@ -56,6 +57,11 @@ fn host_class_name(cls: u64) -> Option<String> {
     Some(name.to_string())
 }
 
+#[cfg(not(unix))]
+fn host_class_name(_cls: u64) -> Option<String> {
+    None
+}
+
 /// `Class objc_getClass(const char *name)`
 #[no_mangle]
 pub extern "C" fn shim_objc_get_class(name: *const c_char) -> u64 {
@@ -100,7 +106,9 @@ pub extern "C" fn shim_objc_get_meta_class(name: *const c_char) -> u64 {
     match rt.get_class(name_str) {
         Some(cls) => {
             // The metaclass address is stored at the class ISA (offset 0)
-            if cls.mapped_addr == 0 { return 0; }
+            if cls.mapped_addr == 0 {
+                return 0;
+            }
             unsafe { *(cls.mapped_addr as *const u64) }
         }
         None => 0,
@@ -408,7 +416,10 @@ pub extern "C" fn shim_objc_get_class_list(buffer: *mut u64, buffer_count: i32) 
         Err(e) => e.into_inner(),
     };
     let Some(rt) = guard.as_ref() else { return 0 };
-    let addrs: Vec<u64> = rt.classes_by_name_iter().map(|(_, c)| c.mapped_addr).collect();
+    let addrs: Vec<u64> = rt
+        .classes_by_name_iter()
+        .map(|(_, c)| c.mapped_addr)
+        .collect();
     let total = addrs.len() as i32;
     if !buffer.is_null() && buffer_count > 0 {
         let n = std::cmp::min(buffer_count as usize, addrs.len());
@@ -430,14 +441,21 @@ pub extern "C" fn shim_objc_copy_class_list(out_count: *mut u32) -> *mut u64 {
     };
     let Some(rt) = guard.as_ref() else {
         if !out_count.is_null() {
-            unsafe { *out_count = 0; }
+            unsafe {
+                *out_count = 0;
+            }
         }
         return std::ptr::null_mut();
     };
-    let addrs: Vec<u64> = rt.classes_by_name_iter().map(|(_, c)| c.mapped_addr).collect();
+    let addrs: Vec<u64> = rt
+        .classes_by_name_iter()
+        .map(|(_, c)| c.mapped_addr)
+        .collect();
     let count = addrs.len();
     if !out_count.is_null() {
-        unsafe { *out_count = count as u32; }
+        unsafe {
+            *out_count = count as u32;
+        }
     }
     if count == 0 {
         return std::ptr::null_mut();
@@ -468,7 +486,9 @@ pub extern "C" fn shim_class_get_image_name(cls: u64) -> *const u8 {
         Ok(g) => g,
         Err(e) => e.into_inner(),
     };
-    let Some(rt) = guard.as_ref() else { return std::ptr::null() };
+    let Some(rt) = guard.as_ref() else {
+        return std::ptr::null();
+    };
     if rt.get_class_by_addr(cls).is_some() {
         CF_LITE.as_ptr()
     } else {
@@ -701,7 +721,10 @@ mod tests {
         assert!(total >= 3, "should have at least 3 classes");
         // At least some entries should be non-zero
         let filled = buffer.iter().filter(|&&v| v != 0).count();
-        assert!(filled >= 3, "buffer should have at least 3 non-zero entries");
+        assert!(
+            filled >= 3,
+            "buffer should have at least 3 non-zero entries"
+        );
     }
 
     #[test]

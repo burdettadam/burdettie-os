@@ -21,18 +21,24 @@ const PASTEBOARD_SIZE: usize = 32;
 const NAME_OFF: usize = 16;
 
 static GENERAL_PASTEBOARD: OnceLock<u64> = OnceLock::new();
-static DRAG_PASTEBOARD:    OnceLock<u64> = OnceLock::new();
-static FIND_PASTEBOARD:    OnceLock<u64> = OnceLock::new();
-static RULER_PASTEBOARD:   OnceLock<u64> = OnceLock::new();
-static FONT_PASTEBOARD:    OnceLock<u64> = OnceLock::new();
+static DRAG_PASTEBOARD: OnceLock<u64> = OnceLock::new();
+static FIND_PASTEBOARD: OnceLock<u64> = OnceLock::new();
+static RULER_PASTEBOARD: OnceLock<u64> = OnceLock::new();
+static FONT_PASTEBOARD: OnceLock<u64> = OnceLock::new();
 
 fn make_pasteboard(name_str: &str) -> u64 {
     let obj = crate::pal_alloc().calloc(1, PASTEBOARD_SIZE) as u64;
-    if obj == 0 { return 0; }
-    unsafe { *(obj as *mut u64) = crate::nsobj::nspasteboard_class_addr(); }
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *(obj as *mut u64) = crate::nsobj::nspasteboard_class_addr();
+    }
     let name_cstr = std::ffi::CString::new(name_str).unwrap_or_default();
     let name = crate::cfstring::alloc_nsstring_from_cstr(name_cstr.as_ptr());
-    unsafe { *((obj as usize + NAME_OFF) as *mut u64) = name; }
+    unsafe {
+        *((obj as usize + NAME_OFF) as *mut u64) = name;
+    }
     obj
 }
 
@@ -76,7 +82,8 @@ pub(crate) mod clipboard_manager {
     static STORE: OnceLock<Mutex<HashMap<u64, PasteboardEntry>>> = OnceLock::new();
 
     fn store() -> std::sync::MutexGuard<'static, HashMap<u64, PasteboardEntry>> {
-        STORE.get_or_init(|| Mutex::new(HashMap::new()))
+        STORE
+            .get_or_init(|| Mutex::new(HashMap::new()))
             .lock()
             .unwrap_or_else(|p| p.into_inner())
     }
@@ -142,7 +149,10 @@ pub(crate) mod clipboard_manager {
     pub fn first_available(pb: u64, candidates: &[String]) -> Option<String> {
         let s = store();
         let entry = s.get(&pb)?;
-        candidates.iter().find(|t| entry.items.contains_key(*t)).cloned()
+        candidates
+            .iter()
+            .find(|t| entry.items.contains_key(*t))
+            .cloned()
     }
 }
 
@@ -166,18 +176,20 @@ pub extern "C" fn shim_nspasteboard_general_pasteboard(_cls: u64, _cmd: u64) -> 
 
 /// `+[NSPasteboard pasteboardWithName:]`
 pub extern "C" fn shim_nspasteboard_pasteboard_with_name(_cls: u64, _cmd: u64, name: u64) -> u64 {
-    if name == 0 { return shim_nspasteboard_general_pasteboard(_cls, _cmd); }
+    if name == 0 {
+        return shim_nspasteboard_general_pasteboard(_cls, _cmd);
+    }
     let s = match crate::cfstring::extract_cfstring_cstr(name) {
         Some(s) => s.to_string(),
         None => return shim_nspasteboard_general_pasteboard(_cls, _cmd),
     };
     match s.as_str() {
         "NSGeneralPboard" => shim_nspasteboard_general_pasteboard(_cls, _cmd),
-        "NSDragPboard"    => *DRAG_PASTEBOARD.get_or_init(|| make_pasteboard("NSDragPboard")),
-        "NSFindPboard"    => *FIND_PASTEBOARD.get_or_init(|| make_pasteboard("NSFindPboard")),
-        "NSRulerPboard"   => *RULER_PASTEBOARD.get_or_init(|| make_pasteboard("NSRulerPboard")),
-        "NSFontPboard"    => *FONT_PASTEBOARD.get_or_init(|| make_pasteboard("NSFontPboard")),
-        _                 => make_pasteboard(s.as_str()),
+        "NSDragPboard" => *DRAG_PASTEBOARD.get_or_init(|| make_pasteboard("NSDragPboard")),
+        "NSFindPboard" => *FIND_PASTEBOARD.get_or_init(|| make_pasteboard("NSFindPboard")),
+        "NSRulerPboard" => *RULER_PASTEBOARD.get_or_init(|| make_pasteboard("NSRulerPboard")),
+        "NSFontPboard" => *FONT_PASTEBOARD.get_or_init(|| make_pasteboard("NSFontPboard")),
+        _ => make_pasteboard(s.as_str()),
     }
 }
 
@@ -190,24 +202,36 @@ pub extern "C" fn shim_nspasteboard_pasteboard_with_unique_name(_cls: u64, _cmd:
 
 /// `−[NSPasteboard declareTypes:owner:]` — clears the store and returns new changeCount.
 pub extern "C" fn shim_nspasteboard_declare_types(
-    obj: u64, _cmd: u64, _types: u64, _owner: u64,
+    obj: u64,
+    _cmd: u64,
+    _types: u64,
+    _owner: u64,
 ) -> i64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     clipboard_manager::clear(obj) as i64
 }
 
 /// `−[NSPasteboard clearContents]` — clears all items; returns new changeCount.
 pub extern "C" fn shim_nspasteboard_clear_contents(obj: u64, _cmd: u64) -> i64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     clipboard_manager::clear(obj) as i64
 }
 
 /// `−[NSPasteboard setString:forType:]` — store a string for a given UTI type.
 /// Mirrors plain-text writes to the system clipboard via arboard.
 pub extern "C" fn shim_nspasteboard_set_string_for_type(
-    obj: u64, _cmd: u64, string: u64, ns_type: u64,
+    obj: u64,
+    _cmd: u64,
+    string: u64,
+    ns_type: u64,
 ) -> u8 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let type_name = type_name_of(ns_type);
     let bytes = if string != 0 {
         crate::cfstring::extract_cfstring_cstr(string)
@@ -229,9 +253,14 @@ pub extern "C" fn shim_nspasteboard_set_string_for_type(
 
 /// `−[NSPasteboard setData:forType:]` — store raw NSData for a given UTI type.
 pub extern "C" fn shim_nspasteboard_set_data_for_type(
-    obj: u64, _cmd: u64, data: u64, ns_type: u64,
+    obj: u64,
+    _cmd: u64,
+    data: u64,
+    ns_type: u64,
 ) -> u8 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let type_name = type_name_of(ns_type);
     let bytes = if data != 0 {
         // Read length and bytes_ptr from NSData layout [ISA|len|ptr].
@@ -251,16 +280,23 @@ pub extern "C" fn shim_nspasteboard_set_data_for_type(
 
 /// `−[NSPasteboard setPropertyList:forType:]` — store a raw ObjC plist object.
 pub extern "C" fn shim_nspasteboard_set_property_list_for_type(
-    obj: u64, _cmd: u64, plist: u64, ns_type: u64,
+    obj: u64,
+    _cmd: u64,
+    plist: u64,
+    ns_type: u64,
 ) -> u8 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     clipboard_manager::write_ptr(obj, type_name_of(ns_type), plist);
     1
 }
 
 /// `−[NSPasteboard writeObjects:]` — store an NSArray of NSPasteboardWriting objects.
 pub extern "C" fn shim_nspasteboard_write_objects(obj: u64, _cmd: u64, objects: u64) -> u8 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     clipboard_manager::write_ptr(obj, "__writeObjects__".to_string(), objects);
     1
 }
@@ -270,10 +306,10 @@ pub extern "C" fn shim_nspasteboard_write_objects(obj: u64, _cmd: u64, objects: 
 /// `−[NSPasteboard stringForType:]` — read a stored string for a UTI type.
 /// Falls back to the system clipboard (arboard) for text types when the
 /// in-memory store is empty.
-pub extern "C" fn shim_nspasteboard_string_for_type(
-    obj: u64, _cmd: u64, ns_type: u64,
-) -> u64 {
-    if obj == 0 { return 0; }
+pub extern "C" fn shim_nspasteboard_string_for_type(obj: u64, _cmd: u64, ns_type: u64) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
     let type_name = type_name_of(ns_type);
 
     // 1. In-memory store.
@@ -295,7 +331,7 @@ pub extern "C" fn shim_nspasteboard_string_for_type(
                     let mut bytes = text.into_bytes();
                     bytes.push(0);
                     return crate::cfstring::alloc_nsstring_from_cstr(
-                        bytes.as_ptr() as *const std::ffi::c_char,
+                        bytes.as_ptr() as *const std::ffi::c_char
                     );
                 }
             }
@@ -306,10 +342,10 @@ pub extern "C" fn shim_nspasteboard_string_for_type(
 }
 
 /// `−[NSPasteboard dataForType:]` — read stored bytes as an NSData object.
-pub extern "C" fn shim_nspasteboard_data_for_type(
-    obj: u64, _cmd: u64, ns_type: u64,
-) -> u64 {
-    if obj == 0 { return 0; }
+pub extern "C" fn shim_nspasteboard_data_for_type(obj: u64, _cmd: u64, ns_type: u64) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
     let type_name = type_name_of(ns_type);
     clipboard_manager::read_bytes(obj, &type_name)
         .filter(|b| !b.is_empty())
@@ -319,44 +355,61 @@ pub extern "C" fn shim_nspasteboard_data_for_type(
 
 /// `−[NSPasteboard propertyListForType:]` — return the stored ObjC plist pointer.
 pub extern "C" fn shim_nspasteboard_property_list_for_type(
-    obj: u64, _cmd: u64, ns_type: u64,
+    obj: u64,
+    _cmd: u64,
+    ns_type: u64,
 ) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     clipboard_manager::read_ptr(obj, &type_name_of(ns_type)).unwrap_or(0)
 }
 
 /// `−[NSPasteboard readObjectsForClasses:options:]` — returns empty NSArray.
 pub extern "C" fn shim_nspasteboard_read_objects_for_classes(
-    _obj: u64, _cmd: u64, _classes: u64, _options: u64,
+    _obj: u64,
+    _cmd: u64,
+    _classes: u64,
+    _options: u64,
 ) -> u64 {
     crate::nsarray::make_nsarray(&[])
 }
 
 /// `−[NSPasteboard types]` — returns an NSArray of the stored type-name strings.
 pub extern "C" fn shim_nspasteboard_types(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return crate::nsarray::make_nsarray(&[]); }
+    if obj == 0 {
+        return crate::nsarray::make_nsarray(&[]);
+    }
     let names = clipboard_manager::type_names(obj);
-    let ns_strings: Vec<u64> = names.iter().map(|n| {
-        let cstr = std::ffi::CString::new(n.as_str()).unwrap_or_default();
-        crate::cfstring::alloc_nsstring_from_cstr(cstr.as_ptr())
-    }).collect();
+    let ns_strings: Vec<u64> = names
+        .iter()
+        .map(|n| {
+            let cstr = std::ffi::CString::new(n.as_str()).unwrap_or_default();
+            crate::cfstring::alloc_nsstring_from_cstr(cstr.as_ptr())
+        })
+        .collect();
     crate::nsarray::make_nsarray(&ns_strings)
 }
 
 /// `−[NSPasteboard availableTypeFromArray:]` — first stored type matching the
 /// requested list, or nil.
 pub extern "C" fn shim_nspasteboard_available_type_from_array(
-    obj: u64, _cmd: u64, types_array: u64,
+    obj: u64,
+    _cmd: u64,
+    types_array: u64,
 ) -> u64 {
-    if obj == 0 || types_array == 0 { return 0; }
+    if obj == 0 || types_array == 0 {
+        return 0;
+    }
     // Walk the NSArray [ISA|count|elems_ptr] to build the candidate list.
     let count = unsafe {
         *((types_array as usize + crate::nsarray::NSARRAY_COUNT_OFF) as *const u64) as usize
     };
-    let elems = unsafe {
-        *((types_array as usize + crate::nsarray::NSARRAY_ELEMS_OFF) as *const u64)
-    };
-    if count == 0 || elems == 0 { return 0; }
+    let elems =
+        unsafe { *((types_array as usize + crate::nsarray::NSARRAY_ELEMS_OFF) as *const u64) };
+    if count == 0 || elems == 0 {
+        return 0;
+    }
     let candidates: Vec<String> = (0..count)
         .map(|i| unsafe { *((elems as usize + i * 8) as *const u64) })
         .map(type_name_of)
@@ -370,13 +423,17 @@ pub extern "C" fn shim_nspasteboard_available_type_from_array(
 
 /// `−[NSPasteboard changeCount]`
 pub extern "C" fn shim_nspasteboard_change_count(obj: u64, _cmd: u64) -> i64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     clipboard_manager::change_count(obj) as i64
 }
 
 /// `−[NSPasteboard name]`
 pub extern "C" fn shim_nspasteboard_name(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + NAME_OFF) as *const u64) }
 }
 
@@ -399,17 +456,37 @@ macro_rules! pboard_const {
     };
 }
 
-pboard_const!(PB_TYPE_STRING,         ns_pasteboard_type_string_addr,        "public.utf8-plain-text");
-pboard_const!(PB_TYPE_RTF,            ns_pasteboard_type_rtf_addr,           "public.rtf");
-pboard_const!(PB_TYPE_HTML,           ns_pasteboard_type_html_addr,          "public.html");
-pboard_const!(PB_TYPE_TIFF,           ns_pasteboard_type_tiff_addr,          "public.tiff");
-pboard_const!(PB_TYPE_PNG,            ns_pasteboard_type_png_addr,           "public.png");
-pboard_const!(PB_TYPE_PDF,            ns_pasteboard_type_pdf_addr,           "com.adobe.pdf");
-pboard_const!(PB_TYPE_FILE_URL,       ns_pasteboard_type_file_url_addr,      "public.file-url");
-pboard_const!(PB_TYPE_URL,            ns_pasteboard_type_url_addr,           "public.url");
-pboard_const!(PB_NS_STRING_PBOARD,    ns_string_pasteboard_type_addr,        "NSStringPboardType");
-pboard_const!(PB_NS_RTF_PBOARD,       ns_rtf_pasteboard_type_addr,           "NSRTFPboardType");
-pboard_const!(PB_NS_FILENAMES_PBOARD, ns_file_names_pasteboard_type_addr,    "NSFilenamesPboardType");
+pboard_const!(
+    PB_TYPE_STRING,
+    ns_pasteboard_type_string_addr,
+    "public.utf8-plain-text"
+);
+pboard_const!(PB_TYPE_RTF, ns_pasteboard_type_rtf_addr, "public.rtf");
+pboard_const!(PB_TYPE_HTML, ns_pasteboard_type_html_addr, "public.html");
+pboard_const!(PB_TYPE_TIFF, ns_pasteboard_type_tiff_addr, "public.tiff");
+pboard_const!(PB_TYPE_PNG, ns_pasteboard_type_png_addr, "public.png");
+pboard_const!(PB_TYPE_PDF, ns_pasteboard_type_pdf_addr, "com.adobe.pdf");
+pboard_const!(
+    PB_TYPE_FILE_URL,
+    ns_pasteboard_type_file_url_addr,
+    "public.file-url"
+);
+pboard_const!(PB_TYPE_URL, ns_pasteboard_type_url_addr, "public.url");
+pboard_const!(
+    PB_NS_STRING_PBOARD,
+    ns_string_pasteboard_type_addr,
+    "NSStringPboardType"
+);
+pboard_const!(
+    PB_NS_RTF_PBOARD,
+    ns_rtf_pasteboard_type_addr,
+    "NSRTFPboardType"
+);
+pboard_const!(
+    PB_NS_FILENAMES_PBOARD,
+    ns_file_names_pasteboard_type_addr,
+    "NSFilenamesPboardType"
+);
 
 #[cfg(test)]
 mod tests {
@@ -464,8 +541,8 @@ mod tests {
         let pb = fresh();
         let text_type = make_ns_str("public.utf8-plain-text");
         let html_type = make_ns_str("public.html");
-        let text      = make_ns_str("hello");
-        let html      = make_ns_str("<b>hello</b>");
+        let text = make_ns_str("hello");
+        let html = make_ns_str("<b>hello</b>");
 
         shim_nspasteboard_set_string_for_type(pb, 0, text, text_type);
         shim_nspasteboard_set_string_for_type(pb, 0, html, html_type);
@@ -474,25 +551,47 @@ mod tests {
         let back_html = shim_nspasteboard_string_for_type(pb, 0, html_type);
         assert_ne!(back_text, 0);
         assert_ne!(back_html, 0);
-        assert_ne!(back_text, back_html, "text and HTML must be stored separately");
+        assert_ne!(
+            back_text, back_html,
+            "text and HTML must be stored separately"
+        );
     }
 
     #[test]
     fn clear_removes_all_types() {
         let pb = fresh();
-        shim_nspasteboard_set_string_for_type(pb, 0, make_ns_str("hi"), make_ns_str("public.utf8-plain-text"));
-        shim_nspasteboard_set_string_for_type(pb, 0, make_ns_str("<b>hi</b>"), make_ns_str("public.html"));
+        shim_nspasteboard_set_string_for_type(
+            pb,
+            0,
+            make_ns_str("hi"),
+            make_ns_str("public.utf8-plain-text"),
+        );
+        shim_nspasteboard_set_string_for_type(
+            pb,
+            0,
+            make_ns_str("<b>hi</b>"),
+            make_ns_str("public.html"),
+        );
         shim_nspasteboard_clear_contents(pb, 0);
-        assert_eq!(shim_nspasteboard_string_for_type(pb, 0, make_ns_str("public.utf8-plain-text")), 0);
-        assert_eq!(shim_nspasteboard_string_for_type(pb, 0, make_ns_str("public.html")), 0);
+        assert_eq!(
+            shim_nspasteboard_string_for_type(pb, 0, make_ns_str("public.utf8-plain-text")),
+            0
+        );
+        assert_eq!(
+            shim_nspasteboard_string_for_type(pb, 0, make_ns_str("public.html")),
+            0
+        );
     }
 
     #[test]
     fn set_data_and_read_back() {
         let pb = fresh();
-        let data     = crate::nsdata::make_nsdata(b"\x89PNG\r\n");
+        let data = crate::nsdata::make_nsdata(b"\x89PNG\r\n");
         let png_type = make_ns_str("public.png");
-        assert_eq!(shim_nspasteboard_set_data_for_type(pb, 0, data, png_type), 1);
+        assert_eq!(
+            shim_nspasteboard_set_data_for_type(pb, 0, data, png_type),
+            1
+        );
         let back = shim_nspasteboard_data_for_type(pb, 0, png_type);
         assert_ne!(back, 0);
         // NSData length should match.
@@ -503,9 +602,14 @@ mod tests {
     #[test]
     fn types_returns_all_stored_keys() {
         let pb = fresh();
-        shim_nspasteboard_set_string_for_type(pb, 0, make_ns_str("a"), make_ns_str("public.utf8-plain-text"));
+        shim_nspasteboard_set_string_for_type(
+            pb,
+            0,
+            make_ns_str("a"),
+            make_ns_str("public.utf8-plain-text"),
+        );
         shim_nspasteboard_set_string_for_type(pb, 0, make_ns_str("b"), make_ns_str("public.html"));
-        let arr   = shim_nspasteboard_types(pb, 0);
+        let arr = shim_nspasteboard_types(pb, 0);
         let count = unsafe { *((arr as usize + crate::nsarray::NSARRAY_COUNT_OFF) as *const u64) };
         assert_eq!(count, 2);
     }
@@ -514,7 +618,12 @@ mod tests {
     fn change_count_increments_per_write() {
         let pb = fresh();
         let c0 = shim_nspasteboard_change_count(pb, 0);
-        shim_nspasteboard_set_string_for_type(pb, 0, make_ns_str("x"), make_ns_str("public.utf8-plain-text"));
+        shim_nspasteboard_set_string_for_type(
+            pb,
+            0,
+            make_ns_str("x"),
+            make_ns_str("public.utf8-plain-text"),
+        );
         let c1 = shim_nspasteboard_change_count(pb, 0);
         shim_nspasteboard_set_string_for_type(pb, 0, make_ns_str("y"), make_ns_str("public.html"));
         let c2 = shim_nspasteboard_change_count(pb, 0);
@@ -539,7 +648,12 @@ mod tests {
 
     #[test]
     fn read_objects_returns_empty_array() {
-        let arr = shim_nspasteboard_read_objects_for_classes(shim_nspasteboard_general_pasteboard(0, 0), 0, 0, 0);
+        let arr = shim_nspasteboard_read_objects_for_classes(
+            shim_nspasteboard_general_pasteboard(0, 0),
+            0,
+            0,
+            0,
+        );
         assert_ne!(arr, 0);
     }
 

@@ -3,8 +3,8 @@
 //! Uses the typestate `Loader` API to instrument each phase transition
 //! with `Instant` checkpoints, producing a `PhaseTiming` breakdown.
 
-use std::path::Path;
 use std::collections::BTreeMap;
+use std::path::Path;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -149,7 +149,9 @@ fn reset_runtime_state() {
 
 /// Run a binary through the typestate loader pipeline, timing each phase.
 pub fn timed_load_and_run(binary_path: &Path) -> Result<(RuntimeResult, PhaseTiming), String> {
-    let _lock = RUNTIME_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let _lock = RUNTIME_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let _reuse_guard = RuntimeReuseGuard::new();
 
     let overall_start = Instant::now();
@@ -163,7 +165,9 @@ pub fn timed_load_and_run(binary_path: &Path) -> Result<(RuntimeResult, PhaseTim
 
     // Phase 2: Security
     let t = Instant::now();
-    let checked = parsed.check_security().map_err(|e| format!("security: {e}"))?;
+    let checked = parsed
+        .check_security()
+        .map_err(|e| format!("security: {e}"))?;
     let security = t.elapsed();
 
     // Phase 3: Map images
@@ -243,7 +247,9 @@ fn parse_perf_breakdowns(tracer: &RuntimeTracer) -> (PhaseBreakdown, PhaseBreakd
             }
             "counter" => {
                 if let Ok(count) = value.parse::<u64>() {
-                    breakdown.counters.push(CounterMetric { name, value: count });
+                    breakdown
+                        .counters
+                        .push(CounterMetric { name, value: count });
                 }
             }
             _ => {}

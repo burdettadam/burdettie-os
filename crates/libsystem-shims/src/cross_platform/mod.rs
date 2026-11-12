@@ -8,12 +8,12 @@
 //! StubResolver's dlsym path. These shims ensure they also resolve
 //! on Linux where the host libraries differ.
 
+mod dirent;
+mod fts;
 mod icu;
 mod kqueue;
 mod posix_extras;
 mod stat;
-mod dirent;
-mod fts;
 pub mod stdio;
 pub mod variadic_shims;
 

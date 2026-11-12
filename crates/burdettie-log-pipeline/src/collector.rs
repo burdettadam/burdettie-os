@@ -92,7 +92,8 @@ impl Collector {
         if self.initialized.swap(true, Ordering::AcqRel) {
             return; // already initialized
         }
-        *self.start_time.lock().unwrap_or_else(|e| e.into_inner()) = Some(std::time::Instant::now());
+        *self.start_time.lock().unwrap_or_else(|e| e.into_inner()) =
+            Some(std::time::Instant::now());
         *self.format.lock().unwrap_or_else(|e| e.into_inner()) = format;
     }
 

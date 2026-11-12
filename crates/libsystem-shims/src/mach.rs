@@ -212,7 +212,10 @@ extern "C" fn shim_dyld_get_image_name(_index: u32) -> *const u8 {
 
 /// `intptr_t _dyld_get_image_vmaddr_slide(uint32_t index)` — returns 0.
 extern "C" fn shim_dyld_get_image_vmaddr_slide(_index: u32) -> isize {
-    log::trace!("_dyld_get_image_vmaddr_slide({}): returning 0 (guest)", _index);
+    log::trace!(
+        "_dyld_get_image_vmaddr_slide({}): returning 0 (guest)",
+        _index
+    );
     0
 }
 
@@ -228,7 +231,9 @@ mod tests {
         assert!(table.resolve("_mach_timebase_info").is_some());
         assert!(table.resolve("_clock").is_some());
         assert!(table.resolve("_sys_icache_invalidate").is_some());
-        assert!(table.resolve("__dyld_register_func_for_add_image").is_some());
+        assert!(table
+            .resolve("__dyld_register_func_for_add_image")
+            .is_some());
         assert!(table.resolve("__dyld_image_count").is_some());
         assert!(table.resolve("__dyld_get_image_header").is_some());
         assert!(table.resolve("__dyld_get_image_name").is_some());

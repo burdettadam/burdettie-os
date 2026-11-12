@@ -122,7 +122,10 @@ mod tests {
             shim_pkbundlecomponentversion_current_marketing_version(obj, 0),
             "26.4",
         );
-        assert_string_eq(shim_pkbundlecomponentversion_bundle_version(obj, 0), "24909");
+        assert_string_eq(
+            shim_pkbundlecomponentversion_bundle_version(obj, 0),
+            "24909",
+        );
         free_obj(obj);
     }
 }

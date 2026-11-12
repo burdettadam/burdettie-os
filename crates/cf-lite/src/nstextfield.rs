@@ -83,7 +83,15 @@ fn init_as_label(obj: u64, string_value: u64) {
 fn init_as_editable(obj: u64, string_value: u64) {
     write_u64(obj, STRING_VALUE_OFF, string_value);
     // Editable: enabled + editable + bezeled + draws background + selectable
-    write_u64(obj, FLAGS_OFF, FLAG_IS_ENABLED | FLAG_IS_EDITABLE | FLAG_IS_BEZELED | FLAG_DRAWS_BACKGROUND | FLAG_IS_SELECTABLE);
+    write_u64(
+        obj,
+        FLAGS_OFF,
+        FLAG_IS_ENABLED
+            | FLAG_IS_EDITABLE
+            | FLAG_IS_BEZELED
+            | FLAG_DRAWS_BACKGROUND
+            | FLAG_IS_SELECTABLE,
+    );
 }
 
 // ── Instance method shims ──────────────────────────────────────
@@ -201,13 +209,21 @@ pub extern "C" fn shim_nstextfield_label_with_string(_cls: u64, _cmd: u64, strin
 }
 
 /// `+[NSTextField wrappingLabelWithString:]` — creates a wrapping label.
-pub extern "C" fn shim_nstextfield_wrapping_label_with_string(_cls: u64, _cmd: u64, string: u64) -> u64 {
+pub extern "C" fn shim_nstextfield_wrapping_label_with_string(
+    _cls: u64,
+    _cmd: u64,
+    string: u64,
+) -> u64 {
     // Same as labelWithString: for our purposes
     shim_nstextfield_label_with_string(_cls, _cmd, string)
 }
 
 /// `+[NSTextField textFieldWithString:]` — creates an editable text field.
-pub extern "C" fn shim_nstextfield_text_field_with_string(_cls: u64, _cmd: u64, string: u64) -> u64 {
+pub extern "C" fn shim_nstextfield_text_field_with_string(
+    _cls: u64,
+    _cmd: u64,
+    string: u64,
+) -> u64 {
     let obj = crate::pal_alloc().calloc(1, TEXTFIELD_SIZE) as u64;
     if obj == 0 {
         return 0;
@@ -227,10 +243,14 @@ pub extern "C" fn shim_nstextfield_text_field_with_string(_cls: u64, _cmd: u64, 
 /// in the current fill color. Uses the CG context from the current
 /// NSGraphicsContext (set by `display_view_recursive`).
 pub extern "C" fn shim_nstextfield_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
 
     let cg_ctx = crate::nsgraphicscontext::current_cg_context_handle();
-    if cg_ctx == 0 { return; }
+    if cg_ctx == 0 {
+        return;
+    }
 
     // Draw background if enabled.
     let flags = read_u64(obj, FLAGS_OFF);
@@ -320,13 +340,17 @@ pub extern "C" fn shim_nstextfield_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64
 /// Check if this view is the first responder of its window.
 fn is_first_responder(obj: u64) -> bool {
     let window = read_u64(obj, 16); // WINDOW_OFF from nsview
-    if window == 0 { return false; }
+    if window == 0 {
+        return false;
+    }
     crate::nswindow::shim_nswindow_first_responder(window, 0) == obj
 }
 
 /// `-[NSTextField acceptsFirstResponder]` — returns YES if editable.
 pub extern "C" fn shim_nstextfield_accepts_first_responder(obj: u64, _cmd: u64) -> u8 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let flags = read_u64(obj, FLAGS_OFF);
     u8::from(flags & FLAG_IS_EDITABLE != 0)
 }
@@ -337,7 +361,9 @@ pub extern "C" fn shim_nstextfield_accepts_first_responder(obj: u64, _cmd: u64) 
 /// reads the event's characters and appends them to the string value.
 /// Backspace (keyCode 51) deletes the last character.
 pub extern "C" fn shim_nstextfield_key_down(obj: u64, _cmd: u64, event: u64) {
-    if obj == 0 || event == 0 { return; }
+    if obj == 0 || event == 0 {
+        return;
+    }
 
     let flags = read_u64(obj, FLAGS_OFF);
     if flags & FLAG_IS_EDITABLE == 0 {
@@ -387,18 +413,26 @@ pub extern "C" fn shim_nstextfield_key_down(obj: u64, _cmd: u64, event: u64) {
 
     // Regular character input — read event characters and append.
     let chars_ptr = crate::nsevent::shim_nsevent_characters(event, 0);
-    if chars_ptr == 0 { return; }
+    if chars_ptr == 0 {
+        return;
+    }
 
     let utf8 = crate::cfstring::shim_nsstring_utf8string(chars_ptr, 0);
-    if utf8.is_null() { return; }
+    if utf8.is_null() {
+        return;
+    }
     let typed = unsafe { std::ffi::CStr::from_ptr(utf8) }
         .to_str()
         .unwrap_or("");
-    if typed.is_empty() { return; }
+    if typed.is_empty() {
+        return;
+    }
 
     // Filter non-printable characters (control chars).
     let typed: String = typed.chars().filter(|c| !c.is_control()).collect();
-    if typed.is_empty() { return; }
+    if typed.is_empty() {
+        return;
+    }
 
     // Get current string value.
     let string_ptr = read_u64(obj, STRING_VALUE_OFF);
@@ -431,7 +465,9 @@ pub extern "C" fn shim_nstextfield_key_down(obj: u64, _cmd: u64, event: u64) {
 
 /// `-[NSTextField mouseDown:]` — make this text field the first responder.
 pub extern "C" fn shim_nstextfield_mouse_down(obj: u64, _cmd: u64, event: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
 
     let flags = read_u64(obj, FLAGS_OFF);
     if flags & FLAG_IS_EDITABLE == 0 && flags & FLAG_IS_SELECTABLE == 0 {
@@ -455,7 +491,9 @@ fn notify_text_did_change(obj: u64) {
     let delegate = read_u64(obj, TARGET_OFF);
     if delegate != 0 {
         let _ = crate::nsapplication::dispatch_selector_named_to_target(
-            delegate, "controlTextDidChange:", obj,
+            delegate,
+            "controlTextDidChange:",
+            obj,
         );
     }
 }
@@ -465,7 +503,9 @@ fn notify_text_did_end_editing(obj: u64) {
     let delegate = read_u64(obj, TARGET_OFF);
     if delegate != 0 {
         let _ = crate::nsapplication::dispatch_selector_named_to_target(
-            delegate, "controlTextDidEndEditing:", obj,
+            delegate,
+            "controlTextDidEndEditing:",
+            obj,
         );
     }
 }

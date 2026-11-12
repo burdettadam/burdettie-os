@@ -15,7 +15,9 @@ const CAP_OFF: usize = 24;
 const INITIAL_CAP: u64 = 4;
 
 fn elements_equal(a: u64, b: u64) -> bool {
-    if a == b { return true; }
+    if a == b {
+        return true;
+    }
     // String equality fallback
     if let (Some(sa), Some(sb)) = (
         cfstring::extract_cfstring_cstr(a),
@@ -29,7 +31,9 @@ fn elements_equal(a: u64, b: u64) -> bool {
 fn contains_element(elems: u64, count: u64, target: u64) -> bool {
     for i in 0..count as usize {
         let elem = unsafe { *((elems as usize + i * 8) as *const u64) };
-        if elements_equal(elem, target) { return true; }
+        if elements_equal(elem, target) {
+            return true;
+        }
     }
     false
 }
@@ -38,14 +42,22 @@ fn contains_element(elems: u64, count: u64, target: u64) -> bool {
 
 /// `+[NSOrderedSet orderedSetWithArray:]`
 pub extern "C" fn shim_nsorderedset_ordered_set_with_array(
-    _cls: u64, _cmd: u64, array: u64,
+    _cls: u64,
+    _cmd: u64,
+    array: u64,
 ) -> u64 {
     let count = if array != 0 {
         crate::nsarray::shim_nsarray_count(array, 0)
-    } else { 0 };
+    } else {
+        0
+    };
     let obj = crate::pal_alloc().calloc(1, 32) as u64;
-    if obj == 0 { return 0; }
-    unsafe { *(obj as *mut u64) = nsobj::nsorderedset_class_addr(); }
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *(obj as *mut u64) = nsobj::nsorderedset_class_addr();
+    }
 
     let cap = if count == 0 { INITIAL_CAP } else { count };
     let buf = crate::pal_alloc().calloc(cap as usize, 8) as u64;
@@ -59,19 +71,27 @@ pub extern "C" fn shim_nsorderedset_ordered_set_with_array(
     for i in 0..count {
         let elem = crate::nsarray::shim_nsarray_object_at_index(array, 0, i);
         if !contains_element(buf, n, elem) {
-            unsafe { *((buf as usize + n as usize * 8) as *mut u64) = elem; }
+            unsafe {
+                *((buf as usize + n as usize * 8) as *mut u64) = elem;
+            }
             n += 1;
         }
     }
-    unsafe { *((obj as usize + COUNT_OFF) as *mut u64) = n; }
+    unsafe {
+        *((obj as usize + COUNT_OFF) as *mut u64) = n;
+    }
     obj
 }
 
 /// `+[NSOrderedSet orderedSet]`
 pub extern "C" fn shim_nsorderedset_ordered_set(_cls: u64, _cmd: u64) -> u64 {
     let obj = crate::pal_alloc().calloc(1, 32) as u64;
-    if obj == 0 { return 0; }
-    unsafe { *(obj as *mut u64) = nsobj::nsorderedset_class_addr(); }
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *(obj as *mut u64) = nsobj::nsorderedset_class_addr();
+    }
     let buf = crate::pal_alloc().calloc(INITIAL_CAP as usize, 8) as u64;
     unsafe {
         *((obj as usize + ELEMS_OFF) as *mut u64) = buf;
@@ -82,17 +102,25 @@ pub extern "C" fn shim_nsorderedset_ordered_set(_cls: u64, _cmd: u64) -> u64 {
 
 /// `-[NSOrderedSet count]`
 pub extern "C" fn shim_nsorderedset_count(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + COUNT_OFF) as *const u64) }
 }
 
 /// `-[NSOrderedSet objectAtIndex:]`
 pub extern "C" fn shim_nsorderedset_object_at_index(obj: u64, _cmd: u64, idx: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let count = unsafe { *((obj as usize + COUNT_OFF) as *const u64) };
-    if idx >= count { return 0; }
+    if idx >= count {
+        return 0;
+    }
     let elems = unsafe { *((obj as usize + ELEMS_OFF) as *const u64) };
-    if elems == 0 { return 0; }
+    if elems == 0 {
+        return 0;
+    }
     unsafe { *((elems as usize + idx as usize * 8) as *const u64) }
 }
 
@@ -104,13 +132,17 @@ pub extern "C" fn shim_nsorderedset_first_object(obj: u64, _cmd: u64) -> u64 {
 /// `-[NSOrderedSet lastObject]`
 pub extern "C" fn shim_nsorderedset_last_object(obj: u64, _cmd: u64) -> u64 {
     let count = shim_nsorderedset_count(obj, 0);
-    if count == 0 { return 0; }
+    if count == 0 {
+        return 0;
+    }
     shim_nsorderedset_object_at_index(obj, 0, count - 1)
 }
 
 /// `-[NSOrderedSet containsObject:]`
 pub extern "C" fn shim_nsorderedset_contains_object(obj: u64, _cmd: u64, target: u64) -> u8 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let count = unsafe { *((obj as usize + COUNT_OFF) as *const u64) };
     let elems = unsafe { *((obj as usize + ELEMS_OFF) as *const u64) };
     u8::from(contains_element(elems, count, target))
@@ -118,19 +150,25 @@ pub extern "C" fn shim_nsorderedset_contains_object(obj: u64, _cmd: u64, target:
 
 /// `-[NSOrderedSet indexOfObject:]`
 pub extern "C" fn shim_nsorderedset_index_of_object(obj: u64, _cmd: u64, target: u64) -> u64 {
-    if obj == 0 { return u64::MAX; }
+    if obj == 0 {
+        return u64::MAX;
+    }
     let count = unsafe { *((obj as usize + COUNT_OFF) as *const u64) };
     let elems = unsafe { *((obj as usize + ELEMS_OFF) as *const u64) };
     for i in 0..count as usize {
         let elem = unsafe { *((elems as usize + i * 8) as *const u64) };
-        if elements_equal(elem, target) { return i as u64; }
+        if elements_equal(elem, target) {
+            return i as u64;
+        }
     }
     u64::MAX // NSNotFound
 }
 
 /// `-[NSOrderedSet array]` — returns an NSArray of all elements in order.
 pub extern "C" fn shim_nsorderedset_array(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let count = unsafe { *((obj as usize + COUNT_OFF) as *const u64) };
     let elems = unsafe { *((obj as usize + ELEMS_OFF) as *const u64) };
     if count == 0 || elems == 0 {
@@ -145,7 +183,9 @@ pub extern "C" fn shim_nsorderedset_array(obj: u64, _cmd: u64) -> u64 {
 
 /// `-[NSOrderedSet set]` — returns an NSSet containing all elements.
 pub extern "C" fn shim_nsorderedset_set(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let count = unsafe { *((obj as usize + COUNT_OFF) as *const u64) };
     let elems = unsafe { *((obj as usize + ELEMS_OFF) as *const u64) };
     if count == 0 || elems == 0 {
@@ -157,7 +197,9 @@ pub extern "C" fn shim_nsorderedset_set(obj: u64, _cmd: u64) -> u64 {
 /// `-[NSOrderedSet reverseObjectEnumerator]` — returns an enumerator that
 /// iterates elements in reverse order.
 pub extern "C" fn shim_nsorderedset_reverse_object_enumerator(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let count = unsafe { *((obj as usize + COUNT_OFF) as *const u64) } as usize;
     let elems = unsafe { *((obj as usize + ELEMS_OFF) as *const u64) };
     if count == 0 || elems == 0 {
@@ -174,7 +216,9 @@ pub extern "C" fn shim_nsorderedset_reverse_object_enumerator(obj: u64, _cmd: u6
 
 /// `-[NSOrderedSet description]`
 pub extern "C" fn shim_nsorderedset_description(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let count = unsafe { *((obj as usize + COUNT_OFF) as *const u64) };
     let desc = format!("<NSOrderedSet: {} objects>", count);
     let c_str = std::ffi::CString::new(desc).unwrap_or_default();
@@ -186,7 +230,9 @@ pub extern "C" fn shim_nsorderedset_description(obj: u64, _cmd: u64) -> u64 {
 unsafe fn grow_ordered_set(obj: u64) {
     let count = *((obj as usize + COUNT_OFF) as *const u64);
     let cap = *((obj as usize + CAP_OFF) as *const u64);
-    if count < cap { return; }
+    if count < cap {
+        return;
+    }
     let new_cap = if cap == 0 { INITIAL_CAP } else { cap * 2 };
     let old_buf = *((obj as usize + ELEMS_OFF) as *const u64);
     let new_buf = crate::pal_alloc().realloc(old_buf as *mut u8, new_cap as usize * 8) as u64;
@@ -201,8 +247,12 @@ unsafe fn grow_ordered_set(obj: u64) {
 /// `+[NSMutableOrderedSet orderedSet]`
 pub extern "C" fn shim_nsmutableorderedset_ordered_set(_cls: u64, _cmd: u64) -> u64 {
     let obj = crate::pal_alloc().calloc(1, 32) as u64;
-    if obj == 0 { return 0; }
-    unsafe { *(obj as *mut u64) = nsobj::nsmutableorderedset_class_addr(); }
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *(obj as *mut u64) = nsobj::nsmutableorderedset_class_addr();
+    }
     let buf = crate::pal_alloc().calloc(INITIAL_CAP as usize, 8) as u64;
     unsafe {
         *((obj as usize + ELEMS_OFF) as *mut u64) = buf;
@@ -227,7 +277,9 @@ pub extern "C" fn shim_nsmutableorderedset_ordered_set_with_array(
     array: u64,
 ) -> u64 {
     let obj = shim_nsmutableorderedset_ordered_set(cls, cmd);
-    if obj == 0 || array == 0 { return obj; }
+    if obj == 0 || array == 0 {
+        return obj;
+    }
     let count = crate::nsarray::shim_nsarray_count(array, 0);
     for i in 0..count {
         let element = crate::nsarray::shim_nsarray_object_at_index(array, 0, i);
@@ -238,11 +290,17 @@ pub extern "C" fn shim_nsmutableorderedset_ordered_set_with_array(
 
 /// `-[NSMutableOrderedSet addObject:]`
 pub extern "C" fn shim_nsmutableorderedset_add_object(obj: u64, _cmd: u64, element: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let count = unsafe { *((obj as usize + COUNT_OFF) as *const u64) };
     let elems = unsafe { *((obj as usize + ELEMS_OFF) as *const u64) };
-    if contains_element(elems, count, element) { return 0; } // already present
-    unsafe { grow_ordered_set(obj); }
+    if contains_element(elems, count, element) {
+        return 0;
+    } // already present
+    unsafe {
+        grow_ordered_set(obj);
+    }
     let elems = unsafe { *((obj as usize + ELEMS_OFF) as *const u64) };
     let count = unsafe { *((obj as usize + COUNT_OFF) as *const u64) };
     unsafe {
@@ -254,41 +312,64 @@ pub extern "C" fn shim_nsmutableorderedset_add_object(obj: u64, _cmd: u64, eleme
 
 /// `-[NSMutableOrderedSet removeObject:]`
 pub extern "C" fn shim_nsmutableorderedset_remove_object(obj: u64, _cmd: u64, target: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let count = unsafe { *((obj as usize + COUNT_OFF) as *const u64) } as usize;
     let elems = unsafe { *((obj as usize + ELEMS_OFF) as *const u64) };
-    if elems == 0 || count == 0 { return 0; }
+    if elems == 0 || count == 0 {
+        return 0;
+    }
     let mut write = 0usize;
     for read in 0..count {
         let elem = unsafe { *((elems as usize + read * 8) as *const u64) };
         if !elements_equal(elem, target) {
             if write != read {
-                unsafe { *((elems as usize + write * 8) as *mut u64) = elem; }
+                unsafe {
+                    *((elems as usize + write * 8) as *mut u64) = elem;
+                }
             }
             write += 1;
         }
     }
-    unsafe { *((obj as usize + COUNT_OFF) as *mut u64) = write as u64; }
+    unsafe {
+        *((obj as usize + COUNT_OFF) as *mut u64) = write as u64;
+    }
     0
 }
 
 /// `-[NSMutableOrderedSet removeAllObjects]`
 pub extern "C" fn shim_nsmutableorderedset_remove_all(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
-    unsafe { *((obj as usize + COUNT_OFF) as *mut u64) = 0; }
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *((obj as usize + COUNT_OFF) as *mut u64) = 0;
+    }
     0
 }
 
 /// `-[NSMutableOrderedSet insertObject:atIndex:]`
 pub extern "C" fn shim_nsmutableorderedset_insert_object(
-    obj: u64, _cmd: u64, element: u64, idx: u64,
+    obj: u64,
+    _cmd: u64,
+    element: u64,
+    idx: u64,
 ) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let count = unsafe { *((obj as usize + COUNT_OFF) as *const u64) };
     let elems = unsafe { *((obj as usize + ELEMS_OFF) as *const u64) };
-    if contains_element(elems, count, element) { return 0; }
-    if idx > count { return 0; }
-    unsafe { grow_ordered_set(obj); }
+    if contains_element(elems, count, element) {
+        return 0;
+    }
+    if idx > count {
+        return 0;
+    }
+    unsafe {
+        grow_ordered_set(obj);
+    }
     let elems = unsafe { *((obj as usize + ELEMS_OFF) as *const u64) };
     // Shift right
     if idx < count {
@@ -553,9 +634,18 @@ mod tests {
         let (oset, _strs) = make_ordered_set_from_strings(&["a", "b", "c"]);
         let e = shim_nsorderedset_reverse_object_enumerator(oset, 0);
         assert_ne!(e, 0);
-        assert_string_eq(crate::nsenumerator::shim_nsenumerator_next_object(e, 0), "c");
-        assert_string_eq(crate::nsenumerator::shim_nsenumerator_next_object(e, 0), "b");
-        assert_string_eq(crate::nsenumerator::shim_nsenumerator_next_object(e, 0), "a");
+        assert_string_eq(
+            crate::nsenumerator::shim_nsenumerator_next_object(e, 0),
+            "c",
+        );
+        assert_string_eq(
+            crate::nsenumerator::shim_nsenumerator_next_object(e, 0),
+            "b",
+        );
+        assert_string_eq(
+            crate::nsenumerator::shim_nsenumerator_next_object(e, 0),
+            "a",
+        );
         assert_eq!(crate::nsenumerator::shim_nsenumerator_next_object(e, 0), 0);
         free_obj(e);
         free_obj(oset);

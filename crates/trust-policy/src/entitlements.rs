@@ -159,8 +159,7 @@ pub mod known {
     pub const ALLOW_UNSIGNED_MEMORY: &str =
         "com.apple.security.cs.allow-unsigned-executable-memory";
     pub const ALLOW_DYLD_ENV: &str = "com.apple.security.cs.allow-dyld-environment-variables";
-    pub const DISABLE_LIBRARY_VALIDATION: &str =
-        "com.apple.security.cs.disable-library-validation";
+    pub const DISABLE_LIBRARY_VALIDATION: &str = "com.apple.security.cs.disable-library-validation";
     pub const DISABLE_EXECUTABLE_PAGE_PROTECTION: &str =
         "com.apple.security.cs.disable-executable-page-protection";
     pub const DEBUGGER: &str = "com.apple.security.cs.debugger";
@@ -378,10 +377,7 @@ mod tests {
 
     #[test]
     fn entitlement_set_has() {
-        let keys = vec![
-            ("present".to_string(), true),
-            ("absent".to_string(), false),
-        ];
+        let keys = vec![("present".to_string(), true), ("absent".to_string(), false)];
         let set = EntitlementSet::from_keys(&keys);
         assert!(set.has("present"));
         assert!(!set.has("absent"));

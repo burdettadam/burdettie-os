@@ -3,57 +3,179 @@
 //! Supplements the core dispatch shims in `crate::dispatch` with
 //! additional primitives used by Xcode tools.
 
-use crate::table::ShimTable;
+use super::blocks_runtime::{invoke_block0, OwnedBlock, BLOCK_IS_GLOBAL_FLAG};
 use super::dispatch_queue;
+use crate::table::ShimTable;
 
 pub struct DispatchExtrasStubs;
 
 impl DispatchExtrasStubs {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
-        register_shims!(table,
-            ("_dispatch_activate", shim_dispatch_void1 as *const () as u64, "dispatch_activate (stub → void)"),
-            ("_dispatch_assert_queue", shim_dispatch_void1 as *const () as u64, "dispatch_assert_queue (stub → void)"),
-            ("_dispatch_assert_queue_barrier", shim_dispatch_void1 as *const () as u64, "dispatch_assert_queue_barrier (stub → void)"),
-            ("_dispatch_assert_queue_not", shim_dispatch_void1 as *const () as u64, "dispatch_assert_queue_not (stub → void)"),
-            ("_dispatch_block_create", shim_dispatch_block_create as *const () as u64, "dispatch_block_create (real cancel/wait tracking)"),
-            ("_dispatch_block_create_with_qos_class", shim_dispatch_block_create_qos as *const () as u64, "dispatch_block_create_with_qos_class (real)"),
-            ("_dispatch_block_cancel", shim_dispatch_block_cancel as *const () as u64, "dispatch_block_cancel (real)"),
-            ("_dispatch_block_testcancel", shim_dispatch_block_testcancel as *const () as u64, "dispatch_block_testcancel (real)"),
-            ("_dispatch_block_wait", shim_dispatch_block_wait as *const () as u64, "dispatch_block_wait (real condvar)"),
-            ("_dispatch_block_notify", shim_dispatch_block_notify as *const () as u64, "dispatch_block_notify (real)"),
-            ("_dispatch_block_perform", shim_dispatch_block_perform as *const () as u64, "dispatch_block_perform (real)"),
+        register_shims!(
+            table,
+            (
+                "_dispatch_activate",
+                shim_dispatch_void1 as *const () as u64,
+                "dispatch_activate (stub → void)"
+            ),
+            (
+                "_dispatch_assert_queue",
+                shim_dispatch_void1 as *const () as u64,
+                "dispatch_assert_queue (stub → void)"
+            ),
+            (
+                "_dispatch_assert_queue_barrier",
+                shim_dispatch_void1 as *const () as u64,
+                "dispatch_assert_queue_barrier (stub → void)"
+            ),
+            (
+                "_dispatch_assert_queue_not",
+                shim_dispatch_void1 as *const () as u64,
+                "dispatch_assert_queue_not (stub → void)"
+            ),
+            (
+                "_dispatch_block_create",
+                shim_dispatch_block_create as *const () as u64,
+                "dispatch_block_create (real cancel/wait tracking)"
+            ),
+            (
+                "_dispatch_block_create_with_qos_class",
+                shim_dispatch_block_create_qos as *const () as u64,
+                "dispatch_block_create_with_qos_class (real)"
+            ),
+            (
+                "_dispatch_block_cancel",
+                shim_dispatch_block_cancel as *const () as u64,
+                "dispatch_block_cancel (real)"
+            ),
+            (
+                "_dispatch_block_testcancel",
+                shim_dispatch_block_testcancel as *const () as u64,
+                "dispatch_block_testcancel (real)"
+            ),
+            (
+                "_dispatch_block_wait",
+                shim_dispatch_block_wait as *const () as u64,
+                "dispatch_block_wait (real condvar)"
+            ),
+            (
+                "_dispatch_block_notify",
+                shim_dispatch_block_notify as *const () as u64,
+                "dispatch_block_notify (real)"
+            ),
+            (
+                "_dispatch_block_perform",
+                shim_dispatch_block_perform as *const () as u64,
+                "dispatch_block_perform (real)"
+            ),
             // dispatch_io: now handled by dispatch_io.rs — removed stubs
-            ("_dispatch_queue_attr_make_with_autorelease_frequency", shim_dispatch_first_arg as *const () as u64, "dispatch_queue_attr_make_with_autorelease_frequency (stub → attr passthrough)"),
+            (
+                "_dispatch_queue_attr_make_with_autorelease_frequency",
+                shim_dispatch_first_arg as *const () as u64,
+                "dispatch_queue_attr_make_with_autorelease_frequency (stub → attr passthrough)"
+            ),
             // dispatch_source data/handle/merge_data: now in dispatch_data_source.rs
             // dispatch_apply — serial loop implementation
-            ("_dispatch_apply", shim_dispatch_apply as *const () as u64, "dispatch_apply (serial loop)"),
-            ("_dispatch_apply_f", shim_dispatch_apply_f as *const () as u64, "dispatch_apply_f (serial loop)"),
+            (
+                "_dispatch_apply",
+                shim_dispatch_apply as *const () as u64,
+                "dispatch_apply (serial loop)"
+            ),
+            (
+                "_dispatch_apply_f",
+                shim_dispatch_apply_f as *const () as u64,
+                "dispatch_apply_f (serial loop)"
+            ),
             // dispatch_queue_create — returns a sentinel queue pointer
-            ("_dispatch_queue_create", shim_dispatch_queue_create as *const () as u64, "dispatch_queue_create (→ sentinel)"),
-            ("__dispatch_queue_attr_concurrent", &DISPATCH_QUEUE_ATTR_CONCURRENT as *const _ as u64, "_dispatch_queue_attr_concurrent (data sentinel)"),
+            (
+                "_dispatch_queue_create",
+                shim_dispatch_queue_create as *const () as u64,
+                "dispatch_queue_create (→ sentinel)"
+            ),
+            (
+                "__dispatch_queue_attr_concurrent",
+                &DISPATCH_QUEUE_ATTR_CONCURRENT as *const _ as u64,
+                "_dispatch_queue_attr_concurrent (data sentinel)"
+            ),
             // ── dispatch_after / dispatch_time ──────────────────
-            ("_dispatch_after", shim_dispatch_after as *const () as u64, "dispatch_after (timer + thread)"),
-            ("_dispatch_after_f", shim_dispatch_after_f as *const () as u64, "dispatch_after_f (timer + thread)"),
-            ("_dispatch_time", shim_dispatch_time as *const () as u64, "dispatch_time (nanosecond math)"),
-            ("_dispatch_walltime", shim_dispatch_walltime as *const () as u64, "dispatch_walltime (wall clock)"),
+            (
+                "_dispatch_after",
+                shim_dispatch_after as *const () as u64,
+                "dispatch_after (timer + thread)"
+            ),
+            (
+                "_dispatch_after_f",
+                shim_dispatch_after_f as *const () as u64,
+                "dispatch_after_f (timer + thread)"
+            ),
+            (
+                "_dispatch_time",
+                shim_dispatch_time as *const () as u64,
+                "dispatch_time (nanosecond math)"
+            ),
+            (
+                "_dispatch_walltime",
+                shim_dispatch_walltime as *const () as u64,
+                "dispatch_walltime (wall clock)"
+            ),
             // ── dispatch_async_f / dispatch_sync_f ──────────────
-            ("_dispatch_async_f", shim_dispatch_async_f as *const () as u64, "dispatch_async_f (threaded)"),
-            ("_dispatch_sync_f", shim_dispatch_sync_f as *const () as u64, "dispatch_sync_f (inline)"),
+            (
+                "_dispatch_async_f",
+                shim_dispatch_async_f as *const () as u64,
+                "dispatch_async_f (threaded)"
+            ),
+            (
+                "_dispatch_sync_f",
+                shim_dispatch_sync_f as *const () as u64,
+                "dispatch_sync_f (inline)"
+            ),
             // ── dispatch_barrier ─────────────────────────────────
-            ("_dispatch_barrier_sync", shim_dispatch_barrier_sync as *const () as u64, "dispatch_barrier_sync (inline)"),
-            ("_dispatch_barrier_async", shim_dispatch_barrier_async as *const () as u64, "dispatch_barrier_async (threaded)"),
-            ("_dispatch_barrier_async_f", shim_dispatch_barrier_async_f as *const () as u64, "dispatch_barrier_async_f (threaded)"),
+            (
+                "_dispatch_barrier_sync",
+                shim_dispatch_barrier_sync as *const () as u64,
+                "dispatch_barrier_sync (inline)"
+            ),
+            (
+                "_dispatch_barrier_async",
+                shim_dispatch_barrier_async as *const () as u64,
+                "dispatch_barrier_async (threaded)"
+            ),
+            (
+                "_dispatch_barrier_async_f",
+                shim_dispatch_barrier_async_f as *const () as u64,
+                "dispatch_barrier_async_f (threaded)"
+            ),
             // ── dispatch_queue_get_label ─────────────────────────
-            ("_dispatch_queue_get_label", shim_dispatch_queue_get_label as *const () as u64, "dispatch_queue_get_label (→ empty)"),
+            (
+                "_dispatch_queue_get_label",
+                shim_dispatch_queue_get_label as *const () as u64,
+                "dispatch_queue_get_label (→ empty)"
+            ),
             // ── dispatch_set_target_queue ────────────────────────
-            ("_dispatch_set_target_queue", shim_dispatch_void2 as *const () as u64, "dispatch_set_target_queue (stub → void)"),
+            (
+                "_dispatch_set_target_queue",
+                shim_dispatch_void2 as *const () as u64,
+                "dispatch_set_target_queue (stub → void)"
+            ),
             // ── dispatch_queue_set_specific ──────────────────────
-            ("_dispatch_queue_set_specific", shim_dispatch_queue_set_specific as *const () as u64, "dispatch_queue_set_specific (real)"),
+            (
+                "_dispatch_queue_set_specific",
+                shim_dispatch_queue_set_specific as *const () as u64,
+                "dispatch_queue_set_specific (real)"
+            ),
             // ── dispatch_get_specific ────────────────────────────
-            ("_dispatch_get_specific", shim_dispatch_get_specific as *const () as u64, "dispatch_get_specific (real)"),
+            (
+                "_dispatch_get_specific",
+                shim_dispatch_get_specific as *const () as u64,
+                "dispatch_get_specific (real)"
+            ),
             // ── dispatch_queue_get_specific ──────────────────────
-            ("_dispatch_queue_get_specific", shim_dispatch_queue_get_specific as *const () as u64, "dispatch_queue_get_specific (real)"),
+            (
+                "_dispatch_queue_get_specific",
+                shim_dispatch_queue_get_specific as *const () as u64,
+                "dispatch_queue_get_specific (real)"
+            ),
         );
         log::debug!("DispatchExtrasStubs: registered 39 dispatch stubs");
     }
@@ -63,9 +185,15 @@ pub extern "C" fn shim_dispatch_void1(_a: u64) {}
 pub extern "C" fn shim_dispatch_void2(_a: u64, _b: u64) {}
 pub extern "C" fn shim_dispatch_void3(_a: u64, _b: u64, _c: u64) {}
 pub extern "C" fn shim_dispatch_void4(_a: u64, _b: u64, _c: u64, _d: u64) {}
-pub extern "C" fn shim_dispatch_null1(_a: u64) -> u64 { 0 }
-pub extern "C" fn shim_dispatch_null3(_a: u64, _b: u64, _c: u64) -> u64 { 0 }
-pub extern "C" fn shim_dispatch_first_arg(a: u64, _b: u64) -> u64 { a }
+pub extern "C" fn shim_dispatch_null1(_a: u64) -> u64 {
+    0
+}
+pub extern "C" fn shim_dispatch_null3(_a: u64, _b: u64, _c: u64) -> u64 {
+    0
+}
+pub extern "C" fn shim_dispatch_first_arg(a: u64, _b: u64) -> u64 {
+    a
+}
 
 // ═══════════════════════════════════════════════════════════════════
 //  dispatch_block — real cancel / wait / notify tracking
@@ -76,10 +204,8 @@ use std::sync::{Arc, Condvar};
 
 /// Per-block metadata tracked by the block registry.
 struct BlockWrapper {
-    /// Guest block pointer (the original block passed to dispatch_block_create).
-    inner_block: usize,
-    /// Invoke function pointer extracted from the inner block (offset 16).
-    inner_invoke: usize,
+    /// Heap-owned guest block passed to dispatch_block_create.
+    inner_block: OwnedBlock,
     /// Whether dispatch_block_cancel has been called.
     cancelled: AtomicBool,
     /// True once the wrapper trampoline has finished executing.
@@ -87,7 +213,7 @@ struct BlockWrapper {
     /// Wakes waiters blocked in dispatch_block_wait.
     completed_cv: Condvar,
     /// (queue_handle, notification_block_ptr) pairs to dispatch on completion.
-    notifications: Mutex<Vec<(u64, usize)>>,
+    notifications: Mutex<Vec<(u64, OwnedBlock)>>,
 }
 
 /// Registry of blocks created via dispatch_block_create.
@@ -113,7 +239,19 @@ struct SyntheticBlock {
     flags: i32,
     reserved: i32,
     invoke: extern "C" fn(*const u8),
+    descriptor: *const SyntheticBlockDescriptor,
 }
+
+#[repr(C)]
+struct SyntheticBlockDescriptor {
+    reserved: u64,
+    size: u64,
+}
+
+static SYNTHETIC_BLOCK_DESCRIPTOR: SyntheticBlockDescriptor = SyntheticBlockDescriptor {
+    reserved: 0,
+    size: std::mem::size_of::<SyntheticBlock>() as u64,
+};
 
 /// Trampoline installed at offset 16 of every synthetic block.
 ///
@@ -128,12 +266,12 @@ extern "C" fn block_trampoline(block: *const u8) {
         let reg = block_registry().lock().unwrap();
         reg.get(&addr).cloned()
     };
-    let Some(wrapper) = wrapper else { return; };
+    let Some(wrapper) = wrapper else {
+        return;
+    };
 
     if !wrapper.cancelled.load(AtomicOrdering::Acquire) {
-        let invoke: extern "C" fn(*const u8) =
-            unsafe { std::mem::transmute(wrapper.inner_invoke) };
-        invoke(wrapper.inner_block as *const u8);
+        unsafe { invoke_block0(wrapper.inner_block.addr()) };
     }
 
     // Mark completed and wake waiters.
@@ -144,17 +282,9 @@ extern "C" fn block_trampoline(block: *const u8) {
     }
 
     // Fire notification blocks.
-    let notes: Vec<(u64, usize)> = wrapper.notifications.lock().unwrap().drain(..).collect();
+    let notes: Vec<(u64, OwnedBlock)> = wrapper.notifications.lock().unwrap().drain(..).collect();
     for (queue, nb) in notes {
-        dispatch_queue::queue_async(
-            queue,
-            Box::new(move || {
-                let ptr = nb as *const u8;
-                let inv: extern "C" fn(*const u8) =
-                    unsafe { *(ptr.add(16) as *const extern "C" fn(*const u8)) };
-                inv(ptr);
-            }),
-        );
+        fire_notification(queue, nb);
     }
 }
 
@@ -164,13 +294,11 @@ extern "C" fn block_trampoline(block: *const u8) {
 /// Allocates a synthetic block that wraps `block` with cancellation and
 /// completion tracking.
 pub extern "C" fn shim_dispatch_block_create(flags: u64, block: u64) -> u64 {
-    if block == 0 {
+    let Some(inner_block) = OwnedBlock::from_block(block) else {
         return 0;
-    }
-    let inner_invoke = unsafe { *(block as *const u8).add(16) as usize };
+    };
     let wrapper = Arc::new(BlockWrapper {
-        inner_block: block as usize,
-        inner_invoke: inner_invoke as usize,
+        inner_block,
         cancelled: AtomicBool::new(false),
         completed: Mutex::new(false),
         completed_cv: Condvar::new(),
@@ -179,9 +307,10 @@ pub extern "C" fn shim_dispatch_block_create(flags: u64, block: u64) -> u64 {
 
     let syn = Box::new(SyntheticBlock {
         isa: 0,
-        flags: flags as i32,
+        flags: (flags as i32) | BLOCK_IS_GLOBAL_FLAG,
         reserved: 0,
         invoke: block_trampoline,
+        descriptor: &SYNTHETIC_BLOCK_DESCRIPTOR,
     });
     let syn_ptr = Box::into_raw(syn) as usize;
     block_registry().lock().unwrap().insert(syn_ptr, wrapper);
@@ -237,7 +366,9 @@ pub extern "C" fn shim_dispatch_block_wait(block: u64, timeout: u64) -> u64 {
         let reg = block_registry().lock().unwrap();
         reg.get(&(block as usize)).cloned()
     };
-    let Some(wrapper) = wrapper else { return 0; };
+    let Some(wrapper) = wrapper else {
+        return 0;
+    };
 
     let mut done = wrapper.completed.lock().unwrap();
     if *done {
@@ -250,7 +381,11 @@ pub extern "C" fn shim_dispatch_block_wait(block: u64, timeout: u64) -> u64 {
         }
         0
     } else if timeout == DISPATCH_TIME_NOW {
-        if *done { 0 } else { 1 }
+        if *done {
+            0
+        } else {
+            1
+        }
     } else {
         let now = nanos_now_monotonic();
         let dur = if timeout > now {
@@ -258,12 +393,13 @@ pub extern "C" fn shim_dispatch_block_wait(block: u64, timeout: u64) -> u64 {
         } else {
             std::time::Duration::ZERO
         };
-        let (d, result) = wrapper
-            .completed_cv
-            .wait_timeout(done, dur)
-            .unwrap();
+        let (d, result) = wrapper.completed_cv.wait_timeout(done, dur).unwrap();
         done = d;
-        if *done { 0 } else { 1 }
+        if *done {
+            0
+        } else {
+            1
+        }
     }
 }
 
@@ -277,36 +413,36 @@ pub extern "C" fn shim_dispatch_block_notify(block: u64, queue: u64, notificatio
     if block == 0 || notification == 0 {
         return;
     }
+    let Some(notification) = OwnedBlock::from_block(notification) else {
+        return;
+    };
     let wrapper = {
         let reg = block_registry().lock().unwrap();
         reg.get(&(block as usize)).cloned()
     };
     let Some(wrapper) = wrapper else {
         // Not a tracked block — fire immediately.
-        fire_notification(queue, notification as usize);
+        fire_notification(queue, notification);
         return;
     };
 
     let already_done = *wrapper.completed.lock().unwrap();
     if already_done {
-        fire_notification(queue, notification as usize);
+        fire_notification(queue, notification);
     } else {
         wrapper
             .notifications
             .lock()
             .unwrap()
-            .push((queue, notification as usize));
+            .push((queue, notification));
     }
 }
 
-fn fire_notification(queue: u64, nb: usize) {
+fn fire_notification(queue: u64, nb: OwnedBlock) {
     dispatch_queue::queue_async(
         queue,
         Box::new(move || {
-            let ptr = nb as *const u8;
-            let inv: extern "C" fn(*const u8) =
-                unsafe { *(ptr.add(16) as *const extern "C" fn(*const u8)) };
-            inv(ptr);
+            unsafe { invoke_block0(nb.addr()) };
         }),
     );
 }
@@ -401,9 +537,8 @@ pub extern "C" fn shim_dispatch_apply(iterations: usize, _queue: u64, block: *co
         return;
     }
     // Block layout: isa(8) + flags(4) + reserved(4) + invoke(8)
-    let invoke: extern "C" fn(*const u8, usize) = unsafe {
-        *(block.add(16) as *const extern "C" fn(*const u8, usize))
-    };
+    let invoke: extern "C" fn(*const u8, usize) =
+        unsafe { *(block.add(16) as *const extern "C" fn(*const u8, usize)) };
     for i in 0..iterations {
         invoke(block, i);
     }
@@ -481,7 +616,9 @@ pub extern "C" fn shim_dispatch_walltime(when: *const libc::timespec, delta: i64
         nanos_now_monotonic()
     } else {
         let ts = unsafe { &*when };
-        (ts.tv_sec as u64).saturating_mul(1_000_000_000).saturating_add(ts.tv_nsec as u64)
+        (ts.tv_sec as u64)
+            .saturating_mul(1_000_000_000)
+            .saturating_add(ts.tv_nsec as u64)
     };
 
     if delta >= 0 {
@@ -492,12 +629,21 @@ pub extern "C" fn shim_dispatch_walltime(when: *const libc::timespec, delta: i64
 }
 
 fn nanos_now_monotonic() -> u64 {
-    let mut ts = libc::timespec { tv_sec: 0, tv_nsec: 0 };
+    let mut ts = libc::timespec {
+        tv_sec: 0,
+        tv_nsec: 0,
+    };
     #[cfg(target_os = "linux")]
-    unsafe { libc::clock_gettime(libc::CLOCK_MONOTONIC, &mut ts); }
+    unsafe {
+        libc::clock_gettime(libc::CLOCK_MONOTONIC, &mut ts);
+    }
     #[cfg(target_os = "macos")]
-    unsafe { libc::clock_gettime(libc::CLOCK_MONOTONIC, &mut ts); }
-    (ts.tv_sec as u64).saturating_mul(1_000_000_000).saturating_add(ts.tv_nsec as u64)
+    unsafe {
+        libc::clock_gettime(libc::CLOCK_MONOTONIC, &mut ts);
+    }
+    (ts.tv_sec as u64)
+        .saturating_mul(1_000_000_000)
+        .saturating_add(ts.tv_nsec as u64)
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -509,25 +655,23 @@ fn nanos_now_monotonic() -> u64 {
 ///
 /// Schedules a block to execute after the specified time on the given queue.
 pub extern "C" fn shim_dispatch_after(when: u64, queue: u64, block: *const u8) {
-    if block.is_null() {
+    let Some(block) = OwnedBlock::from_ptr(block) else {
         return;
-    }
+    };
 
     let delay = delay_from_dispatch_time(when);
-    let invoke_ptr = unsafe { *(block.add(16) as *const usize) };
-    let block_addr = block as usize;
 
     // Timer thread sleeps, then submits to the queue
     std::thread::spawn(move || {
         if delay > std::time::Duration::ZERO {
             std::thread::sleep(delay);
         }
-        dispatch_queue::queue_async(queue, Box::new(move || {
-            unsafe {
-                let invoke: extern "C" fn(*const u8) = std::mem::transmute(invoke_ptr);
-                invoke(block_addr as *const u8);
-            }
-        }));
+        dispatch_queue::queue_async(
+            queue,
+            Box::new(move || {
+                unsafe { invoke_block0(block.addr()) };
+            }),
+        );
     });
 }
 
@@ -539,16 +683,21 @@ pub extern "C" fn shim_dispatch_after_f(
     context: u64,
     work: Option<extern "C" fn(u64)>,
 ) {
-    let Some(f) = work else { return; };
+    let Some(f) = work else {
+        return;
+    };
     let delay = delay_from_dispatch_time(when);
 
     std::thread::spawn(move || {
         if delay > std::time::Duration::ZERO {
             std::thread::sleep(delay);
         }
-        dispatch_queue::queue_async(queue, Box::new(move || {
-            f(context);
-        }));
+        dispatch_queue::queue_async(
+            queue,
+            Box::new(move || {
+                f(context);
+            }),
+        );
     });
 }
 
@@ -582,25 +731,31 @@ pub extern "C" fn shim_dispatch_async_f(
     context: u64,
     work: Option<extern "C" fn(u64)>,
 ) {
-    let Some(f) = work else { return; };
-    dispatch_queue::queue_async(queue, Box::new(move || {
-        f(context);
-    }));
+    let Some(f) = work else {
+        return;
+    };
+    dispatch_queue::queue_async(
+        queue,
+        Box::new(move || {
+            f(context);
+        }),
+    );
 }
 
 /// `void dispatch_sync_f(dispatch_queue_t queue, void *context,
 ///                         void (*work)(void *))`
 ///
 /// Routes through the queue model synchronously.
-pub extern "C" fn shim_dispatch_sync_f(
-    queue: u64,
-    context: u64,
-    work: Option<extern "C" fn(u64)>,
-) {
-    let Some(f) = work else { return; };
-    dispatch_queue::queue_sync(queue, Box::new(move || {
-        f(context);
-    }));
+pub extern "C" fn shim_dispatch_sync_f(queue: u64, context: u64, work: Option<extern "C" fn(u64)>) {
+    let Some(f) = work else {
+        return;
+    };
+    dispatch_queue::queue_sync(
+        queue,
+        Box::new(move || {
+            f(context);
+        }),
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -611,32 +766,28 @@ pub extern "C" fn shim_dispatch_sync_f(
 ///
 /// Barrier on a concurrent queue ensures exclusive access.
 pub extern "C" fn shim_dispatch_barrier_sync(queue: u64, block: *const u8) {
-    if block.is_null() {
+    let Some(block) = OwnedBlock::from_ptr(block) else {
         return;
-    }
-    let invoke_ptr = unsafe { *(block.add(16) as *const usize) };
-    let block_addr = block as usize;
-    dispatch_queue::queue_barrier_sync(queue, Box::new(move || {
-        unsafe {
-            let invoke: extern "C" fn(*const u8) = std::mem::transmute(invoke_ptr);
-            invoke(block_addr as *const u8);
-        }
-    }));
+    };
+    dispatch_queue::queue_barrier_sync(
+        queue,
+        Box::new(move || {
+            unsafe { invoke_block0(block.addr()) };
+        }),
+    );
 }
 
 /// `void dispatch_barrier_async(dispatch_queue_t queue, dispatch_block_t block)`
 pub extern "C" fn shim_dispatch_barrier_async(queue: u64, block: *const u8) {
-    if block.is_null() {
+    let Some(block) = OwnedBlock::from_ptr(block) else {
         return;
-    }
-    let invoke_ptr = unsafe { *(block.add(16) as *const usize) };
-    let block_addr = block as usize;
-    dispatch_queue::queue_barrier_async(queue, Box::new(move || {
-        unsafe {
-            let invoke: extern "C" fn(*const u8) = std::mem::transmute(invoke_ptr);
-            invoke(block_addr as *const u8);
-        }
-    }));
+    };
+    dispatch_queue::queue_barrier_async(
+        queue,
+        Box::new(move || {
+            unsafe { invoke_block0(block.addr()) };
+        }),
+    );
 }
 
 /// `void dispatch_barrier_async_f(dispatch_queue_t queue, void *context,
@@ -646,10 +797,15 @@ pub extern "C" fn shim_dispatch_barrier_async_f(
     context: u64,
     work: Option<extern "C" fn(u64)>,
 ) {
-    let Some(f) = work else { return; };
-    dispatch_queue::queue_barrier_async(queue, Box::new(move || {
-        f(context);
-    }));
+    let Some(f) = work else {
+        return;
+    };
+    dispatch_queue::queue_barrier_async(
+        queue,
+        Box::new(move || {
+            f(context);
+        }),
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -679,11 +835,57 @@ pub extern "C" fn shim_dispatch_queue_get_label(queue: u64) -> *const u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::AtomicUsize;
+
+    const BLOCK_HAS_COPY_DISPOSE_FLAG: i32 = 1 << 25;
+
+    #[repr(C)]
+    struct TestBlockDescriptor {
+        reserved: u64,
+        size: u64,
+        copy: extern "C" fn(u64, u64),
+        dispose: extern "C" fn(u64),
+    }
+
+    static WRAPPED_BLOCK_COPIED: AtomicUsize = AtomicUsize::new(0);
+
+    extern "C" fn wrapped_block_invoke(_block: *const u8) {}
+
+    extern "C" fn wrapped_block_copy(_dst: u64, _src: u64) {
+        WRAPPED_BLOCK_COPIED.fetch_add(1, AtomicOrdering::SeqCst);
+    }
+
+    extern "C" fn wrapped_block_dispose(_block: u64) {}
+
+    static WRAPPED_BLOCK_DESCRIPTOR: TestBlockDescriptor = TestBlockDescriptor {
+        reserved: 0,
+        size: 32,
+        copy: wrapped_block_copy,
+        dispose: wrapped_block_dispose,
+    };
+
+    fn make_copyable_block(buf: &mut [u8; 32]) {
+        buf.fill(0);
+        unsafe {
+            std::ptr::write_unaligned(
+                buf.as_mut_ptr().add(8) as *mut i32,
+                BLOCK_HAS_COPY_DISPOSE_FLAG,
+            );
+            std::ptr::write_unaligned(
+                buf.as_mut_ptr().add(16) as *mut extern "C" fn(*const u8),
+                wrapped_block_invoke,
+            );
+            std::ptr::write_unaligned(
+                buf.as_mut_ptr().add(24) as *mut u64,
+                &WRAPPED_BLOCK_DESCRIPTOR as *const TestBlockDescriptor as u64,
+            );
+        }
+    }
 
     #[test]
     fn dispatch_time_now_plus_delta() {
         let t = shim_dispatch_time(DISPATCH_TIME_NOW, 1_000_000_000); // 1 second
-        // Should be roughly now + 1s in nanoseconds
+                                                                      // Should be roughly now + 1s in nanoseconds
         assert!(t > 0);
     }
 
@@ -800,6 +1002,27 @@ mod tests {
         let mut table = ShimTable::new();
         DispatchExtrasStubs::install(&mut table);
         // Should have 30 entries (dispatch_io + source accessors moved to their own modules)
-        assert!(table.len() >= 30, "expected ≥30 dispatch stubs, got {}", table.len());
+        assert!(
+            table.len() >= 30,
+            "expected ≥30 dispatch stubs, got {}",
+            table.len()
+        );
+    }
+
+    #[test]
+    fn dispatch_block_create_copies_inner_block_and_wrapper_copies_as_global() {
+        WRAPPED_BLOCK_COPIED.store(0, AtomicOrdering::SeqCst);
+
+        let mut block = [0u8; 32];
+        make_copyable_block(&mut block);
+
+        let wrapped = shim_dispatch_block_create(0, block.as_ptr() as u64);
+
+        assert_ne!(wrapped, 0);
+        assert_eq!(WRAPPED_BLOCK_COPIED.load(AtomicOrdering::SeqCst), 1);
+        assert_eq!(
+            crate::darwin_stubs::blocks_runtime::shim_block_copy(wrapped),
+            wrapped
+        );
     }
 }

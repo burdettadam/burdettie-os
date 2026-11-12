@@ -14,9 +14,21 @@ pub fn register_nserror_class(rt: &mut objc_runtime::ObjcRuntime) {
         name: "NSError".to_string(),
         mapped_addr: class_addr,
         methods: vec![
-            me("domain", nserror::shim_nserror_domain as *const () as u64, "@@:"),
-            me("code", nserror::shim_nserror_code as *const () as u64, "q@:"),
-            me("userInfo", nserror::shim_nserror_user_info as *const () as u64, "@@:"),
+            me(
+                "domain",
+                nserror::shim_nserror_domain as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "code",
+                nserror::shim_nserror_code as *const () as u64,
+                "q@:",
+            ),
+            me(
+                "userInfo",
+                nserror::shim_nserror_user_info as *const () as u64,
+                "@@:",
+            ),
             me(
                 "localizedDescription",
                 nserror::shim_nserror_localized_description as *const () as u64,
@@ -71,8 +83,16 @@ pub fn register_nsexception_class(rt: &mut objc_runtime::ObjcRuntime) {
         name: "NSException".to_string(),
         mapped_addr: class_addr,
         methods: vec![
-            me("name", nsexception::shim_nsexception_name as *const () as u64, "@@:"),
-            me("reason", nsexception::shim_nsexception_reason as *const () as u64, "@@:"),
+            me(
+                "name",
+                nsexception::shim_nsexception_name as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "reason",
+                nsexception::shim_nsexception_reason as *const () as u64,
+                "@@:",
+            ),
             me(
                 "userInfo",
                 nsexception::shim_nsexception_user_info as *const () as u64,
@@ -83,7 +103,11 @@ pub fn register_nsexception_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nsexception::shim_nsexception_description as *const () as u64,
                 "@@:",
             ),
-            me("raise", nsexception::shim_nsexception_raise as *const () as u64, "v@:"),
+            me(
+                "raise",
+                nsexception::shim_nsexception_raise as *const () as u64,
+                "v@:",
+            ),
             me(
                 "initWithName:reason:userInfo:",
                 nsexception::shim_nsexception_init_with_name_reason_userinfo as *const () as u64,

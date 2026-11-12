@@ -22,17 +22,25 @@ const OBJ_SIZE: usize = 56;
 
 fn alloc_components() -> u64 {
     let obj = crate::pal_alloc().calloc(1, OBJ_SIZE) as u64;
-    if obj == 0 { return 0; }
-    unsafe { *(obj as *mut u64) = nsobj::nsurlcomponents_class_addr(); }
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *(obj as *mut u64) = nsobj::nsurlcomponents_class_addr();
+    }
     obj
 }
 
 fn set_str_field(obj: u64, off: usize, val: u64) {
-    unsafe { *((obj as usize + off) as *mut u64) = val; }
+    unsafe {
+        *((obj as usize + off) as *mut u64) = val;
+    }
 }
 
 fn get_str_field(obj: u64, off: usize) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + off) as *const u64) }
 }
 
@@ -79,7 +87,9 @@ fn parse_authority_and_path(s: &str, obj: u64) {
         }
     }
 
-    if path_query_frag.is_empty() { return; }
+    if path_query_frag.is_empty() {
+        return;
+    }
 
     // Split fragment
     let (path_query, fragment) = if let Some(pos) = path_query_frag.find('#') {
@@ -95,19 +105,25 @@ fn parse_authority_and_path(s: &str, obj: u64) {
         (path_query, None)
     };
 
-    if !path.is_empty() { set_str_field(obj, PATH_OFF, make_nsstring(path)); }
-    if let Some(q) = query { set_str_field(obj, QUERY_OFF, make_nsstring(q)); }
-    if let Some(f) = fragment { set_str_field(obj, FRAGMENT_OFF, make_nsstring(f)); }
+    if !path.is_empty() {
+        set_str_field(obj, PATH_OFF, make_nsstring(path));
+    }
+    if let Some(q) = query {
+        set_str_field(obj, QUERY_OFF, make_nsstring(q));
+    }
+    if let Some(f) = fragment {
+        set_str_field(obj, FRAGMENT_OFF, make_nsstring(f));
+    }
 }
 
 // ── Class methods ──────────────────────────────────────────────
 
 /// `+[NSURLComponents componentsWithString:]`
-pub extern "C" fn shim_nsurlcomponents_with_string(
-    _cls: u64, _cmd: u64, url_string: u64,
-) -> u64 {
+pub extern "C" fn shim_nsurlcomponents_with_string(_cls: u64, _cmd: u64, url_string: u64) -> u64 {
     let obj = alloc_components();
-    if obj == 0 || url_string == 0 { return obj; }
+    if obj == 0 || url_string == 0 {
+        return obj;
+    }
     if let Some(s) = cfstring::extract_cfstring_cstr(url_string) {
         parse_url(&s, obj);
     }
@@ -143,27 +159,35 @@ pub extern "C" fn shim_nsurlcomponents_fragment(obj: u64, _cmd: u64) -> u64 {
 // ── Instance methods (setters) ─────────────────────────────────
 
 pub extern "C" fn shim_nsurlcomponents_set_scheme(obj: u64, _cmd: u64, val: u64) -> u64 {
-    set_str_field(obj, SCHEME_OFF, val); 0
+    set_str_field(obj, SCHEME_OFF, val);
+    0
 }
 pub extern "C" fn shim_nsurlcomponents_set_host(obj: u64, _cmd: u64, val: u64) -> u64 {
-    set_str_field(obj, HOST_OFF, val); 0
+    set_str_field(obj, HOST_OFF, val);
+    0
 }
 pub extern "C" fn shim_nsurlcomponents_set_port(obj: u64, _cmd: u64, val: u64) -> u64 {
-    set_str_field(obj, PORT_OFF, val); 0
+    set_str_field(obj, PORT_OFF, val);
+    0
 }
 pub extern "C" fn shim_nsurlcomponents_set_path(obj: u64, _cmd: u64, val: u64) -> u64 {
-    set_str_field(obj, PATH_OFF, val); 0
+    set_str_field(obj, PATH_OFF, val);
+    0
 }
 pub extern "C" fn shim_nsurlcomponents_set_query(obj: u64, _cmd: u64, val: u64) -> u64 {
-    set_str_field(obj, QUERY_OFF, val); 0
+    set_str_field(obj, QUERY_OFF, val);
+    0
 }
 pub extern "C" fn shim_nsurlcomponents_set_fragment(obj: u64, _cmd: u64, val: u64) -> u64 {
-    set_str_field(obj, FRAGMENT_OFF, val); 0
+    set_str_field(obj, FRAGMENT_OFF, val);
+    0
 }
 
 /// `-[NSURLComponents URL]` — reconstruct URL from components.
 pub extern "C" fn shim_nsurlcomponents_url(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let mut result = String::new();
 
     if let Some(scheme) = cfstring::extract_cfstring_cstr(get_str_field(obj, SCHEME_OFF)) {
@@ -196,40 +220,49 @@ pub extern "C" fn shim_nsurlcomponents_url(obj: u64, _cmd: u64) -> u64 {
 
 /// `-[NSURLComponents string]`
 pub extern "C" fn shim_nsurlcomponents_string(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let url = shim_nsurlcomponents_url(obj, 0);
-    if url == 0 { return 0; }
+    if url == 0 {
+        return 0;
+    }
     crate::nsurl::shim_nsurl_absolute_string(url, 0)
 }
 
 /// `-[NSURLComponents queryItems]` — returns NSArray of NSURLQueryItem.
 pub extern "C" fn shim_nsurlcomponents_query_items(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let query_str = get_str_field(obj, QUERY_OFF);
-    if query_str == 0 { return crate::nsarray::make_nsarray(&[]); }
+    if query_str == 0 {
+        return crate::nsarray::make_nsarray(&[]);
+    }
     let Some(qs) = cfstring::extract_cfstring_cstr(query_str) else {
         return crate::nsarray::make_nsarray(&[]);
     };
     let mut items = Vec::new();
     for pair in qs.split('&') {
-        if pair.is_empty() { continue; }
+        if pair.is_empty() {
+            continue;
+        }
         let (name, value) = if let Some(eq) = pair.find('=') {
             (&pair[..eq], Some(&pair[eq + 1..]))
         } else {
             (pair, None)
         };
-        let item = alloc_query_item(make_nsstring(name),
-            value.map_or(0, |v| make_nsstring(v)));
+        let item = alloc_query_item(make_nsstring(name), value.map_or(0, |v| make_nsstring(v)));
         items.push(item);
     }
     crate::nsarray::make_nsarray(&items)
 }
 
 /// `-[NSURLComponents setQueryItems:]`
-pub extern "C" fn shim_nsurlcomponents_set_query_items(
-    obj: u64, _cmd: u64, items: u64,
-) -> u64 {
-    if obj == 0 { return 0; }
+pub extern "C" fn shim_nsurlcomponents_set_query_items(obj: u64, _cmd: u64, items: u64) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
     if items == 0 {
         set_str_field(obj, QUERY_OFF, 0);
         return 0;
@@ -262,7 +295,9 @@ pub extern "C" fn shim_nsurlcomponents_percent_encoded_query(obj: u64, _cmd: u64
 }
 
 pub extern "C" fn shim_nsurlcomponents_set_percent_encoded_query(obj: u64, _cmd: u64, query: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     set_str_field(obj, QUERY_OFF, query);
 }
 
@@ -271,7 +306,9 @@ pub extern "C" fn shim_nsurlcomponents_percent_encoded_path(obj: u64, _cmd: u64)
 }
 
 pub extern "C" fn shim_nsurlcomponents_set_percent_encoded_path(obj: u64, _cmd: u64, path: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     set_str_field(obj, PATH_OFF, path);
 }
 
@@ -289,7 +326,9 @@ const QI_VALUE_OFF: usize = 16;
 
 fn alloc_query_item(name: u64, value: u64) -> u64 {
     let obj = crate::pal_alloc().calloc(1, 24) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *(obj as *mut u64) = nsobj::nsurlqueryitem_class_addr();
         *((obj as usize + QI_NAME_OFF) as *mut u64) = name;
@@ -300,27 +339,36 @@ fn alloc_query_item(name: u64, value: u64) -> u64 {
 
 /// `+[NSURLQueryItem queryItemWithName:value:]`
 pub extern "C" fn shim_nsurlqueryitem_with_name_value(
-    _cls: u64, _cmd: u64, name: u64, value: u64,
+    _cls: u64,
+    _cmd: u64,
+    name: u64,
+    value: u64,
 ) -> u64 {
     alloc_query_item(name, value)
 }
 
 pub extern "C" fn shim_nsurlqueryitem_name(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + QI_NAME_OFF) as *const u64) }
 }
 
 pub extern "C" fn shim_nsurlqueryitem_value(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + QI_VALUE_OFF) as *const u64) }
 }
 
 pub extern "C" fn shim_nsurlqueryitem_description(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
-    let name = cfstring::extract_cfstring_cstr(shim_nsurlqueryitem_name(obj, 0))
-        .unwrap_or_default();
-    let val = cfstring::extract_cfstring_cstr(shim_nsurlqueryitem_value(obj, 0))
-        .unwrap_or("(null)");
+    if obj == 0 {
+        return 0;
+    }
+    let name =
+        cfstring::extract_cfstring_cstr(shim_nsurlqueryitem_name(obj, 0)).unwrap_or_default();
+    let val =
+        cfstring::extract_cfstring_cstr(shim_nsurlqueryitem_value(obj, 0)).unwrap_or("(null)");
     let desc = format!("{name}={val}");
     make_nsstring(&desc)
 }
@@ -358,7 +406,10 @@ mod tests {
         // port is an NSNumber
         let port_ptr = read_field(obj, PORT_OFF);
         assert_ne!(port_ptr, 0);
-        assert_eq!(crate::nsnumber::shim_nsnumber_integer_value(port_ptr, 0), 8080);
+        assert_eq!(
+            crate::nsnumber::shim_nsnumber_integer_value(port_ptr, 0),
+            8080
+        );
         assert_string_eq(read_field(obj, PATH_OFF), "/path");
         assert_string_eq(read_field(obj, QUERY_OFF), "q=1");
         assert_string_eq(read_field(obj, FRAGMENT_OFF), "frag");
@@ -682,7 +733,8 @@ mod tests {
 
     #[test]
     fn queryitem_description_format() {
-        let qi = shim_nsurlqueryitem_with_name_value(0, 0, make_string("color"), make_string("red"));
+        let qi =
+            shim_nsurlqueryitem_with_name_value(0, 0, make_string("color"), make_string("red"));
         let desc = shim_nsurlqueryitem_description(qi, 0);
         assert_ne!(desc, 0);
         assert_string_eq(desc, "color=red");
@@ -705,7 +757,10 @@ mod tests {
         let obj = shim_nsurlcomponents_with_string(0, 0, url);
         let s = shim_nsurlcomponents_string(obj, 0);
         assert_ne!(s, 0);
-        assert_string_eq(s, "https://api.example.com/v2/items?sort=name&limit=10#results");
+        assert_string_eq(
+            s,
+            "https://api.example.com/v2/items?sort=name&limit=10#results",
+        );
         free_obj(obj);
     }
 
@@ -733,7 +788,10 @@ mod tests {
         let obj = shim_nsurlcomponents_new(0, 0);
         let q = make_string("a%20b=1");
         shim_nsurlcomponents_set_percent_encoded_query(obj, 0, q);
-        assert_string_eq(shim_nsurlcomponents_percent_encoded_query(obj, 0), "a%20b=1");
+        assert_string_eq(
+            shim_nsurlcomponents_percent_encoded_query(obj, 0),
+            "a%20b=1",
+        );
         // Also visible through regular query getter
         assert_string_eq(shim_nsurlcomponents_query(obj, 0), "a%20b=1");
         free_obj(obj);
@@ -755,7 +813,10 @@ mod tests {
         let obj = shim_nsurlcomponents_new(0, 0);
         let p = make_string("/foo%20bar/baz");
         shim_nsurlcomponents_set_percent_encoded_path(obj, 0, p);
-        assert_string_eq(shim_nsurlcomponents_percent_encoded_path(obj, 0), "/foo%20bar/baz");
+        assert_string_eq(
+            shim_nsurlcomponents_percent_encoded_path(obj, 0),
+            "/foo%20bar/baz",
+        );
         // Also visible through regular path getter
         assert_string_eq(shim_nsurlcomponents_path(obj, 0), "/foo%20bar/baz");
         free_obj(obj);

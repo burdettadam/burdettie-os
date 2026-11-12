@@ -21,7 +21,9 @@ const NOTIF_SIZE: usize = 32;
 /// Create an NSNotification object.
 pub fn make_nsnotification(name: u64, object: u64, user_info: u64) -> u64 {
     let obj = crate::pal_alloc().calloc(1, NOTIF_SIZE) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *(obj as *mut u64) = nsobj::nsnotification_class_addr();
         *((obj + 8) as *mut u64) = name;
@@ -33,33 +35,46 @@ pub fn make_nsnotification(name: u64, object: u64, user_info: u64) -> u64 {
 
 /// `+[NSNotification notificationWithName:object:userInfo:]`
 pub extern "C" fn shim_nsnotification_with_name_object_userinfo(
-    _cls: u64, _cmd: u64, name: u64, object: u64, user_info: u64,
+    _cls: u64,
+    _cmd: u64,
+    name: u64,
+    object: u64,
+    user_info: u64,
 ) -> u64 {
     make_nsnotification(name, object, user_info)
 }
 
 /// `+[NSNotification notificationWithName:object:]`
 pub extern "C" fn shim_nsnotification_with_name_object(
-    _cls: u64, _cmd: u64, name: u64, object: u64,
+    _cls: u64,
+    _cmd: u64,
+    name: u64,
+    object: u64,
 ) -> u64 {
     make_nsnotification(name, object, 0)
 }
 
 /// `-[NSNotification name]`
 pub extern "C" fn shim_nsnotification_name(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj + 8) as *const u64) }
 }
 
 /// `-[NSNotification object]`
 pub extern "C" fn shim_nsnotification_object(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj + 16) as *const u64) }
 }
 
 /// `-[NSNotification userInfo]`
 pub extern "C" fn shim_nsnotification_userinfo(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj + 24) as *const u64) }
 }
 
@@ -118,8 +133,7 @@ fn deliver_to_observers(name_str: &str, notification: u64) {
                 }
                 let imp = unsafe { objc_msg_lookup_imp(*observer, *sel_ptr) };
                 if imp != 0 {
-                    let f: extern "C" fn(u64, u64, u64) =
-                        unsafe { std::mem::transmute(imp) };
+                    let f: extern "C" fn(u64, u64, u64) = unsafe { std::mem::transmute(imp) };
                     f(*observer, *sel_ptr, notification);
                 }
             }
@@ -165,35 +179,57 @@ pub extern "C" fn shim_nsnotificationcenter_default_center(_cls: u64, _cmd: u64)
 
 /// `-[NSNotificationCenter postNotificationName:object:]`
 pub extern "C" fn shim_nsnotificationcenter_post_notification_name_object(
-    _obj: u64, _cmd: u64, name: u64, object: u64,
+    _obj: u64,
+    _cmd: u64,
+    name: u64,
+    object: u64,
 ) {
-    let name_str = cfstring::extract_cfstring_cstr(name).unwrap_or("").to_string();
+    let name_str = cfstring::extract_cfstring_cstr(name)
+        .unwrap_or("")
+        .to_string();
     let notif = make_nsnotification(name, object, 0);
     deliver_to_observers(&name_str, notif);
 }
 
 /// `-[NSNotificationCenter postNotificationName:object:userInfo:]`
 pub extern "C" fn shim_nsnotificationcenter_post_notification_name_object_userinfo(
-    _obj: u64, _cmd: u64, name: u64, object: u64, userinfo: u64,
+    _obj: u64,
+    _cmd: u64,
+    name: u64,
+    object: u64,
+    userinfo: u64,
 ) {
-    let name_str = cfstring::extract_cfstring_cstr(name).unwrap_or("").to_string();
+    let name_str = cfstring::extract_cfstring_cstr(name)
+        .unwrap_or("")
+        .to_string();
     let notif = make_nsnotification(name, object, userinfo);
     deliver_to_observers(&name_str, notif);
 }
 
 /// `-[NSNotificationCenter postNotification:]`
 pub extern "C" fn shim_nsnotificationcenter_post_notification(
-    _obj: u64, _cmd: u64, notification: u64,
+    _obj: u64,
+    _cmd: u64,
+    notification: u64,
 ) {
-    if notification == 0 { return; }
+    if notification == 0 {
+        return;
+    }
     let name = unsafe { *((notification + 8) as *const u64) };
-    let name_str = cfstring::extract_cfstring_cstr(name).unwrap_or("").to_string();
+    let name_str = cfstring::extract_cfstring_cstr(name)
+        .unwrap_or("")
+        .to_string();
     deliver_to_observers(&name_str, notification);
 }
 
 /// `-[NSNotificationCenter addObserver:selector:name:object:]`
 pub extern "C" fn shim_nsnotificationcenter_add_observer(
-    _obj: u64, _cmd: u64, observer: u64, sel: u64, name: u64, _object: u64,
+    _obj: u64,
+    _cmd: u64,
+    observer: u64,
+    sel: u64,
+    name: u64,
+    _object: u64,
 ) {
     let name_str = if name != 0 {
         cfstring::extract_cfstring_cstr(name).map(|s| s.to_string())
@@ -205,13 +241,21 @@ pub extern "C" fn shim_nsnotificationcenter_add_observer(
     obs.push(Observer {
         token,
         name: name_str,
-        kind: ObserverKind::Selector { observer, sel_ptr: sel },
+        kind: ObserverKind::Selector {
+            observer,
+            sel_ptr: sel,
+        },
     });
 }
 
 /// `-[NSNotificationCenter addObserverForName:object:queue:usingBlock:]`
 pub extern "C" fn shim_nsnotificationcenter_add_observer_for_name(
-    _obj: u64, _cmd: u64, name: u64, _object: u64, _queue: u64, block: u64,
+    _obj: u64,
+    _cmd: u64,
+    name: u64,
+    _object: u64,
+    _queue: u64,
+    block: u64,
 ) -> u64 {
     let name_str = if name != 0 {
         cfstring::extract_cfstring_cstr(name).map(|s| s.to_string())
@@ -238,10 +282,10 @@ pub extern "C" fn shim_nsnotificationcenter_add_observer_for_name(
 }
 
 /// `-[NSNotificationCenter removeObserver:]`
-pub extern "C" fn shim_nsnotificationcenter_remove_observer(
-    _obj: u64, _cmd: u64, observer: u64,
-) {
-    if observer == 0 { return; }
+pub extern "C" fn shim_nsnotificationcenter_remove_observer(_obj: u64, _cmd: u64, observer: u64) {
+    if observer == 0 {
+        return;
+    }
     let mut obs = observers().lock().unwrap();
     // Check if it's a block token (has token at offset 8)
     let token_val = unsafe { *((observer + 8) as *const u64) };
@@ -251,7 +295,10 @@ pub extern "C" fn shim_nsnotificationcenter_remove_observer(
     } else {
         // Observer-ptr-based removal (selector observer)
         obs.retain(|o| {
-            if let ObserverKind::Selector { observer: obs_ptr, .. } = &o.kind {
+            if let ObserverKind::Selector {
+                observer: obs_ptr, ..
+            } = &o.kind
+            {
                 *obs_ptr != observer
             } else {
                 true
@@ -262,9 +309,15 @@ pub extern "C" fn shim_nsnotificationcenter_remove_observer(
 
 /// `-[NSNotificationCenter removeObserver:name:object:]`
 pub extern "C" fn shim_nsnotificationcenter_remove_observer_name_object(
-    _obj: u64, _cmd: u64, observer: u64, name: u64, _object: u64,
+    _obj: u64,
+    _cmd: u64,
+    observer: u64,
+    name: u64,
+    _object: u64,
 ) {
-    if observer == 0 { return; }
+    if observer == 0 {
+        return;
+    }
     let name_str = if name != 0 {
         cfstring::extract_cfstring_cstr(name).map(|s| s.to_string())
     } else {
@@ -272,8 +325,13 @@ pub extern "C" fn shim_nsnotificationcenter_remove_observer_name_object(
     };
     let mut obs = observers().lock().unwrap();
     obs.retain(|o| {
-        if let ObserverKind::Selector { observer: obs_ptr, .. } = &o.kind {
-            if *obs_ptr != observer { return true; }
+        if let ObserverKind::Selector {
+            observer: obs_ptr, ..
+        } = &o.kind
+        {
+            if *obs_ptr != observer {
+                return true;
+            }
             if let Some(ref n) = name_str {
                 if let Some(ref on) = o.name {
                     return on != n;
@@ -364,7 +422,9 @@ mod tests {
         // posts with name_str="", iterates observers that match ""
         shim_nsnotificationcenter_post_notification_name_object(
             shim_nsnotificationcenter_default_center(0, 0),
-            0, 0, 0,
+            0,
+            0,
+            0,
         );
     }
 

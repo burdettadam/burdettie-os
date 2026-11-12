@@ -43,7 +43,11 @@ impl Gradient {
 
     /// Create a radial gradient.
     pub fn radial(center: Point, radius: f64, stops: Vec<GradientStop>) -> Self {
-        Self::Radial { center, radius, stops }
+        Self::Radial {
+            center,
+            radius,
+            stops,
+        }
     }
 
     /// Create a simple two-color linear gradient.
@@ -51,10 +55,7 @@ impl Gradient {
         Self::Linear {
             start,
             end,
-            stops: vec![
-                GradientStop::new(0.0, from),
-                GradientStop::new(1.0, to),
-            ],
+            stops: vec![GradientStop::new(0.0, from), GradientStop::new(1.0, to)],
         }
     }
 
@@ -63,10 +64,7 @@ impl Gradient {
         Self::Radial {
             center,
             radius,
-            stops: vec![
-                GradientStop::new(0.0, inner),
-                GradientStop::new(1.0, outer),
-            ],
+            stops: vec![GradientStop::new(0.0, inner), GradientStop::new(1.0, outer)],
         }
     }
 

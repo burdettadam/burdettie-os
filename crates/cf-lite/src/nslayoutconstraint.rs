@@ -46,9 +46,15 @@ fn ancestor_chain(view: u64) -> Vec<u64> {
 /// If `b` is 0 (constant-only constraint), returns `a`.
 /// If no common ancestor exists, returns `a` as fallback.
 fn nearest_common_ancestor(a: u64, b: u64) -> u64 {
-    if a == 0 { return b; }
-    if b == 0 { return a; }
-    if a == b { return a; }
+    if a == 0 {
+        return b;
+    }
+    if b == 0 {
+        return a;
+    }
+    if a == b {
+        return a;
+    }
 
     let chain_a = ancestor_chain(a);
     let chain_b = ancestor_chain(b);
@@ -67,7 +73,9 @@ fn nearest_common_ancestor(a: u64, b: u64) -> u64 {
 /// common ancestor of firstItem/secondItem, and install the constraint
 /// into the layout solver on that view.
 fn activate_constraint(c: u64) {
-    if c == 0 { return; }
+    if c == 0 {
+        return;
+    }
     let was_active = read_u64(c, ACTIVE_OFF) != 0;
     write_u64(c, ACTIVE_OFF, 1);
 
@@ -84,7 +92,9 @@ fn activate_constraint(c: u64) {
 /// Deactivate a single constraint: clear the active flag and remove
 /// from the layout solver.
 fn deactivate_constraint(c: u64) {
-    if c == 0 { return; }
+    if c == 0 {
+        return;
+    }
     let was_active = read_u64(c, ACTIVE_OFF) != 0;
     write_u64(c, ACTIVE_OFF, 0);
 
@@ -99,23 +109,35 @@ fn deactivate_constraint(c: u64) {
 }
 
 fn read_u64(obj: u64, offset: usize) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + offset) as *const u64) }
 }
 
 fn write_u64(obj: u64, offset: usize, value: u64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as usize + offset) as *mut u64) = value; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + offset) as *mut u64) = value;
+    }
 }
 
 fn read_f64(obj: u64, offset: usize) -> f64 {
-    if obj == 0 { return 0.0; }
+    if obj == 0 {
+        return 0.0;
+    }
     unsafe { *((obj as usize + offset) as *const f64) }
 }
 
 fn write_f64(obj: u64, offset: usize, value: f64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as usize + offset) as *mut f64) = value; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + offset) as *mut f64) = value;
+    }
 }
 
 /// `+[NSLayoutConstraint constraintWithItem:attribute:relatedBy:toItem:attribute:multiplier:constant:]`
@@ -131,8 +153,12 @@ pub extern "C" fn shim_nslayoutconstraint_create(
     constant: f64,
 ) -> u64 {
     let obj = crate::pal_alloc().calloc(1, CONSTRAINT_SIZE) as u64;
-    if obj == 0 { return 0; }
-    unsafe { *(obj as *mut u64) = crate::nsobj::nslayoutconstraint_class_addr(); }
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *(obj as *mut u64) = crate::nsobj::nslayoutconstraint_class_addr();
+    }
     write_u64(obj, FIRST_ITEM_OFF, first_item);
     write_u64(obj, FIRST_ATTR_OFF, first_attr);
     write_u64(obj, RELATION_OFF, relation);
@@ -150,7 +176,9 @@ pub extern "C" fn shim_nslayoutconstraint_activate_constraints(
     _cmd: u64,
     constraints_array: u64,
 ) {
-    if constraints_array == 0 { return; }
+    if constraints_array == 0 {
+        return;
+    }
     let count = crate::nsarray::shim_nsarray_count(constraints_array, 0);
     for i in 0..count {
         let c = crate::nsarray::shim_nsarray_object_at_index(constraints_array, 0, i);
@@ -164,7 +192,9 @@ pub extern "C" fn shim_nslayoutconstraint_deactivate_constraints(
     _cmd: u64,
     constraints_array: u64,
 ) {
-    if constraints_array == 0 { return; }
+    if constraints_array == 0 {
+        return;
+    }
     let count = crate::nsarray::shim_nsarray_count(constraints_array, 0);
     for i in 0..count {
         let c = crate::nsarray::shim_nsarray_object_at_index(constraints_array, 0, i);
@@ -179,7 +209,9 @@ pub extern "C" fn shim_nslayoutconstraint_is_active(obj: u64, _cmd: u64) -> u8 {
 
 /// `-[NSLayoutConstraint setActive:]`
 pub extern "C" fn shim_nslayoutconstraint_set_active(obj: u64, _cmd: u64, flag: u8) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     if flag != 0 {
         activate_constraint(obj);
     } else {
@@ -260,21 +292,27 @@ pub extern "C" fn shim_nslayoutconstraint_set_should_be_archived(obj: u64, _cmd:
 
 /// `-[NSView setTranslatesAutoresizingMaskIntoConstraints:]` — stored in flags bit 2.
 pub extern "C" fn shim_nsview_set_translates_autoresize(obj: u64, _cmd: u64, flag: u8) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let flags_off = 72; // nsview FLAGS_OFF
     let mut flags = unsafe { *((obj as usize + flags_off) as *const u64) };
     // Bit 2 encodes "translates DISABLED" (inverted: bit=0 means YES, bit=1 means NO)
     if flag != 0 {
         flags &= !(1 << 2); // YES → clear bit
     } else {
-        flags |= 1 << 2;    // NO  → set bit
+        flags |= 1 << 2; // NO  → set bit
     }
-    unsafe { *((obj as usize + flags_off) as *mut u64) = flags; }
+    unsafe {
+        *((obj as usize + flags_off) as *mut u64) = flags;
+    }
 }
 
 /// `-[NSView translatesAutoresizingMaskIntoConstraints]` — defaults true (bit 2).
 pub extern "C" fn shim_nsview_translates_autoresize(obj: u64, _cmd: u64) -> u8 {
-    if obj == 0 { return 1; }
+    if obj == 0 {
+        return 1;
+    }
     let flags_off = 72; // nsview FLAGS_OFF
     let flags = unsafe { *((obj as usize + flags_off) as *const u64) };
     // Default is YES when bit is NOT set (Apple convention — translates=YES unless explicitly cleared)
@@ -303,7 +341,9 @@ pub extern "C" fn shim_nsview_remove_constraints(obj: u64, _cmd: u64, constraint
 
 /// `-[NSView constraints]` — returns NSArray of constraints added to this view.
 pub extern "C" fn shim_nsview_constraints(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     crate::layout_solver::get_constraints(obj)
 }
 
@@ -563,10 +603,16 @@ mod tests {
         let view = crate::nsview::alloc_view_with_frame(0.0, 0.0, 100.0, 100.0);
         let c = shim_nslayoutconstraint_create(0, 0, view, 7, 0, 0, 0, 1.0, 200.0);
         shim_nslayoutconstraint_set_active(c, 0, 1);
-        assert_eq!(crate::nsarray::shim_nsarray_count(crate::layout_solver::get_constraints(view), 0), 1);
+        assert_eq!(
+            crate::nsarray::shim_nsarray_count(crate::layout_solver::get_constraints(view), 0),
+            1
+        );
         shim_nslayoutconstraint_set_active(c, 0, 0);
         assert_eq!(shim_nslayoutconstraint_is_active(c, 0), 0);
-        assert_eq!(crate::nsarray::shim_nsarray_count(crate::layout_solver::get_constraints(view), 0), 0);
+        assert_eq!(
+            crate::nsarray::shim_nsarray_count(crate::layout_solver::get_constraints(view), 0),
+            0
+        );
         free_obj(c);
         free_obj(view);
         crate::layout_solver::reset_global_state();
@@ -601,7 +647,7 @@ mod tests {
         let c = shim_nslayoutconstraint_create(0, 0, view, 7, 0, 0, 0, 1.0, 200.0);
         shim_nslayoutconstraint_set_active(c, 0, 1);
         shim_nslayoutconstraint_set_active(c, 0, 1); // double activate
-        // Should still only have 1 constraint, not 2.
+                                                     // Should still only have 1 constraint, not 2.
         let arr = crate::layout_solver::get_constraints(view);
         assert_eq!(crate::nsarray::shim_nsarray_count(arr, 0), 1);
         free_obj(c);

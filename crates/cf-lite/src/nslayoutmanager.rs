@@ -10,7 +10,7 @@
 //!   [8..16):  text_storage_ptr  (weak ref)
 //!   [16..24): text_container_ptr (first container)
 
-use crate::cg_types::{CGRect, CGPoint, CGSize};
+use crate::cg_types::{CGPoint, CGRect, CGSize};
 
 const SIZE: usize = 24;
 const TEXT_STORAGE_OFF: usize = 8;
@@ -21,13 +21,19 @@ const DEFAULT_FONT_SIZE: f64 = 12.0;
 const DEFAULT_FONT_NAME: &str = "System";
 
 fn read_u64(obj: u64, offset: usize) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as *const u8).add(offset) as *const u64) }
 }
 
 fn write_u64(obj: u64, offset: usize, val: u64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as *mut u8).add(offset) as *mut u64) = val; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as *mut u8).add(offset) as *mut u64) = val;
+    }
 }
 
 // ── Internal helpers ───────────────────────────────────────────
@@ -35,11 +41,17 @@ fn write_u64(obj: u64, offset: usize, val: u64) {
 /// Extract the UTF-8 text from the NSTextStorage linked to this layout manager.
 fn storage_text(obj: u64) -> Option<String> {
     let ts = read_u64(obj, TEXT_STORAGE_OFF);
-    if ts == 0 { return None; }
+    if ts == 0 {
+        return None;
+    }
     let ns_str = crate::nstextstorage::shim_nstextstorage_string(ts, 0);
-    if ns_str == 0 { return None; }
+    if ns_str == 0 {
+        return None;
+    }
     let cptr = crate::cfstring::shim_nsstring_utf8string(ns_str, 0);
-    if cptr.is_null() { return None; }
+    if cptr.is_null() {
+        return None;
+    }
     let c_str = unsafe { std::ffi::CStr::from_ptr(cptr) };
     c_str.to_str().ok().map(|s| s.to_owned())
 }
@@ -47,9 +59,15 @@ fn storage_text(obj: u64) -> Option<String> {
 /// Get the container width from the text container pointer, falling back to
 /// `None` (infinite width) if the container is nil.
 fn container_width(tc: u64) -> Option<f64> {
-    if tc == 0 { return None; }
+    if tc == 0 {
+        return None;
+    }
     let w = crate::nstextcontainer::shim_nstextcontainer_size_width(tc, 0);
-    if w >= 1.0e6 { None } else { Some(w) }
+    if w >= 1.0e6 {
+        None
+    } else {
+        Some(w)
+    }
 }
 
 /// Measure the text in this layout manager's text storage, constrained to
@@ -70,33 +88,45 @@ fn measure(obj: u64, tc: u64) -> graphics_core::text_system::ShapedTextMetrics {
 /// `+[NSLayoutManager alloc]`
 pub extern "C" fn shim_nslayoutmanager_alloc(_cls: u64, _cmd: u64) -> u64 {
     let obj = crate::pal_alloc().calloc(1, SIZE) as u64;
-    if obj == 0 { return 0; }
-    unsafe { *(obj as *mut u64) = crate::nsobj::nslayoutmanager_class_addr(); }
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *(obj as *mut u64) = crate::nsobj::nslayoutmanager_class_addr();
+    }
     obj
 }
 
 /// `-[NSLayoutManager init]`
 pub extern "C" fn shim_nslayoutmanager_init(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     obj
 }
 
 /// `-[NSLayoutManager textStorage]`
 pub extern "C" fn shim_nslayoutmanager_text_storage(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     read_u64(obj, TEXT_STORAGE_OFF)
 }
 
 /// `-[NSLayoutManager setTextStorage:]`  (called by NSTextStorage -addLayoutManager:)
 pub extern "C" fn shim_nslayoutmanager_set_text_storage(obj: u64, _cmd: u64, ts: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     write_u64(obj, TEXT_STORAGE_OFF, ts);
 }
 
 /// `-[NSLayoutManager addTextContainer:]` — stores container and sets its
 /// `layoutManager` back-pointer.
 pub extern "C" fn shim_nslayoutmanager_add_text_container(obj: u64, _cmd: u64, tc: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     write_u64(obj, TEXT_CONTAINER_OFF, tc);
     if tc != 0 {
         crate::nstextcontainer::shim_nstextcontainer_set_layout_manager(tc, 0, obj);
@@ -104,31 +134,35 @@ pub extern "C" fn shim_nslayoutmanager_add_text_container(obj: u64, _cmd: u64, t
 }
 
 /// `-[NSLayoutManager removeTextContainerAtIndex:]` → no-op
-pub extern "C" fn shim_nslayoutmanager_remove_text_container(
-    _obj: u64, _cmd: u64, _idx: u64,
-) {}
+pub extern "C" fn shim_nslayoutmanager_remove_text_container(_obj: u64, _cmd: u64, _idx: u64) {}
 
 /// `-[NSLayoutManager textContainers]` → returns first container (simplified).
 pub extern "C" fn shim_nslayoutmanager_text_containers(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     read_u64(obj, TEXT_CONTAINER_OFF)
 }
 
 /// `-[NSLayoutManager numberOfGlyphs]` → returns text length (character count
 /// is correct for most Latin text; real TextKit would shape first).
 pub extern "C" fn shim_nslayoutmanager_number_of_glyphs(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let ts = read_u64(obj, TEXT_STORAGE_OFF);
-    if ts == 0 { return 0; }
+    if ts == 0 {
+        return 0;
+    }
     crate::nstextstorage::shim_nstextstorage_length(ts, 0)
 }
 
 /// `-[NSLayoutManager usedRectForTextContainer:]` — measures text using
 /// cosmic-text and returns a real CGRect with the text extents.
-pub extern "C" fn shim_nslayoutmanager_used_rect(
-    obj: u64, _cmd: u64, tc: u64,
-) -> CGRect {
-    if obj == 0 { return CGRect::ZERO; }
+pub extern "C" fn shim_nslayoutmanager_used_rect(obj: u64, _cmd: u64, tc: u64) -> CGRect {
+    if obj == 0 {
+        return CGRect::ZERO;
+    }
     let m = measure(obj, tc);
     CGRect::new(0.0, 0.0, m.width, m.height)
 }
@@ -137,18 +171,30 @@ pub extern "C" fn shim_nslayoutmanager_used_rect(
 /// so any cached layout is ready.  Our implementation is stateless, so this
 /// is effectively a no-op, but we validate the pipeline.
 pub extern "C" fn shim_nslayoutmanager_ensure_layout(obj: u64, _cmd: u64, tc: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let _ = measure(obj, tc);
 }
 
 /// `-[NSLayoutManager glyphRangeForTextContainer:]` — returns {0, numberOfGlyphs}
 /// for the given container (i.e., all glyphs fit in the single container).
 pub extern "C" fn shim_nslayoutmanager_glyph_range_for_tc(
-    obj: u64, _cmd: u64, _tc: u64,
+    obj: u64,
+    _cmd: u64,
+    _tc: u64,
 ) -> core_foundation_lite::NSRange {
-    if obj == 0 { return core_foundation_lite::NSRange { location: 0, length: 0 }; }
+    if obj == 0 {
+        return core_foundation_lite::NSRange {
+            location: 0,
+            length: 0,
+        };
+    }
     let n = shim_nslayoutmanager_number_of_glyphs(obj, 0);
-    core_foundation_lite::NSRange { location: 0, length: n }
+    core_foundation_lite::NSRange {
+        location: 0,
+        length: n,
+    }
 }
 
 /// `-[NSLayoutManager boundingRectForGlyphRange:inTextContainer:]` — returns
@@ -156,9 +202,15 @@ pub extern "C" fn shim_nslayoutmanager_glyph_range_for_tc(
 /// the full text and returning that rect (correct when the range is the
 /// entire text, which is the common case).
 pub extern "C" fn shim_nslayoutmanager_bounding_rect(
-    obj: u64, _cmd: u64, _loc: u64, _len: u64, tc: u64,
+    obj: u64,
+    _cmd: u64,
+    _loc: u64,
+    _len: u64,
+    tc: u64,
 ) -> CGRect {
-    if obj == 0 { return CGRect::ZERO; }
+    if obj == 0 {
+        return CGRect::ZERO;
+    }
     let m = measure(obj, tc);
     CGRect::new(0.0, 0.0, m.width, m.height)
 }
@@ -167,9 +219,14 @@ pub extern "C" fn shim_nslayoutmanager_bounding_rect(
 /// returns the rect of the line containing the glyph at `idx`.
 /// Simplified: returns the full used rect (single-line approximation).
 pub extern "C" fn shim_nslayoutmanager_line_fragment_rect(
-    obj: u64, _cmd: u64, _idx: u64, _effective_range: u64,
+    obj: u64,
+    _cmd: u64,
+    _idx: u64,
+    _effective_range: u64,
 ) -> CGRect {
-    if obj == 0 { return CGRect::ZERO; }
+    if obj == 0 {
+        return CGRect::ZERO;
+    }
     let tc = read_u64(obj, TEXT_CONTAINER_OFF);
     let m = measure(obj, tc);
     CGRect::new(0.0, 0.0, m.width, m.height)
@@ -177,8 +234,13 @@ pub extern "C" fn shim_nslayoutmanager_line_fragment_rect(
 
 /// `-[NSLayoutManager invalidateLayoutForCharacterRange:actualCharacterRange:]` → no-op
 pub extern "C" fn shim_nslayoutmanager_invalidate_layout(
-    _obj: u64, _cmd: u64, _loc: u64, _len: u64, _actual: u64,
-) {}
+    _obj: u64,
+    _cmd: u64,
+    _loc: u64,
+    _len: u64,
+    _actual: u64,
+) {
+}
 
 #[cfg(test)]
 mod tests {
@@ -198,7 +260,12 @@ mod tests {
         let lm = shim_nslayoutmanager_init(lm, 0);
 
         let tc = crate::nstextcontainer::shim_nstextcontainer_alloc(0, 0);
-        let tc = crate::nstextcontainer::shim_nstextcontainer_init_with_size(tc, 0, container_w, container_h);
+        let tc = crate::nstextcontainer::shim_nstextcontainer_init_with_size(
+            tc,
+            0,
+            container_w,
+            container_h,
+        );
 
         // Wire: storage → lm, lm → container
         crate::nstextstorage::shim_nstextstorage_add_layout_manager(ts, 0, lm);
@@ -242,10 +309,19 @@ mod tests {
         assert_eq!(shim_nslayoutmanager_used_rect(0, 0, 0), CGRect::ZERO);
         assert_eq!(
             shim_nslayoutmanager_glyph_range_for_tc(0, 0, 0),
-            core_foundation_lite::NSRange { location: 0, length: 0 },
+            core_foundation_lite::NSRange {
+                location: 0,
+                length: 0
+            },
         );
-        assert_eq!(shim_nslayoutmanager_bounding_rect(0, 0, 0, 0, 0), CGRect::ZERO);
-        assert_eq!(shim_nslayoutmanager_line_fragment_rect(0, 0, 0, 0), CGRect::ZERO);
+        assert_eq!(
+            shim_nslayoutmanager_bounding_rect(0, 0, 0, 0, 0),
+            CGRect::ZERO
+        );
+        assert_eq!(
+            shim_nslayoutmanager_line_fragment_rect(0, 0, 0, 0),
+            CGRect::ZERO
+        );
     }
 
     // ── wired stack tests ──────────────────────────────────────
@@ -258,7 +334,10 @@ mod tests {
         let tc = crate::nstextcontainer::shim_nstextcontainer_init(tc, 0);
         shim_nslayoutmanager_add_text_container(lm, 0, tc);
         // Container's layoutManager should point back to lm.
-        assert_eq!(crate::nstextcontainer::shim_nstextcontainer_layout_manager(tc, 0), lm);
+        assert_eq!(
+            crate::nstextcontainer::shim_nstextcontainer_layout_manager(tc, 0),
+            lm
+        );
         free_obj(tc);
         free_obj(lm);
     }
@@ -274,8 +353,16 @@ mod tests {
     fn used_rect_nonempty_for_text() {
         let (ts, lm, tc) = make_textkit_stack("Hello TextKit", 300.0, 200.0);
         let rect = shim_nslayoutmanager_used_rect(lm, 0, tc);
-        assert!(rect.size.width > 0.0, "width should be > 0, got {}", rect.size.width);
-        assert!(rect.size.height > 0.0, "height should be > 0, got {}", rect.size.height);
+        assert!(
+            rect.size.width > 0.0,
+            "width should be > 0, got {}",
+            rect.size.width
+        );
+        assert!(
+            rect.size.height > 0.0,
+            "height should be > 0, got {}",
+            rect.size.height
+        );
         assert_eq!(rect.origin.x, 0.0);
         assert_eq!(rect.origin.y, 0.0);
         free_textkit(ts, lm, tc);
@@ -307,7 +394,9 @@ mod tests {
         assert!(
             rect.size.height >= single * 2.5,
             "3-line height {} should be ≥ 2.5 × single-line {} = {}",
-            rect.size.height, single, single * 2.5,
+            rect.size.height,
+            single,
+            single * 2.5,
         );
         free_textkit(ts, lm, tc);
     }
@@ -370,7 +459,8 @@ mod tests {
         assert!(
             r2.size.width > r1.size.width,
             "longer text ({}) should be wider than short text ({})",
-            r2.size.width, r1.size.width,
+            r2.size.width,
+            r1.size.width,
         );
         free_textkit(ts1, lm1, tc1);
         free_textkit(ts2, lm2, tc2);

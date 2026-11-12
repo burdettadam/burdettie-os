@@ -44,8 +44,16 @@ pub fn register_nsdate_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nsdate::shim_nsdate_is_equal_to_date as *const () as u64,
                 "B@:@",
             ),
-            me("compare:", nsdate::shim_nsdate_compare as *const () as u64, "q@:@"),
-            me("description", nsdate::shim_nsdate_description as *const () as u64, "@@:"),
+            me(
+                "compare:",
+                nsdate::shim_nsdate_compare as *const () as u64,
+                "q@:@",
+            ),
+            me(
+                "description",
+                nsdate::shim_nsdate_description as *const () as u64,
+                "@@:",
+            ),
             me(
                 "earlierDate:",
                 nsdate::shim_nsdate_earlier_date as *const () as u64,
@@ -203,7 +211,11 @@ pub fn register_nstimezone_class(rt: &mut objc_runtime::ObjcRuntime) {
         name: "NSTimeZone".to_string(),
         mapped_addr: class_addr,
         methods: vec![
-            me("name", nstimezone::shim_nstimezone_name as *const () as u64, "@@:"),
+            me(
+                "name",
+                nstimezone::shim_nstimezone_name as *const () as u64,
+                "@@:",
+            ),
             me(
                 "abbreviation",
                 nstimezone::shim_nstimezone_abbreviation as *const () as u64,
@@ -386,6 +398,11 @@ pub fn register_nslocale_class(rt: &mut objc_runtime::ObjcRuntime) {
             me(
                 "currentLocale",
                 nslocale::shim_nslocale_current_locale as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "autoupdatingCurrentLocale",
+                nslocale::shim_nslocale_autoupdating_current_locale as *const () as u64,
                 "@@:",
             ),
             me(

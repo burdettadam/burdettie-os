@@ -23,7 +23,11 @@ pub fn register_nsstring_class(rt: &mut objc_runtime::ObjcRuntime) {
         name: "__NSCFConstantString".to_string(),
         mapped_addr: class_addr,
         methods: vec![
-            me("length", cfstring::shim_nsstring_length as *const () as u64, "Q@:"),
+            me(
+                "length",
+                cfstring::shim_nsstring_length as *const () as u64,
+                "Q@:",
+            ),
             me(
                 "UTF8String",
                 cfstring::shim_nsstring_utf8string as *const () as u64,
@@ -39,7 +43,11 @@ pub fn register_nsstring_class(rt: &mut objc_runtime::ObjcRuntime) {
                 cfstring::shim_nsstring_description as *const () as u64,
                 "@@:",
             ),
-            me("path", cfstring::shim_nsstring_path as *const () as u64, "@@:"),
+            me(
+                "path",
+                cfstring::shim_nsstring_path as *const () as u64,
+                "@@:",
+            ),
             me(
                 "dataUsingEncoding:",
                 cfstring::shim_nsstring_data_using_encoding as *const () as u64,
@@ -87,12 +95,14 @@ pub fn register_nsstring_class(rt: &mut objc_runtime::ObjcRuntime) {
             ),
             me(
                 "precomposedStringWithCanonicalMapping",
-                cfstring::shim_nsstring_precomposed_string_with_canonical_mapping as *const () as u64,
+                cfstring::shim_nsstring_precomposed_string_with_canonical_mapping as *const ()
+                    as u64,
                 "@@:",
             ),
             me(
                 "decomposedStringWithCanonicalMapping",
-                cfstring::shim_nsstring_decomposed_string_with_canonical_mapping as *const () as u64,
+                cfstring::shim_nsstring_decomposed_string_with_canonical_mapping as *const ()
+                    as u64,
                 "@@:",
             ),
             me(
@@ -151,7 +161,11 @@ pub fn register_nsstring_proper_class(rt: &mut objc_runtime::ObjcRuntime) {
         name: "NSString".to_string(),
         mapped_addr: class_addr,
         methods: vec![
-            me("length", cfstring::shim_nsstring_length as *const () as u64, "Q@:"),
+            me(
+                "length",
+                cfstring::shim_nsstring_length as *const () as u64,
+                "Q@:",
+            ),
             me(
                 "UTF8String",
                 cfstring::shim_nsstring_utf8string as *const () as u64,
@@ -167,7 +181,11 @@ pub fn register_nsstring_proper_class(rt: &mut objc_runtime::ObjcRuntime) {
                 cfstring::shim_nsstring_description as *const () as u64,
                 "@@:",
             ),
-            me("path", cfstring::shim_nsstring_path as *const () as u64, "@@:"),
+            me(
+                "path",
+                cfstring::shim_nsstring_path as *const () as u64,
+                "@@:",
+            ),
             me(
                 "initWithUTF8String:",
                 cfstring::shim_nsstring_init_with_utf8string as *const () as u64,
@@ -180,7 +198,8 @@ pub fn register_nsstring_proper_class(rt: &mut objc_runtime::ObjcRuntime) {
             ),
             me(
                 "initWithContentsOfFile:encoding:error:",
-                cfstring::shim_nsstring_init_with_contents_of_file_encoding_error as *const () as u64,
+                cfstring::shim_nsstring_init_with_contents_of_file_encoding_error as *const ()
+                    as u64,
                 "@@:@Q^@",
             ),
             me(
@@ -223,14 +242,26 @@ pub fn register_nsstring_proper_class(rt: &mut objc_runtime::ObjcRuntime) {
                 cfstring::shim_nsstring_uppercase as *const () as u64,
                 "@@:",
             ),
-            me("compare:", cfstring::shim_nsstring_compare as *const () as u64, "q@:@"),
+            me(
+                "compare:",
+                cfstring::shim_nsstring_compare as *const () as u64,
+                "q@:@",
+            ),
             me(
                 "compare:options:",
                 cfstring::shim_nsstring_compare_options as *const () as u64,
                 "q@:@@Q",
             ),
-            me("copy", cfstring::shim_nsstring_copy as *const () as u64, "@@:"),
-            me("hash", cfstring::shim_nsstring_hash as *const () as u64, "Q@:"),
+            me(
+                "copy",
+                cfstring::shim_nsstring_copy as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "hash",
+                cfstring::shim_nsstring_hash as *const () as u64,
+                "Q@:",
+            ),
             me(
                 "writeToFile:atomically:encoding:error:",
                 cfstring::shim_nsstring_write_to_file as *const () as u64,
@@ -263,7 +294,8 @@ pub fn register_nsstring_proper_class(rt: &mut objc_runtime::ObjcRuntime) {
             ),
             me(
                 "matchMemberOfArray:fromPosition:whichMember:",
-                cfstring::shim_nsstring_match_member_of_array_from_position_which_member as *const () as u64,
+                cfstring::shim_nsstring_match_member_of_array_from_position_which_member
+                    as *const () as u64,
                 "{_NSRange=QQ}@:@Q^q",
             ),
             me(
@@ -328,7 +360,8 @@ pub fn register_nsstring_proper_class(rt: &mut objc_runtime::ObjcRuntime) {
             ),
             me(
                 "componentsSeparatedByCharactersInSet:",
-                cfstring::shim_nsstring_components_separated_by_characters_in_set as *const () as u64,
+                cfstring::shim_nsstring_components_separated_by_characters_in_set as *const ()
+                    as u64,
                 "@@:@",
             ),
             me(
@@ -423,12 +456,14 @@ pub fn register_nsstring_proper_class(rt: &mut objc_runtime::ObjcRuntime) {
             ),
             me(
                 "precomposedStringWithCanonicalMapping",
-                cfstring::shim_nsstring_precomposed_string_with_canonical_mapping as *const () as u64,
+                cfstring::shim_nsstring_precomposed_string_with_canonical_mapping as *const ()
+                    as u64,
                 "@@:",
             ),
             me(
                 "decomposedStringWithCanonicalMapping",
-                cfstring::shim_nsstring_decomposed_string_with_canonical_mapping as *const () as u64,
+                cfstring::shim_nsstring_decomposed_string_with_canonical_mapping as *const ()
+                    as u64,
                 "@@:",
             ),
             me(
@@ -480,12 +515,14 @@ pub fn register_nsstring_proper_class(rt: &mut objc_runtime::ObjcRuntime) {
             ),
             me(
                 "stringWithContentsOfFile:encoding:error:",
-                cfstring::shim_nsstring_string_with_contents_of_file_encoding_error as *const () as u64,
+                cfstring::shim_nsstring_string_with_contents_of_file_encoding_error as *const ()
+                    as u64,
                 "@@:@Q^@",
             ),
             me(
                 "stringWithContentsOfURL:usedEncoding:error:",
-                cfstring::shim_nsstring_string_with_contents_of_url_used_encoding_error as *const () as u64,
+                cfstring::shim_nsstring_string_with_contents_of_url_used_encoding_error as *const ()
+                    as u64,
                 "@@:@@^@",
             ),
             me(
@@ -528,7 +565,11 @@ pub fn register_nsmutablestring_class(rt: &mut objc_runtime::ObjcRuntime) {
                 "@@:@",
             ),
             // Inherited read methods (same 32-byte layout as NSString)
-            me("length", cfstring::shim_nsstring_length as *const () as u64, "Q@:"),
+            me(
+                "length",
+                cfstring::shim_nsstring_length as *const () as u64,
+                "Q@:",
+            ),
             me(
                 "UTF8String",
                 cfstring::shim_nsstring_utf8string as *const () as u64,
@@ -544,7 +585,11 @@ pub fn register_nsmutablestring_class(rt: &mut objc_runtime::ObjcRuntime) {
                 cfstring::shim_nsstring_description as *const () as u64,
                 "@@:",
             ),
-            me("path", cfstring::shim_nsstring_path as *const () as u64, "@@:"),
+            me(
+                "path",
+                cfstring::shim_nsstring_path as *const () as u64,
+                "@@:",
+            ),
             me(
                 "isEqualToString:",
                 cfstring::shim_nsstring_is_equal_to_string as *const () as u64,
@@ -560,7 +605,11 @@ pub fn register_nsmutablestring_class(rt: &mut objc_runtime::ObjcRuntime) {
                 cfstring::shim_nsstring_has_suffix as *const () as u64,
                 "B@:@",
             ),
-            me("hash", cfstring::shim_nsstring_hash as *const () as u64, "Q@:"),
+            me(
+                "hash",
+                cfstring::shim_nsstring_hash as *const () as u64,
+                "Q@:",
+            ),
             me(
                 "writeToFile:atomically:encoding:error:",
                 cfstring::shim_nsstring_write_to_file as *const () as u64,
@@ -589,12 +638,14 @@ pub fn register_nsmutablestring_class(rt: &mut objc_runtime::ObjcRuntime) {
             ),
             me(
                 "deleteCharactersInRange:",
-                nsmutablestring::shim_nsmutablestring_delete_characters_in_range as *const () as u64,
+                nsmutablestring::shim_nsmutablestring_delete_characters_in_range as *const ()
+                    as u64,
                 "v@:{_NSRange=QQ}",
             ),
             me(
                 "replaceCharactersInRange:withString:",
-                nsmutablestring::shim_nsmutablestring_replace_characters_in_range as *const () as u64,
+                nsmutablestring::shim_nsmutablestring_replace_characters_in_range as *const ()
+                    as u64,
                 "v@:{_NSRange=QQ}@",
             ),
             me(

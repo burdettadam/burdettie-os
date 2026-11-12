@@ -16,9 +16,13 @@ use tiny_http::Request;
 pub struct ICloudHandler;
 
 impl Handler for ICloudHandler {
-    fn handle(&self, path: &str, method: &str, body: &[u8], _request: &Request)
-        -> Option<HandlerResponse>
-    {
+    fn handle(
+        &self,
+        path: &str,
+        method: &str,
+        body: &[u8],
+        _request: &Request,
+    ) -> Option<HandlerResponse> {
         if !path.starts_with("/api/v1/icloud") {
             return None;
         }
@@ -70,7 +74,8 @@ impl Handler for ICloudHandler {
 /// Handle a CloudKit notarization ticket lookup by CDHash.
 fn handle_cloudkit_ticket_lookup(body: &[u8]) -> HandlerResponse {
     // Try to extract CDHash from the JSON request body
-    let cdhash = extract_cdhash(body).unwrap_or_else(|| "0000000000000000000000000000000000000000".to_string());
+    let cdhash = extract_cdhash(body)
+        .unwrap_or_else(|| "0000000000000000000000000000000000000000".to_string());
 
     // Build a signed ticket as a base64-encoded plist
     let ticket_plist = format!(
@@ -162,7 +167,9 @@ mod tests {
         let h = ICloudHandler;
         let body = br#"{"records":[{"recordName":"2/abc123"}]}"#;
         let req = tiny_http::TestRequest::new().into();
-        let resp = h.handle("/api/v1/icloud/cloudkit/tickets/lookup", "POST", body, &req).unwrap();
+        let resp = h
+            .handle("/api/v1/icloud/cloudkit/tickets/lookup", "POST", body, &req)
+            .unwrap();
         assert_eq!(resp.status_code, 200);
         let body = String::from_utf8(resp.body).unwrap();
         assert!(body.contains("ACCEPTED"));
@@ -173,7 +180,9 @@ mod tests {
     fn content_returns_empty_tokens() {
         let h = ICloudHandler;
         let req = tiny_http::TestRequest::new().into();
-        let resp = h.handle("/api/v1/icloud/content", "GET", b"", &req).unwrap();
+        let resp = h
+            .handle("/api/v1/icloud/content", "GET", b"", &req)
+            .unwrap();
         let body = String::from_utf8(resp.body).unwrap();
         assert!(body.contains("tokens"));
     }

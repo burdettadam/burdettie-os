@@ -82,7 +82,10 @@ mod tests {
     #[test]
     fn binding_report_all_resolved_is_complete() {
         let report = BindingReport {
-            bindings: vec![make_binding("_foo", true, false), make_binding("_bar", true, false)],
+            bindings: vec![
+                make_binding("_foo", true, false),
+                make_binding("_bar", true, false),
+            ],
             failed: vec![],
             bound_count: 2,
             weak_unbound_count: 0,

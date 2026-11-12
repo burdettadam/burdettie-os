@@ -147,10 +147,8 @@ pub extern "C" fn shim_xcstringsdatafile_write_to(
                     // XCStringsdataEntry: [ISA:8][key:8][value:8][comment:8]
                     let key = unsafe { *((entry as usize + 8) as *const u64) };
                     let val = unsafe { *((entry as usize + 16) as *const u64) };
-                    let key_s =
-                        crate::cfstring::extract_cfstring_cstr(key).unwrap_or_default();
-                    let val_s =
-                        crate::cfstring::extract_cfstring_cstr(val).unwrap_or_default();
+                    let key_s = crate::cfstring::extract_cfstring_cstr(key).unwrap_or_default();
+                    let val_s = crate::cfstring::extract_cfstring_cstr(val).unwrap_or_default();
                     use std::fmt::Write;
                     let _ = writeln!(output, "\"{}\" = \"{}\";", key_s, val_s);
                 }
@@ -214,7 +212,10 @@ mod tests {
 
     #[test]
     fn nil_safety() {
-        assert_eq!(shim_xcstringsdatafile_init_with_source_version_tables(0, 0, 1, 2, 3), 0);
+        assert_eq!(
+            shim_xcstringsdatafile_init_with_source_version_tables(0, 0, 1, 2, 3),
+            0
+        );
         assert_eq!(shim_xcstringsdatafile_init_with_path_options(0, 0, 1, 2), 0);
         assert_eq!(shim_xcstringsdatafile_source(0, 0), 0);
         assert_eq!(shim_xcstringsdatafile_tables(0, 0), 0);
@@ -257,9 +258,7 @@ mod tests {
         let file_obj = alloc_obj(OBJ_SIZE, FAKE_ISA);
         let src = make_string("test");
         let ver = make_string("1.0");
-        shim_xcstringsdatafile_init_with_source_version_tables(
-            file_obj, 0, src, ver, tables_arr,
-        );
+        shim_xcstringsdatafile_init_with_source_version_tables(file_obj, 0, src, ver, tables_arr);
 
         // Write to a temp file
         let tmp = std::env::temp_dir().join("xcstringsdata_test_output.strings");

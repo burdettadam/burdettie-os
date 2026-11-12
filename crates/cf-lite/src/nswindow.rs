@@ -21,7 +21,7 @@
 //!
 //! Total: 128 bytes.
 
-use crate::cg_types::{CGRect, CGPoint, CGSize};
+use crate::cg_types::{CGPoint, CGRect, CGSize};
 
 const CONTENT_VIEW_OFF: usize = 8;
 const TITLE_OFF: usize = 16;
@@ -102,7 +102,9 @@ fn object_is_kind_of(obj: u64, class_addr: u64) -> bool {
         if addr == class_addr {
             return true;
         }
-        current = rt.get_class_by_addr(addr).and_then(|class| class.superclass_addr);
+        current = rt
+            .get_class_by_addr(addr)
+            .and_then(|class| class.superclass_addr);
         depth += 1;
     }
     false
@@ -158,7 +160,8 @@ pub(crate) fn window_desc(obj: u64) -> crate::gui_bridge::WindowDesc {
     crate::gui_bridge::WindowDesc {
         guest_window: obj,
         title,
-        x, y,
+        x,
+        y,
         width: w,
         height: h,
     }
@@ -170,7 +173,9 @@ fn set_visible(obj: u64, is_visible: bool) {
 
 fn alloc_window(rect: CGRect, style: u64) -> u64 {
     let obj = crate::pal_alloc().calloc(1, WINDOW_SIZE) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *(obj as *mut u64) = crate::nsobj::nswindow_class_addr();
         *((obj as usize + STYLE_MASK_OFF) as *mut u64) = style;
@@ -182,7 +187,8 @@ fn alloc_window(rect: CGRect, style: u64) -> u64 {
         *((obj as usize + MAX_W_OFF) as *mut f64) = f64::MAX;
         *((obj as usize + MAX_H_OFF) as *mut f64) = f64::MAX;
     }
-    let content_view = crate::nsview::alloc_view_with_frame(0.0, 0.0, rect.size.width, rect.size.height);
+    let content_view =
+        crate::nsview::alloc_view_with_frame(0.0, 0.0, rect.size.width, rect.size.height);
     if content_view != 0 {
         crate::nsview::set_view_window(content_view, obj);
         write_u64(obj, CONTENT_VIEW_OFF, content_view);
@@ -191,20 +197,123 @@ fn alloc_window(rect: CGRect, style: u64) -> u64 {
     obj
 }
 
+/// `-[NSWindow initWithCoder:]`.
+///
+/// Real nib/storyboard windows are commonly keyed-archive objects.  Decode the
+/// common AppKit keys and then reuse the normal content-view wiring path.
+pub extern "C" fn shim_nswindow_init_with_coder(obj: u64, _cmd: u64, coder: u64) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
+
+    let (x, y, w, h) = crate::nskeyedarchiver::decode_rect_for_any_key(
+        coder,
+        &[
+            "NSWindowFrame",
+            "NSWindowFrameString",
+            "NSWindowContentRect",
+            "NSContentRect",
+            "NSFrame",
+            "frame",
+            "_frame",
+        ],
+    )
+    .unwrap_or((0.0, 0.0, 800.0, 600.0));
+    let style = crate::nskeyedarchiver::decode_integer_for_any_key(
+        coder,
+        &[
+            "NSWindowStyleMask",
+            "NSStyleMask",
+            "NSWindowStyle",
+            "styleMask",
+            "_styleMask",
+        ],
+    )
+    .unwrap_or(0)
+    .max(0) as u64;
+
+    init_window_in_place(
+        obj,
+        CGRect {
+            origin: CGPoint { x, y },
+            size: CGSize {
+                width: w,
+                height: h,
+            },
+        },
+        style,
+    );
+
+    let title = crate::nskeyedarchiver::decode_object_for_any_key(
+        coder,
+        &["NSTitle", "NSWindowTitle", "title", "_title"],
+    );
+    if title != 0 {
+        shim_nswindow_set_title(obj, 0, title);
+    }
+
+    let content_view = crate::nskeyedarchiver::decode_object_for_any_key(
+        coder,
+        &[
+            "NSContentView",
+            "NS.contentView",
+            "contentView",
+            "_contentView",
+        ],
+    );
+    if content_view != 0 {
+        shim_nswindow_set_content_view(obj, 0, content_view);
+    }
+
+    let delegate = crate::nskeyedarchiver::decode_object_for_any_key(
+        coder,
+        &["NSDelegate", "delegate", "_delegate"],
+    );
+    if delegate != 0 {
+        shim_nswindow_set_delegate(obj, 0, delegate);
+    }
+
+    let background = crate::nskeyedarchiver::decode_object_for_any_key(
+        coder,
+        &[
+            "NSBackgroundColor",
+            "NSWindowBackgroundColor",
+            "backgroundColor",
+            "_backgroundColor",
+        ],
+    );
+    if background != 0 {
+        shim_nswindow_set_background_color(obj, 0, background);
+    }
+
+    crate::nsapplication::register_window(obj);
+    obj
+}
+
 /// `-[NSWindow initWithContentRect:styleMask:backing:defer:]`
 pub extern "C" fn shim_nswindow_init_with_content_rect(
     obj: u64,
     _cmd: u64,
-    x: f64, y: f64, w: f64, h: f64, // CGRect passed as 4 doubles on ARM64
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64, // CGRect passed as 4 doubles on ARM64
     style_mask: u64,
     _backing: u64,
     _defer: u8,
 ) -> u64 {
     let rect = CGRect {
         origin: CGPoint { x, y },
-        size: CGSize { width: w, height: h },
+        size: CGSize {
+            width: w,
+            height: h,
+        },
     };
-    log::debug!("NSWindow initWithContentRect:{} styleMask:{}", rect, style_mask);
+    log::debug!(
+        "NSWindow initWithContentRect:{} styleMask:{}",
+        rect,
+        style_mask
+    );
 
     // If the caller already allocated the object (e.g. via +alloc or
     // objc_allocateClassPair), initialise it in-place so that any dynamic
@@ -234,7 +343,8 @@ fn init_window_in_place(obj: u64, rect: CGRect, style: u64) {
         *((obj as usize + MAX_W_OFF) as *mut f64) = f64::MAX;
         *((obj as usize + MAX_H_OFF) as *mut f64) = f64::MAX;
     }
-    let content_view = crate::nsview::alloc_view_with_frame(0.0, 0.0, rect.size.width, rect.size.height);
+    let content_view =
+        crate::nsview::alloc_view_with_frame(0.0, 0.0, rect.size.width, rect.size.height);
     if content_view != 0 {
         crate::nsview::set_view_window(content_view, obj);
         write_u64(obj, CONTENT_VIEW_OFF, content_view);
@@ -254,7 +364,9 @@ pub(crate) fn window_content_view(obj: u64) -> u64 {
 
 /// `-[NSWindow setContentView:]`
 pub extern "C" fn shim_nswindow_set_content_view(obj: u64, _cmd: u64, view: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let previous = read_u64(obj, CONTENT_VIEW_OFF);
     if previous != 0 && previous != view {
         crate::nsview::set_view_superview(previous, 0);
@@ -348,17 +460,29 @@ pub extern "C" fn shim_nswindow_send_event(obj: u64, _cmd: u64, event: u64) {
     let dispatch_target = if crate::nsevent::event_targets_first_responder(event) {
         // Key events → first responder
         let responder = shim_nswindow_first_responder(obj, 0);
-        if responder != 0 { responder } else { obj }
+        if responder != 0 {
+            responder
+        } else {
+            obj
+        }
     } else {
         // Mouse events → hitTest: to find actual target view
         let content_view = shim_nswindow_content_view(obj, 0);
         if content_view != 0 {
             let (px, py) = crate::nsevent::event_location_in_window(event);
             let hit = crate::nsview::shim_nsview_hit_test(content_view, 0, px, py);
-            if hit != 0 { hit } else { content_view }
+            if hit != 0 {
+                hit
+            } else {
+                content_view
+            }
         } else {
             let responder = shim_nswindow_first_responder(obj, 0);
-            if responder != 0 { responder } else { obj }
+            if responder != 0 {
+                responder
+            } else {
+                obj
+            }
         }
     };
 
@@ -369,7 +493,11 @@ pub extern "C" fn shim_nswindow_send_event(obj: u64, _cmd: u64, event: u64) {
     }
 
     if let Some(selector) = crate::nsevent::event_dispatch_selector(event) {
-        let _ = crate::nsapplication::dispatch_selector_named_to_target(dispatch_target, selector, event);
+        let _ = crate::nsapplication::dispatch_selector_named_to_target(
+            dispatch_target,
+            selector,
+            event,
+        );
     }
 
     crate::nsapplication::restore_previous_current_event(previous_event, event);
@@ -397,7 +525,9 @@ pub extern "C" fn shim_nswindow_make_key_window(obj: u64, _cmd: u64) {
 /// Notify old key window's delegate of `windowDidResignKey:` and new
 /// key window's delegate of `windowDidBecomeKey:`.
 fn notify_key_window_change(obj: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let old_key = crate::nsapplication::current_key_window();
     crate::nsapplication::set_key_window(obj);
 
@@ -409,7 +539,9 @@ fn notify_key_window_change(obj: u64) {
             let name_str = crate::cfstring::alloc_nsstring_from_cstr(name_cstr.as_ptr());
             let note = crate::nsnotificationcenter::make_nsnotification(name_str, old_key, 0);
             crate::nsapplication::dispatch_selector_named_to_target(
-                delegate, "windowDidResignKey:", note,
+                delegate,
+                "windowDidResignKey:",
+                note,
             );
         }
     }
@@ -421,7 +553,9 @@ fn notify_key_window_change(obj: u64) {
         let name_str = crate::cfstring::alloc_nsstring_from_cstr(name_cstr.as_ptr());
         let note = crate::nsnotificationcenter::make_nsnotification(name_str, obj, 0);
         crate::nsapplication::dispatch_selector_named_to_target(
-            delegate, "windowDidBecomeKey:", note,
+            delegate,
+            "windowDidBecomeKey:",
+            note,
         );
     }
 }
@@ -459,7 +593,9 @@ pub extern "C" fn shim_nswindow_style_mask(obj: u64, _cmd: u64) -> u64 {
 
 /// `-[NSWindow frame]` — returns CGRect (32 bytes, x8 indirect return on ARM64).
 pub extern "C" fn shim_nswindow_frame(obj: u64, _cmd: u64) -> CGRect {
-    if obj == 0 { return CGRect::ZERO; }
+    if obj == 0 {
+        return CGRect::ZERO;
+    }
     unsafe {
         CGRect::new(
             *((obj as usize + FRAME_X_OFF) as *const f64),
@@ -472,7 +608,12 @@ pub extern "C" fn shim_nswindow_frame(obj: u64, _cmd: u64) -> CGRect {
 
 /// `-[NSWindow contentRectForFrameRect:]` — returns content rect (frame minus title bar).
 pub extern "C" fn shim_nswindow_content_rect_for_frame_rect(
-    _obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64,
+    _obj: u64,
+    _cmd: u64,
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
 ) -> CGRect {
     // Approximate: 22pt title bar
     CGRect::new(x, y, w, h - 22.0)
@@ -486,9 +627,7 @@ pub extern "C" fn shim_nswindow_close(obj: u64, _cmd: u64) {
         let name_cstr = std::ffi::CString::new("NSWindowWillCloseNotification").unwrap();
         let name_str = crate::cfstring::alloc_nsstring_from_cstr(name_cstr.as_ptr());
         let note = crate::nsnotificationcenter::make_nsnotification(name_str, obj, 0);
-        crate::nsapplication::dispatch_selector_named_to_target(
-            delegate, "windowWillClose:", note,
-        );
+        crate::nsapplication::dispatch_selector_named_to_target(delegate, "windowWillClose:", note);
     }
 
     set_visible(obj, false);
@@ -514,6 +653,11 @@ pub extern "C" fn shim_nswindow_order_out(obj: u64, _cmd: u64, _sender: u64) {
 pub extern "C" fn shim_nswindow_order_front(obj: u64, _cmd: u64, _sender: u64) {
     set_visible(obj, true);
     crate::nsapplication::promote_window(obj);
+
+    if let Some(bridge) = crate::gui_bridge::gui_bridge() {
+        let desc = window_desc(obj);
+        bridge.show_window(&desc);
+    }
 }
 
 /// `-[NSWindow isVisible]`
@@ -569,11 +713,17 @@ pub extern "C" fn shim_nswindow_perform_key_equivalent(obj: u64, _cmd: u64, even
 /// After updating the frame, resizes the content view and notifies the
 /// delegate with `windowDidResize:` if the size actually changed.
 pub extern "C" fn shim_nswindow_set_frame_display(
-    obj: u64, _cmd: u64,
-    x: f64, y: f64, w: f64, h: f64,
+    obj: u64,
+    _cmd: u64,
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
     _display: u8,
 ) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     // Read old size for change detection.
     let old_w = unsafe { *((obj as usize + FRAME_W_OFF) as *const f64) };
     let old_h = unsafe { *((obj as usize + FRAME_H_OFF) as *const f64) };
@@ -583,8 +733,16 @@ pub extern "C" fn shim_nswindow_set_frame_display(
     let min_h = unsafe { *((obj as usize + MIN_H_OFF) as *const f64) };
     let max_w = unsafe { *((obj as usize + MAX_W_OFF) as *const f64) };
     let max_h = unsafe { *((obj as usize + MAX_H_OFF) as *const f64) };
-    let w = if max_w > 0.0 { w.max(min_w).min(max_w) } else { w.max(min_w) };
-    let h = if max_h > 0.0 { h.max(min_h).min(max_h) } else { h.max(min_h) };
+    let w = if max_w > 0.0 {
+        w.max(min_w).min(max_w)
+    } else {
+        w.max(min_w)
+    };
+    let h = if max_h > 0.0 {
+        h.max(min_h).min(max_h)
+    } else {
+        h.max(min_h)
+    };
     unsafe {
         *((obj as usize + FRAME_X_OFF) as *mut f64) = x;
         *((obj as usize + FRAME_X_OFF + 8) as *mut f64) = y;
@@ -611,7 +769,9 @@ pub extern "C" fn shim_nswindow_set_frame_display(
             let name_str = crate::cfstring::alloc_nsstring_from_cstr(name_cstr.as_ptr());
             let note = crate::nsnotificationcenter::make_nsnotification(name_str, obj, 0);
             crate::nsapplication::dispatch_selector_named_to_target(
-                delegate, "windowDidResize:", note,
+                delegate,
+                "windowDidResize:",
+                note,
             );
         }
     }
@@ -619,7 +779,9 @@ pub extern "C" fn shim_nswindow_set_frame_display(
 
 /// `-[NSWindow center]` — centres on the main screen (stub: 1920×1080).
 pub extern "C" fn shim_nswindow_center(obj: u64, _cmd: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let w: f64 = unsafe { *((obj as usize + FRAME_X_OFF + 16) as *const f64) };
     let h: f64 = unsafe { *((obj as usize + FRAME_X_OFF + 24) as *const f64) };
     let new_x = (1920.0 - w) / 2.0;
@@ -649,7 +811,12 @@ pub extern "C" fn shim_nswindow_set_background_color(obj: u64, _cmd: u64, color:
 
 /// `-[NSWindow minSize]`
 pub extern "C" fn shim_nswindow_min_size(obj: u64, _cmd: u64) -> CGSize {
-    if obj == 0 { return CGSize { width: 0.0, height: 0.0 }; }
+    if obj == 0 {
+        return CGSize {
+            width: 0.0,
+            height: 0.0,
+        };
+    }
     CGSize {
         width: unsafe { *((obj as usize + MIN_W_OFF) as *const f64) },
         height: unsafe { *((obj as usize + MIN_H_OFF) as *const f64) },
@@ -658,7 +825,9 @@ pub extern "C" fn shim_nswindow_min_size(obj: u64, _cmd: u64) -> CGSize {
 
 /// `-[NSWindow setMinSize:]`
 pub extern "C" fn shim_nswindow_set_min_size(obj: u64, _cmd: u64, w: f64, h: f64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     unsafe {
         *((obj as usize + MIN_W_OFF) as *mut f64) = w;
         *((obj as usize + MIN_H_OFF) as *mut f64) = h;
@@ -667,7 +836,12 @@ pub extern "C" fn shim_nswindow_set_min_size(obj: u64, _cmd: u64, w: f64, h: f64
 
 /// `-[NSWindow maxSize]`
 pub extern "C" fn shim_nswindow_max_size(obj: u64, _cmd: u64) -> CGSize {
-    if obj == 0 { return CGSize { width: f64::MAX, height: f64::MAX }; }
+    if obj == 0 {
+        return CGSize {
+            width: f64::MAX,
+            height: f64::MAX,
+        };
+    }
     CGSize {
         width: unsafe { *((obj as usize + MAX_W_OFF) as *const f64) },
         height: unsafe { *((obj as usize + MAX_H_OFF) as *const f64) },
@@ -676,7 +850,9 @@ pub extern "C" fn shim_nswindow_max_size(obj: u64, _cmd: u64) -> CGSize {
 
 /// `-[NSWindow setMaxSize:]`
 pub extern "C" fn shim_nswindow_set_max_size(obj: u64, _cmd: u64, w: f64, h: f64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     unsafe {
         *((obj as usize + MAX_W_OFF) as *mut f64) = w;
         *((obj as usize + MAX_H_OFF) as *mut f64) = h;
@@ -704,8 +880,7 @@ pub extern "C" fn shim_nswindow_perform_close(obj: u64, _cmd: u64, _sender: u64)
             })
         };
         if let Some((imp, sel_ptr)) = should_close {
-            let func: extern "C" fn(u64, u64, u64) -> u8 =
-                unsafe { std::mem::transmute(imp) };
+            let func: extern "C" fn(u64, u64, u64) -> u8 = unsafe { std::mem::transmute(imp) };
             if func(delegate, sel_ptr, obj) == 0 {
                 return;
             }
@@ -743,7 +918,9 @@ fn window_ctx_map() -> &'static Mutex<WindowMap<u64, u64>> {
 
 /// Get or create a CGContext for a window. The context matches the window's frame size.
 pub(crate) fn get_or_create_window_cg_context(window: u64) -> u64 {
-    if window == 0 { return 0; }
+    if window == 0 {
+        return 0;
+    }
 
     let w = read_f64(window, FRAME_W_OFF) as u32;
     let h = read_f64(window, FRAME_H_OFF) as u32;
@@ -771,13 +948,19 @@ pub(crate) fn get_or_create_window_cg_context(window: u64) -> u64 {
 /// Creates/updates the window's CGContext, runs the display cycle on the content view,
 /// then copies the CGContext's pixels to the bridge's window surface.
 pub(crate) fn display_window_content(window: u64) {
-    if window == 0 { return; }
+    if window == 0 {
+        return;
+    }
 
     let content_view = read_u64(window, CONTENT_VIEW_OFF);
-    if content_view == 0 { return; }
+    if content_view == 0 {
+        return;
+    }
 
     let cg_ctx = get_or_create_window_cg_context(window);
-    if cg_ctx == 0 { return; }
+    if cg_ctx == 0 {
+        return;
+    }
 
     // Clear the surface before drawing.
     cg_shims::bridge::with_context(cg_ctx, |c| {
@@ -841,17 +1024,25 @@ fn fullscreen_saved_frame(obj: u64) -> Option<(f64, f64, f64, f64)> {
 }
 
 fn set_fullscreen_saved_frame(obj: u64, frame: Option<(f64, f64, f64, f64)>) {
-    let mut guard = FULLSCREEN_SAVED_FRAMES.lock().unwrap_or_else(|e| e.into_inner());
+    let mut guard = FULLSCREEN_SAVED_FRAMES
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
     let map = guard.get_or_insert_with(StdHashMap::new);
     match frame {
-        Some(f) => { map.insert(obj, f); }
-        None => { map.remove(&obj); }
+        Some(f) => {
+            map.insert(obj, f);
+        }
+        None => {
+            map.remove(&obj);
+        }
     }
 }
 
 /// `-[NSWindow toggleFullScreen:]` — toggles between full-screen and windowed.
 pub extern "C" fn shim_nswindow_toggle_full_screen(obj: u64, _cmd: u64, _sender: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
 
     if let Some((sx, sy, sw, sh)) = fullscreen_saved_frame(obj) {
         // Currently full-screen — restore saved frame.
@@ -861,40 +1052,55 @@ pub extern "C" fn shim_nswindow_toggle_full_screen(obj: u64, _cmd: u64, _sender:
         // Notify delegate of windowDidExitFullScreen:.
         let delegate = read_u64(obj, DELEGATE_OFF);
         if delegate != 0 {
-            let name_cstr = std::ffi::CString::new("NSWindowDidExitFullScreenNotification").unwrap();
+            let name_cstr =
+                std::ffi::CString::new("NSWindowDidExitFullScreenNotification").unwrap();
             let name_str = crate::cfstring::alloc_nsstring_from_cstr(name_cstr.as_ptr());
             let note = crate::nsnotificationcenter::make_nsnotification(name_str, obj, 0);
             crate::nsapplication::dispatch_selector_named_to_target(
-                delegate, "windowDidExitFullScreen:", note,
+                delegate,
+                "windowDidExitFullScreen:",
+                note,
             );
         }
     } else {
         // Not full-screen — save current frame and go full-screen.
         let frame = shim_nswindow_frame(obj, 0);
-        set_fullscreen_saved_frame(obj, Some((
-            frame.origin.x, frame.origin.y,
-            frame.size.width, frame.size.height,
-        )));
+        set_fullscreen_saved_frame(
+            obj,
+            Some((
+                frame.origin.x,
+                frame.origin.y,
+                frame.size.width,
+                frame.size.height,
+            )),
+        );
 
         // Get screen bounds (main screen).
         let screen_frame = crate::nsscreen::shim_nsscreen_frame(
-            crate::nsscreen::shim_nsscreen_main_screen(0, 0), 0,
+            crate::nsscreen::shim_nsscreen_main_screen(0, 0),
+            0,
         );
         shim_nswindow_set_frame_display(
-            obj, 0,
-            screen_frame.origin.x, screen_frame.origin.y,
-            screen_frame.size.width, screen_frame.size.height,
+            obj,
+            0,
+            screen_frame.origin.x,
+            screen_frame.origin.y,
+            screen_frame.size.width,
+            screen_frame.size.height,
             1,
         );
 
         // Notify delegate of windowDidEnterFullScreen:.
         let delegate = read_u64(obj, DELEGATE_OFF);
         if delegate != 0 {
-            let name_cstr = std::ffi::CString::new("NSWindowDidEnterFullScreenNotification").unwrap();
+            let name_cstr =
+                std::ffi::CString::new("NSWindowDidEnterFullScreenNotification").unwrap();
             let name_str = crate::cfstring::alloc_nsstring_from_cstr(name_cstr.as_ptr());
             let note = crate::nsnotificationcenter::make_nsnotification(name_str, obj, 0);
             crate::nsapplication::dispatch_selector_named_to_target(
-                delegate, "windowDidEnterFullScreen:", note,
+                delegate,
+                "windowDidEnterFullScreen:",
+                note,
             );
         }
     }
@@ -909,10 +1115,10 @@ pub extern "C" fn shim_nswindow_toggle_full_screen(obj: u64, _cmd: u64, _sender:
 ///
 /// Since we lack a real modal-sheet event loop, we invoke the handler
 /// right away so the calling code can proceed.
-pub extern "C" fn shim_nswindow_begin_sheet(
-    obj: u64, _cmd: u64, sheet_window: u64, handler: u64,
-) {
-    if obj == 0 { return; }
+pub extern "C" fn shim_nswindow_begin_sheet(obj: u64, _cmd: u64, sheet_window: u64, handler: u64) {
+    if obj == 0 {
+        return;
+    }
 
     // Make the sheet visible (attached to this window conceptually).
     if sheet_window != 0 {
@@ -933,7 +1139,9 @@ pub extern "C" fn shim_nswindow_begin_sheet(
 
 /// `-[NSWindow endSheet:]` — dismisses a sheet previously presented via `beginSheet:`.
 pub extern "C" fn shim_nswindow_end_sheet(obj: u64, _cmd: u64, sheet_window: u64) {
-    if obj == 0 || sheet_window == 0 { return; }
+    if obj == 0 || sheet_window == 0 {
+        return;
+    }
     set_visible(sheet_window, false);
     if let Some(bridge) = crate::gui_bridge::gui_bridge() {
         bridge.hide_window(sheet_window);
@@ -942,7 +1150,10 @@ pub extern "C" fn shim_nswindow_end_sheet(obj: u64, _cmd: u64, sheet_window: u64
 
 /// `-[NSWindow endSheet:returnCode:]` — dismisses a sheet with a return code.
 pub extern "C" fn shim_nswindow_end_sheet_return_code(
-    obj: u64, _cmd: u64, sheet_window: u64, _return_code: i64,
+    obj: u64,
+    _cmd: u64,
+    sheet_window: u64,
+    _return_code: i64,
 ) {
     shim_nswindow_end_sheet(obj, 0, sheet_window);
 }
@@ -974,6 +1185,28 @@ mod tests {
     static SHOULD_CLOSE_CALL_COUNT: AtomicU64 = AtomicU64::new(0);
     static SHOULD_CLOSE_RETURN: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(1);
 
+    fn make_coder() -> u64 {
+        crate::nskeyedarchiver::shim_nskeyedarchiver_alloc(0, 0)
+    }
+
+    fn encode_object(coder: u64, key: &str, value: u64) {
+        crate::nskeyedarchiver::shim_nskeyedarchiver_encode_object_for_key(
+            coder,
+            0,
+            value,
+            make_string(key),
+        );
+    }
+
+    fn encode_integer(coder: u64, key: &str, value: i64) {
+        crate::nskeyedarchiver::shim_nskeyedarchiver_encode_integer_for_key(
+            coder,
+            0,
+            value,
+            make_string(key),
+        );
+    }
+
     const PROBE_VIEW_CLASS_ADDR: u64 = 0x0000_0001_0050_3000;
     const DELEGATE_PROBE_CLASS_ADDR: u64 = 0x0000_0001_0050_6000;
 
@@ -1004,7 +1237,10 @@ mod tests {
             crate::nsapplication::shim_nsapplication_current_event(app, 0),
             Ordering::SeqCst,
         );
-        EVENT_WINDOW_DURING_CALL.store(crate::nsevent::shim_nsevent_window(event, 0), Ordering::SeqCst);
+        EVENT_WINDOW_DURING_CALL.store(
+            crate::nsevent::shim_nsevent_window(event, 0),
+            Ordering::SeqCst,
+        );
     }
 
     fn reset_event_probe() {
@@ -1071,13 +1307,11 @@ mod tests {
         let mut info = objc_runtime::ClassInfo {
             name: "WindowDelegateProbe".to_string(),
             mapped_addr: DELEGATE_PROBE_CLASS_ADDR,
-            methods: vec![
-                objc_runtime::MethodEntry {
-                    selector: "windowShouldClose:".into(),
-                    imp: probe_window_should_close as *const () as u64,
-                    type_encoding: "B@:@".into(),
-                },
-            ],
+            methods: vec![objc_runtime::MethodEntry {
+                selector: "windowShouldClose:".into(),
+                imp: probe_window_should_close as *const () as u64,
+                type_encoding: "B@:@".into(),
+            }],
             class_methods: vec![],
             ivars: vec![],
             properties: vec![],
@@ -1095,7 +1329,9 @@ mod tests {
 
     fn with_window_runtime<R>(f: impl FnOnce() -> R) -> R {
         let saved_runtime = {
-            let mut guard = objc_runtime::OBJC_RUNTIME.write().unwrap_or_else(|e| e.into_inner());
+            let mut guard = objc_runtime::OBJC_RUNTIME
+                .write()
+                .unwrap_or_else(|e| e.into_inner());
             let saved = std::mem::take(&mut *guard);
 
             let mut rt = objc_runtime::ObjcRuntime::new();
@@ -1114,7 +1350,9 @@ mod tests {
 
         let result = f();
 
-        let mut guard = objc_runtime::OBJC_RUNTIME.write().unwrap_or_else(|e| e.into_inner());
+        let mut guard = objc_runtime::OBJC_RUNTIME
+            .write()
+            .unwrap_or_else(|e| e.into_inner());
         *guard = saved_runtime;
         result
     }
@@ -1133,7 +1371,10 @@ mod tests {
     fn alloc_window_basic() {
         let rect = CGRect {
             origin: CGPoint { x: 10.0, y: 20.0 },
-            size: CGSize { width: 800.0, height: 600.0 },
+            size: CGSize {
+                width: 800.0,
+                height: 600.0,
+            },
         };
         let obj = alloc_window(rect, 0x0F);
         assert_ne!(obj, 0);
@@ -1184,6 +1425,39 @@ mod tests {
         let fw = unsafe { *((obj as usize + FRAME_X_OFF + 16) as *const f64) };
         assert_eq!(fw, 0.0);
         free_obj(obj);
+        reset_app_state();
+    }
+
+    #[test]
+    fn init_with_coder_decodes_frame_title_style_and_content_view() {
+        let _guard = WINDOW_TEST_LOCK.lock().unwrap();
+        reset_app_state();
+        let win = alloc_obj(SIZE, crate::nsobj::nswindow_class_addr());
+        let content = crate::nsview::alloc_view_with_frame(0.0, 0.0, 320.0, 200.0);
+        let title = make_string("Archived Window");
+        let coder = make_coder();
+
+        encode_object(
+            coder,
+            "NSWindowFrame",
+            make_string("{{44, 55}, {640, 480}}"),
+        );
+        encode_integer(coder, "NSWindowStyleMask", 15);
+        encode_object(coder, "NSTitle", title);
+        encode_object(coder, "NSContentView", content);
+
+        assert_eq!(shim_nswindow_init_with_coder(win, 0, coder), win);
+        assert_eq!(read_f64(win, FRAME_X_OFF), 44.0);
+        assert_eq!(read_f64(win, FRAME_X_OFF + 8), 55.0);
+        assert_eq!(read_f64(win, FRAME_X_OFF + 16), 640.0);
+        assert_eq!(read_f64(win, FRAME_X_OFF + 24), 480.0);
+        assert_eq!(shim_nswindow_style_mask(win, 0), 15);
+        assert_eq!(shim_nswindow_title(win, 0), title);
+        assert_eq!(shim_nswindow_content_view(win, 0), content);
+        assert_eq!(crate::nsview::shim_nsview_window(content, 0), win);
+
+        free_obj(content);
+        free_obj(win);
         reset_app_state();
     }
 
@@ -1387,7 +1661,10 @@ mod tests {
             assert_eq!(LAST_EVENT_ARG.load(Ordering::SeqCst), event);
             assert_eq!(CURRENT_EVENT_DURING_CALL.load(Ordering::SeqCst), event);
             assert_eq!(EVENT_WINDOW_DURING_CALL.load(Ordering::SeqCst), window);
-            assert_eq!(crate::nsapplication::shim_nsapplication_current_event(app, 0), event);
+            assert_eq!(
+                crate::nsapplication::shim_nsapplication_current_event(app, 0),
+                event
+            );
 
             free_obj(event);
             free_obj(probe);
@@ -1419,7 +1696,10 @@ mod tests {
             assert_eq!(LAST_EVENT_ARG.load(Ordering::SeqCst), event);
             assert_eq!(CURRENT_EVENT_DURING_CALL.load(Ordering::SeqCst), event);
             assert_eq!(EVENT_WINDOW_DURING_CALL.load(Ordering::SeqCst), window);
-            assert_eq!(crate::nsapplication::shim_nsapplication_current_event(app, 0), event);
+            assert_eq!(
+                crate::nsapplication::shim_nsapplication_current_event(app, 0),
+                event
+            );
 
             free_obj(event);
             free_obj(probe);
@@ -1655,7 +1935,9 @@ mod tests {
     #[test]
     fn frame_basic() {
         let obj = alloc_obj(SIZE, isa());
-        unsafe { *((obj as usize + FRAME_X_OFF) as *mut f64) = 123.5; }
+        unsafe {
+            *((obj as usize + FRAME_X_OFF) as *mut f64) = 123.5;
+        }
         assert_eq!(shim_nswindow_frame(obj, 0).origin.x, 123.5);
         free_obj(obj);
     }
@@ -1694,8 +1976,14 @@ mod tests {
             crate::nsapplication::shim_nsapplication_shared_application(0, 0),
             0,
         );
-        assert_eq!(crate::nsarray::shim_nsarray_object_at_index(ordered, 0, 0), second);
-        assert_eq!(crate::nsarray::shim_nsarray_object_at_index(ordered, 0, 1), first);
+        assert_eq!(
+            crate::nsarray::shim_nsarray_object_at_index(ordered, 0, 0),
+            second
+        );
+        assert_eq!(
+            crate::nsarray::shim_nsarray_object_at_index(ordered, 0, 1),
+            first
+        );
 
         free_obj(second);
         free_obj(first);
@@ -1793,8 +2081,14 @@ mod tests {
             crate::nsapplication::shim_nsapplication_shared_application(0, 0),
             0,
         );
-        assert_eq!(crate::nsarray::shim_nsarray_object_at_index(ordered, 0, 0), first);
-        assert_eq!(crate::nsarray::shim_nsarray_object_at_index(ordered, 0, 1), second);
+        assert_eq!(
+            crate::nsarray::shim_nsarray_object_at_index(ordered, 0, 0),
+            first
+        );
+        assert_eq!(
+            crate::nsarray::shim_nsarray_object_at_index(ordered, 0, 1),
+            second
+        );
 
         free_obj(second);
         free_obj(first);
@@ -1907,7 +2201,13 @@ mod tests {
     #[test]
     fn content_layout_guide_returns_guide_for_content_view() {
         let _lock = WINDOW_TEST_LOCK.lock();
-        let rect = CGRect { origin: CGPoint { x: 0.0, y: 0.0 }, size: CGSize { width: 400.0, height: 300.0 } };
+        let rect = CGRect {
+            origin: CGPoint { x: 0.0, y: 0.0 },
+            size: CGSize {
+                width: 400.0,
+                height: 300.0,
+            },
+        };
         let window = alloc_window(rect, 0);
         let content_view = shim_nswindow_content_view(window, 0);
         assert_ne!(content_view, 0);

@@ -124,7 +124,8 @@ pub extern "C" fn shim_nstimer_fire(obj: u64, _cmd: u64) {
             };
             if let Some(rt) = guard.as_ref() {
                 // sel_ptr is a SEL (pointer to the selector C string)
-                let sel_name = unsafe { std::ffi::CStr::from_ptr(sel_ptr as *const std::ffi::c_char) };
+                let sel_name =
+                    unsafe { std::ffi::CStr::from_ptr(sel_ptr as *const std::ffi::c_char) };
                 if let Ok(name) = sel_name.to_str() {
                     if let Some(imp) = rt.msg_lookup(isa, name) {
                         let f: extern "C" fn(u64, u64, u64) = unsafe { std::mem::transmute(imp) };
@@ -258,7 +259,11 @@ mod tests {
         let t = shim_nstimer_scheduled_with_block(0, 0, 0.1, 0, 0);
         assert_eq!(shim_nstimer_is_valid(t, 0), 1);
         shim_nstimer_fire(t, 0);
-        assert_eq!(shim_nstimer_is_valid(t, 0), 0, "non-repeating timer must auto-invalidate after fire");
+        assert_eq!(
+            shim_nstimer_is_valid(t, 0),
+            0,
+            "non-repeating timer must auto-invalidate after fire"
+        );
         free_obj(t);
     }
 

@@ -313,11 +313,7 @@ impl NSMenu {
     ///
     /// Walks all items and submenus recursively. Returns `true` if a
     /// matching shortcut was found and its action performed.
-    pub fn perform_key_equivalent(
-        &mut self,
-        key: KeyCode,
-        modifiers: ModifierFlags,
-    ) -> bool {
+    pub fn perform_key_equivalent(&mut self, key: KeyCode, modifiers: ModifierFlags) -> bool {
         for item in &mut self.items {
             if item.is_enabled() {
                 if let Some(ke) = &item.key_equivalent {

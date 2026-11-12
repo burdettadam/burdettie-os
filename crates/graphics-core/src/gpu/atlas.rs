@@ -100,13 +100,19 @@ impl GlyphAtlas {
         let u1 = (ox + gw) as f32 / ATLAS_SIZE as f32;
         let v1 = (oy + gh) as f32 / ATLAS_SIZE as f32;
 
-        self.entries.insert(key, GlyphEntry {
-            u0, v0, u1, v1,
-            width: gw as f32,
-            height: gh as f32,
-            offset_x: bounds.min.x,
-            offset_y: bounds.min.y,
-        });
+        self.entries.insert(
+            key,
+            GlyphEntry {
+                u0,
+                v0,
+                u1,
+                v1,
+                width: gw as f32,
+                height: gh as f32,
+                offset_x: bounds.min.x,
+                offset_y: bounds.min.y,
+            },
+        );
 
         self.entries.get(&key)
     }

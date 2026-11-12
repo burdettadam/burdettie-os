@@ -211,9 +211,13 @@ pub extern "C" fn shim_nscombobox_set_uses_data_source(_obj: u64, _cmd: u64, _va
 
 /// `-[NSComboBox drawRect:]` — renders the combo box: text field + dropdown arrow.
 pub extern "C" fn shim_nscombobox_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let cg_ctx = crate::nsgraphicscontext::current_cg_context_handle();
-    if cg_ctx == 0 { return; }
+    if cg_ctx == 0 {
+        return;
+    }
 
     let arrow_w = 20.0;
 
@@ -232,15 +236,24 @@ pub extern "C" fn shim_nscombobox_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64,
         let sh = c.surface.height();
         // Draw "▾" in arrow region
         let _ = graphics_core::text_system::draw_shaped_text(
-            c.surface.pixels_mut(), sw, sh,
-            "▾", x + w - arrow_w + 4.0, y + (h - font_size * 1.2) / 2.0,
-            font_size, "System", graphics_core::Color::BLACK, None,
+            c.surface.pixels_mut(),
+            sw,
+            sh,
+            "▾",
+            x + w - arrow_w + 4.0,
+            y + (h - font_size * 1.2) / 2.0,
+            font_size,
+            "System",
+            graphics_core::Color::BLACK,
+            None,
         );
 
         // Draw selected item text (or placeholder)
         let idx = selected_index(obj);
         let text_ptr = if idx >= 0 {
-            get_items(obj).and_then(|items| items.get(idx as usize).copied()).unwrap_or(0)
+            get_items(obj)
+                .and_then(|items| items.get(idx as usize).copied())
+                .unwrap_or(0)
         } else {
             0
         };
@@ -248,12 +261,20 @@ pub extern "C" fn shim_nscombobox_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64,
             let utf8 = crate::cfstring::shim_nsstring_utf8string(text_ptr, 0);
             if !utf8.is_null() {
                 let text = unsafe { std::ffi::CStr::from_ptr(utf8) }
-                    .to_str().unwrap_or("");
+                    .to_str()
+                    .unwrap_or("");
                 if !text.is_empty() {
                     let _ = graphics_core::text_system::draw_shaped_text(
-                        c.surface.pixels_mut(), sw, sh,
-                        text, x + 4.0, y + (h - font_size * 1.2) / 2.0,
-                        font_size, "System", graphics_core::Color::BLACK, None,
+                        c.surface.pixels_mut(),
+                        sw,
+                        sh,
+                        text,
+                        x + 4.0,
+                        y + (h - font_size * 1.2) / 2.0,
+                        font_size,
+                        "System",
+                        graphics_core::Color::BLACK,
+                        None,
                     );
                 }
             }
@@ -263,7 +284,9 @@ pub extern "C" fn shim_nscombobox_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64,
 
 /// `-[NSComboBox mouseDown:]` — cycle through items on arrow click.
 pub extern "C" fn shim_nscombobox_mouse_down(obj: u64, _cmd: u64, event: u64) {
-    if obj == 0 || event == 0 { return; }
+    if obj == 0 || event == 0 {
+        return;
+    }
 
     let (loc_x, _loc_y) = crate::nsevent::event_location_in_window(event);
     let frame = crate::nsview::view_frame(obj);
@@ -275,7 +298,11 @@ pub extern "C" fn shim_nscombobox_mouse_down(obj: u64, _cmd: u64, event: u64) {
         let count = shim_nscombobox_number_of_items(obj, 0);
         if count > 0 {
             let cur = selected_index(obj);
-            let next = if cur < 0 || cur >= count - 1 { 0 } else { cur + 1 };
+            let next = if cur < 0 || cur >= count - 1 {
+                0
+            } else {
+                cur + 1
+            };
             shim_nscombobox_select_item_at_index(obj, 0, next);
         }
         crate::nsview::shim_nsview_set_needs_display(obj, 0, 1);
@@ -351,7 +378,10 @@ mod tests {
 
         shim_nscombobox_select_item_at_index(combo, 0, 1);
         assert_eq!(shim_nscombobox_index_of_selected_item(combo, 0), 1);
-        assert_eq!(shim_nscombobox_object_value_of_selected_item(combo, 0), beta);
+        assert_eq!(
+            shim_nscombobox_object_value_of_selected_item(combo, 0),
+            beta
+        );
         assert_eq!(read_string(beta), "Beta");
 
         free_items_vec(combo);
@@ -402,7 +432,10 @@ mod tests {
 
         shim_nscombobox_set_autocompletes(combo, 0, 1);
         assert_eq!(shim_nscombobox_autocompletes(combo, 0), 1);
-        assert_eq!(read_u64(combo, FLAGS_OFF) & FLAG_IS_USABLE_WHEN_MODDING, FLAG_IS_USABLE_WHEN_MODDING);
+        assert_eq!(
+            read_u64(combo, FLAGS_OFF) & FLAG_IS_USABLE_WHEN_MODDING,
+            FLAG_IS_USABLE_WHEN_MODDING
+        );
 
         shim_nscombobox_set_autocompletes(combo, 0, 0);
         assert_eq!(shim_nscombobox_autocompletes(combo, 0), 0);

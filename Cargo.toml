@@ -45,9 +45,12 @@ members = [
     "crates/launchd",
     "crates/libxo",
     "crates/burdettie-domain-map",
+    "crates/burdettie-memory-core",
+    "crates/burdettie-memory-index",
     "crates/burdettie-services",
     "crates/burdettie-log-pipeline",
     "crates/burdettie-plutil",
+    "crates/burdettie-xcode-tools",
     "apps/hello-darwin",
     "apps/control-gallery",
     "apps/foundation-explorer",
@@ -109,6 +112,8 @@ trust-eval            = { path = "crates/trust-eval" }
 launchd               = { path = "crates/launchd" }
 libxo                  = { path = "crates/libxo" }
 burdettie-domain-map  = { path = "crates/burdettie-domain-map" }
+burdettie-memory-core = { path = "crates/burdettie-memory-core" }
+burdettie-memory-index = { path = "crates/burdettie-memory-index" }
 burdettie-services    = { path = "crates/burdettie-services" }
 burdettie-log-pipeline = { path = "crates/burdettie-log-pipeline" }
 hello-darwin          = { path = "apps/hello-darwin" }
@@ -145,7 +150,10 @@ lzma-rs   = "0.3"
 lzfse_rust = "0.2"
 tiny_http = "0.12"
 accesskit = "0.17.1"
-accesskit_winit = { version = "0.23.1", default-features = false }
+accesskit_winit = { version = "0.23.1", default-features = false, features = ["rwh_06"] }
+serde_yaml = "0.9"
+open = "5.3.5"
+car = { package = "car-parser", version = "0.0.1", features = ["image"] }
 
 # ── Workspace-wide lints ────────────────────────────────────────────
 # Inherited by every crate via `[lints] workspace = true`.

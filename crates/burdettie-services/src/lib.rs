@@ -30,8 +30,8 @@ pub mod router;
 pub mod server;
 
 pub use config::ServiceConfig;
-pub use recorder::{RequestRecorder, XpcRecord, DnsRecord, OsLogRecord};
-pub use server::{ServiceServer, ServerHandle};
+pub use recorder::{DnsRecord, OsLogRecord, RequestRecorder, XpcRecord};
+pub use server::{ServerHandle, ServiceServer};
 
 use std::sync::{Arc, OnceLock};
 

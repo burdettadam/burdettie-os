@@ -41,13 +41,19 @@ const DEFAULT_ROW_HEIGHT: f64 = 22.0;
 const DEFAULT_HEADER_HEIGHT: f64 = 17.0;
 
 fn read_u64(obj: u64, offset: usize) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + offset) as *const u64) }
 }
 
 fn write_u64(obj: u64, offset: usize, value: u64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as usize + offset) as *mut u64) = value; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + offset) as *mut u64) = value;
+    }
 }
 
 /// Per-table-view column list.
@@ -64,29 +70,43 @@ where
 }
 
 fn read_f64(obj: u64, offset: usize) -> f64 {
-    if obj == 0 { return 0.0; }
+    if obj == 0 {
+        return 0.0;
+    }
     unsafe { *((obj as usize + offset) as *const f64) }
 }
 
 fn write_f64(obj: u64, offset: usize, value: f64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as usize + offset) as *mut f64) = value; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + offset) as *mut f64) = value;
+    }
 }
 
 fn read_i64(obj: u64, offset: usize) -> i64 {
-    if obj == 0 { return -1; }
+    if obj == 0 {
+        return -1;
+    }
     unsafe { *((obj as usize + offset) as *const i64) }
 }
 
 fn write_i64(obj: u64, offset: usize, value: i64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as usize + offset) as *mut i64) = value; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + offset) as *mut i64) = value;
+    }
 }
 
 /// Allocate a new NSTableView.
 pub(crate) fn alloc_table_view() -> u64 {
     let obj = crate::pal_alloc().calloc(1, TABLE_VIEW_SIZE) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *(obj as *mut u64) = crate::nsobj::nstableview_class_addr();
         *((obj as usize + SELECTED_ROW_OFF) as *mut i64) = -1;
@@ -100,10 +120,17 @@ pub(crate) fn alloc_table_view() -> u64 {
 
 /// `-[NSTableView initWithFrame:]`
 pub extern "C" fn shim_nstableview_init_with_frame(
-    _obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64,
+    _obj: u64,
+    _cmd: u64,
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
 ) -> u64 {
     let obj = crate::pal_alloc().calloc(1, TABLE_VIEW_SIZE) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *(obj as *mut u64) = crate::nsobj::nstableview_class_addr();
         *((obj as usize + _FRAME_X_OFF) as *mut f64) = x;
@@ -142,27 +169,37 @@ pub extern "C" fn shim_nstableview_set_delegate(obj: u64, _cmd: u64, del: u64) {
 /// Queries the data source via `numberOfRowsInTableView:`.
 /// Returns 0 when no data source is set or method is absent.
 pub extern "C" fn shim_nstableview_number_of_rows(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     query_data_source_row_count(obj) as u64
 }
 
 /// Dispatch `numberOfRowsInTableView:` to the data source.
 fn query_data_source_row_count(obj: u64) -> i64 {
     let ds = read_u64(obj, DATA_SOURCE_OFF);
-    if ds == 0 { return 0; }
+    if ds == 0 {
+        return 0;
+    }
     let result = crate::nsapplication::dispatch_u64_selector_named_to_target(
         ds,
         "numberOfRowsInTableView:",
         obj,
     );
-    if result == u64::MAX { 0 } else { result as i64 }
+    if result == u64::MAX {
+        0
+    } else {
+        result as i64
+    }
 }
 
 /// Dispatch `tableView:objectValueForTableColumn:row:` to the data source.
 /// Returns the NSString (or object) pointer, or 0.
 fn query_data_source_object_value(obj: u64, column: u64, row: i64) -> u64 {
     let ds = read_u64(obj, DATA_SOURCE_OFF);
-    if ds == 0 { return 0; }
+    if ds == 0 {
+        return 0;
+    }
     dispatch_u64_selector_3arg(
         ds,
         "tableView:objectValueForTableColumn:row:",
@@ -174,13 +211,17 @@ fn query_data_source_object_value(obj: u64, column: u64, row: i64) -> u64 {
 
 /// Dispatch a u64-returning selector with 3 arguments through the ObjC runtime.
 fn dispatch_u64_selector_3arg(target: u64, selector: &str, a1: u64, a2: u64, a3: u64) -> u64 {
-    if target == 0 || selector.is_empty() { return 0; }
+    if target == 0 || selector.is_empty() {
+        return 0;
+    }
     let isa = unsafe { *(target as *const u64) };
     let guard = match objc_runtime::OBJC_RUNTIME.read() {
         Ok(g) => g,
         Err(e) => e.into_inner(),
     };
-    let Some(rt) = guard.as_ref() else { return 0; };
+    let Some(rt) = guard.as_ref() else {
+        return 0;
+    };
     let imp = match rt.msg_lookup(isa, selector) {
         Some(p) => p,
         None => return 0,
@@ -193,13 +234,17 @@ fn dispatch_u64_selector_3arg(target: u64, selector: &str, a1: u64, a2: u64, a3:
 
 /// `-[NSTableView numberOfColumns]`
 pub extern "C" fn shim_nstableview_number_of_columns(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     with_columns(obj, |cols| cols.len() as u64)
 }
 
 /// `-[NSTableView addTableColumn:]`
 pub extern "C" fn shim_nstableview_add_table_column(obj: u64, _cmd: u64, column: u64) {
-    if obj == 0 || column == 0 { return; }
+    if obj == 0 || column == 0 {
+        return;
+    }
     with_columns(obj, |cols| {
         if !cols.contains(&column) {
             cols.push(column);
@@ -209,25 +254,33 @@ pub extern "C" fn shim_nstableview_add_table_column(obj: u64, _cmd: u64, column:
 
 /// `-[NSTableView removeTableColumn:]`
 pub extern "C" fn shim_nstableview_remove_table_column(obj: u64, _cmd: u64, column: u64) {
-    if obj == 0 || column == 0 { return; }
+    if obj == 0 || column == 0 {
+        return;
+    }
     with_columns(obj, |cols| cols.retain(|&c| c != column));
 }
 
 /// `-[NSTableView tableColumns]` — returns an NSArray of columns.
 pub extern "C" fn shim_nstableview_table_columns(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     with_columns(obj, |cols| crate::nsarray::make_nsarray(cols))
 }
 
 /// Returns the first column address for a table/outline view, or 0.
 pub(crate) fn first_column_addr(obj: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     with_columns(obj, |cols| cols.first().copied().unwrap_or(0))
 }
 
 /// `-[NSTableView reloadData]` — queries data source, clamps selection, marks dirty.
 pub extern "C" fn shim_nstableview_reload_data(obj: u64, _cmd: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     // Clamp selection to new row count.
     let row_count = query_data_source_row_count(obj);
     let sel_row = read_i64(obj, SELECTED_ROW_OFF);
@@ -251,19 +304,23 @@ pub extern "C" fn shim_nstableview_selected_row(obj: u64, _cmd: u64) -> i64 {
 /// `-[NSTableView selectRowIndexes:byExtendingSelection:]`
 ///
 /// Simplified: treats the index set as a single row index.
-pub extern "C" fn shim_nstableview_select_row_indexes(obj: u64, _cmd: u64, indexes: u64, _extend: u8) {
-    if obj == 0 { return; }
+pub extern "C" fn shim_nstableview_select_row_indexes(
+    obj: u64,
+    _cmd: u64,
+    indexes: u64,
+    _extend: u8,
+) {
+    if obj == 0 {
+        return;
+    }
     // Treat indexes as single row index (NSIndexSet first index).
     // If indexes is 0, deselect.
     if indexes == 0 {
         write_i64(obj, SELECTED_ROW_OFF, -1);
     } else {
         // Use firstIndex if it looks like an NSIndexSet, otherwise treat as raw row.
-        let first = crate::nsapplication::dispatch_u64_selector_named_to_target(
-            indexes,
-            "firstIndex",
-            0,
-        );
+        let first =
+            crate::nsapplication::dispatch_u64_selector_named_to_target(indexes, "firstIndex", 0);
         if first != u64::MAX {
             write_i64(obj, SELECTED_ROW_OFF, first as i64);
         }
@@ -273,7 +330,9 @@ pub extern "C" fn shim_nstableview_select_row_indexes(obj: u64, _cmd: u64, index
 
 /// `-[NSTableView deselectAll:]`
 pub extern "C" fn shim_nstableview_deselect_all(obj: u64, _cmd: u64, _sender: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     write_i64(obj, SELECTED_ROW_OFF, -1);
     crate::nsview::shim_nsview_set_needs_display(obj, 0, 1);
 }
@@ -290,7 +349,9 @@ pub extern "C" fn shim_nstableview_set_row_height(obj: u64, _cmd: u64, h: f64) {
 
 /// `-[NSTableView headerView]` — returns 0 (no separate header object).
 pub extern "C" fn shim_nstableview_header_view(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     // We render headers inline in drawRect; no standalone NSTableHeaderView.
     0
 }
@@ -299,9 +360,13 @@ pub extern "C" fn shim_nstableview_header_view(obj: u64, _cmd: u64) -> u64 {
 
 /// `-[NSTableView drawRect:]` — renders header, alternating rows, selection, cell text.
 pub extern "C" fn shim_nstableview_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let cg_ctx = crate::nsgraphicscontext::current_cg_context_handle();
-    if cg_ctx == 0 { return; }
+    if cg_ctx == 0 {
+        return;
+    }
 
     let row_height = read_f64(obj, ROW_HEIGHT_OFF);
     let header_h = read_f64(obj, HEADER_HEIGHT_OFF);
@@ -335,7 +400,9 @@ pub extern "C" fn shim_nstableview_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64
             // Draw column identifier as header text.
             if col != 0 {
                 let id_ptr = crate::nsapplication::dispatch_u64_selector_named_to_target(
-                    col, "identifier", 0,
+                    col,
+                    "identifier",
+                    0,
                 );
                 if id_ptr != 0 && id_ptr != u64::MAX {
                     let utf8 = crate::cfstring::shim_nsstring_utf8string(id_ptr, 0);
@@ -402,7 +469,9 @@ pub extern "C" fn shim_nstableview_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64
 
 /// `-[NSTableView mouseDown:]` — select row under click and notify delegate.
 pub extern "C" fn shim_nstableview_mouse_down(obj: u64, _cmd: u64, event: u64) {
-    if obj == 0 || event == 0 { return; }
+    if obj == 0 || event == 0 {
+        return;
+    }
 
     let (loc_x, loc_y) = crate::nsevent::event_location_in_window(event);
     let frame = crate::nsview::view_frame(obj);
@@ -535,8 +604,14 @@ mod tests {
         let arr = shim_nstableview_table_columns(tv, 0);
         assert_ne!(arr, 0);
         assert_eq!(crate::nsarray::shim_nsarray_count(arr, 0), 2);
-        assert_eq!(crate::nsarray::shim_nsarray_object_at_index(arr, 0, 0), 0x100);
-        assert_eq!(crate::nsarray::shim_nsarray_object_at_index(arr, 0, 1), 0x200);
+        assert_eq!(
+            crate::nsarray::shim_nsarray_object_at_index(arr, 0, 0),
+            0x100
+        );
+        assert_eq!(
+            crate::nsarray::shim_nsarray_object_at_index(arr, 0, 1),
+            0x200
+        );
 
         TABLE_COLUMNS.lock().unwrap().as_mut().unwrap().remove(&tv);
         free_obj(tv);

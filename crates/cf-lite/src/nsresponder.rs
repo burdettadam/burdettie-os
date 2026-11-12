@@ -34,7 +34,9 @@ fn receiver_is_kind_of(obj: u64, class_addr: u64) -> bool {
         if addr == class_addr {
             return true;
         }
-        current = rt.get_class_by_addr(addr).and_then(|class| class.superclass_addr);
+        current = rt
+            .get_class_by_addr(addr)
+            .and_then(|class| class.superclass_addr);
         depth += 1;
     }
 
@@ -224,14 +226,20 @@ fn forward_event_to_next_responder(obj: u64, selector: &str, event: u64) {
 
 /// `-[NSResponder nextResponder]`
 pub extern "C" fn shim_nsresponder_next_responder(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + 8) as *const u64) }
 }
 
 /// `-[NSResponder setNextResponder:]`
 pub extern "C" fn shim_nsresponder_set_next_responder(obj: u64, _cmd: u64, next: u64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as usize + 8) as *mut u64) = next; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + 8) as *mut u64) = next;
+    }
 }
 
 /// `-[NSResponder keyDown:]` — forwards to next responder when available.
@@ -290,7 +298,12 @@ pub extern "C" fn shim_nsresponder_scroll_wheel(obj: u64, _cmd: u64, event: u64)
 }
 
 /// `-[NSResponder tryToPerform:with:]`
-pub extern "C" fn shim_nsresponder_try_to_perform_with(obj: u64, _cmd: u64, action: u64, arg: u64) -> u8 {
+pub extern "C" fn shim_nsresponder_try_to_perform_with(
+    obj: u64,
+    _cmd: u64,
+    action: u64,
+    arg: u64,
+) -> u8 {
     if obj == 0 || action == 0 {
         return 0;
     }
@@ -299,7 +312,9 @@ pub extern "C" fn shim_nsresponder_try_to_perform_with(obj: u64, _cmd: u64, acti
     let mut depth = 0;
     while current != 0 && depth < 64 {
         if crate::nsapplication::target_responds_to_selector_ptr(action, current) {
-            return u8::from(crate::nsapplication::dispatch_selector_ptr_to_target(action, current, arg));
+            return u8::from(crate::nsapplication::dispatch_selector_ptr_to_target(
+                action, current, arg,
+            ));
         }
 
         let next = next_try_to_perform_target(current);
@@ -392,15 +407,18 @@ mod tests {
         let mut info = objc_runtime::ClassInfo {
             name: "ResponderEventProbe".to_string(),
             mapped_addr: EVENT_PROBE_CLASS_ADDR,
-            methods: vec![objc_runtime::MethodEntry {
-                selector: "keyDown:".into(),
-                imp: event_probe_key_down as *const () as u64,
-                type_encoding: "v@:@".into(),
-            }, objc_runtime::MethodEntry {
-                selector: "performAction:".into(),
-                imp: action_probe_imp as *const () as u64,
-                type_encoding: "v@:@".into(),
-            }],
+            methods: vec![
+                objc_runtime::MethodEntry {
+                    selector: "keyDown:".into(),
+                    imp: event_probe_key_down as *const () as u64,
+                    type_encoding: "v@:@".into(),
+                },
+                objc_runtime::MethodEntry {
+                    selector: "performAction:".into(),
+                    imp: action_probe_imp as *const () as u64,
+                    type_encoding: "v@:@".into(),
+                },
+            ],
             class_methods: vec![],
             ivars: vec![],
             properties: vec![],
@@ -418,7 +436,9 @@ mod tests {
 
     fn with_responder_runtime<R>(f: impl FnOnce() -> R) -> R {
         let saved_runtime = {
-            let mut guard = objc_runtime::OBJC_RUNTIME.write().unwrap_or_else(|e| e.into_inner());
+            let mut guard = objc_runtime::OBJC_RUNTIME
+                .write()
+                .unwrap_or_else(|e| e.into_inner());
             let saved = std::mem::take(&mut *guard);
 
             let mut rt = objc_runtime::ObjcRuntime::new();
@@ -436,13 +456,17 @@ mod tests {
 
         let result = f();
 
-        let mut guard = objc_runtime::OBJC_RUNTIME.write().unwrap_or_else(|e| e.into_inner());
+        let mut guard = objc_runtime::OBJC_RUNTIME
+            .write()
+            .unwrap_or_else(|e| e.into_inner());
         *guard = saved_runtime;
         result
     }
 
     fn intern_selector(name: &str) -> u64 {
-        let mut guard = objc_runtime::OBJC_RUNTIME.write().unwrap_or_else(|e| e.into_inner());
+        let mut guard = objc_runtime::OBJC_RUNTIME
+            .write()
+            .unwrap_or_else(|e| e.into_inner());
         guard
             .as_mut()
             .expect("test ObjC runtime should be installed")
@@ -553,7 +577,10 @@ mod tests {
             assert_eq!(LAST_EVENT_ARG.load(Ordering::SeqCst), event);
             assert_eq!(CURRENT_EVENT_DURING_CALL.load(Ordering::SeqCst), event);
             assert_eq!(EVENT_WINDOW_DURING_CALL.load(Ordering::SeqCst), 0);
-            assert_eq!(crate::nsapplication::shim_nsapplication_current_event(app, 0), event);
+            assert_eq!(
+                crate::nsapplication::shim_nsapplication_current_event(app, 0),
+                event
+            );
 
             free_obj(event);
             free_obj(next);
@@ -586,7 +613,10 @@ mod tests {
             shim_nsresponder_key_down(view, 0, event);
 
             assert_eq!(crate::nsevent::shim_nsevent_window(event, 0), window);
-            assert_eq!(crate::nsapplication::shim_nsapplication_current_event(app, 0), event);
+            assert_eq!(
+                crate::nsapplication::shim_nsapplication_current_event(app, 0),
+                event
+            );
 
             free_obj(event);
             free_obj(view);
@@ -613,7 +643,10 @@ mod tests {
             shim_nsresponder_key_down(responder, 0, event);
 
             assert_eq!(crate::nsevent::shim_nsevent_window(event, 0), window);
-            assert_eq!(crate::nsapplication::shim_nsapplication_current_event(app, 0), event);
+            assert_eq!(
+                crate::nsapplication::shim_nsapplication_current_event(app, 0),
+                event
+            );
 
             free_obj(event);
             free_obj(responder);
@@ -641,7 +674,10 @@ mod tests {
             shim_nsresponder_key_down(obj, 0, event);
 
             assert_eq!(CURRENT_EVENT_DURING_CALL.load(Ordering::SeqCst), event);
-            assert_eq!(crate::nsapplication::shim_nsapplication_current_event(app, 0), previous_event);
+            assert_eq!(
+                crate::nsapplication::shim_nsapplication_current_event(app, 0),
+                previous_event
+            );
 
             free_obj(event);
             free_obj(previous_event);
@@ -699,7 +735,10 @@ mod tests {
 
             shim_nsresponder_mouse_down(obj, 0, event);
 
-            assert_eq!(crate::nsapplication::shim_nsapplication_current_event(app, 0), event);
+            assert_eq!(
+                crate::nsapplication::shim_nsapplication_current_event(app, 0),
+                event
+            );
 
             free_obj(event);
             free_obj(obj);
@@ -803,7 +842,10 @@ mod tests {
             let obj = alloc_obj(SIZE, EVENT_PROBE_CLASS_ADDR);
             let action = intern_selector("performAction:");
 
-            assert_eq!(shim_nsresponder_try_to_perform_with(obj, 0, action, 0xCAFE), 1);
+            assert_eq!(
+                shim_nsresponder_try_to_perform_with(obj, 0, action, 0xCAFE),
+                1
+            );
             assert_eq!(ACTION_CALL_COUNT.load(Ordering::SeqCst), 1);
             assert_eq!(LAST_ACTION_TARGET.load(Ordering::SeqCst), obj);
             assert_eq!(LAST_ACTION_ARG.load(Ordering::SeqCst), 0xCAFE);
@@ -826,7 +868,10 @@ mod tests {
             let action = intern_selector("performAction:");
 
             shim_nsresponder_set_next_responder(obj, 0, next);
-            assert_eq!(shim_nsresponder_try_to_perform_with(obj, 0, action, 0xBEEF), 1);
+            assert_eq!(
+                shim_nsresponder_try_to_perform_with(obj, 0, action, 0xBEEF),
+                1
+            );
             assert_eq!(ACTION_CALL_COUNT.load(Ordering::SeqCst), 1);
             assert_eq!(LAST_ACTION_TARGET.load(Ordering::SeqCst), next);
             assert_eq!(LAST_ACTION_ARG.load(Ordering::SeqCst), 0xBEEF);
@@ -847,7 +892,10 @@ mod tests {
             let obj = alloc_responder();
             let action = intern_selector("performAction:");
 
-            assert_eq!(shim_nsresponder_try_to_perform_with(obj, 0, action, 0xDEAD), 0);
+            assert_eq!(
+                shim_nsresponder_try_to_perform_with(obj, 0, action, 0xDEAD),
+                0
+            );
 
             free_obj(obj);
         });

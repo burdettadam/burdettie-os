@@ -1,21 +1,25 @@
 //! Branch instruction decoding.
 
-use crate::cpu::Condition;
 use super::util::sign_extend;
 use super::Instruction;
+use crate::cpu::Condition;
 
 pub(super) fn decode_branch(raw: u32, pc: u64) -> Instruction {
     // Unconditional branch (immediate): 0 00101 imm26
     if (raw >> 26) & 0x3F == 0b000101 {
         let imm26 = (raw & 0x03FFFFFF) as u64;
         let offset = sign_extend(imm26, 26) << 2;
-        return Instruction::B { offset: pc as i64 + offset };
+        return Instruction::B {
+            offset: pc as i64 + offset,
+        };
     }
     // BL: 1 00101 imm26
     if (raw >> 26) & 0x3F == 0b100101 {
         let imm26 = (raw & 0x03FFFFFF) as u64;
         let offset = sign_extend(imm26, 26) << 2;
-        return Instruction::Bl { offset: pc as i64 + offset };
+        return Instruction::Bl {
+            offset: pc as i64 + offset,
+        };
     }
 
     // Conditional branch: 0101010 0 imm19 0 cond
@@ -23,7 +27,10 @@ pub(super) fn decode_branch(raw: u32, pc: u64) -> Instruction {
         let cond = Condition::from_bits(raw & 0xF);
         let imm19 = ((raw >> 5) & 0x7FFFF) as u64;
         let offset = sign_extend(imm19, 19) << 2;
-        return Instruction::Bcond { cond, offset: pc as i64 + offset };
+        return Instruction::Bcond {
+            cond,
+            offset: pc as i64 + offset,
+        };
     }
 
     // CBZ/CBNZ: sf 011010 op imm19 Rt
@@ -34,9 +41,17 @@ pub(super) fn decode_branch(raw: u32, pc: u64) -> Instruction {
         let imm19 = ((raw >> 5) & 0x7FFFF) as u64;
         let offset = sign_extend(imm19, 19) << 2;
         return if op == 0 {
-            Instruction::Cbz { sf, rt, offset: pc as i64 + offset }
+            Instruction::Cbz {
+                sf,
+                rt,
+                offset: pc as i64 + offset,
+            }
         } else {
-            Instruction::Cbnz { sf, rt, offset: pc as i64 + offset }
+            Instruction::Cbnz {
+                sf,
+                rt,
+                offset: pc as i64 + offset,
+            }
         };
     }
 
@@ -50,9 +65,17 @@ pub(super) fn decode_branch(raw: u32, pc: u64) -> Instruction {
         let imm14 = ((raw >> 5) & 0x3FFF) as u64;
         let offset = sign_extend(imm14, 14) << 2;
         return if op == 0 {
-            Instruction::Tbz { rt, bit, offset: pc as i64 + offset }
+            Instruction::Tbz {
+                rt,
+                bit,
+                offset: pc as i64 + offset,
+            }
         } else {
-            Instruction::Tbnz { rt, bit, offset: pc as i64 + offset }
+            Instruction::Tbnz {
+                rt,
+                bit,
+                offset: pc as i64 + offset,
+            }
         };
     }
 
@@ -128,10 +151,7 @@ pub(super) fn decode_branch(raw: u32, pc: u64) -> Instruction {
         return Instruction::Nop;
     }
     // DSB, DMB, ISB — treat as NOP
-    if (raw & 0xFFFFF0FF) == 0xD503309F
-        || (raw & 0xFFFFF0FF) == 0xD50330BF
-        || raw == 0xD50330DF
-    {
+    if (raw & 0xFFFFF0FF) == 0xD503309F || (raw & 0xFFFFF0FF) == 0xD50330BF || raw == 0xD50330DF {
         return Instruction::Nop;
     }
 
@@ -141,9 +161,9 @@ pub(super) fn decode_branch(raw: u32, pc: u64) -> Instruction {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cpu::Condition;
     use crate::decode::{decode, Instruction};
     use crate::test_helpers::*;
-    use crate::cpu::Condition;
 
     // ── B (unconditional branch) ─────────────────────────────
 
@@ -252,97 +272,129 @@ mod tests {
     #[test]
     fn test_decode_bcond_eq() {
         let insn = decode(enc_bcond(0, 0x20), 0x1000);
-        assert!(matches!(insn, Instruction::Bcond { cond: Condition::Eq, offset } if offset == 0x1020));
+        assert!(
+            matches!(insn, Instruction::Bcond { cond: Condition::Eq, offset } if offset == 0x1020)
+        );
     }
 
     #[test]
     fn test_decode_bcond_ne() {
         let insn = decode(enc_bcond(1, 0x20), 0x1000);
-        assert!(matches!(insn, Instruction::Bcond { cond: Condition::Ne, offset } if offset == 0x1020));
+        assert!(
+            matches!(insn, Instruction::Bcond { cond: Condition::Ne, offset } if offset == 0x1020)
+        );
     }
 
     #[test]
     fn test_decode_bcond_cs() {
         let insn = decode(enc_bcond(2, 0x20), 0x1000);
-        assert!(matches!(insn, Instruction::Bcond { cond: Condition::Cs, offset } if offset == 0x1020));
+        assert!(
+            matches!(insn, Instruction::Bcond { cond: Condition::Cs, offset } if offset == 0x1020)
+        );
     }
 
     #[test]
     fn test_decode_bcond_cc() {
         let insn = decode(enc_bcond(3, 0x20), 0x1000);
-        assert!(matches!(insn, Instruction::Bcond { cond: Condition::Cc, offset } if offset == 0x1020));
+        assert!(
+            matches!(insn, Instruction::Bcond { cond: Condition::Cc, offset } if offset == 0x1020)
+        );
     }
 
     #[test]
     fn test_decode_bcond_mi() {
         let insn = decode(enc_bcond(4, 0x20), 0x1000);
-        assert!(matches!(insn, Instruction::Bcond { cond: Condition::Mi, offset } if offset == 0x1020));
+        assert!(
+            matches!(insn, Instruction::Bcond { cond: Condition::Mi, offset } if offset == 0x1020)
+        );
     }
 
     #[test]
     fn test_decode_bcond_pl() {
         let insn = decode(enc_bcond(5, 0x20), 0x1000);
-        assert!(matches!(insn, Instruction::Bcond { cond: Condition::Pl, offset } if offset == 0x1020));
+        assert!(
+            matches!(insn, Instruction::Bcond { cond: Condition::Pl, offset } if offset == 0x1020)
+        );
     }
 
     #[test]
     fn test_decode_bcond_vs() {
         let insn = decode(enc_bcond(6, 0x20), 0x1000);
-        assert!(matches!(insn, Instruction::Bcond { cond: Condition::Vs, offset } if offset == 0x1020));
+        assert!(
+            matches!(insn, Instruction::Bcond { cond: Condition::Vs, offset } if offset == 0x1020)
+        );
     }
 
     #[test]
     fn test_decode_bcond_vc() {
         let insn = decode(enc_bcond(7, 0x20), 0x1000);
-        assert!(matches!(insn, Instruction::Bcond { cond: Condition::Vc, offset } if offset == 0x1020));
+        assert!(
+            matches!(insn, Instruction::Bcond { cond: Condition::Vc, offset } if offset == 0x1020)
+        );
     }
 
     #[test]
     fn test_decode_bcond_hi() {
         let insn = decode(enc_bcond(8, 0x20), 0x1000);
-        assert!(matches!(insn, Instruction::Bcond { cond: Condition::Hi, offset } if offset == 0x1020));
+        assert!(
+            matches!(insn, Instruction::Bcond { cond: Condition::Hi, offset } if offset == 0x1020)
+        );
     }
 
     #[test]
     fn test_decode_bcond_ls() {
         let insn = decode(enc_bcond(9, 0x20), 0x1000);
-        assert!(matches!(insn, Instruction::Bcond { cond: Condition::Ls, offset } if offset == 0x1020));
+        assert!(
+            matches!(insn, Instruction::Bcond { cond: Condition::Ls, offset } if offset == 0x1020)
+        );
     }
 
     #[test]
     fn test_decode_bcond_ge() {
         let insn = decode(enc_bcond(10, 0x20), 0x1000);
-        assert!(matches!(insn, Instruction::Bcond { cond: Condition::Ge, offset } if offset == 0x1020));
+        assert!(
+            matches!(insn, Instruction::Bcond { cond: Condition::Ge, offset } if offset == 0x1020)
+        );
     }
 
     #[test]
     fn test_decode_bcond_lt() {
         let insn = decode(enc_bcond(11, 0x20), 0x1000);
-        assert!(matches!(insn, Instruction::Bcond { cond: Condition::Lt, offset } if offset == 0x1020));
+        assert!(
+            matches!(insn, Instruction::Bcond { cond: Condition::Lt, offset } if offset == 0x1020)
+        );
     }
 
     #[test]
     fn test_decode_bcond_gt() {
         let insn = decode(enc_bcond(12, 0x20), 0x1000);
-        assert!(matches!(insn, Instruction::Bcond { cond: Condition::Gt, offset } if offset == 0x1020));
+        assert!(
+            matches!(insn, Instruction::Bcond { cond: Condition::Gt, offset } if offset == 0x1020)
+        );
     }
 
     #[test]
     fn test_decode_bcond_le() {
         let insn = decode(enc_bcond(13, 0x20), 0x1000);
-        assert!(matches!(insn, Instruction::Bcond { cond: Condition::Le, offset } if offset == 0x1020));
+        assert!(
+            matches!(insn, Instruction::Bcond { cond: Condition::Le, offset } if offset == 0x1020)
+        );
     }
 
     #[test]
     fn test_decode_bcond_al() {
         let insn = decode(enc_bcond(14, 0x20), 0x1000);
-        assert!(matches!(insn, Instruction::Bcond { cond: Condition::Al, offset } if offset == 0x1020));
+        assert!(
+            matches!(insn, Instruction::Bcond { cond: Condition::Al, offset } if offset == 0x1020)
+        );
     }
 
     #[test]
     fn test_decode_bcond_negative_offset() {
         let insn = decode(enc_bcond(0, -0x20), 0x1000);
-        assert!(matches!(insn, Instruction::Bcond { cond: Condition::Eq, offset } if offset == 0x0FE0));
+        assert!(
+            matches!(insn, Instruction::Bcond { cond: Condition::Eq, offset } if offset == 0x0FE0)
+        );
     }
 
     // ── CBZ (compare and branch if zero) ─────────────────────

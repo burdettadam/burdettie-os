@@ -5,8 +5,8 @@
 //! This abstraction allows the GUI framework (app-kit-lite, ui-controls)
 //! to work identically on any platform.
 
-mod types;
 pub mod keyboard_layout;
+mod types;
 
 pub use keyboard_layout::KeyboardLayout;
 pub use types::*;
@@ -31,13 +31,17 @@ pub trait WindowBackend: Send + Sync {
     fn set_title(&self, id: WindowId, title: &str);
 
     /// Get the title of a window.
-    fn title(&self, _id: WindowId) -> Option<String> { None }
+    fn title(&self, _id: WindowId) -> Option<String> {
+        None
+    }
 
     /// Set whether a window is resizable.
     fn set_resizable(&self, _id: WindowId, _resizable: bool) {}
 
     /// Query whether a window is resizable.
-    fn is_resizable(&self, _id: WindowId) -> bool { true }
+    fn is_resizable(&self, _id: WindowId) -> bool {
+        true
+    }
 
     /// Resize a window.
     fn set_size(&self, id: WindowId, width: f64, height: f64);
@@ -73,10 +77,14 @@ pub trait WindowBackend: Send + Sync {
     fn set_window_mode(&mut self, _mode: WindowMode) {}
 
     /// Query the current window display mode.
-    fn window_mode(&self) -> WindowMode { WindowMode::Normal }
+    fn window_mode(&self) -> WindowMode {
+        WindowMode::Normal
+    }
 
     /// Query the current UI theme.
-    fn theme(&self) -> Theme { Theme::Light }
+    fn theme(&self) -> Theme {
+        Theme::Light
+    }
 }
 
 // ── Headless backend (for testing) ─────────────────────────────────
@@ -134,7 +142,10 @@ impl HeadlessBackend {
 
     /// Inject an event into the queue (for testing).
     pub fn inject_event(&self, event: WindowEvent) {
-        self.events.lock().unwrap_or_else(|e| e.into_inner()).push(event);
+        self.events
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .push(event);
     }
 }
 
@@ -157,7 +168,10 @@ impl WindowBackend for HeadlessBackend {
     }
 
     fn destroy_window(&self, id: WindowId) {
-        self.windows.lock().unwrap_or_else(|e| e.into_inner()).retain(|(wid, _)| *wid != id);
+        self.windows
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .retain(|(wid, _)| *wid != id);
     }
 
     fn set_title(&self, id: WindowId, title: &str) {
@@ -486,7 +500,12 @@ mod tests {
     fn headless_right_click_event() {
         let backend = HeadlessBackend::new();
         let wid = backend.create_window(WindowConfig::default());
-        backend.inject_event(WindowEvent::MouseDown(wid, 100.0, 200.0, MouseButton::Right));
+        backend.inject_event(WindowEvent::MouseDown(
+            wid,
+            100.0,
+            200.0,
+            MouseButton::Right,
+        ));
         let events = backend.poll_events();
         assert_eq!(events.len(), 1);
         match &events[0] {

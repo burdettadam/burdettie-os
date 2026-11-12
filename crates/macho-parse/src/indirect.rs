@@ -76,7 +76,14 @@ pub fn resolve_indirect_symbols(
     let mut result = Vec::new();
 
     // Sections that use indirect symbols
-    let indirect_sections = ["__stubs", "__got", "__la_symbol_ptr", "__nl_symbol_ptr", "__auth_got", "__auth_stubs"];
+    let indirect_sections = [
+        "__stubs",
+        "__got",
+        "__la_symbol_ptr",
+        "__nl_symbol_ptr",
+        "__auth_got",
+        "__auth_stubs",
+    ];
 
     for seg in &parsed.segments {
         for sect in &seg.sections {

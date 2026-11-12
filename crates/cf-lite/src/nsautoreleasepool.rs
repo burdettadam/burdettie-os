@@ -19,8 +19,8 @@ pub extern "C" fn shim_nsautoreleasepool_init(obj: u64, _cmd: u64) -> u64 {
     if obj == 0 {
         return 0;
     }
-    let token = objc_runtime::refcount::AUTORELEASE_POOLS
-        .with(|pools| pools.borrow_mut().push() as u64);
+    let token =
+        objc_runtime::refcount::AUTORELEASE_POOLS.with(|pools| pools.borrow_mut().push() as u64);
     unsafe {
         *((obj as usize + TOKEN_OFF) as *mut u64) = token;
     }
@@ -83,16 +83,14 @@ mod tests {
         let obj = crate::pal_alloc().calloc(1, 16) as u64;
         assert_ne!(obj, 0);
         // Give it a retain count of 1 (implicit), then autorelease it
-        objc_runtime::refcount::AUTORELEASE_POOLS
-            .with(|pools| pools.borrow_mut().autorelease(obj));
+        objc_runtime::refcount::AUTORELEASE_POOLS.with(|pools| pools.borrow_mut().autorelease(obj));
 
         // Drain — object should be released (count goes 1→0, freed)
         shim_nsautoreleasepool_drain(pool, 0);
 
         // After drain, the object's refcount entry is removed (count returns
         // implicit 1).  We verify drain didn't panic and the pool is drained.
-        let depth = objc_runtime::refcount::AUTORELEASE_POOLS
-            .with(|pools| pools.borrow().depth());
+        let depth = objc_runtime::refcount::AUTORELEASE_POOLS.with(|pools| pools.borrow().depth());
         assert_eq!(depth, 0);
         free_obj(pool);
     }
@@ -117,14 +115,12 @@ mod tests {
 
         // Drain inner — obj_b released, outer pool intact
         shim_nsautoreleasepool_drain(pool2, 0);
-        let depth = objc_runtime::refcount::AUTORELEASE_POOLS
-            .with(|pools| pools.borrow().depth());
+        let depth = objc_runtime::refcount::AUTORELEASE_POOLS.with(|pools| pools.borrow().depth());
         assert_eq!(depth, 1, "outer pool should still be active");
 
         // Drain outer — obj_a released
         shim_nsautoreleasepool_drain(pool1, 0);
-        let depth = objc_runtime::refcount::AUTORELEASE_POOLS
-            .with(|pools| pools.borrow().depth());
+        let depth = objc_runtime::refcount::AUTORELEASE_POOLS.with(|pools| pools.borrow().depth());
         assert_eq!(depth, 0, "all pools should be drained");
 
         free_obj(pool2);
@@ -155,8 +151,7 @@ mod tests {
         let pool = shim_nsautoreleasepool_init(pool, 0);
         // Release should behave identically to drain
         shim_nsautoreleasepool_release(pool, 0);
-        let depth = objc_runtime::refcount::AUTORELEASE_POOLS
-            .with(|pools| pools.borrow().depth());
+        let depth = objc_runtime::refcount::AUTORELEASE_POOLS.with(|pools| pools.borrow().depth());
         assert_eq!(depth, 0);
         free_obj(pool);
     }

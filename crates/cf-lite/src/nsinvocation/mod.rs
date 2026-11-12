@@ -46,11 +46,7 @@ pub(super) unsafe fn get_ret_buffer(obj: u64) -> u64 {
 // ── Shim functions ─────────────────────────────────────────────────
 
 /// `+[NSInvocation invocationWithMethodSignature:]`
-pub extern "C" fn shim_invocation_with_method_signature(
-    _cls: u64,
-    _cmd: u64,
-    sig: u64,
-) -> u64 {
+pub extern "C" fn shim_invocation_with_method_signature(_cls: u64, _cmd: u64, sig: u64) -> u64 {
     let obj = crate::pal_alloc().calloc(1, INSTANCE_SIZE as usize) as u64;
     if obj == 0 {
         return 0;
@@ -250,7 +246,10 @@ mod tests {
     use crate::shim_test_helpers::*;
 
     fn alloc_inv() -> u64 {
-        let obj = alloc_obj(INSTANCE_SIZE as usize, crate::nsobj::nsinvocation_class_addr());
+        let obj = alloc_obj(
+            INSTANCE_SIZE as usize,
+            crate::nsobj::nsinvocation_class_addr(),
+        );
         let arg_buf = crate::pal_alloc().calloc(8, 8) as u64;
         let ret_buf = crate::pal_alloc().calloc(1, 8) as u64;
         write_field(obj, 32, arg_buf);

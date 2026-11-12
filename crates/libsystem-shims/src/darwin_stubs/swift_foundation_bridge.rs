@@ -112,49 +112,63 @@ extern "C" fn write_zero_to_x8_ret_buf() {}
 /// Dictionary<K,V>._unconditionallyBridgeFromObjectiveC(NSDictionary?) -> [K:V]
 extern "C" fn shim_bridge_dictionary_from_nsdictionary() {
     #[cfg(target_arch = "aarch64")]
-    unsafe { write_zero_to_x8_ret_buf(); }
+    unsafe {
+        write_zero_to_x8_ret_buf();
+    }
     log::trace!("swift_bridge: Dictionary._unconditionallyBridgeFromObjectiveC → empty");
 }
 
 /// Array<T>._unconditionallyBridgeFromObjectiveC(NSArray?) -> [T]
 extern "C" fn shim_bridge_array_from_nsarray() {
     #[cfg(target_arch = "aarch64")]
-    unsafe { write_zero_to_x8_ret_buf(); }
+    unsafe {
+        write_zero_to_x8_ret_buf();
+    }
     log::trace!("swift_bridge: Array._unconditionallyBridgeFromObjectiveC → empty");
 }
 
 /// String._unconditionallyBridgeFromObjectiveC(NSString?) -> String
 extern "C" fn shim_bridge_string_from_nsstring() {
     #[cfg(target_arch = "aarch64")]
-    unsafe { write_zero_to_x8_ret_buf(); }
+    unsafe {
+        write_zero_to_x8_ret_buf();
+    }
     log::trace!("swift_bridge: String._unconditionallyBridgeFromObjectiveC → empty");
 }
 
 /// Substring._unconditionallyBridgeFromObjectiveC(NSString?) -> Substring
 extern "C" fn shim_bridge_substring_from_nsstring() {
     #[cfg(target_arch = "aarch64")]
-    unsafe { write_zero_to_x8_ret_buf(); }
+    unsafe {
+        write_zero_to_x8_ret_buf();
+    }
     log::trace!("swift_bridge: Substring._unconditionallyBridgeFromObjectiveC → empty");
 }
 
 /// Set<T>._unconditionallyBridgeFromObjectiveC(NSSet?) -> Set<T>
 extern "C" fn shim_bridge_set_from_nsset() {
     #[cfg(target_arch = "aarch64")]
-    unsafe { write_zero_to_x8_ret_buf(); }
+    unsafe {
+        write_zero_to_x8_ret_buf();
+    }
     log::trace!("swift_bridge: Set._unconditionallyBridgeFromObjectiveC → empty");
 }
 
 /// Data._unconditionallyBridgeFromObjectiveC(NSData?) -> Data
 extern "C" fn shim_bridge_data_from_nsdata() {
     #[cfg(target_arch = "aarch64")]
-    unsafe { write_zero_to_x8_ret_buf(); }
+    unsafe {
+        write_zero_to_x8_ret_buf();
+    }
     log::trace!("swift_bridge: Data._unconditionallyBridgeFromObjectiveC → empty");
 }
 
 /// IndexSet._unconditionallyBridgeFromObjectiveC(NSIndexSet?) -> IndexSet
 extern "C" fn shim_bridge_indexset_from_nsindexset() {
     #[cfg(target_arch = "aarch64")]
-    unsafe { write_zero_to_x8_ret_buf(); }
+    unsafe {
+        write_zero_to_x8_ret_buf();
+    }
     log::trace!("swift_bridge: IndexSet._unconditionallyBridgeFromObjectiveC → empty");
 }
 
@@ -230,7 +244,8 @@ impl SwiftFoundationBridgeStubs {
         // ── _unconditionallyBridgeFromObjectiveC ─────────────────────────
         // Mangled names extracted from `libswiftFoundation.dylib` via `nm`.
         // These are stable across Swift versions (ABI-stable since Swift 5.0).
-        register_shims!(table,
+        register_shims!(
+            table,
             // Dictionary<K,V>  ← NSDictionary
             (
                 "_$sSD10FoundationE36_unconditionallyBridgeFromObjectiveCySDyxq_GSo12NSDictionaryCSgFZ",
@@ -273,7 +288,6 @@ impl SwiftFoundationBridgeStubs {
                 shim_bridge_indexset_from_nsindexset as *const () as u64,
                 "IndexSet._unconditionallyBridgeFromObjectiveC: returns empty (safe bridge stub)"
             ),
-
             // ── _forceBridgeFromObjectiveC ───────────────────────────────
             // Same symbols without the trailing `FZ` — these are `FZ` variants too,
             // but the force-bridge take two arguments (inout result pointer in x1).
@@ -309,7 +323,10 @@ impl SwiftFoundationBridgeStubs {
             ),
         );
 
-        log::debug!("SwiftFoundationBridgeStubs: registered {} Swift-ObjC bridge intercepts", 13);
+        log::debug!(
+            "SwiftFoundationBridgeStubs: registered {} Swift-ObjC bridge intercepts",
+            13
+        );
     }
 }
 
@@ -350,10 +367,7 @@ mod tests {
         ];
 
         for sym in key_syms {
-            assert!(
-                table.resolve(sym).is_some(),
-                "symbol not registered: {sym}"
-            );
+            assert!(table.resolve(sym).is_some(), "symbol not registered: {sym}");
         }
     }
 

@@ -1,7 +1,7 @@
 //! Data processing — register instruction decoding.
 
-use crate::cpu::Condition;
 use super::Instruction;
+use crate::cpu::Condition;
 
 pub(super) fn decode_dp_reg(raw: u32) -> Instruction {
     // Primary dispatch on bits[28:21] — uniquely identifies most DP-reg classes.
@@ -57,10 +57,38 @@ fn decode_add_sub_reg(raw: u32) -> Instruction {
     let rd = (raw & 0x1F) as u8;
 
     match (op, s) {
-        (0, 0) => Instruction::AddReg { sf, rd, rn, rm, shift_type, shift_amount: imm6 },
-        (0, 1) => Instruction::AddsReg { sf, rd, rn, rm, shift_type, shift_amount: imm6 },
-        (1, 0) => Instruction::SubReg { sf, rd, rn, rm, shift_type, shift_amount: imm6 },
-        (1, _) => Instruction::SubsReg { sf, rd, rn, rm, shift_type, shift_amount: imm6 },
+        (0, 0) => Instruction::AddReg {
+            sf,
+            rd,
+            rn,
+            rm,
+            shift_type,
+            shift_amount: imm6,
+        },
+        (0, 1) => Instruction::AddsReg {
+            sf,
+            rd,
+            rn,
+            rm,
+            shift_type,
+            shift_amount: imm6,
+        },
+        (1, 0) => Instruction::SubReg {
+            sf,
+            rd,
+            rn,
+            rm,
+            shift_type,
+            shift_amount: imm6,
+        },
+        (1, _) => Instruction::SubsReg {
+            sf,
+            rd,
+            rn,
+            rm,
+            shift_type,
+            shift_amount: imm6,
+        },
         _ => Instruction::Unknown { raw },
     }
 }
@@ -75,10 +103,38 @@ fn decode_add_sub_ext_reg(raw: u32) -> Instruction {
     let rd = (raw & 0x1F) as u8;
 
     match (op, s) {
-        (0, 0) => Instruction::AddReg { sf, rd, rn, rm, shift_type: 0, shift_amount: 0 },
-        (0, 1) => Instruction::AddsReg { sf, rd, rn, rm, shift_type: 0, shift_amount: 0 },
-        (1, 0) => Instruction::SubReg { sf, rd, rn, rm, shift_type: 0, shift_amount: 0 },
-        (1, _) => Instruction::SubsReg { sf, rd, rn, rm, shift_type: 0, shift_amount: 0 },
+        (0, 0) => Instruction::AddReg {
+            sf,
+            rd,
+            rn,
+            rm,
+            shift_type: 0,
+            shift_amount: 0,
+        },
+        (0, 1) => Instruction::AddsReg {
+            sf,
+            rd,
+            rn,
+            rm,
+            shift_type: 0,
+            shift_amount: 0,
+        },
+        (1, 0) => Instruction::SubReg {
+            sf,
+            rd,
+            rn,
+            rm,
+            shift_type: 0,
+            shift_amount: 0,
+        },
+        (1, _) => Instruction::SubsReg {
+            sf,
+            rd,
+            rn,
+            rm,
+            shift_type: 0,
+            shift_amount: 0,
+        },
         _ => Instruction::Unknown { raw },
     }
 }
@@ -93,7 +149,16 @@ fn decode_logical_reg(raw: u32) -> Instruction {
     let rn = ((raw >> 5) & 0x1F) as u8;
     let rd = (raw & 0x1F) as u8;
 
-    Instruction::LogicalReg { sf, opc, n, rd, rn, rm, shift_type, shift_amount: imm6 }
+    Instruction::LogicalReg {
+        sf,
+        opc,
+        n,
+        rd,
+        rn,
+        rm,
+        shift_type,
+        shift_amount: imm6,
+    }
 }
 
 fn decode_dp_1source(raw: u32) -> Instruction {
@@ -103,24 +168,24 @@ fn decode_dp_1source(raw: u32) -> Instruction {
     //   00001 → PAC instructions (PACIA, PACIB, AUTIA, AUTIB, XPACI, etc.)
     let sf = (raw >> 31) & 1 == 1;
     let opcode2_field = (raw >> 16) & 0x1F; // bits[20:16]
-    let opcode = (raw >> 10) & 0x3F;        // bits[15:10]
+    let opcode = (raw >> 10) & 0x3F; // bits[15:10]
     let rn = ((raw >> 5) & 0x1F) as u8;
     let rd = (raw & 0x1F) as u8;
 
     if opcode2_field == 0b00001 {
         // PAC (ARMv8.3 arm64e) instructions
         return match opcode {
-            0b000000 => Instruction::PacIA { rd, rn },  // PACIA / PACIZA
-            0b000010 => Instruction::PacIB { rd, rn },  // PACIB / PACIZB
-            0b000100 => Instruction::PacDA { rd, rn },  // PACDA / PACDZA
-            0b000110 => Instruction::PacDB { rd, rn },  // PACDB / PACDZB
-            0b001000 => Instruction::AutIA { rd, rn },  // AUTIA / AUTIZA
-            0b001010 => Instruction::AutIB { rd, rn },  // AUTIB / AUTIZB
-            0b001100 => Instruction::AutDA { rd, rn },  // AUTDA / AUTDZA
-            0b001110 => Instruction::AutDB { rd, rn },  // AUTDB / AUTDZB
-            0b100000 => Instruction::Xpaci { rd },      // XPACI
-            0b100010 => Instruction::Xpacd { rd },      // XPACD
-            _ => Instruction::Nop, // unrecognized PAC variant → NOP
+            0b000000 => Instruction::PacIA { rd, rn }, // PACIA / PACIZA
+            0b000010 => Instruction::PacIB { rd, rn }, // PACIB / PACIZB
+            0b000100 => Instruction::PacDA { rd, rn }, // PACDA / PACDZA
+            0b000110 => Instruction::PacDB { rd, rn }, // PACDB / PACDZB
+            0b001000 => Instruction::AutIA { rd, rn }, // AUTIA / AUTIZA
+            0b001010 => Instruction::AutIB { rd, rn }, // AUTIB / AUTIZB
+            0b001100 => Instruction::AutDA { rd, rn }, // AUTDA / AUTDZA
+            0b001110 => Instruction::AutDB { rd, rn }, // AUTDB / AUTDZB
+            0b100000 => Instruction::Xpaci { rd },     // XPACI
+            0b100010 => Instruction::Xpacd { rd },     // XPACD
+            _ => Instruction::Nop,                     // unrecognized PAC variant → NOP
         };
     }
 
@@ -145,19 +210,62 @@ fn decode_dp_2source(raw: u32) -> Instruction {
     let rd = (raw & 0x1F) as u8;
 
     match opcode {
-        0b000010 => Instruction::Div { sf, rd, rn, rm, is_signed: false }, // UDIV
-        0b000011 => Instruction::Div { sf, rd, rn, rm, is_signed: true },  // SDIV
-        0b001000 => Instruction::ShiftVar { sf, rd, rn, rm, shift_type: 0 }, // LSLV
-        0b001001 => Instruction::ShiftVar { sf, rd, rn, rm, shift_type: 1 }, // LSRV
-        0b001010 => Instruction::ShiftVar { sf, rd, rn, rm, shift_type: 2 }, // ASRV
-        0b001011 => Instruction::ShiftVar { sf, rd, rn, rm, shift_type: 3 }, // RORV
+        0b000010 => Instruction::Div {
+            sf,
+            rd,
+            rn,
+            rm,
+            is_signed: false,
+        }, // UDIV
+        0b000011 => Instruction::Div {
+            sf,
+            rd,
+            rn,
+            rm,
+            is_signed: true,
+        }, // SDIV
+        0b001000 => Instruction::ShiftVar {
+            sf,
+            rd,
+            rn,
+            rm,
+            shift_type: 0,
+        }, // LSLV
+        0b001001 => Instruction::ShiftVar {
+            sf,
+            rd,
+            rn,
+            rm,
+            shift_type: 1,
+        }, // LSRV
+        0b001010 => Instruction::ShiftVar {
+            sf,
+            rd,
+            rn,
+            rm,
+            shift_type: 2,
+        }, // ASRV
+        0b001011 => Instruction::ShiftVar {
+            sf,
+            rd,
+            rn,
+            rm,
+            shift_type: 3,
+        }, // RORV
         // CRC32: sf=1(X)/0(W), opcode 010 sz C
         // 010000=CRC32B, 010001=CRC32H, 010010=CRC32W, 010011=CRC32X
         // 010100=CRC32CB, 010101=CRC32CH, 010110=CRC32CW, 010111=CRC32CX
         0b010000..=0b010111 => {
             let sz = ((opcode >> 0) & 0x3) as u8;
             let c = (opcode >> 2) & 1 == 1;
-            Instruction::Crc32 { sf, rd, rn, rm, sz, c }
+            Instruction::Crc32 {
+                sf,
+                rd,
+                rn,
+                rm,
+                sz,
+                c,
+            }
         }
         _ => Instruction::Unknown { raw },
     }
@@ -170,7 +278,13 @@ fn decode_extr(raw: u32) -> Instruction {
     let imms = ((raw >> 10) & 0x3F) as u8;
     let rn = ((raw >> 5) & 0x1F) as u8;
     let rd = (raw & 0x1F) as u8;
-    Instruction::Extr { sf, rd, rn, rm, lsb: imms }
+    Instruction::Extr {
+        sf,
+        rd,
+        rn,
+        rm,
+        lsb: imms,
+    }
 }
 
 fn decode_dp_3source(raw: u32) -> Instruction {
@@ -198,10 +312,34 @@ fn decode_cond_select(raw: u32) -> Instruction {
     // op bit[30] distinguishes CSEL/CSINC (op=0) from CSINV/CSNEG (op=1)
     let op = (raw >> 30) & 1;
     match (op, op2) {
-        (0, 0b00) => Instruction::Csel { sf, rd, rn, rm, cond },
-        (0, 0b01) => Instruction::Csinc { sf, rd, rn, rm, cond },
-        (1, 0b00) => Instruction::Csinv { sf, rd, rn, rm, cond },
-        (1, 0b01) => Instruction::Csneg { sf, rd, rn, rm, cond },
+        (0, 0b00) => Instruction::Csel {
+            sf,
+            rd,
+            rn,
+            rm,
+            cond,
+        },
+        (0, 0b01) => Instruction::Csinc {
+            sf,
+            rd,
+            rn,
+            rm,
+            cond,
+        },
+        (1, 0b00) => Instruction::Csinv {
+            sf,
+            rd,
+            rn,
+            rm,
+            cond,
+        },
+        (1, 0b01) => Instruction::Csneg {
+            sf,
+            rd,
+            rn,
+            rm,
+            cond,
+        },
         _ => Instruction::Unknown { raw },
     }
 }
@@ -221,22 +359,45 @@ fn decode_ccmp(raw: u32) -> Instruction {
     let nzcv = (raw & 0xF) as u8;
 
     if op == 1 {
-        Instruction::Ccmp { sf, rn, imm5_or_rm: rm_or_imm5, nzcv, cond, is_imm }
+        Instruction::Ccmp {
+            sf,
+            rn,
+            imm5_or_rm: rm_or_imm5,
+            nzcv,
+            cond,
+            is_imm,
+        }
     } else {
-        Instruction::Ccmn { sf, rn, imm5_or_rm: rm_or_imm5, nzcv, cond, is_imm }
+        Instruction::Ccmn {
+            sf,
+            rn,
+            imm5_or_rm: rm_or_imm5,
+            nzcv,
+            cond,
+            is_imm,
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_helpers::*;
-    use crate::decode::{decode, Instruction};
     use crate::cpu::Condition;
+    use crate::decode::{decode, Instruction};
+    use crate::test_helpers::*;
 
     // ── Helper: build a logical shifted-register encoding ────────────
     // sf opc 01010 shift N Rm imm6 Rn Rd
-    fn enc_logical_reg(sf: bool, opc: u8, shift_type: u8, n: bool, rm: u8, imm6: u8, rn: u8, rd: u8) -> u32 {
+    fn enc_logical_reg(
+        sf: bool,
+        opc: u8,
+        shift_type: u8,
+        n: bool,
+        rm: u8,
+        imm6: u8,
+        rn: u8,
+        rd: u8,
+    ) -> u32 {
         (u32::from(sf) << 31)
             | ((opc as u32 & 0x3) << 29)
             | (0b01010 << 24)
@@ -323,85 +484,225 @@ mod tests {
     #[test]
     fn test_decode_add_reg_64() {
         let insn = decode(enc_add_reg(true, 0, 1, 2, 0, 0), 0x1000);
-        assert!(matches!(insn, Instruction::AddReg { sf: true, rd: 0, rn: 1, rm: 2, shift_type: 0, shift_amount: 0 }));
+        assert!(matches!(
+            insn,
+            Instruction::AddReg {
+                sf: true,
+                rd: 0,
+                rn: 1,
+                rm: 2,
+                shift_type: 0,
+                shift_amount: 0
+            }
+        ));
     }
 
     #[test]
     fn test_decode_add_reg_32() {
         let insn = decode(enc_add_reg(false, 3, 4, 5, 0, 0), 0x1000);
-        assert!(matches!(insn, Instruction::AddReg { sf: false, rd: 3, rn: 4, rm: 5, shift_type: 0, shift_amount: 0 }));
+        assert!(matches!(
+            insn,
+            Instruction::AddReg {
+                sf: false,
+                rd: 3,
+                rn: 4,
+                rm: 5,
+                shift_type: 0,
+                shift_amount: 0
+            }
+        ));
     }
 
     #[test]
     fn test_decode_add_reg_with_lsl_shift() {
         let insn = decode(enc_add_reg(true, 0, 1, 2, 0, 3), 0x1000);
-        assert!(matches!(insn, Instruction::AddReg { sf: true, rd: 0, rn: 1, rm: 2, shift_type: 0, shift_amount: 3 }));
+        assert!(matches!(
+            insn,
+            Instruction::AddReg {
+                sf: true,
+                rd: 0,
+                rn: 1,
+                rm: 2,
+                shift_type: 0,
+                shift_amount: 3
+            }
+        ));
     }
 
     #[test]
     fn test_decode_add_reg_with_lsr_shift() {
         let insn = decode(enc_add_reg(true, 0, 1, 2, 1, 16), 0x1000);
-        assert!(matches!(insn, Instruction::AddReg { sf: true, rd: 0, rn: 1, rm: 2, shift_type: 1, shift_amount: 16 }));
+        assert!(matches!(
+            insn,
+            Instruction::AddReg {
+                sf: true,
+                rd: 0,
+                rn: 1,
+                rm: 2,
+                shift_type: 1,
+                shift_amount: 16
+            }
+        ));
     }
 
     #[test]
     fn test_decode_add_reg_with_asr_shift() {
         let insn = decode(enc_add_reg(true, 0, 1, 2, 2, 8), 0x1000);
-        assert!(matches!(insn, Instruction::AddReg { sf: true, rd: 0, rn: 1, rm: 2, shift_type: 2, shift_amount: 8 }));
+        assert!(matches!(
+            insn,
+            Instruction::AddReg {
+                sf: true,
+                rd: 0,
+                rn: 1,
+                rm: 2,
+                shift_type: 2,
+                shift_amount: 8
+            }
+        ));
     }
 
     #[test]
     fn test_decode_adds_reg_64() {
         let insn = decode(enc_adds_reg(true, 0, 1, 2, 0, 0), 0x1000);
-        assert!(matches!(insn, Instruction::AddsReg { sf: true, rd: 0, rn: 1, rm: 2, shift_type: 0, shift_amount: 0 }));
+        assert!(matches!(
+            insn,
+            Instruction::AddsReg {
+                sf: true,
+                rd: 0,
+                rn: 1,
+                rm: 2,
+                shift_type: 0,
+                shift_amount: 0
+            }
+        ));
     }
 
     #[test]
     fn test_decode_adds_reg_32() {
         let insn = decode(enc_adds_reg(false, 5, 6, 7, 0, 0), 0x1000);
-        assert!(matches!(insn, Instruction::AddsReg { sf: false, rd: 5, rn: 6, rm: 7, shift_type: 0, shift_amount: 0 }));
+        assert!(matches!(
+            insn,
+            Instruction::AddsReg {
+                sf: false,
+                rd: 5,
+                rn: 6,
+                rm: 7,
+                shift_type: 0,
+                shift_amount: 0
+            }
+        ));
     }
 
     #[test]
     fn test_decode_adds_reg_with_shift() {
         let insn = decode(enc_adds_reg(true, 0, 1, 2, 0, 4), 0x1000);
-        assert!(matches!(insn, Instruction::AddsReg { sf: true, rd: 0, rn: 1, rm: 2, shift_type: 0, shift_amount: 4 }));
+        assert!(matches!(
+            insn,
+            Instruction::AddsReg {
+                sf: true,
+                rd: 0,
+                rn: 1,
+                rm: 2,
+                shift_type: 0,
+                shift_amount: 4
+            }
+        ));
     }
 
     #[test]
     fn test_decode_sub_reg_64() {
         let insn = decode(enc_sub_reg(true, 0, 1, 2, 0, 0), 0x1000);
-        assert!(matches!(insn, Instruction::SubReg { sf: true, rd: 0, rn: 1, rm: 2, shift_type: 0, shift_amount: 0 }));
+        assert!(matches!(
+            insn,
+            Instruction::SubReg {
+                sf: true,
+                rd: 0,
+                rn: 1,
+                rm: 2,
+                shift_type: 0,
+                shift_amount: 0
+            }
+        ));
     }
 
     #[test]
     fn test_decode_sub_reg_32() {
         let insn = decode(enc_sub_reg(false, 3, 4, 5, 0, 0), 0x1000);
-        assert!(matches!(insn, Instruction::SubReg { sf: false, rd: 3, rn: 4, rm: 5, shift_type: 0, shift_amount: 0 }));
+        assert!(matches!(
+            insn,
+            Instruction::SubReg {
+                sf: false,
+                rd: 3,
+                rn: 4,
+                rm: 5,
+                shift_type: 0,
+                shift_amount: 0
+            }
+        ));
     }
 
     #[test]
     fn test_decode_sub_reg_with_shift() {
         let insn = decode(enc_sub_reg(true, 0, 1, 2, 1, 12), 0x1000);
-        assert!(matches!(insn, Instruction::SubReg { sf: true, rd: 0, rn: 1, rm: 2, shift_type: 1, shift_amount: 12 }));
+        assert!(matches!(
+            insn,
+            Instruction::SubReg {
+                sf: true,
+                rd: 0,
+                rn: 1,
+                rm: 2,
+                shift_type: 1,
+                shift_amount: 12
+            }
+        ));
     }
 
     #[test]
     fn test_decode_subs_reg_64() {
         let insn = decode(enc_subs_reg(true, 0, 1, 2, 0, 0), 0x1000);
-        assert!(matches!(insn, Instruction::SubsReg { sf: true, rd: 0, rn: 1, rm: 2, shift_type: 0, shift_amount: 0 }));
+        assert!(matches!(
+            insn,
+            Instruction::SubsReg {
+                sf: true,
+                rd: 0,
+                rn: 1,
+                rm: 2,
+                shift_type: 0,
+                shift_amount: 0
+            }
+        ));
     }
 
     #[test]
     fn test_decode_subs_reg_32() {
         let insn = decode(enc_subs_reg(false, 8, 9, 10, 0, 0), 0x1000);
-        assert!(matches!(insn, Instruction::SubsReg { sf: false, rd: 8, rn: 9, rm: 10, shift_type: 0, shift_amount: 0 }));
+        assert!(matches!(
+            insn,
+            Instruction::SubsReg {
+                sf: false,
+                rd: 8,
+                rn: 9,
+                rm: 10,
+                shift_type: 0,
+                shift_amount: 0
+            }
+        ));
     }
 
     #[test]
     fn test_decode_subs_reg_with_shift() {
         let insn = decode(enc_subs_reg(true, 0, 1, 2, 2, 5), 0x1000);
-        assert!(matches!(insn, Instruction::SubsReg { sf: true, rd: 0, rn: 1, rm: 2, shift_type: 2, shift_amount: 5 }));
+        assert!(matches!(
+            insn,
+            Instruction::SubsReg {
+                sf: true,
+                rd: 0,
+                rn: 1,
+                rm: 2,
+                shift_type: 2,
+                shift_amount: 5
+            }
+        ));
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -412,92 +713,260 @@ mod tests {
     #[test]
     fn test_decode_and_reg_64() {
         let insn = decode(enc_and_reg(true, 0, 1, 2, 0, 0), 0x1000);
-        assert!(matches!(insn, Instruction::LogicalReg { sf: true, opc: 0, n: false, rd: 0, rn: 1, rm: 2, shift_type: 0, shift_amount: 0 }));
+        assert!(matches!(
+            insn,
+            Instruction::LogicalReg {
+                sf: true,
+                opc: 0,
+                n: false,
+                rd: 0,
+                rn: 1,
+                rm: 2,
+                shift_type: 0,
+                shift_amount: 0
+            }
+        ));
     }
 
     #[test]
     fn test_decode_and_reg_32() {
         let insn = decode(enc_and_reg(false, 3, 4, 5, 0, 0), 0x1000);
-        assert!(matches!(insn, Instruction::LogicalReg { sf: false, opc: 0, n: false, rd: 3, rn: 4, rm: 5, shift_type: 0, shift_amount: 0 }));
+        assert!(matches!(
+            insn,
+            Instruction::LogicalReg {
+                sf: false,
+                opc: 0,
+                n: false,
+                rd: 3,
+                rn: 4,
+                rm: 5,
+                shift_type: 0,
+                shift_amount: 0
+            }
+        ));
     }
 
     #[test]
     fn test_decode_and_reg_with_shift() {
         let insn = decode(enc_and_reg(true, 0, 1, 2, 1, 8), 0x1000);
-        assert!(matches!(insn, Instruction::LogicalReg { sf: true, opc: 0, n: false, rd: 0, rn: 1, rm: 2, shift_type: 1, shift_amount: 8 }));
+        assert!(matches!(
+            insn,
+            Instruction::LogicalReg {
+                sf: true,
+                opc: 0,
+                n: false,
+                rd: 0,
+                rn: 1,
+                rm: 2,
+                shift_type: 1,
+                shift_amount: 8
+            }
+        ));
     }
 
     // BIC (opc=00, N=1)
     #[test]
     fn test_decode_bic_reg_64() {
         let insn = decode(enc_logical_reg(true, 0b00, 0, true, 2, 0, 1, 0), 0x1000);
-        assert!(matches!(insn, Instruction::LogicalReg { sf: true, opc: 0, n: true, rd: 0, rn: 1, rm: 2, shift_type: 0, shift_amount: 0 }));
+        assert!(matches!(
+            insn,
+            Instruction::LogicalReg {
+                sf: true,
+                opc: 0,
+                n: true,
+                rd: 0,
+                rn: 1,
+                rm: 2,
+                shift_type: 0,
+                shift_amount: 0
+            }
+        ));
     }
 
     // ORR (opc=01, N=0)
     #[test]
     fn test_decode_orr_reg_64() {
         let insn = decode(enc_orr_reg(true, 0, 1, 2, 0, 0), 0x1000);
-        assert!(matches!(insn, Instruction::LogicalReg { sf: true, opc: 1, n: false, rd: 0, rn: 1, rm: 2, shift_type: 0, shift_amount: 0 }));
+        assert!(matches!(
+            insn,
+            Instruction::LogicalReg {
+                sf: true,
+                opc: 1,
+                n: false,
+                rd: 0,
+                rn: 1,
+                rm: 2,
+                shift_type: 0,
+                shift_amount: 0
+            }
+        ));
     }
 
     #[test]
     fn test_decode_orr_reg_32() {
         let insn = decode(enc_orr_reg(false, 3, 4, 5, 0, 0), 0x1000);
-        assert!(matches!(insn, Instruction::LogicalReg { sf: false, opc: 1, n: false, rd: 3, rn: 4, rm: 5, shift_type: 0, shift_amount: 0 }));
+        assert!(matches!(
+            insn,
+            Instruction::LogicalReg {
+                sf: false,
+                opc: 1,
+                n: false,
+                rd: 3,
+                rn: 4,
+                rm: 5,
+                shift_type: 0,
+                shift_amount: 0
+            }
+        ));
     }
 
     #[test]
     fn test_decode_orr_reg_with_shift() {
         let insn = decode(enc_orr_reg(true, 0, 1, 2, 2, 16), 0x1000);
-        assert!(matches!(insn, Instruction::LogicalReg { sf: true, opc: 1, n: false, rd: 0, rn: 1, rm: 2, shift_type: 2, shift_amount: 16 }));
+        assert!(matches!(
+            insn,
+            Instruction::LogicalReg {
+                sf: true,
+                opc: 1,
+                n: false,
+                rd: 0,
+                rn: 1,
+                rm: 2,
+                shift_type: 2,
+                shift_amount: 16
+            }
+        ));
     }
 
     // ORN (opc=01, N=1)
     #[test]
     fn test_decode_orn_reg_64() {
         let insn = decode(enc_logical_reg(true, 0b01, 0, true, 2, 0, 1, 0), 0x1000);
-        assert!(matches!(insn, Instruction::LogicalReg { sf: true, opc: 1, n: true, rd: 0, rn: 1, rm: 2, shift_type: 0, shift_amount: 0 }));
+        assert!(matches!(
+            insn,
+            Instruction::LogicalReg {
+                sf: true,
+                opc: 1,
+                n: true,
+                rd: 0,
+                rn: 1,
+                rm: 2,
+                shift_type: 0,
+                shift_amount: 0
+            }
+        ));
     }
 
     // EOR (opc=10, N=0)
     #[test]
     fn test_decode_eor_reg_64() {
         let insn = decode(enc_logical_reg(true, 0b10, 0, false, 2, 0, 1, 0), 0x1000);
-        assert!(matches!(insn, Instruction::LogicalReg { sf: true, opc: 2, n: false, rd: 0, rn: 1, rm: 2, shift_type: 0, shift_amount: 0 }));
+        assert!(matches!(
+            insn,
+            Instruction::LogicalReg {
+                sf: true,
+                opc: 2,
+                n: false,
+                rd: 0,
+                rn: 1,
+                rm: 2,
+                shift_type: 0,
+                shift_amount: 0
+            }
+        ));
     }
 
     #[test]
     fn test_decode_eor_reg_32() {
         let insn = decode(enc_logical_reg(false, 0b10, 0, false, 5, 0, 4, 3), 0x1000);
-        assert!(matches!(insn, Instruction::LogicalReg { sf: false, opc: 2, n: false, rd: 3, rn: 4, rm: 5, shift_type: 0, shift_amount: 0 }));
+        assert!(matches!(
+            insn,
+            Instruction::LogicalReg {
+                sf: false,
+                opc: 2,
+                n: false,
+                rd: 3,
+                rn: 4,
+                rm: 5,
+                shift_type: 0,
+                shift_amount: 0
+            }
+        ));
     }
 
     // EON (opc=10, N=1)
     #[test]
     fn test_decode_eon_reg_64() {
         let insn = decode(enc_logical_reg(true, 0b10, 0, true, 2, 0, 1, 0), 0x1000);
-        assert!(matches!(insn, Instruction::LogicalReg { sf: true, opc: 2, n: true, rd: 0, rn: 1, rm: 2, shift_type: 0, shift_amount: 0 }));
+        assert!(matches!(
+            insn,
+            Instruction::LogicalReg {
+                sf: true,
+                opc: 2,
+                n: true,
+                rd: 0,
+                rn: 1,
+                rm: 2,
+                shift_type: 0,
+                shift_amount: 0
+            }
+        ));
     }
 
     // ANDS (opc=11, N=0)
     #[test]
     fn test_decode_ands_reg_64() {
         let insn = decode(enc_logical_reg(true, 0b11, 0, false, 2, 0, 1, 0), 0x1000);
-        assert!(matches!(insn, Instruction::LogicalReg { sf: true, opc: 3, n: false, rd: 0, rn: 1, rm: 2, shift_type: 0, shift_amount: 0 }));
+        assert!(matches!(
+            insn,
+            Instruction::LogicalReg {
+                sf: true,
+                opc: 3,
+                n: false,
+                rd: 0,
+                rn: 1,
+                rm: 2,
+                shift_type: 0,
+                shift_amount: 0
+            }
+        ));
     }
 
     #[test]
     fn test_decode_ands_reg_32() {
         let insn = decode(enc_logical_reg(false, 0b11, 0, false, 5, 0, 4, 3), 0x1000);
-        assert!(matches!(insn, Instruction::LogicalReg { sf: false, opc: 3, n: false, rd: 3, rn: 4, rm: 5, shift_type: 0, shift_amount: 0 }));
+        assert!(matches!(
+            insn,
+            Instruction::LogicalReg {
+                sf: false,
+                opc: 3,
+                n: false,
+                rd: 3,
+                rn: 4,
+                rm: 5,
+                shift_type: 0,
+                shift_amount: 0
+            }
+        ));
     }
 
     // BICS (opc=11, N=1)
     #[test]
     fn test_decode_bics_reg_64() {
         let insn = decode(enc_logical_reg(true, 0b11, 0, true, 2, 0, 1, 0), 0x1000);
-        assert!(matches!(insn, Instruction::LogicalReg { sf: true, opc: 3, n: true, rd: 0, rn: 1, rm: 2, shift_type: 0, shift_amount: 0 }));
+        assert!(matches!(
+            insn,
+            Instruction::LogicalReg {
+                sf: true,
+                opc: 3,
+                n: true,
+                rd: 0,
+                rn: 1,
+                rm: 2,
+                shift_type: 0,
+                shift_amount: 0
+            }
+        ));
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -507,39 +976,93 @@ mod tests {
     #[test]
     fn test_decode_madd_64() {
         let insn = decode(enc_madd(true, 0, 1, 2, 3), 0x1000);
-        assert!(matches!(insn, Instruction::Madd { sf: true, rd: 0, rn: 1, rm: 2, ra: 3 }));
+        assert!(matches!(
+            insn,
+            Instruction::Madd {
+                sf: true,
+                rd: 0,
+                rn: 1,
+                rm: 2,
+                ra: 3
+            }
+        ));
     }
 
     #[test]
     fn test_decode_madd_32() {
         let insn = decode(enc_madd(false, 4, 5, 6, 7), 0x1000);
-        assert!(matches!(insn, Instruction::Madd { sf: false, rd: 4, rn: 5, rm: 6, ra: 7 }));
+        assert!(matches!(
+            insn,
+            Instruction::Madd {
+                sf: false,
+                rd: 4,
+                rn: 5,
+                rm: 6,
+                ra: 7
+            }
+        ));
     }
 
     #[test]
     fn test_decode_madd_mul_alias() {
         // MUL is MADD with Ra=XZR (31)
         let insn = decode(enc_madd(true, 0, 1, 2, 31), 0x1000);
-        assert!(matches!(insn, Instruction::Madd { sf: true, rd: 0, rn: 1, rm: 2, ra: 31 }));
+        assert!(matches!(
+            insn,
+            Instruction::Madd {
+                sf: true,
+                rd: 0,
+                rn: 1,
+                rm: 2,
+                ra: 31
+            }
+        ));
     }
 
     #[test]
     fn test_decode_msub_64() {
         let insn = decode(enc_msub(true, 0, 1, 2, 3), 0x1000);
-        assert!(matches!(insn, Instruction::Msub { sf: true, rd: 0, rn: 1, rm: 2, ra: 3 }));
+        assert!(matches!(
+            insn,
+            Instruction::Msub {
+                sf: true,
+                rd: 0,
+                rn: 1,
+                rm: 2,
+                ra: 3
+            }
+        ));
     }
 
     #[test]
     fn test_decode_msub_32() {
         let insn = decode(enc_msub(false, 4, 5, 6, 7), 0x1000);
-        assert!(matches!(insn, Instruction::Msub { sf: false, rd: 4, rn: 5, rm: 6, ra: 7 }));
+        assert!(matches!(
+            insn,
+            Instruction::Msub {
+                sf: false,
+                rd: 4,
+                rn: 5,
+                rm: 6,
+                ra: 7
+            }
+        ));
     }
 
     #[test]
     fn test_decode_msub_mneg_alias() {
         // MNEG is MSUB with Ra=XZR (31)
         let insn = decode(enc_msub(true, 0, 1, 2, 31), 0x1000);
-        assert!(matches!(insn, Instruction::Msub { sf: true, rd: 0, rn: 1, rm: 2, ra: 31 }));
+        assert!(matches!(
+            insn,
+            Instruction::Msub {
+                sf: true,
+                rd: 0,
+                rn: 1,
+                rm: 2,
+                ra: 31
+            }
+        ));
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -549,25 +1072,61 @@ mod tests {
     #[test]
     fn test_decode_udiv_64() {
         let insn = decode(enc_udiv(true, 0, 1, 2), 0x1000);
-        assert!(matches!(insn, Instruction::Div { sf: true, rd: 0, rn: 1, rm: 2, is_signed: false }));
+        assert!(matches!(
+            insn,
+            Instruction::Div {
+                sf: true,
+                rd: 0,
+                rn: 1,
+                rm: 2,
+                is_signed: false
+            }
+        ));
     }
 
     #[test]
     fn test_decode_udiv_32() {
         let insn = decode(enc_udiv(false, 3, 4, 5), 0x1000);
-        assert!(matches!(insn, Instruction::Div { sf: false, rd: 3, rn: 4, rm: 5, is_signed: false }));
+        assert!(matches!(
+            insn,
+            Instruction::Div {
+                sf: false,
+                rd: 3,
+                rn: 4,
+                rm: 5,
+                is_signed: false
+            }
+        ));
     }
 
     #[test]
     fn test_decode_sdiv_64() {
         let insn = decode(enc_sdiv(true, 0, 1, 2), 0x1000);
-        assert!(matches!(insn, Instruction::Div { sf: true, rd: 0, rn: 1, rm: 2, is_signed: true }));
+        assert!(matches!(
+            insn,
+            Instruction::Div {
+                sf: true,
+                rd: 0,
+                rn: 1,
+                rm: 2,
+                is_signed: true
+            }
+        ));
     }
 
     #[test]
     fn test_decode_sdiv_32() {
         let insn = decode(enc_sdiv(false, 3, 4, 5), 0x1000);
-        assert!(matches!(insn, Instruction::Div { sf: false, rd: 3, rn: 4, rm: 5, is_signed: true }));
+        assert!(matches!(
+            insn,
+            Instruction::Div {
+                sf: false,
+                rd: 3,
+                rn: 4,
+                rm: 5,
+                is_signed: true
+            }
+        ));
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -577,69 +1136,168 @@ mod tests {
     #[test]
     fn test_decode_csel_64_eq() {
         let insn = decode(enc_csel(true, 0, 1, 2, 0), 0x1000);
-        assert!(matches!(insn, Instruction::Csel { sf: true, rd: 0, rn: 1, rm: 2, cond: Condition::Eq }));
+        assert!(matches!(
+            insn,
+            Instruction::Csel {
+                sf: true,
+                rd: 0,
+                rn: 1,
+                rm: 2,
+                cond: Condition::Eq
+            }
+        ));
     }
 
     #[test]
     fn test_decode_csel_32_ne() {
         let insn = decode(enc_csel(false, 3, 4, 5, 1), 0x1000);
-        assert!(matches!(insn, Instruction::Csel { sf: false, rd: 3, rn: 4, rm: 5, cond: Condition::Ne }));
+        assert!(matches!(
+            insn,
+            Instruction::Csel {
+                sf: false,
+                rd: 3,
+                rn: 4,
+                rm: 5,
+                cond: Condition::Ne
+            }
+        ));
     }
 
     #[test]
     fn test_decode_csel_64_ge() {
         let insn = decode(enc_csel(true, 0, 1, 2, 0xA), 0x1000);
-        assert!(matches!(insn, Instruction::Csel { sf: true, rd: 0, rn: 1, rm: 2, cond: Condition::Ge }));
+        assert!(matches!(
+            insn,
+            Instruction::Csel {
+                sf: true,
+                rd: 0,
+                rn: 1,
+                rm: 2,
+                cond: Condition::Ge
+            }
+        ));
     }
 
     #[test]
     fn test_decode_csinc_64_eq() {
         let insn = decode(enc_csinc(true, 0, 1, 2, 0), 0x1000);
-        assert!(matches!(insn, Instruction::Csinc { sf: true, rd: 0, rn: 1, rm: 2, cond: Condition::Eq }));
+        assert!(matches!(
+            insn,
+            Instruction::Csinc {
+                sf: true,
+                rd: 0,
+                rn: 1,
+                rm: 2,
+                cond: Condition::Eq
+            }
+        ));
     }
 
     #[test]
     fn test_decode_csinc_32_cs() {
         let insn = decode(enc_csinc(false, 3, 4, 5, 2), 0x1000);
-        assert!(matches!(insn, Instruction::Csinc { sf: false, rd: 3, rn: 4, rm: 5, cond: Condition::Cs }));
+        assert!(matches!(
+            insn,
+            Instruction::Csinc {
+                sf: false,
+                rd: 3,
+                rn: 4,
+                rm: 5,
+                cond: Condition::Cs
+            }
+        ));
     }
 
     #[test]
     fn test_decode_csinc_cset_alias() {
         // CSET Xd, cond → CSINC Xd, XZR, XZR, invert(cond)
         let insn = decode(enc_csinc(true, 0, 31, 31, 1), 0x1000);
-        assert!(matches!(insn, Instruction::Csinc { sf: true, rd: 0, rn: 31, rm: 31, cond: Condition::Ne }));
+        assert!(matches!(
+            insn,
+            Instruction::Csinc {
+                sf: true,
+                rd: 0,
+                rn: 31,
+                rm: 31,
+                cond: Condition::Ne
+            }
+        ));
     }
 
     #[test]
     fn test_decode_csinv_64_eq() {
         let insn = decode(enc_csinv(true, 0, 1, 2, 0), 0x1000);
-        assert!(matches!(insn, Instruction::Csinv { sf: true, rd: 0, rn: 1, rm: 2, cond: Condition::Eq }));
+        assert!(matches!(
+            insn,
+            Instruction::Csinv {
+                sf: true,
+                rd: 0,
+                rn: 1,
+                rm: 2,
+                cond: Condition::Eq
+            }
+        ));
     }
 
     #[test]
     fn test_decode_csinv_32_lt() {
         let insn = decode(enc_csinv(false, 3, 4, 5, 0xB), 0x1000);
-        assert!(matches!(insn, Instruction::Csinv { sf: false, rd: 3, rn: 4, rm: 5, cond: Condition::Lt }));
+        assert!(matches!(
+            insn,
+            Instruction::Csinv {
+                sf: false,
+                rd: 3,
+                rn: 4,
+                rm: 5,
+                cond: Condition::Lt
+            }
+        ));
     }
 
     #[test]
     fn test_decode_csinv_csetm_alias() {
         // CSETM Xd, cond → CSINV Xd, XZR, XZR, invert(cond)
         let insn = decode(enc_csinv(true, 0, 31, 31, 1), 0x1000);
-        assert!(matches!(insn, Instruction::Csinv { sf: true, rd: 0, rn: 31, rm: 31, cond: Condition::Ne }));
+        assert!(matches!(
+            insn,
+            Instruction::Csinv {
+                sf: true,
+                rd: 0,
+                rn: 31,
+                rm: 31,
+                cond: Condition::Ne
+            }
+        ));
     }
 
     #[test]
     fn test_decode_csneg_64_eq() {
         let insn = decode(enc_csneg(true, 0, 1, 2, 0), 0x1000);
-        assert!(matches!(insn, Instruction::Csneg { sf: true, rd: 0, rn: 1, rm: 2, cond: Condition::Eq }));
+        assert!(matches!(
+            insn,
+            Instruction::Csneg {
+                sf: true,
+                rd: 0,
+                rn: 1,
+                rm: 2,
+                cond: Condition::Eq
+            }
+        ));
     }
 
     #[test]
     fn test_decode_csneg_32_mi() {
         let insn = decode(enc_csneg(false, 3, 4, 5, 4), 0x1000);
-        assert!(matches!(insn, Instruction::Csneg { sf: false, rd: 3, rn: 4, rm: 5, cond: Condition::Mi }));
+        assert!(matches!(
+            insn,
+            Instruction::Csneg {
+                sf: false,
+                rd: 3,
+                rn: 4,
+                rm: 5,
+                cond: Condition::Mi
+            }
+        ));
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -649,49 +1307,129 @@ mod tests {
     #[test]
     fn test_decode_ccmp_reg_64() {
         let insn = decode(enc_ccmp_reg(true, 1, 2, 0, 3, 0b0100), 0x1000);
-        assert!(matches!(insn, Instruction::Ccmp { sf: true, rn: 3, imm5_or_rm: 2, nzcv: 0b0100, cond: Condition::Eq, is_imm: false }));
+        assert!(matches!(
+            insn,
+            Instruction::Ccmp {
+                sf: true,
+                rn: 3,
+                imm5_or_rm: 2,
+                nzcv: 0b0100,
+                cond: Condition::Eq,
+                is_imm: false
+            }
+        ));
     }
 
     #[test]
     fn test_decode_ccmp_reg_32() {
         let insn = decode(enc_ccmp_reg(false, 1, 5, 1, 6, 0b1000), 0x1000);
-        assert!(matches!(insn, Instruction::Ccmp { sf: false, rn: 6, imm5_or_rm: 5, nzcv: 0b1000, cond: Condition::Ne, is_imm: false }));
+        assert!(matches!(
+            insn,
+            Instruction::Ccmp {
+                sf: false,
+                rn: 6,
+                imm5_or_rm: 5,
+                nzcv: 0b1000,
+                cond: Condition::Ne,
+                is_imm: false
+            }
+        ));
     }
 
     #[test]
     fn test_decode_ccmp_imm_64() {
         let insn = decode(enc_ccmp_imm(true, 1, 10, 0, 3, 0b0010), 0x1000);
-        assert!(matches!(insn, Instruction::Ccmp { sf: true, rn: 3, imm5_or_rm: 10, nzcv: 0b0010, cond: Condition::Eq, is_imm: true }));
+        assert!(matches!(
+            insn,
+            Instruction::Ccmp {
+                sf: true,
+                rn: 3,
+                imm5_or_rm: 10,
+                nzcv: 0b0010,
+                cond: Condition::Eq,
+                is_imm: true
+            }
+        ));
     }
 
     #[test]
     fn test_decode_ccmp_imm_32() {
         let insn = decode(enc_ccmp_imm(false, 1, 15, 0xA, 4, 0b0001), 0x1000);
-        assert!(matches!(insn, Instruction::Ccmp { sf: false, rn: 4, imm5_or_rm: 15, nzcv: 0b0001, cond: Condition::Ge, is_imm: true }));
+        assert!(matches!(
+            insn,
+            Instruction::Ccmp {
+                sf: false,
+                rn: 4,
+                imm5_or_rm: 15,
+                nzcv: 0b0001,
+                cond: Condition::Ge,
+                is_imm: true
+            }
+        ));
     }
 
     #[test]
     fn test_decode_ccmn_reg_64() {
         let insn = decode(enc_ccmp_reg(true, 0, 2, 0, 3, 0b0100), 0x1000);
-        assert!(matches!(insn, Instruction::Ccmn { sf: true, rn: 3, imm5_or_rm: 2, nzcv: 0b0100, cond: Condition::Eq, is_imm: false }));
+        assert!(matches!(
+            insn,
+            Instruction::Ccmn {
+                sf: true,
+                rn: 3,
+                imm5_or_rm: 2,
+                nzcv: 0b0100,
+                cond: Condition::Eq,
+                is_imm: false
+            }
+        ));
     }
 
     #[test]
     fn test_decode_ccmn_reg_32() {
         let insn = decode(enc_ccmp_reg(false, 0, 7, 3, 8, 0b1100), 0x1000);
-        assert!(matches!(insn, Instruction::Ccmn { sf: false, rn: 8, imm5_or_rm: 7, nzcv: 0b1100, cond: Condition::Cc, is_imm: false }));
+        assert!(matches!(
+            insn,
+            Instruction::Ccmn {
+                sf: false,
+                rn: 8,
+                imm5_or_rm: 7,
+                nzcv: 0b1100,
+                cond: Condition::Cc,
+                is_imm: false
+            }
+        ));
     }
 
     #[test]
     fn test_decode_ccmn_imm_64() {
         let insn = decode(enc_ccmp_imm(true, 0, 5, 0xC, 1, 0b0000), 0x1000);
-        assert!(matches!(insn, Instruction::Ccmn { sf: true, rn: 1, imm5_or_rm: 5, nzcv: 0b0000, cond: Condition::Gt, is_imm: true }));
+        assert!(matches!(
+            insn,
+            Instruction::Ccmn {
+                sf: true,
+                rn: 1,
+                imm5_or_rm: 5,
+                nzcv: 0b0000,
+                cond: Condition::Gt,
+                is_imm: true
+            }
+        ));
     }
 
     #[test]
     fn test_decode_ccmn_imm_32() {
         let insn = decode(enc_ccmp_imm(false, 0, 31, 0xE, 10, 0b1111), 0x1000);
-        assert!(matches!(insn, Instruction::Ccmn { sf: false, rn: 10, imm5_or_rm: 31, nzcv: 0b1111, cond: Condition::Al, is_imm: true }));
+        assert!(matches!(
+            insn,
+            Instruction::Ccmn {
+                sf: false,
+                rn: 10,
+                imm5_or_rm: 31,
+                nzcv: 0b1111,
+                cond: Condition::Al,
+                is_imm: true
+            }
+        ));
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -701,49 +1439,121 @@ mod tests {
     #[test]
     fn test_decode_lslv_64() {
         let insn = decode(enc_shift_var(true, 0, 1, 2, 0), 0x1000);
-        assert!(matches!(insn, Instruction::ShiftVar { sf: true, rd: 0, rn: 1, rm: 2, shift_type: 0 }));
+        assert!(matches!(
+            insn,
+            Instruction::ShiftVar {
+                sf: true,
+                rd: 0,
+                rn: 1,
+                rm: 2,
+                shift_type: 0
+            }
+        ));
     }
 
     #[test]
     fn test_decode_lslv_32() {
         let insn = decode(enc_shift_var(false, 3, 4, 5, 0), 0x1000);
-        assert!(matches!(insn, Instruction::ShiftVar { sf: false, rd: 3, rn: 4, rm: 5, shift_type: 0 }));
+        assert!(matches!(
+            insn,
+            Instruction::ShiftVar {
+                sf: false,
+                rd: 3,
+                rn: 4,
+                rm: 5,
+                shift_type: 0
+            }
+        ));
     }
 
     #[test]
     fn test_decode_lsrv_64() {
         let insn = decode(enc_shift_var(true, 0, 1, 2, 1), 0x1000);
-        assert!(matches!(insn, Instruction::ShiftVar { sf: true, rd: 0, rn: 1, rm: 2, shift_type: 1 }));
+        assert!(matches!(
+            insn,
+            Instruction::ShiftVar {
+                sf: true,
+                rd: 0,
+                rn: 1,
+                rm: 2,
+                shift_type: 1
+            }
+        ));
     }
 
     #[test]
     fn test_decode_lsrv_32() {
         let insn = decode(enc_shift_var(false, 3, 4, 5, 1), 0x1000);
-        assert!(matches!(insn, Instruction::ShiftVar { sf: false, rd: 3, rn: 4, rm: 5, shift_type: 1 }));
+        assert!(matches!(
+            insn,
+            Instruction::ShiftVar {
+                sf: false,
+                rd: 3,
+                rn: 4,
+                rm: 5,
+                shift_type: 1
+            }
+        ));
     }
 
     #[test]
     fn test_decode_asrv_64() {
         let insn = decode(enc_shift_var(true, 0, 1, 2, 2), 0x1000);
-        assert!(matches!(insn, Instruction::ShiftVar { sf: true, rd: 0, rn: 1, rm: 2, shift_type: 2 }));
+        assert!(matches!(
+            insn,
+            Instruction::ShiftVar {
+                sf: true,
+                rd: 0,
+                rn: 1,
+                rm: 2,
+                shift_type: 2
+            }
+        ));
     }
 
     #[test]
     fn test_decode_asrv_32() {
         let insn = decode(enc_shift_var(false, 3, 4, 5, 2), 0x1000);
-        assert!(matches!(insn, Instruction::ShiftVar { sf: false, rd: 3, rn: 4, rm: 5, shift_type: 2 }));
+        assert!(matches!(
+            insn,
+            Instruction::ShiftVar {
+                sf: false,
+                rd: 3,
+                rn: 4,
+                rm: 5,
+                shift_type: 2
+            }
+        ));
     }
 
     #[test]
     fn test_decode_rorv_64() {
         let insn = decode(enc_shift_var(true, 0, 1, 2, 3), 0x1000);
-        assert!(matches!(insn, Instruction::ShiftVar { sf: true, rd: 0, rn: 1, rm: 2, shift_type: 3 }));
+        assert!(matches!(
+            insn,
+            Instruction::ShiftVar {
+                sf: true,
+                rd: 0,
+                rn: 1,
+                rm: 2,
+                shift_type: 3
+            }
+        ));
     }
 
     #[test]
     fn test_decode_rorv_32() {
         let insn = decode(enc_shift_var(false, 3, 4, 5, 3), 0x1000);
-        assert!(matches!(insn, Instruction::ShiftVar { sf: false, rd: 3, rn: 4, rm: 5, shift_type: 3 }));
+        assert!(matches!(
+            insn,
+            Instruction::ShiftVar {
+                sf: false,
+                rd: 3,
+                rn: 4,
+                rm: 5,
+                shift_type: 3
+            }
+        ));
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -754,34 +1564,75 @@ mod tests {
     fn test_decode_add_reg_zero_regs() {
         // XZR as rd and rn
         let insn = decode(enc_add_reg(true, 31, 31, 2, 0, 0), 0x1000);
-        assert!(matches!(insn, Instruction::AddReg { sf: true, rd: 31, rn: 31, rm: 2, .. }));
+        assert!(matches!(
+            insn,
+            Instruction::AddReg {
+                sf: true,
+                rd: 31,
+                rn: 31,
+                rm: 2,
+                ..
+            }
+        ));
     }
 
     #[test]
     fn test_decode_mov_reg_alias() {
         // MOV is ORR Xd, XZR, Xm
         let insn = decode(enc_mov_reg(true, 0, 5), 0x1000);
-        assert!(matches!(insn, Instruction::LogicalReg { sf: true, opc: 1, n: false, rd: 0, rn: 31, rm: 5, shift_type: 0, shift_amount: 0 }));
+        assert!(matches!(
+            insn,
+            Instruction::LogicalReg {
+                sf: true,
+                opc: 1,
+                n: false,
+                rd: 0,
+                rn: 31,
+                rm: 5,
+                shift_type: 0,
+                shift_amount: 0
+            }
+        ));
     }
 
     #[test]
     fn test_decode_logical_reg_ror_shift() {
         // ORR with ROR shift (shift_type=3)
         let insn = decode(enc_orr_reg(true, 0, 1, 2, 3, 10), 0x1000);
-        assert!(matches!(insn, Instruction::LogicalReg { sf: true, opc: 1, n: false, rd: 0, rn: 1, rm: 2, shift_type: 3, shift_amount: 10 }));
+        assert!(matches!(
+            insn,
+            Instruction::LogicalReg {
+                sf: true,
+                opc: 1,
+                n: false,
+                rd: 0,
+                rn: 1,
+                rm: 2,
+                shift_type: 3,
+                shift_amount: 10
+            }
+        ));
     }
 
     #[test]
     fn test_decode_csel_all_conditions() {
         // Spot-check several condition codes
         for (code, expected) in [
-            (0u8, Condition::Eq), (1, Condition::Ne), (2, Condition::Cs),
-            (3, Condition::Cc), (4, Condition::Mi), (5, Condition::Pl),
-            (8, Condition::Hi), (0xC, Condition::Gt), (0xE, Condition::Al),
+            (0u8, Condition::Eq),
+            (1, Condition::Ne),
+            (2, Condition::Cs),
+            (3, Condition::Cc),
+            (4, Condition::Mi),
+            (5, Condition::Pl),
+            (8, Condition::Hi),
+            (0xC, Condition::Gt),
+            (0xE, Condition::Al),
         ] {
             let insn = decode(enc_csel(true, 0, 1, 2, code), 0x1000);
-            assert!(matches!(insn, Instruction::Csel { cond, .. } if cond == expected),
-                "failed for condition code {code}");
+            assert!(
+                matches!(insn, Instruction::Csel { cond, .. } if cond == expected),
+                "failed for condition code {code}"
+            );
         }
     }
 }

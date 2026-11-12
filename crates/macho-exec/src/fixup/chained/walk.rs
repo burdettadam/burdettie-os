@@ -66,17 +66,30 @@ pub(super) fn walk_chain(
                             Some(a) => {
                                 let slot_addr = seg.base as u64 + offset as u64;
                                 unsafe {
-                                    pac_sign_pointer(a, meta.key, slot_addr, meta.diversity, meta.addr_diversity)
+                                    pac_sign_pointer(
+                                        a,
+                                        meta.key,
+                                        slot_addr,
+                                        meta.diversity,
+                                        meta.addr_diversity,
+                                    )
                                 }
                             }
                             None => {
-                                super::UNRESOLVED_BIND_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                super::UNRESOLVED_BIND_COUNT
+                                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                                 // Auth-GOT stubs use BRAA/BLRAA which require a signed pointer.
                                 // Sign the trap address so the authenticated branch succeeds and
                                 // lands on the trap function instead of faulting on PAC mismatch.
                                 let slot_addr = seg.base as u64 + offset as u64;
                                 unsafe {
-                                    pac_sign_pointer(super::trap_addr(), meta.key, slot_addr, meta.diversity, meta.addr_diversity)
+                                    pac_sign_pointer(
+                                        super::trap_addr(),
+                                        meta.key,
+                                        slot_addr,
+                                        meta.diversity,
+                                        meta.addr_diversity,
+                                    )
                                 }
                             }
                         };
@@ -116,7 +129,13 @@ pub(super) fn walk_chain(
                         // Auth rebase: PAC-sign the rebased pointer
                         let slot_addr = seg.base as u64 + offset as u64;
                         unsafe {
-                            pac_sign_pointer(rebased, meta.key, slot_addr, meta.diversity, meta.addr_diversity)
+                            pac_sign_pointer(
+                                rebased,
+                                meta.key,
+                                slot_addr,
+                                meta.diversity,
+                                meta.addr_diversity,
+                            )
                         }
                     } else {
                         let target43 = raw & 0x7FF_FFFF_FFFF;

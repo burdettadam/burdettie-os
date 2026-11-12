@@ -63,20 +63,73 @@ pub struct NotifyStubs;
 impl NotifyStubs {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
-        register_shims!(table,
-            ("_notify_register_dispatch", shim_notify_register_dispatch as *const () as u64, "notify_register_dispatch (real dispatch)"),
-            ("_notify_register_check", shim_notify_register_check as *const () as u64, "notify_register_check (real token)"),
-            ("_notify_check", shim_notify_check as *const () as u64, "notify_check (real state check)"),
-            ("_notify_get_state", shim_notify_get_state as *const () as u64, "notify_get_state (real)"),
-            ("_notify_set_state", shim_notify_set_state as *const () as u64, "notify_set_state (real)"),
-            ("_notify_post", shim_notify_post as *const () as u64, "notify_post (real fires handlers)"),
-            ("_notify_cancel", shim_notify_cancel as *const () as u64, "notify_cancel (real)"),
-            ("_notify_register_mach_port", shim_notify_register_check as *const () as u64, "notify_register_mach_port (→ check token)"),
-            ("_notify_register_file_descriptor", shim_notify_register_check as *const () as u64, "notify_register_file_descriptor (→ check token)"),
-            ("_notify_register_signal", shim_notify_register_check as *const () as u64, "notify_register_signal (→ check token)"),
-            ("_notify_suspend", shim_notify_suspend as *const () as u64, "notify_suspend (real)"),
-            ("_notify_resume", shim_notify_resume as *const () as u64, "notify_resume (real)"),
-            ("_notify_is_valid_token", shim_notify_is_valid_token as *const () as u64, "notify_is_valid_token (real)"),
+        register_shims!(
+            table,
+            (
+                "_notify_register_dispatch",
+                shim_notify_register_dispatch as *const () as u64,
+                "notify_register_dispatch (real dispatch)"
+            ),
+            (
+                "_notify_register_check",
+                shim_notify_register_check as *const () as u64,
+                "notify_register_check (real token)"
+            ),
+            (
+                "_notify_check",
+                shim_notify_check as *const () as u64,
+                "notify_check (real state check)"
+            ),
+            (
+                "_notify_get_state",
+                shim_notify_get_state as *const () as u64,
+                "notify_get_state (real)"
+            ),
+            (
+                "_notify_set_state",
+                shim_notify_set_state as *const () as u64,
+                "notify_set_state (real)"
+            ),
+            (
+                "_notify_post",
+                shim_notify_post as *const () as u64,
+                "notify_post (real fires handlers)"
+            ),
+            (
+                "_notify_cancel",
+                shim_notify_cancel as *const () as u64,
+                "notify_cancel (real)"
+            ),
+            (
+                "_notify_register_mach_port",
+                shim_notify_register_check as *const () as u64,
+                "notify_register_mach_port (→ check token)"
+            ),
+            (
+                "_notify_register_file_descriptor",
+                shim_notify_register_check as *const () as u64,
+                "notify_register_file_descriptor (→ check token)"
+            ),
+            (
+                "_notify_register_signal",
+                shim_notify_register_check as *const () as u64,
+                "notify_register_signal (→ check token)"
+            ),
+            (
+                "_notify_suspend",
+                shim_notify_suspend as *const () as u64,
+                "notify_suspend (real)"
+            ),
+            (
+                "_notify_resume",
+                shim_notify_resume as *const () as u64,
+                "notify_resume (real)"
+            ),
+            (
+                "_notify_is_valid_token",
+                shim_notify_is_valid_token as *const () as u64,
+                "notify_is_valid_token (real)"
+            ),
         );
         log::debug!("NotifyStubs: registered 13 notify shims");
     }
@@ -100,32 +153,48 @@ fn extract_name(name_ptr: u64) -> Option<String> {
 /// Registers `handler` to be submitted to `queue` whenever `notify_post(name)`
 /// is called. The handler is `void (^)(int token)` — a block taking the token.
 pub extern "C" fn shim_notify_register_dispatch(
-    name: u64, out_token: *mut i32, queue: u64, handler: u64,
+    name: u64,
+    out_token: *mut i32,
+    queue: u64,
+    handler: u64,
 ) -> u32 {
     let name_str = match extract_name(name) {
         Some(n) => n,
         None => {
-            if !out_token.is_null() { unsafe { *out_token = 0; } }
+            if !out_token.is_null() {
+                unsafe {
+                    *out_token = 0;
+                }
+            }
             return NOTIFY_STATUS_OK;
         }
     };
 
     let token = alloc_token();
-    log::debug!("notify_register_dispatch(\"{}\") → token {}", name_str, token);
+    log::debug!(
+        "notify_register_dispatch(\"{}\") → token {}",
+        name_str,
+        token
+    );
 
     let mut guard = registry();
     let map = guard.get_or_insert_with(HashMap::new);
-    map.insert(token, Registration {
-        name: name_str,
-        state: 0,
-        dirty: false,
-        has_handler: handler != 0,
-        queue,
-        handler_block: handler,
-    });
+    map.insert(
+        token,
+        Registration {
+            name: name_str,
+            state: 0,
+            dirty: false,
+            has_handler: handler != 0,
+            queue,
+            handler_block: handler,
+        },
+    );
 
     if !out_token.is_null() {
-        unsafe { *out_token = token; }
+        unsafe {
+            *out_token = token;
+        }
     }
     NOTIFY_STATUS_OK
 }
@@ -134,13 +203,15 @@ pub extern "C" fn shim_notify_register_dispatch(
 ///
 /// Registers a poll-only token. `notify_check` can later test if the
 /// notification was posted since the last check.
-pub extern "C" fn shim_notify_register_check(
-    name: u64, out_token: *mut i32,
-) -> u32 {
+pub extern "C" fn shim_notify_register_check(name: u64, out_token: *mut i32) -> u32 {
     let name_str = match extract_name(name) {
         Some(n) => n,
         None => {
-            if !out_token.is_null() { unsafe { *out_token = 0; } }
+            if !out_token.is_null() {
+                unsafe {
+                    *out_token = 0;
+                }
+            }
             return NOTIFY_STATUS_OK;
         }
     };
@@ -150,17 +221,22 @@ pub extern "C" fn shim_notify_register_check(
 
     let mut guard = registry();
     let map = guard.get_or_insert_with(HashMap::new);
-    map.insert(token, Registration {
-        name: name_str,
-        state: 0,
-        dirty: false,
-        has_handler: false,
-        queue: 0,
-        handler_block: 0,
-    });
+    map.insert(
+        token,
+        Registration {
+            name: name_str,
+            state: 0,
+            dirty: false,
+            has_handler: false,
+            queue: 0,
+            handler_block: 0,
+        },
+    );
 
     if !out_token.is_null() {
-        unsafe { *out_token = token; }
+        unsafe {
+            *out_token = token;
+        }
     }
     NOTIFY_STATUS_OK
 }
@@ -174,14 +250,18 @@ pub extern "C" fn shim_notify_check(token: i32, check: *mut i32) -> u32 {
     if let Some(map) = guard.as_mut() {
         if let Some(reg) = map.get_mut(&token) {
             if !check.is_null() {
-                unsafe { *check = if reg.dirty { 1 } else { 0 }; }
+                unsafe {
+                    *check = if reg.dirty { 1 } else { 0 };
+                }
             }
             reg.dirty = false; // clear after read
             return NOTIFY_STATUS_OK;
         }
     }
     if !check.is_null() {
-        unsafe { *check = 0; }
+        unsafe {
+            *check = 0;
+        }
     }
     NOTIFY_STATUS_INVALID_TOKEN
 }
@@ -192,13 +272,17 @@ pub extern "C" fn shim_notify_get_state(token: i32, state: *mut u64) -> u32 {
     if let Some(map) = guard.as_ref() {
         if let Some(reg) = map.get(&token) {
             if !state.is_null() {
-                unsafe { *state = reg.state; }
+                unsafe {
+                    *state = reg.state;
+                }
             }
             return NOTIFY_STATUS_OK;
         }
     }
     if !state.is_null() {
-        unsafe { *state = 0; }
+        unsafe {
+            *state = 0;
+        }
     }
     NOTIFY_STATUS_INVALID_TOKEN
 }
@@ -327,8 +411,14 @@ mod tests {
         let name = make_name("com.test.unique_tokens");
         let mut t1: i32 = 0;
         let mut t2: i32 = 0;
-        assert_eq!(shim_notify_register_check(name.as_ptr() as u64, &mut t1), NOTIFY_STATUS_OK);
-        assert_eq!(shim_notify_register_check(name.as_ptr() as u64, &mut t2), NOTIFY_STATUS_OK);
+        assert_eq!(
+            shim_notify_register_check(name.as_ptr() as u64, &mut t1),
+            NOTIFY_STATUS_OK
+        );
+        assert_eq!(
+            shim_notify_register_check(name.as_ptr() as u64, &mut t2),
+            NOTIFY_STATUS_OK
+        );
         assert_ne!(t1, t2);
         assert_ne!(t1, 0);
         shim_notify_cancel(t1);
@@ -465,6 +555,10 @@ mod tests {
     fn install_count() {
         let mut table = ShimTable::new();
         NotifyStubs::install(&mut table);
-        assert!(table.len() >= 13, "expected ≥13 notify stubs, got {}", table.len());
+        assert!(
+            table.len() >= 13,
+            "expected ≥13 notify stubs, got {}",
+            table.len()
+        );
     }
 }

@@ -38,11 +38,11 @@ unsafe fn get_regex(obj: u64) -> Option<&'static regex::Regex> {
 // ── Class methods ──────────────────────────────────────────────────
 
 /// NSRegularExpressionOptions bit masks (Apple NSRegularExpression.h)
-const OPT_CASE_INSENSITIVE:           u64 = 1 << 0; // 1
-const OPT_ALLOW_COMMENTS_WHITESPACE:  u64 = 1 << 1; // 2
-const OPT_IGNORE_METACHARACTERS:      u64 = 1 << 2; // 4
-const OPT_DOT_MATCHES_SEPARATORS:     u64 = 1 << 3; // 8
-const OPT_ANCHORS_MATCH_LINES:        u64 = 1 << 4; // 16
+const OPT_CASE_INSENSITIVE: u64 = 1 << 0; // 1
+const OPT_ALLOW_COMMENTS_WHITESPACE: u64 = 1 << 1; // 2
+const OPT_IGNORE_METACHARACTERS: u64 = 1 << 2; // 4
+const OPT_DOT_MATCHES_SEPARATORS: u64 = 1 << 3; // 8
+const OPT_ANCHORS_MATCH_LINES: u64 = 1 << 4; // 16
 
 /// Build a `regex`-crate pattern string from a raw pattern + NSRegularExpressionOptions.
 fn build_regex_pattern(raw_pat: &str, options: u64) -> String {
@@ -53,17 +53,25 @@ fn build_regex_pattern(raw_pat: &str, options: u64) -> String {
         raw_pat.to_string()
     };
 
-    let ci   = (options & OPT_CASE_INSENSITIVE)          != 0;
-    let x    = (options & OPT_ALLOW_COMMENTS_WHITESPACE) != 0;
-    let s    = (options & OPT_DOT_MATCHES_SEPARATORS)    != 0;
-    let m    = (options & OPT_ANCHORS_MATCH_LINES)        != 0;
+    let ci = (options & OPT_CASE_INSENSITIVE) != 0;
+    let x = (options & OPT_ALLOW_COMMENTS_WHITESPACE) != 0;
+    let s = (options & OPT_DOT_MATCHES_SEPARATORS) != 0;
+    let m = (options & OPT_ANCHORS_MATCH_LINES) != 0;
 
     if ci || x || s || m {
         let mut flags = String::from("(?");
-        if ci { flags.push('i'); }
-        if x  { flags.push('x'); }
-        if s  { flags.push('s'); }
-        if m  { flags.push('m'); }
+        if ci {
+            flags.push('i');
+        }
+        if x {
+            flags.push('x');
+        }
+        if s {
+            flags.push('s');
+        }
+        if m {
+            flags.push('m');
+        }
         flags.push(')');
         flags + &pat
     } else {
@@ -88,7 +96,9 @@ pub extern "C" fn shim_regex_with_pattern(
                     "NSCocoaErrorDomain",
                     2048, // NSFormattingError
                 );
-                unsafe { *(error_out as *mut u64) = err; }
+                unsafe {
+                    *(error_out as *mut u64) = err;
+                }
             }
             return 0;
         }
@@ -113,7 +123,9 @@ pub extern "C" fn shim_regex_with_pattern(
                     "NSCocoaErrorDomain",
                     2048, // NSFormattingError
                 );
-                unsafe { *(error_out as *mut u64) = err; }
+                unsafe {
+                    *(error_out as *mut u64) = err;
+                }
                 log::debug!("NSRegularExpression: invalid pattern: {}", e);
             }
             0
@@ -140,11 +152,10 @@ pub extern "C" fn shim_regex_init_with_pattern(
         Some(s) => s.to_string(),
         None => {
             if error_out != 0 {
-                let err = crate::nserror::make_nserror(
-                    "NSCocoaErrorDomain",
-                    2048,
-                );
-                unsafe { *(error_out as *mut u64) = err; }
+                let err = crate::nserror::make_nserror("NSCocoaErrorDomain", 2048);
+                unsafe {
+                    *(error_out as *mut u64) = err;
+                }
             }
             return 0;
         }
@@ -165,11 +176,10 @@ pub extern "C" fn shim_regex_init_with_pattern(
         }
         Err(e) => {
             if error_out != 0 {
-                let err = crate::nserror::make_nserror(
-                    "NSCocoaErrorDomain",
-                    2048,
-                );
-                unsafe { *(error_out as *mut u64) = err; }
+                let err = crate::nserror::make_nserror("NSCocoaErrorDomain", 2048);
+                unsafe {
+                    *(error_out as *mut u64) = err;
+                }
                 log::debug!("NSRegularExpression: invalid pattern: {}", e);
             }
             0
@@ -382,7 +392,11 @@ pub extern "C" fn shim_textcheckingresult_range(obj: u64, _cmd: u64) -> NSRange 
 }
 
 /// `-[NSTextCheckingResult rangeAtIndex:]` — returns NSRange for capture group i.
-pub extern "C" fn shim_textcheckingresult_range_at_index(obj: u64, _cmd: u64, index: u64) -> NSRange {
+pub extern "C" fn shim_textcheckingresult_range_at_index(
+    obj: u64,
+    _cmd: u64,
+    index: u64,
+) -> NSRange {
     if obj == 0 {
         return NSRange {
             location: u64::MAX,
@@ -475,8 +489,7 @@ pub extern "C" fn shim_nsregex_escaped_pattern_for_string(
     let mut escaped = String::with_capacity(s.len() + 8);
     for ch in s.chars() {
         match ch {
-            '.' | '*' | '+' | '?' | '^' | '$' | '{' | '}' | '(' | ')' | '[' | ']' | '|'
-            | '\\' => {
+            '.' | '*' | '+' | '?' | '^' | '$' | '{' | '}' | '(' | ')' | '[' | ']' | '|' | '\\' => {
                 escaped.push('\\');
                 escaped.push(ch);
             }
@@ -681,7 +694,10 @@ mod tests {
 
     #[test]
     fn replacement_string_nil_safety() {
-        assert_eq!(shim_nsregex_replacement_string_for_result(0, 0, 0, 0, 0, 0), 0);
+        assert_eq!(
+            shim_nsregex_replacement_string_for_result(0, 0, 0, 0, 0, 0),
+            0
+        );
     }
 
     #[test]

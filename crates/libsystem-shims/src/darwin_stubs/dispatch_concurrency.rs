@@ -11,6 +11,7 @@ use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
+use super::blocks_runtime::{invoke_block0, OwnedBlock};
 use crate::table::ShimTable;
 
 // ---------------------------------------------------------------------------
@@ -41,7 +42,7 @@ fn registry() -> &'static Mutex<HashMap<u64, Primitive>> {
 
 struct Group {
     count: AtomicI64,
-    notify: Mutex<Vec<(u64, u64)>>,
+    notify: Mutex<Vec<(u64, OwnedBlock)>>,
     condvar: Condvar,
     mutex: Mutex<()>,
 }
@@ -83,14 +84,13 @@ impl Semaphore {
 
 /// Invoke a GCD block.  The block layout puts the invoke function pointer
 /// at offset 16: `isa(8) + flags(4) + reserved(4) + invoke(8)`.
-unsafe fn invoke_block(block: u64) {
-    if block == 0 {
-        return;
-    }
-    let block_ptr = block as *const u8;
-    let invoke_ptr = unsafe { *(block_ptr.add(16) as *const usize) };
-    let invoke: extern "C" fn(*const u8) = unsafe { std::mem::transmute(invoke_ptr) };
-    invoke(block_ptr);
+fn queue_block_async(queue: u64, block: OwnedBlock) {
+    super::dispatch_queue::queue_async(
+        queue,
+        Box::new(move || {
+            unsafe { invoke_block0(block.addr()) };
+        }),
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -129,16 +129,12 @@ extern "C" fn shim_dispatch_group_leave(group: u64) {
         // Count just reached 0 — wake waiters and fire notify blocks.
         g.condvar.notify_all();
 
-        let pending: Vec<(u64, u64)> = {
+        let pending: Vec<(u64, OwnedBlock)> = {
             let mut notify = g.notify.lock().unwrap();
             std::mem::take(&mut *notify)
         };
         for (queue, block) in pending {
-            let block_val = block;
-            super::dispatch_queue::queue_async(queue, Box::new(move || {
-                // SAFETY: caller guaranteed valid block layout.
-                unsafe { invoke_block(block_val) };
-            }));
+            queue_block_async(queue, block);
         }
     }
 }
@@ -188,6 +184,9 @@ extern "C" fn shim_dispatch_group_wait(group: u64, timeout: u64) -> i64 {
 }
 
 extern "C" fn shim_dispatch_group_notify(group: u64, queue: u64, block: u64) {
+    let Some(block) = OwnedBlock::from_block(block) else {
+        return;
+    };
     let g = {
         let reg = registry().lock().unwrap();
         match reg.get(&group) {
@@ -198,23 +197,25 @@ extern "C" fn shim_dispatch_group_notify(group: u64, queue: u64, block: u64) {
 
     if g.count.load(Ordering::Acquire) == 0 {
         // Already done — fire immediately.
-        super::dispatch_queue::queue_async(queue, Box::new(move || {
-            // SAFETY: caller guaranteed valid block layout.
-            unsafe { invoke_block(block) };
-        }));
+        queue_block_async(queue, block);
     } else {
         g.notify.lock().unwrap().push((queue, block));
     }
 }
 
 extern "C" fn shim_dispatch_group_async(group: u64, queue: u64, block: u64) {
+    let Some(block) = OwnedBlock::from_block(block) else {
+        return;
+    };
     // Enter before submitting so the group count is incremented synchronously.
     shim_dispatch_group_enter(group);
-    super::dispatch_queue::queue_async(queue, Box::new(move || {
-        // SAFETY: caller guaranteed valid block layout.
-        unsafe { invoke_block(block) };
-        shim_dispatch_group_leave(group);
-    }));
+    super::dispatch_queue::queue_async(
+        queue,
+        Box::new(move || {
+            unsafe { invoke_block0(block.addr()) };
+            shim_dispatch_group_leave(group);
+        }),
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -305,16 +306,53 @@ pub struct DispatchConcurrencyStubs;
 impl DispatchConcurrencyStubs {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
-        register_shims!(table,
-            ("_dispatch_group_create", shim_dispatch_group_create as *const () as u64, "dispatch_group_create (real)"),
-            ("_dispatch_group_enter", shim_dispatch_group_enter as *const () as u64, "dispatch_group_enter (real)"),
-            ("_dispatch_group_leave", shim_dispatch_group_leave as *const () as u64, "dispatch_group_leave (real)"),
-            ("_dispatch_group_wait", shim_dispatch_group_wait as *const () as u64, "dispatch_group_wait (real)"),
-            ("_dispatch_group_notify", shim_dispatch_group_notify as *const () as u64, "dispatch_group_notify (real)"),
-            ("_dispatch_group_async", shim_dispatch_group_async as *const () as u64, "dispatch_group_async (real)"),
-            ("_dispatch_semaphore_create", shim_dispatch_semaphore_create as *const () as u64, "dispatch_semaphore_create (real)"),
-            ("_dispatch_semaphore_wait", shim_dispatch_semaphore_wait as *const () as u64, "dispatch_semaphore_wait (real)"),
-            ("_dispatch_semaphore_signal", shim_dispatch_semaphore_signal as *const () as u64, "dispatch_semaphore_signal (real)"),
+        register_shims!(
+            table,
+            (
+                "_dispatch_group_create",
+                shim_dispatch_group_create as *const () as u64,
+                "dispatch_group_create (real)"
+            ),
+            (
+                "_dispatch_group_enter",
+                shim_dispatch_group_enter as *const () as u64,
+                "dispatch_group_enter (real)"
+            ),
+            (
+                "_dispatch_group_leave",
+                shim_dispatch_group_leave as *const () as u64,
+                "dispatch_group_leave (real)"
+            ),
+            (
+                "_dispatch_group_wait",
+                shim_dispatch_group_wait as *const () as u64,
+                "dispatch_group_wait (real)"
+            ),
+            (
+                "_dispatch_group_notify",
+                shim_dispatch_group_notify as *const () as u64,
+                "dispatch_group_notify (real)"
+            ),
+            (
+                "_dispatch_group_async",
+                shim_dispatch_group_async as *const () as u64,
+                "dispatch_group_async (real)"
+            ),
+            (
+                "_dispatch_semaphore_create",
+                shim_dispatch_semaphore_create as *const () as u64,
+                "dispatch_semaphore_create (real)"
+            ),
+            (
+                "_dispatch_semaphore_wait",
+                shim_dispatch_semaphore_wait as *const () as u64,
+                "dispatch_semaphore_wait (real)"
+            ),
+            (
+                "_dispatch_semaphore_signal",
+                shim_dispatch_semaphore_signal as *const () as u64,
+                "dispatch_semaphore_signal (real)"
+            ),
         );
         log::debug!("DispatchConcurrencyStubs: registered 9 stubs");
     }

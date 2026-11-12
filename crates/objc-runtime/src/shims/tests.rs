@@ -88,7 +88,9 @@ fn objc_shims_registered() {
     assert!(table.resolve("_objc_allocateProtocol").is_some());
     assert!(table.resolve("_objc_registerProtocol").is_some());
     assert!(table.resolve("_class_addProtocol").is_some());
-    assert!(table.resolve("_protocol_copyMethodDescriptionList").is_some());
+    assert!(table
+        .resolve("_protocol_copyMethodDescriptionList")
+        .is_some());
     assert!(table.resolve("_protocol_getMethodDescription").is_some());
     assert!(table.resolve("_protocol_copyPropertyList").is_some());
     assert!(table.resolve("_protocol_getProperty").is_some());

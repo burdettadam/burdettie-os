@@ -7,7 +7,6 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DiagEvent {
     // ── Selector dispatch failures ─────────────────────────────────
-
     /// A selector was not found on any class in the hierarchy.
     SelectorMissing {
         selector: String,
@@ -30,47 +29,29 @@ pub enum DiagEvent {
     },
 
     // ── Class lookup failures ──────────────────────────────────────
-
     /// `objc_getClass` could not find a class by name.
-    ClassMissing {
-        name: String,
-    },
+    ClassMissing { name: String },
 
     /// `class_createInstance` given an unknown class address.
-    ClassAddrUnknown {
-        addr: u64,
-    },
+    ClassAddrUnknown { addr: u64 },
 
     /// `objc_msgSendSuper2` was given an unknown class address.
-    Super2UnknownClass {
-        current_class: u64,
-    },
+    Super2UnknownClass { current_class: u64 },
 
     /// A category targets a class that is not registered.
-    CategoryOrphan {
-        class_addr: u64,
-    },
+    CategoryOrphan { class_addr: u64 },
 
     // ── Symbol resolution failures ─────────────────────────────────
-
     /// A symbol was blocked by the safe-list policy.
-    SymbolBlocked {
-        name: String,
-    },
+    SymbolBlocked { name: String },
 
     /// A symbol was not found by the host resolver (dlsym returned null).
-    SymbolMissing {
-        name: String,
-    },
+    SymbolMissing { name: String },
 
     /// A chained-fixup bind could not be resolved (non-weak).
-    BindFailed {
-        ordinal: usize,
-        symbol: String,
-    },
+    BindFailed { ordinal: usize, symbol: String },
 
     // ── Host fallback paths ────────────────────────────────────────
-
     /// Dispatch hit a tagged/unaligned pointer — forwarded to host semantics.
     HostFallback {
         reason: String,
@@ -86,7 +67,6 @@ pub enum DiagEvent {
     },
 
     // ── Method dispatch tracing (verbose / opt-in) ─────────────────
-
     /// A method was successfully dispatched.
     MethodDispatch {
         selector: String,
@@ -95,12 +75,8 @@ pub enum DiagEvent {
     },
 
     // ── Resource-request graph ─────────────────────────────────────
-
     /// A resource (dylib, image, symbol) was requested.
-    ResourceRequest {
-        kind: String,
-        name: String,
-    },
+    ResourceRequest { kind: String, name: String },
 
     /// A resource request was successfully resolved.
     ResourceResolved {
@@ -120,14 +96,32 @@ pub enum DiagEvent {
 impl std::fmt::Display for DiagEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DiagEvent::SelectorMissing { selector, class_name, receiver } => {
-                write!(f, "selector missing: -[{class_name} {selector}] (receiver {receiver:#x})")
+            DiagEvent::SelectorMissing {
+                selector,
+                class_name,
+                receiver,
+            } => {
+                write!(
+                    f,
+                    "selector missing: -[{class_name} {selector}] (receiver {receiver:#x})"
+                )
             }
-            DiagEvent::SuperSelectorMissing { selector, receiver, super_class } => {
+            DiagEvent::SuperSelectorMissing {
+                selector,
+                receiver,
+                super_class,
+            } => {
                 write!(f, "super selector missing: [{selector}] on {receiver:#x} (super={super_class:#x})")
             }
-            DiagEvent::ForwardingEntered { selector, receiver, isa } => {
-                write!(f, "forwarding: [{selector}] on {receiver:#x} (isa={isa:#x})")
+            DiagEvent::ForwardingEntered {
+                selector,
+                receiver,
+                isa,
+            } => {
+                write!(
+                    f,
+                    "forwarding: [{selector}] on {receiver:#x} (isa={isa:#x})"
+                )
             }
             DiagEvent::ClassMissing { name } => {
                 write!(f, "class missing: '{name}'")
@@ -150,10 +144,18 @@ impl std::fmt::Display for DiagEvent {
             DiagEvent::BindFailed { ordinal, symbol } => {
                 write!(f, "bind failed: ordinal {ordinal} '{symbol}'")
             }
-            DiagEvent::HostFallback { reason, selector, receiver } => {
+            DiagEvent::HostFallback {
+                reason,
+                selector,
+                receiver,
+            } => {
                 write!(f, "host fallback ({reason}): [{selector}] on {receiver:#x}")
             }
-            DiagEvent::UnknownIsa { isa, selector, receiver } => {
+            DiagEvent::UnknownIsa {
+                isa,
+                selector,
+                receiver,
+            } => {
                 write!(f, "unknown ISA {isa:#x}: [{selector}] on {receiver:#x}")
             }
             DiagEvent::MethodDispatch { selector, isa, imp } => {

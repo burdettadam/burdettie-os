@@ -21,7 +21,7 @@ const FLAGS_OFF: usize = 24;
 const TITLES_PTR_OFF: usize = 32;
 pub(crate) const SEGMENTED_CONTROL_SIZE: usize = 80;
 
-const FLAG_TRACKING_MODE: u64 = 1 << 0;  // 0 = select-one, 1 = select-any
+const FLAG_TRACKING_MODE: u64 = 1 << 0; // 0 = select-one, 1 = select-any
 const FLAG_MOMENTARY: u64 = 1 << 1;
 
 fn read_u64(obj: u64, offset: usize) -> u64 {
@@ -145,11 +145,7 @@ pub extern "C" fn shim_nssegmentedcontrol_set_selected_for_segment(
 }
 
 /// `-[NSSegmentedControl labelForSegment:]`
-pub extern "C" fn shim_nssegmentedcontrol_label_for_segment(
-    obj: u64,
-    _cmd: u64,
-    seg: i64,
-) -> u64 {
+pub extern "C" fn shim_nssegmentedcontrol_label_for_segment(obj: u64, _cmd: u64, seg: i64) -> u64 {
     if obj == 0 {
         return 0;
     }
@@ -210,13 +206,26 @@ pub extern "C" fn shim_nssegmentedcontrol_set_momentary(obj: u64, _cmd: u64, val
 }
 
 /// `-[NSSegmentedControl drawRect:]` — renders segments.
-pub extern "C" fn shim_nssegmentedcontrol_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64) {
-    if obj == 0 { return; }
+pub extern "C" fn shim_nssegmentedcontrol_draw_rect(
+    obj: u64,
+    _cmd: u64,
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
+) {
+    if obj == 0 {
+        return;
+    }
     let cg_ctx = crate::nsgraphicscontext::current_cg_context_handle();
-    if cg_ctx == 0 { return; }
+    if cg_ctx == 0 {
+        return;
+    }
 
     let count = read_u64(obj, SEGMENT_COUNT_OFF) as usize;
-    if count == 0 { return; }
+    if count == 0 {
+        return;
+    }
     let selected = read_i64(obj, SELECTED_SEGMENT_OFF);
     let seg_w = w / count as f64;
 
@@ -243,7 +252,9 @@ pub extern "C" fn shim_nssegmentedcontrol_draw_rect(obj: u64, _cmd: u64, x: f64,
         if label != 0 {
             let utf8 = crate::cfstring::shim_nsstring_utf8string(label, 0);
             if !utf8.is_null() {
-                let text = unsafe { std::ffi::CStr::from_ptr(utf8) }.to_str().unwrap_or("");
+                let text = unsafe { std::ffi::CStr::from_ptr(utf8) }
+                    .to_str()
+                    .unwrap_or("");
                 if !text.is_empty() {
                     cg_shims::bridge::with_context(cg_ctx, |c| {
                         c.fill_color = if is_selected {
@@ -286,10 +297,14 @@ pub extern "C" fn shim_nssegmentedcontrol_set_action(obj: u64, _cmd: u64, sel: u
 
 /// `-[NSSegmentedControl mouseDown:]` — select segment under click, fire action.
 pub extern "C" fn shim_nssegmentedcontrol_mouse_down(obj: u64, _cmd: u64, event: u64) {
-    if obj == 0 || event == 0 { return; }
+    if obj == 0 || event == 0 {
+        return;
+    }
 
     let count = read_u64(obj, SEGMENT_COUNT_OFF) as usize;
-    if count == 0 { return; }
+    if count == 0 {
+        return;
+    }
 
     let (loc_x, _loc_y) = crate::nsevent::event_location_in_window(event);
     let frame = crate::nsview::view_frame(obj);
@@ -305,7 +320,7 @@ pub extern "C" fn shim_nssegmentedcontrol_mouse_down(obj: u64, _cmd: u64, event:
     let action = read_u64(obj, ACTION_OFF);
     let target = read_u64(obj, TARGET_OFF);
     if action != 0 {
-        let nsapp = crate::nsapplication::nsapp_global_addr();
+        let nsapp = crate::nsapplication::shim_nsapplication_shared_application(0, 0);
         crate::nsapplication::shim_nsapplication_send_action_to_from(nsapp, 0, action, target, obj);
     }
 
@@ -335,14 +350,14 @@ mod tests {
     #[test]
     fn segment_count_and_selection() {
         let seg = alloc_obj(SEGMENTED_CONTROL_SIZE, 0xDEAD);
-        
+
         // Set 3 segments
         shim_nssegmentedcontrol_set_segment_count(seg, 0, 3);
         assert_eq!(shim_nssegmentedcontrol_segment_count(seg, 0), 3);
-        
+
         // Initially -1
         assert_eq!(shim_nssegmentedcontrol_selected_segment(seg, 0), -1);
-        
+
         free_obj(seg);
     }
 
@@ -350,12 +365,18 @@ mod tests {
     fn select_segment() {
         let seg = alloc_obj(SEGMENTED_CONTROL_SIZE, 0xDEAD);
         shim_nssegmentedcontrol_set_segment_count(seg, 0, 3);
-        
+
         shim_nssegmentedcontrol_set_selected_segment(seg, 0, 1);
         assert_eq!(shim_nssegmentedcontrol_selected_segment(seg, 0), 1);
-        assert_eq!(shim_nssegmentedcontrol_is_selected_for_segment(seg, 0, 1), 1);
-        assert_eq!(shim_nssegmentedcontrol_is_selected_for_segment(seg, 0, 0), 0);
-        
+        assert_eq!(
+            shim_nssegmentedcontrol_is_selected_for_segment(seg, 0, 1),
+            1
+        );
+        assert_eq!(
+            shim_nssegmentedcontrol_is_selected_for_segment(seg, 0, 0),
+            0
+        );
+
         free_obj(seg);
     }
 
@@ -363,15 +384,15 @@ mod tests {
     fn set_selected_flag_behavior() {
         let seg = alloc_obj(SEGMENTED_CONTROL_SIZE, 0xDEAD);
         shim_nssegmentedcontrol_set_segment_count(seg, 0, 3);
-        
+
         // Set selected flag for segment 2
         shim_nssegmentedcontrol_set_selected_for_segment(seg, 0, 1, 2);
         assert_eq!(shim_nssegmentedcontrol_selected_segment(seg, 0), 2);
-        
+
         // Clear selected flag for any segment
         shim_nssegmentedcontrol_set_selected_for_segment(seg, 0, 0, 99);
         assert_eq!(shim_nssegmentedcontrol_selected_segment(seg, 0), -1);
-        
+
         free_obj(seg);
     }
 
@@ -379,66 +400,66 @@ mod tests {
     fn label_round_trip() {
         let seg = alloc_obj(SEGMENTED_CONTROL_SIZE, 0xDEAD);
         shim_nssegmentedcontrol_set_segment_count(seg, 0, 2);
-        
+
         let label1 = make_string("Option 1");
         let label2 = make_string("Option 2");
-        
+
         shim_nssegmentedcontrol_set_label_for_segment(seg, 0, label1, 0);
         shim_nssegmentedcontrol_set_label_for_segment(seg, 0, label2, 1);
-        
+
         assert_eq!(shim_nssegmentedcontrol_label_for_segment(seg, 0, 0), label1);
         assert_eq!(shim_nssegmentedcontrol_label_for_segment(seg, 0, 1), label2);
-        
+
         free_obj(seg);
     }
 
     #[test]
     fn tracking_mode_flag() {
         let seg = alloc_obj(SEGMENTED_CONTROL_SIZE, 0xDEAD);
-        
+
         // Default mode is 0 (select-one)
         assert_eq!(shim_nssegmentedcontrol_tracking_mode(seg, 0), 0);
-        
+
         // Set to select-any mode (1)
         shim_nssegmentedcontrol_set_tracking_mode(seg, 0, 1);
         assert_eq!(shim_nssegmentedcontrol_tracking_mode(seg, 0), 1);
-        
+
         // Set back to select-one (0)
         shim_nssegmentedcontrol_set_tracking_mode(seg, 0, 0);
         assert_eq!(shim_nssegmentedcontrol_tracking_mode(seg, 0), 0);
-        
+
         free_obj(seg);
     }
 
     #[test]
     fn momentary_flag() {
         let seg = alloc_obj(SEGMENTED_CONTROL_SIZE, 0xDEAD);
-        
+
         assert_eq!(shim_nssegmentedcontrol_is_momentary(seg, 0), 0);
-        
+
         shim_nssegmentedcontrol_set_momentary(seg, 0, 1);
         assert_eq!(shim_nssegmentedcontrol_is_momentary(seg, 0), 1);
-        
+
         shim_nssegmentedcontrol_set_momentary(seg, 0, 0);
         assert_eq!(shim_nssegmentedcontrol_is_momentary(seg, 0), 0);
-        
+
         free_obj(seg);
     }
 
     #[test]
     fn flags_independent() {
         let seg = alloc_obj(SEGMENTED_CONTROL_SIZE, 0xDEAD);
-        
+
         shim_nssegmentedcontrol_set_tracking_mode(seg, 0, 1);
         shim_nssegmentedcontrol_set_momentary(seg, 0, 1);
-        
+
         assert_eq!(shim_nssegmentedcontrol_tracking_mode(seg, 0), 1);
         assert_eq!(shim_nssegmentedcontrol_is_momentary(seg, 0), 1);
-        
+
         shim_nssegmentedcontrol_set_tracking_mode(seg, 0, 0);
         assert_eq!(shim_nssegmentedcontrol_tracking_mode(seg, 0), 0);
         assert_eq!(shim_nssegmentedcontrol_is_momentary(seg, 0), 1);
-        
+
         free_obj(seg);
     }
 

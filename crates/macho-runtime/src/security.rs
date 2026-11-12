@@ -18,9 +18,8 @@ pub(crate) fn evaluate_security(
 
     // Reject encrypted binaries
     for cmd in &parsed.commands {
-        if let macho_types::load_command::LoadCommandPayload::EncryptionInfo {
-            crypt_id, ..
-        } = &cmd.payload
+        if let macho_types::load_command::LoadCommandPayload::EncryptionInfo { crypt_id, .. } =
+            &cmd.payload
         {
             if *crypt_id != 0 {
                 return Err(RuntimeError::EncryptedBinary {

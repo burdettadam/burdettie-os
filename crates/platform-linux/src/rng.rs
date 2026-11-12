@@ -13,8 +13,7 @@ impl Rng for LinuxRng {
 #[cfg(target_os = "linux")]
 fn fill_random(buf: &mut [u8]) {
     // getrandom(2) — available since Linux 3.17
-    let ret =
-        unsafe { libc::getrandom(buf.as_mut_ptr() as *mut libc::c_void, buf.len(), 0) };
+    let ret = unsafe { libc::getrandom(buf.as_mut_ptr() as *mut libc::c_void, buf.len(), 0) };
     if ret < 0 || (ret as usize) < buf.len() {
         // Fallback: read from /dev/urandom
         fallback_urandom(buf);

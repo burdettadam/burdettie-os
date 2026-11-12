@@ -4,13 +4,17 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use libsystem_shims::ShimConfig;
-use macho_exec::{ImageRegistry, StubResolver, DataSymbolStore};
+use macho_exec::{DataSymbolStore, ImageRegistry, StubResolver};
 use macho_parse::ParsedMachO;
 
 use crate::config::RuntimeConfig;
 use crate::context::RuntimeContext;
 use crate::error::RuntimeError;
 use crate::parse_cache::{insert_both, lookup};
+use crate::platform_adapters::{
+    ProviderAllocator, ProviderHasher, ProviderHostSymbols, ProviderThreading,
+    ProviderUnwindRegistry,
+};
 use crate::tracer::{EventKind, RuntimeTracer};
 use crate::{loader, security};
 
@@ -24,16 +28,9 @@ impl Loader<Parsed> {
     /// Results are cached per binary path: subsequent calls for the same
     /// path skip file I/O and re-parsing, returning Arc clones instead.
     pub fn parse(binary_path: &Path, config: RuntimeConfig) -> Result<Self, RuntimeError> {
-        #[cfg(target_os = "macos")]
-        macho_parse::set_platform_hasher(Arc::new(platform_darwin_host::DarwinHasher));
-        #[cfg(target_os = "linux")]
-        macho_parse::set_platform_hasher(Arc::new(platform_linux::LinuxHasher));
-
         let mut config = config;
-        let tracer = config
-            .tracer
-            .take()
-            .unwrap_or_else(RuntimeTracer::disabled);
+        macho_parse::set_platform_hasher(Arc::new(ProviderHasher::new(config.platform.clone())));
+        let tracer = config.tracer.take().unwrap_or_else(RuntimeTracer::disabled);
 
         // Fast path: try raw path first (no realpath syscall), then canonical.
         if let Some((main_data, parsed)) = lookup(binary_path) {
@@ -95,7 +92,9 @@ impl Loader<Parsed> {
         };
         let parsed: Arc<ParsedMachO> = Arc::new(parsed_result);
 
-        let canonical = binary_path.canonicalize().unwrap_or_else(|_| binary_path.to_path_buf());
+        let canonical = binary_path
+            .canonicalize()
+            .unwrap_or_else(|_| binary_path.to_path_buf());
         insert_both(binary_path, canonical, main_data.clone(), parsed.clone());
 
         Ok(Loader {
@@ -171,30 +170,25 @@ impl Loader<Checked> {
         inner
             .tracer
             .record_perf_timing("map_images", "shim_setup_us", shim_setup_time);
-        inner
-            .tracer
-            .record_perf_counter("map_images", "shims_installed", ctx.shim_table.len() as u64);
+        inner.tracer.record_perf_counter(
+            "map_images",
+            "shims_installed",
+            ctx.shim_table.len() as u64,
+        );
 
         // Host symbol resolver
         let host_setup_start = Instant::now();
-        #[cfg(target_os = "macos")]
         let host_symbols: Arc<dyn platform_core::symbols::HostSymbolResolver> =
-            Arc::new(platform_darwin_host::DarwinSymbolResolver::new());
-        #[cfg(target_os = "linux")]
-        let host_symbols: Arc<dyn platform_core::symbols::HostSymbolResolver> =
-            Arc::new(platform_linux::LinuxSymbolResolver::new());
+            Arc::new(ProviderHostSymbols::new(inner.config.platform.clone()));
 
         objc_runtime::set_host_symbols(host_symbols.clone());
 
-        #[cfg(target_os = "macos")]
-        objc_runtime::set_allocator(Arc::new(platform_darwin_host::DarwinAllocator));
-        #[cfg(target_os = "linux")]
-        objc_runtime::set_allocator(Arc::new(platform_linux::LinuxAllocator));
-
-        #[cfg(target_os = "macos")]
-        objc_runtime::set_threading(Arc::new(platform_darwin_host::PosixThreading));
-        #[cfg(target_os = "linux")]
-        objc_runtime::set_threading(Arc::new(platform_linux::LinuxThreading));
+        objc_runtime::set_allocator(Arc::new(ProviderAllocator::new(
+            inner.config.platform.clone(),
+        )));
+        objc_runtime::set_threading(Arc::new(ProviderThreading::new(
+            inner.config.platform.clone(),
+        )));
 
         let host_setup_time = host_setup_start.elapsed();
         inner
@@ -212,15 +206,10 @@ impl Loader<Checked> {
         );
 
         // Create ImageRegistry and load all images
-        #[cfg(target_os = "macos")]
         let unwind_registry: Arc<dyn platform_core::unwind::UnwindRegistry> =
-            Arc::new(platform_darwin_host::DarwinUnwindRegistry);
-        #[cfg(target_os = "linux")]
-        let unwind_registry: Arc<dyn platform_core::unwind::UnwindRegistry> =
-            Arc::new(platform_linux::LinuxUnwindRegistry::new());
+            Arc::new(ProviderUnwindRegistry::new(inner.config.platform.clone()));
 
-        let mut registry =
-            ImageRegistry::new(inner.config.platform.memory(), unwind_registry);
+        let mut registry = ImageRegistry::new(inner.config.platform.memory(), unwind_registry);
         let binary_dir = inner.binary_path.parent().unwrap_or(Path::new("."));
         let dep_stats = loader::load_dependencies(
             &inner.parsed,
@@ -239,9 +228,11 @@ impl Loader<Checked> {
         inner
             .tracer
             .record_perf_timing("map_images", "main_image_load_us", main_load_time);
-        inner
-            .tracer
-            .record_perf_counter("map_images", "mapped_images_total", registry.images().len() as u64);
+        inner.tracer.record_perf_counter(
+            "map_images",
+            "mapped_images_total",
+            registry.images().len() as u64,
+        );
 
         for loaded in registry.images() {
             inner.tracer.record(
@@ -273,4 +264,3 @@ impl Loader<Checked> {
         })
     }
 }
-

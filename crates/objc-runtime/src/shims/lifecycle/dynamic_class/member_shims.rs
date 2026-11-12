@@ -2,7 +2,7 @@ use std::ffi::{c_char, CStr};
 
 use crate::class::{IvarEntry, PropertyEntry, OBJC_RUNTIME};
 
-use super::{STAGED_CLASSES, StagedClassInit};
+use super::{StagedClassInit, STAGED_CLASSES};
 
 // ── class_addIvar / class_addProperty ─────────────────────────────
 
@@ -21,23 +21,17 @@ pub extern "C" fn shim_class_add_ivar(
     if cls == 0 || name.is_null() {
         return 0;
     }
-    let name_str = unsafe { CStr::from_ptr(name) }
-        .to_str()
-        .unwrap_or("");
+    let name_str = unsafe { CStr::from_ptr(name) }.to_str().unwrap_or("");
     if name_str.is_empty() {
         return 0;
     }
     let type_str = if types.is_null() {
         ""
     } else {
-        unsafe { CStr::from_ptr(types) }
-            .to_str()
-            .unwrap_or("")
+        unsafe { CStr::from_ptr(types) }.to_str().unwrap_or("")
     };
 
-    let mut staged = STAGED_CLASSES
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
+    let mut staged = STAGED_CLASSES.lock().unwrap_or_else(|e| e.into_inner());
 
     let Some(pair) = staged.get_mut(&cls) else {
         // Not staged — refuse (Apple semantics: can't add ivars after registration)
@@ -76,18 +70,14 @@ pub extern "C" fn shim_class_add_property(
     if cls == 0 || name.is_null() {
         return 0;
     }
-    let name_str = unsafe { CStr::from_ptr(name) }
-        .to_str()
-        .unwrap_or("");
+    let name_str = unsafe { CStr::from_ptr(name) }.to_str().unwrap_or("");
     if name_str.is_empty() {
         return 0;
     }
 
     // Try staged classes first.
     {
-        let mut staged = STAGED_CLASSES
-            .lock()
-            .unwrap_or_else(|e| e.into_inner());
+        let mut staged = STAGED_CLASSES.lock().unwrap_or_else(|e| e.into_inner());
         if let Some(pair) = staged.get_mut(&cls) {
             if pair.class.properties.iter().any(|p| p.name == name_str) {
                 return 0;
@@ -142,7 +132,10 @@ mod tests {
 
     #[test]
     fn add_ivar_null_name() {
-        assert_eq!(shim_class_add_ivar(0x1234, ptr::null(), 8, 3, ptr::null()), 0);
+        assert_eq!(
+            shim_class_add_ivar(0x1234, ptr::null(), 8, 3, ptr::null()),
+            0
+        );
     }
 
     #[test]
@@ -167,9 +160,15 @@ mod tests {
 
         let ivar_name = CString::new("_dup").unwrap();
         let types = CString::new("i").unwrap();
-        assert_eq!(shim_class_add_ivar(cls, ivar_name.as_ptr(), 4, 2, types.as_ptr()), 1);
+        assert_eq!(
+            shim_class_add_ivar(cls, ivar_name.as_ptr(), 4, 2, types.as_ptr()),
+            1
+        );
         // Second add with the same name must fail.
-        assert_eq!(shim_class_add_ivar(cls, ivar_name.as_ptr(), 4, 2, types.as_ptr()), 0);
+        assert_eq!(
+            shim_class_add_ivar(cls, ivar_name.as_ptr(), 4, 2, types.as_ptr()),
+            0
+        );
     }
 
     #[test]

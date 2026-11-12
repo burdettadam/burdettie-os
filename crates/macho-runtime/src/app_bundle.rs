@@ -78,7 +78,8 @@ mod tests {
 
     #[test]
     fn parse_cf_bundle_executable_valid() {
-        let plist = r#"<plist><dict><key>CFBundleExecutable</key><string>MyApp</string></dict></plist>"#;
+        let plist =
+            r#"<plist><dict><key>CFBundleExecutable</key><string>MyApp</string></dict></plist>"#;
         assert_eq!(parse_cf_bundle_executable(plist), Some("MyApp".to_string()));
     }
 
@@ -90,7 +91,8 @@ mod tests {
 
     #[test]
     fn parse_cf_bundle_executable_empty_string() {
-        let plist = r#"<plist><dict><key>CFBundleExecutable</key><string>  </string></dict></plist>"#;
+        let plist =
+            r#"<plist><dict><key>CFBundleExecutable</key><string>  </string></dict></plist>"#;
         // Trimmed empty should return None
         assert!(parse_cf_bundle_executable(plist).is_none());
     }

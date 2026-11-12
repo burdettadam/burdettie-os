@@ -1,5 +1,5 @@
-use super::*;
 use super::helpers::{dict_keys, dict_vals, make_nsdictionary};
+use super::*;
 use crate::cfstring;
 use crate::nsarray;
 use crate::nsobj;
@@ -137,13 +137,8 @@ fn all_keys_returns_nsarray() {
 
 #[test]
 fn empty_dictionary() {
-    let dict = shim_nsdictionary_with_objects_for_keys_count(
-        nsobj::nsdictionary_class_addr(),
-        0,
-        0,
-        0,
-        0,
-    );
+    let dict =
+        shim_nsdictionary_with_objects_for_keys_count(nsobj::nsdictionary_class_addr(), 0, 0, 0, 0);
     assert_ne!(dict, 0);
     assert_eq!(shim_nsdictionary_count(dict, 0), 0);
     assert_eq!(shim_nsdictionary_object_for_key(dict, 0, 42), 0);
@@ -229,7 +224,10 @@ fn keyed_subscript_miss() {
     let dict = make_nsdictionary(&[k], &[v]);
 
     let lookup = make_string("zzz");
-    assert_eq!(shim_nsdictionary_object_for_keyed_subscript(dict, 0, lookup), 0);
+    assert_eq!(
+        shim_nsdictionary_object_for_keyed_subscript(dict, 0, lookup),
+        0
+    );
 
     free_obj(dict);
 }
@@ -270,7 +268,10 @@ fn copy_returns_self_for_immutable_dictionary() {
 
     let copy = shim_nsdictionary_copy(dict, 0);
     assert_eq!(copy, dict);
-    assert_eq!(objc_runtime::shim_nsobject_retain_count(dict, 0), before + 1);
+    assert_eq!(
+        objc_runtime::shim_nsobject_retain_count(dict, 0),
+        before + 1
+    );
 
     let keys = dict_keys(dict);
     let vals = dict_vals(dict);
@@ -328,7 +329,10 @@ fn constant_dictionary_mutable_copy_clones_entries() {
     let copy = shim_nsdictionary_mutable_copy(dict, 0);
     assert_ne!(copy, 0);
     assert_eq!(read_field(copy, 0), nsobj::nsmutabledictionary_class_addr());
-    assert_string_eq(shim_nsdictionary_object_for_key(copy, 0, make_string("k")), "v");
+    assert_string_eq(
+        shim_nsdictionary_object_for_key(copy, 0, make_string("k")),
+        "v",
+    );
 
     free_dictionary(dict);
     free_dictionary(copy);
@@ -514,7 +518,8 @@ fn dictionary_with_contents_of_url_error_reads_plist() {
     .unwrap();
 
     let path = make_string(plist_path.to_string_lossy().as_ref());
-    let url = crate::nsurl::shim_nsurl_file_url_with_path(crate::nsobj::nsurl_class_addr(), 0, path);
+    let url =
+        crate::nsurl::shim_nsurl_file_url_with_path(crate::nsobj::nsurl_class_addr(), 0, path);
     let mut error = 99u64;
     let dict = shim_nsdictionary_with_contents_of_url_error(
         nsobj::nsdictionary_class_addr(),
@@ -538,12 +543,7 @@ fn dictionary_with_contents_of_url_error_reads_plist() {
 fn dict_with_object_for_key_creates_single_entry() {
     let k = make_cfstring("name");
     let v = make_cfstring("Alice");
-    let dict = shim_nsdictionary_with_object_for_key(
-        nsobj::nsdictionary_class_addr(),
-        0,
-        v,
-        k,
-    );
+    let dict = shim_nsdictionary_with_object_for_key(nsobj::nsdictionary_class_addr(), 0, v, k);
     assert_ne!(dict, 0);
     assert_eq!(shim_nsdictionary_count(dict, 0), 1);
     let lookup = make_cfstring("name");
@@ -563,11 +563,7 @@ fn dict_with_dictionary_copies_source() {
     let v2 = make_cfstring("2");
     let source = make_nsdictionary(&[k1, k2], &[v1, v2]);
 
-    let copy = shim_nsdictionary_with_dictionary(
-        nsobj::nsdictionary_class_addr(),
-        0,
-        source,
-    );
+    let copy = shim_nsdictionary_with_dictionary(nsobj::nsdictionary_class_addr(), 0, source);
     assert_ne!(copy, 0);
     assert_ne!(copy, source);
     assert_eq!(shim_nsdictionary_count(copy, 0), 2);
@@ -581,11 +577,7 @@ fn dict_with_dictionary_copies_source() {
 
 #[test]
 fn dict_with_dictionary_nil_source_returns_empty() {
-    let dict = shim_nsdictionary_with_dictionary(
-        nsobj::nsdictionary_class_addr(),
-        0,
-        0,
-    );
+    let dict = shim_nsdictionary_with_dictionary(nsobj::nsdictionary_class_addr(), 0, 0);
     assert_ne!(dict, 0);
     assert_eq!(shim_nsdictionary_count(dict, 0), 0);
     free_obj(dict);
@@ -675,7 +667,10 @@ fn write_to_file_returns_zero_stub() {
 
 #[test]
 fn fast_enum_nil_returns_zero() {
-    assert_eq!(shim_nsdictionary_count_by_enumerating_with_state(0, 0, 1, 1, 16), 0);
+    assert_eq!(
+        shim_nsdictionary_count_by_enumerating_with_state(0, 0, 1, 1, 16),
+        0
+    );
 }
 
 #[test]
@@ -684,7 +679,8 @@ fn fast_enum_empty_dict() {
     let mut state = [0u64; 4];
     let mut buf = [0u64; 16];
     let n = shim_nsdictionary_count_by_enumerating_with_state(
-        dict, 0,
+        dict,
+        0,
         state.as_mut_ptr() as u64,
         buf.as_mut_ptr() as u64,
         16,
@@ -704,7 +700,8 @@ fn fast_enum_returns_all_keys() {
     let mut state = [0u64; 4];
     let mut buf = [0u64; 16];
     let n = shim_nsdictionary_count_by_enumerating_with_state(
-        dict, 0,
+        dict,
+        0,
         state.as_mut_ptr() as u64,
         buf.as_mut_ptr() as u64,
         16,
@@ -720,7 +717,8 @@ fn fast_enum_returns_all_keys() {
 
     // Second call should return 0 (exhausted)
     let n2 = shim_nsdictionary_count_by_enumerating_with_state(
-        dict, 0,
+        dict,
+        0,
         state.as_mut_ptr() as u64,
         buf.as_mut_ptr() as u64,
         16,
@@ -739,7 +737,8 @@ fn fast_enum_batched() {
     let mut buf = [0u64; 2]; // buffer smaller than count → forces batching
 
     let n1 = shim_nsdictionary_count_by_enumerating_with_state(
-        dict, 0,
+        dict,
+        0,
         state.as_mut_ptr() as u64,
         buf.as_mut_ptr() as u64,
         2,
@@ -748,7 +747,8 @@ fn fast_enum_batched() {
     assert_eq!(state[0], 2);
 
     let n2 = shim_nsdictionary_count_by_enumerating_with_state(
-        dict, 0,
+        dict,
+        0,
         state.as_mut_ptr() as u64,
         buf.as_mut_ptr() as u64,
         2,
@@ -757,7 +757,8 @@ fn fast_enum_batched() {
     assert_eq!(state[0], 4);
 
     let n3 = shim_nsdictionary_count_by_enumerating_with_state(
-        dict, 0,
+        dict,
+        0,
         state.as_mut_ptr() as u64,
         buf.as_mut_ptr() as u64,
         2,
@@ -766,7 +767,8 @@ fn fast_enum_batched() {
     assert_eq!(state[0], 5);
 
     let n4 = shim_nsdictionary_count_by_enumerating_with_state(
-        dict, 0,
+        dict,
+        0,
         state.as_mut_ptr() as u64,
         buf.as_mut_ptr() as u64,
         2,
@@ -784,7 +786,8 @@ fn fast_enum_constant_dict() {
     let mut state = [0u64; 4];
     let mut buf = [0u64; 16];
     let n = shim_nsdictionary_count_by_enumerating_with_state(
-        dict, 0,
+        dict,
+        0,
         state.as_mut_ptr() as u64,
         buf.as_mut_ptr() as u64,
         16,

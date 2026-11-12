@@ -1,7 +1,7 @@
 use ab_glyph::{Font as AbFont, ScaleFont};
 
 use crate::color::Color;
-use crate::font::{TextRun};
+use crate::font::TextRun;
 use crate::font_manager::{FontFace, FontManager};
 use crate::unicode::{is_combining_mark, is_zero_width, normalize_nfc};
 
@@ -47,7 +47,9 @@ pub fn layout_attributed<'a>(
 
     for run in runs {
         let face = resolve_run_font(run, fm, default_font);
-        let idx = font_list.iter().position(|f| std::ptr::eq(*f, face))
+        let idx = font_list
+            .iter()
+            .position(|f| std::ptr::eq(*f, face))
             .unwrap_or_else(|| {
                 font_list.push(face);
                 font_list.len() - 1
@@ -96,7 +98,11 @@ pub fn layout_attributed<'a>(
 
         // Find active run for this byte offset.
         let (font_index, size, color) = find_run_for_offset(
-            byte_offset, runs, &run_font_indices, &run_sizes, default_size,
+            byte_offset,
+            runs,
+            &run_font_indices,
+            &run_sizes,
+            default_size,
         );
 
         let face = font_list[font_index];
@@ -148,11 +154,7 @@ pub fn layout_attributed<'a>(
 }
 
 /// Resolve the font face for a text run based on its bold/italic flags.
-fn resolve_run_font<'a>(
-    run: &TextRun,
-    fm: &'a FontManager,
-    default: &'a FontFace,
-) -> &'a FontFace {
+fn resolve_run_font<'a>(run: &TextRun, fm: &'a FontManager, default: &'a FontFace) -> &'a FontFace {
     if run.bold && run.italic {
         fm.get("System-BoldItalic")
     } else if run.bold {

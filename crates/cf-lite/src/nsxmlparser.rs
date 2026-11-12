@@ -26,8 +26,12 @@ fn make_nsstring(s: &str) -> u64 {
 
 fn alloc_parser() -> u64 {
     let obj = crate::pal_alloc().calloc(1, 40) as u64;
-    if obj == 0 { return 0; }
-    unsafe { *(obj as *mut u64) = nsobj::nsxmlparser_class_addr(); }
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *(obj as *mut u64) = nsobj::nsxmlparser_class_addr();
+    }
     obj
 }
 
@@ -40,21 +44,40 @@ pub extern "C" fn shim_nsxmlparser_alloc(_cls: u64, _cmd: u64) -> u64 {
 
 /// `-[NSXMLParser initWithData:]`
 pub extern "C" fn shim_nsxmlparser_init_with_data(obj: u64, _cmd: u64, data: u64) -> u64 {
-    if obj == 0 { return 0; }
-    unsafe { *((obj as usize + DATA_OFF) as *mut u64) = data; }
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *((obj as usize + DATA_OFF) as *mut u64) = data;
+    }
     obj
 }
 
 /// `-[NSXMLParser initWithContentsOfURL:]`
 pub extern "C" fn shim_nsxmlparser_init_with_url(obj: u64, _cmd: u64, url: u64) -> u64 {
-    if obj == 0 || url == 0 { return 0; }
+    if obj == 0 || url == 0 {
+        return 0;
+    }
     // Read URL path to NSData
     let path_str = crate::nsurl::shim_nsurl_path(url, 0);
-    if path_str == 0 { return obj; }
-    let Some(p) = cfstring::extract_cfstring_cstr(path_str) else { return obj; };
-    let Ok(bytes) = std::fs::read(p) else { return obj; };
-    let data = crate::nsdata::shim_nsdata_data_with_bytes_length(0, 0, bytes.as_ptr() as u64, bytes.len() as u64);
-    unsafe { *((obj as usize + DATA_OFF) as *mut u64) = data; }
+    if path_str == 0 {
+        return obj;
+    }
+    let Some(p) = cfstring::extract_cfstring_cstr(path_str) else {
+        return obj;
+    };
+    let Ok(bytes) = std::fs::read(p) else {
+        return obj;
+    };
+    let data = crate::nsdata::shim_nsdata_data_with_bytes_length(
+        0,
+        0,
+        bytes.as_ptr() as u64,
+        bytes.len() as u64,
+    );
+    unsafe {
+        *((obj as usize + DATA_OFF) as *mut u64) = data;
+    }
     obj
 }
 
@@ -62,13 +85,19 @@ pub extern "C" fn shim_nsxmlparser_init_with_url(obj: u64, _cmd: u64, url: u64) 
 
 /// `-[NSXMLParser setDelegate:]`
 pub extern "C" fn shim_nsxmlparser_set_delegate(obj: u64, _cmd: u64, delegate: u64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as usize + DELEGATE_OFF) as *mut u64) = delegate; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + DELEGATE_OFF) as *mut u64) = delegate;
+    }
 }
 
 /// `-[NSXMLParser delegate]`
 pub extern "C" fn shim_nsxmlparser_delegate(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + DELEGATE_OFF) as *const u64) }
 }
 
@@ -174,7 +203,10 @@ fn extract_attrs(e: &quick_xml::events::BytesStart<'_>) -> Vec<(String, String)>
         .filter_map(|a| a.ok())
         .map(|a| {
             let key = String::from_utf8_lossy(a.key.as_ref()).to_string();
-            let val = a.unescape_value().map(|v| v.to_string()).unwrap_or_default();
+            let val = a
+                .unescape_value()
+                .map(|v| v.to_string())
+                .unwrap_or_default();
             (key, val)
         })
         .collect()
@@ -189,7 +221,9 @@ extern "C" {
 
 /// Look up IMP for `sel_str` on `delegate` and return it, or 0 if not found.
 fn delegate_imp(delegate: u64, sel_str: &str) -> u64 {
-    let Ok(csel) = std::ffi::CString::new(sel_str) else { return 0; };
+    let Ok(csel) = std::ffi::CString::new(sel_str) else {
+        return 0;
+    };
     // First check that the delegate actually has this method registered.
     // objc_msg_lookup_imp returns forwarding_trampoline (non-zero) for unknown
     // selectors on known classes, which would throw "unrecognized selector".
@@ -202,9 +236,13 @@ fn delegate_imp(delegate: u64, sel_str: &str) -> u64 {
 
 /// Build a temporary NSDictionary from attribute pairs.
 fn make_attrs_dict(attrs: &[(String, String)]) -> u64 {
-    if attrs.is_empty() { return 0; }
+    if attrs.is_empty() {
+        return 0;
+    }
     let dict = crate::nsmutabledict::shim_nsmutabledict_dictionary(0, 0);
-    if dict == 0 { return 0; }
+    if dict == 0 {
+        return 0;
+    }
     for (k, v) in attrs {
         let k_ns = make_nsstring(k);
         let v_ns = make_nsstring(v);
@@ -217,16 +255,25 @@ fn make_attrs_dict(attrs: &[(String, String)]) -> u64 {
 ///
 /// Returns 1 (YES) on success, 0 (NO) on failure.
 pub extern "C" fn shim_nsxmlparser_parse(obj: u64, _cmd: u64) -> u8 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let data_ptr = unsafe { *((obj as usize + DATA_OFF) as *const u64) };
-    if data_ptr == 0 { return 0; }
+    if data_ptr == 0 {
+        return 0;
+    }
     let delegate = unsafe { *((obj as usize + DELEGATE_OFF) as *const u64) };
 
     let length = crate::nsdata::shim_nsdata_length(data_ptr, 0);
-    if length == 0 { return 1; }
+    if length == 0 {
+        return 1;
+    }
     let bytes_ptr = crate::nsdata::shim_nsdata_bytes(data_ptr, 0);
     let xml = unsafe {
-        std::str::from_utf8(std::slice::from_raw_parts(bytes_ptr as *const u8, length as usize))
+        std::str::from_utf8(std::slice::from_raw_parts(
+            bytes_ptr as *const u8,
+            length as usize,
+        ))
     };
     let xml = match xml {
         Ok(s) => s.to_owned(),
@@ -245,7 +292,9 @@ pub extern "C" fn shim_nsxmlparser_parse(obj: u64, _cmd: u64) -> u8 {
     }
 
     for token in &tokens {
-        if delegate == 0 { continue; }
+        if delegate == 0 {
+            continue;
+        }
         match token.kind {
             TokenKind::StartElement => {
                 let imp = delegate_imp(
@@ -255,24 +304,31 @@ pub extern "C" fn shim_nsxmlparser_parse(obj: u64, _cmd: u64) -> u8 {
                 if imp != 0 {
                     let csel = std::ffi::CString::new(
                         "parser:didStartElement:namespaceURI:qualifiedName:attributes:",
-                    ).unwrap();
+                    )
+                    .unwrap();
                     let name_ns = make_nsstring(&token.name);
                     let attrs_dict = make_attrs_dict(&token.attrs);
                     // (delegate, cmd, parser, localName, nsURI, qualName, attrs)
                     let f: extern "C" fn(u64, u64, u64, u64, u64, u64, u64) =
                         unsafe { std::mem::transmute(imp) };
-                    f(delegate, csel.as_ptr() as u64, obj, name_ns, 0, name_ns, attrs_dict);
+                    f(
+                        delegate,
+                        csel.as_ptr() as u64,
+                        obj,
+                        name_ns,
+                        0,
+                        name_ns,
+                        attrs_dict,
+                    );
                 }
             }
             TokenKind::EndElement => {
-                let imp = delegate_imp(
-                    delegate,
-                    "parser:didEndElement:namespaceURI:qualifiedName:",
-                );
+                let imp =
+                    delegate_imp(delegate, "parser:didEndElement:namespaceURI:qualifiedName:");
                 if imp != 0 {
-                    let csel = std::ffi::CString::new(
-                        "parser:didEndElement:namespaceURI:qualifiedName:",
-                    ).unwrap();
+                    let csel =
+                        std::ffi::CString::new("parser:didEndElement:namespaceURI:qualifiedName:")
+                            .unwrap();
                     let name_ns = make_nsstring(&token.name);
                     let f: extern "C" fn(u64, u64, u64, u64, u64, u64) =
                         unsafe { std::mem::transmute(imp) };
@@ -284,8 +340,7 @@ pub extern "C" fn shim_nsxmlparser_parse(obj: u64, _cmd: u64) -> u8 {
                 if imp != 0 {
                     let csel = std::ffi::CString::new("parser:foundCharacters:").unwrap();
                     let text_ns = make_nsstring(&token.text);
-                    let f: extern "C" fn(u64, u64, u64, u64) =
-                        unsafe { std::mem::transmute(imp) };
+                    let f: extern "C" fn(u64, u64, u64, u64) = unsafe { std::mem::transmute(imp) };
                     f(delegate, csel.as_ptr() as u64, obj, text_ns);
                 }
             }
@@ -306,7 +361,9 @@ pub extern "C" fn shim_nsxmlparser_parse(obj: u64, _cmd: u64) -> u8 {
 
 /// `-[NSXMLParser parserError]`
 pub extern "C" fn shim_nsxmlparser_parser_error(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + ERROR_OFF) as *const u64) }
 }
 
@@ -317,42 +374,60 @@ pub extern "C" fn shim_nsxmlparser_abort_parsing(_obj: u64, _cmd: u64) {
 
 /// `-[NSXMLParser setShouldProcessNamespaces:]`
 pub extern "C" fn shim_nsxmlparser_set_should_process_ns(obj: u64, _cmd: u64, val: u8) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let flags_ptr = (obj as usize + FLAGS_OFF) as *mut u64;
     unsafe {
         let mut flags = *flags_ptr;
-        if val != 0 { flags |= 1; } else { flags &= !1; }
+        if val != 0 {
+            flags |= 1;
+        } else {
+            flags &= !1;
+        }
         *flags_ptr = flags;
     }
 }
 
 /// `-[NSXMLParser setShouldReportNamespacePrefixes:]`
 pub extern "C" fn shim_nsxmlparser_set_should_report_ns(obj: u64, _cmd: u64, val: u8) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let flags_ptr = (obj as usize + FLAGS_OFF) as *mut u64;
     unsafe {
         let mut flags = *flags_ptr;
-        if val != 0 { flags |= 2; } else { flags &= !2; }
+        if val != 0 {
+            flags |= 2;
+        } else {
+            flags &= !2;
+        }
         *flags_ptr = flags;
     }
 }
 
 /// `-[NSXMLParser shouldProcessNamespaces]`
 pub extern "C" fn shim_nsxmlparser_should_process_ns(obj: u64, _cmd: u64) -> u8 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let flags = unsafe { *((obj as usize + FLAGS_OFF) as *const u64) };
     u8::from(flags & 1 != 0)
 }
 
 /// `-[NSXMLParser shouldReportNamespacePrefixes]`
 pub extern "C" fn shim_nsxmlparser_should_report_ns(obj: u64, _cmd: u64) -> u8 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let flags = unsafe { *((obj as usize + FLAGS_OFF) as *const u64) };
     u8::from(flags & 2 != 0)
 }
 
 pub extern "C" fn shim_nsxmlparser_description(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     make_nsstring("<NSXMLParser>")
 }
 
@@ -450,4 +525,3 @@ mod tests {
         assert_eq!(shim_nsxmlparser_should_report_ns(0, 0), 0);
     }
 }
-

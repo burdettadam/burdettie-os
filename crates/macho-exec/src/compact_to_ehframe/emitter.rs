@@ -5,11 +5,7 @@ use super::constants::*;
 const DW_EH_PE_ABSPTR: u8 = 0x00;
 
 /// Emit a CIE for ARM64 into `buf`.
-pub(crate) fn emit_cie_arm64(
-    buf: &mut Vec<u8>,
-    personality: Option<usize>,
-    uses_lsda: bool,
-) {
+pub(crate) fn emit_cie_arm64(buf: &mut Vec<u8>, personality: Option<usize>, uses_lsda: bool) {
     let cie_start = buf.len();
     buf.extend_from_slice(&0u32.to_ne_bytes()); // placeholder for length
 
@@ -185,4 +181,3 @@ pub(crate) fn write_sleb128(buf: &mut Vec<u8>, mut val: i64) {
         buf.push(byte | 0x80);
     }
 }
-

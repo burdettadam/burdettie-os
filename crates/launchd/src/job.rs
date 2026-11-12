@@ -132,10 +132,9 @@ impl Job {
                     let k = unsafe { std::ffi::CStr::from_ptr(key) };
                     let s = get_string(val);
                     if !s.is_null() {
-                        if let (Ok(ks), Ok(vs)) = (
-                            k.to_str(),
-                            unsafe { std::ffi::CStr::from_ptr(s) }.to_str(),
-                        ) {
+                        if let (Ok(ks), Ok(vs)) =
+                            (k.to_str(), unsafe { std::ffi::CStr::from_ptr(s) }.to_str())
+                        {
                             map.insert(ks.to_string(), vs.to_string());
                         }
                     }
@@ -202,34 +201,67 @@ impl Job {
 
         let dict = alloc(LaunchDataType::Dictionary as u32);
 
-        dict_insert(dict, new_string(
-            std::ffi::CString::new(self.label.as_str()).unwrap_or_default().as_ptr(),
-        ), std::ffi::CString::new(LAUNCH_JOBKEY_LABEL).unwrap_or_default().as_ptr());
+        dict_insert(
+            dict,
+            new_string(
+                std::ffi::CString::new(self.label.as_str())
+                    .unwrap_or_default()
+                    .as_ptr(),
+            ),
+            std::ffi::CString::new(LAUNCH_JOBKEY_LABEL)
+                .unwrap_or_default()
+                .as_ptr(),
+        );
 
         if let Some(ref prog) = self.program {
-            dict_insert(dict, new_string(
-                std::ffi::CString::new(prog.as_str()).unwrap_or_default().as_ptr(),
-            ), std::ffi::CString::new(LAUNCH_JOBKEY_PROGRAM).unwrap_or_default().as_ptr());
+            dict_insert(
+                dict,
+                new_string(
+                    std::ffi::CString::new(prog.as_str())
+                        .unwrap_or_default()
+                        .as_ptr(),
+                ),
+                std::ffi::CString::new(LAUNCH_JOBKEY_PROGRAM)
+                    .unwrap_or_default()
+                    .as_ptr(),
+            );
         }
 
         if self.pid != 0 {
-            dict_insert(dict, new_integer(i64::from(self.pid)),
-                std::ffi::CString::new(LAUNCH_JOBKEY_PID).unwrap_or_default().as_ptr());
+            dict_insert(
+                dict,
+                new_integer(i64::from(self.pid)),
+                std::ffi::CString::new(LAUNCH_JOBKEY_PID)
+                    .unwrap_or_default()
+                    .as_ptr(),
+            );
         }
 
-        dict_insert(dict, new_integer(i64::from(self.last_exit_status)),
-            std::ffi::CString::new(LAUNCH_JOBKEY_LASTEXITSTATUS).unwrap_or_default().as_ptr());
+        dict_insert(
+            dict,
+            new_integer(i64::from(self.last_exit_status)),
+            std::ffi::CString::new(LAUNCH_JOBKEY_LASTEXITSTATUS)
+                .unwrap_or_default()
+                .as_ptr(),
+        );
 
         if !self.program_arguments.is_empty() {
             let arr = alloc(LaunchDataType::Array as u32);
             for (i, arg) in self.program_arguments.iter().enumerate() {
                 let s = new_string(
-                    std::ffi::CString::new(arg.as_str()).unwrap_or_default().as_ptr(),
+                    std::ffi::CString::new(arg.as_str())
+                        .unwrap_or_default()
+                        .as_ptr(),
                 );
                 array_set_index(arr, s, i);
             }
-            dict_insert(dict, arr,
-                std::ffi::CString::new(LAUNCH_JOBKEY_PROGRAMARGUMENTS).unwrap_or_default().as_ptr());
+            dict_insert(
+                dict,
+                arr,
+                std::ffi::CString::new(LAUNCH_JOBKEY_PROGRAMARGUMENTS)
+                    .unwrap_or_default()
+                    .as_ptr(),
+            );
         }
 
         dict
@@ -470,29 +502,51 @@ mod tests {
 
     #[test]
     fn from_launch_data_roundtrip() {
-        use crate::launch_data::*;
         use crate::constants::*;
+        use crate::launch_data::*;
 
         let dict = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(dict, new_string(
-            std::ffi::CString::new("com.test.plist").unwrap().as_ptr(),
-        ), std::ffi::CString::new(LAUNCH_JOBKEY_LABEL).unwrap().as_ptr());
-        dict_insert(dict, new_string(
-            std::ffi::CString::new("/bin/echo").unwrap().as_ptr(),
-        ), std::ffi::CString::new(LAUNCH_JOBKEY_PROGRAM).unwrap().as_ptr());
-        dict_insert(dict, new_bool(true),
-            std::ffi::CString::new(LAUNCH_JOBKEY_RUNATLOAD).unwrap().as_ptr());
+        dict_insert(
+            dict,
+            new_string(std::ffi::CString::new("com.test.plist").unwrap().as_ptr()),
+            std::ffi::CString::new(LAUNCH_JOBKEY_LABEL)
+                .unwrap()
+                .as_ptr(),
+        );
+        dict_insert(
+            dict,
+            new_string(std::ffi::CString::new("/bin/echo").unwrap().as_ptr()),
+            std::ffi::CString::new(LAUNCH_JOBKEY_PROGRAM)
+                .unwrap()
+                .as_ptr(),
+        );
+        dict_insert(
+            dict,
+            new_bool(true),
+            std::ffi::CString::new(LAUNCH_JOBKEY_RUNATLOAD)
+                .unwrap()
+                .as_ptr(),
+        );
 
         // ProgramArguments
         let args = alloc(LaunchDataType::Array as u32);
-        array_set_index(args, new_string(
-            std::ffi::CString::new("echo").unwrap().as_ptr(),
-        ), 0);
-        array_set_index(args, new_string(
-            std::ffi::CString::new("hello").unwrap().as_ptr(),
-        ), 1);
-        dict_insert(dict, args,
-            std::ffi::CString::new(LAUNCH_JOBKEY_PROGRAMARGUMENTS).unwrap().as_ptr());
+        array_set_index(
+            args,
+            new_string(std::ffi::CString::new("echo").unwrap().as_ptr()),
+            0,
+        );
+        array_set_index(
+            args,
+            new_string(std::ffi::CString::new("hello").unwrap().as_ptr()),
+            1,
+        );
+        dict_insert(
+            dict,
+            args,
+            std::ffi::CString::new(LAUNCH_JOBKEY_PROGRAMARGUMENTS)
+                .unwrap()
+                .as_ptr(),
+        );
 
         let job = Job::from_launch_data(dict).unwrap();
         assert_eq!(job.label, "com.test.plist");
@@ -502,7 +556,10 @@ mod tests {
 
         // Roundtrip back to launch_data
         let dict2 = job.to_launch_data();
-        assert_eq!(dict_get_string_value(dict2, LAUNCH_JOBKEY_LABEL).as_deref(), Some("com.test.plist"));
+        assert_eq!(
+            dict_get_string_value(dict2, LAUNCH_JOBKEY_LABEL).as_deref(),
+            Some("com.test.plist")
+        );
 
         free(dict);
         free(dict2);
@@ -535,14 +592,16 @@ mod tests {
 
     #[test]
     fn from_launch_data_with_environment_variables() {
-        use crate::launch_data::*;
         use crate::constants::*;
+        use crate::launch_data::*;
 
         let dict = alloc(LaunchDataType::Dictionary as u32);
         dict_insert(
             dict,
             new_string(std::ffi::CString::new("com.test.env").unwrap().as_ptr()),
-            std::ffi::CString::new(LAUNCH_JOBKEY_LABEL).unwrap().as_ptr(),
+            std::ffi::CString::new(LAUNCH_JOBKEY_LABEL)
+                .unwrap()
+                .as_ptr(),
         );
 
         let env = alloc(LaunchDataType::Dictionary as u32);
@@ -559,7 +618,9 @@ mod tests {
         dict_insert(
             dict,
             env,
-            std::ffi::CString::new(LAUNCH_JOBKEY_ENVIRONMENTVARIABLES).unwrap().as_ptr(),
+            std::ffi::CString::new(LAUNCH_JOBKEY_ENVIRONMENTVARIABLES)
+                .unwrap()
+                .as_ptr(),
         );
 
         let job = Job::from_launch_data(dict).unwrap();
@@ -571,31 +632,39 @@ mod tests {
 
     #[test]
     fn from_launch_data_with_mach_services() {
-        use crate::launch_data::*;
         use crate::constants::*;
+        use crate::launch_data::*;
 
         let dict = alloc(LaunchDataType::Dictionary as u32);
         dict_insert(
             dict,
             new_string(std::ffi::CString::new("com.test.mach").unwrap().as_ptr()),
-            std::ffi::CString::new(LAUNCH_JOBKEY_LABEL).unwrap().as_ptr(),
+            std::ffi::CString::new(LAUNCH_JOBKEY_LABEL)
+                .unwrap()
+                .as_ptr(),
         );
 
         let mach = alloc(LaunchDataType::Dictionary as u32);
         dict_insert(
             mach,
             new_bool(true),
-            std::ffi::CString::new("com.test.mach.port").unwrap().as_ptr(),
+            std::ffi::CString::new("com.test.mach.port")
+                .unwrap()
+                .as_ptr(),
         );
         dict_insert(
             mach,
             new_bool(true),
-            std::ffi::CString::new("com.test.mach.other").unwrap().as_ptr(),
+            std::ffi::CString::new("com.test.mach.other")
+                .unwrap()
+                .as_ptr(),
         );
         dict_insert(
             dict,
             mach,
-            std::ffi::CString::new(LAUNCH_JOBKEY_MACHSERVICES).unwrap().as_ptr(),
+            std::ffi::CString::new(LAUNCH_JOBKEY_MACHSERVICES)
+                .unwrap()
+                .as_ptr(),
         );
 
         let job = Job::from_launch_data(dict).unwrap();
@@ -608,19 +677,23 @@ mod tests {
 
     #[test]
     fn from_launch_data_keepalive_bool() {
-        use crate::launch_data::*;
         use crate::constants::*;
+        use crate::launch_data::*;
 
         let dict = alloc(LaunchDataType::Dictionary as u32);
         dict_insert(
             dict,
             new_string(std::ffi::CString::new("com.test.ka.bool").unwrap().as_ptr()),
-            std::ffi::CString::new(LAUNCH_JOBKEY_LABEL).unwrap().as_ptr(),
+            std::ffi::CString::new(LAUNCH_JOBKEY_LABEL)
+                .unwrap()
+                .as_ptr(),
         );
         dict_insert(
             dict,
             new_bool(true),
-            std::ffi::CString::new(LAUNCH_JOBKEY_KEEPALIVE).unwrap().as_ptr(),
+            std::ffi::CString::new(LAUNCH_JOBKEY_KEEPALIVE)
+                .unwrap()
+                .as_ptr(),
         );
 
         let job = Job::from_launch_data(dict).unwrap();
@@ -630,14 +703,16 @@ mod tests {
 
     #[test]
     fn from_launch_data_keepalive_dict() {
-        use crate::launch_data::*;
         use crate::constants::*;
+        use crate::launch_data::*;
 
         let dict = alloc(LaunchDataType::Dictionary as u32);
         dict_insert(
             dict,
             new_string(std::ffi::CString::new("com.test.ka.dict").unwrap().as_ptr()),
-            std::ffi::CString::new(LAUNCH_JOBKEY_LABEL).unwrap().as_ptr(),
+            std::ffi::CString::new(LAUNCH_JOBKEY_LABEL)
+                .unwrap()
+                .as_ptr(),
         );
         let ka = alloc(LaunchDataType::Dictionary as u32);
         dict_insert(
@@ -648,7 +723,9 @@ mod tests {
         dict_insert(
             dict,
             ka,
-            std::ffi::CString::new(LAUNCH_JOBKEY_KEEPALIVE).unwrap().as_ptr(),
+            std::ffi::CString::new(LAUNCH_JOBKEY_KEEPALIVE)
+                .unwrap()
+                .as_ptr(),
         );
 
         let job = Job::from_launch_data(dict).unwrap();
@@ -658,21 +735,29 @@ mod tests {
 
     #[test]
     fn from_launch_data_keepalive_empty_dict() {
-        use crate::launch_data::*;
         use crate::constants::*;
+        use crate::launch_data::*;
 
         let dict = alloc(LaunchDataType::Dictionary as u32);
         dict_insert(
             dict,
-            new_string(std::ffi::CString::new("com.test.ka.empty").unwrap().as_ptr()),
-            std::ffi::CString::new(LAUNCH_JOBKEY_LABEL).unwrap().as_ptr(),
+            new_string(
+                std::ffi::CString::new("com.test.ka.empty")
+                    .unwrap()
+                    .as_ptr(),
+            ),
+            std::ffi::CString::new(LAUNCH_JOBKEY_LABEL)
+                .unwrap()
+                .as_ptr(),
         );
         let ka = alloc(LaunchDataType::Dictionary as u32);
         // Empty dict → keep_alive stays false
         dict_insert(
             dict,
             ka,
-            std::ffi::CString::new(LAUNCH_JOBKEY_KEEPALIVE).unwrap().as_ptr(),
+            std::ffi::CString::new(LAUNCH_JOBKEY_KEEPALIVE)
+                .unwrap()
+                .as_ptr(),
         );
 
         let job = Job::from_launch_data(dict).unwrap();
@@ -682,19 +767,27 @@ mod tests {
 
     #[test]
     fn from_launch_data_start_interval() {
-        use crate::launch_data::*;
         use crate::constants::*;
+        use crate::launch_data::*;
 
         let dict = alloc(LaunchDataType::Dictionary as u32);
         dict_insert(
             dict,
-            new_string(std::ffi::CString::new("com.test.interval").unwrap().as_ptr()),
-            std::ffi::CString::new(LAUNCH_JOBKEY_LABEL).unwrap().as_ptr(),
+            new_string(
+                std::ffi::CString::new("com.test.interval")
+                    .unwrap()
+                    .as_ptr(),
+            ),
+            std::ffi::CString::new(LAUNCH_JOBKEY_LABEL)
+                .unwrap()
+                .as_ptr(),
         );
         dict_insert(
             dict,
             new_integer(300),
-            std::ffi::CString::new(LAUNCH_JOBKEY_STARTINTERVAL).unwrap().as_ptr(),
+            std::ffi::CString::new(LAUNCH_JOBKEY_STARTINTERVAL)
+                .unwrap()
+                .as_ptr(),
         );
 
         let job = Job::from_launch_data(dict).unwrap();
@@ -704,19 +797,23 @@ mod tests {
 
     #[test]
     fn from_launch_data_negative_start_interval_clamps_to_zero() {
-        use crate::launch_data::*;
         use crate::constants::*;
+        use crate::launch_data::*;
 
         let dict = alloc(LaunchDataType::Dictionary as u32);
         dict_insert(
             dict,
             new_string(std::ffi::CString::new("com.test.neg").unwrap().as_ptr()),
-            std::ffi::CString::new(LAUNCH_JOBKEY_LABEL).unwrap().as_ptr(),
+            std::ffi::CString::new(LAUNCH_JOBKEY_LABEL)
+                .unwrap()
+                .as_ptr(),
         );
         dict_insert(
             dict,
             new_integer(-5),
-            std::ffi::CString::new(LAUNCH_JOBKEY_STARTINTERVAL).unwrap().as_ptr(),
+            std::ffi::CString::new(LAUNCH_JOBKEY_STARTINTERVAL)
+                .unwrap()
+                .as_ptr(),
         );
 
         let job = Job::from_launch_data(dict).unwrap();
@@ -726,31 +823,54 @@ mod tests {
 
     #[test]
     fn from_launch_data_all_string_fields() {
-        use crate::launch_data::*;
         use crate::constants::*;
+        use crate::launch_data::*;
 
         let dict = alloc(LaunchDataType::Dictionary as u32);
 
         let mk = |s: &str| std::ffi::CString::new(s).unwrap();
 
-        dict_insert(dict, new_string(mk("com.test.paths").as_ptr()),
-            mk(LAUNCH_JOBKEY_LABEL).as_ptr());
-        dict_insert(dict, new_string(mk("/bin/ls").as_ptr()),
-            mk(LAUNCH_JOBKEY_PROGRAM).as_ptr());
-        dict_insert(dict, new_string(mk("/tmp").as_ptr()),
-            mk(LAUNCH_JOBKEY_WORKINGDIRECTORY).as_ptr());
-        dict_insert(dict, new_string(mk("/var/log/out.log").as_ptr()),
-            mk(LAUNCH_JOBKEY_STANDARDOUTPATH).as_ptr());
-        dict_insert(dict, new_string(mk("/var/log/err.log").as_ptr()),
-            mk(LAUNCH_JOBKEY_STANDARDERRORPATH).as_ptr());
-        dict_insert(dict, new_string(mk("/dev/null").as_ptr()),
-            mk(LAUNCH_JOBKEY_STANDARDINPATH).as_ptr());
-        dict_insert(dict, new_string(mk("Interactive").as_ptr()),
-            mk(LAUNCH_JOBKEY_PROCESSTYPE).as_ptr());
-        dict_insert(dict, new_bool(true),
-            mk(LAUNCH_JOBKEY_DISABLED).as_ptr());
-        dict_insert(dict, new_bool(true),
-            mk(LAUNCH_JOBKEY_ENABLETRANSACTIONS).as_ptr());
+        dict_insert(
+            dict,
+            new_string(mk("com.test.paths").as_ptr()),
+            mk(LAUNCH_JOBKEY_LABEL).as_ptr(),
+        );
+        dict_insert(
+            dict,
+            new_string(mk("/bin/ls").as_ptr()),
+            mk(LAUNCH_JOBKEY_PROGRAM).as_ptr(),
+        );
+        dict_insert(
+            dict,
+            new_string(mk("/tmp").as_ptr()),
+            mk(LAUNCH_JOBKEY_WORKINGDIRECTORY).as_ptr(),
+        );
+        dict_insert(
+            dict,
+            new_string(mk("/var/log/out.log").as_ptr()),
+            mk(LAUNCH_JOBKEY_STANDARDOUTPATH).as_ptr(),
+        );
+        dict_insert(
+            dict,
+            new_string(mk("/var/log/err.log").as_ptr()),
+            mk(LAUNCH_JOBKEY_STANDARDERRORPATH).as_ptr(),
+        );
+        dict_insert(
+            dict,
+            new_string(mk("/dev/null").as_ptr()),
+            mk(LAUNCH_JOBKEY_STANDARDINPATH).as_ptr(),
+        );
+        dict_insert(
+            dict,
+            new_string(mk("Interactive").as_ptr()),
+            mk(LAUNCH_JOBKEY_PROCESSTYPE).as_ptr(),
+        );
+        dict_insert(dict, new_bool(true), mk(LAUNCH_JOBKEY_DISABLED).as_ptr());
+        dict_insert(
+            dict,
+            new_bool(true),
+            mk(LAUNCH_JOBKEY_ENABLETRANSACTIONS).as_ptr(),
+        );
 
         let job = Job::from_launch_data(dict).unwrap();
         assert_eq!(job.program.as_deref(), Some("/bin/ls"));
@@ -768,8 +888,8 @@ mod tests {
 
     #[test]
     fn to_launch_data_includes_pid_when_nonzero() {
-        use crate::launch_data::*;
         use crate::constants::*;
+        use crate::launch_data::*;
 
         let mut job = Job::new("com.test.to_ld.pid");
         job.pid = 9876;
@@ -781,8 +901,8 @@ mod tests {
 
     #[test]
     fn to_launch_data_omits_pid_when_zero() {
-        use crate::launch_data::*;
         use crate::constants::*;
+        use crate::launch_data::*;
 
         let job = Job::new("com.test.to_ld.nopid");
         let dict = job.to_launch_data();
@@ -795,8 +915,8 @@ mod tests {
 
     #[test]
     fn to_launch_data_includes_program_arguments() {
-        use crate::launch_data::*;
         use crate::constants::*;
+        use crate::launch_data::*;
 
         let mut job = Job::new("com.test.to_ld.args");
         job.program_arguments = vec!["ls".into(), "-la".into(), "/tmp".into()];
@@ -811,7 +931,10 @@ mod tests {
         let get_str = |idx: usize| -> String {
             let elem = array_get_index(arr, idx);
             let s = get_string(elem);
-            unsafe { std::ffi::CStr::from_ptr(s) }.to_str().unwrap().to_string()
+            unsafe { std::ffi::CStr::from_ptr(s) }
+                .to_str()
+                .unwrap()
+                .to_string()
         };
         assert_eq!(get_str(0), "ls");
         assert_eq!(get_str(1), "-la");
@@ -822,8 +945,8 @@ mod tests {
 
     #[test]
     fn to_launch_data_omits_empty_program_arguments() {
-        use crate::launch_data::*;
         use crate::constants::*;
+        use crate::launch_data::*;
 
         let job = Job::new("com.test.to_ld.noargs");
         let dict = job.to_launch_data();
@@ -835,8 +958,8 @@ mod tests {
 
     #[test]
     fn to_launch_data_last_exit_status() {
-        use crate::launch_data::*;
         use crate::constants::*;
+        use crate::launch_data::*;
 
         let mut job = Job::new("com.test.to_ld.exit");
         job.last_exit_status = -1;

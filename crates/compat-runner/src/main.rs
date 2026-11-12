@@ -85,8 +85,7 @@ fn main() {
             };
 
             let result = run_binary(&entry);
-            let json =
-                serde_json::to_string_pretty(&result).expect("JSON serialization failed");
+            let json = serde_json::to_string_pretty(&result).expect("JSON serialization failed");
             println!("{json}");
 
             if !result.success {
@@ -98,15 +97,9 @@ fn main() {
 
 fn print_summary_table(report: &compat_runner::CompatibilityReport) {
     eprintln!();
-    eprintln!(
-        "╔═══════════════════════════════╦═════════╦══════════╦════════╗"
-    );
-    eprintln!(
-        "║ Binary                        ║ Status  ║ Exit     ║ Gaps   ║"
-    );
-    eprintln!(
-        "╠═══════════════════════════════╬═════════╬══════════╬════════╣"
-    );
+    eprintln!("╔═══════════════════════════════╦═════════╦══════════╦════════╗");
+    eprintln!("║ Binary                        ║ Status  ║ Exit     ║ Gaps   ║");
+    eprintln!("╠═══════════════════════════════╬═════════╬══════════╬════════╣");
 
     for b in &report.binaries {
         let status = if b.success { "  PASS " } else { "  FAIL " };
@@ -131,18 +124,12 @@ fn print_summary_table(report: &compat_runner::CompatibilityReport) {
         );
     }
 
-    eprintln!(
-        "╠═══════════════════════════════╬═════════╬══════════╬════════╣"
-    );
+    eprintln!("╠═══════════════════════════════╬═════════╬══════════╬════════╣");
     eprintln!(
         "║ TOTAL: {:>3}/{:<3} ({:.0}%)            ║         ║          ║        ║",
-        report.summary.passed,
-        report.summary.total,
-        report.summary.pass_rate,
+        report.summary.passed, report.summary.total, report.summary.pass_rate,
     );
-    eprintln!(
-        "╚═══════════════════════════════╩═════════╩══════════╩════════╝"
-    );
+    eprintln!("╚═══════════════════════════════╩═════════╩══════════╩════════╝");
     eprintln!();
 }
 

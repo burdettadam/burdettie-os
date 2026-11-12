@@ -2,12 +2,16 @@
 
 use macho_parse::{vmaddr_to_file_offset, ParsedMachO};
 
-use crate::types::*;
 use super::util::{file_offset_to_vmaddr, read_cstring, resolve_on_disk_pointer};
+use crate::types::*;
 
 // ── Class detail extraction ────────────────────────────────────────
 
-pub(super) fn extract_class_name(parsed: &ParsedMachO, data: &[u8], class_ptr_raw: u64) -> Option<String> {
+pub(super) fn extract_class_name(
+    parsed: &ParsedMachO,
+    data: &[u8],
+    class_ptr_raw: u64,
+) -> Option<String> {
     let class_off = resolve_on_disk_pointer(parsed, data, class_ptr_raw)?;
     if class_off + 40 > data.len() {
         return None;
@@ -97,7 +101,14 @@ pub(super) fn extract_class_details(
         Vec::new()
     };
 
-    (methods, ivars, properties, instance_size, ro_flags, protocol_names)
+    (
+        methods,
+        ivars,
+        properties,
+        instance_size,
+        ro_flags,
+        protocol_names,
+    )
 }
 
 pub(super) fn extract_metaclass_methods(
@@ -136,7 +147,11 @@ pub(super) fn extract_metaclass_methods(
     }
 }
 
-pub(super) fn extract_superclass_addr(parsed: &ParsedMachO, data: &[u8], class_ptr_raw: u64) -> u64 {
+pub(super) fn extract_superclass_addr(
+    parsed: &ParsedMachO,
+    data: &[u8],
+    class_ptr_raw: u64,
+) -> u64 {
     let Some(class_off) = resolve_on_disk_pointer(parsed, data, class_ptr_raw) else {
         return 0;
     };

@@ -6,8 +6,8 @@
 
 use std::sync::{LazyLock, Mutex};
 
+use crate::ring::{CategoryCounters, DiagCategory, DiagRing, StampedEvent};
 use crate::DiagEvent;
-use crate::ring::{DiagRing, StampedEvent, CategoryCounters, DiagCategory};
 
 static RING: LazyLock<Mutex<DiagRing>> = LazyLock::new(|| Mutex::new(DiagRing::new()));
 

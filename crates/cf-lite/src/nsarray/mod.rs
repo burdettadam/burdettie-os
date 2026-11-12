@@ -112,7 +112,9 @@ pub(crate) fn collect_variadic_object_args(args: &[u64]) -> Vec<u64> {
 /// Create an NSArray from a slice of object pointers.
 pub fn make_nsarray(items: &[u64]) -> u64 {
     let obj = crate::pal_alloc().calloc(1, NSARRAY_SIZE) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     init_nsarray_items(obj, items)
 }
 
@@ -409,4 +411,3 @@ pub extern "C" fn shim_nsarray_count_by_enumerating_with_state(
 
 #[cfg(test)]
 mod tests;
-

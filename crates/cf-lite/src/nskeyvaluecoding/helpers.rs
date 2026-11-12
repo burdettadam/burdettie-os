@@ -1,7 +1,7 @@
 use crate::cfstring;
 use crate::nsnumber;
 
-use super::accessor::{try_getter_accessor, try_ivar_read, try_setter_accessor, try_ivar_write};
+use super::accessor::{try_getter_accessor, try_ivar_read, try_ivar_write, try_setter_accessor};
 use super::boxing::unbox_double;
 
 // ── Internal helpers ──────────────────────────────────────────────
@@ -10,11 +10,7 @@ use super::boxing::unbox_double;
 ///
 /// Splits the key-path on `.` and calls `objectForKey:` at each step,
 /// creating an NSString key from each path component.
-pub extern "C" fn shim_dict_value_for_key_path(
-    obj: u64,
-    _sel: u64,
-    key_path_nsstring: u64,
-) -> u64 {
+pub extern "C" fn shim_dict_value_for_key_path(obj: u64, _sel: u64, key_path_nsstring: u64) -> u64 {
     if obj == 0 || key_path_nsstring == 0 {
         return 0;
     }
@@ -89,10 +85,7 @@ pub(super) fn handle_collection_operator(collection: u64, operator: &str, full_p
         "@unionOfObjects" => collection_union_of_objects(collection, sub),
         "@distinctUnionOfObjects" => collection_distinct_union_of_objects(collection, sub),
         _ => {
-            log::warn!(
-                "KVC collection operator '{}' not yet implemented",
-                operator
-            );
+            log::warn!("KVC collection operator '{}' not yet implemented", operator);
             0
         }
     }
@@ -145,14 +138,20 @@ pub(super) fn collect_items(collection: u64) -> Vec<u64> {
     let isa = unsafe { *(collection as *const u64) };
     let (at_imp, at_sel) = {
         let guard = OBJC_RUNTIME.read().unwrap_or_else(|e| e.into_inner());
-        let Some(rt) = guard.as_ref() else { return Vec::new() };
+        let Some(rt) = guard.as_ref() else {
+            return Vec::new();
+        };
         let at_imp = rt.msg_lookup(isa, "objectAtIndex:");
         let at_sel = rt.selector_ptr("objectAtIndex:").unwrap_or(0) as u64;
         (at_imp, at_sel)
     };
-    let Some(at_fn) = at_imp else { return Vec::new() };
+    let Some(at_fn) = at_imp else {
+        return Vec::new();
+    };
     let at_fn: extern "C" fn(u64, u64, u64) -> u64 = unsafe { std::mem::transmute(at_fn) };
-    (0..count as u64).map(|i| at_fn(collection, at_sel, i)).collect()
+    (0..count as u64)
+        .map(|i| at_fn(collection, at_sel, i))
+        .collect()
 }
 
 /// Evaluate a dot-separated key path on an object using ivar-first KVC lookup

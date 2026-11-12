@@ -2,8 +2,8 @@
 
 mod chained;
 pub mod ctor_thunk;
-mod resolver;
 pub mod data_symbols;
+mod resolver;
 
 use macho_parse::Fixups;
 use macho_resolve::BindingReport;
@@ -11,6 +11,7 @@ use macho_resolve::BindingReport;
 use crate::{ExecError, MappedImage};
 
 pub use chained::apply_chained_fixups;
+pub(crate) use chained::note_unresolved_bind;
 pub use chained::unresolved_bind_trap_addr;
 pub use resolver::{StubResolver, SymbolResolver};
 
@@ -63,16 +64,32 @@ pub fn apply_binds(
         .chain(fixups.lazy_binds.iter())
         .chain(fixups.weak_binds.iter())
     {
-        let seg =
-            image
-                .segments
-                .get(bind.segment_index)
-                .ok_or(ExecError::FixupSegmentOutOfRange {
-                    index: bind.segment_index,
-                    count: image.segments.len(),
-                })?;
+        let Some(seg) = image.segments.get(bind.segment_index) else {
+            if bind.is_lazy {
+                log::debug!(
+                    "skipping lazy bind '{}' with out-of-range segment {}",
+                    bind.symbol_name,
+                    bind.segment_index
+                );
+                continue;
+            }
+            return Err(ExecError::FixupSegmentOutOfRange {
+                index: bind.segment_index,
+                count: image.segments.len(),
+            });
+        };
 
         if bind.segment_offset + 8 > seg.size as u64 {
+            if bind.is_lazy {
+                log::debug!(
+                    "skipping lazy bind '{}' with out-of-bounds offset {:#x} in {} (size {:#x})",
+                    bind.symbol_name,
+                    bind.segment_offset,
+                    seg.name,
+                    seg.size
+                );
+                continue;
+            }
             return Err(ExecError::FixupOffsetOutOfBounds {
                 segment: seg.name.clone(),
                 offset: bind.segment_offset,
@@ -87,6 +104,25 @@ pub fn apply_binds(
                 ptr.write_unaligned(final_addr);
             }
             count += 1;
+        } else if bind.is_lazy {
+            log::warn!(
+                "unresolved lazy bind: {} (segment={} offset={:#x}) — stub will call dyld_stub_binder → 0 → crash",
+                bind.symbol_name,
+                bind.segment_index,
+                bind.segment_offset
+            );
+        } else if bind.is_weak {
+            log::debug!(
+                "unresolved weak bind: {} — expected, will be NULL",
+                bind.symbol_name
+            );
+        } else {
+            log::error!(
+                "unresolved non-lazy bind: {} (segment={} offset={:#x}) — GOT entry left as-is",
+                bind.symbol_name,
+                bind.segment_index,
+                bind.segment_offset
+            );
         }
     }
 

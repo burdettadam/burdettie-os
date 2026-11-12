@@ -2,13 +2,15 @@
 
 mod common;
 
-use common::{RUNTIME_LOCK, Runtime, RuntimeConfig, fixtures_dir};
+use common::{fixtures_dir, Runtime, RuntimeConfig, RUNTIME_LOCK};
 
 // ── Single-image runtime execution tests ─────────────────────────────
 
 #[test]
 fn runtime_return42() {
-    let Some(result) = common::run_fixture("return42/return42") else { return };
+    let Some(result) = common::run_fixture("return42/return42") else {
+        return;
+    };
 
     assert_eq!(result.exit_code, 42, "return42 should exit with code 42");
     assert_eq!(result.images_loaded, 1);
@@ -17,7 +19,9 @@ fn runtime_return42() {
 
 #[test]
 fn runtime_simple_cli() {
-    let Some(result) = common::run_fixture("simple_cli/simple_cli") else { return };
+    let Some(result) = common::run_fixture("simple_cli/simple_cli") else {
+        return;
+    };
 
     assert_eq!(result.exit_code, 0, "simple_cli should exit with code 0");
     assert!(result.shims_installed > 0);
@@ -25,7 +29,9 @@ fn runtime_simple_cli() {
 
 #[test]
 fn runtime_constructor_test() {
-    let Some(result) = common::run_fixture("constructor_test/constructor_test") else { return };
+    let Some(result) = common::run_fixture("constructor_test/constructor_test") else {
+        return;
+    };
 
     assert_eq!(result.exit_code, 0);
     assert!(
@@ -38,7 +44,9 @@ fn runtime_constructor_test() {
 
 #[test]
 fn runtime_dylib_chain() {
-    let Some(result) = common::run_fixture("dylib_chain/app") else { return };
+    let Some(result) = common::run_fixture("dylib_chain/app") else {
+        return;
+    };
 
     assert_eq!(result.exit_code, 0, "dylib_chain should exit with code 0");
     assert!(
@@ -50,7 +58,9 @@ fn runtime_dylib_chain() {
 
 #[test]
 fn runtime_weak_dylib() {
-    let Some(result) = common::run_fixture("weak_dylib/app") else { return };
+    let Some(result) = common::run_fixture("weak_dylib/app") else {
+        return;
+    };
 
     // weak_dylib should still run (uses else branch when dylib is absent)
     assert_eq!(result.exit_code, 0);
@@ -58,7 +68,9 @@ fn runtime_weak_dylib() {
 
 #[test]
 fn runtime_fat_binary() {
-    let Some(result) = common::run_fixture("fat_binary/app") else { return };
+    let Some(result) = common::run_fixture("fat_binary/app") else {
+        return;
+    };
 
     assert_eq!(result.exit_code, 0, "fat_binary should exit with code 0");
     assert_eq!(result.images_loaded, 1);
@@ -66,7 +78,9 @@ fn runtime_fat_binary() {
 
 #[test]
 fn runtime_framework_style() {
-    let Some(result) = common::run_fixture("framework_style/app") else { return };
+    let Some(result) = common::run_fixture("framework_style/app") else {
+        return;
+    };
 
     assert_eq!(
         result.exit_code, 0,
@@ -83,21 +97,27 @@ fn runtime_framework_style() {
 
 #[test]
 fn runtime_tlv_basic() {
-    let Some(result) = common::run_fixture("tlv_basic/app") else { return };
+    let Some(result) = common::run_fixture("tlv_basic/app") else {
+        return;
+    };
 
     assert_eq!(result.exit_code, 0, "tlv_basic should exit with code 0");
 }
 
 #[test]
 fn runtime_process_info() {
-    let Some(result) = common::run_fixture("process_info/process_info") else { return };
+    let Some(result) = common::run_fixture("process_info/process_info") else {
+        return;
+    };
 
     assert_eq!(result.exit_code, 0, "process_info should exit with code 0");
 }
 
 #[test]
 fn runtime_dispatch_test() {
-    let Some(result) = common::run_fixture("dispatch_test/dispatch_test") else { return };
+    let Some(result) = common::run_fixture("dispatch_test/dispatch_test") else {
+        return;
+    };
 
     assert_eq!(result.exit_code, 0, "dispatch_test should exit with code 0");
 }
@@ -170,7 +190,9 @@ fn runtime_malformed_truncated_header_rejected() {
 
 #[test]
 fn runtime_dylib_chain_images_counted() {
-    let Some(result) = common::run_fixture("dylib_chain/app") else { return };
+    let Some(result) = common::run_fixture("dylib_chain/app") else {
+        return;
+    };
 
     // dylib_chain has: app → libchaina → libchainb
     // images_loaded should be 3 (2 dylibs + main)
@@ -183,7 +205,9 @@ fn runtime_dylib_chain_images_counted() {
 
 #[test]
 fn runtime_shim_count_with_all_categories() {
-    let Some(result) = common::run_fixture("return42/return42") else { return };
+    let Some(result) = common::run_fixture("return42/return42") else {
+        return;
+    };
 
     use libsystem_shims::ShimConfig;
     use macho_runtime::{RuntimeContext, ShimSet};
@@ -266,13 +290,17 @@ fn runtime_tracing_collects_pipeline_events() {
 
 #[test]
 fn runtime_struct_return_exit_zero() {
-    let Some(result) = common::run_fixture("struct_return/app") else { return };
+    let Some(result) = common::run_fixture("struct_return/app") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0, "struct_return fixture should exit 0");
 }
 
 #[test]
 fn runtime_struct_return_shims_resolved() {
-    let Some(result) = common::run_fixture("struct_return/app") else { return };
+    let Some(result) = common::run_fixture("struct_return/app") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0);
     // The fixture uses objc_msgSend (and implicitly objc_msgSend_stret for CGRect).
     // If it exits 0, both regular and struct-returning dispatch worked.
@@ -283,13 +311,17 @@ fn runtime_struct_return_shims_resolved() {
 
 #[test]
 fn runtime_cf_bridging_exit_zero() {
-    let Some(result) = common::run_fixture("cf_bridging/app") else { return };
+    let Some(result) = common::run_fixture("cf_bridging/app") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0, "cf_bridging fixture should exit 0");
 }
 
 #[test]
 fn runtime_cf_bridging_shims_resolved() {
-    let Some(result) = common::run_fixture("cf_bridging/app") else { return };
+    let Some(result) = common::run_fixture("cf_bridging/app") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0);
     assert!(result.shims_installed >= 333, "should have all CF shims");
 }

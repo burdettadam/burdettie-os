@@ -40,7 +40,11 @@ impl GpuRenderer {
         // Create render target texture
         let render_texture = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("render_target"),
-            size: wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
+            size: wgpu::Extent3d {
+                width: w,
+                height: h,
+                depth_or_array_layers: 1,
+            },
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
@@ -54,16 +58,21 @@ impl GpuRenderer {
         let vertex_buffer = if self.vertices.is_empty() {
             None
         } else {
-            Some(self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("vertex_buffer"),
-                contents: bytemuck::cast_slice(&self.vertices),
-                usage: wgpu::BufferUsages::VERTEX,
-            }))
+            Some(
+                self.device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("vertex_buffer"),
+                        contents: bytemuck::cast_slice(&self.vertices),
+                        usage: wgpu::BufferUsages::VERTEX,
+                    }),
+            )
         };
 
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("render_encoder"),
-        });
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("render_encoder"),
+            });
 
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -112,7 +121,11 @@ impl GpuRenderer {
                     rows_per_image: Some(h),
                 },
             },
-            wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
+            wgpu::Extent3d {
+                width: w,
+                height: h,
+                depth_or_array_layers: 1,
+            },
         );
 
         self.queue.submit(std::iter::once(encoder.finish()));
@@ -144,6 +157,4 @@ impl GpuRenderer {
         self.vertices.clear();
         surface
     }
-
-    /// Returns true if a GPU device was successfully initialized.
 }

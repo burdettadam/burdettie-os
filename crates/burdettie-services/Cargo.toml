@@ -9,6 +9,7 @@ rust-version.workspace = true
 [dependencies]
 burdettie-domain-map   = { workspace = true }
 burdettie-log-pipeline = { workspace = true }
+burdettie-memory-index = { workspace = true }
 log                  = { workspace = true }
 serde                = { workspace = true }
 serde_json           = { workspace = true }
@@ -19,6 +20,7 @@ ureq                 = { workspace = true }
 tiny_http            = "0.12"
 
 [dev-dependencies]
+tempfile             = { workspace = true }
 
 [lints]
 workspace = true

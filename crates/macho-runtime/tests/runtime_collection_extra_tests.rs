@@ -7,14 +7,18 @@ mod common;
 
 #[test]
 fn runtime_nsstring_manip_exit_zero() {
-    let Some(result) = common::run_fixture("nsstring_manip/app") else { return };
+    let Some(result) = common::run_fixture("nsstring_manip/app") else {
+        return;
+    };
 
     assert_eq!(result.exit_code, 0, "nsstring_manip should exit 0");
 }
 
 #[test]
 fn runtime_nsstring_manip_nslog_captures() {
-    let Some((result, lines)) = common::run_fixture_with_nslog("nsstring_manip/app") else { return };
+    let Some((result, lines)) = common::run_fixture_with_nslog("nsstring_manip/app") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0);
 
     assert!(
@@ -28,14 +32,18 @@ fn runtime_nsstring_manip_nslog_captures() {
 
 #[test]
 fn runtime_nsstring_format_exit_zero() {
-    let Some(result) = common::run_fixture("nsstring_format/app") else { return };
+    let Some(result) = common::run_fixture("nsstring_format/app") else {
+        return;
+    };
 
     assert_eq!(result.exit_code, 0, "nsstring_format should exit 0");
 }
 
 #[test]
 fn runtime_nsstring_format_nslog_captures() {
-    let Some((result, lines)) = common::run_fixture_with_nslog("nsstring_format/app") else { return };
+    let Some((result, lines)) = common::run_fixture_with_nslog("nsstring_format/app") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0);
 
     assert!(
@@ -51,14 +59,18 @@ fn runtime_nsstring_format_nslog_captures() {
 
 #[test]
 fn runtime_nsmutablearray_basics_exit_zero() {
-    let Some(result) = common::run_fixture("nsmutablearray_basics/app") else { return };
+    let Some(result) = common::run_fixture("nsmutablearray_basics/app") else {
+        return;
+    };
 
     assert_eq!(result.exit_code, 0, "nsmutablearray_basics should exit 0");
 }
 
 #[test]
 fn runtime_nsmutablearray_nslog_captures() {
-    let Some((result, lines)) = common::run_fixture_with_nslog("nsmutablearray_basics/app") else { return };
+    let Some((result, lines)) = common::run_fixture_with_nslog("nsmutablearray_basics/app") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0);
 
     assert!(
@@ -72,7 +84,9 @@ fn runtime_nsmutablearray_nslog_captures() {
 
 #[test]
 fn runtime_nsmutabledictionary_basics_exit_zero() {
-    let Some(result) = common::run_fixture("nsmutabledictionary_basics/app") else { return };
+    let Some(result) = common::run_fixture("nsmutabledictionary_basics/app") else {
+        return;
+    };
 
     assert_eq!(
         result.exit_code, 0,
@@ -82,7 +96,10 @@ fn runtime_nsmutabledictionary_basics_exit_zero() {
 
 #[test]
 fn runtime_nsmutabledictionary_nslog_captures() {
-    let Some((result, lines)) = common::run_fixture_with_nslog("nsmutabledictionary_basics/app") else { return };
+    let Some((result, lines)) = common::run_fixture_with_nslog("nsmutabledictionary_basics/app")
+    else {
+        return;
+    };
     assert_eq!(result.exit_code, 0);
 
     assert!(
@@ -96,14 +113,19 @@ fn runtime_nsmutabledictionary_nslog_captures() {
 
 #[test]
 fn runtime_nslog_format_specifiers_exit_zero() {
-    let Some(result) = common::run_fixture("nslog_format_specifiers/app") else { return };
+    let Some(result) = common::run_fixture("nslog_format_specifiers/app") else {
+        return;
+    };
 
     assert_eq!(result.exit_code, 0, "nslog_format_specifiers should exit 0");
 }
 
 #[test]
 fn runtime_nslog_format_specifiers_captures() {
-    let Some((result, lines)) = common::run_fixture_with_nslog("nslog_format_specifiers/app") else { return };
+    let Some((result, lines)) = common::run_fixture_with_nslog("nslog_format_specifiers/app")
+    else {
+        return;
+    };
     assert_eq!(result.exit_code, 0);
 
     assert!(

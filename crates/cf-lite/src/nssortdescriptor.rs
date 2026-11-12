@@ -131,8 +131,7 @@ pub extern "C" fn shim_nssortdescriptor_compare_object(obj: u64, _cmd: u64, a: u
                 resolve_isa(rt, a)
                     .and_then(|isa| rt.msg_lookup(isa, key))
                     .map(|imp| {
-                        let f: extern "C" fn(u64, u64) -> u64 =
-                            unsafe { std::mem::transmute(imp) };
+                        let f: extern "C" fn(u64, u64) -> u64 = unsafe { std::mem::transmute(imp) };
                         f(a, 0)
                     })
                     .unwrap_or(a)
@@ -143,8 +142,7 @@ pub extern "C" fn shim_nssortdescriptor_compare_object(obj: u64, _cmd: u64, a: u
                 resolve_isa(rt, b)
                     .and_then(|isa| rt.msg_lookup(isa, key))
                     .map(|imp| {
-                        let f: extern "C" fn(u64, u64) -> u64 =
-                            unsafe { std::mem::transmute(imp) };
+                        let f: extern "C" fn(u64, u64) -> u64 = unsafe { std::mem::transmute(imp) };
                         f(b, 0)
                     })
                     .unwrap_or(b)

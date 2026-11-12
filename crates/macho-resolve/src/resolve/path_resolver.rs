@@ -207,12 +207,11 @@ mod tests {
     fn path_resolver_env_stored() {
         let mut env = SearchEnv::default();
         env.library_path.push(PathBuf::from("/custom/lib"));
-        let pr = PathResolver::new_with_env(
-            PathBuf::from("/usr/bin/myapp"),
-            vec![],
-            env,
+        let pr = PathResolver::new_with_env(PathBuf::from("/usr/bin/myapp"), vec![], env);
+        assert_eq!(
+            pr.search_env.library_path,
+            vec![PathBuf::from("/custom/lib")]
         );
-        assert_eq!(pr.search_env.library_path, vec![PathBuf::from("/custom/lib")]);
     }
 
     #[test]
@@ -231,7 +230,10 @@ mod tests {
 
         let pr = PathResolver::new(exe, vec![]);
         let result = pr.resolve("@executable_path/libfoo.dylib");
-        assert!(result.is_some(), "should resolve @executable_path/libfoo.dylib");
+        assert!(
+            result.is_some(),
+            "should resolve @executable_path/libfoo.dylib"
+        );
         assert_eq!(result.unwrap(), lib);
     }
 
@@ -263,7 +265,10 @@ mod tests {
 
         let pr = PathResolver::new(PathBuf::from("/usr/bin/myapp"), vec![]);
         let result = pr.resolve(lib.to_str().unwrap());
-        assert!(result.is_some(), "absolute path to existing file should resolve");
+        assert!(
+            result.is_some(),
+            "absolute path to existing file should resolve"
+        );
         assert_eq!(result.unwrap(), lib);
     }
 

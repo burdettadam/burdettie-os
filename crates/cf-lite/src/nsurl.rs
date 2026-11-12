@@ -105,8 +105,10 @@ fn host_cfstring_to_rust(obj: u64) -> Option<String> {
         return None;
     }
 
-    let cf_string_get_length: HostCFStringGetLengthFn = unsafe { std::mem::transmute(get_length_sym) };
-    let cf_string_get_cstring: HostCFStringGetCStringFn = unsafe { std::mem::transmute(get_cstring_sym) };
+    let cf_string_get_length: HostCFStringGetLengthFn =
+        unsafe { std::mem::transmute(get_length_sym) };
+    let cf_string_get_cstring: HostCFStringGetCStringFn =
+        unsafe { std::mem::transmute(get_cstring_sym) };
 
     let len = unsafe { cf_string_get_length(obj) };
     if len < 0 {
@@ -154,7 +156,8 @@ fn host_url_path_string(obj: u64) -> Option<String> {
         return None;
     }
 
-    let cf_url_copy_file_system_path: HostCFURLCopyFileSystemPathFn = unsafe { std::mem::transmute(symbol) };
+    let cf_url_copy_file_system_path: HostCFURLCopyFileSystemPathFn =
+        unsafe { std::mem::transmute(symbol) };
     let host_path = unsafe { cf_url_copy_file_system_path(obj, 0) };
     if host_path == 0 {
         return None;
@@ -364,12 +367,22 @@ pub extern "C" fn shim_nsurl_url_by_appending_path_component(
     if obj == 0 || component == 0 {
         return 0;
     }
-    if let (Some(base), Some(comp)) = (extract_absolute_url_string(obj), cfstring::extract_cfstring_cstr(component)) {
+    if let (Some(base), Some(comp)) = (
+        extract_absolute_url_string(obj),
+        cfstring::extract_cfstring_cstr(component),
+    ) {
         let sep = if base.ends_with('/') { "" } else { "/" };
         let new_url = format!("{}{}{}", base, sep, comp);
         let c_str = CString::new(new_url).unwrap_or_default();
         let ns_str = cfstring::shim_cf_string_create_with_cstring(0, c_str.as_ptr(), 0);
-        alloc_url(ns_str, if is_synthetic_url(obj) { url_is_file(obj) } else { base.starts_with("file://") })
+        alloc_url(
+            ns_str,
+            if is_synthetic_url(obj) {
+                url_is_file(obj)
+            } else {
+                base.starts_with("file://")
+            },
+        )
     } else {
         0
     }
@@ -515,11 +528,7 @@ pub extern "C" fn shim_nsurl_url_by_deleting_path_extension(obj: u64, _cmd: u64)
 }
 
 /// `-[NSURL URLByAppendingPathExtension:]` — returns a new URL with the extension appended.
-pub extern "C" fn shim_nsurl_url_by_appending_path_extension(
-    obj: u64,
-    _cmd: u64,
-    ext: u64,
-) -> u64 {
+pub extern "C" fn shim_nsurl_url_by_appending_path_extension(obj: u64, _cmd: u64, ext: u64) -> u64 {
     if obj == 0 || ext == 0 {
         return 0;
     }
@@ -712,20 +721,17 @@ mod tests {
         type HostCFStringCreateWithCStringFn = unsafe extern "C" fn(u64, *const c_char, u32) -> u64;
         type HostCFURLCreateWithFileSystemPathFn = unsafe extern "C" fn(u64, u64, i64, u8) -> u64;
 
-        let cf_string_create: HostCFStringCreateWithCStringFn = unsafe {
-            std::mem::transmute(host_cf_symbol(b"CFStringCreateWithCString\0"))
-        };
-        let cf_url_create_with_file_system_path: HostCFURLCreateWithFileSystemPathFn = unsafe {
-            std::mem::transmute(host_cf_symbol(b"CFURLCreateWithFileSystemPath\0"))
-        };
+        let cf_string_create: HostCFStringCreateWithCStringFn =
+            unsafe { std::mem::transmute(host_cf_symbol(b"CFStringCreateWithCString\0")) };
+        let cf_url_create_with_file_system_path: HostCFURLCreateWithFileSystemPathFn =
+            unsafe { std::mem::transmute(host_cf_symbol(b"CFURLCreateWithFileSystemPath\0")) };
 
         let cstr = CString::new(path).unwrap();
         let host_path = unsafe {
             cf_string_create(0, cstr.as_ptr(), crate::cfstring::K_CF_STRING_ENCODING_UTF8)
         };
-        let url = unsafe {
-            cf_url_create_with_file_system_path(0, host_path, 0, u8::from(is_directory))
-        };
+        let url =
+            unsafe { cf_url_create_with_file_system_path(0, host_path, 0, u8::from(is_directory)) };
         host_cf_release(host_path);
         url
     }
@@ -750,7 +756,10 @@ mod tests {
     fn url_with_string_basic() {
         let url = url_from_str("https://example.com/foo");
         assert_ne!(url, 0);
-        assert_string_eq(shim_nsurl_absolute_string(url, 0), "https://example.com/foo");
+        assert_string_eq(
+            shim_nsurl_absolute_string(url, 0),
+            "https://example.com/foo",
+        );
         free_obj(url);
     }
 
@@ -965,7 +974,10 @@ mod tests {
         let comp = make_string("test.txt");
         let result = shim_nsurl_url_by_appending_path_component(url, 0, comp);
         assert_ne!(result, 0);
-        assert_string_eq(shim_nsurl_absolute_string(result, 0), "file:///tmp/test.txt");
+        assert_string_eq(
+            shim_nsurl_absolute_string(result, 0),
+            "file:///tmp/test.txt",
+        );
         assert_eq!(shim_nsurl_is_file_url(result, 0), 1);
         free_obj(result);
         free_obj(url);
@@ -1071,11 +1083,11 @@ mod tests {
         assert_ne!(url, 0);
 
         assert_string_eq(shim_nsurl_scheme(url, 0), "https");
+        assert_string_eq(shim_nsurl_path(url, 0), "/path/to/resource?q=1&r=2#section");
         assert_string_eq(
-            shim_nsurl_path(url, 0),
-            "/path/to/resource?q=1&r=2#section",
+            shim_nsurl_last_path_component(url, 0),
+            "resource?q=1&r=2#section",
         );
-        assert_string_eq(shim_nsurl_last_path_component(url, 0), "resource?q=1&r=2#section");
         assert_eq!(shim_nsurl_is_file_url(url, 0), 0);
 
         free_obj(url);
@@ -1153,7 +1165,10 @@ mod tests {
         let url = url_from_str("https://example.com/a/b/c");
         let result = shim_nsurl_url_by_deleting_last_path_component(url, 0);
         assert_ne!(result, 0);
-        assert_string_eq(shim_nsurl_absolute_string(result, 0), "https://example.com/a/b/");
+        assert_string_eq(
+            shim_nsurl_absolute_string(result, 0),
+            "https://example.com/a/b/",
+        );
         free_obj(result);
         free_obj(url);
     }
@@ -1180,7 +1195,10 @@ mod tests {
         let url = file_url_from_str("/tmp/Makefile");
         let result = shim_nsurl_url_by_deleting_path_extension(url, 0);
         assert_ne!(result, 0);
-        assert_string_eq(shim_nsurl_absolute_string(result, 0), "file:///tmp/Makefile");
+        assert_string_eq(
+            shim_nsurl_absolute_string(result, 0),
+            "file:///tmp/Makefile",
+        );
         free_obj(result);
         free_obj(url);
     }
@@ -1190,7 +1208,10 @@ mod tests {
         let url = file_url_from_str("/tmp/archive.tar.gz");
         let result = shim_nsurl_url_by_deleting_path_extension(url, 0);
         assert_ne!(result, 0);
-        assert_string_eq(shim_nsurl_absolute_string(result, 0), "file:///tmp/archive.tar");
+        assert_string_eq(
+            shim_nsurl_absolute_string(result, 0),
+            "file:///tmp/archive.tar",
+        );
         free_obj(result);
         free_obj(url);
     }
@@ -1216,7 +1237,10 @@ mod tests {
         let ext = make_string("txt");
         let result = shim_nsurl_url_by_appending_path_extension(url, 0, ext);
         assert_ne!(result, 0);
-        assert_string_eq(shim_nsurl_absolute_string(result, 0), "file:///tmp/file.txt");
+        assert_string_eq(
+            shim_nsurl_absolute_string(result, 0),
+            "file:///tmp/file.txt",
+        );
         free_obj(result);
         free_obj(url);
     }
@@ -1235,9 +1259,18 @@ mod tests {
         assert_ne!(arr, 0);
         assert_eq!(crate::nsarray::shim_nsarray_count(arr, 0), 4);
         assert_string_eq(crate::nsarray::shim_nsarray_object_at_index(arr, 0, 0), "/");
-        assert_string_eq(crate::nsarray::shim_nsarray_object_at_index(arr, 0, 1), "tmp");
-        assert_string_eq(crate::nsarray::shim_nsarray_object_at_index(arr, 0, 2), "docs");
-        assert_string_eq(crate::nsarray::shim_nsarray_object_at_index(arr, 0, 3), "README.md");
+        assert_string_eq(
+            crate::nsarray::shim_nsarray_object_at_index(arr, 0, 1),
+            "tmp",
+        );
+        assert_string_eq(
+            crate::nsarray::shim_nsarray_object_at_index(arr, 0, 2),
+            "docs",
+        );
+        assert_string_eq(
+            crate::nsarray::shim_nsarray_object_at_index(arr, 0, 3),
+            "README.md",
+        );
         free_obj(url);
     }
 
@@ -1284,7 +1317,10 @@ mod tests {
 
     #[test]
     fn init_with_string_nil_obj() {
-        assert_eq!(shim_nsurl_init_with_string(0, 0, make_string("http://x")), 0);
+        assert_eq!(
+            shim_nsurl_init_with_string(0, 0, make_string("http://x")),
+            0
+        );
     }
 
     #[test]
@@ -1300,7 +1336,10 @@ mod tests {
         let s = make_string("https://example.com/path");
         let result = shim_nsurl_init_with_string(obj, 0, s);
         assert_eq!(result, obj);
-        assert_string_eq(shim_nsurl_absolute_string(result, 0), "https://example.com/path");
+        assert_string_eq(
+            shim_nsurl_absolute_string(result, 0),
+            "https://example.com/path",
+        );
         assert_eq!(shim_nsurl_is_file_url(result, 0), 0);
         free_obj(obj);
     }
@@ -1319,7 +1358,10 @@ mod tests {
 
     #[test]
     fn init_with_string_relative_nil_obj() {
-        assert_eq!(shim_nsurl_init_with_string_relative(0, 0, make_string("x"), 0), 0);
+        assert_eq!(
+            shim_nsurl_init_with_string_relative(0, 0, make_string("x"), 0),
+            0
+        );
     }
 
     #[test]
@@ -1346,7 +1388,10 @@ mod tests {
         let s = make_string("page.html");
         let result = shim_nsurl_init_with_string_relative(obj, 0, s, base);
         assert_eq!(result, obj);
-        assert_string_eq(shim_nsurl_absolute_string(result, 0), "https://example.com/dir/page.html");
+        assert_string_eq(
+            shim_nsurl_absolute_string(result, 0),
+            "https://example.com/dir/page.html",
+        );
         free_obj(obj);
         free_obj(base);
     }
@@ -1361,7 +1406,10 @@ mod tests {
     #[test]
     fn resource_specifier_http() {
         let url = url_from_str("https://example.com/path?q=1");
-        assert_string_eq(shim_nsurl_resource_specifier(url, 0), "//example.com/path?q=1");
+        assert_string_eq(
+            shim_nsurl_resource_specifier(url, 0),
+            "//example.com/path?q=1",
+        );
         free_obj(url);
     }
 

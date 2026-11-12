@@ -11,13 +11,38 @@ use std::sync::Mutex;
 
 pub fn install(table: &mut ShimTable) {
     use libsystem_shims::register_shims;
-    register_shims!(table,
-        ("_CGGradientCreateWithColorComponents", shim_gradient_create as *const () as u64, "CGGradientCreateWithColorComponents (bridge → real)"),
-        ("_CGGradientCreateWithColors", shim_gradient_create_with_colors as *const () as u64, "CGGradientCreateWithColors (bridge → real)"),
-        ("_CGGradientRetain", shim_gradient_retain as *const () as u64, "CGGradientRetain (bridge → same)"),
-        ("_CGGradientRelease", shim_gradient_release as *const () as u64, "CGGradientRelease (bridge → real)"),
-        ("_CGContextDrawLinearGradient", shim_draw_linear_gradient as *const () as u64, "CGContextDrawLinearGradient (bridge → real)"),
-        ("_CGContextDrawRadialGradient", shim_draw_radial_gradient as *const () as u64, "CGContextDrawRadialGradient (stub → approx)")
+    register_shims!(
+        table,
+        (
+            "_CGGradientCreateWithColorComponents",
+            shim_gradient_create as *const () as u64,
+            "CGGradientCreateWithColorComponents (bridge → real)"
+        ),
+        (
+            "_CGGradientCreateWithColors",
+            shim_gradient_create_with_colors as *const () as u64,
+            "CGGradientCreateWithColors (bridge → real)"
+        ),
+        (
+            "_CGGradientRetain",
+            shim_gradient_retain as *const () as u64,
+            "CGGradientRetain (bridge → same)"
+        ),
+        (
+            "_CGGradientRelease",
+            shim_gradient_release as *const () as u64,
+            "CGGradientRelease (bridge → real)"
+        ),
+        (
+            "_CGContextDrawLinearGradient",
+            shim_draw_linear_gradient as *const () as u64,
+            "CGContextDrawLinearGradient (bridge → real)"
+        ),
+        (
+            "_CGContextDrawRadialGradient",
+            shim_draw_radial_gradient as *const () as u64,
+            "CGContextDrawRadialGradient (bridge → approx)"
+        )
     );
 }
 
@@ -42,7 +67,11 @@ impl Gradient {
                 let a = &self.stops[i - 1];
                 let b = &self.stops[i];
                 let range = b.0 - a.0;
-                let frac = if range > 1e-12 { (t - a.0) / range } else { 0.0 };
+                let frac = if range > 1e-12 {
+                    (t - a.0) / range
+                } else {
+                    0.0
+                };
                 return (
                     a.1 + (b.1 - a.1) * frac,
                     a.2 + (b.2 - a.2) * frac,
@@ -53,6 +82,92 @@ impl Gradient {
         }
         let s = self.stops.last().unwrap();
         (s.1, s.2, s.3, s.4)
+    }
+}
+
+fn composite_pixel(pixel: &mut u32, r: f64, g: f64, b: f64, a: f64) {
+    if a > 0.999 {
+        *pixel = (255 << 24)
+            | ((r * 255.0) as u32) << 16
+            | ((g * 255.0) as u32) << 8
+            | (b * 255.0) as u32;
+    } else if a > 0.001 {
+        let dst_a = ((*pixel >> 24) & 0xFF) as f64 / 255.0;
+        let dst_r = ((*pixel >> 16) & 0xFF) as f64 / 255.0;
+        let dst_g = ((*pixel >> 8) & 0xFF) as f64 / 255.0;
+        let dst_b = (*pixel & 0xFF) as f64 / 255.0;
+        let out_a = a + dst_a * (1.0 - a);
+        let out_r = (r * a + dst_r * dst_a * (1.0 - a)) / out_a;
+        let out_g = (g * a + dst_g * dst_a * (1.0 - a)) / out_a;
+        let out_b = (b * a + dst_b * dst_a * (1.0 - a)) / out_a;
+        *pixel = ((out_a * 255.0) as u32) << 24
+            | ((out_r * 255.0) as u32) << 16
+            | ((out_g * 255.0) as u32) << 8
+            | (out_b * 255.0) as u32;
+    }
+}
+
+fn radial_gradient_t(
+    px: f64,
+    py: f64,
+    start_x: f64,
+    start_y: f64,
+    start_radius: f64,
+    end_x: f64,
+    end_y: f64,
+    end_radius: f64,
+) -> f64 {
+    let mx = px - start_x;
+    let my = py - start_y;
+    let dx = end_x - start_x;
+    let dy = end_y - start_y;
+    let dr = end_radius - start_radius;
+
+    // Solve |(P - S) - t(E - S)| = r0 + t(r1 - r0) for t.
+    let a = dx * dx + dy * dy - dr * dr;
+    let b = -2.0 * (mx * dx + my * dy + start_radius * dr);
+    let c = mx * mx + my * my - start_radius * start_radius;
+
+    if a.abs() < 1e-12 {
+        if b.abs() < 1e-12 {
+            return if c <= 0.0 { 0.0 } else { 1.0 };
+        }
+        return (-c / b).clamp(0.0, 1.0);
+    }
+
+    let discriminant = b * b - 4.0 * a * c;
+    if discriminant < 0.0 {
+        if dr.abs() < 1e-12 {
+            return if c <= 0.0 { 0.0 } else { 1.0 };
+        }
+        let dist = (mx * mx + my * my).sqrt();
+        return ((dist - start_radius) / dr).clamp(0.0, 1.0);
+    }
+
+    let sqrt_disc = discriminant.sqrt();
+    let t0 = (-b - sqrt_disc) / (2.0 * a);
+    let t1 = (-b + sqrt_disc) / (2.0 * a);
+    let mut valid = [t0, t1]
+        .into_iter()
+        .filter(|t| t.is_finite() && (0.0..=1.0).contains(t));
+    if let Some(first) = valid.next() {
+        return valid.fold(first, |chosen, candidate| {
+            if dr >= 0.0 {
+                chosen.max(candidate)
+            } else {
+                chosen.min(candidate)
+            }
+        });
+    }
+
+    let start_dist = (mx * mx + my * my).sqrt() - start_radius;
+    let end_dx = px - end_x;
+    let end_dy = py - end_y;
+    let end_dist = (end_dx * end_dx + end_dy * end_dy).sqrt() - end_radius;
+    if end_dist.abs() < start_dist.abs() {
+        1.0
+    } else {
+        0.0
     }
 }
 
@@ -179,26 +294,7 @@ pub extern "C" fn shim_draw_linear_gradient(
                 let t_clamped = t.clamp(0.0, 1.0);
                 let (r, g, b, a) = grad.color_at(t_clamped);
                 let pixel = &mut pixels[py * width + px];
-                // Alpha-composite over existing pixel.
-                if a > 0.999 {
-                    *pixel = (255 << 24)
-                        | ((r * 255.0) as u32) << 16
-                        | ((g * 255.0) as u32) << 8
-                        | (b * 255.0) as u32;
-                } else if a > 0.001 {
-                    let dst_a = ((*pixel >> 24) & 0xFF) as f64 / 255.0;
-                    let dst_r = ((*pixel >> 16) & 0xFF) as f64 / 255.0;
-                    let dst_g = ((*pixel >> 8) & 0xFF) as f64 / 255.0;
-                    let dst_b = (*pixel & 0xFF) as f64 / 255.0;
-                    let out_a = a + dst_a * (1.0 - a);
-                    let out_r = (r * a + dst_r * dst_a * (1.0 - a)) / out_a;
-                    let out_g = (g * a + dst_g * dst_a * (1.0 - a)) / out_a;
-                    let out_b = (b * a + dst_b * dst_a * (1.0 - a)) / out_a;
-                    *pixel = ((out_a * 255.0) as u32) << 24
-                        | ((out_r * 255.0) as u32) << 16
-                        | ((out_g * 255.0) as u32) << 8
-                        | (out_b * 255.0) as u32;
-                }
+                composite_pixel(pixel, r, g, b, a);
             }
         }
     });
@@ -206,17 +302,52 @@ pub extern "C" fn shim_draw_linear_gradient(
 
 /// CGContextDrawRadialGradient — simplified approximation.
 pub extern "C" fn shim_draw_radial_gradient(
-    _ctx: u64,
-    _gradient: u64,
-    _start_x: f64,
-    _start_y: f64,
-    _start_radius: f64,
-    _end_x: f64,
-    _end_y: f64,
-    _end_radius: f64,
+    ctx: u64,
+    gradient: u64,
+    start_x: f64,
+    start_y: f64,
+    start_radius: f64,
+    end_x: f64,
+    end_y: f64,
+    end_radius: f64,
     _options: u32,
 ) {
-    // TODO: implement radial gradient rendering
+    let stops: Vec<(f64, f64, f64, f64, f64)> = {
+        let guard = GRADIENTS.lock().unwrap_or_else(|e| e.into_inner());
+        guard
+            .as_ref()
+            .and_then(|m| m.get(&gradient))
+            .map(|g| g.stops.clone())
+            .unwrap_or_default()
+    };
+    if stops.is_empty() {
+        return;
+    }
+    let grad = Gradient { stops };
+
+    bridge::with_context(ctx, |c| {
+        let width = c.surface.width() as usize;
+        let height = c.surface.height() as usize;
+        let pixels = c.surface.pixels_mut();
+        for py in 0..height {
+            for px in 0..width {
+                let fx = px as f64 + 0.5;
+                let fy = py as f64 + 0.5;
+                let t = radial_gradient_t(
+                    fx,
+                    fy,
+                    start_x,
+                    start_y,
+                    start_radius,
+                    end_x,
+                    end_y,
+                    end_radius,
+                );
+                let (r, g, b, a) = grad.color_at(t.clamp(0.0, 1.0));
+                composite_pixel(&mut pixels[py * width + px], r, g, b, a);
+            }
+        }
+    });
 }
 
 #[cfg(test)]
@@ -224,24 +355,31 @@ mod tests {
     use super::*;
     use libsystem_shims::table::ShimTable;
 
+    fn pixel_rgba(pixel: u32) -> (u8, u8, u8, u8) {
+        (
+            ((pixel >> 16) & 0xFF) as u8,
+            ((pixel >> 8) & 0xFF) as u8,
+            (pixel & 0xFF) as u8,
+            ((pixel >> 24) & 0xFF) as u8,
+        )
+    }
+
     #[test]
     fn gradient_stubs_registered() {
         let mut table = ShimTable::new();
         install(&mut table);
-        assert!(table.resolve("_CGGradientCreateWithColorComponents").is_some());
+        assert!(table
+            .resolve("_CGGradientCreateWithColorComponents")
+            .is_some());
         assert!(table.resolve("_CGContextDrawLinearGradient").is_some());
+        assert!(table.resolve("_CGContextDrawRadialGradient").is_some());
     }
 
     #[test]
     fn gradient_create_and_release() {
         let components: [f64; 8] = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0];
         let locations: [f64; 2] = [0.0, 1.0];
-        let h = shim_gradient_create(
-            0,
-            components.as_ptr() as u64,
-            locations.as_ptr() as u64,
-            2,
-        );
+        let h = shim_gradient_create(0, components.as_ptr() as u64, locations.as_ptr() as u64, 2);
         assert_ne!(h, 0);
         shim_gradient_release(h);
     }
@@ -256,5 +394,37 @@ mod tests {
         let (r, _, b, _) = g.color_at(0.5);
         assert!((r - 0.5).abs() < 1e-6);
         assert!((b - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn radial_gradient_renders_center_and_edge_colors() {
+        let components: [f64; 8] = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0];
+        let locations: [f64; 2] = [0.0, 1.0];
+        let gradient =
+            shim_gradient_create(0, components.as_ptr() as u64, locations.as_ptr() as u64, 2);
+        let ctx = bridge::context_create(9, 9);
+
+        shim_draw_radial_gradient(ctx, gradient, 4.5, 4.5, 0.0, 4.5, 4.5, 4.0, 0);
+
+        let (center, edge) = bridge::with_context(ctx, |c| {
+            let pixels = c.surface.pixels();
+            (pixels[4 * 9 + 4], pixels[0])
+        })
+        .expect("context should exist");
+        let (center_r, _, center_b, center_a) = pixel_rgba(center);
+        let (edge_r, _, edge_b, edge_a) = pixel_rgba(edge);
+
+        assert!(center_r > 200, "center should stay near start color red");
+        assert!(
+            center_b < 80,
+            "center should not drift strongly toward end blue"
+        );
+        assert!(edge_b > 200, "edge should reach end color blue");
+        assert!(edge_r < 80, "edge should no longer be strongly red");
+        assert_eq!(center_a, 255);
+        assert_eq!(edge_a, 255);
+
+        bridge::context_release(ctx);
+        shim_gradient_release(gradient);
     }
 }

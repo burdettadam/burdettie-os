@@ -45,7 +45,10 @@ pub fn init(format: OutputFormat) {
 pub fn init_with_sink(format: OutputFormat, sink: SinkConfig) {
     GLOBAL_COLLECTOR.init(format);
     sink::GLOBAL_SINK.init(sink);
-    log::debug!("burdettie-log-pipeline: initialized with format {:?}", format);
+    log::debug!(
+        "burdettie-log-pipeline: initialized with format {:?}",
+        format
+    );
 }
 
 /// Emit a structured log event into the pipeline.

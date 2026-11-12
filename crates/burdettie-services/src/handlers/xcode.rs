@@ -11,9 +11,13 @@ use tiny_http::Request;
 pub struct XcodeHandler;
 
 impl Handler for XcodeHandler {
-    fn handle(&self, path: &str, method: &str, body: &[u8], _request: &Request)
-        -> Option<HandlerResponse>
-    {
+    fn handle(
+        &self,
+        path: &str,
+        method: &str,
+        body: &[u8],
+        _request: &Request,
+    ) -> Option<HandlerResponse> {
         if !path.starts_with("/api/v1/xcode/") {
             return None;
         }

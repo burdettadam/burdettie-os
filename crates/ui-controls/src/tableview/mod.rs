@@ -240,8 +240,7 @@ impl TableView {
         // Header
         let mut body_y = frame.y;
         if self.shows_header {
-            let header_rect =
-                Rect::new(frame.x, frame.y, frame.width, self.header_height);
+            let header_rect = Rect::new(frame.x, frame.y, frame.width, self.header_height);
             renderer.fill_rect(header_rect, self.header_bg);
 
             let mut col_x = frame.x;
@@ -313,7 +312,6 @@ impl TableView {
         renderer.stroke_rect(frame, Color::new(0.7, 0.7, 0.7, 1.0), 1.0);
     }
 }
-
 
 #[cfg(test)]
 mod tests;

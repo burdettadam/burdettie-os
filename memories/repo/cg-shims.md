@@ -1,0 +1,1 @@
+- Radial gradients in `cg-shims` need endpoint fallback when the circle interpolation quadratic has no root in `[0, 1]`; otherwise pixels outside the end circle can incorrectly snap back to the start stop instead of clamping toward the nearer endpoint circle.

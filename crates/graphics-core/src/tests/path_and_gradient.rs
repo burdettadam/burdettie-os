@@ -87,7 +87,10 @@ fn path_rect() {
 fn path_rounded_rect() {
     let p = BezierPath::rounded_rect(0.0, 0.0, 100.0, 80.0, 10.0);
     assert!(!p.is_empty());
-    let has_cubic = p.elements().iter().any(|e| matches!(e, PathElement::CubicTo { .. }));
+    let has_cubic = p
+        .elements()
+        .iter()
+        .any(|e| matches!(e, PathElement::CubicTo { .. }));
     assert!(has_cubic, "rounded rect should contain cubic curves");
 }
 
@@ -97,7 +100,10 @@ fn path_rounded_rect_zero_radius() {
     let r = BezierPath::rect(10.0, 20.0, 50.0, 60.0);
     assert_eq!(rr.elements().len(), r.elements().len());
     // No cubics — it should be the same as a plain rect.
-    let has_cubic = rr.elements().iter().any(|e| matches!(e, PathElement::CubicTo { .. }));
+    let has_cubic = rr
+        .elements()
+        .iter()
+        .any(|e| matches!(e, PathElement::CubicTo { .. }));
     assert!(!has_cubic);
 }
 
@@ -105,16 +111,30 @@ fn path_rounded_rect_zero_radius() {
 fn path_circle() {
     let p = BezierPath::circle(50.0, 50.0, 20.0);
     assert!(!p.is_empty());
-    let cubic_count = p.elements().iter().filter(|e| matches!(e, PathElement::CubicTo { .. })).count();
-    assert!(cubic_count >= 4, "circle should have at least 4 cubic segments");
+    let cubic_count = p
+        .elements()
+        .iter()
+        .filter(|e| matches!(e, PathElement::CubicTo { .. }))
+        .count();
+    assert!(
+        cubic_count >= 4,
+        "circle should have at least 4 cubic segments"
+    );
 }
 
 #[test]
 fn path_ellipse() {
     let p = BezierPath::ellipse(0.0, 0.0, 100.0, 60.0);
     assert!(!p.is_empty());
-    let cubic_count = p.elements().iter().filter(|e| matches!(e, PathElement::CubicTo { .. })).count();
-    assert!(cubic_count >= 4, "ellipse should have at least 4 cubic segments");
+    let cubic_count = p
+        .elements()
+        .iter()
+        .filter(|e| matches!(e, PathElement::CubicTo { .. }))
+        .count();
+    assert!(
+        cubic_count >= 4,
+        "ellipse should have at least 4 cubic segments"
+    );
 }
 
 #[test]
@@ -139,7 +159,10 @@ fn path_flatten_quad() {
     let flat = p.flatten(0.25);
     assert_eq!(flat.len(), 1);
     // Curved path must flatten to more than a single segment.
-    assert!(flat[0].len() > 2, "quad curve should produce multiple line segments");
+    assert!(
+        flat[0].len() > 2,
+        "quad curve should produce multiple line segments"
+    );
 }
 
 #[test]
@@ -153,7 +176,10 @@ fn path_flatten_cubic() {
     );
     let flat = p.flatten(0.25);
     assert_eq!(flat.len(), 1);
-    assert!(flat[0].len() > 2, "cubic curve should produce multiple line segments");
+    assert!(
+        flat[0].len() > 2,
+        "cubic curve should produce multiple line segments"
+    );
 }
 
 #[test]

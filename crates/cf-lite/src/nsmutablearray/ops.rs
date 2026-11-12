@@ -90,7 +90,11 @@ pub extern "C" fn shim_nsmutablearray_remove_object(obj: u64, _cmd: u64, target:
 }
 
 /// `-[NSMutableArray addObjectsFromArray:]` — appends all elements from another array.
-pub extern "C" fn shim_nsmutablearray_add_objects_from_array(obj: u64, _cmd: u64, other: u64) -> u64 {
+pub extern "C" fn shim_nsmutablearray_add_objects_from_array(
+    obj: u64,
+    _cmd: u64,
+    other: u64,
+) -> u64 {
     if obj == 0 || other == 0 {
         return 0;
     }
@@ -109,10 +113,14 @@ pub extern "C" fn shim_nsmutablearray_exchange_object_at_index(
     idx1: u64,
     idx2: u64,
 ) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let count = unsafe { *((obj as usize + NSMUTABLEARRAY_COUNT_OFF) as *const u64) };
     let elems = unsafe { *((obj as usize + NSMUTABLEARRAY_ELEMS_OFF) as *const u64) };
-    if idx1 >= count || idx2 >= count || elems == 0 { return 0; }
+    if idx1 >= count || idx2 >= count || elems == 0 {
+        return 0;
+    }
     unsafe {
         let p1 = (elems as usize + idx1 as usize * 8) as *mut u64;
         let p2 = (elems as usize + idx2 as usize * 8) as *mut u64;
@@ -145,7 +153,11 @@ pub extern "C" fn shim_nsmutablearray_remove_objects_at_indexes(
 /// and comparator selectors that the shim environment doesn't fully support yet.
 /// `-[NSMutableArray sortUsingDescriptors:]` — sort using NSSortDescriptor array.
 /// Implements real sorting using the provided descriptors.
-pub extern "C" fn shim_nsmutablearray_sort_using_descriptors(obj: u64, _cmd: u64, descriptors: u64) {
+pub extern "C" fn shim_nsmutablearray_sort_using_descriptors(
+    obj: u64,
+    _cmd: u64,
+    descriptors: u64,
+) {
     if obj == 0 || descriptors == 0 {
         return;
     }
@@ -254,8 +266,8 @@ pub extern "C" fn shim_nsmutablearray_remove_objects_in_range(
 mod tests {
     use super::*;
     use crate::nsindexset;
-    use crate::shim_test_helpers::*;
     use crate::nsmutablearray::{NSMUTABLEARRAY_COUNT_OFF, NSMUTABLEARRAY_ELEMS_OFF};
+    use crate::shim_test_helpers::*;
 
     const CAP_OFF: usize = 24;
 
@@ -347,8 +359,14 @@ mod tests {
 
     #[test]
     fn nil_remove_objects_at_indexes_is_noop() {
-        assert_eq!(shim_nsmutablearray_remove_objects_at_indexes(0, 0, 0xABC), 0);
-        assert_eq!(shim_nsmutablearray_remove_objects_at_indexes(0xABC, 0, 0), 0);
+        assert_eq!(
+            shim_nsmutablearray_remove_objects_at_indexes(0, 0, 0xABC),
+            0
+        );
+        assert_eq!(
+            shim_nsmutablearray_remove_objects_at_indexes(0xABC, 0, 0),
+            0
+        );
     }
 
     // ── removeObjectsInRange: tests ──────────────────────────────

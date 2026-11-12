@@ -161,21 +161,32 @@ impl ObjcRuntime {
         // Pre-reserve to prevent HashMap rehashing during bulk insert.
         self.classes_by_name.reserve(other.classes_by_name.len());
         self.classes_by_addr.reserve(other.classes_by_addr.len());
-        self.protocols_by_name.reserve(other.protocols_by_name.len());
-        self.category_load_imps.reserve(other.category_load_imps.len());
+        self.protocols_by_name
+            .reserve(other.protocols_by_name.len());
+        self.category_load_imps
+            .reserve(other.category_load_imps.len());
 
         // Extend directly from references — avoids allocating a temporary
         // cloned HashMap for each field (saves ~10 KB of allocations).
         self.protocols_by_name.extend(
-            other.protocols_by_name.iter().map(|(k, v)| (Arc::clone(k), Arc::clone(v))),
+            other
+                .protocols_by_name
+                .iter()
+                .map(|(k, v)| (Arc::clone(k), Arc::clone(v))),
         );
         self.classes_by_addr.extend(
-            other.classes_by_addr.iter().map(|(&k, v)| (k, Arc::clone(v))),
+            other
+                .classes_by_addr
+                .iter()
+                .map(|(&k, v)| (k, Arc::clone(v))),
         );
         self.metaclass_addrs
             .extend(other.metaclass_addrs.iter().copied());
         self.classes_by_name.extend(
-            other.classes_by_name.iter().map(|(k, v)| (Arc::clone(k), Arc::clone(v))),
+            other
+                .classes_by_name
+                .iter()
+                .map(|(k, v)| (Arc::clone(k), Arc::clone(v))),
         );
         self.category_load_imps
             .extend(other.category_load_imps.iter().cloned());
@@ -242,8 +253,7 @@ impl ObjcRuntime {
             return selector.as_ptr() as usize;
         }
         let selector = Arc::new(
-            std::ffi::CString::new(name)
-                .unwrap_or_else(|_| std::ffi::CString::new("").unwrap()),
+            std::ffi::CString::new(name).unwrap_or_else(|_| std::ffi::CString::new("").unwrap()),
         );
         let ptr = selector.as_ptr() as usize;
         self.selectors.insert(Arc::from(name), selector);
@@ -252,7 +262,16 @@ impl ObjcRuntime {
 
     /// Get a stable pointer for a selector name (intern if needed).
     pub fn selector_ptr(&self, name: &str) -> Option<usize> {
-        self.selectors.get(name).map(|selector| selector.as_ptr() as usize)
+        self.selectors
+            .get(name)
+            .map(|selector| selector.as_ptr() as usize)
+    }
+
+    /// Look up a selector name by its stable pointer.
+    pub fn selector_name(&self, sel: u64) -> Option<&str> {
+        self.selectors.iter().find_map(|(name, selector)| {
+            ((selector.as_ptr() as u64) == sel).then_some(name.as_ref())
+        })
     }
 
     /// Number of registered classes.
@@ -267,7 +286,9 @@ impl ObjcRuntime {
 
     /// Iterate over all registered classes by name.
     pub fn classes_by_name_iter(&self) -> impl Iterator<Item = (&str, &ClassInfo)> {
-        self.classes_by_name.iter().map(|(k, v)| (k.as_ref(), v.as_ref()))
+        self.classes_by_name
+            .iter()
+            .map(|(k, v)| (k.as_ref(), v.as_ref()))
     }
 
     /// Iterate over all registered classes mutably (values only).
@@ -283,7 +304,9 @@ impl ObjcRuntime {
     /// Get mutable access to a class by mapped address.
     pub fn get_class_by_addr_mut(&mut self, addr: u64) -> Option<&mut ClassInfo> {
         let name = self.classes_by_addr.get(&addr)?.clone();
-        self.classes_by_name.get_mut(&name).map(|a| Arc::make_mut(a))
+        self.classes_by_name
+            .get_mut(&name)
+            .map(|a| Arc::make_mut(a))
     }
 
     /// Register a host ISA address as an alias for an existing class.
@@ -293,10 +316,9 @@ impl ObjcRuntime {
     /// through our shim implementations for the corresponding class.
     pub fn register_isa_alias(&mut self, host_addr: u64, class_name: &str) {
         if self.classes_by_name.contains_key(class_name) {
-            self.classes_by_addr.insert(host_addr, Arc::from(class_name));
-            log::debug!(
-                "ObjcRuntime: registered ISA alias {host_addr:#x} → '{class_name}'"
-            );
+            self.classes_by_addr
+                .insert(host_addr, Arc::from(class_name));
+            log::debug!("ObjcRuntime: registered ISA alias {host_addr:#x} → '{class_name}'");
         } else {
             log::warn!(
                 "ObjcRuntime: cannot alias {host_addr:#x} → '{class_name}': class not registered"
@@ -408,7 +430,9 @@ impl ObjcRuntime {
 
     /// Iterate over all registered protocols.
     pub fn protocols_iter(&self) -> impl Iterator<Item = (&str, &ProtocolInfo)> {
-        self.protocols_by_name.iter().map(|(k, v)| (k.as_ref(), v.as_ref()))
+        self.protocols_by_name
+            .iter()
+            .map(|(k, v)| (k.as_ref(), v.as_ref()))
     }
 
     /// Remove a dynamically-created class by its address.

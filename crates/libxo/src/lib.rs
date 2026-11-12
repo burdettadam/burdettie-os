@@ -54,7 +54,11 @@ pub const XOF_WARN: u32 = 0x200;
 impl XoHandle {
     /// Create a new handle writing to the given FILE*.
     pub fn new(fp: *mut libc::FILE, style: u32) -> Self {
-        Self { fp, style, flags: 0 }
+        Self {
+            fp,
+            style,
+            flags: 0,
+        }
     }
 
     pub fn file_ptr(&self) -> *mut libc::FILE {
@@ -166,10 +170,7 @@ pub unsafe fn xo_emit_text_h(
 ///
 /// # Safety
 /// `argv` must be a valid pointer to `argc` C strings.
-pub unsafe fn parse_args(
-    argc: libc::c_int,
-    argv: *mut *mut libc::c_char,
-) -> libc::c_int {
+pub unsafe fn parse_args(argc: libc::c_int, argv: *mut *mut libc::c_char) -> libc::c_int {
     if argv.is_null() || argc <= 0 {
         return argc;
     }
@@ -195,7 +196,9 @@ pub unsafe fn parse_args(
                 continue;
             }
         }
-        unsafe { *argv.add(write) = arg; }
+        unsafe {
+            *argv.add(write) = arg;
+        }
         write += 1;
         read += 1;
     }

@@ -321,7 +321,11 @@ pub extern "C" fn shim_nsuserdefaults_remove_suite_named(obj: u64, _cmd: u64, su
 /// Our simplified defaults model exposes a single in-memory dictionary. For
 /// callers probing `NSRegistrationDomain` after `registerDefaults:`, returning
 /// that store is sufficient.
-pub extern "C" fn shim_nsuserdefaults_volatile_domain_for_name(obj: u64, _cmd: u64, name: u64) -> u64 {
+pub extern "C" fn shim_nsuserdefaults_volatile_domain_for_name(
+    obj: u64,
+    _cmd: u64,
+    name: u64,
+) -> u64 {
     if obj == 0 || name == 0 {
         return 0;
     }
@@ -402,7 +406,11 @@ pub extern "C" fn shim_nsuserdefaults_url_for_key(obj: u64, _cmd: u64, key: u64)
                 value,
             );
         }
-        return crate::nsurl::shim_nsurl_url_with_string(crate::nsobj::nsurl_class_addr(), 0, value);
+        return crate::nsurl::shim_nsurl_url_with_string(
+            crate::nsobj::nsurl_class_addr(),
+            0,
+            value,
+        );
     }
 
     value
@@ -444,9 +452,15 @@ mod tests {
     fn init_initializes_backing_store() {
         let obj = alloc_defaults();
 
-        assert_eq!(unsafe { *((obj as usize + NSUD_STORE_OFF) as *const u64) }, 0);
+        assert_eq!(
+            unsafe { *((obj as usize + NSUD_STORE_OFF) as *const u64) },
+            0
+        );
         assert_eq!(shim_nsuserdefaults_init(obj, 0), obj);
-        assert_ne!(unsafe { *((obj as usize + NSUD_STORE_OFF) as *const u64) }, 0);
+        assert_ne!(
+            unsafe { *((obj as usize + NSUD_STORE_OFF) as *const u64) },
+            0
+        );
     }
 
     #[test]
@@ -455,7 +469,10 @@ mod tests {
         let suite = make_string("com.example.test");
 
         assert_eq!(shim_nsuserdefaults_init_with_suite_name(obj, 0, suite), obj);
-        assert_ne!(unsafe { *((obj as usize + NSUD_STORE_OFF) as *const u64) }, 0);
+        assert_ne!(
+            unsafe { *((obj as usize + NSUD_STORE_OFF) as *const u64) },
+            0
+        );
     }
 
     #[test]
@@ -576,7 +593,10 @@ mod tests {
         crate::nsmutabledict::shim_nsmutabledict_set_object_for_key(source, 0, fallback, key);
 
         shim_nsuserdefaults_register_defaults(defaults, 0, source);
-        assert_eq!(shim_nsuserdefaults_object_for_key(defaults, 0, key), existing);
+        assert_eq!(
+            shim_nsuserdefaults_object_for_key(defaults, 0, key),
+            existing
+        );
     }
 
     #[test]
@@ -589,7 +609,10 @@ mod tests {
 
         let store = shim_nsuserdefaults_volatile_domain_for_name(defaults, 0, domain);
         assert_ne!(store, 0);
-        assert_eq!(crate::nsdictionary::shim_nsdictionary_object_for_key(store, 0, key), value);
+        assert_eq!(
+            crate::nsdictionary::shim_nsdictionary_object_for_key(store, 0, key),
+            value
+        );
     }
 
     #[test]
@@ -640,7 +663,10 @@ mod tests {
 
         let store = shim_nsuserdefaults_volatile_domain_for_name(suite_defaults, 0, suite);
         assert_ne!(store, 0);
-        assert_eq!(crate::nsdictionary::shim_nsdictionary_object_for_key(store, 0, key), value);
+        assert_eq!(
+            crate::nsdictionary::shim_nsdictionary_object_for_key(store, 0, key),
+            value
+        );
     }
 
     #[test]
@@ -653,7 +679,10 @@ mod tests {
         let out = shim_nsuserdefaults_url_for_key(defaults, 0, key);
         assert_ne!(out, 0);
         assert_ne!(out, value);
-        assert_string_eq(crate::nsurl::shim_nsurl_absolute_string(out, 0), "https://example.invalid");
+        assert_string_eq(
+            crate::nsurl::shim_nsurl_absolute_string(out, 0),
+            "https://example.invalid",
+        );
     }
 
     #[test]
@@ -661,7 +690,11 @@ mod tests {
         let defaults = get_defaults();
         let key = make_string("_ut_url_existing_nsurl_key");
         let url_string = make_string("file:///tmp/test.txt");
-        let value = crate::nsurl::shim_nsurl_url_with_string(crate::nsobj::nsurl_class_addr(), 0, url_string);
+        let value = crate::nsurl::shim_nsurl_url_with_string(
+            crate::nsobj::nsurl_class_addr(),
+            0,
+            url_string,
+        );
         shim_nsuserdefaults_set_object(defaults, 0, value, key);
 
         assert_eq!(shim_nsuserdefaults_url_for_key(defaults, 0, key), value);

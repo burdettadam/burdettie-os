@@ -80,15 +80,15 @@ impl ViewVars {
     /// Return the Expression for a given `NSLayoutAttribute` integer.
     fn expr_for_attr(&self, attr: u64) -> Option<Expression> {
         match attr {
-            1 | 5 => Some(Expression::from(self.x)),              // Left / Leading
-            2 | 6 => Some(Expression::from(self.x) + self.w),     // Right / Trailing
-            3     => Some(Expression::from(self.y)),               // Top
-            4     => Some(Expression::from(self.y) + self.h),      // Bottom
-            7     => Some(Expression::from(self.w)),               // Width
-            8     => Some(Expression::from(self.h)),               // Height
-            9     => Some(Expression::from(self.x) + self.w / 2.0), // CenterX
-            10    => Some(Expression::from(self.y) + self.h / 2.0), // CenterY
-            _     => None, // NotAnAttribute (0) or unknown
+            1 | 5 => Some(Expression::from(self.x)), // Left / Leading
+            2 | 6 => Some(Expression::from(self.x) + self.w), // Right / Trailing
+            3 => Some(Expression::from(self.y)),     // Top
+            4 => Some(Expression::from(self.y) + self.h), // Bottom
+            7 => Some(Expression::from(self.w)),     // Width
+            8 => Some(Expression::from(self.h)),     // Height
+            9 => Some(Expression::from(self.x) + self.w / 2.0), // CenterX
+            10 => Some(Expression::from(self.y) + self.h / 2.0), // CenterY
+            _ => None,                               // NotAnAttribute (0) or unknown
         }
     }
 }
@@ -152,11 +152,12 @@ pub fn add_constraint(view: u64, constraint: u64) {
         return;
     }
     with_state(|state| {
-        let entry = state.view_constraints.entry(view).or_insert_with(|| {
-            ViewConstraintState {
+        let entry = state
+            .view_constraints
+            .entry(view)
+            .or_insert_with(|| ViewConstraintState {
                 constraint_ptrs: Vec::new(),
-            }
-        });
+            });
         if !entry.constraint_ptrs.contains(&constraint) {
             entry.constraint_ptrs.push(constraint);
         }
@@ -315,8 +316,8 @@ pub fn layout_if_needed(view: u64) {
 
     // Add non-negative width/height constraints for all views.
     for (&_view_ptr, vars) in &var_map {
-        let _ = solver.add_constraint(vars.w |GE(REQUIRED)| 0.0);
-        let _ = solver.add_constraint(vars.h |GE(REQUIRED)| 0.0);
+        let _ = solver.add_constraint(vars.w | GE(REQUIRED) | 0.0);
+        let _ = solver.add_constraint(vars.h | GE(REQUIRED) | 0.0);
     }
 
     // Seed the root view's frame as edit variables (STRONG), so the
@@ -356,10 +357,22 @@ pub fn layout_if_needed(view: u64) {
         if view_ptr == view {
             continue;
         }
-        let x = change_map.get(&vars.x).copied().unwrap_or_else(|| unsafe { read_f64(view_ptr, FRAME_X_OFF) });
-        let y = change_map.get(&vars.y).copied().unwrap_or_else(|| unsafe { read_f64(view_ptr, FRAME_Y_OFF) });
-        let w = change_map.get(&vars.w).copied().unwrap_or_else(|| unsafe { read_f64(view_ptr, FRAME_W_OFF) });
-        let h = change_map.get(&vars.h).copied().unwrap_or_else(|| unsafe { read_f64(view_ptr, FRAME_H_OFF) });
+        let x = change_map
+            .get(&vars.x)
+            .copied()
+            .unwrap_or_else(|| unsafe { read_f64(view_ptr, FRAME_X_OFF) });
+        let y = change_map
+            .get(&vars.y)
+            .copied()
+            .unwrap_or_else(|| unsafe { read_f64(view_ptr, FRAME_Y_OFF) });
+        let w = change_map
+            .get(&vars.w)
+            .copied()
+            .unwrap_or_else(|| unsafe { read_f64(view_ptr, FRAME_W_OFF) });
+        let h = change_map
+            .get(&vars.h)
+            .copied()
+            .unwrap_or_else(|| unsafe { read_f64(view_ptr, FRAME_H_OFF) });
         unsafe {
             write_f64(view_ptr, FRAME_X_OFF, x);
             write_f64(view_ptr, FRAME_Y_OFF, y);
@@ -393,7 +406,7 @@ fn collect_subtree(root: u64, out: &mut Vec<u64>) {
         out.push(v);
         // Read subview_count and subviews_ptr.
         let count = unsafe { read_u64(v, 64) } as usize; // SUBVIEW_COUNT_OFF
-        let ptr = unsafe { read_u64(v, 56) };             // SUBVIEWS_PTR_OFF
+        let ptr = unsafe { read_u64(v, 56) }; // SUBVIEWS_PTR_OFF
         if ptr != 0 && count > 0 {
             for i in 0..count {
                 let child = unsafe { *((ptr as usize + i * 8) as *const u64) };
@@ -464,10 +477,10 @@ fn translate_constraint(
     // Build the constraint based on relation:
     //   relation -1 = LE, 0 = EQ, 1 = GE
     let cass_constraint = match relation as i64 {
-        -1 => lhs |LE(strength)| rhs,
-         0 => lhs |EQ(strength)| rhs,
-         1 => lhs |GE(strength)| rhs,
-         _ => return None,
+        -1 => lhs | LE(strength) | rhs,
+        0 => lhs | EQ(strength) | rhs,
+        1 => lhs | GE(strength) | rhs,
+        _ => return None,
     };
 
     Some(cass_constraint)
@@ -508,9 +521,9 @@ pub(crate) fn reset() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::shim_test_helpers::*;
     use crate::nslayoutconstraint::*;
     use crate::nsview::VIEW_SIZE;
+    use crate::shim_test_helpers::*;
 
     /// Serialise layout-solver tests — they share a process-global `LAYOUT_STATE`.
     static TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
@@ -534,7 +547,7 @@ mod tests {
 
             // Append to parent's subview array.
             let count = read_u64(parent, 64) as usize; // SUBVIEW_COUNT_OFF
-            let old_ptr = read_u64(parent, 56);         // SUBVIEWS_PTR_OFF
+            let old_ptr = read_u64(parent, 56); // SUBVIEWS_PTR_OFF
             let new_count = count + 1;
             let new_ptr = if old_ptr == 0 {
                 crate::pal_alloc().calloc(new_count, 8) as u64
@@ -562,27 +575,34 @@ mod tests {
         // attr 7 = Width, relation 0 = EQ, no second item.
         // Mark active directly (not via setActive: which auto-installs).
         let c = shim_nslayoutconstraint_create(0, 0, view, 7, 0, 0, 0, 1.0, width);
-        unsafe { *((c as usize + 72) as *mut u64) = 1; } // C_ACTIVE
+        unsafe {
+            *((c as usize + 72) as *mut u64) = 1;
+        } // C_ACTIVE
         c
     }
 
     fn make_height_constraint(view: u64, height: f64) -> u64 {
         // attr 8 = Height, relation 0 = EQ, no second item.
         let c = shim_nslayoutconstraint_create(0, 0, view, 8, 0, 0, 0, 1.0, height);
-        unsafe { *((c as usize + 72) as *mut u64) = 1; } // C_ACTIVE
+        unsafe {
+            *((c as usize + 72) as *mut u64) = 1;
+        } // C_ACTIVE
         c
     }
 
     // attr: 1=Left, 2=Right, 3=Top, 4=Bottom
     fn make_eq_constraint(
-        view_a: u64, attr_a: u64,
-        view_b: u64, attr_b: u64,
+        view_a: u64,
+        attr_a: u64,
+        view_b: u64,
+        attr_b: u64,
         constant: f64,
     ) -> u64 {
-        let c = shim_nslayoutconstraint_create(
-            0, 0, view_a, attr_a, 0, view_b, attr_b, 1.0, constant,
-        );
-        unsafe { *((c as usize + 72) as *mut u64) = 1; } // C_ACTIVE
+        let c =
+            shim_nslayoutconstraint_create(0, 0, view_a, attr_a, 0, view_b, attr_b, 1.0, constant);
+        unsafe {
+            *((c as usize + 72) as *mut u64) = 1;
+        } // C_ACTIVE
         c
     }
 
@@ -729,7 +749,10 @@ mod tests {
 
         // Child frame should be unchanged (no active constraints solved).
         let (_, _, w, _) = read_frame(child);
-        assert!((w - 10.0).abs() < 1.0, "width should be unchanged at ~10, got {w}");
+        assert!(
+            (w - 10.0).abs() < 1.0,
+            "width should be unchanged at ~10, got {w}"
+        );
 
         free_obj(child);
         free_obj(parent);
@@ -752,12 +775,17 @@ mod tests {
 
         // Remove the constraint, reset child frame, re-layout.
         remove_constraint(parent, cw);
-        unsafe { write_f64(child, FRAME_W_OFF, 0.0); }
+        unsafe {
+            write_f64(child, FRAME_W_OFF, 0.0);
+        }
         layout_if_needed(parent);
 
         // No constraints → frame should stay at 0.
         let (_, _, w2, _) = read_frame(child);
-        assert!((w2 - 0.0).abs() < 1.0, "width should be ~0 after constraint removed, got {w2}");
+        assert!(
+            (w2 - 0.0).abs() < 1.0,
+            "width should be ~0 after constraint removed, got {w2}"
+        );
 
         free_obj(child);
         free_obj(parent);
@@ -912,8 +940,14 @@ mod tests {
         let (x, y, w, h) = read_frame(child);
         assert!((w - 100.0).abs() < 1.0, "width should be ~100, got {w}");
         assert!((h - 50.0).abs() < 1.0, "height should be ~50, got {h}");
-        assert!((x - 150.0).abs() < 1.0, "x should be ~150 (centered), got {x}");
-        assert!((y - 125.0).abs() < 1.0, "y should be ~125 (centered), got {y}");
+        assert!(
+            (x - 150.0).abs() < 1.0,
+            "x should be ~150 (centered), got {x}"
+        );
+        assert!(
+            (y - 125.0).abs() < 1.0,
+            "y should be ~125 (centered), got {y}"
+        );
 
         free_obj(child);
         free_obj(parent);

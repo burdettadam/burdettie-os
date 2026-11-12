@@ -340,10 +340,7 @@ mod tests {
     fn full_compare_entry_not_observed() {
         let report = DiffReport::full_compare(&[], &[], &[], &[], Some(0x100), None);
         assert!(report.is_clean()); // warning, not mismatch
-        assert!(report
-            .warnings
-            .iter()
-            .any(|w| w.contains("not observed")));
+        assert!(report.warnings.iter().any(|w| w.contains("not observed")));
     }
 
     #[test]

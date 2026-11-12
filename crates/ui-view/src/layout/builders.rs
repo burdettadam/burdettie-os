@@ -1,8 +1,8 @@
 //! Intrinsic size and convenience layout builder functions.
 
 use super::types::{
-    LayoutAttribute, LayoutConstraint, LayoutPriority, LayoutRelation, LAYOUT_MARGINS_GUIDE,
-    SAFE_AREA_GUIDE, ViewId,
+    LayoutAttribute, LayoutConstraint, LayoutPriority, LayoutRelation, ViewId,
+    LAYOUT_MARGINS_GUIDE, SAFE_AREA_GUIDE,
 };
 
 // ── Intrinsic Content Size ─────────────────────────────────────────
@@ -103,20 +103,40 @@ pub fn intrinsic_size_constraints(
 pub fn pin_edges(view: ViewId, parent: ViewId, insets: f64) -> Vec<LayoutConstraint> {
     vec![
         LayoutConstraint::new(
-            view, LayoutAttribute::Left, LayoutRelation::Equal,
-            parent, LayoutAttribute::Left, 1.0, insets,
+            view,
+            LayoutAttribute::Left,
+            LayoutRelation::Equal,
+            parent,
+            LayoutAttribute::Left,
+            1.0,
+            insets,
         ),
         LayoutConstraint::new(
-            view, LayoutAttribute::Top, LayoutRelation::Equal,
-            parent, LayoutAttribute::Top, 1.0, insets,
+            view,
+            LayoutAttribute::Top,
+            LayoutRelation::Equal,
+            parent,
+            LayoutAttribute::Top,
+            1.0,
+            insets,
         ),
         LayoutConstraint::new(
-            view, LayoutAttribute::Right, LayoutRelation::Equal,
-            parent, LayoutAttribute::Right, 1.0, -insets,
+            view,
+            LayoutAttribute::Right,
+            LayoutRelation::Equal,
+            parent,
+            LayoutAttribute::Right,
+            1.0,
+            -insets,
         ),
         LayoutConstraint::new(
-            view, LayoutAttribute::Bottom, LayoutRelation::Equal,
-            parent, LayoutAttribute::Bottom, 1.0, -insets,
+            view,
+            LayoutAttribute::Bottom,
+            LayoutRelation::Equal,
+            parent,
+            LayoutAttribute::Bottom,
+            1.0,
+            -insets,
         ),
     ]
 }
@@ -125,12 +145,22 @@ pub fn pin_edges(view: ViewId, parent: ViewId, insets: f64) -> Vec<LayoutConstra
 pub fn center_in(view: ViewId, parent: ViewId) -> Vec<LayoutConstraint> {
     vec![
         LayoutConstraint::new(
-            view, LayoutAttribute::CenterX, LayoutRelation::Equal,
-            parent, LayoutAttribute::CenterX, 1.0, 0.0,
+            view,
+            LayoutAttribute::CenterX,
+            LayoutRelation::Equal,
+            parent,
+            LayoutAttribute::CenterX,
+            1.0,
+            0.0,
         ),
         LayoutConstraint::new(
-            view, LayoutAttribute::CenterY, LayoutRelation::Equal,
-            parent, LayoutAttribute::CenterY, 1.0, 0.0,
+            view,
+            LayoutAttribute::CenterY,
+            LayoutRelation::Equal,
+            parent,
+            LayoutAttribute::CenterY,
+            1.0,
+            0.0,
         ),
     ]
 }
@@ -151,7 +181,15 @@ pub fn equal(
     anchor_attr: LayoutAttribute,
     offset: f64,
 ) -> LayoutConstraint {
-    LayoutConstraint::new(view, attr, LayoutRelation::Equal, anchor, anchor_attr, 1.0, offset)
+    LayoutConstraint::new(
+        view,
+        attr,
+        LayoutRelation::Equal,
+        anchor,
+        anchor_attr,
+        1.0,
+        offset,
+    )
 }
 
 /// Pin all four edges of `view` to the layout margins guide.

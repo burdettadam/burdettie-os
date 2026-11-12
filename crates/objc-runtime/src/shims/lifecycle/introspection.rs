@@ -29,7 +29,9 @@ pub extern "C" fn shim_object_set_class(obj: u64, cls: u64) -> u64 {
         return 0;
     }
     let old_isa = unsafe { *(obj as *const u64) };
-    unsafe { *(obj as *mut u64) = cls; }
+    unsafe {
+        *(obj as *mut u64) = cls;
+    }
     old_isa
 }
 
@@ -419,10 +421,7 @@ pub extern "C" fn shim_method_copy_return_type(method: u64) -> *mut u8 {
         .to_str()
         .unwrap_or("");
     let parts = split_type_encoding(enc);
-    let ret_type = parts
-        .first()
-        .map(|p| type_from_component(p))
-        .unwrap_or("");
+    let ret_type = parts.first().map(|p| type_from_component(p)).unwrap_or("");
     if ret_type.is_empty() {
         return std::ptr::null_mut();
     }
@@ -654,7 +653,9 @@ mod tests {
             .unwrap();
         assert_eq!(s, "v");
         // Free the returned string
-        unsafe { drop(CString::from_raw(ret as *mut c_char)); }
+        unsafe {
+            drop(CString::from_raw(ret as *mut c_char));
+        }
     }
 
     #[test]
@@ -666,7 +667,9 @@ mod tests {
             .to_str()
             .unwrap();
         assert_eq!(s, "@");
-        unsafe { drop(CString::from_raw(ret as *mut c_char)); }
+        unsafe {
+            drop(CString::from_raw(ret as *mut c_char));
+        }
     }
 
     // ── method_copyArgumentType tests ──────────────────────────────
@@ -686,7 +689,9 @@ mod tests {
             .to_str()
             .unwrap();
         assert_eq!(s, "@");
-        unsafe { drop(CString::from_raw(arg0 as *mut c_char)); }
+        unsafe {
+            drop(CString::from_raw(arg0 as *mut c_char));
+        }
     }
 
     #[test]
@@ -698,7 +703,9 @@ mod tests {
             .to_str()
             .unwrap();
         assert_eq!(s, ":");
-        unsafe { drop(CString::from_raw(arg1 as *mut c_char)); }
+        unsafe {
+            drop(CString::from_raw(arg1 as *mut c_char));
+        }
     }
 
     #[test]

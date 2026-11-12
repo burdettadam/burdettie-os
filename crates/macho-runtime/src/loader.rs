@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use macho_exec::{ImageRegistry, normalize_install_name};
+use macho_exec::{normalize_install_name, ImageRegistry};
 use macho_parse::{parse, ParsedMachO};
 use platform_core::fs::FilesystemProvider;
 use runtime_diagnostics::DiagEvent;
@@ -54,11 +54,7 @@ impl DependencyLoadStats {
             "direct_deps_requested",
             self.direct_deps_requested as u64,
         );
-        tracer.record_perf_counter(
-            "map_images",
-            "deps_enqueued",
-            self.deps_enqueued as u64,
-        );
+        tracer.record_perf_counter("map_images", "deps_enqueued", self.deps_enqueued as u64);
         tracer.record_perf_counter(
             "map_images",
             "subdeps_enqueued",
@@ -74,32 +70,12 @@ impl DependencyLoadStats {
             "already_loaded_skipped",
             self.already_loaded_skipped as u64,
         );
-        tracer.record_perf_counter(
-            "map_images",
-            "resolve_misses",
-            self.resolve_misses as u64,
-        );
+        tracer.record_perf_counter("map_images", "resolve_misses", self.resolve_misses as u64);
         tracer.record_perf_counter("map_images", "resolved", self.resolved as u64);
-        tracer.record_perf_counter(
-            "map_images",
-            "read_failures",
-            self.read_failures as u64,
-        );
-        tracer.record_perf_counter(
-            "map_images",
-            "parse_failures",
-            self.parse_failures as u64,
-        );
-        tracer.record_perf_counter(
-            "map_images",
-            "load_failures",
-            self.load_failures as u64,
-        );
-        tracer.record_perf_counter(
-            "map_images",
-            "images_loaded",
-            self.images_loaded as u64,
-        );
+        tracer.record_perf_counter("map_images", "read_failures", self.read_failures as u64);
+        tracer.record_perf_counter("map_images", "parse_failures", self.parse_failures as u64);
+        tracer.record_perf_counter("map_images", "load_failures", self.load_failures as u64);
+        tracer.record_perf_counter("map_images", "images_loaded", self.images_loaded as u64);
         tracer.record_perf_counter("map_images", "bytes_read", self.bytes_read as u64);
     }
 }
@@ -201,7 +177,11 @@ pub(crate) fn load_dependencies(
             if registry.get(&sub_dlib.name).is_none() {
                 stats.subdeps_enqueued += 1;
                 stats.deps_enqueued += 1;
-                queue.push_back((sub_dlib.name.clone(), sub_rpaths.clone(), sub_loader_dir.clone()));
+                queue.push_back((
+                    sub_dlib.name.clone(),
+                    sub_rpaths.clone(),
+                    sub_loader_dir.clone(),
+                ));
             }
         }
 
@@ -325,7 +305,10 @@ pub(crate) fn load_insert_libraries(
         let parsed = match parse(&data) {
             Ok(p) => p,
             Err(e) => {
-                log::warn!("DYLD_INSERT_LIBRARIES: cannot parse {}: {e}", path.display());
+                log::warn!(
+                    "DYLD_INSERT_LIBRARIES: cannot parse {}: {e}",
+                    path.display()
+                );
                 continue;
             }
         };

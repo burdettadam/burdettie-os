@@ -49,7 +49,7 @@ fn format_text(event: &LogEvent) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::collector::{LogLevel, LogEvent};
+    use crate::collector::{LogEvent, LogLevel};
 
     fn sample_event() -> LogEvent {
         LogEvent {

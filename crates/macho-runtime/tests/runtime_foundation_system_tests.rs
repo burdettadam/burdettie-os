@@ -6,14 +6,18 @@ mod common;
 
 #[test]
 fn runtime_nserror_basics_exit_zero() {
-    let Some(result) = common::run_fixture("nserror_basics/app") else { return };
+    let Some(result) = common::run_fixture("nserror_basics/app") else {
+        return;
+    };
 
     assert_eq!(result.exit_code, 0, "nserror_basics should exit 0");
 }
 
 #[test]
 fn runtime_nserror_class_registered() {
-    let Some(_result) = common::run_fixture("nserror_basics/app") else { return };
+    let Some(_result) = common::run_fixture("nserror_basics/app") else {
+        return;
+    };
 
     let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
@@ -48,14 +52,18 @@ fn runtime_nserror_class_registered() {
 
 #[test]
 fn runtime_nsbundle_basics_exit_zero() {
-    let Some(result) = common::run_fixture("nsbundle_basics/app") else { return };
+    let Some(result) = common::run_fixture("nsbundle_basics/app") else {
+        return;
+    };
 
     assert_eq!(result.exit_code, 0, "nsbundle_basics should exit 0");
 }
 
 #[test]
 fn runtime_nsbundle_class_registered() {
-    let Some(_result) = common::run_fixture("nsbundle_basics/app") else { return };
+    let Some(_result) = common::run_fixture("nsbundle_basics/app") else {
+        return;
+    };
 
     let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
@@ -83,14 +91,18 @@ fn runtime_nsbundle_class_registered() {
 
 #[test]
 fn runtime_nsfilemanager_basics_exit_zero() {
-    let Some(result) = common::run_fixture("nsfilemanager_basics/app") else { return };
+    let Some(result) = common::run_fixture("nsfilemanager_basics/app") else {
+        return;
+    };
 
     assert_eq!(result.exit_code, 0, "nsfilemanager_basics should exit 0");
 }
 
 #[test]
 fn runtime_nsfilemanager_class_registered() {
-    let Some(_result) = common::run_fixture("nsfilemanager_basics/app") else { return };
+    let Some(_result) = common::run_fixture("nsfilemanager_basics/app") else {
+        return;
+    };
 
     let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
@@ -119,14 +131,18 @@ fn runtime_nsfilemanager_class_registered() {
 
 #[test]
 fn runtime_exception_basics_exit_zero() {
-    let Some(result) = common::run_fixture("exception_basics/app") else { return };
+    let Some(result) = common::run_fixture("exception_basics/app") else {
+        return;
+    };
 
     assert_eq!(result.exit_code, 0, "exception_basics should exit 0");
 }
 
 #[test]
 fn runtime_nsexception_class_registered() {
-    let Some(_result) = common::run_fixture("exception_basics/app") else { return };
+    let Some(_result) = common::run_fixture("exception_basics/app") else {
+        return;
+    };
 
     let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
@@ -160,14 +176,18 @@ fn runtime_nsexception_class_registered() {
 
 #[test]
 fn runtime_real_cli_exit_zero() {
-    let Some(result) = common::run_fixture("real_cli/app") else { return };
+    let Some(result) = common::run_fixture("real_cli/app") else {
+        return;
+    };
 
     assert_eq!(result.exit_code, 0, "real_cli should exit 0");
 }
 
 #[test]
 fn runtime_real_cli_classes_registered() {
-    let Some(_result) = common::run_fixture("real_cli/app") else { return };
+    let Some(_result) = common::run_fixture("real_cli/app") else {
+        return;
+    };
 
     let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");

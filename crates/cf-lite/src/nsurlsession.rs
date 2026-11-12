@@ -16,8 +16,8 @@
 
 use crate::cfstring;
 use crate::nsobj;
-use crate::nsurlrequest;
 use crate::nsurl;
+use crate::nsurlrequest;
 use std::sync::OnceLock;
 
 fn make_nsstring(s: &str) -> u64 {
@@ -41,7 +41,9 @@ fn http_agent() -> &'static ureq::Agent {
 
 fn alloc_config() -> u64 {
     let obj = crate::pal_alloc().calloc(1, 16) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *(obj as *mut u64) = nsobj::nsurlsessionconfiguration_class_addr();
         // Default timeout: 60.0 seconds
@@ -62,18 +64,28 @@ pub extern "C" fn shim_nsurlsessionconfig_ephemeral(_cls: u64, _cmd: u64) -> u64
 
 /// `-[NSURLSessionConfiguration timeoutIntervalForRequest]`
 pub extern "C" fn shim_nsurlsessionconfig_timeout(obj: u64, _cmd: u64) -> f64 {
-    if obj == 0 { return 60.0; }
+    if obj == 0 {
+        return 60.0;
+    }
     f64::from_bits(unsafe { *((obj as usize + 8) as *const u64) })
 }
 
 /// `-[NSURLSessionConfiguration setTimeoutIntervalForRequest:]`
 pub extern "C" fn shim_nsurlsessionconfig_set_timeout(obj: u64, _cmd: u64, val: f64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as usize + 8) as *mut u64) = val.to_bits(); }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + 8) as *mut u64) = val.to_bits();
+    }
 }
 
 /// `+[NSURLSessionConfiguration backgroundSessionConfigurationWithIdentifier:]`
-pub extern "C" fn shim_nsurlsessionconfig_background(_cls: u64, _cmd: u64, _identifier: u64) -> u64 {
+pub extern "C" fn shim_nsurlsessionconfig_background(
+    _cls: u64,
+    _cmd: u64,
+    _identifier: u64,
+) -> u64 {
     alloc_config()
 }
 
@@ -83,12 +95,18 @@ pub extern "C" fn shim_nsurlsessionconfig_timeout_resource(_obj: u64, _cmd: u64)
 }
 
 /// `-[NSURLSessionConfiguration setTimeoutIntervalForResource:]`
-pub extern "C" fn shim_nsurlsessionconfig_set_timeout_resource(_obj: u64, _cmd: u64, _interval: f64) {
+pub extern "C" fn shim_nsurlsessionconfig_set_timeout_resource(
+    _obj: u64,
+    _cmd: u64,
+    _interval: f64,
+) {
     // stub — not tracked
 }
 
 pub extern "C" fn shim_nsurlsessionconfig_description(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     make_nsstring("<NSURLSessionConfiguration>")
 }
 
@@ -104,15 +122,21 @@ const SESSION_SIZE: usize = 32;
 /// `+[NSURLSession sharedSession]`
 pub extern "C" fn shim_nsurlsession_shared(_cls: u64, _cmd: u64) -> u64 {
     let obj = crate::pal_alloc().calloc(1, SESSION_SIZE) as u64;
-    if obj == 0 { return 0; }
-    unsafe { *(obj as *mut u64) = nsobj::nsurlsession_class_addr(); }
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *(obj as *mut u64) = nsobj::nsurlsession_class_addr();
+    }
     obj
 }
 
 /// `+[NSURLSession sessionWithConfiguration:]`
 pub extern "C" fn shim_nsurlsession_with_config(_cls: u64, _cmd: u64, config: u64) -> u64 {
     let obj = crate::pal_alloc().calloc(1, SESSION_SIZE) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *(obj as *mut u64) = nsobj::nsurlsession_class_addr();
         *((obj as usize + SESSION_CONFIG_OFF) as *mut u64) = config;
@@ -122,10 +146,16 @@ pub extern "C" fn shim_nsurlsession_with_config(_cls: u64, _cmd: u64, config: u6
 
 /// `+[NSURLSession sessionWithConfiguration:delegate:delegateQueue:]`
 pub extern "C" fn shim_nsurlsession_with_config_delegate(
-    _cls: u64, _cmd: u64, config: u64, delegate: u64, queue: u64,
+    _cls: u64,
+    _cmd: u64,
+    config: u64,
+    delegate: u64,
+    queue: u64,
 ) -> u64 {
     let obj = crate::pal_alloc().calloc(1, SESSION_SIZE) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *(obj as *mut u64) = nsobj::nsurlsession_class_addr();
         *((obj as usize + SESSION_CONFIG_OFF) as *mut u64) = config;
@@ -137,33 +167,47 @@ pub extern "C" fn shim_nsurlsession_with_config_delegate(
 
 /// `-[NSURLSession delegate]`
 pub extern "C" fn shim_nsurlsession_delegate(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + SESSION_DELEGATE_OFF) as *const u64) }
 }
 
 /// `-[NSURLSession delegateQueue]`
 pub extern "C" fn shim_nsurlsession_delegate_queue(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + SESSION_QUEUE_OFF) as *const u64) }
 }
 
 /// `-[NSURLSession configuration]`
 pub extern "C" fn shim_nsurlsession_configuration(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + SESSION_CONFIG_OFF) as *const u64) }
 }
 
 /// `-[NSURLSession dataTaskWithURL:]`
 pub extern "C" fn shim_nsurlsession_data_task_with_url(obj: u64, _cmd: u64, url: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     // Create an NSURLRequest from the URL
     let req = crate::nsurlrequest::shim_nsurlrequest_with_url(0, 0, url);
     alloc_data_task_for_session(req, obj)
 }
 
 /// `-[NSURLSession dataTaskWithRequest:]`
-pub extern "C" fn shim_nsurlsession_data_task_with_request(obj: u64, _cmd: u64, request: u64) -> u64 {
-    if obj == 0 { return 0; }
+pub extern "C" fn shim_nsurlsession_data_task_with_request(
+    obj: u64,
+    _cmd: u64,
+    request: u64,
+) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
     alloc_data_task_for_session(request, obj)
 }
 
@@ -182,8 +226,15 @@ pub extern "C" fn shim_nsurlsession_finish_tasks(_obj: u64, _cmd: u64) {
 /// Creates an upload task: sets the HTTP body on the request and marks the
 /// task type as upload.  On `resume`, the existing HTTP engine reads the body
 /// from the request and sends it as a POST/PUT payload.
-pub extern "C" fn shim_nsurlsession_upload_task_with_request(obj: u64, _cmd: u64, request: u64, data: u64) -> u64 {
-    if obj == 0 { return 0; }
+pub extern "C" fn shim_nsurlsession_upload_task_with_request(
+    obj: u64,
+    _cmd: u64,
+    request: u64,
+    data: u64,
+) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
     // Attach the body data to the request so resume picks it up.
     if request != 0 && data != 0 {
         nsurlrequest::shim_nsmutableurlrequest_set_http_body(request, 0, data);
@@ -200,9 +251,15 @@ pub extern "C" fn shim_nsurlsession_upload_task_with_request(obj: u64, _cmd: u64
 
 /// `-[NSURLSession uploadTaskWithRequest:fromData:completionHandler:]`
 pub extern "C" fn shim_nsurlsession_upload_task_with_request_completion(
-    obj: u64, _cmd: u64, request: u64, data: u64, block: u64,
+    obj: u64,
+    _cmd: u64,
+    request: u64,
+    data: u64,
+    block: u64,
 ) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     if request != 0 && data != 0 {
         nsurlrequest::shim_nsmutableurlrequest_set_http_body(request, 0, data);
     }
@@ -213,7 +270,9 @@ pub extern "C" fn shim_nsurlsession_upload_task_with_request_completion(
             *((task as usize + TASK_TYPE_OFF) as *mut u64) = 1;
         }
         if block != 0 {
-            unsafe { *((task as usize + TASK_BLOCK_OFF) as *mut u64) = block; }
+            unsafe {
+                *((task as usize + TASK_BLOCK_OFF) as *mut u64) = block;
+            }
         }
     }
     task
@@ -223,8 +282,14 @@ pub extern "C" fn shim_nsurlsession_upload_task_with_request_completion(
 ///
 /// Creates a download task.  On `resume`, the response body is written to a
 /// temporary file and the completion handler receives a file URL.
-pub extern "C" fn shim_nsurlsession_download_task_with_request(obj: u64, _cmd: u64, request: u64) -> u64 {
-    if obj == 0 { return 0; }
+pub extern "C" fn shim_nsurlsession_download_task_with_request(
+    obj: u64,
+    _cmd: u64,
+    request: u64,
+) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
     let task = alloc_data_task_for_session(request, obj);
     if task != 0 {
         unsafe {
@@ -237,7 +302,9 @@ pub extern "C" fn shim_nsurlsession_download_task_with_request(obj: u64, _cmd: u
 
 /// `-[NSURLSession downloadTaskWithURL:]`
 pub extern "C" fn shim_nsurlsession_download_task_with_url(obj: u64, _cmd: u64, url: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let req = crate::nsurlrequest::shim_nsurlrequest_with_url(0, 0, url);
     let task = alloc_data_task_for_session(req, obj);
     if task != 0 {
@@ -251,9 +318,14 @@ pub extern "C" fn shim_nsurlsession_download_task_with_url(obj: u64, _cmd: u64, 
 
 /// `-[NSURLSession downloadTaskWithRequest:completionHandler:]`
 pub extern "C" fn shim_nsurlsession_download_task_with_request_completion(
-    obj: u64, _cmd: u64, request: u64, block: u64,
+    obj: u64,
+    _cmd: u64,
+    request: u64,
+    block: u64,
 ) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let task = alloc_data_task_for_session(request, obj);
     if task != 0 {
         unsafe {
@@ -261,7 +333,9 @@ pub extern "C" fn shim_nsurlsession_download_task_with_request_completion(
             *((task as usize + TASK_TYPE_OFF) as *mut u64) = 2;
         }
         if block != 0 {
-            unsafe { *((task as usize + TASK_BLOCK_OFF) as *mut u64) = block; }
+            unsafe {
+                *((task as usize + TASK_BLOCK_OFF) as *mut u64) = block;
+            }
         }
     }
     task
@@ -269,9 +343,14 @@ pub extern "C" fn shim_nsurlsession_download_task_with_request_completion(
 
 /// `-[NSURLSession downloadTaskWithURL:completionHandler:]`
 pub extern "C" fn shim_nsurlsession_download_task_with_url_completion(
-    obj: u64, _cmd: u64, url: u64, block: u64,
+    obj: u64,
+    _cmd: u64,
+    url: u64,
+    block: u64,
 ) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let req = crate::nsurlrequest::shim_nsurlrequest_with_url(0, 0, url);
     let task = alloc_data_task_for_session(req, obj);
     if task != 0 {
@@ -280,14 +359,20 @@ pub extern "C" fn shim_nsurlsession_download_task_with_url_completion(
             *((task as usize + TASK_TYPE_OFF) as *mut u64) = 2;
         }
         if block != 0 {
-            unsafe { *((task as usize + TASK_BLOCK_OFF) as *mut u64) = block; }
+            unsafe {
+                *((task as usize + TASK_BLOCK_OFF) as *mut u64) = block;
+            }
         }
     }
     task
 }
 
 /// `-[NSURLSession resetWithCompletionHandler:]`
-pub extern "C" fn shim_nsurlsession_reset_with_completion_handler(_obj: u64, _cmd: u64, block: u64) {
+pub extern "C" fn shim_nsurlsession_reset_with_completion_handler(
+    _obj: u64,
+    _cmd: u64,
+    block: u64,
+) {
     if block != 0 {
         let invoke_ptr = unsafe { *((block as usize + 16) as *const u64) };
         if invoke_ptr != 0 {
@@ -298,7 +383,11 @@ pub extern "C" fn shim_nsurlsession_reset_with_completion_handler(_obj: u64, _cm
 }
 
 /// `-[NSURLSession getAllTasksWithCompletionHandler:]`
-pub extern "C" fn shim_nsurlsession_all_tasks_with_completion_handler(_obj: u64, _cmd: u64, block: u64) {
+pub extern "C" fn shim_nsurlsession_all_tasks_with_completion_handler(
+    _obj: u64,
+    _cmd: u64,
+    block: u64,
+) {
     if block != 0 {
         let empty = crate::nsarray::make_nsarray(&[]);
         let invoke_ptr = unsafe { *((block as usize + 16) as *const u64) };
@@ -310,7 +399,9 @@ pub extern "C" fn shim_nsurlsession_all_tasks_with_completion_handler(_obj: u64,
 }
 
 pub extern "C" fn shim_nsurlsession_description(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     make_nsstring("<NSURLSession>")
 }
 
@@ -322,12 +413,14 @@ const TASK_REQUEST_OFF: usize = 8;
 const TASK_STATE_OFF: usize = 16;
 const TASK_BLOCK_OFF: usize = 24;
 const TASK_SESSION_OFF: usize = 32;
-const TASK_TYPE_OFF: usize = 40;   // 0=data, 1=upload, 2=download
+const TASK_TYPE_OFF: usize = 40; // 0=data, 1=upload, 2=download
 const TASK_SIZE: usize = 48;
 
 fn alloc_data_task(request: u64) -> u64 {
     let obj = crate::pal_alloc().calloc(1, TASK_SIZE) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *(obj as *mut u64) = nsobj::nsurlsessiondatatask_class_addr();
         *((obj as usize + TASK_REQUEST_OFF) as *mut u64) = request;
@@ -339,7 +432,9 @@ fn alloc_data_task(request: u64) -> u64 {
 fn alloc_data_task_for_session(request: u64, session: u64) -> u64 {
     let obj = alloc_data_task(request);
     if obj != 0 && session != 0 {
-        unsafe { *((obj as usize + TASK_SESSION_OFF) as *mut u64) = session; }
+        unsafe {
+            *((obj as usize + TASK_SESSION_OFF) as *mut u64) = session;
+        }
     }
     obj
 }
@@ -350,25 +445,39 @@ fn alloc_data_task_for_session(request: u64, session: u64) -> u64 {
 /// called with `(nil, nil, nil)` so callers that gate on the error argument
 /// will proceed gracefully.
 pub extern "C" fn shim_nsurlsession_data_task_with_url_completion(
-    obj: u64, _cmd: u64, url: u64, block: u64,
+    obj: u64,
+    _cmd: u64,
+    url: u64,
+    block: u64,
 ) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let req = crate::nsurlrequest::shim_nsurlrequest_with_url(0, 0, url);
     let task = alloc_data_task_for_session(req, obj);
     if task != 0 && block != 0 {
-        unsafe { *((task as usize + TASK_BLOCK_OFF) as *mut u64) = block; }
+        unsafe {
+            *((task as usize + TASK_BLOCK_OFF) as *mut u64) = block;
+        }
     }
     task
 }
 
 /// `-[NSURLSession dataTaskWithRequest:completionHandler:]`
 pub extern "C" fn shim_nsurlsession_data_task_with_request_completion(
-    obj: u64, _cmd: u64, request: u64, block: u64,
+    obj: u64,
+    _cmd: u64,
+    request: u64,
+    block: u64,
 ) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let task = alloc_data_task_for_session(request, obj);
     if task != 0 && block != 0 {
-        unsafe { *((task as usize + TASK_BLOCK_OFF) as *mut u64) = block; }
+        unsafe {
+            *((task as usize + TASK_BLOCK_OFF) as *mut u64) = block;
+        }
     }
     task
 }
@@ -381,30 +490,43 @@ pub extern "C" fn shim_nsurlsession_data_task_with_request_completion(
 ///   - download tasks:    `(NSURL, NSHTTPURLResponse, NSError)`
 /// Falls back to a 200-stub response if no URL is available.
 pub extern "C" fn shim_nsurlsessiondatatask_resume(obj: u64, _cmd: u64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as usize + TASK_STATE_OFF) as *mut u64) = 1; } // running
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + TASK_STATE_OFF) as *mut u64) = 1;
+    } // running
 
     let block = unsafe { *((obj as usize + TASK_BLOCK_OFF) as *const u64) };
     let request = unsafe { *((obj as usize + TASK_REQUEST_OFF) as *const u64) };
     let task_type = unsafe { *((obj as usize + TASK_TYPE_OFF) as *const u64) };
 
     if block == 0 {
-        unsafe { *((obj as usize + TASK_STATE_OFF) as *mut u64) = 3; }
+        unsafe {
+            *((obj as usize + TASK_STATE_OFF) as *mut u64) = 3;
+        }
         return;
     }
 
     // Resolve the URL string from the NSURLRequest.
-    let url_ns = if request != 0 { nsurlrequest::shim_nsurlrequest_url(request, 0) } else { 0 };
+    let url_ns = if request != 0 {
+        nsurlrequest::shim_nsurlrequest_url(request, 0)
+    } else {
+        0
+    };
     let url_str = if url_ns != 0 {
-        crate::cfstring::extract_cfstring_cstr(
-            nsurl::shim_nsurl_absolute_string(url_ns, 0)
-        ).map(|s| s.to_string())
+        crate::cfstring::extract_cfstring_cstr(nsurl::shim_nsurl_absolute_string(url_ns, 0))
+            .map(|s| s.to_string())
     } else {
         None
     };
 
     // Resolve the HTTP method.
-    let method_ns = if request != 0 { nsurlrequest::shim_nsurlrequest_http_method(request, 0) } else { 0 };
+    let method_ns = if request != 0 {
+        nsurlrequest::shim_nsurlrequest_http_method(request, 0)
+    } else {
+        0
+    };
     let method = crate::cfstring::extract_cfstring_cstr(method_ns)
         .map(|s| s.to_string())
         .unwrap_or_else(|| "GET".to_string());
@@ -439,14 +561,19 @@ pub extern "C" fn shim_nsurlsessiondatatask_resume(obj: u64, _cmd: u64) {
 
 /// Resume for data and upload tasks — fires completion with `(NSData, NSHTTPURLResponse, NSError)`.
 fn resume_data_task(
-    obj: u64, block: u64, url_ns: u64,
-    url_str: &Option<String>, method: &str, body: Option<&[u8]>,
+    obj: u64,
+    block: u64,
+    url_ns: u64,
+    url_str: &Option<String>,
+    method: &str,
+    body: Option<&[u8]>,
 ) {
     let (data_obj, response_obj, error_obj) = if let Some(ref url) = url_str {
         match perform_http_request(url, method, body) {
             Ok((status, body)) => {
                 let ns_data = crate::nsdata::make_nsdata(&body);
-                let ns_resp = nsurlrequest::make_http_response(url_ns, status as i64, 0, body.len() as i64);
+                let ns_resp =
+                    nsurlrequest::make_http_response(url_ns, status as i64, 0, body.len() as i64);
                 (ns_data, ns_resp, 0u64)
             }
             Err(e) => {
@@ -461,12 +588,13 @@ fn resume_data_task(
         (0u64, ns_resp, 0u64)
     };
 
-    unsafe { *((obj as usize + TASK_STATE_OFF) as *mut u64) = 3; }
+    unsafe {
+        *((obj as usize + TASK_STATE_OFF) as *mut u64) = 3;
+    }
 
     let invoke_ptr = unsafe { *((block as usize + 16) as *const u64) };
     if invoke_ptr != 0 {
-        let invoke: extern "C" fn(u64, u64, u64, u64) =
-            unsafe { std::mem::transmute(invoke_ptr) };
+        let invoke: extern "C" fn(u64, u64, u64, u64) = unsafe { std::mem::transmute(invoke_ptr) };
         invoke(block, data_obj, response_obj, error_obj);
     }
 }
@@ -474,13 +602,22 @@ fn resume_data_task(
 /// Resume for download tasks — writes body to a temp file, fires completion
 /// with `(NSURL, NSHTTPURLResponse, NSError)`.
 fn resume_download_task(
-    obj: u64, block: u64, url_ns: u64,
-    url_str: &Option<String>, method: &str, body: Option<&[u8]>,
+    obj: u64,
+    block: u64,
+    url_ns: u64,
+    url_str: &Option<String>,
+    method: &str,
+    body: Option<&[u8]>,
 ) {
     let (file_url, response_obj, error_obj) = if let Some(ref url) = url_str {
         match perform_http_request(url, method, body) {
             Ok((status, body_bytes)) => {
-                let ns_resp = nsurlrequest::make_http_response(url_ns, status as i64, 0, body_bytes.len() as i64);
+                let ns_resp = nsurlrequest::make_http_response(
+                    url_ns,
+                    status as i64,
+                    0,
+                    body_bytes.len() as i64,
+                );
                 // Write body to a temporary file.
                 let file_url = write_download_to_temp(&body_bytes);
                 (file_url, ns_resp, 0u64)
@@ -498,12 +635,13 @@ fn resume_download_task(
         (file_url, ns_resp, 0u64)
     };
 
-    unsafe { *((obj as usize + TASK_STATE_OFF) as *mut u64) = 3; }
+    unsafe {
+        *((obj as usize + TASK_STATE_OFF) as *mut u64) = 3;
+    }
 
     let invoke_ptr = unsafe { *((block as usize + 16) as *const u64) };
     if invoke_ptr != 0 {
-        let invoke: extern "C" fn(u64, u64, u64, u64) =
-            unsafe { std::mem::transmute(invoke_ptr) };
+        let invoke: extern "C" fn(u64, u64, u64, u64) = unsafe { std::mem::transmute(invoke_ptr) };
         invoke(block, file_url, response_obj, error_obj);
     }
 }
@@ -512,7 +650,11 @@ fn resume_download_task(
 fn write_download_to_temp(data: &[u8]) -> u64 {
     use std::io::Write;
     let dir = std::env::temp_dir();
-    let name = format!("burdettie-download-{}", std::process::id() as u64 * 1_000_000 + DOWNLOAD_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed));
+    let name = format!(
+        "burdettie-download-{}",
+        std::process::id() as u64 * 1_000_000
+            + DOWNLOAD_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    );
     let path = dir.join(name);
     match std::fs::File::create(&path) {
         Ok(mut f) => {
@@ -531,7 +673,11 @@ fn write_download_to_temp(data: &[u8]) -> u64 {
 static DOWNLOAD_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 /// Perform a synchronous HTTP/HTTPS request and return (status_code, body_bytes).
-fn perform_http_request(url: &str, method: &str, body: Option<&[u8]>) -> Result<(i32, Vec<u8>), String> {
+fn perform_http_request(
+    url: &str,
+    method: &str,
+    body: Option<&[u8]>,
+) -> Result<(i32, Vec<u8>), String> {
     // BurdettieOS domain rewrite — redirect Apple service URLs to local server.
     // The original URL is passed as X-Burdettie-Original-URL header for recording.
     let (effective_url, original_url) = match burdettie_domain_map::rewrite_url(url) {
@@ -545,27 +691,37 @@ fn perform_http_request(url: &str, method: &str, body: Option<&[u8]>) -> Result<
     let mut resp = match () {
         _ if method.eq_ignore_ascii_case("HEAD") => {
             let mut r = agent.head(&effective_url);
-            if let Some(ref orig) = original_url { r = r.header("X-Burdettie-Original-URL", orig); }
+            if let Some(ref orig) = original_url {
+                r = r.header("X-Burdettie-Original-URL", orig);
+            }
             r.call().map_err(|e| e.to_string())
         }
         _ if method.eq_ignore_ascii_case("DELETE") => {
             let mut r = agent.delete(&effective_url);
-            if let Some(ref orig) = original_url { r = r.header("X-Burdettie-Original-URL", orig); }
+            if let Some(ref orig) = original_url {
+                r = r.header("X-Burdettie-Original-URL", orig);
+            }
             r.call().map_err(|e| e.to_string())
         }
         _ if method.eq_ignore_ascii_case("POST") => {
             let mut r = agent.post(&effective_url);
-            if let Some(ref orig) = original_url { r = r.header("X-Burdettie-Original-URL", orig); }
+            if let Some(ref orig) = original_url {
+                r = r.header("X-Burdettie-Original-URL", orig);
+            }
             r.send(body.unwrap_or(b"")).map_err(|e| e.to_string())
         }
         _ if method.eq_ignore_ascii_case("PUT") => {
             let mut r = agent.put(&effective_url);
-            if let Some(ref orig) = original_url { r = r.header("X-Burdettie-Original-URL", orig); }
+            if let Some(ref orig) = original_url {
+                r = r.header("X-Burdettie-Original-URL", orig);
+            }
             r.send(body.unwrap_or(b"")).map_err(|e| e.to_string())
         }
         _ => {
             let mut r = agent.get(&effective_url);
-            if let Some(ref orig) = original_url { r = r.header("X-Burdettie-Original-URL", orig); }
+            if let Some(ref orig) = original_url {
+                r = r.header("X-Burdettie-Original-URL", orig);
+            }
             r.call().map_err(|e| e.to_string())
         }
     }?;
@@ -576,25 +732,37 @@ fn perform_http_request(url: &str, method: &str, body: Option<&[u8]>) -> Result<
 
 /// `-[NSURLSessionDataTask cancel]`
 pub extern "C" fn shim_nsurlsessiondatatask_cancel(obj: u64, _cmd: u64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as usize + TASK_STATE_OFF) as *mut u64) = 2; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + TASK_STATE_OFF) as *mut u64) = 2;
+    }
 }
 
 /// `-[NSURLSessionDataTask suspend]`
 pub extern "C" fn shim_nsurlsessiondatatask_suspend(obj: u64, _cmd: u64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as usize + TASK_STATE_OFF) as *mut u64) = 0; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + TASK_STATE_OFF) as *mut u64) = 0;
+    }
 }
 
 /// `-[NSURLSessionDataTask state]`
 pub extern "C" fn shim_nsurlsessiondatatask_state(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 3; }
+    if obj == 0 {
+        return 3;
+    }
     unsafe { *((obj as usize + TASK_STATE_OFF) as *const u64) }
 }
 
 /// `-[NSURLSessionDataTask originalRequest]`
 pub extern "C" fn shim_nsurlsessiondatatask_original_request(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + TASK_REQUEST_OFF) as *const u64) }
 }
 
@@ -605,7 +773,9 @@ pub extern "C" fn shim_nsurlsessiondatatask_task_id(obj: u64, _cmd: u64) -> u64 
 }
 
 pub extern "C" fn shim_nsurlsessiondatatask_description(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let state = unsafe { *((obj as usize + TASK_STATE_OFF) as *const u64) };
     let task_type = unsafe { *((obj as usize + TASK_TYPE_OFF) as *const u64) };
     let state_str = match state {
@@ -635,9 +805,7 @@ mod tests {
 
     #[test]
     fn config_default_creates_valid_object() {
-        let cfg = shim_nsurlsessionconfig_default(
-            nsobj::nsurlsessionconfiguration_class_addr(), 0,
-        );
+        let cfg = shim_nsurlsessionconfig_default(nsobj::nsurlsessionconfiguration_class_addr(), 0);
         assert_ne!(cfg, 0);
         let isa = read_field(cfg, 0);
         assert_eq!(isa, nsobj::nsurlsessionconfiguration_class_addr());
@@ -649,9 +817,8 @@ mod tests {
 
     #[test]
     fn config_ephemeral_creates_valid_object() {
-        let cfg = shim_nsurlsessionconfig_ephemeral(
-            nsobj::nsurlsessionconfiguration_class_addr(), 0,
-        );
+        let cfg =
+            shim_nsurlsessionconfig_ephemeral(nsobj::nsurlsessionconfiguration_class_addr(), 0);
         assert_ne!(cfg, 0);
         let t = shim_nsurlsessionconfig_timeout(cfg, 0);
         assert!((t - 60.0).abs() < f64::EPSILON);
@@ -666,9 +833,7 @@ mod tests {
 
     #[test]
     fn config_set_timeout() {
-        let cfg = shim_nsurlsessionconfig_default(
-            nsobj::nsurlsessionconfiguration_class_addr(), 0,
-        );
+        let cfg = shim_nsurlsessionconfig_default(nsobj::nsurlsessionconfiguration_class_addr(), 0);
         shim_nsurlsessionconfig_set_timeout(cfg, 0, 120.0);
         let t = shim_nsurlsessionconfig_timeout(cfg, 0);
         assert!((t - 120.0).abs() < f64::EPSILON);
@@ -683,9 +848,7 @@ mod tests {
 
     #[test]
     fn config_description_valid() {
-        let cfg = shim_nsurlsessionconfig_default(
-            nsobj::nsurlsessionconfiguration_class_addr(), 0,
-        );
+        let cfg = shim_nsurlsessionconfig_default(nsobj::nsurlsessionconfiguration_class_addr(), 0);
         let desc = shim_nsurlsessionconfig_description(cfg, 0);
         assert_ne!(desc, 0);
         assert_string_eq(desc, "<NSURLSessionConfiguration>");
@@ -712,12 +875,8 @@ mod tests {
 
     #[test]
     fn session_with_config() {
-        let cfg = shim_nsurlsessionconfig_default(
-            nsobj::nsurlsessionconfiguration_class_addr(), 0,
-        );
-        let s = shim_nsurlsession_with_config(
-            nsobj::nsurlsession_class_addr(), 0, cfg,
-        );
+        let cfg = shim_nsurlsessionconfig_default(nsobj::nsurlsessionconfiguration_class_addr(), 0);
+        let s = shim_nsurlsession_with_config(nsobj::nsurlsession_class_addr(), 0, cfg);
         assert_ne!(s, 0);
         assert_eq!(read_field(s, SESSION_CONFIG_OFF), cfg);
         free_obj(s);
@@ -726,12 +885,8 @@ mod tests {
 
     #[test]
     fn session_configuration_getter() {
-        let cfg = shim_nsurlsessionconfig_default(
-            nsobj::nsurlsessionconfiguration_class_addr(), 0,
-        );
-        let s = shim_nsurlsession_with_config(
-            nsobj::nsurlsession_class_addr(), 0, cfg,
-        );
+        let cfg = shim_nsurlsessionconfig_default(nsobj::nsurlsessionconfiguration_class_addr(), 0);
+        let s = shim_nsurlsession_with_config(nsobj::nsurlsession_class_addr(), 0, cfg);
         let got = shim_nsurlsession_configuration(s, 0);
         assert_eq!(got, cfg);
         free_obj(s);
@@ -958,7 +1113,10 @@ mod tests {
 
     #[test]
     fn data_task_with_url_completion_nil_session() {
-        assert_eq!(shim_nsurlsession_data_task_with_url_completion(0, 0, 0, 0), 0);
+        assert_eq!(
+            shim_nsurlsession_data_task_with_url_completion(0, 0, 0, 0),
+            0
+        );
     }
 
     #[test]
@@ -984,7 +1142,10 @@ mod tests {
 
     #[test]
     fn data_task_with_request_completion_nil_session() {
-        assert_eq!(shim_nsurlsession_data_task_with_request_completion(0, 0, 0, 0), 0);
+        assert_eq!(
+            shim_nsurlsession_data_task_with_request_completion(0, 0, 0, 0),
+            0
+        );
     }
 
     #[test]
@@ -1015,7 +1176,10 @@ mod tests {
         let task = shim_nsurlsession_upload_task_with_request(s, 0, req, body);
         assert_ne!(task, 0);
         // isa is NSURLSessionUploadTask
-        assert_eq!(read_field(task, 0), nsobj::nsurlsessionuploadtask_class_addr());
+        assert_eq!(
+            read_field(task, 0),
+            nsobj::nsurlsessionuploadtask_class_addr()
+        );
         // task type = 1 (upload)
         assert_eq!(read_field(task, TASK_TYPE_OFF), 1);
         // state = suspended
@@ -1044,7 +1208,10 @@ mod tests {
 
     #[test]
     fn upload_task_completion_nil_session() {
-        assert_eq!(shim_nsurlsession_upload_task_with_request_completion(0, 0, 0, 0, 0), 0);
+        assert_eq!(
+            shim_nsurlsession_upload_task_with_request_completion(0, 0, 0, 0, 0),
+            0
+        );
     }
 
     #[test]
@@ -1053,11 +1220,15 @@ mod tests {
         let req = crate::nsurlrequest::shim_nsurlrequest_with_url(0, 0, 0);
         let body = crate::nsdata::make_nsdata(b"data");
         let fake_block: u64 = 0xBEEF;
-        let task = shim_nsurlsession_upload_task_with_request_completion(s, 0, req, body, fake_block);
+        let task =
+            shim_nsurlsession_upload_task_with_request_completion(s, 0, req, body, fake_block);
         assert_ne!(task, 0);
         assert_eq!(read_field(task, TASK_BLOCK_OFF), fake_block);
         assert_eq!(read_field(task, TASK_TYPE_OFF), 1);
-        assert_eq!(read_field(task, 0), nsobj::nsurlsessionuploadtask_class_addr());
+        assert_eq!(
+            read_field(task, 0),
+            nsobj::nsurlsessionuploadtask_class_addr()
+        );
         free_obj(task);
         free_obj(s);
     }
@@ -1073,7 +1244,10 @@ mod tests {
         let req = crate::nsurlrequest::shim_nsurlrequest_with_url(0, 0, 0);
         let task = shim_nsurlsession_download_task_with_request(s, 0, req);
         assert_ne!(task, 0);
-        assert_eq!(read_field(task, 0), nsobj::nsurlsessiondownloadtask_class_addr());
+        assert_eq!(
+            read_field(task, 0),
+            nsobj::nsurlsessiondownloadtask_class_addr()
+        );
         assert_eq!(read_field(task, TASK_TYPE_OFF), 2);
         assert_eq!(read_field(task, TASK_STATE_OFF), 0);
         assert_eq!(read_field(task, TASK_REQUEST_OFF), req);
@@ -1092,7 +1266,10 @@ mod tests {
         let url = make_string("http://example.com/file.zip");
         let task = shim_nsurlsession_download_task_with_url(s, 0, url);
         assert_ne!(task, 0);
-        assert_eq!(read_field(task, 0), nsobj::nsurlsessiondownloadtask_class_addr());
+        assert_eq!(
+            read_field(task, 0),
+            nsobj::nsurlsessiondownloadtask_class_addr()
+        );
         assert_eq!(read_field(task, TASK_TYPE_OFF), 2);
         assert_ne!(read_field(task, TASK_REQUEST_OFF), 0); // auto-created request
         free_obj(task);
@@ -1101,7 +1278,10 @@ mod tests {
 
     #[test]
     fn download_task_with_request_completion_nil_session() {
-        assert_eq!(shim_nsurlsession_download_task_with_request_completion(0, 0, 0, 0), 0);
+        assert_eq!(
+            shim_nsurlsession_download_task_with_request_completion(0, 0, 0, 0),
+            0
+        );
     }
 
     #[test]
@@ -1119,7 +1299,10 @@ mod tests {
 
     #[test]
     fn download_task_with_url_completion_nil_session() {
-        assert_eq!(shim_nsurlsession_download_task_with_url_completion(0, 0, 0, 0), 0);
+        assert_eq!(
+            shim_nsurlsession_download_task_with_url_completion(0, 0, 0, 0),
+            0
+        );
     }
 
     #[test]
@@ -1131,7 +1314,10 @@ mod tests {
         assert_ne!(task, 0);
         assert_eq!(read_field(task, TASK_BLOCK_OFF), fake_block);
         assert_eq!(read_field(task, TASK_TYPE_OFF), 2);
-        assert_eq!(read_field(task, 0), nsobj::nsurlsessiondownloadtask_class_addr());
+        assert_eq!(
+            read_field(task, 0),
+            nsobj::nsurlsessiondownloadtask_class_addr()
+        );
         free_obj(task);
         free_obj(s);
     }
@@ -1172,8 +1358,8 @@ mod tests {
         // Extract the path and verify the file exists with correct content
         let path_ns = crate::nsurl::shim_nsurl_path(url, 0);
         assert_ne!(path_ns, 0);
-        let path_str = crate::cfstring::extract_cfstring_cstr(path_ns)
-            .expect("path should be extractable");
+        let path_str =
+            crate::cfstring::extract_cfstring_cstr(path_ns).expect("path should be extractable");
         let contents = std::fs::read(path_str).expect("temp file should exist");
         assert_eq!(contents, b"test download data");
         // Cleanup
@@ -1185,8 +1371,8 @@ mod tests {
         let url = write_download_to_temp(b"");
         assert_ne!(url, 0);
         let path_ns = crate::nsurl::shim_nsurl_path(url, 0);
-        let path_str = crate::cfstring::extract_cfstring_cstr(path_ns)
-            .expect("path should be extractable");
+        let path_str =
+            crate::cfstring::extract_cfstring_cstr(path_ns).expect("path should be extractable");
         let contents = std::fs::read(path_str).expect("temp file should exist");
         assert!(contents.is_empty());
         let _ = std::fs::remove_file(path_str);
@@ -1260,7 +1446,9 @@ mod tests {
     fn config_background_creates_valid_object() {
         let id = make_string("com.test.bg");
         let cfg = shim_nsurlsessionconfig_background(
-            nsobj::nsurlsessionconfiguration_class_addr(), 0, id,
+            nsobj::nsurlsessionconfiguration_class_addr(),
+            0,
+            id,
         );
         assert_ne!(cfg, 0);
         let isa = read_field(cfg, 0);
@@ -1286,13 +1474,15 @@ mod tests {
 
     #[test]
     fn session_with_delegate_stores_fields() {
-        let cfg = shim_nsurlsessionconfig_default(
-            nsobj::nsurlsessionconfiguration_class_addr(), 0,
-        );
+        let cfg = shim_nsurlsessionconfig_default(nsobj::nsurlsessionconfiguration_class_addr(), 0);
         let fake_delegate: u64 = 0xD000;
         let fake_queue: u64 = 0xE000;
         let s = shim_nsurlsession_with_config_delegate(
-            nsobj::nsurlsession_class_addr(), 0, cfg, fake_delegate, fake_queue,
+            nsobj::nsurlsession_class_addr(),
+            0,
+            cfg,
+            fake_delegate,
+            fake_queue,
         );
         assert_ne!(s, 0);
         assert_eq!(read_field(s, SESSION_CONFIG_OFF), cfg);

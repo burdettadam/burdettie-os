@@ -22,9 +22,9 @@ use crate::table::ShimTable;
 #[cfg(target_os = "linux")]
 use std::collections::HashMap;
 #[cfg(target_os = "linux")]
-use std::sync::Mutex;
-#[cfg(target_os = "linux")]
 use std::sync::atomic::{AtomicU32, Ordering};
+#[cfg(target_os = "linux")]
+use std::sync::Mutex;
 
 // ── macOS kqueue constants ──────────────────────────────────────────────────
 
@@ -253,7 +253,9 @@ fn registry_only_pipes_for_kq(kq: i32) -> bool {
 #[cfg(target_os = "linux")]
 fn timerfd_map_insert(tfd: i32, epfd: i32, ident: u64) {
     let mut guard = TIMERFD_MAP.lock().unwrap_or_else(|e| e.into_inner());
-    guard.get_or_insert_with(HashMap::new).insert(tfd, (epfd, ident));
+    guard
+        .get_or_insert_with(HashMap::new)
+        .insert(tfd, (epfd, ident));
 }
 
 #[cfg(target_os = "linux")]
@@ -271,7 +273,9 @@ fn timerfd_map_lookup_by_fd(tfd: i32) -> Option<(i32, u64)> {
 #[cfg(target_os = "linux")]
 fn userfd_map_insert(ufd: i32, epfd: i32, ident: u64) {
     let mut guard = USERFD_MAP.lock().unwrap_or_else(|e| e.into_inner());
-    guard.get_or_insert_with(HashMap::new).insert(ufd, (epfd, ident));
+    guard
+        .get_or_insert_with(HashMap::new)
+        .insert(ufd, (epfd, ident));
 }
 
 #[cfg(target_os = "linux")]
@@ -312,13 +316,15 @@ pub extern "C" fn shim_kqueue() -> i32 {
 #[cfg(target_os = "linux")]
 pub extern "C" fn shim_kevent(
     kq: i32,
-    changelist: u64,  // *const DarwinKevent
+    changelist: u64, // *const DarwinKevent
     nchanges: i32,
-    eventlist: u64,    // *mut DarwinKevent
+    eventlist: u64, // *mut DarwinKevent
     nevents: i32,
-    timeout: u64,      // *const libc::timespec
+    timeout: u64, // *const libc::timespec
 ) -> i32 {
-    log::debug!("kevent(kq={kq}, nchanges={nchanges}, nevents={nevents}, timeout_ptr={timeout:#x})");
+    log::debug!(
+        "kevent(kq={kq}, nchanges={nchanges}, nevents={nevents}, timeout_ptr={timeout:#x})"
+    );
 
     // Phase 1: Apply changelist (register/deregister events via epoll_ctl).
     if changelist != 0 && nchanges > 0 {
@@ -327,7 +333,13 @@ pub extern "C" fn shim_kevent(
                 &*((changelist as usize + i * std::mem::size_of::<DarwinKevent>())
                     as *const DarwinKevent)
             };
-            log::debug!("  changelist[{i}]: ident={} filter={} flags={:#06x} udata={:#x}", kev.ident, kev.filter, kev.flags, kev.udata);
+            log::debug!(
+                "  changelist[{i}]: ident={} filter={} flags={:#06x} udata={:#x}",
+                kev.ident,
+                kev.filter,
+                kev.flags,
+                kev.udata
+            );
             apply_change(kq, kev);
         }
     }
@@ -378,7 +390,7 @@ pub extern "C" fn shim_kevent(
         // Sleep briefly for CPU courtesy, then return 0 events.
         // This forces the event loop to see "nothing happened" and check
         // its exit condition rather than perpetually processing pipe wakeups.
-        unsafe { libc::usleep(50_000) };  // 50ms
+        unsafe { libc::usleep(50_000) }; // 50ms
         return 0;
     }
 
@@ -395,9 +407,8 @@ pub extern "C" fn shim_kevent(
     let max_events = nevents.min(64) as usize;
     let mut epoll_events = vec![libc::epoll_event { events: 0, u64: 0 }; max_events];
 
-    let n = unsafe {
-        libc::epoll_wait(kq, epoll_events.as_mut_ptr(), max_events as i32, timeout_ms)
-    };
+    let n =
+        unsafe { libc::epoll_wait(kq, epoll_events.as_mut_ptr(), max_events as i32, timeout_ms) };
     log::debug!("  epoll_wait returned {n}");
     if n < 0 {
         return -1;
@@ -439,7 +450,9 @@ pub extern "C" fn shim_kevent(
                 udata,
             };
             out_idx += 1;
-            log::debug!("  event[{out_idx}]: timerfd {fd} → EVFILT_TIMER ident={original_ident} udata={udata:#x}");
+            log::debug!(
+                "  event[{out_idx}]: timerfd {fd} → EVFILT_TIMER ident={original_ident} udata={udata:#x}"
+            );
             continue;
         }
 
@@ -466,7 +479,9 @@ pub extern "C" fn shim_kevent(
                 udata,
             };
             out_idx += 1;
-            log::debug!("  event[{out_idx}]: eventfd {fd} → EVFILT_USER ident={original_ident} udata={udata:#x}");
+            log::debug!(
+                "  event[{out_idx}]: eventfd {fd} → EVFILT_USER ident={original_ident} udata={udata:#x}"
+            );
             continue;
         }
 
@@ -580,7 +595,12 @@ fn apply_change(epfd: i32, kev: &DarwinKevent) {
             if let Some(reg) = registry_remove(&(epfd, kev.ident, EVFILT_TIMER)) {
                 if reg.timerfd >= 0 {
                     unsafe {
-                        libc::epoll_ctl(epfd, libc::EPOLL_CTL_DEL, reg.timerfd, std::ptr::null_mut());
+                        libc::epoll_ctl(
+                            epfd,
+                            libc::EPOLL_CTL_DEL,
+                            reg.timerfd,
+                            std::ptr::null_mut(),
+                        );
                         libc::close(reg.timerfd);
                     }
                     timerfd_map_remove(reg.timerfd);
@@ -592,7 +612,12 @@ fn apply_change(epfd: i32, kev: &DarwinKevent) {
                 if reg.timerfd >= 0 {
                     // timerfd field repurposed as eventfd for EVFILT_USER.
                     unsafe {
-                        libc::epoll_ctl(epfd, libc::EPOLL_CTL_DEL, reg.timerfd, std::ptr::null_mut());
+                        libc::epoll_ctl(
+                            epfd,
+                            libc::EPOLL_CTL_DEL,
+                            reg.timerfd,
+                            std::ptr::null_mut(),
+                        );
                         libc::close(reg.timerfd);
                     }
                     userfd_map_remove(reg.timerfd);
@@ -618,7 +643,11 @@ fn apply_change(epfd: i32, kev: &DarwinKevent) {
                 unsafe {
                     libc::write(reg.timerfd, &val as *const u64 as *const libc::c_void, 8);
                 }
-                log::debug!("  EVFILT_USER: triggered ident={} (eventfd={})", kev.ident, reg.timerfd);
+                log::debug!(
+                    "  EVFILT_USER: triggered ident={} (eventfd={})",
+                    kev.ident,
+                    reg.timerfd
+                );
             }
         }
         return;
@@ -673,7 +702,9 @@ fn apply_change(epfd: i32, kev: &DarwinKevent) {
                 if ret < 0 {
                     let err = unsafe { *libc::__errno_location() };
                     if err == libc::EEXIST {
-                        unsafe { libc::epoll_ctl(epfd, libc::EPOLL_CTL_MOD, fd, &mut ev); }
+                        unsafe {
+                            libc::epoll_ctl(epfd, libc::EPOLL_CTL_MOD, fd, &mut ev);
+                        }
                     }
                 }
             }
@@ -698,8 +729,14 @@ fn apply_change(epfd: i32, kev: &DarwinKevent) {
                 let secs = (ns / 1_000_000_000) as i64;
                 let nsecs = (ns % 1_000_000_000) as i64;
 
-                log::debug!("  EVFILT_TIMER: ident={} data={} → {}s {}ns oneshot={}", 
-                    kev.ident, kev.data, secs, nsecs, kev.flags & EV_ONESHOT != 0);
+                log::debug!(
+                    "  EVFILT_TIMER: ident={} data={} → {}s {}ns oneshot={}",
+                    kev.ident,
+                    kev.data,
+                    secs,
+                    nsecs,
+                    kev.flags & EV_ONESHOT != 0
+                );
 
                 // Create a timerfd.
                 let tfd = unsafe {
@@ -717,18 +754,32 @@ fn apply_change(epfd: i32, kev: &DarwinKevent) {
                 // Otherwise, make it repeating.
                 let is_oneshot = kev.flags & EV_ONESHOT != 0;
                 let interval = if is_oneshot {
-                    libc::timespec { tv_sec: 0, tv_nsec: 0 }
+                    libc::timespec {
+                        tv_sec: 0,
+                        tv_nsec: 0,
+                    }
                 } else {
-                    libc::timespec { tv_sec: secs, tv_nsec: nsecs }
+                    libc::timespec {
+                        tv_sec: secs,
+                        tv_nsec: nsecs,
+                    }
                 };
                 let spec = libc::itimerspec {
                     it_interval: interval,
-                    it_value: libc::timespec { tv_sec: secs, tv_nsec: nsecs },
+                    it_value: libc::timespec {
+                        tv_sec: secs,
+                        tv_nsec: nsecs,
+                    },
                 };
                 let ret = unsafe { libc::timerfd_settime(tfd, 0, &spec, std::ptr::null_mut()) };
                 if ret < 0 {
-                    log::warn!("timerfd_settime failed: {}", std::io::Error::last_os_error());
-                    unsafe { libc::close(tfd); }
+                    log::warn!(
+                        "timerfd_settime failed: {}",
+                        std::io::Error::last_os_error()
+                    );
+                    unsafe {
+                        libc::close(tfd);
+                    }
                     return;
                 }
 
@@ -739,8 +790,13 @@ fn apply_change(epfd: i32, kev: &DarwinKevent) {
                 };
                 let ret = unsafe { libc::epoll_ctl(epfd, libc::EPOLL_CTL_ADD, tfd, &mut ev) };
                 if ret < 0 {
-                    log::warn!("epoll_ctl(timer) failed: {}", std::io::Error::last_os_error());
-                    unsafe { libc::close(tfd); }
+                    log::warn!(
+                        "epoll_ctl(timer) failed: {}",
+                        std::io::Error::last_os_error()
+                    );
+                    unsafe {
+                        libc::close(tfd);
+                    }
                     return;
                 }
 
@@ -760,13 +816,15 @@ fn apply_change(epfd: i32, kev: &DarwinKevent) {
             EVFILT_USER => {
                 // User events are non-pipe activity — mark lifecycle.
                 lifecycle_mark_non_pipe(epfd);
-                log::debug!("  EVFILT_USER: ident={} fflags={:#x} udata={:#x}",
-                    kev.ident, kev.fflags, kev.udata);
+                log::debug!(
+                    "  EVFILT_USER: ident={} fflags={:#x} udata={:#x}",
+                    kev.ident,
+                    kev.fflags,
+                    kev.udata
+                );
 
                 // Create an eventfd (semaphore mode, non-blocking).
-                let efd = unsafe {
-                    libc::eventfd(0, libc::EFD_NONBLOCK | libc::EFD_CLOEXEC)
-                };
+                let efd = unsafe { libc::eventfd(0, libc::EFD_NONBLOCK | libc::EFD_CLOEXEC) };
                 if efd < 0 {
                     log::warn!("eventfd failed: {}", std::io::Error::last_os_error());
                     return;
@@ -779,8 +837,13 @@ fn apply_change(epfd: i32, kev: &DarwinKevent) {
                 };
                 let ret = unsafe { libc::epoll_ctl(epfd, libc::EPOLL_CTL_ADD, efd, &mut ev) };
                 if ret < 0 {
-                    log::warn!("epoll_ctl(user) failed: {}", std::io::Error::last_os_error());
-                    unsafe { libc::close(efd); }
+                    log::warn!(
+                        "epoll_ctl(user) failed: {}",
+                        std::io::Error::last_os_error()
+                    );
+                    unsafe {
+                        libc::close(efd);
+                    }
                     return;
                 }
 
@@ -819,9 +882,18 @@ pub struct KqueueShims;
 impl KqueueShims {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
-        register_shims!(table,
-            ("_kqueue", shim_kqueue as *const () as u64, "kqueue → epoll_create1"),
-            ("_kevent", shim_kevent as *const () as u64, "kevent → epoll_ctl/wait"),
+        register_shims!(
+            table,
+            (
+                "_kqueue",
+                shim_kqueue as *const () as u64,
+                "kqueue → epoll_create1"
+            ),
+            (
+                "_kevent",
+                shim_kevent as *const () as u64,
+                "kevent → epoll_ctl/wait"
+            ),
         );
     }
 }
@@ -839,6 +911,8 @@ mod tests {
     fn kqueue_returns_valid_fd() {
         let fd = shim_kqueue();
         assert!(fd >= 0, "kqueue/epoll_create failed: fd={fd}");
-        unsafe { libc::close(fd); }
+        unsafe {
+            libc::close(fd);
+        }
     }
 }

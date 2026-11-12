@@ -117,7 +117,10 @@ mod tests {
         // Very unlikely (but not impossible) to get exactly 0 twice.
         let v1 = shim_arc4random();
         let v2 = shim_arc4random();
-        assert!(v1 != 0 || v2 != 0, "arc4random should return non-zero values");
+        assert!(
+            v1 != 0 || v2 != 0,
+            "arc4random should return non-zero values"
+        );
     }
 
     #[test]
@@ -125,7 +128,10 @@ mod tests {
         let mut buf = [0u8; 32];
         shim_arc4random_buf(buf.as_mut_ptr(), buf.len());
         // At least some bytes should be non-zero.
-        assert!(buf.iter().any(|&b| b != 0), "buffer should have non-zero bytes");
+        assert!(
+            buf.iter().any(|&b| b != 0),
+            "buffer should have non-zero bytes"
+        );
     }
 
     #[test]

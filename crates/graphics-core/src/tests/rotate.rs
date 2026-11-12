@@ -161,10 +161,16 @@ fn stroke_path_with_width() {
     // proving the stroke is wider than 1px.
     let p_above = px(&surface, 20, 19);
     let r_above = (p_above >> 16) & 0xFF;
-    assert!(r_above > 0, "pixel above center should have red component, got 0x{p_above:08X}");
+    assert!(
+        r_above > 0,
+        "pixel above center should have red component, got 0x{p_above:08X}"
+    );
     let p_below = px(&surface, 20, 21);
     let r_below = (p_below >> 16) & 0xFF;
-    assert!(r_below > 0, "pixel below center should have red component, got 0x{p_below:08X}");
+    assert!(
+        r_below > 0,
+        "pixel below center should have red component, got 0x{p_below:08X}"
+    );
     // Several pixels away should remain white.
     assert_eq!(px(&surface, 20, 17), WHITE_ARGB);
     assert_eq!(px(&surface, 20, 23), WHITE_ARGB);

@@ -16,20 +16,30 @@ const IDENTIFIER_OFF: usize = 16;
 pub(crate) const LAYOUT_GUIDE_SIZE: usize = 24;
 
 fn read_u64(obj: u64, offset: usize) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + offset) as *const u64) }
 }
 
 fn write_u64(obj: u64, offset: usize, value: u64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as usize + offset) as *mut u64) = value; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + offset) as *mut u64) = value;
+    }
 }
 
 /// Allocate a new NSLayoutGuide for the given owning view.
 pub(crate) fn make_layout_guide(owning_view: u64) -> u64 {
     let obj = crate::pal_alloc().calloc(1, LAYOUT_GUIDE_SIZE) as u64;
-    if obj == 0 { return 0; }
-    unsafe { *(obj as *mut u64) = crate::nsobj::nslayoutguide_class_addr(); }
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *(obj as *mut u64) = crate::nsobj::nslayoutguide_class_addr();
+    }
     write_u64(obj, OWNING_VIEW_OFF, owning_view);
     obj
 }
@@ -64,70 +74,90 @@ pub extern "C" fn shim_nslayoutguide_set_identifier(obj: u64, _cmd: u64, ident: 
 /// `-[NSLayoutGuide leadingAnchor]`
 pub extern "C" fn shim_nslayoutguide_leading_anchor(obj: u64, _cmd: u64) -> u64 {
     let view = read_u64(obj, OWNING_VIEW_OFF);
-    if view == 0 { return 0; }
+    if view == 0 {
+        return 0;
+    }
     crate::nslayoutanchor::make_anchor(view, 5)
 }
 
 /// `-[NSLayoutGuide trailingAnchor]`
 pub extern "C" fn shim_nslayoutguide_trailing_anchor(obj: u64, _cmd: u64) -> u64 {
     let view = read_u64(obj, OWNING_VIEW_OFF);
-    if view == 0 { return 0; }
+    if view == 0 {
+        return 0;
+    }
     crate::nslayoutanchor::make_anchor(view, 6)
 }
 
 /// `-[NSLayoutGuide leftAnchor]`
 pub extern "C" fn shim_nslayoutguide_left_anchor(obj: u64, _cmd: u64) -> u64 {
     let view = read_u64(obj, OWNING_VIEW_OFF);
-    if view == 0 { return 0; }
+    if view == 0 {
+        return 0;
+    }
     crate::nslayoutanchor::make_anchor(view, 1)
 }
 
 /// `-[NSLayoutGuide rightAnchor]`
 pub extern "C" fn shim_nslayoutguide_right_anchor(obj: u64, _cmd: u64) -> u64 {
     let view = read_u64(obj, OWNING_VIEW_OFF);
-    if view == 0 { return 0; }
+    if view == 0 {
+        return 0;
+    }
     crate::nslayoutanchor::make_anchor(view, 2)
 }
 
 /// `-[NSLayoutGuide topAnchor]`
 pub extern "C" fn shim_nslayoutguide_top_anchor(obj: u64, _cmd: u64) -> u64 {
     let view = read_u64(obj, OWNING_VIEW_OFF);
-    if view == 0 { return 0; }
+    if view == 0 {
+        return 0;
+    }
     crate::nslayoutanchor::make_anchor(view, 3)
 }
 
 /// `-[NSLayoutGuide bottomAnchor]`
 pub extern "C" fn shim_nslayoutguide_bottom_anchor(obj: u64, _cmd: u64) -> u64 {
     let view = read_u64(obj, OWNING_VIEW_OFF);
-    if view == 0 { return 0; }
+    if view == 0 {
+        return 0;
+    }
     crate::nslayoutanchor::make_anchor(view, 4)
 }
 
 /// `-[NSLayoutGuide widthAnchor]`
 pub extern "C" fn shim_nslayoutguide_width_anchor(obj: u64, _cmd: u64) -> u64 {
     let view = read_u64(obj, OWNING_VIEW_OFF);
-    if view == 0 { return 0; }
+    if view == 0 {
+        return 0;
+    }
     crate::nslayoutanchor::make_anchor(view, 7)
 }
 
 /// `-[NSLayoutGuide heightAnchor]`
 pub extern "C" fn shim_nslayoutguide_height_anchor(obj: u64, _cmd: u64) -> u64 {
     let view = read_u64(obj, OWNING_VIEW_OFF);
-    if view == 0 { return 0; }
+    if view == 0 {
+        return 0;
+    }
     crate::nslayoutanchor::make_anchor(view, 8)
 }
 
 /// `-[NSLayoutGuide centerXAnchor]`
 pub extern "C" fn shim_nslayoutguide_center_x_anchor(obj: u64, _cmd: u64) -> u64 {
     let view = read_u64(obj, OWNING_VIEW_OFF);
-    if view == 0 { return 0; }
+    if view == 0 {
+        return 0;
+    }
     crate::nslayoutanchor::make_anchor(view, 9)
 }
 
 /// `-[NSLayoutGuide centerYAnchor]`
 pub extern "C" fn shim_nslayoutguide_center_y_anchor(obj: u64, _cmd: u64) -> u64 {
     let view = read_u64(obj, OWNING_VIEW_OFF);
-    if view == 0 { return 0; }
+    if view == 0 {
+        return 0;
+    }
     crate::nslayoutanchor::make_anchor(view, 10)
 }
 

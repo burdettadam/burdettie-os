@@ -1,5 +1,5 @@
-use super::*;
 use super::make_metadata;
+use super::*;
 #[test]
 fn register_and_lookup_class() {
     let mut rt = ObjcRuntime::new();
@@ -209,4 +209,3 @@ fn category_class_methods_collected_as_load() {
     let loads = rt.collect_load_methods();
     assert!(loads.iter().any(|(name, _)| name == "Widget"));
 }
-

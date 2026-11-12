@@ -1,0 +1,216 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://burdettie.local/docker/imported-artifacts.schema.json",
+  "title": "Burdettie Imported Artifacts Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "workflow",
+    "generated_at",
+    "source_host",
+    "artifacts"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "workflow": {
+      "type": "string",
+      "enum": ["docker-first"]
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source_host": {
+      "$ref": "#/$defs/source_host"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/artifact"
+      }
+    }
+  },
+  "$defs": {
+    "source_host": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capture_kind", "machine_name", "macos_version", "macos_build"],
+      "properties": {
+        "capture_kind": {
+          "type": "string",
+          "enum": ["manual-export", "wormhole-transfer", "scripted-extract", "unknown"]
+        },
+        "machine_name": {
+          "type": "string"
+        },
+        "macos_version": {
+          "type": "string"
+        },
+        "macos_build": {
+          "type": "string"
+        },
+        "xcode_version": {
+          "type": "string"
+        },
+        "xcode_build": {
+          "type": "string"
+        }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "label",
+        "source",
+        "storage",
+        "integrity",
+        "classification",
+        "entries"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["tool-set", "app-bundle", "framework-set", "sdk-set", "binary"]
+        },
+        "label": {
+          "type": "string"
+        },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["host_path", "extracted_at", "transfer_method"],
+          "properties": {
+            "host_path": {
+              "type": "string"
+            },
+            "extracted_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "transfer_method": {
+              "type": "string",
+              "enum": ["wormhole", "rsync", "manual-copy", "zip", "other"]
+            },
+            "tooling": {
+              "type": "string"
+            }
+          }
+        },
+        "storage": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["overlay_path", "container_path", "read_only"],
+          "properties": {
+            "overlay_path": {
+              "type": "string"
+            },
+            "container_path": {
+              "type": "string"
+            },
+            "read_only": {
+              "type": "boolean",
+              "const": true
+            }
+          }
+        },
+        "integrity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sha256", "architectures"],
+          "properties": {
+            "sha256": {
+              "type": "string",
+              "pattern": "^[A-Fa-f0-9]{64}$"
+            },
+            "size_bytes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "architectures": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "enum": ["arm64", "arm64e", "x86_64", "universal"]
+              }
+            }
+          }
+        },
+        "classification": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["tier", "dependency_class", "scoreable_in_docker"],
+          "properties": {
+            "tier": {
+              "type": "string",
+              "enum": ["tier-a", "tier-b", "tier-c", "validation-only"]
+            },
+            "dependency_class": {
+              "type": "string",
+              "enum": ["public-surface", "mixed", "private-heavy"]
+            },
+            "scoreable_in_docker": {
+              "type": "boolean"
+            },
+            "reason": {
+              "type": "string"
+            }
+          }
+        },
+        "entries": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/entry"
+          }
+        }
+      }
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["relative_path", "role"],
+      "properties": {
+        "relative_path": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "main-executable",
+            "helper-executable",
+            "xcode-tool",
+            "framework",
+            "dylib",
+            "resource",
+            "sdk"
+          ]
+        },
+        "executable": {
+          "type": "boolean"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

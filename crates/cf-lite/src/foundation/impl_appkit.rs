@@ -84,12 +84,24 @@ impl FoundationShims {
 
     // ── Phase C8 AppKit GUI classes ─────────────────────────────
 
+    pub fn register_nsstoryboard_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsstoryboard_class(rt);
+    }
+
     pub fn register_nsviewcontroller_class(rt: &mut objc_runtime::ObjcRuntime) {
         register::register_nsviewcontroller_class(rt);
     }
 
     pub fn register_nswindowcontroller_class(rt: &mut objc_runtime::ObjcRuntime) {
         register::register_nswindowcontroller_class(rt);
+    }
+
+    pub fn register_nsdocument_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsdocument_class(rt);
+    }
+
+    pub fn register_nsdocumentcontroller_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsdocumentcontroller_class(rt);
     }
 
     pub fn register_nscontrol_class(rt: &mut objc_runtime::ObjcRuntime) {
@@ -150,12 +162,10 @@ impl FoundationShims {
         register::register_nstoolbaritem_class(rt);
     }
 
-    #[cfg(target_os = "macos")]
     pub fn register_nssavepanel_class(rt: &mut objc_runtime::ObjcRuntime) {
         register::register_nssavepanel_class(rt);
     }
 
-    #[cfg(target_os = "macos")]
     pub fn register_nsopenpanel_class(rt: &mut objc_runtime::ObjcRuntime) {
         register::register_nsopenpanel_class(rt);
     }
@@ -511,10 +521,14 @@ impl FoundationShims {
         register::register_nsview_safe_area_methods(rt);
     }
 
-    // ── Phase C13: CoreAnimation (CALayer, CATransaction, CADisplayLink) ──
+    // ── Phase C13: CoreAnimation (CALayer, CAMetalLayer, CATransaction, CADisplayLink) ──
 
     pub fn register_calayer_class(rt: &mut objc_runtime::ObjcRuntime) {
         register::register_calayer_class(rt);
+    }
+
+    pub fn register_cametallayer_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_cametallayer_class(rt);
     }
 
     pub fn register_catransaction_class(rt: &mut objc_runtime::ObjcRuntime) {
@@ -529,7 +543,16 @@ impl FoundationShims {
         register::register_camediatimingfunction_class(rt);
     }
 
-    // ── Phase C14: Drawing (NSGraphicsContext, NSBezierPath) ─────
+    // ── Phase C14: Drawing (NSOpenGLPixelFormat, NSOpenGLContext,
+    //    NSGraphicsContext, NSBezierPath) ─────────────────────────
+
+    pub fn register_nsopenglpixelformat_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsopenglpixelformat_class(rt);
+    }
+
+    pub fn register_nsopenglcontext_class(rt: &mut objc_runtime::ObjcRuntime) {
+        register::register_nsopenglcontext_class(rt);
+    }
 
     pub fn register_nsgraphicscontext_class(rt: &mut objc_runtime::ObjcRuntime) {
         register::register_nsgraphicscontext_class(rt);

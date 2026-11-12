@@ -340,11 +340,7 @@ pub extern "C" fn shim_nsfilemanager_create_file(
 }
 
 /// `-[NSFileManager contentsAtPath:]`
-pub extern "C" fn shim_nsfilemanager_contents_at_path(
-    _obj: u64,
-    _cmd: u64,
-    path: u64,
-) -> u64 {
+pub extern "C" fn shim_nsfilemanager_contents_at_path(_obj: u64, _cmd: u64, path: u64) -> u64 {
     let Some(p) = extract_path(path) else {
         return 0;
     };
@@ -356,11 +352,7 @@ pub extern "C" fn shim_nsfilemanager_contents_at_path(
 }
 
 /// `-[NSFileManager isReadableFileAtPath:]`
-pub extern "C" fn shim_nsfilemanager_is_readable_file(
-    _obj: u64,
-    _cmd: u64,
-    path: u64,
-) -> u8 {
+pub extern "C" fn shim_nsfilemanager_is_readable_file(_obj: u64, _cmd: u64, path: u64) -> u8 {
     let Some(p) = extract_path(path) else {
         return 0;
     };
@@ -368,11 +360,7 @@ pub extern "C" fn shim_nsfilemanager_is_readable_file(
 }
 
 /// `-[NSFileManager isWritableFileAtPath:]`
-pub extern "C" fn shim_nsfilemanager_is_writable_file(
-    _obj: u64,
-    _cmd: u64,
-    path: u64,
-) -> u8 {
+pub extern "C" fn shim_nsfilemanager_is_writable_file(_obj: u64, _cmd: u64, path: u64) -> u8 {
     let Some(p) = extract_path(path) else {
         return 0;
     };
@@ -384,11 +372,7 @@ pub extern "C" fn shim_nsfilemanager_is_writable_file(
 }
 
 /// `-[NSFileManager isDeletableFileAtPath:]`
-pub extern "C" fn shim_nsfilemanager_is_deletable_file(
-    _obj: u64,
-    _cmd: u64,
-    path: u64,
-) -> u8 {
+pub extern "C" fn shim_nsfilemanager_is_deletable_file(_obj: u64, _cmd: u64, path: u64) -> u8 {
     let Some(p) = extract_path(path) else {
         return 0;
     };
@@ -489,11 +473,7 @@ pub extern "C" fn shim_nsfilemanager_attributes_of_item(
 /// Implementation: eagerly collects all subpaths into an NSArray, then wraps
 /// with an NSEnumerator. This matches the `subpathsOfDirectoryAtPath:` walk
 /// order (breadth-first per directory, then children).
-pub extern "C" fn shim_nsfilemanager_enumerator_at_path(
-    _obj: u64,
-    _cmd: u64,
-    path: u64,
-) -> u64 {
+pub extern "C" fn shim_nsfilemanager_enumerator_at_path(_obj: u64, _cmd: u64, path: u64) -> u64 {
     if path == 0 {
         return 0;
     }

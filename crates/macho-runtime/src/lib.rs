@@ -18,18 +18,21 @@
 //! It orchestrates the loader core crates and provides the execution
 //! environment (shims, TLS, process identity) that real programs expect.
 
+mod app_bundle;
 pub mod config;
 pub mod context;
 pub mod error;
 pub mod interp_bridge;
-mod app_bundle;
 mod loader;
 pub mod objc_setup;
+pub(crate) mod parse_cache;
 mod pipeline_interp;
 mod pipeline_native;
-pub(crate) mod parse_cache;
-mod security;
+mod platform_adapters;
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
+mod platform_fallback;
 pub mod resolver;
+mod security;
 pub mod shared_cache;
 pub mod tracer;
 pub mod typestate;

@@ -78,9 +78,21 @@ pub fn register_nsinvocation_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nsinvocation::shim_method_signature as *const () as u64,
                 "@@:",
             ),
-            me("target", nsinvocation::shim_target as *const () as u64, "@@:"),
-            me("setTarget:", nsinvocation::shim_set_target as *const () as u64, "v@:@"),
-            me("selector", nsinvocation::shim_selector as *const () as u64, ":@:"),
+            me(
+                "target",
+                nsinvocation::shim_target as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "setTarget:",
+                nsinvocation::shim_set_target as *const () as u64,
+                "v@:@",
+            ),
+            me(
+                "selector",
+                nsinvocation::shim_selector as *const () as u64,
+                ":@:",
+            ),
             me(
                 "setSelector:",
                 nsinvocation::shim_set_selector as *const () as u64,
@@ -96,7 +108,11 @@ pub fn register_nsinvocation_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nsinvocation::shim_get_argument_at_index as *const () as u64,
                 "v@:^vq",
             ),
-            me("invoke", nsinvocation::shim_invoke as *const () as u64, "v@:"),
+            me(
+                "invoke",
+                nsinvocation::shim_invoke as *const () as u64,
+                "v@:",
+            ),
             me(
                 "invokeWithTarget:",
                 nsinvocation::shim_invoke_with_target as *const () as u64,
@@ -122,7 +138,11 @@ pub fn register_nsinvocation_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nsinvocation::shim_arguments_retained as *const () as u64,
                 "B@:",
             ),
-            me("dealloc", nsinvocation::shim_dealloc as *const () as u64, "v@:"),
+            me(
+                "dealloc",
+                nsinvocation::shim_dealloc as *const () as u64,
+                "v@:",
+            ),
         ],
         class_methods: vec![me(
             "invocationWithMethodSignature:",

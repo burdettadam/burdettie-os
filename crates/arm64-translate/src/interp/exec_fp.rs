@@ -7,12 +7,15 @@ impl Interpreter {
     pub(super) fn exec_fp(&mut self, insn: Instruction, pc: u64) -> StepResult {
         match insn {
             // ── FP/SIMD Load/Store ──────────────────────────────────
-
             Instruction::FpLdrImm { size, rt, rn, imm } => {
                 let base = self.cpu.read_reg(rn);
                 let addr = base.wrapping_add(imm as u64);
                 if !self.fp_load(rt, addr, size) {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr,
+                        is_write: false,
+                    });
                 }
                 self.cpu.pc = pc + 4;
             }
@@ -20,7 +23,11 @@ impl Interpreter {
                 let base = self.cpu.read_reg(rn);
                 let addr = base.wrapping_add(imm as u64);
                 if !self.fp_store(rt, addr, size) {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr,
+                        is_write: true,
+                    });
                 }
                 self.cpu.pc = pc + 4;
             }
@@ -28,7 +35,11 @@ impl Interpreter {
                 let base = self.cpu.read_reg(rn);
                 let addr = base.wrapping_add(imm as i64 as u64);
                 if !self.fp_load(rt, addr, size) {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr,
+                        is_write: false,
+                    });
                 }
                 self.cpu.pc = pc + 4;
             }
@@ -36,14 +47,22 @@ impl Interpreter {
                 let base = self.cpu.read_reg(rn);
                 let addr = base.wrapping_add(imm as i64 as u64);
                 if !self.fp_store(rt, addr, size) {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr,
+                        is_write: true,
+                    });
                 }
                 self.cpu.pc = pc + 4;
             }
             Instruction::FpLdrPre { size, rt, rn, imm } => {
                 let addr = self.cpu.read_reg(rn).wrapping_add(imm as i64 as u64);
                 if !self.fp_load(rt, addr, size) {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr,
+                        is_write: false,
+                    });
                 }
                 self.cpu.write_reg(rn, addr);
                 self.cpu.pc = pc + 4;
@@ -51,7 +70,11 @@ impl Interpreter {
             Instruction::FpStrPre { size, rt, rn, imm } => {
                 let addr = self.cpu.read_reg(rn).wrapping_add(imm as i64 as u64);
                 if !self.fp_store(rt, addr, size) {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr,
+                        is_write: true,
+                    });
                 }
                 self.cpu.write_reg(rn, addr);
                 self.cpu.pc = pc + 4;
@@ -59,7 +82,11 @@ impl Interpreter {
             Instruction::FpLdrPost { size, rt, rn, imm } => {
                 let base = self.cpu.read_reg(rn);
                 if !self.fp_load(rt, base, size) {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: false });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr: base,
+                        is_write: false,
+                    });
                 }
                 self.cpu.write_reg(rn, base.wrapping_add(imm as i64 as u64));
                 self.cpu.pc = pc + 4;
@@ -67,103 +94,231 @@ impl Interpreter {
             Instruction::FpStrPost { size, rt, rn, imm } => {
                 let base = self.cpu.read_reg(rn);
                 if !self.fp_store(rt, base, size) {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: true });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr: base,
+                        is_write: true,
+                    });
                 }
                 self.cpu.write_reg(rn, base.wrapping_add(imm as i64 as u64));
                 self.cpu.pc = pc + 4;
             }
-            Instruction::FpLdp { size, rt, rt2, rn, imm } => {
+            Instruction::FpLdp {
+                size,
+                rt,
+                rt2,
+                rn,
+                imm,
+            } => {
                 let base = self.cpu.read_reg(rn);
                 let addr = base.wrapping_add(imm as i64 as u64);
                 if !self.fp_load(rt, addr, size) {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr,
+                        is_write: false,
+                    });
                 }
                 let addr2 = addr.wrapping_add(size as u64);
                 if !self.fp_load(rt2, addr2, size) {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr: addr2, is_write: false });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr: addr2,
+                        is_write: false,
+                    });
                 }
                 self.cpu.pc = pc + 4;
             }
-            Instruction::FpStp { size, rt, rt2, rn, imm } => {
+            Instruction::FpStp {
+                size,
+                rt,
+                rt2,
+                rn,
+                imm,
+            } => {
                 let base = self.cpu.read_reg(rn);
                 let addr = base.wrapping_add(imm as i64 as u64);
                 if !self.fp_store(rt, addr, size) {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr,
+                        is_write: true,
+                    });
                 }
                 let addr2 = addr.wrapping_add(size as u64);
                 if !self.fp_store(rt2, addr2, size) {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr: addr2, is_write: true });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr: addr2,
+                        is_write: true,
+                    });
                 }
                 self.cpu.pc = pc + 4;
             }
-            Instruction::FpLdpPre { size, rt, rt2, rn, imm } => {
+            Instruction::FpLdpPre {
+                size,
+                rt,
+                rt2,
+                rn,
+                imm,
+            } => {
                 let addr = self.cpu.read_reg(rn).wrapping_add(imm as i64 as u64);
                 if !self.fp_load(rt, addr, size) {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr,
+                        is_write: false,
+                    });
                 }
                 let addr2 = addr.wrapping_add(size as u64);
                 if !self.fp_load(rt2, addr2, size) {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr: addr2, is_write: false });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr: addr2,
+                        is_write: false,
+                    });
                 }
                 self.cpu.write_reg(rn, addr);
                 self.cpu.pc = pc + 4;
             }
-            Instruction::FpStpPre { size, rt, rt2, rn, imm } => {
+            Instruction::FpStpPre {
+                size,
+                rt,
+                rt2,
+                rn,
+                imm,
+            } => {
                 let addr = self.cpu.read_reg(rn).wrapping_add(imm as i64 as u64);
                 if !self.fp_store(rt, addr, size) {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr,
+                        is_write: true,
+                    });
                 }
                 let addr2 = addr.wrapping_add(size as u64);
                 if !self.fp_store(rt2, addr2, size) {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr: addr2, is_write: true });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr: addr2,
+                        is_write: true,
+                    });
                 }
                 self.cpu.write_reg(rn, addr);
                 self.cpu.pc = pc + 4;
             }
-            Instruction::FpLdpPost { size, rt, rt2, rn, imm } => {
+            Instruction::FpLdpPost {
+                size,
+                rt,
+                rt2,
+                rn,
+                imm,
+            } => {
                 let base = self.cpu.read_reg(rn);
                 if !self.fp_load(rt, base, size) {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: false });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr: base,
+                        is_write: false,
+                    });
                 }
                 let addr2 = base.wrapping_add(size as u64);
                 if !self.fp_load(rt2, addr2, size) {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr: addr2, is_write: false });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr: addr2,
+                        is_write: false,
+                    });
                 }
                 self.cpu.write_reg(rn, base.wrapping_add(imm as i64 as u64));
                 self.cpu.pc = pc + 4;
             }
-            Instruction::FpStpPost { size, rt, rt2, rn, imm } => {
+            Instruction::FpStpPost {
+                size,
+                rt,
+                rt2,
+                rn,
+                imm,
+            } => {
                 let base = self.cpu.read_reg(rn);
                 if !self.fp_store(rt, base, size) {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr: base, is_write: true });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr: base,
+                        is_write: true,
+                    });
                 }
                 let addr2 = base.wrapping_add(size as u64);
                 if !self.fp_store(rt2, addr2, size) {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr: addr2, is_write: true });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr: addr2,
+                        is_write: true,
+                    });
                 }
                 self.cpu.write_reg(rn, base.wrapping_add(imm as i64 as u64));
                 self.cpu.pc = pc + 4;
             }
-            Instruction::FpLdrReg { size, rt, rn, rm, extend, s } => {
-                let log2_size = match size { 1 => 0u8, 2 => 1, 4 => 2, 8 => 3, 16 => 4, _ => 0 };
+            Instruction::FpLdrReg {
+                size,
+                rt,
+                rn,
+                rm,
+                extend,
+                s,
+            } => {
+                let log2_size = match size {
+                    1 => 0u8,
+                    2 => 1,
+                    4 => 2,
+                    8 => 3,
+                    16 => 4,
+                    _ => 0,
+                };
                 let addr = self.reg_index_addr(rn, rm, extend, s, log2_size);
                 if !self.fp_load(rt, addr, size) {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr,
+                        is_write: false,
+                    });
                 }
                 self.cpu.pc = pc + 4;
             }
-            Instruction::FpStrReg { size, rt, rn, rm, extend, s } => {
-                let log2_size = match size { 1 => 0u8, 2 => 1, 4 => 2, 8 => 3, 16 => 4, _ => 0 };
+            Instruction::FpStrReg {
+                size,
+                rt,
+                rn,
+                rm,
+                extend,
+                s,
+            } => {
+                let log2_size = match size {
+                    1 => 0u8,
+                    2 => 1,
+                    4 => 2,
+                    8 => 3,
+                    16 => 4,
+                    _ => 0,
+                };
                 let addr = self.reg_index_addr(rn, rm, extend, s, log2_size);
                 if !self.fp_store(rt, addr, size) {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: true });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr,
+                        is_write: true,
+                    });
                 }
                 self.cpu.pc = pc + 4;
             }
             Instruction::FpLdrLiteral { size, rt, imm } => {
                 let addr = imm as u64;
                 if !self.fp_load(rt, addr, size) {
-                    return StepResult::Exit(ExitReason::MemoryFault { pc, addr, is_write: false });
+                    return StepResult::Exit(ExitReason::MemoryFault {
+                        pc,
+                        addr,
+                        is_write: false,
+                    });
                 }
                 self.cpu.pc = pc + 4;
             }
@@ -183,31 +338,41 @@ impl Interpreter {
                 if let Some(v) = self.mem.read_u8(addr) {
                     self.cpu.write_q(rt, v as u128);
                     true
-                } else { false }
+                } else {
+                    false
+                }
             }
             2 => {
                 if let Some(v) = self.mem.read_u16(addr) {
                     self.cpu.write_q(rt, v as u128);
                     true
-                } else { false }
+                } else {
+                    false
+                }
             }
             4 => {
                 if let Some(v) = self.mem.read_u32(addr) {
                     self.cpu.write_s(rt, v);
                     true
-                } else { false }
+                } else {
+                    false
+                }
             }
             8 => {
                 if let Some(v) = self.mem.read_u64(addr) {
                     self.cpu.write_d(rt, v);
                     true
-                } else { false }
+                } else {
+                    false
+                }
             }
             16 => {
                 if let Some(v) = self.mem.read_u128(addr) {
                     self.cpu.write_q(rt, v);
                     true
-                } else { false }
+                } else {
+                    false
+                }
             }
             _ => false,
         }
@@ -229,27 +394,67 @@ impl Interpreter {
     pub(super) fn fp_compare_64(&mut self, a: f64, b: f64) {
         if a.is_nan() || b.is_nan() {
             // Unordered
-            self.cpu.nzcv = crate::cpu::Nzcv { n: false, z: false, c: true, v: true };
+            self.cpu.nzcv = crate::cpu::Nzcv {
+                n: false,
+                z: false,
+                c: true,
+                v: true,
+            };
         } else if a == b {
-            self.cpu.nzcv = crate::cpu::Nzcv { n: false, z: true, c: true, v: false };
+            self.cpu.nzcv = crate::cpu::Nzcv {
+                n: false,
+                z: true,
+                c: true,
+                v: false,
+            };
         } else if a < b {
-            self.cpu.nzcv = crate::cpu::Nzcv { n: true, z: false, c: false, v: false };
+            self.cpu.nzcv = crate::cpu::Nzcv {
+                n: true,
+                z: false,
+                c: false,
+                v: false,
+            };
         } else {
             // a > b
-            self.cpu.nzcv = crate::cpu::Nzcv { n: false, z: false, c: true, v: false };
+            self.cpu.nzcv = crate::cpu::Nzcv {
+                n: false,
+                z: false,
+                c: true,
+                v: false,
+            };
         }
     }
 
     /// Compare two f32 values and set NZCV.
     pub(super) fn fp_compare_32(&mut self, a: f32, b: f32) {
         if a.is_nan() || b.is_nan() {
-            self.cpu.nzcv = crate::cpu::Nzcv { n: false, z: false, c: true, v: true };
+            self.cpu.nzcv = crate::cpu::Nzcv {
+                n: false,
+                z: false,
+                c: true,
+                v: true,
+            };
         } else if a == b {
-            self.cpu.nzcv = crate::cpu::Nzcv { n: false, z: true, c: true, v: false };
+            self.cpu.nzcv = crate::cpu::Nzcv {
+                n: false,
+                z: true,
+                c: true,
+                v: false,
+            };
         } else if a < b {
-            self.cpu.nzcv = crate::cpu::Nzcv { n: true, z: false, c: false, v: false };
+            self.cpu.nzcv = crate::cpu::Nzcv {
+                n: true,
+                z: false,
+                c: false,
+                v: false,
+            };
         } else {
-            self.cpu.nzcv = crate::cpu::Nzcv { n: false, z: false, c: true, v: false };
+            self.cpu.nzcv = crate::cpu::Nzcv {
+                n: false,
+                z: false,
+                c: true,
+                v: false,
+            };
         }
     }
 }
@@ -425,4 +630,3 @@ mod tests {
         assert!(!cpu.nzcv.v);
     }
 }
-

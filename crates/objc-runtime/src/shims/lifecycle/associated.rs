@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use super::retain_release::{shim_objc_retain, shim_objc_release};
+use super::retain_release::{shim_objc_release, shim_objc_retain};
 
 // ── @synchronized support ─────────────────────────────────────────
 
@@ -96,7 +96,8 @@ pub extern "C" fn shim_objc_set_associated_object(
     let obj_map = map.entry(object).or_default();
 
     // Retain the new value if policy requires it
-    let is_retain = policy == OBJC_ASSOCIATION_RETAIN_NONATOMIC || policy == OBJC_ASSOCIATION_RETAIN;
+    let is_retain =
+        policy == OBJC_ASSOCIATION_RETAIN_NONATOMIC || policy == OBJC_ASSOCIATION_RETAIN;
     if is_retain && value != 0 {
         shim_objc_retain(value);
     }
@@ -166,7 +167,9 @@ pub extern "C" fn shim_objc_init_weak(location: u64, new_value: u64) -> u64 {
     if location == 0 {
         return 0;
     }
-    unsafe { *(location as *mut u64) = new_value; }
+    unsafe {
+        *(location as *mut u64) = new_value;
+    }
     let mut guard = weak_map();
     let map = guard.get_or_insert_with(HashMap::new);
     if new_value != 0 {
@@ -180,7 +183,9 @@ pub extern "C" fn shim_objc_destroy_weak(location: u64) {
     if location == 0 {
         return;
     }
-    unsafe { *(location as *mut u64) = 0; }
+    unsafe {
+        *(location as *mut u64) = 0;
+    }
     let mut guard = weak_map();
     if let Some(map) = guard.as_mut() {
         map.remove(&location);
@@ -204,7 +209,9 @@ pub extern "C" fn shim_objc_store_weak(location: u64, new_value: u64) -> u64 {
     if location == 0 {
         return 0;
     }
-    unsafe { *(location as *mut u64) = new_value; }
+    unsafe {
+        *(location as *mut u64) = new_value;
+    }
     let mut guard = weak_map();
     let map = guard.get_or_insert_with(HashMap::new);
     if new_value != 0 {
@@ -229,7 +236,9 @@ pub extern "C" fn shim_objc_copy_weak(dst: u64, src: u64) {
         return;
     }
     let val = unsafe { *(src as *const u64) };
-    unsafe { *(dst as *mut u64) = val; }
+    unsafe {
+        *(dst as *mut u64) = val;
+    }
     let mut guard = weak_map();
     let map = guard.get_or_insert_with(HashMap::new);
     if val != 0 {

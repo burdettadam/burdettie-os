@@ -224,10 +224,7 @@ mod tests {
     fn jit_entitlement_relaxes() {
         let gate = FlagBasedHardenedRuntime::new();
         let cs = make_cs_info(|i| i.runtime = true);
-        let ents = vec![(
-            "com.apple.security.cs.allow-jit".to_string(),
-            true,
-        )];
+        let ents = vec![("com.apple.security.cs.allow-jit".to_string(), true)];
         let effects = gate.compute_effects(&cs, Path::new("/tmp/app"), &ents);
         assert!(effects.allows_jit);
     }

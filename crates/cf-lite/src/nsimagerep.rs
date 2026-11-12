@@ -14,23 +14,35 @@ const WIDTH_OFF: usize = 24;
 const HEIGHT_OFF: usize = 32;
 
 fn read_u64(obj: u64, offset: usize) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as *const u8).add(offset) as *const u64) }
 }
 
 fn write_u64(obj: u64, offset: usize, val: u64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as *mut u8).add(offset) as *mut u64) = val; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as *mut u8).add(offset) as *mut u64) = val;
+    }
 }
 
 fn read_f64(obj: u64, offset: usize) -> f64 {
-    if obj == 0 { return 0.0; }
+    if obj == 0 {
+        return 0.0;
+    }
     unsafe { *((obj as *const u8).add(offset) as *const f64) }
 }
 
 fn write_f64(obj: u64, offset: usize, val: f64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as *mut u8).add(offset) as *mut f64) = val; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as *mut u8).add(offset) as *mut f64) = val;
+    }
 }
 
 pub(crate) const IMAGE_REP_SIZE: usize = SIZE;
@@ -38,14 +50,20 @@ pub(crate) const IMAGE_REP_SIZE: usize = SIZE;
 /// `+[NSImageRep alloc]`
 pub extern "C" fn shim_nsimagerep_alloc(_cls: u64, _cmd: u64) -> u64 {
     let obj = crate::pal_alloc().calloc(1, SIZE) as u64;
-    if obj == 0 { return 0; }
-    unsafe { *(obj as *mut u64) = crate::nsobj::nsimagerep_class_addr(); }
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *(obj as *mut u64) = crate::nsobj::nsimagerep_class_addr();
+    }
     obj
 }
 
 /// `-[NSImageRep init]`
 pub extern "C" fn shim_nsimagerep_init(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     obj
 }
 
@@ -71,7 +89,9 @@ pub extern "C" fn shim_nsimagerep_set_pixels_high(obj: u64, _cmd: u64, h: u64) {
 
 /// `-[NSImageRep size]` → returns (width, height) as two f64 values.
 pub extern "C" fn shim_nsimagerep_size(obj: u64, _cmd: u64) -> (f64, f64) {
-    if obj == 0 { return (0.0, 0.0); }
+    if obj == 0 {
+        return (0.0, 0.0);
+    }
     (read_f64(obj, WIDTH_OFF), read_f64(obj, HEIGHT_OFF))
 }
 

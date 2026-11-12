@@ -174,8 +174,8 @@ pub fn build_tree_update(content_view: u64) -> TreeUpdate {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::shim_test_helpers::*;
     use crate::nsview::VIEW_SIZE;
+    use crate::shim_test_helpers::*;
 
     fn alloc_view() -> u64 {
         alloc_obj(VIEW_SIZE, nsobj::nsview_class_addr())

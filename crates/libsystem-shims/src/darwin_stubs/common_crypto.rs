@@ -11,27 +11,100 @@ pub struct CommonCryptoStubs;
 impl CommonCryptoStubs {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
-        register_shims!(table,
-            ("_CC_SHA256", shim_cc_sha256 as *const () as u64, "CC_SHA256 one-shot"),
-            ("_CC_SHA256_Init", shim_cc_sha256_init as *const () as u64, "CC_SHA256_Init streaming"),
-            ("_CC_SHA256_Update", shim_cc_sha256_update as *const () as u64, "CC_SHA256_Update streaming"),
-            ("_CC_SHA256_Final", shim_cc_sha256_final as *const () as u64, "CC_SHA256_Final streaming"),
-            ("_CC_SHA1", shim_cc_sha1 as *const () as u64, "CC_SHA1 one-shot"),
-            ("_CC_MD5", shim_cc_md5 as *const () as u64, "CC_MD5 one-shot"),
-            ("_CCRandomGenerateBytes", shim_cc_random_generate_bytes as *const () as u64, "CCRandomGenerateBytes"),
-            ("_CCHmac", shim_cc_hmac as *const () as u64, "CCHmac one-shot"),
+        register_shims!(
+            table,
+            (
+                "_CC_SHA256",
+                shim_cc_sha256 as *const () as u64,
+                "CC_SHA256 one-shot"
+            ),
+            (
+                "_CC_SHA256_Init",
+                shim_cc_sha256_init as *const () as u64,
+                "CC_SHA256_Init streaming"
+            ),
+            (
+                "_CC_SHA256_Update",
+                shim_cc_sha256_update as *const () as u64,
+                "CC_SHA256_Update streaming"
+            ),
+            (
+                "_CC_SHA256_Final",
+                shim_cc_sha256_final as *const () as u64,
+                "CC_SHA256_Final streaming"
+            ),
+            (
+                "_CC_SHA1",
+                shim_cc_sha1 as *const () as u64,
+                "CC_SHA1 one-shot"
+            ),
+            (
+                "_CC_MD5",
+                shim_cc_md5 as *const () as u64,
+                "CC_MD5 one-shot"
+            ),
+            (
+                "_CCRandomGenerateBytes",
+                shim_cc_random_generate_bytes as *const () as u64,
+                "CCRandomGenerateBytes"
+            ),
+            (
+                "_CCHmac",
+                shim_cc_hmac as *const () as u64,
+                "CCHmac one-shot"
+            ),
             // CCCryptor stateful AES API
-            ("_CCCryptorCreate", shim_cc_cryptor_create as *const () as u64, "CCCryptorCreate (AES-128/256 CBC/ECB)"),
-            ("_CCCryptorUpdate", shim_cc_cryptor_update as *const () as u64, "CCCryptorUpdate"),
-            ("_CCCryptorFinal", shim_cc_cryptor_final as *const () as u64, "CCCryptorFinal + PKCS7"),
-            ("_CCCryptorRelease", shim_cc_cryptor_release as *const () as u64, "CCCryptorRelease"),
-            ("_CCCryptorGetOutputLength", shim_cc_cryptor_get_output_length as *const () as u64, "CCCryptorGetOutputLength"),
-            ("_CCCrypt", shim_cc_crypt as *const () as u64, "CCCrypt one-shot"),
+            (
+                "_CCCryptorCreate",
+                shim_cc_cryptor_create as *const () as u64,
+                "CCCryptorCreate (AES-128/256 CBC/ECB)"
+            ),
+            (
+                "_CCCryptorUpdate",
+                shim_cc_cryptor_update as *const () as u64,
+                "CCCryptorUpdate"
+            ),
+            (
+                "_CCCryptorFinal",
+                shim_cc_cryptor_final as *const () as u64,
+                "CCCryptorFinal + PKCS7"
+            ),
+            (
+                "_CCCryptorRelease",
+                shim_cc_cryptor_release as *const () as u64,
+                "CCCryptorRelease"
+            ),
+            (
+                "_CCCryptorGetOutputLength",
+                shim_cc_cryptor_get_output_length as *const () as u64,
+                "CCCryptorGetOutputLength"
+            ),
+            (
+                "_CCCrypt",
+                shim_cc_crypt as *const () as u64,
+                "CCCrypt one-shot"
+            ),
             // RSA/EC — unimplemented stubs (kCCUnimplemented = -4305)
-            ("_CCRSACryptorGeneratePair", shim_cc_rsa_unimplemented as *const () as u64, "CCRSACryptorGeneratePair (stub)"),
-            ("_CCRSACryptorEncrypt", shim_cc_rsa_unimplemented as *const () as u64, "CCRSACryptorEncrypt (stub)"),
-            ("_CCRSACryptorDecrypt", shim_cc_rsa_unimplemented as *const () as u64, "CCRSACryptorDecrypt (stub)"),
-            ("_CCECCryptorGeneratePair", shim_cc_rsa_unimplemented as *const () as u64, "CCECCryptorGeneratePair (stub)"),
+            (
+                "_CCRSACryptorGeneratePair",
+                shim_cc_rsa_unimplemented as *const () as u64,
+                "CCRSACryptorGeneratePair (stub)"
+            ),
+            (
+                "_CCRSACryptorEncrypt",
+                shim_cc_rsa_unimplemented as *const () as u64,
+                "CCRSACryptorEncrypt (stub)"
+            ),
+            (
+                "_CCRSACryptorDecrypt",
+                shim_cc_rsa_unimplemented as *const () as u64,
+                "CCRSACryptorDecrypt (stub)"
+            ),
+            (
+                "_CCECCryptorGeneratePair",
+                shim_cc_rsa_unimplemented as *const () as u64,
+                "CCECCryptorGeneratePair (stub)"
+            ),
         );
         log::debug!("CommonCryptoStubs: registered 19 stubs");
     }
@@ -42,33 +115,28 @@ impl CommonCryptoStubs {
 // ---------------------------------------------------------------------------
 
 const SHA256_K: [u32; 64] = [
-    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
-    0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
-    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
-    0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
-    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc,
-    0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
-    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7,
-    0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
-    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13,
-    0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
-    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3,
-    0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
-    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5,
-    0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
-    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
-    0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
+    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
 ];
 
 const SHA256_H0: [u32; 8] = [
-    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
-    0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
+    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
 ];
 
 #[inline(always)]
-fn sha256_ch(x: u32, y: u32, z: u32) -> u32 { (x & y) ^ (!x & z) }
+fn sha256_ch(x: u32, y: u32, z: u32) -> u32 {
+    (x & y) ^ (!x & z)
+}
 #[inline(always)]
-fn sha256_maj(x: u32, y: u32, z: u32) -> u32 { (x & y) ^ (x & z) ^ (y & z) }
+fn sha256_maj(x: u32, y: u32, z: u32) -> u32 {
+    (x & y) ^ (x & z) ^ (y & z)
+}
 #[inline(always)]
 fn sha256_big_sigma0(x: u32) -> u32 {
     x.rotate_right(2) ^ x.rotate_right(13) ^ x.rotate_right(22)
@@ -289,9 +357,7 @@ pub extern "C" fn shim_cc_sha256_final(md: u64, ctx: u64) -> i32 {
 // SHA-1 (FIPS 180-4)
 // ---------------------------------------------------------------------------
 
-const SHA1_H0: [u32; 5] = [
-    0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476, 0xc3d2e1f0,
-];
+const SHA1_H0: [u32; 5] = [0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476, 0xc3d2e1f0];
 
 fn sha1_compress(state: &mut [u32; 5], block: &[u8; 64]) {
     let mut w = [0u32; 80];
@@ -402,29 +468,20 @@ pub extern "C" fn shim_cc_sha1(data: u64, len: u32, md: u64) -> u64 {
 // ---------------------------------------------------------------------------
 
 const MD5_T: [u32; 64] = [
-    0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee,
-    0xf57c0faf, 0x4787c62a, 0xa8304613, 0xfd469501,
-    0x698098d8, 0x8b44f7af, 0xffff5bb1, 0x895cd7be,
-    0x6b901122, 0xfd987193, 0xa679438e, 0x49b40821,
-    0xf61e2562, 0xc040b340, 0x265e5a51, 0xe9b6c7aa,
-    0xd62f105d, 0x02441453, 0xd8a1e681, 0xe7d3fbc8,
-    0x21e1cde6, 0xc33707d6, 0xf4d50d87, 0x455a14ed,
-    0xa9e3e905, 0xfcefa3f8, 0x676f02d9, 0x8d2a4c8a,
-    0xfffa3942, 0x8771f681, 0x6d9d6122, 0xfde5380c,
-    0xa4beea44, 0x4bdecfa9, 0xf6bb4b60, 0xbebfbc70,
-    0x289b7ec6, 0xeaa127fa, 0xd4ef3085, 0x04881d05,
-    0xd9d4d039, 0xe6db99e5, 0x1fa27cf8, 0xc4ac5665,
-    0xf4292244, 0x432aff97, 0xab9423a7, 0xfc93a039,
-    0x655b59c3, 0x8f0ccc92, 0xffeff47d, 0x85845dd1,
-    0x6fa87e4f, 0xfe2ce6e0, 0xa3014314, 0x4e0811a1,
-    0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391,
+    0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee, 0xf57c0faf, 0x4787c62a, 0xa8304613, 0xfd469501,
+    0x698098d8, 0x8b44f7af, 0xffff5bb1, 0x895cd7be, 0x6b901122, 0xfd987193, 0xa679438e, 0x49b40821,
+    0xf61e2562, 0xc040b340, 0x265e5a51, 0xe9b6c7aa, 0xd62f105d, 0x02441453, 0xd8a1e681, 0xe7d3fbc8,
+    0x21e1cde6, 0xc33707d6, 0xf4d50d87, 0x455a14ed, 0xa9e3e905, 0xfcefa3f8, 0x676f02d9, 0x8d2a4c8a,
+    0xfffa3942, 0x8771f681, 0x6d9d6122, 0xfde5380c, 0xa4beea44, 0x4bdecfa9, 0xf6bb4b60, 0xbebfbc70,
+    0x289b7ec6, 0xeaa127fa, 0xd4ef3085, 0x04881d05, 0xd9d4d039, 0xe6db99e5, 0x1fa27cf8, 0xc4ac5665,
+    0xf4292244, 0x432aff97, 0xab9423a7, 0xfc93a039, 0x655b59c3, 0x8f0ccc92, 0xffeff47d, 0x85845dd1,
+    0x6fa87e4f, 0xfe2ce6e0, 0xa3014314, 0x4e0811a1, 0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391,
 ];
 
 const MD5_S: [u32; 64] = [
-    7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
-    5,  9, 14, 20, 5,  9, 14, 20, 5,  9, 14, 20, 5,  9, 14, 20,
-    4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
-    6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21,
+    7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9,
+    14, 20, 5, 9, 14, 20, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 6, 10, 15,
+    21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21,
 ];
 
 fn md5_compress(state: &mut [u32; 4], block: &[u8; 64]) {
@@ -447,10 +504,7 @@ fn md5_compress(state: &mut [u32; 4], block: &[u8; 64]) {
             32..=47 => (b ^ c ^ d, (3 * i + 5) % 16),
             _ => (c ^ (b | !d), (7 * i) % 16),
         };
-        let temp = a
-            .wrapping_add(f)
-            .wrapping_add(MD5_T[i])
-            .wrapping_add(m[g]);
+        let temp = a.wrapping_add(f).wrapping_add(MD5_T[i]).wrapping_add(m[g]);
         a = d;
         d = c;
         c = b;
@@ -655,65 +709,72 @@ const KCC_UNIMPLEMENTED: i32 = -4305;
 
 // AES S-box
 static SBOX: [u8; 256] = [
-    0x63,0x7c,0x77,0x7b,0xf2,0x6b,0x6f,0xc5,0x30,0x01,0x67,0x2b,0xfe,0xd7,0xab,0x76,
-    0xca,0x82,0xc9,0x7d,0xfa,0x59,0x47,0xf0,0xad,0xd4,0xa2,0xaf,0x9c,0xa4,0x72,0xc0,
-    0xb7,0xfd,0x93,0x26,0x36,0x3f,0xf7,0xcc,0x34,0xa5,0xe5,0xf1,0x71,0xd8,0x31,0x15,
-    0x04,0xc7,0x23,0xc3,0x18,0x96,0x05,0x9a,0x07,0x12,0x80,0xe2,0xeb,0x27,0xb2,0x75,
-    0x09,0x83,0x2c,0x1a,0x1b,0x6e,0x5a,0xa0,0x52,0x3b,0xd6,0xb3,0x29,0xe3,0x2f,0x84,
-    0x53,0xd1,0x00,0xed,0x20,0xfc,0xb1,0x5b,0x6a,0xcb,0xbe,0x39,0x4a,0x4c,0x58,0xcf,
-    0xd0,0xef,0xaa,0xfb,0x43,0x4d,0x33,0x85,0x45,0xf9,0x02,0x7f,0x50,0x3c,0x9f,0xa8,
-    0x51,0xa3,0x40,0x8f,0x92,0x9d,0x38,0xf5,0xbc,0xb6,0xda,0x21,0x10,0xff,0xf3,0xd2,
-    0xcd,0x0c,0x13,0xec,0x5f,0x97,0x44,0x17,0xc4,0xa7,0x7e,0x3d,0x64,0x5d,0x19,0x73,
-    0x60,0x81,0x4f,0xdc,0x22,0x2a,0x90,0x88,0x46,0xee,0xb8,0x14,0xde,0x5e,0x0b,0xdb,
-    0xe0,0x32,0x3a,0x0a,0x49,0x06,0x24,0x5c,0xc2,0xd3,0xac,0x62,0x91,0x95,0xe4,0x79,
-    0xe7,0xc8,0x37,0x6d,0x8d,0xd5,0x4e,0xa9,0x6c,0x56,0xf4,0xea,0x65,0x7a,0xae,0x08,
-    0xba,0x78,0x25,0x2e,0x1c,0xa6,0xb4,0xc6,0xe8,0xdd,0x74,0x1f,0x4b,0xbd,0x8b,0x8a,
-    0x70,0x3e,0xb5,0x66,0x48,0x03,0xf6,0x0e,0x61,0x35,0x57,0xb9,0x86,0xc1,0x1d,0x9e,
-    0xe1,0xf8,0x98,0x11,0x69,0xd9,0x8e,0x94,0x9b,0x1e,0x87,0xe9,0xce,0x55,0x28,0xdf,
-    0x8c,0xa1,0x89,0x0d,0xbf,0xe6,0x42,0x68,0x41,0x99,0x2d,0x0f,0xb0,0x54,0xbb,0x16,
+    0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
+    0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0,
+    0xb7, 0xfd, 0x93, 0x26, 0x36, 0x3f, 0xf7, 0xcc, 0x34, 0xa5, 0xe5, 0xf1, 0x71, 0xd8, 0x31, 0x15,
+    0x04, 0xc7, 0x23, 0xc3, 0x18, 0x96, 0x05, 0x9a, 0x07, 0x12, 0x80, 0xe2, 0xeb, 0x27, 0xb2, 0x75,
+    0x09, 0x83, 0x2c, 0x1a, 0x1b, 0x6e, 0x5a, 0xa0, 0x52, 0x3b, 0xd6, 0xb3, 0x29, 0xe3, 0x2f, 0x84,
+    0x53, 0xd1, 0x00, 0xed, 0x20, 0xfc, 0xb1, 0x5b, 0x6a, 0xcb, 0xbe, 0x39, 0x4a, 0x4c, 0x58, 0xcf,
+    0xd0, 0xef, 0xaa, 0xfb, 0x43, 0x4d, 0x33, 0x85, 0x45, 0xf9, 0x02, 0x7f, 0x50, 0x3c, 0x9f, 0xa8,
+    0x51, 0xa3, 0x40, 0x8f, 0x92, 0x9d, 0x38, 0xf5, 0xbc, 0xb6, 0xda, 0x21, 0x10, 0xff, 0xf3, 0xd2,
+    0xcd, 0x0c, 0x13, 0xec, 0x5f, 0x97, 0x44, 0x17, 0xc4, 0xa7, 0x7e, 0x3d, 0x64, 0x5d, 0x19, 0x73,
+    0x60, 0x81, 0x4f, 0xdc, 0x22, 0x2a, 0x90, 0x88, 0x46, 0xee, 0xb8, 0x14, 0xde, 0x5e, 0x0b, 0xdb,
+    0xe0, 0x32, 0x3a, 0x0a, 0x49, 0x06, 0x24, 0x5c, 0xc2, 0xd3, 0xac, 0x62, 0x91, 0x95, 0xe4, 0x79,
+    0xe7, 0xc8, 0x37, 0x6d, 0x8d, 0xd5, 0x4e, 0xa9, 0x6c, 0x56, 0xf4, 0xea, 0x65, 0x7a, 0xae, 0x08,
+    0xba, 0x78, 0x25, 0x2e, 0x1c, 0xa6, 0xb4, 0xc6, 0xe8, 0xdd, 0x74, 0x1f, 0x4b, 0xbd, 0x8b, 0x8a,
+    0x70, 0x3e, 0xb5, 0x66, 0x48, 0x03, 0xf6, 0x0e, 0x61, 0x35, 0x57, 0xb9, 0x86, 0xc1, 0x1d, 0x9e,
+    0xe1, 0xf8, 0x98, 0x11, 0x69, 0xd9, 0x8e, 0x94, 0x9b, 0x1e, 0x87, 0xe9, 0xce, 0x55, 0x28, 0xdf,
+    0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16,
 ];
 
 static SBOX_INV: [u8; 256] = [
-    0x52,0x09,0x6a,0xd5,0x30,0x36,0xa5,0x38,0xbf,0x40,0xa3,0x9e,0x81,0xf3,0xd7,0xfb,
-    0x7c,0xe3,0x39,0x82,0x9b,0x2f,0xff,0x87,0x34,0x8e,0x43,0x44,0xc4,0xde,0xe9,0xcb,
-    0x54,0x7b,0x94,0x32,0xa6,0xc2,0x23,0x3d,0xee,0x4c,0x95,0x0b,0x42,0xfa,0xc3,0x4e,
-    0x08,0x2e,0xa1,0x66,0x28,0xd9,0x24,0xb2,0x76,0x5b,0xa2,0x49,0x6d,0x8b,0xd1,0x25,
-    0x72,0xf8,0xf6,0x64,0x86,0x68,0x98,0x16,0xd4,0xa4,0x5c,0xcc,0x5d,0x65,0xb6,0x92,
-    0x6c,0x70,0x48,0x50,0xfd,0xed,0xb9,0xda,0x5e,0x15,0x46,0x57,0xa7,0x8d,0x9d,0x84,
-    0x90,0xd8,0xab,0x00,0x8c,0xbc,0xd3,0x0a,0xf7,0xe4,0x58,0x05,0xb8,0xb3,0x45,0x06,
-    0xd0,0x2c,0x1e,0x8f,0xca,0x3f,0x0f,0x02,0xc1,0xaf,0xbd,0x03,0x01,0x13,0x8a,0x6b,
-    0x3a,0x91,0x11,0x41,0x4f,0x67,0xdc,0xea,0x97,0xf2,0xcf,0xce,0xf0,0xb4,0xe6,0x73,
-    0x96,0xac,0x74,0x22,0xe7,0xad,0x35,0x85,0xe2,0xf9,0x37,0xe8,0x1c,0x75,0xdf,0x6e,
-    0x47,0xf1,0x1a,0x71,0x1d,0x29,0xc5,0x89,0x6f,0xb7,0x62,0x0e,0xaa,0x18,0xbe,0x1b,
-    0xfc,0x56,0x3e,0x4b,0xc6,0xd2,0x79,0x20,0x9a,0xdb,0xc0,0xfe,0x78,0xcd,0x5a,0xf4,
-    0x1f,0xdd,0xa8,0x33,0x88,0x07,0xc7,0x31,0xb1,0x12,0x10,0x59,0x27,0x80,0xec,0x5f,
-    0x60,0x51,0x7f,0xa9,0x19,0xb5,0x4a,0x0d,0x2d,0xe5,0x7a,0x9f,0x93,0xc9,0x9c,0xef,
-    0xa0,0xe0,0x3b,0x4d,0xae,0x2a,0xf5,0xb0,0xc8,0xeb,0xbb,0x3c,0x83,0x53,0x99,0x61,
-    0x17,0x2b,0x04,0x7e,0xba,0x77,0xd6,0x26,0xe1,0x69,0x14,0x63,0x55,0x21,0x0c,0x7d,
+    0x52, 0x09, 0x6a, 0xd5, 0x30, 0x36, 0xa5, 0x38, 0xbf, 0x40, 0xa3, 0x9e, 0x81, 0xf3, 0xd7, 0xfb,
+    0x7c, 0xe3, 0x39, 0x82, 0x9b, 0x2f, 0xff, 0x87, 0x34, 0x8e, 0x43, 0x44, 0xc4, 0xde, 0xe9, 0xcb,
+    0x54, 0x7b, 0x94, 0x32, 0xa6, 0xc2, 0x23, 0x3d, 0xee, 0x4c, 0x95, 0x0b, 0x42, 0xfa, 0xc3, 0x4e,
+    0x08, 0x2e, 0xa1, 0x66, 0x28, 0xd9, 0x24, 0xb2, 0x76, 0x5b, 0xa2, 0x49, 0x6d, 0x8b, 0xd1, 0x25,
+    0x72, 0xf8, 0xf6, 0x64, 0x86, 0x68, 0x98, 0x16, 0xd4, 0xa4, 0x5c, 0xcc, 0x5d, 0x65, 0xb6, 0x92,
+    0x6c, 0x70, 0x48, 0x50, 0xfd, 0xed, 0xb9, 0xda, 0x5e, 0x15, 0x46, 0x57, 0xa7, 0x8d, 0x9d, 0x84,
+    0x90, 0xd8, 0xab, 0x00, 0x8c, 0xbc, 0xd3, 0x0a, 0xf7, 0xe4, 0x58, 0x05, 0xb8, 0xb3, 0x45, 0x06,
+    0xd0, 0x2c, 0x1e, 0x8f, 0xca, 0x3f, 0x0f, 0x02, 0xc1, 0xaf, 0xbd, 0x03, 0x01, 0x13, 0x8a, 0x6b,
+    0x3a, 0x91, 0x11, 0x41, 0x4f, 0x67, 0xdc, 0xea, 0x97, 0xf2, 0xcf, 0xce, 0xf0, 0xb4, 0xe6, 0x73,
+    0x96, 0xac, 0x74, 0x22, 0xe7, 0xad, 0x35, 0x85, 0xe2, 0xf9, 0x37, 0xe8, 0x1c, 0x75, 0xdf, 0x6e,
+    0x47, 0xf1, 0x1a, 0x71, 0x1d, 0x29, 0xc5, 0x89, 0x6f, 0xb7, 0x62, 0x0e, 0xaa, 0x18, 0xbe, 0x1b,
+    0xfc, 0x56, 0x3e, 0x4b, 0xc6, 0xd2, 0x79, 0x20, 0x9a, 0xdb, 0xc0, 0xfe, 0x78, 0xcd, 0x5a, 0xf4,
+    0x1f, 0xdd, 0xa8, 0x33, 0x88, 0x07, 0xc7, 0x31, 0xb1, 0x12, 0x10, 0x59, 0x27, 0x80, 0xec, 0x5f,
+    0x60, 0x51, 0x7f, 0xa9, 0x19, 0xb5, 0x4a, 0x0d, 0x2d, 0xe5, 0x7a, 0x9f, 0x93, 0xc9, 0x9c, 0xef,
+    0xa0, 0xe0, 0x3b, 0x4d, 0xae, 0x2a, 0xf5, 0xb0, 0xc8, 0xeb, 0xbb, 0x3c, 0x83, 0x53, 0x99, 0x61,
+    0x17, 0x2b, 0x04, 0x7e, 0xba, 0x77, 0xd6, 0x26, 0xe1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0c, 0x7d,
 ];
 
 // AES RCON constants
 static RCON: [u32; 11] = [
-    0x00000000,0x01000000,0x02000000,0x04000000,0x08000000,0x10000000,
-    0x20000000,0x40000000,0x80000000,0x1b000000,0x36000000,
+    0x00000000, 0x01000000, 0x02000000, 0x04000000, 0x08000000, 0x10000000, 0x20000000, 0x40000000,
+    0x80000000, 0x1b000000, 0x36000000,
 ];
 
 fn aes_sub_word(w: u32) -> u32 {
     let b = w.to_be_bytes();
-    u32::from_be_bytes([SBOX[b[0] as usize], SBOX[b[1] as usize], SBOX[b[2] as usize], SBOX[b[3] as usize]])
+    u32::from_be_bytes([
+        SBOX[b[0] as usize],
+        SBOX[b[1] as usize],
+        SBOX[b[2] as usize],
+        SBOX[b[3] as usize],
+    ])
 }
 
-fn aes_rot_word(w: u32) -> u32 { w.rotate_left(8) }
+fn aes_rot_word(w: u32) -> u32 {
+    w.rotate_left(8)
+}
 
 /// Expand an AES-128 or AES-256 key into round key words.
 /// Returns (round_keys, number_of_rounds).
 fn aes_key_expand(key: &[u8]) -> (Vec<u32>, usize) {
     let nk = key.len() / 4; // 4 (AES-128) or 6 (AES-192) or 8 (AES-256)
-    let nr = nk + 6;        // 10, 12, or 14 rounds
+    let nr = nk + 6; // 10, 12, or 14 rounds
     let total = 4 * (nr + 1);
     let mut w = vec![0u32; total];
     for i in 0..nk {
-        w[i] = u32::from_be_bytes([key[4*i], key[4*i+1], key[4*i+2], key[4*i+3]]);
+        w[i] = u32::from_be_bytes([key[4 * i], key[4 * i + 1], key[4 * i + 2], key[4 * i + 3]]);
     }
     for i in nk..total {
         let mut temp = w[i - 1];
@@ -728,19 +789,37 @@ fn aes_key_expand(key: &[u8]) -> (Vec<u32>, usize) {
 }
 
 #[inline]
-fn xtime(b: u8) -> u8 { if b & 0x80 != 0 { (b << 1) ^ 0x1b } else { b << 1 } }
+fn xtime(b: u8) -> u8 {
+    if b & 0x80 != 0 {
+        (b << 1) ^ 0x1b
+    } else {
+        b << 1
+    }
+}
 #[inline]
-fn gmul2(b: u8) -> u8 { xtime(b) }
+fn gmul2(b: u8) -> u8 {
+    xtime(b)
+}
 #[inline]
-fn gmul3(b: u8) -> u8 { xtime(b) ^ b }
+fn gmul3(b: u8) -> u8 {
+    xtime(b) ^ b
+}
 #[inline]
-fn gmul9(b: u8) -> u8 { xtime(xtime(xtime(b))) ^ b }
+fn gmul9(b: u8) -> u8 {
+    xtime(xtime(xtime(b))) ^ b
+}
 #[inline]
-fn gmuln(b: u8) -> u8 { xtime(xtime(xtime(b))) ^ xtime(b) }  // 0x0e
+fn gmuln(b: u8) -> u8 {
+    xtime(xtime(xtime(b))) ^ xtime(b)
+} // 0x0e
 #[inline]
-fn gmulb(b: u8) -> u8 { xtime(xtime(xtime(b))) ^ xtime(b) ^ b }  // 0x0b
+fn gmulb(b: u8) -> u8 {
+    xtime(xtime(xtime(b))) ^ xtime(b) ^ b
+} // 0x0b
 #[inline]
-fn gmuld(b: u8) -> u8 { xtime(xtime(xtime(b))) ^ xtime(xtime(b)) ^ b }  // 0x0d
+fn gmuld(b: u8) -> u8 {
+    xtime(xtime(xtime(b))) ^ xtime(xtime(b)) ^ b
+} // 0x0d
 
 fn aes_encrypt_block(block: &[u8; 16], round_keys: &[u32], nr: usize) -> [u8; 16] {
     let mut s = [0u8; 16];
@@ -748,30 +827,50 @@ fn aes_encrypt_block(block: &[u8; 16], round_keys: &[u32], nr: usize) -> [u8; 16
     // AddRoundKey (round 0)
     for i in 0..4 {
         let rk = round_keys[i].to_be_bytes();
-        s[4*i] ^= rk[0]; s[4*i+1] ^= rk[1]; s[4*i+2] ^= rk[2]; s[4*i+3] ^= rk[3];
+        s[4 * i] ^= rk[0];
+        s[4 * i + 1] ^= rk[1];
+        s[4 * i + 2] ^= rk[2];
+        s[4 * i + 3] ^= rk[3];
     }
     for r in 1..=nr {
         // SubBytes
-        for b in s.iter_mut() { *b = SBOX[*b as usize]; }
+        for b in s.iter_mut() {
+            *b = SBOX[*b as usize];
+        }
         // ShiftRows: row1 left 1, row2 left 2, row3 left 3
-        let t = s[1]; s[1] = s[5]; s[5] = s[9]; s[9] = s[13]; s[13] = t;
-        let (t1, t2) = (s[2], s[6]); s[2] = s[10]; s[6] = s[14]; s[10] = t1; s[14] = t2;
-        let t = s[15]; s[15] = s[11]; s[11] = s[7]; s[7] = s[3]; s[3] = t;
+        let t = s[1];
+        s[1] = s[5];
+        s[5] = s[9];
+        s[9] = s[13];
+        s[13] = t;
+        let (t1, t2) = (s[2], s[6]);
+        s[2] = s[10];
+        s[6] = s[14];
+        s[10] = t1;
+        s[14] = t2;
+        let t = s[15];
+        s[15] = s[11];
+        s[11] = s[7];
+        s[7] = s[3];
+        s[3] = t;
         // MixColumns (skip for last round)
         if r < nr {
             for c in 0..4 {
-                let (a,b,cc,d) = (s[4*c],s[4*c+1],s[4*c+2],s[4*c+3]);
-                s[4*c]   = gmul2(a)^gmul3(b)^cc^d;
-                s[4*c+1] = a^gmul2(b)^gmul3(cc)^d;
-                s[4*c+2] = a^b^gmul2(cc)^gmul3(d);
-                s[4*c+3] = gmul3(a)^b^cc^gmul2(d);
+                let (a, b, cc, d) = (s[4 * c], s[4 * c + 1], s[4 * c + 2], s[4 * c + 3]);
+                s[4 * c] = gmul2(a) ^ gmul3(b) ^ cc ^ d;
+                s[4 * c + 1] = a ^ gmul2(b) ^ gmul3(cc) ^ d;
+                s[4 * c + 2] = a ^ b ^ gmul2(cc) ^ gmul3(d);
+                s[4 * c + 3] = gmul3(a) ^ b ^ cc ^ gmul2(d);
             }
         }
         // AddRoundKey
         let off = 4 * r;
         for i in 0..4 {
             let rk = round_keys[off + i].to_be_bytes();
-            s[4*i] ^= rk[0]; s[4*i+1] ^= rk[1]; s[4*i+2] ^= rk[2]; s[4*i+3] ^= rk[3];
+            s[4 * i] ^= rk[0];
+            s[4 * i + 1] ^= rk[1];
+            s[4 * i + 2] ^= rk[2];
+            s[4 * i + 3] ^= rk[3];
         }
     }
     s
@@ -783,29 +882,49 @@ fn aes_decrypt_block(block: &[u8; 16], round_keys: &[u32], nr: usize) -> [u8; 16
     let off = 4 * nr;
     for i in 0..4 {
         let rk = round_keys[off + i].to_be_bytes();
-        s[4*i] ^= rk[0]; s[4*i+1] ^= rk[1]; s[4*i+2] ^= rk[2]; s[4*i+3] ^= rk[3];
+        s[4 * i] ^= rk[0];
+        s[4 * i + 1] ^= rk[1];
+        s[4 * i + 2] ^= rk[2];
+        s[4 * i + 3] ^= rk[3];
     }
     for r in (0..nr).rev() {
         // InvShiftRows: row1 right 1, row2 right 2, row3 right 3
-        let t = s[13]; s[13] = s[9]; s[9] = s[5]; s[5] = s[1]; s[1] = t;
-        let (t1, t2) = (s[2], s[6]); s[2] = s[10]; s[6] = s[14]; s[10] = t1; s[14] = t2;
-        let t = s[3]; s[3] = s[7]; s[7] = s[11]; s[11] = s[15]; s[15] = t;
+        let t = s[13];
+        s[13] = s[9];
+        s[9] = s[5];
+        s[5] = s[1];
+        s[1] = t;
+        let (t1, t2) = (s[2], s[6]);
+        s[2] = s[10];
+        s[6] = s[14];
+        s[10] = t1;
+        s[14] = t2;
+        let t = s[3];
+        s[3] = s[7];
+        s[7] = s[11];
+        s[11] = s[15];
+        s[15] = t;
         // InvSubBytes
-        for b in s.iter_mut() { *b = SBOX_INV[*b as usize]; }
+        for b in s.iter_mut() {
+            *b = SBOX_INV[*b as usize];
+        }
         // AddRoundKey
         let off = 4 * r;
         for i in 0..4 {
             let rk = round_keys[off + i].to_be_bytes();
-            s[4*i] ^= rk[0]; s[4*i+1] ^= rk[1]; s[4*i+2] ^= rk[2]; s[4*i+3] ^= rk[3];
+            s[4 * i] ^= rk[0];
+            s[4 * i + 1] ^= rk[1];
+            s[4 * i + 2] ^= rk[2];
+            s[4 * i + 3] ^= rk[3];
         }
         // InvMixColumns (skip for round 0, i.e., before first round key)
         if r > 0 {
             for c in 0..4 {
-                let (a,b,cc,d) = (s[4*c],s[4*c+1],s[4*c+2],s[4*c+3]);
-                s[4*c]   = gmuln(a)^gmulb(b)^gmuld(cc)^gmul9(d);
-                s[4*c+1] = gmul9(a)^gmuln(b)^gmulb(cc)^gmuld(d);
-                s[4*c+2] = gmuld(a)^gmul9(b)^gmuln(cc)^gmulb(d);
-                s[4*c+3] = gmulb(a)^gmuld(b)^gmul9(cc)^gmuln(d);
+                let (a, b, cc, d) = (s[4 * c], s[4 * c + 1], s[4 * c + 2], s[4 * c + 3]);
+                s[4 * c] = gmuln(a) ^ gmulb(b) ^ gmuld(cc) ^ gmul9(d);
+                s[4 * c + 1] = gmul9(a) ^ gmuln(b) ^ gmulb(cc) ^ gmuld(d);
+                s[4 * c + 2] = gmuld(a) ^ gmul9(b) ^ gmuln(cc) ^ gmulb(d);
+                s[4 * c + 3] = gmulb(a) ^ gmuld(b) ^ gmul9(cc) ^ gmuln(d);
             }
         }
     }
@@ -818,9 +937,9 @@ struct CcCryptorState {
     nr: usize,
     round_keys: Vec<u32>,
     iv: [u8; 16],
-    ecb: bool,       // true → ECB mode, false → CBC
+    ecb: bool, // true → ECB mode, false → CBC
     pkcs7: bool,
-    buf: [u8; 16],   // partial block accumulator
+    buf: [u8; 16], // partial block accumulator
     buf_len: usize,
 }
 
@@ -829,18 +948,24 @@ impl CcCryptorState {
         if self.op == KCC_ENCRYPT {
             let mut xored = [0u8; 16];
             if !self.ecb {
-                for i in 0..16 { xored[i] = block[i] ^ self.iv[i]; }
+                for i in 0..16 {
+                    xored[i] = block[i] ^ self.iv[i];
+                }
             } else {
                 xored.copy_from_slice(block);
             }
             let out = aes_encrypt_block(&xored, &self.round_keys, self.nr);
-            if !self.ecb { self.iv = out; }
+            if !self.ecb {
+                self.iv = out;
+            }
             out
         } else {
             let pt = aes_decrypt_block(block, &self.round_keys, self.nr);
             let mut out = [0u8; 16];
             if !self.ecb {
-                for i in 0..16 { out[i] = pt[i] ^ self.iv[i]; }
+                for i in 0..16 {
+                    out[i] = pt[i] ^ self.iv[i];
+                }
                 self.iv.copy_from_slice(block);
             } else {
                 out.copy_from_slice(&pt);
@@ -860,14 +985,23 @@ unsafe fn unbox_cryptor(ptr: u64) -> &'static mut CcCryptorState {
 
 /// `CCCryptorStatus CCCryptorCreate(op, alg, options, key, keyLen, iv, refOut)`
 pub extern "C" fn shim_cc_cryptor_create(
-    op: u32, alg: u32, options: u32,
-    key: u64, key_len: usize,
+    op: u32,
+    alg: u32,
+    options: u32,
+    key: u64,
+    key_len: usize,
     iv: u64,
     ref_out: u64,
 ) -> i32 {
-    if alg != KCC_ALGORITHM_AES { return KCC_UNIMPLEMENTED; }
-    if key == 0 || ref_out == 0 { return KCC_PARAM_ERROR; }
-    if key_len != 16 && key_len != 24 && key_len != 32 { return KCC_PARAM_ERROR; }
+    if alg != KCC_ALGORITHM_AES {
+        return KCC_UNIMPLEMENTED;
+    }
+    if key == 0 || ref_out == 0 {
+        return KCC_PARAM_ERROR;
+    }
+    if key_len != 16 && key_len != 24 && key_len != 32 {
+        return KCC_PARAM_ERROR;
+    }
 
     let key_bytes = unsafe { std::slice::from_raw_parts(key as *const u8, key_len) };
     let (round_keys, nr) = aes_key_expand(key_bytes);
@@ -889,16 +1023,24 @@ pub extern "C" fn shim_cc_cryptor_create(
         buf_len: 0,
     };
 
-    unsafe { *(ref_out as *mut u64) = box_cryptor(state); }
+    unsafe {
+        *(ref_out as *mut u64) = box_cryptor(state);
+    }
     KCC_SUCCESS
 }
 
 /// `CCCryptorStatus CCCryptorUpdate(ref, dataIn, dataInLen, out, outAvail, moved)`
 pub extern "C" fn shim_cc_cryptor_update(
-    cref: u64, data_in: u64, data_in_len: usize,
-    out: u64, out_avail: usize, moved: u64,
+    cref: u64,
+    data_in: u64,
+    data_in_len: usize,
+    out: u64,
+    out_avail: usize,
+    moved: u64,
 ) -> i32 {
-    if cref == 0 { return KCC_PARAM_ERROR; }
+    if cref == 0 {
+        return KCC_PARAM_ERROR;
+    }
     let state = unsafe { unbox_cryptor(cref) };
 
     let input = if data_in == 0 || data_in_len == 0 {
@@ -911,7 +1053,9 @@ pub extern "C" fn shim_cc_cryptor_update(
     let total_available = state.buf_len + input.len();
     let blocks_out = total_available / 16;
     let needed = blocks_out * 16;
-    if needed > out_avail { return KCC_BUFFER_TOO_SMALL; }
+    if needed > out_avail {
+        return KCC_BUFFER_TOO_SMALL;
+    }
 
     let out_ptr = out as *mut u8;
     let mut written = 0usize;
@@ -927,37 +1071,47 @@ pub extern "C" fn shim_cc_cryptor_update(
         if state.buf_len == 16 {
             let block: [u8; 16] = state.buf;
             let cipher = state.process_block(&block);
-            unsafe { std::ptr::copy_nonoverlapping(cipher.as_ptr(), out_ptr.add(written), 16); }
+            unsafe {
+                std::ptr::copy_nonoverlapping(cipher.as_ptr(), out_ptr.add(written), 16);
+            }
             written += 16;
             state.buf_len = 0;
         }
     }
 
     if moved != 0 {
-        unsafe { *(moved as *mut usize) = written; }
+        unsafe {
+            *(moved as *mut usize) = written;
+        }
     }
     KCC_SUCCESS
 }
 
 /// `CCCryptorStatus CCCryptorFinal(ref, out, outAvail, moved)`
-pub extern "C" fn shim_cc_cryptor_final(
-    cref: u64, out: u64, out_avail: usize, moved: u64,
-) -> i32 {
-    if cref == 0 { return KCC_PARAM_ERROR; }
+pub extern "C" fn shim_cc_cryptor_final(cref: u64, out: u64, out_avail: usize, moved: u64) -> i32 {
+    if cref == 0 {
+        return KCC_PARAM_ERROR;
+    }
     let state = unsafe { unbox_cryptor(cref) };
 
     if state.op == KCC_ENCRYPT && state.pkcs7 {
         // Add PKCS#7 padding
         let pad = (16 - state.buf_len % 16) as u8;
-        for i in state.buf_len..16 { state.buf[i] = pad; }
+        for i in state.buf_len..16 {
+            state.buf[i] = pad;
+        }
         state.buf_len = 16;
     }
 
     let written = if state.buf_len == 16 {
-        if out_avail < 16 { return KCC_BUFFER_TOO_SMALL; }
+        if out_avail < 16 {
+            return KCC_BUFFER_TOO_SMALL;
+        }
         let block: [u8; 16] = state.buf;
         let cipher = state.process_block(&block);
-        unsafe { std::ptr::copy_nonoverlapping(cipher.as_ptr(), out as *mut u8, 16); }
+        unsafe {
+            std::ptr::copy_nonoverlapping(cipher.as_ptr(), out as *mut u8, 16);
+        }
         state.buf_len = 0;
         16usize
     } else if state.op == KCC_DECRYPT && state.pkcs7 && state.buf_len == 0 {
@@ -969,45 +1123,80 @@ pub extern "C" fn shim_cc_cryptor_final(
     };
 
     if moved != 0 {
-        unsafe { *(moved as *mut usize) = written; }
+        unsafe {
+            *(moved as *mut usize) = written;
+        }
     }
     KCC_SUCCESS
 }
 
 /// `CCCryptorStatus CCCryptorRelease(ref)`
 pub extern "C" fn shim_cc_cryptor_release(cref: u64) -> i32 {
-    if cref == 0 { return KCC_PARAM_ERROR; }
-    unsafe { drop(Box::from_raw(cref as *mut CcCryptorState)); }
+    if cref == 0 {
+        return KCC_PARAM_ERROR;
+    }
+    unsafe {
+        drop(Box::from_raw(cref as *mut CcCryptorState));
+    }
     KCC_SUCCESS
 }
 
 /// `size_t CCCryptorGetOutputLength(ref, inputLength, final)`
 pub extern "C" fn shim_cc_cryptor_get_output_length(
-    cref: u64, input_len: usize, is_final: bool,
+    cref: u64,
+    input_len: usize,
+    is_final: bool,
 ) -> usize {
-    let buf_len = if cref != 0 { unsafe { unbox_cryptor(cref) }.buf_len } else { 0 };
+    let buf_len = if cref != 0 {
+        unsafe { unbox_cryptor(cref) }.buf_len
+    } else {
+        0
+    };
     let total = buf_len + input_len;
-    if is_final { ((total / 16) + 1) * 16 } else { (total / 16) * 16 }
+    if is_final {
+        ((total / 16) + 1) * 16
+    } else {
+        (total / 16) * 16
+    }
 }
 
 /// One-shot `CCCrypt`.
 pub extern "C" fn shim_cc_crypt(
-    op: u32, alg: u32, options: u32,
-    key: u64, key_len: usize,
+    op: u32,
+    alg: u32,
+    options: u32,
+    key: u64,
+    key_len: usize,
     iv: u64,
-    data_in: u64, data_in_len: usize,
-    data_out: u64, data_out_avail: usize,
+    data_in: u64,
+    data_in_len: usize,
+    data_out: u64,
+    data_out_avail: usize,
     data_out_moved: u64,
 ) -> i32 {
     let mut cref: u64 = 0;
-    let rc = shim_cc_cryptor_create(op, alg, options, key, key_len, iv,
-        &mut cref as *mut u64 as u64);
-    if rc != KCC_SUCCESS { return rc; }
+    let rc = shim_cc_cryptor_create(
+        op,
+        alg,
+        options,
+        key,
+        key_len,
+        iv,
+        &mut cref as *mut u64 as u64,
+    );
+    if rc != KCC_SUCCESS {
+        return rc;
+    }
 
     let mut moved1: usize = 0;
     let rc2 = shim_cc_cryptor_update(
-        cref, data_in, data_in_len,
-        data_out, data_out_avail, &mut moved1 as *mut usize as u64);
+        cref,
+        data_in,
+        data_in_len,
+        data_out,
+        data_out_avail,
+        &mut moved1 as *mut usize as u64,
+    );
 
     if rc2 != KCC_SUCCESS {
         shim_cc_cryptor_release(cref);
@@ -1018,7 +1207,11 @@ pub extern "C" fn shim_cc_crypt(
     let mut moved2: usize = 0;
     let rc3 = shim_cc_cryptor_final(
         cref,
-        if data_out != 0 { data_out + moved1 as u64 } else { 0 },
+        if data_out != 0 {
+            data_out + moved1 as u64
+        } else {
+            0
+        },
         remaining,
         &mut moved2 as *mut usize as u64,
     );
@@ -1026,7 +1219,9 @@ pub extern "C" fn shim_cc_crypt(
     shim_cc_cryptor_release(cref);
 
     if data_out_moved != 0 {
-        unsafe { *(data_out_moved as *mut usize) = moved1 + moved2; }
+        unsafe {
+            *(data_out_moved as *mut usize) = moved1 + moved2;
+        }
     }
     rc3
 }
@@ -1084,10 +1279,7 @@ mod tests {
         );
 
         let mut md = [0u8; 32];
-        assert_eq!(
-            shim_cc_sha256_final(md.as_mut_ptr() as u64, ctx_ptr),
-            1
-        );
+        assert_eq!(shim_cc_sha256_final(md.as_mut_ptr() as u64, ctx_ptr), 1);
 
         assert_eq!(
             hex(&md),
@@ -1125,7 +1317,10 @@ mod tests {
         let ret = shim_cc_random_generate_bytes(buf.as_mut_ptr() as u64, buf.len());
         assert_eq!(ret, 0);
         // Extremely unlikely that 64 random bytes are all zero.
-        assert!(buf.iter().any(|&b| b != 0), "random buffer should not be all zeros");
+        assert!(
+            buf.iter().any(|&b| b != 0),
+            "random buffer should not be all zeros"
+        );
     }
 
     #[test]

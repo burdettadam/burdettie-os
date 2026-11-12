@@ -49,14 +49,21 @@ impl ImageInfo {
             let base = offset + i * Self::SIZE;
             let d = &data[base..base + Self::SIZE];
 
-            let address  = u64::from_le_bytes([d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7]]);
-            let mod_time = u64::from_le_bytes([d[8], d[9], d[10], d[11], d[12], d[13], d[14], d[15]]);
-            let inode    = u64::from_le_bytes([d[16], d[17], d[18], d[19], d[20], d[21], d[22], d[23]]);
+            let address = u64::from_le_bytes([d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7]]);
+            let mod_time =
+                u64::from_le_bytes([d[8], d[9], d[10], d[11], d[12], d[13], d[14], d[15]]);
+            let inode =
+                u64::from_le_bytes([d[16], d[17], d[18], d[19], d[20], d[21], d[22], d[23]]);
             let path_offset = u32::from_le_bytes([d[24], d[25], d[26], d[27]]) as usize;
 
             let path = Self::read_path(data, path_offset)?;
 
-            images.push(Self { address, mod_time, inode, path });
+            images.push(Self {
+                address,
+                mod_time,
+                inode,
+                path,
+            });
         }
 
         Ok(images)
@@ -72,11 +79,13 @@ impl ImageInfo {
         }
 
         let remaining = &data[offset..];
-        let end = remaining.iter().position(|&b| b == 0).unwrap_or(remaining.len());
+        let end = remaining
+            .iter()
+            .position(|&b| b == 0)
+            .unwrap_or(remaining.len());
         let bytes = &remaining[..end];
 
-        String::from_utf8(bytes.to_vec())
-            .map_err(|_| SharedCacheError::InvalidPath(offset))
+        String::from_utf8(bytes.to_vec()).map_err(|_| SharedCacheError::InvalidPath(offset))
     }
 
     /// The VM address of this image's Mach-O header.
@@ -117,15 +126,15 @@ mod tests {
 
         // Image at offset 80
         let i = 80;
-        data[i..i+8].copy_from_slice(&0x0001_8000_0000u64.to_le_bytes());
-        data[i+8..i+16].copy_from_slice(&0u64.to_le_bytes());
-        data[i+16..i+24].copy_from_slice(&0u64.to_le_bytes());
-        data[i+24..i+28].copy_from_slice(&112u32.to_le_bytes());
-        data[i+28..i+32].copy_from_slice(&0u32.to_le_bytes());
+        data[i..i + 8].copy_from_slice(&0x0001_8000_0000u64.to_le_bytes());
+        data[i + 8..i + 16].copy_from_slice(&0u64.to_le_bytes());
+        data[i + 16..i + 24].copy_from_slice(&0u64.to_le_bytes());
+        data[i + 24..i + 28].copy_from_slice(&112u32.to_le_bytes());
+        data[i + 28..i + 32].copy_from_slice(&0u32.to_le_bytes());
 
         // Path at 112
         let path = b"/usr/lib/libSystem.B.dylib\0";
-        data[112..112+path.len()].copy_from_slice(path);
+        data[112..112 + path.len()].copy_from_slice(path);
 
         let header = CacheHeader::parse(&data).unwrap();
         let images = ImageInfo::parse_all(&data, &header).unwrap();

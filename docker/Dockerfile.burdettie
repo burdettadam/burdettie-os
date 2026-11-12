@@ -1,16 +1,16 @@
 # docker/Dockerfile.burdettie — Burdettie OS: A Linux distro that runs Mach-O binaries natively.
 #
-# This builds the full darwin-loader runtime stack for Linux ARM64,
-# installs macho-inspect as the system Mach-O executor, and stages
-# extracted Xcode/macOS CLI tools for compatibility testing.
+# This builds the full darwin-loader runtime stack for Linux, installs the
+# runtime host binaries for the requested Docker target architecture, and
+# optionally stages extracted Xcode/macOS CLI tools for compatibility testing.
 #
-# Prerequisites (run on macOS first):
+# Optional imported-tool staging (run on macOS first if needed):
 #   ./scripts/extract_xcode_tools.sh
-#   cargo zigbuild --release --target aarch64-unknown-linux-gnu.2.36 -p macho-inspect -p burdettie-plutil
-#   cp /tmp/burdettieOS-target/aarch64-unknown-linux-gnu/release/macho-inspect docker/macho-inspect-linux-arm64
-#   cp /tmp/burdettieOS-target/aarch64-unknown-linux-gnu/release/plutil docker/plutil-linux-arm64
 #
-# Build (from repo root):
+# Build (from repo root, host-native by default):
+#   docker build -f docker/Dockerfile.burdettie -t burdettie-os .
+#
+# Force the reference ARM64 lane explicitly:
 #   docker build --platform linux/arm64 -f docker/Dockerfile.burdettie -t burdettie-os .
 #
 # Run all tool tests:
@@ -44,9 +44,55 @@ RUN cd /tmp \
     && make install \
     && strip --strip-debug /opt/libressl/lib/*.so*
 
+# Build native Rust replacements for foundational Xcode CLI entrypoints.
+# This avoids depending on the host toolchain while still installing /usr/bin
+# shims that guest processes can execute inside the runtime image.
+FROM rust:1.82-bookworm AS xcode-tools-builder
+
+WORKDIR /workspace
+
+COPY crates/burdettie-xcode-tools/Cargo.toml /workspace/crates/burdettie-xcode-tools/Cargo.toml
+COPY crates/burdettie-xcode-tools/src /workspace/crates/burdettie-xcode-tools/src
+
+RUN printf '[workspace]\nresolver = "2"\nmembers = ["crates/burdettie-xcode-tools"]\n\n[workspace.package]\nversion = "0.1.0"\nedition = "2021"\nlicense = "MIT OR Apache-2.0"\n\n[workspace.dependencies]\ntempfile = "3"\n\n[workspace.lints.rust]\n\n[workspace.lints.clippy]\n' > /workspace/Cargo.toml \
+    && cargo build --release -p burdettie-xcode-tools --bins
+
+# Build target-arch runtime binaries inside Docker so the image follows the
+# requested platform instead of copying tracked ARM64 executables.
+FROM rust:1.94-bookworm AS runtime-binaries-builder
+
+WORKDIR /workspace
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    pkg-config \
+    libwayland-dev \
+    libxkbcommon-dev \
+    libx11-dev \
+    libx11-xcb-dev \
+    libxcb1-dev \
+    libxrandr-dev \
+    libxi-dev \
+    libxcursor-dev \
+    libxinerama-dev \
+    libxcb-shape0-dev \
+    libxcb-xfixes0-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY . /workspace
+
+RUN cargo build --release -p burdettie-plutil -p launchpad \
+    && cargo build --release --features gui -p macho-inspect
+
+FROM busybox:1.36 AS apple-libcxx-arm64
+
+RUN mkdir -p /out
+COPY docker/apple-libcxx/libc++.so.1.0 /out/libc++.so.1.0
+
 # ── Runtime image ──────────────────────────────────────────────────
 
 FROM debian:bookworm-slim
+
+ARG TARGETARCH
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libstdc++6 \
@@ -58,7 +104,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libacl1 \
     libc++1 \
     libc++abi1 \
+    libx11-6 \
+    libx11-xcb1 \
+    libxcb-shape0 \
+    libxcb-xfixes0 \
+    libxcb1 \
+    libxcursor1 \
+    libxi6 \
+    libxinerama1 \
+    libxkbcommon-x11-0 \
+    libxkbcommon0 \
+    libxrandr2 \
     locales \
+    novnc \
+    websockify \
+    x11-utils \
+    x11vnc \
+    xvfb \
     && rm -rf /var/lib/apt/lists/* \
     && echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen \
     && locale-gen
@@ -101,37 +163,78 @@ RUN mkdir -p /System/Library/CoreServices && \
 </dict>\n\
 </plist>\n' > /System/Library/CoreServices/SystemVersion.plist
 
-# Install macho-inspect — pre-built via zigbuild for deterministic builds.
-# The in-Docker cargo build uses a subtly different toolchain that causes
-# timing-dependent SIGSEGV in C++ constructors; zigbuild avoids this.
-COPY docker/macho-inspect-linux-arm64 /usr/local/bin/macho-inspect
+# Install target-arch runtime binaries built in the stage above.
+# The workspace target dir is configured in .cargo/config.toml.
+# macho-inspect carries the `gui` feature so guest AppKit windows can run
+# against the Linux Xvfb/VNC stack shipped in this image.
+COPY --from=runtime-binaries-builder /tmp/burdettieOS-target/release/macho-inspect /usr/local/bin/macho-inspect
 RUN chmod +x /usr/local/bin/macho-inspect
 
 # Install burdettie-plutil — native Rust replacement for macOS plutil.
 # The macOS plutil is a Swift binary needing 273+ Foundation stubs;
 # this native implementation handles all plist operations directly.
-COPY docker/plutil-linux-arm64 /usr/local/bin/plutil
+COPY --from=runtime-binaries-builder /tmp/burdettieOS-target/release/plutil /usr/local/bin/plutil
 RUN chmod +x /usr/local/bin/plutil
 
-# Stage Mach-O tool binaries extracted from macOS host
+# Install the native home-screen launcher built for the target Docker arch.
+COPY --from=runtime-binaries-builder /tmp/burdettieOS-target/release/launchpad /usr/local/bin/launchpad
+RUN chmod +x /usr/local/bin/launchpad
+
+# Install native Rust replacements for the foundational Xcode CLI surface.
+COPY --from=xcode-tools-builder /workspace/target/release/xcrun /usr/local/bin/xcrun
+COPY --from=xcode-tools-builder /workspace/target/release/xcode-select /usr/local/bin/xcode-select
+RUN chmod +x /usr/local/bin/xcrun /usr/local/bin/xcode-select \
+    && ln -sf /usr/local/bin/xcrun /usr/bin/xcrun \
+    && ln -sf /usr/local/bin/xcode-select /usr/bin/xcode-select \
+    && mkdir -p /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin \
+    && mkdir -p /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
+
+# Stage optional Mach-O tool binaries extracted from a macOS host.
+# The tracked docker/xcode-tools placeholder keeps the base image buildable even
+# when no imported tools have been staged yet.
 COPY docker/xcode-tools/ /opt/xcode-tools/
+RUN mkdir -p /opt/imported-artifacts
 
-# Install Apple-ABI libc++ (built with _LIBCPP_ABI_ALTERNATE_STRING_LAYOUT).
-# macOS binaries use Apple's alternate std::string layout; this libc++ matches
-# that ABI. The loader (StubResolver) dlopen()s it with RTLD_LOCAL for targeted
-# symbol resolution of std::basic_string methods.
-COPY docker/apple-libcxx/libc++.so.1.0 /opt/apple-libcxx/libc++.so.1.0
+# Install the Apple-ABI libc++ shim only for architectures that have a staged
+# target-arch build. The checked-in shim is currently ARM64-only; leaving it
+# absent on other targets is safer than preloading a wrong-arch ELF.
+COPY --from=apple-libcxx-arm64 /out/libc++.so.1.0 /tmp/apple-libcxx/libc++.so.1.0
 
-# Replace system libc++ with Apple-ABI version so ALL C++ code (including
-# internal libc++ calls not routed through GOT) uses the correct string layout.
-# macho-inspect uses libstdc++ (not libc++), so this is safe for the host.
-RUN ln -sf /opt/apple-libcxx/libc++.so.1.0 /usr/lib/aarch64-linux-gnu/libc++.so.1
+# Replace system libc++ with the Apple-ABI version so C++ code uses the correct
+# string layout when the target-arch shim is available.
+RUN set -eux; \
+    if [ "${TARGETARCH}" = "arm64" ]; then \
+        install -Dm755 /tmp/apple-libcxx/libc++.so.1.0 /opt/apple-libcxx/libc++.so.1.0; \
+        ln -sf /opt/apple-libcxx/libc++.so.1.0 /usr/lib/aarch64-linux-gnu/libc++.so.1; \
+    else \
+        echo "Skipping Apple-ABI libc++ shim for TARGETARCH=${TARGETARCH}; no target-arch build is staged."; \
+    fi; \
+    rm -rf /tmp/apple-libcxx
 
-# Install test runner
+# Install test runner and GUI launcher.
 COPY scripts/test_xcode_tools_docker.sh /usr/local/bin/test-xcode-tools
-RUN chmod +x /usr/local/bin/test-xcode-tools
+COPY scripts/burdettie_gui.sh /usr/local/bin/burdettie-gui
+COPY scripts/burdettie_home.sh /usr/local/bin/burdettie-home
+COPY scripts/burdettie_gui_session.sh /usr/local/bin/burdettie-gui-session
+RUN sed -i 's/\r$//' /usr/local/bin/test-xcode-tools \
+    && chmod +x /usr/local/bin/test-xcode-tools \
+    && sed -i 's/\r$//' /usr/local/bin/burdettie-gui \
+    && chmod +x /usr/local/bin/burdettie-gui \
+    && sed -i 's/\r$//' /usr/local/bin/burdettie-home \
+    && chmod +x /usr/local/bin/burdettie-home \
+    && sed -i 's/\r$//' /usr/local/bin/burdettie-gui-session \
+    && chmod +x /usr/local/bin/burdettie-gui-session
+
+ENV BURDETTIE_GUI_DISPLAY=:99 \
+    BURDETTIE_GUI_NOVNC_DIR=/usr/share/novnc \
+    BURDETTIE_GUI_NOVNC_PORT=6080 \
+    BURDETTIE_GUI_SCREEN=1440x900x24 \
+    BURDETTIE_GUI_VNC_PORT=5900
+
+EXPOSE 5900 6080
 
 WORKDIR /opt/xcode-tools
 
-# Default: run the full Xcode tool compatibility test suite
+# Default: run the imported tool compatibility suite if staged, otherwise smoke
+# test the native Rust replacements shipped in the base runtime.
 CMD ["test-xcode-tools"]

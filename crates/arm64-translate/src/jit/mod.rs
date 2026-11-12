@@ -45,7 +45,12 @@ unsafe impl Send for CodeBuffer {}
 impl CodeBuffer {
     /// Create an empty code buffer. Allocation is deferred until first use.
     pub fn new_lazy() -> Self {
-        Self { ptr: std::ptr::null_mut(), len: 0, offset: 0, attempted: false }
+        Self {
+            ptr: std::ptr::null_mut(),
+            len: 0,
+            offset: 0,
+            attempted: false,
+        }
     }
 
     /// Ensure the code buffer has been allocated. Returns true if usable.
@@ -55,37 +60,49 @@ impl CodeBuffer {
         }
         self.attempted = true;
 
-        let page_size = unsafe { libc::sysconf(libc::_SC_PAGESIZE) as usize };
-        let len = (min_size + page_size - 1) & !(page_size - 1);
-
-        // macOS requires MAP_JIT for pages that will be both writable and executable.
-        #[cfg(target_os = "macos")]
-        let flags = libc::MAP_PRIVATE | libc::MAP_ANON | libc::MAP_JIT;
-        #[cfg(not(target_os = "macos"))]
-        let flags = libc::MAP_PRIVATE | libc::MAP_ANON;
-
-        let ptr = unsafe {
-            libc::mmap(
-                std::ptr::null_mut(),
-                len,
-                libc::PROT_READ | libc::PROT_WRITE | libc::PROT_EXEC,
-                flags,
-                -1,
-                0,
-            )
-        };
-        if ptr == libc::MAP_FAILED || ptr.is_null() {
-            log::debug!("JIT code buffer mmap failed — JIT disabled");
+        #[cfg(not(all(target_arch = "aarch64", target_family = "unix")))]
+        {
+            let _ = min_size;
+            log::debug!("JIT code buffer allocation unsupported on this host — JIT disabled");
             return false;
         }
-        self.ptr = ptr as *mut u8;
-        self.len = len;
-        true
+
+        #[cfg(all(target_arch = "aarch64", target_family = "unix"))]
+        {
+            let page_size = unsafe { libc::sysconf(libc::_SC_PAGESIZE) as usize };
+            let len = (min_size + page_size - 1) & !(page_size - 1);
+
+            // macOS requires MAP_JIT for pages that will be both writable and executable.
+            #[cfg(target_os = "macos")]
+            let flags = libc::MAP_PRIVATE | libc::MAP_ANON | libc::MAP_JIT;
+            #[cfg(not(target_os = "macos"))]
+            let flags = libc::MAP_PRIVATE | libc::MAP_ANON;
+
+            let ptr = unsafe {
+                libc::mmap(
+                    std::ptr::null_mut(),
+                    len,
+                    libc::PROT_READ | libc::PROT_WRITE | libc::PROT_EXEC,
+                    flags,
+                    -1,
+                    0,
+                )
+            };
+            if ptr == libc::MAP_FAILED || ptr.is_null() {
+                log::debug!("JIT code buffer mmap failed — JIT disabled");
+                return false;
+            }
+            self.ptr = ptr as *mut u8;
+            self.len = len;
+            true
+        }
     }
 
     /// Remaining capacity in bytes.
     pub fn remaining(&self) -> usize {
-        if self.ptr.is_null() { return 0; }
+        if self.ptr.is_null() {
+            return 0;
+        }
         self.len - self.offset
     }
 
@@ -102,7 +119,10 @@ impl CodeBuffer {
 
     /// Emit raw bytes.
     pub fn emit_bytes(&mut self, bytes: &[u8]) {
-        assert!(self.offset + bytes.len() <= self.len, "JIT code buffer overflow");
+        assert!(
+            self.offset + bytes.len() <= self.len,
+            "JIT code buffer overflow"
+        );
         unsafe {
             std::ptr::copy_nonoverlapping(bytes.as_ptr(), self.ptr.add(self.offset), bytes.len());
         }
@@ -169,6 +189,7 @@ impl CodeBuffer {
 
 impl Drop for CodeBuffer {
     fn drop(&mut self) {
+        #[cfg(all(target_arch = "aarch64", target_family = "unix"))]
         if !self.ptr.is_null() && self.len > 0 {
             unsafe {
                 libc::munmap(self.ptr as *mut _, self.len);

@@ -189,7 +189,10 @@ mod tests {
     fn button_intrinsic_size_varies_with_title() {
         let short = Button::new(Rect::new(0.0, 0.0, 80.0, 30.0), "A");
         let long = Button::new(Rect::new(0.0, 0.0, 80.0, 30.0), "LongTitle");
-        assert!(long.intrinsic_content_size().width.unwrap() > short.intrinsic_content_size().width.unwrap());
+        assert!(
+            long.intrinsic_content_size().width.unwrap()
+                > short.intrinsic_content_size().width.unwrap()
+        );
     }
 
     #[test]

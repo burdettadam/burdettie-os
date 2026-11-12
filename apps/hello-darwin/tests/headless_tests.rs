@@ -10,9 +10,7 @@ use std::sync::Mutex;
 use graphics_core::Rect;
 use macho_runtime::{Runtime, RuntimeConfig};
 use ui_controls::{Button, HeadlessApp, Label};
-use ui_view::layout::{
-    equal, set_size, LayoutAttribute, ViewId, SUPERVIEW,
-};
+use ui_view::layout::{equal, set_size, LayoutAttribute, ViewId, SUPERVIEW};
 
 use hello_darwin::{discover_fixtures, run_scorecard_from};
 
@@ -181,7 +179,9 @@ fn expected_exit(name: &str) -> i32 {
 /// which specific fixtures pass or fail, instead of a single opaque scorecard.
 #[test]
 fn scorecard_per_fixture_results() {
-    let Some(fixtures_root) = real_fixtures_dir() else { return };
+    let Some(fixtures_root) = real_fixtures_dir() else {
+        return;
+    };
     let entries = discover_fixtures(&fixtures_root);
 
     assert!(
@@ -265,20 +265,68 @@ fn build_hello_app(scorecard_fn: impl FnMut() -> String + 'static) -> HeadlessAp
 
     // Constraints (same as main.rs)
     let scene = app.scene_mut();
-    scene.add_constraint(equal(title_id, LayoutAttribute::Left, SUPERVIEW, LayoutAttribute::Left, 30.0));
-    scene.add_constraint(equal(title_id, LayoutAttribute::Top, SUPERVIEW, LayoutAttribute::Top, 25.0));
+    scene.add_constraint(equal(
+        title_id,
+        LayoutAttribute::Left,
+        SUPERVIEW,
+        LayoutAttribute::Left,
+        30.0,
+    ));
+    scene.add_constraint(equal(
+        title_id,
+        LayoutAttribute::Top,
+        SUPERVIEW,
+        LayoutAttribute::Top,
+        25.0,
+    ));
     scene.add_constraints(set_size(title_id, 460.0, 24.0));
 
-    scene.add_constraint(equal(run_id, LayoutAttribute::Left, SUPERVIEW, LayoutAttribute::Left, 30.0));
-    scene.add_constraint(equal(run_id, LayoutAttribute::Top, title_id, LayoutAttribute::Bottom, 31.0));
+    scene.add_constraint(equal(
+        run_id,
+        LayoutAttribute::Left,
+        SUPERVIEW,
+        LayoutAttribute::Left,
+        30.0,
+    ));
+    scene.add_constraint(equal(
+        run_id,
+        LayoutAttribute::Top,
+        title_id,
+        LayoutAttribute::Bottom,
+        31.0,
+    ));
     scene.add_constraints(set_size(run_id, 200.0, 40.0));
 
-    scene.add_constraint(equal(quit_id, LayoutAttribute::Left, run_id, LayoutAttribute::Right, 30.0));
-    scene.add_constraint(equal(quit_id, LayoutAttribute::Top, run_id, LayoutAttribute::Top, 0.0));
+    scene.add_constraint(equal(
+        quit_id,
+        LayoutAttribute::Left,
+        run_id,
+        LayoutAttribute::Right,
+        30.0,
+    ));
+    scene.add_constraint(equal(
+        quit_id,
+        LayoutAttribute::Top,
+        run_id,
+        LayoutAttribute::Top,
+        0.0,
+    ));
     scene.add_constraints(set_size(quit_id, 120.0, 40.0));
 
-    scene.add_constraint(equal(result_id, LayoutAttribute::Left, SUPERVIEW, LayoutAttribute::Left, 30.0));
-    scene.add_constraint(equal(result_id, LayoutAttribute::Top, run_id, LayoutAttribute::Bottom, 70.0));
+    scene.add_constraint(equal(
+        result_id,
+        LayoutAttribute::Left,
+        SUPERVIEW,
+        LayoutAttribute::Left,
+        30.0,
+    ));
+    scene.add_constraint(equal(
+        result_id,
+        LayoutAttribute::Top,
+        run_id,
+        LayoutAttribute::Bottom,
+        70.0,
+    ));
     scene.add_constraints(set_size(result_id, 460.0, 24.0));
 
     let conflicts = scene.solve_layout(520.0, 300.0);
@@ -302,10 +350,7 @@ fn hello_app_initial_state() {
 
     assert_eq!(app.label_count(), 2);
     assert_eq!(app.button_count(), 2);
-    assert_eq!(
-        app.label_text(0),
-        "Running on burdettie-os runtime v0.1"
-    );
+    assert_eq!(app.label_text(0), "Running on burdettie-os runtime v0.1");
     assert_eq!(app.label_text(1), "Press a button to begin.");
     assert_eq!(app.button_title(0), "Run Scorecard");
     assert_eq!(app.button_title(1), "Quit");
@@ -371,17 +416,65 @@ fn hello_app_zero_constraint_conflicts() {
         app.add_button(quit_btn);
 
         let scene = app.scene_mut();
-        scene.add_constraint(equal(title_id, LayoutAttribute::Left, SUPERVIEW, LayoutAttribute::Left, 30.0));
-        scene.add_constraint(equal(title_id, LayoutAttribute::Top, SUPERVIEW, LayoutAttribute::Top, 25.0));
+        scene.add_constraint(equal(
+            title_id,
+            LayoutAttribute::Left,
+            SUPERVIEW,
+            LayoutAttribute::Left,
+            30.0,
+        ));
+        scene.add_constraint(equal(
+            title_id,
+            LayoutAttribute::Top,
+            SUPERVIEW,
+            LayoutAttribute::Top,
+            25.0,
+        ));
         scene.add_constraints(set_size(title_id, 460.0, 24.0));
-        scene.add_constraint(equal(run_id, LayoutAttribute::Left, SUPERVIEW, LayoutAttribute::Left, 30.0));
-        scene.add_constraint(equal(run_id, LayoutAttribute::Top, title_id, LayoutAttribute::Bottom, 31.0));
+        scene.add_constraint(equal(
+            run_id,
+            LayoutAttribute::Left,
+            SUPERVIEW,
+            LayoutAttribute::Left,
+            30.0,
+        ));
+        scene.add_constraint(equal(
+            run_id,
+            LayoutAttribute::Top,
+            title_id,
+            LayoutAttribute::Bottom,
+            31.0,
+        ));
         scene.add_constraints(set_size(run_id, 200.0, 40.0));
-        scene.add_constraint(equal(quit_id, LayoutAttribute::Left, run_id, LayoutAttribute::Right, 30.0));
-        scene.add_constraint(equal(quit_id, LayoutAttribute::Top, run_id, LayoutAttribute::Top, 0.0));
+        scene.add_constraint(equal(
+            quit_id,
+            LayoutAttribute::Left,
+            run_id,
+            LayoutAttribute::Right,
+            30.0,
+        ));
+        scene.add_constraint(equal(
+            quit_id,
+            LayoutAttribute::Top,
+            run_id,
+            LayoutAttribute::Top,
+            0.0,
+        ));
         scene.add_constraints(set_size(quit_id, 120.0, 40.0));
-        scene.add_constraint(equal(result_id, LayoutAttribute::Left, SUPERVIEW, LayoutAttribute::Left, 30.0));
-        scene.add_constraint(equal(result_id, LayoutAttribute::Top, run_id, LayoutAttribute::Bottom, 70.0));
+        scene.add_constraint(equal(
+            result_id,
+            LayoutAttribute::Left,
+            SUPERVIEW,
+            LayoutAttribute::Left,
+            30.0,
+        ));
+        scene.add_constraint(equal(
+            result_id,
+            LayoutAttribute::Top,
+            run_id,
+            LayoutAttribute::Bottom,
+            70.0,
+        ));
         scene.add_constraints(set_size(result_id, 460.0, 24.0));
 
         let conflicts = scene.solve_layout(w, h);

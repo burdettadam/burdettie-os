@@ -2,7 +2,7 @@
 
 mod common;
 
-use common::{RUNTIME_LOCK, ShimSet, fixtures_dir};
+use common::{fixtures_dir, ShimSet, RUNTIME_LOCK};
 
 #[test]
 fn register_foundation_classes_registers_key_classes_and_tagged_pointers() {
@@ -44,15 +44,18 @@ fn register_foundation_classes_registers_key_classes_and_tagged_pointers() {
         .expect("NSDate tagged pointer class should be registered");
 
     assert_eq!(
-        rt.get_class_by_addr(number_tagged).map(|cls| cls.name.as_str()),
+        rt.get_class_by_addr(number_tagged)
+            .map(|cls| cls.name.as_str()),
         Some("NSNumber")
     );
     assert_eq!(
-        rt.get_class_by_addr(string_tagged).map(|cls| cls.name.as_str()),
+        rt.get_class_by_addr(string_tagged)
+            .map(|cls| cls.name.as_str()),
         Some("NSString")
     );
     assert_eq!(
-        rt.get_class_by_addr(date_tagged).map(|cls| cls.name.as_str()),
+        rt.get_class_by_addr(date_tagged)
+            .map(|cls| cls.name.as_str()),
         Some("NSDate")
     );
 }
@@ -86,7 +89,8 @@ fn register_foundation_classes_registers_host_isa_aliases_when_available() {
         ] {
             if let Some(addr) = symbols.resolve(symbol) {
                 assert_eq!(
-                    rt.get_class_by_addr(addr as u64).map(|cls| cls.name.as_str()),
+                    rt.get_class_by_addr(addr as u64)
+                        .map(|cls| cls.name.as_str()),
                     Some(class_name),
                     "expected ISA alias for {symbol} to resolve to {class_name}"
                 );
@@ -152,7 +156,9 @@ fn register_foundation_classes_overlays_foundation_without_losing_guest_classes(
         "guest compat methods should still be attached after overlay"
     );
     assert!(
-        guest_compat.find_class_method("hostAppVersionPlistPath").is_some(),
+        guest_compat
+            .find_class_method("hostAppVersionPlistPath")
+            .is_some(),
         "guest compat methods should still be attached after overlay"
     );
     assert!(
@@ -170,7 +176,9 @@ fn register_foundation_classes_overlays_foundation_without_losing_guest_classes(
         "foundation overlay should replace colliding guest NSString"
     );
     assert!(
-        nsstring.find_class_method("stringWithUTF8String:").is_some(),
+        nsstring
+            .find_class_method("stringWithUTF8String:")
+            .is_some(),
         "Foundation NSString methods should be present after overlay"
     );
 }
@@ -189,14 +197,23 @@ fn run_registration_pipeline_reports_foundation_and_selector_stats() {
     let unwind_registry: Arc<dyn platform_core::unwind::UnwindRegistry> =
         Arc::new(platform_linux::LinuxUnwindRegistry::new());
 
-    let registry = ImageRegistry::new(config_platform(Path::new("/tmp/objc-stats-test")).memory(), unwind_registry);
+    let registry = ImageRegistry::new(
+        config_platform(Path::new("/tmp/objc-stats-test")).memory(),
+        unwind_registry,
+    );
     let config = RuntimeConfig::permissive(Path::new("/tmp/objc-stats-test"));
     let tracer = RuntimeTracer::new();
 
     let stats = macho_runtime::objc_setup::run_registration_pipeline(&registry, &config, &tracer);
 
-    assert_eq!(stats.images_scanned, 0, "empty registry should scan zero guest images");
-    assert_eq!(stats.objc_images, 0, "empty registry should contain no ObjC guest images");
+    assert_eq!(
+        stats.images_scanned, 0,
+        "empty registry should scan zero guest images"
+    );
+    assert_eq!(
+        stats.objc_images, 0,
+        "empty registry should contain no ObjC guest images"
+    );
     assert_eq!(
         stats.foundation_classes_registered, 93,
         "foundation registration count should remain stable"
@@ -215,19 +232,25 @@ fn run_registration_pipeline_reports_foundation_and_selector_stats() {
     );
     assert!(
         events.iter().any(|event| {
-            event.message.starts_with("perf|objc_reg|timing|foundation_registration_us|")
+            event
+                .message
+                .starts_with("perf|objc_reg|timing|foundation_registration_us|")
         }),
         "tracer should emit foundation registration timing perf event"
     );
     assert!(
         events.iter().any(|event| {
-            event.message.starts_with("perf|objc_reg|timing|foundation_template_apply_us|")
+            event
+                .message
+                .starts_with("perf|objc_reg|timing|foundation_template_apply_us|")
         }),
         "tracer should emit foundation template apply timing perf event"
     );
     assert!(
         events.iter().any(|event| {
-            event.message.starts_with("perf|objc_reg|timing|foundation_host_isa_alias_us|")
+            event
+                .message
+                .starts_with("perf|objc_reg|timing|foundation_host_isa_alias_us|")
         }),
         "tracer should emit foundation host ISA alias timing perf event"
     );
@@ -241,7 +264,9 @@ fn config_platform(path: &std::path::Path) -> std::sync::Arc<dyn platform_core::
 
 #[test]
 fn runtime_objc_minimal() {
-    let Some(result) = common::run_fixture("objc_minimal/objc_minimal") else { return };
+    let Some(result) = common::run_fixture("objc_minimal/objc_minimal") else {
+        return;
+    };
 
     assert_eq!(result.exit_code, 0, "objc_minimal should exit 0");
 }
@@ -249,7 +274,9 @@ fn runtime_objc_minimal() {
 #[test]
 fn runtime_objc_minimal_class_registration() {
     // After running objc_minimal, verify the global ObjC runtime was populated
-    let Some(_result) = common::run_fixture("objc_minimal/objc_minimal") else { return };
+    let Some(_result) = common::run_fixture("objc_minimal/objc_minimal") else {
+        return;
+    };
 
     // The global runtime should have registered the Answer class
     let guard = objc_runtime::OBJC_RUNTIME.read().unwrap();
@@ -271,14 +298,18 @@ fn runtime_objc_minimal_class_registration() {
 
 #[test]
 fn runtime_objc_category_exit_zero() {
-    let Some(result) = common::run_fixture("objc_category/objc_category") else { return };
+    let Some(result) = common::run_fixture("objc_category/objc_category") else {
+        return;
+    };
 
     assert_eq!(result.exit_code, 0, "objc_category should exit 0");
 }
 
 #[test]
 fn runtime_objc_category_class_registered() {
-    let Some(_result) = common::run_fixture("objc_category/objc_category") else { return };
+    let Some(_result) = common::run_fixture("objc_category/objc_category") else {
+        return;
+    };
 
     let guard = objc_runtime::OBJC_RUNTIME.read().unwrap();
     if let Some(rt) = guard.as_ref() {
@@ -301,7 +332,9 @@ fn runtime_objc_category_class_registered() {
 
 #[test]
 fn runtime_objc_category_load_method_detected() {
-    let Some(_result) = common::run_fixture("objc_category/objc_category") else { return };
+    let Some(_result) = common::run_fixture("objc_category/objc_category") else {
+        return;
+    };
 
     let guard = objc_runtime::OBJC_RUNTIME.read().unwrap();
     if let Some(rt) = guard.as_ref() {
@@ -317,7 +350,9 @@ fn runtime_objc_category_load_method_detected() {
 
 #[test]
 fn runtime_objc_foundation_exit_zero() {
-    let Some(result) = common::run_fixture("objc_foundation/app") else { return };
+    let Some(result) = common::run_fixture("objc_foundation/app") else {
+        return;
+    };
 
     assert_eq!(result.exit_code, 0, "objc_foundation should exit 0");
 }
@@ -352,7 +387,9 @@ fn runtime_objc_foundation_nslog_shim_resolved() {
 
 #[test]
 fn runtime_objc_classes_with_foundation_exit_zero() {
-    let Some(result) = common::run_fixture("objc_classes/app") else { return };
+    let Some(result) = common::run_fixture("objc_classes/app") else {
+        return;
+    };
 
     assert_eq!(
         result.exit_code, 0,
@@ -362,7 +399,9 @@ fn runtime_objc_classes_with_foundation_exit_zero() {
 
 #[test]
 fn runtime_objc_classes_foundation_classes_registered() {
-    let Some(_result) = common::run_fixture("objc_classes/app") else { return };
+    let Some(_result) = common::run_fixture("objc_classes/app") else {
+        return;
+    };
 
     // Verify classes from the fixture were registered alongside foundation symbols
     let guard = objc_runtime::OBJC_RUNTIME.read().unwrap();
@@ -382,7 +421,9 @@ fn runtime_objc_classes_foundation_classes_registered() {
 
 #[test]
 fn runtime_objc_dylib_chain_exit_zero() {
-    let Some(result) = common::run_fixture("objc_dylib_chain/app") else { return };
+    let Some(result) = common::run_fixture("objc_dylib_chain/app") else {
+        return;
+    };
 
     assert_eq!(result.exit_code, 0, "objc_dylib_chain should exit 0");
     assert!(
@@ -393,7 +434,9 @@ fn runtime_objc_dylib_chain_exit_zero() {
 
 #[test]
 fn runtime_objc_dylib_chain_cross_image_class() {
-    let Some(_result) = common::run_fixture("objc_dylib_chain/app") else { return };
+    let Some(_result) = common::run_fixture("objc_dylib_chain/app") else {
+        return;
+    };
 
     // Greeter class should be registered (defined in libgreeter.dylib)
     let guard = objc_runtime::OBJC_RUNTIME.read().unwrap();
@@ -407,7 +450,9 @@ fn runtime_objc_dylib_chain_cross_image_class() {
 
 #[test]
 fn runtime_objc_dylib_chain_cross_image_category() {
-    let Some(_result) = common::run_fixture("objc_dylib_chain/app") else { return };
+    let Some(_result) = common::run_fixture("objc_dylib_chain/app") else {
+        return;
+    };
 
     // Verify category from libextras was merged into Greeter from libgreeter
     let guard = objc_runtime::OBJC_RUNTIME.read().unwrap();
@@ -428,7 +473,9 @@ fn runtime_objc_dylib_chain_cross_image_category() {
 
 #[test]
 fn runtime_objc_dylib_chain_load_method() {
-    let Some(_result) = common::run_fixture("objc_dylib_chain/app") else { return };
+    let Some(_result) = common::run_fixture("objc_dylib_chain/app") else {
+        return;
+    };
 
     // Verify +load was detected for Greeter (defined in libgreeter.dylib)
     let guard = objc_runtime::OBJC_RUNTIME.read().unwrap();

@@ -28,19 +28,16 @@ trust-policy   = { workspace = true }
 burdettie-domain-map  = { workspace = true }
 burdettie-services    = { workspace = true }
 burdettie-log-pipeline = { workspace = true }
+window-backend-darwin = { workspace = true, optional = true }
 clap           = { workspace = true }
 serde_json     = { workspace = true }
 serde          = { workspace = true }
 env_logger     = { workspace = true }
 log            = { workspace = true }
-winit          = { version = "0.30", optional = true }
-softbuffer     = { version = "0.4", optional = true }
-accesskit      = { workspace = true, optional = true }
-accesskit_winit = { workspace = true, optional = true }
 
 [features]
 default = []
-gui = ["dep:winit", "dep:softbuffer"]
+gui = ["dep:window-backend-darwin", "window-backend-darwin/guest-appkit"]
 
 [target.'cfg(target_os = "macos")'.dependencies]
 platform-darwin-host = { workspace = true }

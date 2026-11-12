@@ -25,12 +25,11 @@ const PATCH_TARGETS: &[&str] = &[
     "__ZN5clang6driver6Driver22AddWorkaroundArgumentsERN4llvm3opt12InputArgListE",
 ];
 
-/// Functions whose entry should be replaced with `mov x0, #0; ret`
-/// (return-null stub).  The callers must handle a null/empty return.
+/// Functions whose entry should be replaced with `xor eax, eax; ret`
+/// (return-null stub) for x86_64, or `mov x0, #0; ret` for aarch64.
+/// Callers must handle a null/empty return.
 ///
-/// This is more aggressive than PATCH_TARGETS (which NOPs individual
-/// call sites).  Use it when the ENTIRE function body is unsafe under
-/// our loader.
+/// Exact symbol name matches.
 const STUB_TARGETS: &[&str] = &[
     // Swift's ClangImporter constructs Clang CC1 arguments and invokes
     // the Clang driver internally.  The driver's argument arrays contain
@@ -40,6 +39,18 @@ const STUB_TARGETS: &[&str] = &[
     // without affecting standalone clang, which uses BuildCompilation
     // directly and works correctly.
     "__ZN5swift13ClangImporter20getClangCC1ArgumentsERNS_10ASTContextEN4llvm18IntrusiveRefCntPtrINS3_3vfs10FileSystemEEEb",
+];
+
+/// Symbol name prefixes for functions that should be stubbed.
+/// Any symbol whose name starts with one of these prefixes is stubbed.
+const STUB_PREFIXES: &[&str] = &[
+    // Rust std::sys::unix::thread_local_dtor::register_dtor accesses
+    // internal data structures (DTORS linked list / REGISTERED flag)
+    // that rely on macOS TLV init-function semantics.  Stubbing it to
+    // return 0 skips TLS destructor registration; the process is
+    // short-lived so the leak is harmless and prevents a write to
+    // unmapped memory inside the corrupted list.
+    "__ZN3std3sys4unix17thread_local_dtor13register_dtor",
 ];
 
 /// Patch out known crash-causing function calls in a mapped binary.
@@ -87,10 +98,25 @@ pub fn patch_known_crashes(image: &MappedImage, parsed: &ParsedMachO) -> usize {
         };
 
         if stub_function_entry(text_seg, text_vmaddr, func_vmaddr) {
-            log::info!(
-                "stubbed {target_name} at vmaddr {func_vmaddr:#x} → return null"
-            );
+            log::info!("stubbed {target_name} at vmaddr {func_vmaddr:#x} → return null");
             total_patched += 1;
+        }
+    }
+
+    // Phase 3: Stub functions matching any STUB_PREFIXES prefix.
+    for prefix in STUB_PREFIXES {
+        for sym in symbols.iter().filter(|s| s.name.starts_with(prefix)) {
+            let func_vmaddr = sym.value;
+            if func_vmaddr == 0 {
+                continue;
+            }
+            if stub_function_entry(text_seg, text_vmaddr, func_vmaddr) {
+                log::info!(
+                    "stubbed {} at vmaddr {func_vmaddr:#x} → return null (prefix match)",
+                    sym.name
+                );
+                total_patched += 1;
+            }
         }
     }
 
@@ -176,8 +202,7 @@ fn patch_calls_to(
             continue;
         }
 
-        let rel32 =
-            unsafe { (ptr.add(1) as *const i32).read_unaligned() };
+        let rel32 = unsafe { (ptr.add(1) as *const i32).read_unaligned() };
         let pc = text_vmaddr + i as u64 + 5; // PC after the call instruction
         let branch_target = (pc as i64 + rel32 as i64) as u64;
 

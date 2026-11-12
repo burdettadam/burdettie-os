@@ -24,7 +24,9 @@ pub extern "C" fn shim_nsnib_alloc(cls: u64, _cmd: u64) -> u64 {
 
 /// `-[NSNib initWithNibNamed:bundle:]` — stores name and bundle.
 pub extern "C" fn shim_nsnib_init_with_name(obj: u64, _cmd: u64, name: u64, bundle: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *((obj as usize + NAME_OFF) as *mut u64) = name;
         *((obj as usize + BUNDLE_OFF) as *mut u64) = bundle;
@@ -37,9 +39,13 @@ pub extern "C" fn shim_nsnib_init_with_name(obj: u64, _cmd: u64, name: u64, bund
 ///
 /// Loads the nib via NSBundle loadNibNamed: if a name was stored.
 pub extern "C" fn shim_nsnib_instantiate(obj: u64, _cmd: u64, owner: u64, objects: u64) -> u8 {
-    if obj == 0 { return 1; } // stub: YES
+    if obj == 0 {
+        return 1;
+    } // stub: YES
     let name = unsafe { *((obj as usize + NAME_OFF) as *const u64) };
-    if name == 0 { return 1; } // no name stored
+    if name == 0 {
+        return 1;
+    } // no name stored
 
     let bundle = unsafe { *((obj as usize + BUNDLE_OFF) as *const u64) };
     let bundle = if bundle == 0 {
@@ -48,8 +54,8 @@ pub extern "C" fn shim_nsnib_instantiate(obj: u64, _cmd: u64, owner: u64, object
         bundle
     };
 
-    crate::nsbundle::shim_nsbundle_load_nib_named(bundle, 0, name, owner, objects)
-        .max(1) // return at least YES for compat
+    crate::nsbundle::shim_nsbundle_load_nib_named(bundle, 0, name, owner, objects).max(1)
+    // return at least YES for compat
 }
 
 #[cfg(test)]

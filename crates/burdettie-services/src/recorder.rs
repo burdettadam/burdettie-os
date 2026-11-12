@@ -104,14 +104,19 @@ impl RequestRecorder {
         )
         .map_err(|e| e.to_string())?;
 
-        Ok(Self { conn: Mutex::new(conn) })
+        Ok(Self {
+            conn: Mutex::new(conn),
+        })
     }
 
     /// Record an HTTP request/response.
     pub fn record_http(&self, record: &HttpRecord) {
         let conn = match self.conn.lock() {
             Ok(c) => c,
-            Err(e) => { log::warn!("recorder lock poisoned: {e}"); return; }
+            Err(e) => {
+                log::warn!("recorder lock poisoned: {e}");
+                return;
+            }
         };
         if let Err(e) = conn.execute(
             "INSERT INTO requests (source, original_url, rewritten_url, method,
@@ -140,7 +145,10 @@ impl RequestRecorder {
     pub fn record_xpc(&self, record: &XpcRecord) {
         let conn = match self.conn.lock() {
             Ok(c) => c,
-            Err(e) => { log::warn!("recorder lock poisoned: {e}"); return; }
+            Err(e) => {
+                log::warn!("recorder lock poisoned: {e}");
+                return;
+            }
         };
         if let Err(e) = conn.execute(
             "INSERT INTO requests (source, xpc_service, xpc_request, xpc_reply, guest_binary)
@@ -161,7 +169,10 @@ impl RequestRecorder {
     pub fn record_dns(&self, record: &DnsRecord) {
         let conn = match self.conn.lock() {
             Ok(c) => c,
-            Err(e) => { log::warn!("recorder lock poisoned: {e}"); return; }
+            Err(e) => {
+                log::warn!("recorder lock poisoned: {e}");
+                return;
+            }
         };
         if let Err(e) = conn.execute(
             "INSERT INTO requests (source, dns_query, dns_resolved, guest_binary)
@@ -181,7 +192,10 @@ impl RequestRecorder {
     pub fn record_os_log(&self, record: &OsLogRecord) {
         let conn = match self.conn.lock() {
             Ok(c) => c,
-            Err(e) => { log::warn!("recorder lock poisoned: {e}"); return; }
+            Err(e) => {
+                log::warn!("recorder lock poisoned: {e}");
+                return;
+            }
         };
         if let Err(e) = conn.execute(
             "INSERT INTO requests (source, log_subsystem, log_category, log_level,
@@ -240,10 +254,7 @@ impl RequestRecorder {
                  dns_query, log_subsystem, log_category, log_level, log_message,
                  guest_binary, duration_ms, response_status
                  FROM requests ORDER BY id DESC LIMIT ?1 OFFSET ?2",
-                vec![
-                    Box::new(limit as i64),
-                    Box::new(offset as i64),
-                ],
+                vec![Box::new(limit as i64), Box::new(offset as i64)],
             ),
         };
 
@@ -286,9 +297,9 @@ impl RequestRecorder {
             Ok(c) => c,
             Err(_) => return Vec::new(),
         };
-        let mut stmt = match conn.prepare(
-            "SELECT source, COUNT(*) FROM requests GROUP BY source ORDER BY source"
-        ) {
+        let mut stmt = match conn
+            .prepare("SELECT source, COUNT(*) FROM requests GROUP BY source ORDER BY source")
+        {
             Ok(s) => s,
             Err(_) => return Vec::new(),
         };

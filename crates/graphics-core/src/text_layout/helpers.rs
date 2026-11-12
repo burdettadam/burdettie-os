@@ -79,8 +79,8 @@ pub(super) fn layout_line_word_wrap(
                     y: ascent + *line as f64 * line_height,
                     size,
                     missing,
-                font_index: 0,
-                color: None,
+                    font_index: 0,
+                    color: None,
                 });
             } else {
                 if let Some(prev) = prev_glyph {
@@ -275,4 +275,3 @@ pub(super) fn measure_str(
     }
     width as f64
 }
-

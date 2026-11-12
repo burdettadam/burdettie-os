@@ -14,6 +14,12 @@
 
 use crate::cfstring;
 use crate::nsobj;
+#[cfg(not(unix))]
+use std::{
+    collections::HashMap,
+    process::{Child, Command, ExitStatus},
+    sync::{Mutex, OnceLock},
+};
 
 const LAUNCH_PATH_OFF: usize = 8;
 const ARGUMENTS_OFF: usize = 16;
@@ -25,6 +31,17 @@ const PID_OFF: usize = 44;
 const STDIN_OFF: usize = 48;
 const STDERR_OFF: usize = 56;
 
+#[cfg(not(unix))]
+fn child_registry() -> &'static Mutex<HashMap<i32, Child>> {
+    static REGISTRY: OnceLock<Mutex<HashMap<i32, Child>>> = OnceLock::new();
+    REGISTRY.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+#[cfg(not(unix))]
+fn exit_code_from_status(status: ExitStatus) -> i32 {
+    status.code().unwrap_or(-1)
+}
+
 fn make_nsstring(s: &str) -> u64 {
     let c = std::ffi::CString::new(s).unwrap_or_default();
     cfstring::shim_cf_string_create_with_cstring(0, c.as_ptr(), 0)
@@ -32,7 +49,9 @@ fn make_nsstring(s: &str) -> u64 {
 
 fn alloc_task() -> u64 {
     let obj = crate::pal_alloc().calloc(1, 72) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *(obj as *mut u64) = nsobj::nstask_class_addr();
         *((obj as usize + EXIT_STATUS_OFF) as *mut i32) = -1;
@@ -55,102 +74,154 @@ pub extern "C" fn shim_nstask_init(obj: u64, _cmd: u64) -> u64 {
 // ── Setters ────────────────────────────────────────────────────
 
 pub extern "C" fn shim_nstask_set_launch_path(obj: u64, _cmd: u64, path: u64) -> u64 {
-    if obj == 0 { return 0; }
-    unsafe { *((obj as usize + LAUNCH_PATH_OFF) as *mut u64) = path; }
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *((obj as usize + LAUNCH_PATH_OFF) as *mut u64) = path;
+    }
     0
 }
 
 pub extern "C" fn shim_nstask_set_executable_url(obj: u64, _cmd: u64, url: u64) -> u64 {
-    if obj == 0 || url == 0 { return 0; }
+    if obj == 0 || url == 0 {
+        return 0;
+    }
     let path_str = crate::nsurl::shim_nsurl_path(url, 0);
-    unsafe { *((obj as usize + LAUNCH_PATH_OFF) as *mut u64) = path_str; }
+    unsafe {
+        *((obj as usize + LAUNCH_PATH_OFF) as *mut u64) = path_str;
+    }
     0
 }
 
 pub extern "C" fn shim_nstask_set_arguments(obj: u64, _cmd: u64, args: u64) -> u64 {
-    if obj == 0 { return 0; }
-    unsafe { *((obj as usize + ARGUMENTS_OFF) as *mut u64) = args; }
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *((obj as usize + ARGUMENTS_OFF) as *mut u64) = args;
+    }
     0
 }
 
 pub extern "C" fn shim_nstask_set_environment(obj: u64, _cmd: u64, env: u64) -> u64 {
-    if obj == 0 { return 0; }
-    unsafe { *((obj as usize + ENVIRONMENT_OFF) as *mut u64) = env; }
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *((obj as usize + ENVIRONMENT_OFF) as *mut u64) = env;
+    }
     0
 }
 
 pub extern "C" fn shim_nstask_set_stdout(obj: u64, _cmd: u64, pipe: u64) -> u64 {
-    if obj == 0 { return 0; }
-    unsafe { *((obj as usize + STDOUT_OFF) as *mut u64) = pipe; }
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *((obj as usize + STDOUT_OFF) as *mut u64) = pipe;
+    }
     0
 }
 
 /// `-[NSTask setStandardInput:]`
 pub extern "C" fn shim_nstask_set_stdin(obj: u64, _cmd: u64, pipe: u64) -> u64 {
-    if obj == 0 { return 0; }
-    unsafe { *((obj as usize + STDIN_OFF) as *mut u64) = pipe; }
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *((obj as usize + STDIN_OFF) as *mut u64) = pipe;
+    }
     0
 }
 
 /// `-[NSTask setStandardError:]`
 pub extern "C" fn shim_nstask_set_stderr(obj: u64, _cmd: u64, pipe: u64) -> u64 {
-    if obj == 0 { return 0; }
-    unsafe { *((obj as usize + STDERR_OFF) as *mut u64) = pipe; }
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *((obj as usize + STDERR_OFF) as *mut u64) = pipe;
+    }
     0
 }
 
 /// `-[NSTask standardOutput]`
 pub extern "C" fn shim_nstask_get_stdout(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + STDOUT_OFF) as *const u64) }
 }
 
 /// `-[NSTask standardInput]`
 pub extern "C" fn shim_nstask_get_stdin(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + STDIN_OFF) as *const u64) }
 }
 
 /// `-[NSTask standardError]`
 pub extern "C" fn shim_nstask_get_stderr(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + STDERR_OFF) as *const u64) }
 }
 
 /// `-[NSTask setCurrentDirectoryPath:]`
 pub extern "C" fn shim_nstask_set_current_dir(obj: u64, _cmd: u64, path: u64) -> u64 {
-    if obj == 0 { return 0; }
-    unsafe { *((obj as usize + CURRENT_DIR_OFF) as *mut u64) = path; }
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *((obj as usize + CURRENT_DIR_OFF) as *mut u64) = path;
+    }
     0
 }
 
 /// `-[NSTask setCurrentDirectoryURL:]` — convenience wrapper taking an NSURL.
 pub extern "C" fn shim_nstask_set_current_dir_url(obj: u64, _cmd: u64, url: u64) -> u64 {
-    if obj == 0 || url == 0 { return 0; }
+    if obj == 0 || url == 0 {
+        return 0;
+    }
     let path = crate::nsurl::shim_nsurl_path(url, 0);
-    unsafe { *((obj as usize + CURRENT_DIR_OFF) as *mut u64) = path; }
+    unsafe {
+        *((obj as usize + CURRENT_DIR_OFF) as *mut u64) = path;
+    }
     0
 }
 
 /// `-[NSTask currentDirectoryPath]`
 pub extern "C" fn shim_nstask_current_dir(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + CURRENT_DIR_OFF) as *const u64) }
 }
 
 /// `-[NSTask currentDirectoryURL]` — return an NSURL for the stored current-directory path.
 pub extern "C" fn shim_nstask_current_directory_url(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let path = unsafe { *((obj as usize + CURRENT_DIR_OFF) as *const u64) };
-    if path == 0 { return 0; }
+    if path == 0 {
+        return 0;
+    }
     crate::nsurl::shim_nsurl_file_url_with_path(0, 0, path)
 }
 
 /// `-[NSTask executableURL]` — return an NSURL for the stored launch-path.
 pub extern "C" fn shim_nstask_executable_url(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let path = unsafe { *((obj as usize + LAUNCH_PATH_OFF) as *const u64) };
-    if path == 0 { return 0; }
+    if path == 0 {
+        return 0;
+    }
     crate::nsurl::shim_nsurl_file_url_with_path(0, 0, path)
 }
 
@@ -162,36 +233,78 @@ pub extern "C" fn shim_nstask_termination_reason(_obj: u64, _cmd: u64) -> i64 {
 // ── Getters ────────────────────────────────────────────────────
 
 pub extern "C" fn shim_nstask_launch_path(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + LAUNCH_PATH_OFF) as *const u64) }
 }
 
 pub extern "C" fn shim_nstask_arguments(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + ARGUMENTS_OFF) as *const u64) }
 }
 
 pub extern "C" fn shim_nstask_environment(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + ENVIRONMENT_OFF) as *const u64) }
 }
 
 pub extern "C" fn shim_nstask_termination_status(obj: u64, _cmd: u64) -> i32 {
-    if obj == 0 { return -1; }
+    if obj == 0 {
+        return -1;
+    }
     unsafe { *((obj as usize + EXIT_STATUS_OFF) as *const i32) }
 }
 
 pub extern "C" fn shim_nstask_process_identifier(obj: u64, _cmd: u64) -> i32 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + PID_OFF) as *const i32) }
 }
 
+#[cfg(unix)]
 pub extern "C" fn shim_nstask_is_running(obj: u64, _cmd: u64) -> u8 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let pid = unsafe { *((obj as usize + PID_OFF) as *const i32) };
-    if pid <= 0 { return 0; }
+    if pid <= 0 {
+        return 0;
+    }
     let rc = unsafe { libc::kill(pid, 0) };
     u8::from(rc == 0)
+}
+
+#[cfg(not(unix))]
+pub extern "C" fn shim_nstask_is_running(obj: u64, _cmd: u64) -> u8 {
+    if obj == 0 {
+        return 0;
+    }
+    let pid = unsafe { *((obj as usize + PID_OFF) as *const i32) };
+    if pid <= 0 {
+        return 0;
+    }
+
+    let mut registry = child_registry().lock().unwrap_or_else(|e| e.into_inner());
+    let status = match registry
+        .get_mut(&pid)
+        .and_then(|child| child.try_wait().ok())
+    {
+        None => return 0,
+        Some(None) => return 1,
+        Some(Some(status)) => status,
+    };
+    registry.remove(&pid);
+    unsafe {
+        *((obj as usize + EXIT_STATUS_OFF) as *mut i32) = exit_code_from_status(status);
+        *((obj as usize + PID_OFF) as *mut i32) = 0;
+    }
+    0
 }
 
 /// Close and invalidate the child-facing end of a pipe in the parent after posix_spawn.
@@ -205,25 +318,37 @@ pub extern "C" fn shim_nstask_is_running(obj: u64, _cmd: u64) -> u8 {
 ///
 /// Only acts on NSPipe objects; raw NSFileHandle objects are left alone (caller manages).
 fn close_parent_pipe_end(obj: u64, is_stdin: bool) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let isa = unsafe { *(obj as *const u64) };
-    if isa != nsobj::nspipe_class_addr() { return; }
+    if isa != nsobj::nspipe_class_addr() {
+        return;
+    }
     // NSPipe layout: [isa:0, read_fh:8, write_fh:16]
     let fh_off: usize = if is_stdin { 8 } else { 16 };
     let fh = unsafe { *((obj as usize + fh_off) as *const u64) };
-    if fh == 0 { return; }
+    if fh == 0 {
+        return;
+    }
     // NSFileHandle layout: [isa:0, fd:8, flags:16]
     let fd = unsafe { *((fh as usize + 8) as *const i64) } as i32;
     if fd >= 0 {
-        unsafe { libc::close(fd); }
-        unsafe { *((fh as usize + 8) as *mut i64) = -1; }
+        unsafe {
+            libc::close(fd);
+        }
+        unsafe {
+            *((fh as usize + 8) as *mut i64) = -1;
+        }
     }
 }
 
 /// Helper: get the file descriptor from an NSPipe or NSFileHandle object.
 /// NSPipe layout: [isa, read_fh, write_fh]; NSFileHandle layout: [isa, fd, flags]
 fn pipe_or_fh_to_fd(obj: u64) -> Option<i32> {
-    if obj == 0 { return None; }
+    if obj == 0 {
+        return None;
+    }
     let isa = unsafe { *(obj as *const u64) };
     if isa == nsobj::nspipe_class_addr() {
         // For NSPipe used as stdin: writing end for stdin, reading end for stdout/stderr
@@ -233,7 +358,9 @@ fn pipe_or_fh_to_fd(obj: u64) -> Option<i32> {
         // the child writes to; parent reads from the read end.
         // We return the write-end fd here; launch() will wire it to the child's stdout/stderr.
         let write_fh = unsafe { *((obj as usize + 16) as *const u64) };
-        if write_fh == 0 { return None; }
+        if write_fh == 0 {
+            return None;
+        }
         let fd = unsafe { *((write_fh as usize + 8) as *const i64) } as i32;
         Some(fd)
     } else if isa == nsobj::nsfilehandle_class_addr() {
@@ -246,11 +373,15 @@ fn pipe_or_fh_to_fd(obj: u64) -> Option<i32> {
 
 /// Helper for stdin pipe: return the READ end fd of an NSPipe.
 fn pipe_read_fd(obj: u64) -> Option<i32> {
-    if obj == 0 { return None; }
+    if obj == 0 {
+        return None;
+    }
     let isa = unsafe { *(obj as *const u64) };
     if isa == nsobj::nspipe_class_addr() {
         let read_fh = unsafe { *((obj as usize + 8) as *const u64) };
-        if read_fh == 0 { return None; }
+        if read_fh == 0 {
+            return None;
+        }
         let fd = unsafe { *((read_fh as usize + 8) as *const i64) } as i32;
         Some(fd)
     } else {
@@ -277,16 +408,41 @@ fn build_envp(env_ptr: u64) -> (Vec<std::ffi::CString>, Vec<*mut std::ffi::c_cha
             }
         }
     }
-    let mut ptrs: Vec<*mut std::ffi::c_char> = owners.iter().map(|c| c.as_ptr() as *mut std::ffi::c_char).collect();
+    let mut ptrs: Vec<*mut std::ffi::c_char> = owners
+        .iter()
+        .map(|c| c.as_ptr() as *mut std::ffi::c_char)
+        .collect();
     ptrs.push(std::ptr::null_mut());
     (owners, ptrs)
 }
 
+fn inherited_envp(
+    env_ptr: u64,
+    env_ptrs: &[*mut std::ffi::c_char],
+) -> *const *mut std::ffi::c_char {
+    if env_ptr != 0 {
+        return env_ptrs.as_ptr();
+    }
+
+    unsafe {
+        unsafe extern "C" {
+            static mut environ: *mut *mut std::ffi::c_char;
+        }
+
+        environ as *const *mut std::ffi::c_char
+    }
+}
+
 /// `-[NSTask launch]` — spawn the subprocess.
+#[cfg(unix)]
 pub extern "C" fn shim_nstask_launch(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let path_ptr = unsafe { *((obj as usize + LAUNCH_PATH_OFF) as *const u64) };
-    let Some(path) = cfstring::extract_cfstring_cstr(path_ptr) else { return 0; };
+    let Some(path) = cfstring::extract_cfstring_cstr(path_ptr) else {
+        return 0;
+    };
     let c_path = std::ffi::CString::new(path).unwrap_or_default();
 
     // Build argv
@@ -303,7 +459,10 @@ pub extern "C" fn shim_nstask_launch(obj: u64, _cmd: u64) -> u64 {
             }
         }
     }
-    let mut argv_ptrs: Vec<*mut std::ffi::c_char> = c_args.iter().map(|a| a.as_ptr() as *mut std::ffi::c_char).collect();
+    let mut argv_ptrs: Vec<*mut std::ffi::c_char> = c_args
+        .iter()
+        .map(|a| a.as_ptr() as *mut std::ffi::c_char)
+        .collect();
     argv_ptrs.push(std::ptr::null_mut());
 
     // Build envp from NSDictionary if provided, else inherit
@@ -314,19 +473,15 @@ pub extern "C" fn shim_nstask_launch(obj: u64, _cmd: u64) -> u64 {
     } else {
         (Vec::new(), Vec::new())
     };
-    let envp_arg: *const *mut std::ffi::c_char = if env_ptr != 0 {
-        env_ptrs.as_ptr()
-    } else {
-        std::ptr::null()
-    };
 
     // Set up file actions for stdin/stdout/stderr pipes and optional chdir
     let stdout_obj = unsafe { *((obj as usize + STDOUT_OFF) as *const u64) };
-    let stdin_obj  = unsafe { *((obj as usize + STDIN_OFF) as *const u64) };
+    let stdin_obj = unsafe { *((obj as usize + STDIN_OFF) as *const u64) };
     let stderr_obj = unsafe { *((obj as usize + STDERR_OFF) as *const u64) };
     let current_dir_ptr = unsafe { *((obj as usize + CURRENT_DIR_OFF) as *const u64) };
     let c_dir = if current_dir_ptr != 0 {
-        cfstring::extract_cfstring_cstr(current_dir_ptr).and_then(|s| std::ffi::CString::new(s).ok())
+        cfstring::extract_cfstring_cstr(current_dir_ptr)
+            .and_then(|s| std::ffi::CString::new(s).ok())
     } else {
         None
     };
@@ -334,18 +489,26 @@ pub extern "C" fn shim_nstask_launch(obj: u64, _cmd: u64) -> u64 {
     let mut file_actions: libc::posix_spawn_file_actions_t = unsafe { std::mem::zeroed() };
     let has_actions = stdout_obj != 0 || stdin_obj != 0 || stderr_obj != 0 || c_dir.is_some();
     if has_actions {
-        unsafe { libc::posix_spawn_file_actions_init(&mut file_actions); }
+        unsafe {
+            libc::posix_spawn_file_actions_init(&mut file_actions);
+        }
         // stdout: dup write-end of pipe to child's stdout (fd 1)
         if let Some(fd) = pipe_or_fh_to_fd(stdout_obj) {
-            unsafe { libc::posix_spawn_file_actions_adddup2(&mut file_actions, fd, 1); }
+            unsafe {
+                libc::posix_spawn_file_actions_adddup2(&mut file_actions, fd, 1);
+            }
         }
         // stderr: dup write-end of pipe to child's stderr (fd 2)
         if let Some(fd) = pipe_or_fh_to_fd(stderr_obj) {
-            unsafe { libc::posix_spawn_file_actions_adddup2(&mut file_actions, fd, 2); }
+            unsafe {
+                libc::posix_spawn_file_actions_adddup2(&mut file_actions, fd, 2);
+            }
         }
         // stdin: dup read-end of pipe to child's stdin (fd 0)
         if let Some(fd) = pipe_read_fd(stdin_obj) {
-            unsafe { libc::posix_spawn_file_actions_adddup2(&mut file_actions, fd, 0); }
+            unsafe {
+                libc::posix_spawn_file_actions_adddup2(&mut file_actions, fd, 0);
+            }
         }
         // chdir: change to currentDirectoryPath before exec
         if let Some(ref dir) = c_dir {
@@ -357,85 +520,215 @@ pub extern "C" fn shim_nstask_launch(obj: u64, _cmd: u64) -> u64 {
                     path: *const libc::c_char,
                 ) -> libc::c_int;
             }
-            unsafe { posix_spawn_file_actions_addchdir_np(&mut file_actions, dir.as_ptr()); }
+            unsafe {
+                posix_spawn_file_actions_addchdir_np(&mut file_actions, dir.as_ptr());
+            }
         }
     }
 
     let mut pid: libc::pid_t = 0;
+    let envp = inherited_envp(env_ptr, &env_ptrs);
+
     let rc = unsafe {
         libc::posix_spawn(
             &mut pid,
             c_path.as_ptr(),
-            if has_actions { &file_actions } else { std::ptr::null() },
-            std::ptr::null(),   // spawn attrs
+            if has_actions {
+                &file_actions
+            } else {
+                std::ptr::null()
+            },
+            std::ptr::null(), // spawn attrs
             argv_ptrs.as_ptr(),
-            if env_ptr != 0 { envp_arg as *const *mut std::ffi::c_char } else { std::ptr::null() },
+            envp,
         )
     };
 
     if has_actions {
-        unsafe { libc::posix_spawn_file_actions_destroy(&mut file_actions); }
+        unsafe {
+            libc::posix_spawn_file_actions_destroy(&mut file_actions);
+        }
     }
 
     if rc == 0 {
-        unsafe { *((obj as usize + PID_OFF) as *mut i32) = pid; }
+        unsafe {
+            *((obj as usize + PID_OFF) as *mut i32) = pid;
+        }
         // Close the parent's copy of each child-facing pipe end.  The child has already
         // inherited these via posix_spawn_file_actions dup2; leaving them open in the
         // parent would prevent readDataToEndOfFile from ever detecting EOF.
         close_parent_pipe_end(stdout_obj, false); // close write end — child writes stdout
         close_parent_pipe_end(stderr_obj, false); // close write end — child writes stderr
-        close_parent_pipe_end(stdin_obj,  true);  // close read  end — child reads stdin
+        close_parent_pipe_end(stdin_obj, true); // close read  end — child reads stdin
     } else {
-        log::warn!("NSTask launch failed: posix_spawn returned {rc} for {:?}", path_ptr);
+        log::warn!(
+            "NSTask launch failed: posix_spawn returned {rc} for {:?}",
+            path_ptr
+        );
+    }
+    0
+}
+
+#[cfg(not(unix))]
+pub extern "C" fn shim_nstask_launch(obj: u64, _cmd: u64) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
+    let path_ptr = unsafe { *((obj as usize + LAUNCH_PATH_OFF) as *const u64) };
+    let Some(path) = cfstring::extract_cfstring_cstr(path_ptr) else {
+        return 0;
+    };
+
+    let mut command = Command::new(path);
+
+    let args_ptr = unsafe { *((obj as usize + ARGUMENTS_OFF) as *const u64) };
+    if args_ptr != 0 {
+        let n = crate::nsarray::shim_nsarray_count(args_ptr, 0);
+        for i in 0..n {
+            let arg = crate::nsarray::shim_nsarray_object_at_index(args_ptr, 0, i);
+            if let Some(s) = cfstring::extract_cfstring_cstr(arg) {
+                command.arg(s);
+            }
+        }
+    }
+
+    let env_ptr = unsafe { *((obj as usize + ENVIRONMENT_OFF) as *const u64) };
+    if env_ptr != 0 {
+        let count = crate::nsdictionary::helpers_pub::dict_count_pub(env_ptr) as usize;
+        let keys_ptr = crate::nsdictionary::helpers_pub::dict_keys_pub(env_ptr);
+        let vals_ptr = crate::nsdictionary::helpers_pub::dict_vals_pub(env_ptr);
+        for i in 0..count {
+            let k = unsafe { *((keys_ptr as *const u64).add(i)) };
+            let v = unsafe { *((vals_ptr as *const u64).add(i)) };
+            if let (Some(ks), Some(vs)) = (
+                cfstring::extract_cfstring_cstr(k),
+                cfstring::extract_cfstring_cstr(v),
+            ) {
+                command.env(ks, vs);
+            }
+        }
+    }
+
+    let current_dir_ptr = unsafe { *((obj as usize + CURRENT_DIR_OFF) as *const u64) };
+    if current_dir_ptr != 0 {
+        if let Some(dir) = cfstring::extract_cfstring_cstr(current_dir_ptr) {
+            command.current_dir(dir);
+        }
+    }
+
+    if unsafe { *((obj as usize + STDOUT_OFF) as *const u64) } != 0
+        || unsafe { *((obj as usize + STDERR_OFF) as *const u64) } != 0
+        || unsafe { *((obj as usize + STDIN_OFF) as *const u64) } != 0
+    {
+        log::warn!("NSTask: pipe redirection is not implemented for this host backend");
+    }
+
+    match command.spawn() {
+        Ok(child) => {
+            let pid = child.id() as i32;
+            unsafe {
+                *((obj as usize + PID_OFF) as *mut i32) = pid;
+            }
+            child_registry()
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .insert(pid, child);
+        }
+        Err(err) => {
+            log::warn!("NSTask launch failed for {path:?}: {err}");
+        }
     }
     0
 }
 
 /// `-[NSTask launchAndReturnError:]`
-pub extern "C" fn shim_nstask_launch_and_return_error(
-    obj: u64, _cmd: u64, error_out: u64,
-) -> u8 {
+pub extern "C" fn shim_nstask_launch_and_return_error(obj: u64, _cmd: u64, error_out: u64) -> u8 {
     let result = shim_nstask_launch(obj, 0);
     let _ = result;
     // Check if pid was set
     if obj != 0 {
         let pid = unsafe { *((obj as usize + PID_OFF) as *const i32) };
         if pid > 0 {
-            if error_out != 0 { unsafe { *(error_out as *mut u64) = 0; } }
+            if error_out != 0 {
+                unsafe {
+                    *(error_out as *mut u64) = 0;
+                }
+            }
             return 1; // YES
         }
     }
     if error_out != 0 {
         let err = crate::nserror::make_nserror("NSPOSIXErrorDomain", 2); // ENOENT
-        unsafe { *(error_out as *mut u64) = err; }
+        unsafe {
+            *(error_out as *mut u64) = err;
+        }
     }
     0 // NO
 }
 
 /// `-[NSTask waitUntilExit]` — block until subprocess finishes.
+#[cfg(unix)]
 pub extern "C" fn shim_nstask_wait_until_exit(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let pid = unsafe { *((obj as usize + PID_OFF) as *const i32) };
-    if pid <= 0 { return 0; }
+    if pid <= 0 {
+        return 0;
+    }
 
     let mut status: i32 = 0;
-    unsafe { libc::waitpid(pid, &mut status, 0); }
+    unsafe {
+        libc::waitpid(pid, &mut status, 0);
+    }
 
     let exit_code = if libc::WIFEXITED(status) {
         libc::WEXITSTATUS(status)
     } else {
         -1
     };
-    unsafe { *((obj as usize + EXIT_STATUS_OFF) as *mut i32) = exit_code; }
+    unsafe {
+        *((obj as usize + EXIT_STATUS_OFF) as *mut i32) = exit_code;
+    }
+    0
+}
+
+#[cfg(not(unix))]
+pub extern "C" fn shim_nstask_wait_until_exit(obj: u64, _cmd: u64) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
+    let pid = unsafe { *((obj as usize + PID_OFF) as *const i32) };
+    if pid <= 0 {
+        return 0;
+    }
+
+    let child = child_registry()
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .remove(&pid);
+    let Some(mut child) = child else {
+        return 0;
+    };
+    let exit_code = child.wait().map(exit_code_from_status).unwrap_or(-1);
+    unsafe {
+        *((obj as usize + EXIT_STATUS_OFF) as *mut i32) = exit_code;
+        *((obj as usize + PID_OFF) as *mut i32) = 0;
+    }
     0
 }
 
 /// `+[NSTask launchedTaskWithLaunchPath:arguments:]`
 pub extern "C" fn shim_nstask_launched_with_path(
-    _cls: u64, _cmd: u64, path: u64, args: u64,
+    _cls: u64,
+    _cmd: u64,
+    path: u64,
+    args: u64,
 ) -> u64 {
     let obj = alloc_task();
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *((obj as usize + LAUNCH_PATH_OFF) as *mut u64) = path;
         *((obj as usize + ARGUMENTS_OFF) as *mut u64) = args;
@@ -445,10 +738,13 @@ pub extern "C" fn shim_nstask_launched_with_path(
 }
 
 pub extern "C" fn shim_nstask_description(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
-    let path = cfstring::extract_cfstring_cstr(
-        unsafe { *((obj as usize + LAUNCH_PATH_OFF) as *const u64) }
-    ).unwrap_or("(null)");
+    if obj == 0 {
+        return 0;
+    }
+    let path = cfstring::extract_cfstring_cstr(unsafe {
+        *((obj as usize + LAUNCH_PATH_OFF) as *const u64)
+    })
+    .unwrap_or("(null)");
     let pid = unsafe { *((obj as usize + PID_OFF) as *const i32) };
     make_nsstring(&format!("<NSTask: {path} pid={pid}>"))
 }
@@ -693,9 +989,13 @@ mod tests {
     #[test]
     fn test_termination_status_after_write() {
         let obj = alloc_task();
-        unsafe { *((obj as usize + EXIT_STATUS_OFF) as *mut i32) = 0; }
+        unsafe {
+            *((obj as usize + EXIT_STATUS_OFF) as *mut i32) = 0;
+        }
         assert_eq!(shim_nstask_termination_status(obj, 0), 0);
-        unsafe { *((obj as usize + EXIT_STATUS_OFF) as *mut i32) = 42; }
+        unsafe {
+            *((obj as usize + EXIT_STATUS_OFF) as *mut i32) = 42;
+        }
         assert_eq!(shim_nstask_termination_status(obj, 0), 42);
         free_obj(obj);
     }
@@ -717,7 +1017,9 @@ mod tests {
     #[test]
     fn test_process_identifier_after_write() {
         let obj = alloc_task();
-        unsafe { *((obj as usize + PID_OFF) as *mut i32) = 12345; }
+        unsafe {
+            *((obj as usize + PID_OFF) as *mut i32) = 12345;
+        }
         assert_eq!(shim_nstask_process_identifier(obj, 0), 12345);
         free_obj(obj);
     }
@@ -740,7 +1042,9 @@ mod tests {
     #[test]
     fn test_is_running_negative_pid() {
         let obj = alloc_task();
-        unsafe { *((obj as usize + PID_OFF) as *mut i32) = -1; }
+        unsafe {
+            *((obj as usize + PID_OFF) as *mut i32) = -1;
+        }
         assert_eq!(shim_nstask_is_running(obj, 0), 0);
         free_obj(obj);
     }
@@ -845,6 +1149,49 @@ mod tests {
         free_obj(obj);
     }
 
+    #[test]
+    fn test_launch_inherits_host_environment_when_task_env_is_nil() {
+        let obj = alloc_task();
+        let path = make_string("/usr/bin/printenv");
+        let key = format!("NSTASK_TEST_INHERIT_ENV_{}", std::process::id());
+        let value = "burdettie";
+        let key_obj = make_string(&key);
+        let args = crate::nsarray::make_nsarray(&[key_obj]);
+        let stdout_pipe = crate::nspipe::shim_nspipe_pipe(0, 0);
+
+        std::env::set_var(&key, value);
+
+        shim_nstask_set_launch_path(obj, 0, path);
+        shim_nstask_set_arguments(obj, 0, args);
+        shim_nstask_set_stdout(obj, 0, stdout_pipe);
+
+        assert_eq!(shim_nstask_launch(obj, 0), 0);
+        shim_nstask_wait_until_exit(obj, 0);
+
+        let read_handle = crate::nspipe::shim_nspipe_file_handle_for_reading(stdout_pipe, 0);
+        let data = crate::nsfilehandle::shim_nsfilehandle_read_data_to_end(read_handle, 0);
+        let len = crate::nsdata::shim_nsdata_length(data, 0) as usize;
+        let bytes = crate::nsdata::shim_nsdata_bytes(data, 0);
+        let output = if len == 0 || bytes == 0 {
+            String::new()
+        } else {
+            let slice = unsafe { std::slice::from_raw_parts(bytes as *const u8, len) };
+            String::from_utf8_lossy(slice).trim().to_string()
+        };
+
+        assert_eq!(shim_nstask_termination_status(obj, 0), 0);
+        assert_eq!(output, value);
+
+        std::env::remove_var(&key);
+
+        free_obj(data);
+        free_obj(stdout_pipe);
+        free_obj(args);
+        free_obj(key_obj);
+        free_obj(path);
+        free_obj(obj);
+    }
+
     // ── launchAndReturnError (nil / no-path only) ──────────────
 
     #[test]
@@ -858,7 +1205,7 @@ mod tests {
         let err_buf = alloc_u64_buf(1);
         let result = shim_nstask_launch_and_return_error(obj, 0, err_buf);
         assert_eq!(result, 0); // NO — launch failed
-        // error_out should have been written with a non-zero NSError
+                               // error_out should have been written with a non-zero NSError
         let err = read_field(err_buf, 0);
         assert_ne!(err, 0, "expected NSError to be written");
         free_buf(err_buf);

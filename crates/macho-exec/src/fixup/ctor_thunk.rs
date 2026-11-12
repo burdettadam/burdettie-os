@@ -146,7 +146,9 @@ pub fn wrap_ctor(real_addr: u64) -> Option<u64> {
 /// marker separates it from the parameter types.
 pub fn is_ctor_or_dtor(symbol: &str) -> bool {
     // Strip Mach-O leading underscore(s) to get the Itanium mangled name.
-    let name = symbol.strip_prefix("__Z").or_else(|| symbol.strip_prefix("_Z"));
+    let name = symbol
+        .strip_prefix("__Z")
+        .or_else(|| symbol.strip_prefix("_Z"));
     let Some(name) = name else { return false };
 
     // Look for constructor/destructor markers followed by 'E' (end of nested name).

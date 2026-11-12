@@ -117,9 +117,17 @@ pub fn create_source(ctx: u64) -> u64 {
     };
     // Allocate a small object as the source "handle"
     let addr = crate::pal_alloc().calloc(1, 8) as u64;
-    if addr == 0 { return 0; }
+    if addr == 0 {
+        return 0;
+    }
     let mut guard = sources().lock().unwrap_or_else(|e| e.into_inner());
-    guard.push(RunLoopSource { addr, info, perform, signaled: false, valid: true });
+    guard.push(RunLoopSource {
+        addr,
+        info,
+        perform,
+        signaled: false,
+        valid: true,
+    });
     addr
 }
 
@@ -143,7 +151,11 @@ pub fn invalidate_source(source: u64) {
 
 pub fn source_is_valid(source: u64) -> u8 {
     let guard = sources().lock().unwrap_or_else(|e| e.into_inner());
-    if guard.iter().any(|s| s.addr == source && s.valid) { 1 } else { 0 }
+    if guard.iter().any(|s| s.addr == source && s.valid) {
+        1
+    } else {
+        0
+    }
 }
 
 pub fn add_source(source: u64) {
@@ -226,9 +238,18 @@ pub fn create_observer(activities: u64, repeats: bool, callback: u64, ctx: u64) 
         0
     };
     let addr = crate::pal_alloc().calloc(1, 8) as u64;
-    if addr == 0 { return 0; }
+    if addr == 0 {
+        return 0;
+    }
     let mut guard = observers().lock().unwrap_or_else(|e| e.into_inner());
-    guard.push(RunLoopObserver { addr, activities, repeats, callback, info, valid: true });
+    guard.push(RunLoopObserver {
+        addr,
+        activities,
+        repeats,
+        callback,
+        info,
+        valid: true,
+    });
     addr
 }
 
@@ -255,7 +276,8 @@ pub fn invalidate_observer(observer: u64) {
 fn notify_observers(activity: u64) {
     let to_call: Vec<(u64, u64, u64, bool)> = {
         let guard = observers().lock().unwrap_or_else(|e| e.into_inner());
-        guard.iter()
+        guard
+            .iter()
             .filter(|o| o.valid && (o.activities & activity) != 0 && o.callback != 0)
             .map(|o| (o.callback, o.addr, o.info, o.repeats))
             .collect()
@@ -272,8 +294,8 @@ fn notify_observers(activity: u64) {
 // ── Pending timer queue ────────────────────────────────────────────────────
 
 struct PendingTimer {
-    timer: u64,        // NSTimer object address
-    fire_at: Instant,  // when to fire
+    timer: u64,       // NSTimer object address
+    fire_at: Instant, // when to fire
 }
 
 static PENDING_TIMERS: OnceLock<Mutex<Vec<PendingTimer>>> = OnceLock::new();
@@ -283,10 +305,19 @@ fn pending_timers() -> &'static Mutex<Vec<PendingTimer>> {
 }
 
 pub(crate) fn reset_runtime_state_for_reuse() {
-    pending_timers().lock().unwrap_or_else(|e| e.into_inner()).clear();
+    pending_timers()
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .clear();
     sources().lock().unwrap_or_else(|e| e.into_inner()).clear();
-    observers().lock().unwrap_or_else(|e| e.into_inner()).clear();
-    fd_sources().lock().unwrap_or_else(|e| e.into_inner()).clear();
+    observers()
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .clear();
+    fd_sources()
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .clear();
     // Reset the stop/wakeup state
     {
         let mut guard = WAKEUP_STATE.lock().unwrap_or_else(|e| e.into_inner());
@@ -322,6 +353,7 @@ static WAKEUP_STATE: Mutex<WakeupState> = Mutex::new(WakeupState {
     woken: false,
 });
 static WAKEUP_CONDVAR: Condvar = Condvar::new();
+static WAITING: AtomicBool = AtomicBool::new(false);
 
 /// Wake the run loop (from any thread).  Used by `CFRunLoopWakeUp` and
 /// internally when a source is signaled or a timer is added.
@@ -339,12 +371,18 @@ pub fn stop() {
     WAKEUP_CONDVAR.notify_all();
 }
 
+/// Returns whether the run loop is currently sleeping while waiting for work.
+pub fn is_waiting() -> bool {
+    WAITING.load(Ordering::Acquire)
+}
+
 /// Returns the time until the next pending timer fires, or None if no
 /// timers are scheduled.
 fn time_until_next_timer() -> Option<Duration> {
     let now = Instant::now();
     let guard = pending_timers().lock().unwrap_or_else(|e| e.into_inner());
-    guard.iter()
+    guard
+        .iter()
         .map(|t| {
             if t.fire_at <= now {
                 Duration::ZERO
@@ -391,7 +429,11 @@ pub fn register_fd_source(fd: i32, source_addr: u64, events: i16) {
     let mut guard = fd_sources().lock().unwrap_or_else(|e| e.into_inner());
     // Remove any existing entry for this fd
     guard.retain(|f| f.fd != fd);
-    guard.push(FdSource { fd, source_addr, events });
+    guard.push(FdSource {
+        fd,
+        source_addr,
+        events,
+    });
     drop(guard);
     ensure_fd_poller_running();
     wakeup();
@@ -429,7 +471,10 @@ fn fd_poller_loop() {
         // Build the pollfd array from registered fd sources
         let entries: Vec<(i32, i16, u64)> = {
             let guard = fd_sources().lock().unwrap_or_else(|e| e.into_inner());
-            guard.iter().map(|f| (f.fd, f.events, f.source_addr)).collect()
+            guard
+                .iter()
+                .map(|f| (f.fd, f.events, f.source_addr))
+                .collect()
         };
 
         if entries.is_empty() {
@@ -438,24 +483,36 @@ fn fd_poller_loop() {
             continue;
         }
 
-        let mut pollfds: Vec<libc::pollfd> = entries.iter().map(|(fd, events, _)| {
-            libc::pollfd { fd: *fd, events: *events, revents: 0 }
-        }).collect();
+        #[cfg(unix)]
+        {
+            let mut pollfds: Vec<libc::pollfd> = entries
+                .iter()
+                .map(|(fd, events, _)| libc::pollfd {
+                    fd: *fd,
+                    events: *events,
+                    revents: 0,
+                })
+                .collect();
 
-        // poll with 50ms timeout
-        let ret = unsafe {
-            libc::poll(pollfds.as_mut_ptr(), pollfds.len() as libc::nfds_t, 50)
-        };
+            // poll with 50ms timeout
+            let ret =
+                unsafe { libc::poll(pollfds.as_mut_ptr(), pollfds.len() as libc::nfds_t, 50) };
 
-        if ret > 0 {
-            for (i, pfd) in pollfds.iter().enumerate() {
-                if pfd.revents != 0 {
-                    let source_addr = entries[i].2;
-                    // Signal the associated run loop source
-                    signal_source(source_addr);
-                    // wakeup() is called inside signal_source already
+            if ret > 0 {
+                for (i, pfd) in pollfds.iter().enumerate() {
+                    if pfd.revents != 0 {
+                        let source_addr = entries[i].2;
+                        // Signal the associated run loop source
+                        signal_source(source_addr);
+                        // wakeup() is called inside signal_source already
+                    }
                 }
             }
+        }
+
+        #[cfg(not(unix))]
+        {
+            std::thread::sleep(Duration::from_millis(50));
         }
     }
 }
@@ -491,6 +548,7 @@ pub fn run_loop_blocking(deadline: Option<Instant>, single_pass: bool) -> i32 {
         guard.stopped = false;
         guard.woken = false;
     }
+    WAITING.store(false, Ordering::Release);
 
     notify_observers(CF_RUN_LOOP_ENTRY);
 
@@ -559,9 +617,15 @@ pub fn run_loop_blocking(deadline: Option<Instant>, single_pass: bool) -> i32 {
         // If there are no sources, no timers, and no fd sources, exit — matches Apple behavior
         // where `CFRunLoopRun` returns when nothing is attached.
         {
-            let src_empty = sources().lock().unwrap_or_else(|e| e.into_inner())
-                .iter().all(|s| !s.valid);
-            let timer_empty = pending_timers().lock().unwrap_or_else(|e| e.into_inner()).is_empty();
+            let src_empty = sources()
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .iter()
+                .all(|s| !s.valid);
+            let timer_empty = pending_timers()
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .is_empty();
             let fd_empty = !has_fd_sources();
             if src_empty && timer_empty && fd_empty {
                 notify_observers(CF_RUN_LOOP_EXIT);
@@ -574,10 +638,14 @@ pub fn run_loop_blocking(deadline: Option<Instant>, single_pass: bool) -> i32 {
         {
             let mut guard = WAKEUP_STATE.lock().unwrap_or_else(|e| e.into_inner());
             if !guard.woken && !guard.stopped {
-                let result = WAKEUP_CONDVAR.wait_timeout(guard, sleep_dur)
+                WAITING.store(true, Ordering::Release);
+                let result = WAKEUP_CONDVAR
+                    .wait_timeout(guard, sleep_dur)
                     .unwrap_or_else(|e| e.into_inner());
+                WAITING.store(false, Ordering::Release);
                 guard = result.0;
             }
+            WAITING.store(false, Ordering::Release);
             guard.woken = false;
         }
         notify_observers(CF_RUN_LOOP_AFTER_WAITING);
@@ -658,7 +726,9 @@ fn get_or_create_main_run_loop() -> u64 {
 /// Allocate a fresh 16-byte NSRunLoop object (isa + flags).
 fn alloc_run_loop_obj() -> u64 {
     let obj = crate::pal_alloc().calloc(1, 16) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *(obj as *mut u64) = crate::nsobj::nsrunloop_class_addr();
     }
@@ -673,23 +743,22 @@ thread_local! {
 
 /// Get (or create) the run loop for the calling thread.
 fn get_or_create_current_run_loop() -> u64 {
-    // Fast path: if we're on the main thread (or the main run loop was already
-    // initialised on this thread), return it.
-    if let Some(&main_rl) = MAIN_RUN_LOOP.get() {
-        // Check if the current thread IS the main thread — true when no per-thread
-        // value has been set yet AND main was initialised from this thread.
-        let per_thread = THREAD_RUN_LOOP.with(|c| c.get());
-        if per_thread == 0 || per_thread == main_rl {
-            // First call on this thread — pin it to main.
-            THREAD_RUN_LOOP.with(|c| c.set(main_rl));
-            return main_rl;
-        }
-        return per_thread;
+    if crate::nsthread::is_current_main_thread() {
+        let main_rl = get_or_create_main_run_loop();
+        THREAD_RUN_LOOP.with(|c| c.set(main_rl));
+        return main_rl;
     }
-    // Main run loop not yet initialised — this IS the main thread.
-    let main_rl = get_or_create_main_run_loop();
-    THREAD_RUN_LOOP.with(|c| c.set(main_rl));
-    main_rl
+
+    THREAD_RUN_LOOP.with(|c| {
+        let existing = c.get();
+        if existing != 0 {
+            return existing;
+        }
+
+        let run_loop = alloc_run_loop_obj();
+        c.set(run_loop);
+        run_loop
+    })
 }
 
 // ── Mode string constants ──────────────────────────────────────────
@@ -755,11 +824,20 @@ pub extern "C" fn shim_nsrunloop_run_until_date(_obj: u64, _cmd: u64, _date: u64
 }
 
 /// `-[NSRunLoop runMode:beforeDate:]` — single pass, returns YES if a source was handled.
-pub extern "C" fn shim_nsrunloop_run_mode_before_date(_obj: u64, _cmd: u64, _mode: u64, _date: u64) -> u8 {
+pub extern "C" fn shim_nsrunloop_run_mode_before_date(
+    _obj: u64,
+    _cmd: u64,
+    _mode: u64,
+    _date: u64,
+) -> u8 {
     let deadline = deadline_from_nsdate(_date);
     let result = run_loop_blocking(deadline, true);
     // Return 1 (YES) unless timed-out with nothing handled
-    if result == 2 { 0 } else { 1 }
+    if result == 2 {
+        0
+    } else {
+        1
+    }
 }
 
 /// `-[NSRunLoop run]` — blocks indefinitely until stopped.
@@ -768,12 +846,23 @@ pub extern "C" fn shim_nsrunloop_run_mode_before_date(_obj: u64, _cmd: u64, _mod
 /// `runMode:beforeDate:` with distant-future until no input sources remain
 /// or the loop is stopped.
 pub extern "C" fn shim_nsrunloop_run(_obj: u64, _cmd: u64) {
+    if _obj != 0 && _obj == get_or_create_main_run_loop() && crate::gui_bridge::has_gui_bridge() {
+        crate::nsapplication::set_app_running(true);
+        if crate::nsapplication::run_gui_event_loop_if_available() {
+            crate::nsapplication::set_app_running(false);
+            return;
+        }
+        crate::nsapplication::set_app_running(false);
+    }
+
     run_loop_blocking(None, false);
 }
 
 /// `-[NSRunLoop addTimer:forMode:]` — enqueues the timer for firing on the next run.
 pub extern "C" fn shim_nsrunloop_add_timer_for_mode(_obj: u64, _cmd: u64, timer: u64, _mode: u64) {
-    if timer == 0 { return; }
+    if timer == 0 {
+        return;
+    }
     // Read the fire interval from the NSTimer layout
     let interval_bits = unsafe { *((timer as *const u64).add(1)) };
     let interval = f64::from_bits(interval_bits);
@@ -799,7 +888,13 @@ pub extern "C" fn shim_nsrunloop_get_cf_run_loop(obj: u64, _cmd: u64) -> u64 {
 
 /// `-[NSRunLoop performSelector:target:argument:order:modes:]`
 pub extern "C" fn shim_nsrunloop_perform_selector(
-    _obj: u64, _cmd: u64, sel: u64, target: u64, arg: u64, _order: u64, _modes: u64,
+    _obj: u64,
+    _cmd: u64,
+    sel: u64,
+    target: u64,
+    arg: u64,
+    _order: u64,
+    _modes: u64,
 ) -> u64 {
     let _ = dispatch_selector_to_target(sel, target, arg);
     0
@@ -1046,7 +1141,10 @@ mod tests {
         assert_ne!(obs, 0);
         remove_observer(obs);
         let guard = observers().lock().unwrap();
-        assert!(guard.iter().find(|o| o.addr == obs).is_none(), "observer should be removed");
+        assert!(
+            guard.iter().find(|o| o.addr == obs).is_none(),
+            "observer should be removed"
+        );
         drop(guard);
         reset_runtime_state_for_reuse();
     }
@@ -1083,7 +1181,10 @@ mod tests {
         reset_runtime_state_for_reuse();
         // With no sources or timers, run_loop_blocking should return immediately.
         let result = run_loop_blocking(None, false);
-        assert_eq!(result, 4, "empty run loop should return kCFRunLoopRunFinished (4)");
+        assert_eq!(
+            result, 4,
+            "empty run loop should return kCFRunLoopRunFinished (4)"
+        );
         reset_runtime_state_for_reuse();
     }
 
@@ -1092,7 +1193,10 @@ mod tests {
         let _guard = lock_runloop_state();
         reset_runtime_state_for_reuse();
         let result = run_loop_blocking(None, true);
-        assert_eq!(result, 3, "single_pass should return kCFRunLoopRunHandledSource (3)");
+        assert_eq!(
+            result, 3,
+            "single_pass should return kCFRunLoopRunHandledSource (3)"
+        );
         reset_runtime_state_for_reuse();
     }
 
@@ -1105,7 +1209,10 @@ mod tests {
         assert_ne!(src, 0);
         let deadline = Some(Instant::now() + Duration::from_millis(10));
         let result = run_loop_blocking(deadline, false);
-        assert_eq!(result, 2, "expired deadline should return kCFRunLoopRunTimedOut (2)");
+        assert_eq!(
+            result, 2,
+            "expired deadline should return kCFRunLoopRunTimedOut (2)"
+        );
         reset_runtime_state_for_reuse();
     }
 
@@ -1153,7 +1260,8 @@ mod tests {
         assert_eq!(result, 1, "should have been stopped");
         assert!(
             elapsed < Duration::from_secs(1),
-            "should not have waited the full 5s; elapsed: {:?}", elapsed
+            "should not have waited the full 5s; elapsed: {:?}",
+            elapsed
         );
         handle.join().unwrap();
         reset_runtime_state_for_reuse();
@@ -1191,13 +1299,39 @@ mod tests {
     #[test]
     fn per_thread_run_loop_is_same_on_main() {
         let _guard = lock_runloop_state();
+        crate::nsthread::init_main_thread_id();
         let rl1 = shim_nsrunloop_current_run_loop(0, 0);
         let rl2 = shim_nsrunloop_main_run_loop(0, 0);
-        assert_eq!(rl1, rl2, "main thread currentRunLoop should equal mainRunLoop");
+        assert_eq!(
+            rl1, rl2,
+            "main thread currentRunLoop should equal mainRunLoop"
+        );
+    }
+
+    #[test]
+    fn worker_thread_cannot_claim_main_run_loop() {
+        let _guard = lock_runloop_state();
+        crate::nsthread::init_main_thread_id();
+
+        let main_rl = shim_nsrunloop_main_run_loop(0, 0);
+        let worker_rl = std::thread::spawn(|| shim_nsrunloop_current_run_loop(0, 0))
+            .join()
+            .unwrap();
+        let current_main = shim_nsrunloop_current_run_loop(0, 0);
+
+        assert_eq!(
+            current_main, main_rl,
+            "main thread must retain the main run loop"
+        );
+        assert_ne!(
+            worker_rl, main_rl,
+            "worker thread must not steal the main run loop"
+        );
     }
 
     // ── FD source tests ───────────────────────────────────────────────
 
+    #[cfg(unix)]
     #[test]
     fn register_fd_source_adds_entry() {
         let _guard = lock_runloop_state();
@@ -1206,10 +1340,14 @@ mod tests {
         register_fd_source(999, src, libc::POLLIN as i16);
         assert!(has_fd_sources(), "should have fd sources after registering");
         unregister_fd_source(999);
-        assert!(!has_fd_sources(), "should have no fd sources after unregistering");
+        assert!(
+            !has_fd_sources(),
+            "should have no fd sources after unregistering"
+        );
         reset_runtime_state_for_reuse();
     }
 
+    #[cfg(unix)]
     #[test]
     fn fd_source_keeps_run_loop_alive() {
         let _guard = lock_runloop_state();
@@ -1221,12 +1359,16 @@ mod tests {
         // It should block — so use a short deadline.
         let deadline = Some(Instant::now() + Duration::from_millis(20));
         let result = run_loop_blocking(deadline, false);
-        assert_eq!(result, 2, "should time out (not finish) due to fd source keeping it alive");
+        assert_eq!(
+            result, 2,
+            "should time out (not finish) due to fd source keeping it alive"
+        );
 
         unregister_fd_source(998);
         reset_runtime_state_for_reuse();
     }
 
+    #[cfg(unix)]
     #[test]
     fn fd_source_fires_on_readable_pipe() {
         let _guard = lock_runloop_state();
@@ -1280,6 +1422,7 @@ mod tests {
         reset_runtime_state_for_reuse();
     }
 
+    #[cfg(unix)]
     #[test]
     fn reset_clears_fd_sources() {
         let _guard = lock_runloop_state();

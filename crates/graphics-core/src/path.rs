@@ -16,7 +16,11 @@ pub enum PathElement {
     /// Quadratic Bézier curve: control point + end point.
     QuadTo { ctrl: Point, end: Point },
     /// Cubic Bézier curve: two control points + end point.
-    CubicTo { ctrl1: Point, ctrl2: Point, end: Point },
+    CubicTo {
+        ctrl1: Point,
+        ctrl2: Point,
+        end: Point,
+    },
     /// Close the current subpath (line back to the subpath start).
     Close,
 }
@@ -51,7 +55,8 @@ impl BezierPath {
     }
 
     pub fn cubic_to(&mut self, ctrl1: Point, ctrl2: Point, end: Point) -> &mut Self {
-        self.elements.push(PathElement::CubicTo { ctrl1, ctrl2, end });
+        self.elements
+            .push(PathElement::CubicTo { ctrl1, ctrl2, end });
         self
     }
 
@@ -248,10 +253,7 @@ fn flatten_quad(p0: Point, ctrl: Point, p2: Point, tol: f64, out: &mut Vec<Point
 }
 
 /// Recursively flatten a cubic Bézier into line segments.
-fn flatten_cubic(
-    p0: Point, c1: Point, c2: Point, p3: Point,
-    tol: f64, out: &mut Vec<Point>,
-) {
+fn flatten_cubic(p0: Point, c1: Point, c2: Point, p3: Point, tol: f64, out: &mut Vec<Point>) {
     // Flatness test: max distance of control points from the chord p0→p3.
     let ux = 3.0 * c1.x - 2.0 * p0.x - p3.x;
     let uy = 3.0 * c1.y - 2.0 * p0.y - p3.y;
@@ -282,18 +284,31 @@ impl BezierPath {
         let mut max_y = f64::MIN;
 
         let mut visit = |p: Point| {
-            if p.x < min_x { min_x = p.x; }
-            if p.y < min_y { min_y = p.y; }
-            if p.x > max_x { max_x = p.x; }
-            if p.y > max_y { max_y = p.y; }
+            if p.x < min_x {
+                min_x = p.x;
+            }
+            if p.y < min_y {
+                min_y = p.y;
+            }
+            if p.x > max_x {
+                max_x = p.x;
+            }
+            if p.y > max_y {
+                max_y = p.y;
+            }
         };
 
         for el in &self.elements {
             match *el {
                 PathElement::MoveTo(p) | PathElement::LineTo(p) => visit(p),
-                PathElement::QuadTo { ctrl, end } => { visit(ctrl); visit(end); }
+                PathElement::QuadTo { ctrl, end } => {
+                    visit(ctrl);
+                    visit(end);
+                }
                 PathElement::CubicTo { ctrl1, ctrl2, end } => {
-                    visit(ctrl1); visit(ctrl2); visit(end);
+                    visit(ctrl1);
+                    visit(ctrl2);
+                    visit(end);
                 }
                 PathElement::Close => {}
             }

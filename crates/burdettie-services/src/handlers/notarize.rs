@@ -20,9 +20,13 @@ use tiny_http::Request;
 pub struct NotarizeHandler;
 
 impl Handler for NotarizeHandler {
-    fn handle(&self, path: &str, method: &str, body: &[u8], _request: &Request)
-        -> Option<HandlerResponse>
-    {
+    fn handle(
+        &self,
+        path: &str,
+        method: &str,
+        body: &[u8],
+        _request: &Request,
+    ) -> Option<HandlerResponse> {
         if !path.starts_with("/api/v1/notarize") {
             return None;
         }
@@ -124,7 +128,8 @@ fn handle_submit() -> HandlerResponse {
 fn extract_cdhash(body: &[u8]) -> Option<String> {
     let v: serde_json::Value = serde_json::from_slice(body).ok()?;
     // Try Apple's format: records.recordName = "2/<cdhash>"
-    let record_name = v.pointer("/records/recordName")
+    let record_name = v
+        .pointer("/records/recordName")
         .or_else(|| v.pointer("/records/0/recordName"))
         .and_then(|v| v.as_str())?;
     record_name.strip_prefix("2/").map(|s| s.to_string())
@@ -143,8 +148,14 @@ fn build_signed_ticket_base64(cdhash: &str) -> String {
     let mut ticket = BTreeMap::new();
     ticket.insert("cdhash".to_string(), Value::String(cdhash.to_string()));
     ticket.insert("ticketVersion".to_string(), Value::Integer(2.into()));
-    ticket.insert("signedDate".to_string(), Value::String("2026-04-06T00:00:00Z".to_string()));
-    ticket.insert("issuer".to_string(), Value::String("BurdettieOS Notary".to_string()));
+    ticket.insert(
+        "signedDate".to_string(),
+        Value::String("2026-04-06T00:00:00Z".to_string()),
+    );
+    ticket.insert(
+        "issuer".to_string(),
+        Value::String("BurdettieOS Notary".to_string()),
+    );
     ticket.insert("status".to_string(), Value::Integer(0.into())); // 0 = valid
 
     let ticket_value = Value::Dictionary(ticket.into_iter().collect());
@@ -190,7 +201,10 @@ mod tests {
         let body = br#"{"records":{"recordName":"2/abc123def456"}}"#;
         let resp = handle_ticket_lookup(body);
         let json: serde_json::Value = serde_json::from_slice(&resp.body).unwrap();
-        assert_eq!(json["records"][0]["fields"]["cdhash"]["value"], "abc123def456");
+        assert_eq!(
+            json["records"][0]["fields"]["cdhash"]["value"],
+            "abc123def456"
+        );
         assert_eq!(json["records"][0]["fields"]["status"]["value"], "ACCEPTED");
     }
 
@@ -200,7 +214,9 @@ mod tests {
         let resp = handle_ticket_lookup(body);
         let json: serde_json::Value = serde_json::from_slice(&resp.body).unwrap();
         // Should have a 64-char zero placeholder
-        let cdhash = json["records"][0]["fields"]["cdhash"]["value"].as_str().unwrap();
+        let cdhash = json["records"][0]["fields"]["cdhash"]["value"]
+            .as_str()
+            .unwrap();
         assert_eq!(cdhash.len(), 64);
     }
 
@@ -208,7 +224,9 @@ mod tests {
     fn signed_ticket_is_base64_plist() {
         let encoded = build_signed_ticket_base64("deadbeef");
         // Must be valid base64
-        assert!(encoded.chars().all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '='));
+        assert!(encoded
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '='));
         assert!(!encoded.is_empty());
     }
 

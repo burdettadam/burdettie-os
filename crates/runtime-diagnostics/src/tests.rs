@@ -1,6 +1,6 @@
-use crate::{DiagEvent, emit, drain, clear, has_events, event_count, snapshot};
+use crate::ring::{DiagCategory, DiagRing};
+use crate::{clear, drain, emit, event_count, has_events, snapshot, DiagEvent};
 use crate::{drain_stamped, snapshot_stamped, total_emitted};
-use crate::ring::{DiagRing, DiagCategory};
 use std::sync::Mutex;
 
 /// Serialize tests that use the process-global diagnostic ring.
@@ -11,7 +11,9 @@ fn emit_and_drain() {
     let _guard = COLLECTOR_TEST_LOCK.lock().unwrap();
     clear();
     emit(DiagEvent::ClassMissing { name: "Foo".into() });
-    emit(DiagEvent::SymbolMissing { name: "_bar".into() });
+    emit(DiagEvent::SymbolMissing {
+        name: "_bar".into(),
+    });
     assert_eq!(event_count(), 2);
     assert!(has_events());
 
@@ -46,13 +48,18 @@ fn display_selector_missing() {
 
 #[test]
 fn display_symbol_blocked() {
-    let ev = DiagEvent::SymbolBlocked { name: "_dlopen".into() };
+    let ev = DiagEvent::SymbolBlocked {
+        name: "_dlopen".into(),
+    };
     assert_eq!(format!("{ev}"), "symbol blocked by policy: _dlopen");
 }
 
 #[test]
 fn display_bind_failed() {
-    let ev = DiagEvent::BindFailed { ordinal: 3, symbol: "_missing".into() };
+    let ev = DiagEvent::BindFailed {
+        ordinal: 3,
+        symbol: "_missing".into(),
+    };
     assert_eq!(format!("{ev}"), "bind failed: ordinal 3 '_missing'");
 }
 
@@ -137,13 +144,17 @@ fn class_addr_unknown_display() {
 
 #[test]
 fn super2_unknown_class_display() {
-    let ev = DiagEvent::Super2UnknownClass { current_class: 0xface };
+    let ev = DiagEvent::Super2UnknownClass {
+        current_class: 0xface,
+    };
     assert!(format!("{ev}").contains("0xface"));
 }
 
 #[test]
 fn symbol_missing_display() {
-    let ev = DiagEvent::SymbolMissing { name: "_CFRelease".into() };
+    let ev = DiagEvent::SymbolMissing {
+        name: "_CFRelease".into(),
+    };
     assert!(format!("{ev}").contains("_CFRelease"));
 }
 
@@ -207,7 +218,9 @@ fn ring_push_and_snapshot() {
 fn ring_eviction() {
     let mut ring = DiagRing::with_capacity(3);
     for i in 0..5u64 {
-        ring.push(DiagEvent::SymbolMissing { name: format!("sym{i}") });
+        ring.push(DiagEvent::SymbolMissing {
+            name: format!("sym{i}"),
+        });
     }
     // Should keep only the last 3
     assert_eq!(ring.len(), 3);
@@ -249,9 +262,18 @@ fn ring_drain_clears_but_preserves_counters() {
 fn ring_by_category() {
     let mut ring = DiagRing::with_capacity(16);
     ring.push(DiagEvent::ClassMissing { name: "X".into() });
-    ring.push(DiagEvent::ResourceRequest { kind: "dylib".into(), name: "foo".into() });
-    ring.push(DiagEvent::ResourceResolved { kind: "dylib".into(), name: "foo".into(), addr: 0x100 });
-    ring.push(DiagEvent::SymbolMissing { name: "_bar".into() });
+    ring.push(DiagEvent::ResourceRequest {
+        kind: "dylib".into(),
+        name: "foo".into(),
+    });
+    ring.push(DiagEvent::ResourceResolved {
+        kind: "dylib".into(),
+        name: "foo".into(),
+        addr: 0x100,
+    });
+    ring.push(DiagEvent::SymbolMissing {
+        name: "_bar".into(),
+    });
 
     let rg = ring.by_category(DiagCategory::ResourceGraph);
     assert_eq!(rg.len(), 2);
@@ -262,7 +284,9 @@ fn ring_by_category() {
 fn ring_tail() {
     let mut ring = DiagRing::with_capacity(16);
     for i in 0..10u64 {
-        ring.push(DiagEvent::SymbolMissing { name: format!("s{i}") });
+        ring.push(DiagEvent::SymbolMissing {
+            name: format!("s{i}"),
+        });
     }
     let last3 = ring.tail(3);
     assert_eq!(last3.len(), 3);
@@ -274,22 +298,60 @@ fn ring_tail() {
 fn ring_category_of_all_variants() {
     // Ensure every variant classifies without panic
     let events = vec![
-        DiagEvent::SelectorMissing { selector: "a".into(), class_name: "b".into(), receiver: 0 },
-        DiagEvent::SuperSelectorMissing { selector: "a".into(), receiver: 0, super_class: 0 },
-        DiagEvent::ForwardingEntered { selector: "a".into(), receiver: 0, isa: 0 },
+        DiagEvent::SelectorMissing {
+            selector: "a".into(),
+            class_name: "b".into(),
+            receiver: 0,
+        },
+        DiagEvent::SuperSelectorMissing {
+            selector: "a".into(),
+            receiver: 0,
+            super_class: 0,
+        },
+        DiagEvent::ForwardingEntered {
+            selector: "a".into(),
+            receiver: 0,
+            isa: 0,
+        },
         DiagEvent::ClassMissing { name: "a".into() },
         DiagEvent::ClassAddrUnknown { addr: 0 },
         DiagEvent::Super2UnknownClass { current_class: 0 },
         DiagEvent::CategoryOrphan { class_addr: 0 },
         DiagEvent::SymbolBlocked { name: "a".into() },
         DiagEvent::SymbolMissing { name: "a".into() },
-        DiagEvent::BindFailed { ordinal: 0, symbol: "a".into() },
-        DiagEvent::HostFallback { reason: "a".into(), selector: "b".into(), receiver: 0 },
-        DiagEvent::UnknownIsa { isa: 0, selector: "a".into(), receiver: 0 },
-        DiagEvent::MethodDispatch { selector: "a".into(), isa: 0, imp: 0 },
-        DiagEvent::ResourceRequest { kind: "a".into(), name: "b".into() },
-        DiagEvent::ResourceResolved { kind: "a".into(), name: "b".into(), addr: 0 },
-        DiagEvent::ResourceFailed { kind: "a".into(), name: "b".into(), reason: "c".into() },
+        DiagEvent::BindFailed {
+            ordinal: 0,
+            symbol: "a".into(),
+        },
+        DiagEvent::HostFallback {
+            reason: "a".into(),
+            selector: "b".into(),
+            receiver: 0,
+        },
+        DiagEvent::UnknownIsa {
+            isa: 0,
+            selector: "a".into(),
+            receiver: 0,
+        },
+        DiagEvent::MethodDispatch {
+            selector: "a".into(),
+            isa: 0,
+            imp: 0,
+        },
+        DiagEvent::ResourceRequest {
+            kind: "a".into(),
+            name: "b".into(),
+        },
+        DiagEvent::ResourceResolved {
+            kind: "a".into(),
+            name: "b".into(),
+            addr: 0,
+        },
+        DiagEvent::ResourceFailed {
+            kind: "a".into(),
+            name: "b".into(),
+            reason: "c".into(),
+        },
     ];
     for e in &events {
         let _ = DiagCategory::of(e);
@@ -312,8 +374,14 @@ fn drain_stamped_has_seq_numbers() {
     assert!(stamped[0].seq < stamped[1].seq);
     assert!(stamped[1].seq < stamped[2].seq);
     // Verify event content is preserved
-    assert_eq!(stamped[0].event, DiagEvent::ClassMissing { name: "A".into() });
-    assert_eq!(stamped[2].event, DiagEvent::ClassMissing { name: "C".into() });
+    assert_eq!(
+        stamped[0].event,
+        DiagEvent::ClassMissing { name: "A".into() }
+    );
+    assert_eq!(
+        stamped[2].event,
+        DiagEvent::ClassMissing { name: "C".into() }
+    );
     // Buffer should be empty after drain
     assert_eq!(event_count(), 0);
 }
@@ -323,7 +391,9 @@ fn total_emitted_counts_all() {
     let _guard = COLLECTOR_TEST_LOCK.lock().unwrap();
     clear();
     for i in 0..5 {
-        emit(DiagEvent::SymbolMissing { name: format!("sym{i}") });
+        emit(DiagEvent::SymbolMissing {
+            name: format!("sym{i}"),
+        });
     }
     let before = total_emitted();
     // total_emitted counts all events ever pushed into the global ring
@@ -359,22 +429,31 @@ fn category_counters_all_fields() {
     // Use a fresh ring so we can check exact counts
     let mut ring = DiagRing::with_capacity(64);
     ring.push(DiagEvent::SelectorMissing {
-        selector: "foo".into(), class_name: "Bar".into(), receiver: 0,
+        selector: "foo".into(),
+        class_name: "Bar".into(),
+        receiver: 0,
     });
     ring.push(DiagEvent::ForwardingEntered {
-        selector: "x".into(), receiver: 0, isa: 0,
+        selector: "x".into(),
+        receiver: 0,
+        isa: 0,
     });
     ring.push(DiagEvent::ClassMissing { name: "A".into() });
     ring.push(DiagEvent::SymbolBlocked { name: "s".into() });
     ring.push(DiagEvent::SymbolMissing { name: "t".into() });
     ring.push(DiagEvent::HostFallback {
-        reason: "r".into(), selector: "s".into(), receiver: 0,
+        reason: "r".into(),
+        selector: "s".into(),
+        receiver: 0,
     });
     ring.push(DiagEvent::MethodDispatch {
-        selector: "m".into(), isa: 0, imp: 0,
+        selector: "m".into(),
+        isa: 0,
+        imp: 0,
     });
     ring.push(DiagEvent::ResourceRequest {
-        kind: "dylib".into(), name: "lib".into(),
+        kind: "dylib".into(),
+        name: "lib".into(),
     });
 
     assert_eq!(ring.counters.selector_dispatch, 2); // SelectorMissing + ForwardingEntered
@@ -388,7 +467,9 @@ fn category_counters_all_fields() {
 
 #[test]
 fn diag_event_display_class_missing() {
-    let ev = DiagEvent::ClassMissing { name: "NSWidgetController".into() };
+    let ev = DiagEvent::ClassMissing {
+        name: "NSWidgetController".into(),
+    };
     let s = format!("{ev}");
     assert!(s.contains("class missing"));
     assert!(s.contains("NSWidgetController"));

@@ -39,12 +39,16 @@ fn with_pipes<R>(f: impl FnOnce(&mut HashMap<String, PipeHandler>) -> R) -> R {
 /// return a reply dictionary.
 pub fn register_pipe_handler(name: &str, handler: PipeHandler) {
     log::debug!("xpc_pipe: registering handler for '{}'", name);
-    with_pipes(|t| { t.insert(name.to_string(), handler); });
+    with_pipes(|t| {
+        t.insert(name.to_string(), handler);
+    });
 }
 
 /// Unregister a pipe handler.
 pub fn unregister_pipe_handler(name: &str) {
-    with_pipes(|t| { t.remove(name); });
+    with_pipes(|t| {
+        t.remove(name);
+    });
 }
 
 /// Check if a pipe handler is registered.
@@ -383,18 +387,12 @@ pub fn install_defaults() {
     );
     register_pipe_handler("com.apple.cfprefsd.daemon", burdettie_cfprefs_handler);
     register_pipe_handler("com.apple.cfprefsd.agent", burdettie_cfprefs_handler);
-    register_pipe_handler(
-        "com.apple.pluginkit.pkd",
-        burdettie_pluginkit_handler,
-    );
+    register_pipe_handler("com.apple.pluginkit.pkd", burdettie_pluginkit_handler);
 
     // Security & trust — keychain, certificate validation, code signing
     register_pipe_handler("com.apple.securityd", burdettie_securityd_handler);
     register_pipe_handler("com.apple.trustd", burdettie_trustd_handler);
-    register_pipe_handler(
-        "com.apple.MobileFileIntegrity",
-        burdettie_amfi_handler,
-    );
+    register_pipe_handler("com.apple.MobileFileIntegrity", burdettie_amfi_handler);
 
     // System services — launch services, notifications, directory, syslog
     register_pipe_handler(
@@ -408,9 +406,7 @@ pub fn install_defaults() {
     );
     register_pipe_handler("com.apple.syslog", burdettie_syslog_handler);
 
-    log::debug!(
-        "xpc_pipe: installed default launchd + 15 BurdettieOS daemon handlers"
-    );
+    log::debug!("xpc_pipe: installed default launchd + 15 BurdettieOS daemon handlers");
 }
 
 #[cfg(test)]
@@ -440,7 +436,10 @@ mod tests {
         assert_eq!(result, 0);
         assert_ne!(reply_handle, 0);
         // The echo handler returns count of request entries
-        assert_eq!(xpc_objects::dict_get_int64(reply_handle, b"count\0".as_ptr() as u64), 2);
+        assert_eq!(
+            xpc_objects::dict_get_int64(reply_handle, b"count\0".as_ptr() as u64),
+            2
+        );
     }
 
     #[test]
@@ -476,7 +475,10 @@ mod tests {
         assert_eq!(result, 0); // Handler exists, returns success
         assert_ne!(reply, 0);
         // Check error field in reply
-        assert_eq!(xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64), 32);
+        assert_eq!(
+            xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64),
+            32
+        );
     }
 
     #[test]
@@ -497,8 +499,14 @@ mod tests {
         let result = routine(pipe, request, &mut reply as *mut u64 as u64);
         assert_eq!(result, 0);
         assert_ne!(reply, 0);
-        assert_eq!(xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64), 0);
-        assert!(xpc_objects::dict_get_bool(reply, b"success\0".as_ptr() as u64));
+        assert_eq!(
+            xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64),
+            0
+        );
+        assert!(xpc_objects::dict_get_bool(
+            reply,
+            b"success\0".as_ptr() as u64
+        ));
     }
 
     #[test]
@@ -511,7 +519,10 @@ mod tests {
         let result = routine(pipe, request, &mut reply as *mut u64 as u64);
         assert_eq!(result, 0);
         assert_ne!(reply, 0);
-        assert_eq!(xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64), 0);
+        assert_eq!(
+            xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64),
+            0
+        );
     }
 
     #[test]
@@ -523,7 +534,10 @@ mod tests {
         let result = routine(pipe, request, &mut reply as *mut u64 as u64);
         assert_eq!(result, 0);
         assert_ne!(reply, 0);
-        assert!(!xpc_objects::dict_get_bool(reply, b"quarantined\0".as_ptr() as u64));
+        assert!(!xpc_objects::dict_get_bool(
+            reply,
+            b"quarantined\0".as_ptr() as u64
+        ));
     }
 
     #[test]
@@ -536,8 +550,14 @@ mod tests {
         assert_eq!(result, 0);
         assert_ne!(reply, 0);
         // errSecItemNotFound = -25300
-        assert_eq!(xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64), -25300);
-        assert_eq!(xpc_objects::dict_get_int64(reply, b"result\0".as_ptr() as u64), -25300);
+        assert_eq!(
+            xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64),
+            -25300
+        );
+        assert_eq!(
+            xpc_objects::dict_get_int64(reply, b"result\0".as_ptr() as u64),
+            -25300
+        );
     }
 
     #[test]
@@ -549,8 +569,14 @@ mod tests {
         let result = routine(pipe, request, &mut reply as *mut u64 as u64);
         assert_eq!(result, 0);
         assert_ne!(reply, 0);
-        assert_eq!(xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64), 0);
-        assert_eq!(xpc_objects::dict_get_int64(reply, b"trust-result\0".as_ptr() as u64), 1);
+        assert_eq!(
+            xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64),
+            0
+        );
+        assert_eq!(
+            xpc_objects::dict_get_int64(reply, b"trust-result\0".as_ptr() as u64),
+            1
+        );
     }
 
     #[test]
@@ -562,24 +588,45 @@ mod tests {
         let result = routine(pipe, request, &mut reply as *mut u64 as u64);
         assert_eq!(result, 0);
         assert_ne!(reply, 0);
-        assert_eq!(xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64), 0);
-        assert!(xpc_objects::dict_get_bool(reply, b"valid\0".as_ptr() as u64));
-        assert_eq!(xpc_objects::dict_get_int64(reply, b"status\0".as_ptr() as u64), 0);
+        assert_eq!(
+            xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64),
+            0
+        );
+        assert!(xpc_objects::dict_get_bool(
+            reply,
+            b"valid\0".as_ptr() as u64
+        ));
+        assert_eq!(
+            xpc_objects::dict_get_int64(reply, b"status\0".as_ptr() as u64),
+            0
+        );
     }
 
     #[test]
     fn burdettie_launchservicesd_returns_not_found() {
         install_defaults();
-        let pipe = create(b"com.apple.coreservices.launchservicesd\0".as_ptr() as u64, 0);
+        let pipe = create(
+            b"com.apple.coreservices.launchservicesd\0".as_ptr() as u64,
+            0,
+        );
         let request = xpc_objects::create_dictionary_empty();
         let mut reply: u64 = 0;
         let result = routine(pipe, request, &mut reply as *mut u64 as u64);
         assert_eq!(result, 0);
         assert_ne!(reply, 0);
-        assert_eq!(xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64), 0);
+        assert_eq!(
+            xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64),
+            0
+        );
         // kLSApplicationNotFoundErr = -10814
-        assert_eq!(xpc_objects::dict_get_int64(reply, b"result\0".as_ptr() as u64), -10814);
-        assert_eq!(xpc_objects::dict_get_int64(reply, b"result-count\0".as_ptr() as u64), 0);
+        assert_eq!(
+            xpc_objects::dict_get_int64(reply, b"result\0".as_ptr() as u64),
+            -10814
+        );
+        assert_eq!(
+            xpc_objects::dict_get_int64(reply, b"result-count\0".as_ptr() as u64),
+            0
+        );
     }
 
     #[test]
@@ -591,9 +638,18 @@ mod tests {
         let result = routine(pipe, request, &mut reply as *mut u64 as u64);
         assert_eq!(result, 0);
         assert_ne!(reply, 0);
-        assert_eq!(xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64), 0);
-        assert_eq!(xpc_objects::dict_get_int64(reply, b"token\0".as_ptr() as u64), 1);
-        assert_eq!(xpc_objects::dict_get_int64(reply, b"status\0".as_ptr() as u64), 0);
+        assert_eq!(
+            xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64),
+            0
+        );
+        assert_eq!(
+            xpc_objects::dict_get_int64(reply, b"token\0".as_ptr() as u64),
+            1
+        );
+        assert_eq!(
+            xpc_objects::dict_get_int64(reply, b"status\0".as_ptr() as u64),
+            0
+        );
     }
 
     #[test]
@@ -608,12 +664,24 @@ mod tests {
         let result = routine(pipe, request, &mut reply as *mut u64 as u64);
         assert_eq!(result, 0);
         assert_ne!(reply, 0);
-        assert_eq!(xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64), 0);
+        assert_eq!(
+            xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64),
+            0
+        );
         let uid = unsafe { libc::getuid() } as i64;
         let gid = unsafe { libc::getgid() } as i64;
-        assert_eq!(xpc_objects::dict_get_int64(reply, b"uid\0".as_ptr() as u64), uid);
-        assert_eq!(xpc_objects::dict_get_int64(reply, b"gid\0".as_ptr() as u64), gid);
-        assert_eq!(xpc_objects::dict_get_int64(reply, b"member\0".as_ptr() as u64), 1);
+        assert_eq!(
+            xpc_objects::dict_get_int64(reply, b"uid\0".as_ptr() as u64),
+            uid
+        );
+        assert_eq!(
+            xpc_objects::dict_get_int64(reply, b"gid\0".as_ptr() as u64),
+            gid
+        );
+        assert_eq!(
+            xpc_objects::dict_get_int64(reply, b"member\0".as_ptr() as u64),
+            1
+        );
     }
 
     #[test]
@@ -625,8 +693,14 @@ mod tests {
         let result = routine(pipe, request, &mut reply as *mut u64 as u64);
         assert_eq!(result, 0);
         assert_ne!(reply, 0);
-        assert_eq!(xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64), 0);
-        assert!(xpc_objects::dict_get_bool(reply, b"success\0".as_ptr() as u64));
+        assert_eq!(
+            xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64),
+            0
+        );
+        assert!(xpc_objects::dict_get_bool(
+            reply,
+            b"success\0".as_ptr() as u64
+        ));
     }
 
     #[test]

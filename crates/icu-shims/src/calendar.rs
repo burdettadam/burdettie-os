@@ -8,8 +8,8 @@
 //! back to epoch millis.
 
 use std::collections::HashMap;
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Mutex;
 
 use libsystem_shims::register_shims;
 use libsystem_shims::table::ShimTable;
@@ -22,10 +22,10 @@ const U_ZERO_ERROR: i32 = 0;
 
 const UCAL_ERA: i32 = 0;
 const UCAL_YEAR: i32 = 1;
-const UCAL_MONTH: i32 = 2;       // 0-based
+const UCAL_MONTH: i32 = 2; // 0-based
 const UCAL_WEEK_OF_YEAR: i32 = 3;
 const UCAL_WEEK_OF_MONTH: i32 = 4;
-const UCAL_DATE: i32 = 5;        // day of month
+const UCAL_DATE: i32 = 5; // day of month
 const UCAL_DAY_OF_YEAR: i32 = 6;
 const UCAL_DAY_OF_WEEK: i32 = 7; // 1=Sunday
 const UCAL_HOUR_OF_DAY: i32 = 11;
@@ -98,10 +98,7 @@ fn decompose(millis: f64) -> (i32, i32, i32, i32, i32, i32, i32) {
 /// Recompose (year, month 0-based, day, hour, min, sec, ms) → epoch millis.
 fn recompose(year: i32, month0: i32, day: i32, hour: i32, min: i32, sec: i32, ms: i32) -> f64 {
     let days = days_from_epoch(year as i64, month0 + 1, day);
-    let day_ms = hour as i64 * 3_600_000
-        + min as i64 * 60_000
-        + sec as i64 * 1000
-        + ms as i64;
+    let day_ms = hour as i64 * 3_600_000 + min as i64 * 60_000 + sec as i64 * 1000 + ms as i64;
     (days * 86_400_000 + day_ms) as f64
 }
 
@@ -110,7 +107,11 @@ fn day_of_week(millis: f64) -> i32 {
     let days = (millis / 86_400_000.0).floor() as i64;
     // Jan 1, 1970 was Thursday (5 in ICU 1-based Sunday start).
     let dow = ((days + 4) % 7) as i32; // 0=Sunday
-    if dow < 0 { dow + 7 + 1 } else { dow + 1 }
+    if dow < 0 {
+        dow + 7 + 1
+    } else {
+        dow + 1
+    }
 }
 
 /// Day of year (1-based).
@@ -128,15 +129,48 @@ fn week_of_year(year: i32, month0: i32, day: i32) -> i32 {
 // ── Registration ───────────────────────────────────────────────
 
 pub fn install(table: &mut ShimTable) {
-    register_shims!(table,
-        ("_ucal_open", shim_ucal_open as *const () as u64, "ucal_open (Gregorian calendar)"),
-        ("_ucal_close", shim_ucal_close as *const () as u64, "ucal_close"),
-        ("_ucal_get", shim_ucal_get as *const () as u64, "ucal_get (field extraction)"),
-        ("_ucal_set", shim_ucal_set as *const () as u64, "ucal_set (field modification)"),
-        ("_ucal_getMillis", shim_ucal_get_millis as *const () as u64, "ucal_getMillis"),
-        ("_ucal_setMillis", shim_ucal_set_millis as *const () as u64, "ucal_setMillis"),
-        ("_ucal_add", shim_ucal_add as *const () as u64, "ucal_add (date arithmetic)"),
-        ("_ucal_getTimeZoneDisplayName", shim_ucal_get_tz_display_name as *const () as u64, "ucal_getTimeZoneDisplayName (stub → UTC)")
+    register_shims!(
+        table,
+        (
+            "_ucal_open",
+            shim_ucal_open as *const () as u64,
+            "ucal_open (Gregorian calendar)"
+        ),
+        (
+            "_ucal_close",
+            shim_ucal_close as *const () as u64,
+            "ucal_close"
+        ),
+        (
+            "_ucal_get",
+            shim_ucal_get as *const () as u64,
+            "ucal_get (field extraction)"
+        ),
+        (
+            "_ucal_set",
+            shim_ucal_set as *const () as u64,
+            "ucal_set (field modification)"
+        ),
+        (
+            "_ucal_getMillis",
+            shim_ucal_get_millis as *const () as u64,
+            "ucal_getMillis"
+        ),
+        (
+            "_ucal_setMillis",
+            shim_ucal_set_millis as *const () as u64,
+            "ucal_setMillis"
+        ),
+        (
+            "_ucal_add",
+            shim_ucal_add as *const () as u64,
+            "ucal_add (date arithmetic)"
+        ),
+        (
+            "_ucal_getTimeZoneDisplayName",
+            shim_ucal_get_tz_display_name as *const () as u64,
+            "ucal_getTimeZoneDisplayName (stub → UTC)"
+        )
     );
 }
 
@@ -144,10 +178,17 @@ pub fn install(table: &mut ShimTable) {
 
 /// `ucal_open(zoneID, len, locale, caltype, status) → UCalendar*`
 pub extern "C" fn shim_ucal_open(
-    _zone_id: u64, _zone_len: i32, _locale: u64, _cal_type: i32,
+    _zone_id: u64,
+    _zone_len: i32,
+    _locale: u64,
+    _cal_type: i32,
     status: *mut i32,
 ) -> u64 {
-    if !status.is_null() { unsafe { *status = U_ZERO_ERROR; } }
+    if !status.is_null() {
+        unsafe {
+            *status = U_ZERO_ERROR;
+        }
+    }
     let handle = NEXT_HANDLE.fetch_add(1, Ordering::Relaxed);
     with_table(|t| {
         t.insert(handle, CalState { millis: 0.0 });
@@ -157,12 +198,18 @@ pub extern "C" fn shim_ucal_open(
 
 /// `ucal_close(cal)`
 pub extern "C" fn shim_ucal_close(cal: u64) {
-    with_table(|t| { t.remove(&cal); });
+    with_table(|t| {
+        t.remove(&cal);
+    });
 }
 
 /// `ucal_get(cal, field, status) → int32_t`
 pub extern "C" fn shim_ucal_get(cal: u64, field: i32, status: *mut i32) -> i32 {
-    if !status.is_null() { unsafe { *status = U_ZERO_ERROR; } }
+    if !status.is_null() {
+        unsafe {
+            *status = U_ZERO_ERROR;
+        }
+    }
     let millis = with_table(|t| t.get(&cal).map(|c| c.millis).unwrap_or(0.0));
     let (year, month0, day, hour, min, sec, ms) = decompose(millis);
     match field {
@@ -185,7 +232,9 @@ pub extern "C" fn shim_ucal_get(cal: u64, field: i32, status: *mut i32) -> i32 {
 /// `ucal_set(cal, field, value)`
 pub extern "C" fn shim_ucal_set(cal: u64, field: i32, value: i32) {
     with_table(|t| {
-        let Some(state) = t.get_mut(&cal) else { return; };
+        let Some(state) = t.get_mut(&cal) else {
+            return;
+        };
         let (mut y, mut m, mut d, mut h, mut mi, mut s, mut ms) = decompose(state.millis);
         match field {
             UCAL_YEAR => y = value,
@@ -203,13 +252,21 @@ pub extern "C" fn shim_ucal_set(cal: u64, field: i32, value: i32) {
 
 /// `ucal_getMillis(cal, status) → UDate (double)`
 pub extern "C" fn shim_ucal_get_millis(cal: u64, status: *mut i32) -> f64 {
-    if !status.is_null() { unsafe { *status = U_ZERO_ERROR; } }
+    if !status.is_null() {
+        unsafe {
+            *status = U_ZERO_ERROR;
+        }
+    }
     with_table(|t| t.get(&cal).map(|c| c.millis).unwrap_or(0.0))
 }
 
 /// `ucal_setMillis(cal, dateTime, status)`
 pub extern "C" fn shim_ucal_set_millis(cal: u64, date_time: f64, status: *mut i32) {
-    if !status.is_null() { unsafe { *status = U_ZERO_ERROR; } }
+    if !status.is_null() {
+        unsafe {
+            *status = U_ZERO_ERROR;
+        }
+    }
     with_table(|t| {
         if let Some(state) = t.get_mut(&cal) {
             state.millis = date_time;
@@ -219,9 +276,15 @@ pub extern "C" fn shim_ucal_set_millis(cal: u64, date_time: f64, status: *mut i3
 
 /// `ucal_add(cal, field, amount, status)`
 pub extern "C" fn shim_ucal_add(cal: u64, field: i32, amount: i32, status: *mut i32) {
-    if !status.is_null() { unsafe { *status = U_ZERO_ERROR; } }
+    if !status.is_null() {
+        unsafe {
+            *status = U_ZERO_ERROR;
+        }
+    }
     with_table(|t| {
-        let Some(state) = t.get_mut(&cal) else { return; };
+        let Some(state) = t.get_mut(&cal) else {
+            return;
+        };
         let (mut y, mut m, d, h, mi, s, ms) = decompose(state.millis);
         match field {
             UCAL_YEAR => y += amount,
@@ -261,10 +324,18 @@ pub extern "C" fn shim_ucal_add(cal: u64, field: i32, amount: i32, status: *mut 
 ///
 /// Returns "UTC" for all requests (timezone support is UTC-only).
 pub extern "C" fn shim_ucal_get_tz_display_name(
-    _cal: u64, _name_type: i32, _locale: u64,
-    result: *mut u16, result_capacity: i32, status: *mut i32,
+    _cal: u64,
+    _name_type: i32,
+    _locale: u64,
+    result: *mut u16,
+    result_capacity: i32,
+    status: *mut i32,
 ) -> i32 {
-    if !status.is_null() { unsafe { *status = U_ZERO_ERROR; } }
+    if !status.is_null() {
+        unsafe {
+            *status = U_ZERO_ERROR;
+        }
+    }
     let name: &[u16] = &[b'U' as u16, b'T' as u16, b'C' as u16];
     let copy_len = std::cmp::min(name.len(), result_capacity.max(0) as usize);
     if !result.is_null() && copy_len > 0 {

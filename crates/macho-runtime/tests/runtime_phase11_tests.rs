@@ -23,9 +23,7 @@ fn assert_output_contains_in_order(output: &str, required: &[&str]) {
     for needle in required {
         let remaining = &output[pos..];
         let found = remaining.find(needle).unwrap_or_else(|| {
-            panic!(
-                "expected output to contain '{needle}' after byte {pos}, full output:\n{output}"
-            )
+            panic!("expected output to contain '{needle}' after byte {pos}, full output:\n{output}")
         });
         pos += found + needle.len();
     }
@@ -35,7 +33,9 @@ fn assert_output_contains_in_order(output: &str, required: &[&str]) {
 
 #[test]
 fn runtime_nsvalue_class_registered() {
-    let Some(_result) = common::run_fixture("return42/app") else { return };
+    let Some(_result) = common::run_fixture("return42/app") else {
+        return;
+    };
 
     let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
@@ -50,7 +50,9 @@ fn runtime_nsvalue_class_registered() {
 
 #[test]
 fn runtime_nsuuid_class_registered() {
-    let Some(_result) = common::run_fixture("return42/app") else { return };
+    let Some(_result) = common::run_fixture("return42/app") else {
+        return;
+    };
 
     let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
@@ -62,7 +64,9 @@ fn runtime_nsuuid_class_registered() {
 
 #[test]
 fn runtime_nslocale_class_registered() {
-    let Some(_result) = common::run_fixture("return42/app") else { return };
+    let Some(_result) = common::run_fixture("return42/app") else {
+        return;
+    };
 
     let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
@@ -72,11 +76,14 @@ fn runtime_nslocale_class_registered() {
         .expect("NSLocale should be registered");
     assert!(rt.msg_lookup(cls.mapped_addr, "localeIdentifier").is_some());
     assert!(rt.msg_lookup(cls.mapped_addr, "languageCode").is_some());
+    assert!(cls.find_class_method("autoupdatingCurrentLocale").is_some());
 }
 
 #[test]
 fn runtime_nstimezone_class_registered() {
-    let Some(_result) = common::run_fixture("return42/app") else { return };
+    let Some(_result) = common::run_fixture("return42/app") else {
+        return;
+    };
 
     let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
@@ -90,7 +97,9 @@ fn runtime_nstimezone_class_registered() {
 
 #[test]
 fn runtime_nscalendar_class_registered() {
-    let Some(_result) = common::run_fixture("return42/app") else { return };
+    let Some(_result) = common::run_fixture("return42/app") else {
+        return;
+    };
 
     let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
@@ -108,31 +117,41 @@ fn runtime_nscalendar_class_registered() {
 
 #[test]
 fn runtime_nsvalue_basics_exit_zero() {
-    let Some(result) = common::run_fixture("nsvalue_basics/app") else { return };
+    let Some(result) = common::run_fixture("nsvalue_basics/app") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0, "nsvalue_basics should exit 0");
 }
 
 #[test]
 fn runtime_nsuuid_basics_exit_zero() {
-    let Some(result) = common::run_fixture("nsuuid_basics/app") else { return };
+    let Some(result) = common::run_fixture("nsuuid_basics/app") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0, "nsuuid_basics should exit 0");
 }
 
 #[test]
 fn runtime_nslocale_basics_exit_zero() {
-    let Some(result) = common::run_fixture("nslocale_basics/app") else { return };
+    let Some(result) = common::run_fixture("nslocale_basics/app") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0, "nslocale_basics should exit 0");
 }
 
 #[test]
 fn runtime_nstimezone_basics_exit_zero() {
-    let Some(result) = common::run_fixture("nstimezone_basics/app") else { return };
+    let Some(result) = common::run_fixture("nstimezone_basics/app") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0, "nstimezone_basics should exit 0");
 }
 
 #[test]
 fn runtime_nscalendar_basics_exit_zero() {
-    let Some(result) = common::run_fixture("nscalendar_basics/app") else { return };
+    let Some(result) = common::run_fixture("nscalendar_basics/app") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0, "nscalendar_basics should exit 0");
 }
 
@@ -140,7 +159,9 @@ fn runtime_nscalendar_basics_exit_zero() {
 
 #[test]
 fn runtime_nsnumberformatter_class_registered() {
-    let Some(_result) = common::run_fixture("return42/app") else { return };
+    let Some(_result) = common::run_fixture("return42/app") else {
+        return;
+    };
 
     let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
@@ -158,7 +179,9 @@ fn runtime_nsnumberformatter_class_registered() {
 
 #[test]
 fn runtime_nsnumberformatter_basics_exit_zero() {
-    let Some(result) = common::run_fixture("nsnumberformatter_basics/app") else { return };
+    let Some(result) = common::run_fixture("nsnumberformatter_basics/app") else {
+        return;
+    };
     assert_eq!(
         result.exit_code, 0,
         "nsnumberformatter_basics should exit 0"
@@ -169,7 +192,9 @@ fn runtime_nsnumberformatter_basics_exit_zero() {
 
 #[test]
 fn runtime_nsindexset_class_registered() {
-    let Some(_result) = common::run_fixture("return42/app") else { return };
+    let Some(_result) = common::run_fixture("return42/app") else {
+        return;
+    };
 
     let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
@@ -188,7 +213,9 @@ fn runtime_nsindexset_class_registered() {
 
 #[test]
 fn runtime_nsindexset_basics_exit_zero() {
-    let Some(result) = common::run_fixture("nsindexset_basics/app") else { return };
+    let Some(result) = common::run_fixture("nsindexset_basics/app") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0, "nsindexset_basics should exit 0");
 }
 
@@ -196,7 +223,9 @@ fn runtime_nsindexset_basics_exit_zero() {
 
 #[test]
 fn runtime_nssortdescriptor_class_registered() {
-    let Some(_result) = common::run_fixture("return42/app") else { return };
+    let Some(_result) = common::run_fixture("return42/app") else {
+        return;
+    };
 
     let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
@@ -212,7 +241,9 @@ fn runtime_nssortdescriptor_class_registered() {
 
 #[test]
 fn runtime_nssortdescriptor_basics_exit_zero() {
-    let Some(result) = common::run_fixture("nssortdescriptor_basics/app") else { return };
+    let Some(result) = common::run_fixture("nssortdescriptor_basics/app") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0, "nssortdescriptor_basics should exit 0");
 }
 
@@ -220,7 +251,9 @@ fn runtime_nssortdescriptor_basics_exit_zero() {
 
 #[test]
 fn runtime_nstimer_class_registered() {
-    let Some(_result) = common::run_fixture("return42/app") else { return };
+    let Some(_result) = common::run_fixture("return42/app") else {
+        return;
+    };
 
     let rt = objc_runtime::OBJC_RUNTIME.read().unwrap();
     let rt = rt.as_ref().expect("ObjcRuntime should be initialized");
@@ -234,7 +267,9 @@ fn runtime_nstimer_class_registered() {
 
 #[test]
 fn runtime_nstimer_basics_exit_zero() {
-    let Some(result) = common::run_fixture("nstimer_basics/app") else { return };
+    let Some(result) = common::run_fixture("nstimer_basics/app") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0, "nstimer_basics should exit 0");
 }
 
@@ -242,7 +277,9 @@ fn runtime_nstimer_basics_exit_zero() {
 
 #[test]
 fn runtime_minimal_throw_catches_exception_in_subprocess() {
-    let Some(run) = run_exception_fixture("minimal_throw") else { return };
+    let Some(run) = run_exception_fixture("minimal_throw") else {
+        return;
+    };
 
     match &run.result {
         common::IsolatedResult::Completed { exit_code } => {
@@ -272,7 +309,9 @@ fn runtime_minimal_throw_catches_exception_in_subprocess() {
 
 #[test]
 fn runtime_try_catch_test_handles_nested_catch_and_finally_in_subprocess() {
-    let Some(run) = run_exception_fixture("try_catch_test") else { return };
+    let Some(run) = run_exception_fixture("try_catch_test") else {
+        return;
+    };
 
     match &run.result {
         common::IsolatedResult::Completed { exit_code } => {

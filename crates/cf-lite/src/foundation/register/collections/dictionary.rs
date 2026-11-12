@@ -14,7 +14,11 @@ pub fn register_nsdictionary_class(rt: &mut objc_runtime::ObjcRuntime) {
         name: "NSDictionary".to_string(),
         mapped_addr: class_addr,
         methods: vec![
-            me("count", nsdictionary::shim_nsdictionary_count as *const () as u64, "Q@:"),
+            me(
+                "count",
+                nsdictionary::shim_nsdictionary_count as *const () as u64,
+                "Q@:",
+            ),
             me(
                 "objectForKey:",
                 nsdictionary::shim_nsdictionary_object_for_key as *const () as u64,
@@ -40,7 +44,11 @@ pub fn register_nsdictionary_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nsdictionary::shim_nsdictionary_description as *const () as u64,
                 "@@:",
             ),
-            me("copy", nsdictionary::shim_nsdictionary_copy as *const () as u64, "@@:"),
+            me(
+                "copy",
+                nsdictionary::shim_nsdictionary_copy as *const () as u64,
+                "@@:",
+            ),
             me(
                 "mutableCopy",
                 nsdictionary::shim_nsdictionary_mutable_copy as *const () as u64,
@@ -48,7 +56,8 @@ pub fn register_nsdictionary_class(rt: &mut objc_runtime::ObjcRuntime) {
             ),
             me(
                 "enumerateKeysAndObjectsUsingBlock:",
-                nsdictionary::shim_nsdictionary_enumerate_keys_and_objects_using_block as *const () as u64,
+                nsdictionary::shim_nsdictionary_enumerate_keys_and_objects_using_block as *const ()
+                    as u64,
                 "v@:@?",
             ),
             me(
@@ -139,19 +148,72 @@ pub fn register_nsconstantdictionary_class(rt: &mut objc_runtime::ObjcRuntime) {
         name: "NSConstantDictionary".to_string(),
         mapped_addr: class_addr,
         methods: vec![
-            me("count", nsdictionary::shim_nsdictionary_count as *const () as u64, "Q@:"),
-            me("objectForKey:", nsdictionary::shim_nsdictionary_object_for_key as *const () as u64, "@@:@"),
-            me("objectForKeyedSubscript:", nsdictionary::shim_nsdictionary_object_for_keyed_subscript as *const () as u64, "@@:@"),
-            me("allKeys", nsdictionary::shim_nsdictionary_all_keys as *const () as u64, "@@:"),
-            me("allValues", nsdictionary::shim_nsdictionary_all_values as *const () as u64, "@@:"),
-            me("description", nsdictionary::shim_nsdictionary_description as *const () as u64, "@@:"),
-            me("copy", nsdictionary::shim_nsdictionary_copy as *const () as u64, "@@:"),
-            me("mutableCopy", nsdictionary::shim_nsdictionary_mutable_copy as *const () as u64, "@@:"),
-            me("enumerateKeysAndObjectsUsingBlock:", nsdictionary::shim_nsdictionary_enumerate_keys_and_objects_using_block as *const () as u64, "v@:@?"),
-            me("keyEnumerator", nsenumerator::shim_nsdictionary_key_enumerator as *const () as u64, "@@:"),
-            me("valueForKey:", nsdictionary::shim_nsdictionary_object_for_key as *const () as u64, "@@:@"),
-            me("valueForKeyPath:", nskeyvaluecoding::shim_dict_value_for_key_path as *const () as u64, "@@:@"),
-            me("countByEnumeratingWithState:objects:count:", nsdictionary::shim_nsdictionary_count_by_enumerating_with_state as *const () as u64, "Q@:^{NSFastEnumerationState}^@Q"),
+            me(
+                "count",
+                nsdictionary::shim_nsdictionary_count as *const () as u64,
+                "Q@:",
+            ),
+            me(
+                "objectForKey:",
+                nsdictionary::shim_nsdictionary_object_for_key as *const () as u64,
+                "@@:@",
+            ),
+            me(
+                "objectForKeyedSubscript:",
+                nsdictionary::shim_nsdictionary_object_for_keyed_subscript as *const () as u64,
+                "@@:@",
+            ),
+            me(
+                "allKeys",
+                nsdictionary::shim_nsdictionary_all_keys as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "allValues",
+                nsdictionary::shim_nsdictionary_all_values as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "description",
+                nsdictionary::shim_nsdictionary_description as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "copy",
+                nsdictionary::shim_nsdictionary_copy as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "mutableCopy",
+                nsdictionary::shim_nsdictionary_mutable_copy as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "enumerateKeysAndObjectsUsingBlock:",
+                nsdictionary::shim_nsdictionary_enumerate_keys_and_objects_using_block as *const ()
+                    as u64,
+                "v@:@?",
+            ),
+            me(
+                "keyEnumerator",
+                nsenumerator::shim_nsdictionary_key_enumerator as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "valueForKey:",
+                nsdictionary::shim_nsdictionary_object_for_key as *const () as u64,
+                "@@:@",
+            ),
+            me(
+                "valueForKeyPath:",
+                nskeyvaluecoding::shim_dict_value_for_key_path as *const () as u64,
+                "@@:@",
+            ),
+            me(
+                "countByEnumeratingWithState:objects:count:",
+                nsdictionary::shim_nsdictionary_count_by_enumerating_with_state as *const () as u64,
+                "Q@:^{NSFastEnumerationState}^@Q",
+            ),
         ],
         class_methods: vec![],
         ivars: vec![],
@@ -187,7 +249,11 @@ pub fn register_nsmutabledictionary_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nsmutabledict::shim_nsmutabledict_init_with_dictionary as *const () as u64,
                 "@@:@",
             ),
-            me("count", nsdictionary::shim_nsdictionary_count as *const () as u64, "Q@:"),
+            me(
+                "count",
+                nsdictionary::shim_nsdictionary_count as *const () as u64,
+                "Q@:",
+            ),
             me(
                 "objectForKey:",
                 nsdictionary::shim_nsdictionary_object_for_key as *const () as u64,
@@ -213,7 +279,11 @@ pub fn register_nsmutabledictionary_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nsdictionary::shim_nsdictionary_description as *const () as u64,
                 "@@:",
             ),
-            me("copy", nsdictionary::shim_nsmutabledict_copy as *const () as u64, "@@:"),
+            me(
+                "copy",
+                nsdictionary::shim_nsmutabledict_copy as *const () as u64,
+                "@@:",
+            ),
             me(
                 "mutableCopy",
                 nsdictionary::shim_nsmutabledict_mutable_copy as *const () as u64,
@@ -221,7 +291,8 @@ pub fn register_nsmutabledictionary_class(rt: &mut objc_runtime::ObjcRuntime) {
             ),
             me(
                 "enumerateKeysAndObjectsUsingBlock:",
-                nsdictionary::shim_nsdictionary_enumerate_keys_and_objects_using_block as *const () as u64,
+                nsdictionary::shim_nsdictionary_enumerate_keys_and_objects_using_block as *const ()
+                    as u64,
                 "v@:@?",
             ),
             me(
@@ -246,7 +317,8 @@ pub fn register_nsmutabledictionary_class(rt: &mut objc_runtime::ObjcRuntime) {
             ),
             me(
                 "setObject:forKeyedSubscript:",
-                nsmutabledict::shim_nsmutabledict_set_object_for_keyed_subscript as *const () as u64,
+                nsmutabledict::shim_nsmutabledict_set_object_for_keyed_subscript as *const ()
+                    as u64,
                 "v@:@@",
             ),
             me(

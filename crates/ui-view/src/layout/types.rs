@@ -91,14 +91,29 @@ pub struct EdgeInsets {
 }
 
 impl EdgeInsets {
-    pub const ZERO: Self = Self { top: 0.0, left: 0.0, bottom: 0.0, right: 0.0 };
+    pub const ZERO: Self = Self {
+        top: 0.0,
+        left: 0.0,
+        bottom: 0.0,
+        right: 0.0,
+    };
 
     pub fn new(top: f64, left: f64, bottom: f64, right: f64) -> Self {
-        Self { top, left, bottom, right }
+        Self {
+            top,
+            left,
+            bottom,
+            right,
+        }
     }
 
     pub fn uniform(value: f64) -> Self {
-        Self { top: value, left: value, bottom: value, right: value }
+        Self {
+            top: value,
+            left: value,
+            bottom: value,
+            right: value,
+        }
     }
 }
 

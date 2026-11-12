@@ -36,11 +36,18 @@ fn simple_cli_compact_to_ehframe_roundtrip() {
     };
 
     let entries = parse_compact_unwind(&cu_data);
-    assert!(!entries.is_empty(), "should parse at least one compact entry");
+    assert!(
+        !entries.is_empty(),
+        "should parse at least one compact entry"
+    );
 
     // All entries should have non-zero encodings.
     for e in &entries {
-        assert_ne!(e.encoding, 0, "entry at offset {:#x} has zero encoding", e.func_offset);
+        assert_ne!(
+            e.encoding, 0,
+            "entry at offset {:#x} has zero encoding",
+            e.func_offset
+        );
     }
 
     // Generate .eh_frame.
@@ -56,12 +63,20 @@ fn simple_cli_compact_to_ehframe_roundtrip() {
 
     // At least one FDE should follow the CIE.
     let fde_off = 4 + cie_len as usize;
-    assert!(fde_off + 8 <= eh.len(), "should have at least one FDE after CIE");
-    let fde_len = u32::from_ne_bytes([eh[fde_off], eh[fde_off+1], eh[fde_off+2], eh[fde_off+3]]);
+    assert!(
+        fde_off + 8 <= eh.len(),
+        "should have at least one FDE after CIE"
+    );
+    let fde_len = u32::from_ne_bytes([
+        eh[fde_off],
+        eh[fde_off + 1],
+        eh[fde_off + 2],
+        eh[fde_off + 3],
+    ]);
     assert!(fde_len > 0, "first FDE should have non-zero length");
 
     // Terminator at the end.
-    let last4 = &eh[eh.len()-4..];
+    let last4 = &eh[eh.len() - 4..];
     let term = u32::from_ne_bytes([last4[0], last4[1], last4[2], last4[3]]);
     assert_eq!(term, 0, ".eh_frame should end with zero terminator");
 }
@@ -85,7 +100,7 @@ fn exception_basics_compact_to_ehframe() {
     let mut fde_count = 0;
     let mut pos = 0;
     while pos + 4 <= eh.len() {
-        let len = u32::from_ne_bytes([eh[pos], eh[pos+1], eh[pos+2], eh[pos+3]]);
+        let len = u32::from_ne_bytes([eh[pos], eh[pos + 1], eh[pos + 2], eh[pos + 3]]);
         if len == 0 {
             break; // terminator
         }
@@ -95,7 +110,7 @@ fn exception_basics_compact_to_ehframe() {
         }
         // Check if this is an FDE (CIE pointer != 0).
         if pos + 8 <= eh.len() {
-            let id = u32::from_ne_bytes([eh[pos+4], eh[pos+5], eh[pos+6], eh[pos+7]]);
+            let id = u32::from_ne_bytes([eh[pos + 4], eh[pos + 5], eh[pos + 6], eh[pos + 7]]);
             if id != 0 {
                 fde_count += 1;
             }
@@ -127,7 +142,11 @@ fn autorelease_has_multiple_entries() {
     // Function lengths should be non-zero (except possibly the last).
     for (i, e) in entries.iter().enumerate() {
         if i < entries.len() - 1 {
-            assert!(e.func_length > 0, "entry {i} at {:#x} has zero length", e.func_offset);
+            assert!(
+                e.func_length > 0,
+                "entry {i} at {:#x} has zero length",
+                e.func_offset
+            );
         }
     }
 
@@ -145,9 +164,14 @@ fn minimal_throw_compact_unwind_carries_exception_metadata() {
     };
 
     let entries = parse_compact_unwind(&cu_data);
-    assert!(!entries.is_empty(), "minimal_throw should parse compact unwind entries");
     assert!(
-        entries.iter().any(|entry| entry.personality_slot_offset.is_some()),
+        !entries.is_empty(),
+        "minimal_throw should parse compact unwind entries"
+    );
+    assert!(
+        entries
+            .iter()
+            .any(|entry| entry.personality_slot_offset.is_some()),
         "minimal_throw should expose an exception personality slot"
     );
     assert!(
@@ -156,7 +180,10 @@ fn minimal_throw_compact_unwind_carries_exception_metadata() {
     );
 
     let eh = generate_eh_frame(&entries, 0x3_0000_0000);
-    assert!(!eh.is_empty(), "minimal_throw should synthesize a non-empty eh_frame");
+    assert!(
+        !eh.is_empty(),
+        "minimal_throw should synthesize a non-empty eh_frame"
+    );
 }
 
 #[test]
@@ -169,9 +196,14 @@ fn try_catch_test_compact_unwind_carries_exception_metadata() {
     };
 
     let entries = parse_compact_unwind(&cu_data);
-    assert!(!entries.is_empty(), "try_catch_test should parse compact unwind entries");
     assert!(
-        entries.iter().any(|entry| entry.personality_slot_offset.is_some()),
+        !entries.is_empty(),
+        "try_catch_test should parse compact unwind entries"
+    );
+    assert!(
+        entries
+            .iter()
+            .any(|entry| entry.personality_slot_offset.is_some()),
         "try_catch_test should expose an exception personality slot"
     );
     assert!(
@@ -180,5 +212,8 @@ fn try_catch_test_compact_unwind_carries_exception_metadata() {
     );
 
     let eh = generate_eh_frame(&entries, 0x4_0000_0000);
-    assert!(!eh.is_empty(), "try_catch_test should synthesize a non-empty eh_frame");
+    assert!(
+        !eh.is_empty(),
+        "try_catch_test should synthesize a non-empty eh_frame"
+    );
 }

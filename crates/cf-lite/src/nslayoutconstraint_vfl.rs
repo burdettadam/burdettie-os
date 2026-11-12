@@ -293,7 +293,15 @@ fn make_constraint(
     priority: f64,
 ) -> u64 {
     let c = crate::nslayoutconstraint::shim_nslayoutconstraint_create(
-        0, 0, first_item, first_attr, relation, second_item, second_attr, 1.0, constant,
+        0,
+        0,
+        first_item,
+        first_attr,
+        relation,
+        second_item,
+        second_attr,
+        1.0,
+        constant,
     );
     if c != 0 && (priority - 1000.0).abs() > f64::EPSILON {
         crate::nslayoutconstraint::shim_nslayoutconstraint_set_priority(c, 0, priority);
@@ -318,9 +326,9 @@ pub extern "C" fn shim_nslayoutconstraint_constraints_with_visual_format(
     let (is_vertical, elements) = parse_vfl(&format);
 
     // Choose attributes based on orientation.
-    let leading_attr: u64 = if is_vertical { 3 } else { 1 };  // Top / Left
+    let leading_attr: u64 = if is_vertical { 3 } else { 1 }; // Top / Left
     let trailing_attr: u64 = if is_vertical { 4 } else { 2 }; // Bottom / Right
-    let size_attr: u64 = if is_vertical { 8 } else { 7 };     // Height / Width
+    let size_attr: u64 = if is_vertical { 8 } else { 7 }; // Height / Width
 
     let mut constraints: Vec<u64> = Vec::new();
 
@@ -371,7 +379,13 @@ pub extern "C" fn shim_nslayoutconstraint_constraints_with_visual_format(
                     let superview = crate::nsview::shim_nsview_superview(view, 0);
                     if superview != 0 {
                         let c = make_constraint(
-                            view, leading_attr, REL_EQ, superview, leading_attr, spacing, 1000.0,
+                            view,
+                            leading_attr,
+                            REL_EQ,
+                            superview,
+                            leading_attr,
+                            spacing,
+                            1000.0,
                         );
                         if c != 0 {
                             constraints.push(c);
@@ -382,7 +396,13 @@ pub extern "C" fn shim_nslayoutconstraint_constraints_with_visual_format(
                     // prev.trailing → view.leading with spacing.
                     // view.leading = prev.trailing + spacing
                     let c = make_constraint(
-                        view, leading_attr, REL_EQ, prev_item, trailing_attr, spacing, 1000.0,
+                        view,
+                        leading_attr,
+                        REL_EQ,
+                        prev_item,
+                        trailing_attr,
+                        spacing,
+                        1000.0,
                     );
                     if c != 0 {
                         constraints.push(c);
@@ -393,7 +413,13 @@ pub extern "C" fn shim_nslayoutconstraint_constraints_with_visual_format(
                 for pred in predicates {
                     let constant = resolve_metric_value(metrics, pred);
                     let c = make_constraint(
-                        view, size_attr, pred.relation, 0, 0, constant, pred.priority,
+                        view,
+                        size_attr,
+                        pred.relation,
+                        0,
+                        0,
+                        constant,
+                        pred.priority,
                     );
                     if c != 0 {
                         constraints.push(c);
@@ -412,7 +438,13 @@ pub extern "C" fn shim_nslayoutconstraint_constraints_with_visual_format(
         if superview != 0 {
             // superview.trailing = prev.trailing + spacing
             let c = make_constraint(
-                superview, trailing_attr, REL_EQ, prev_item, trailing_attr, spacing, 1000.0,
+                superview,
+                trailing_attr,
+                REL_EQ,
+                prev_item,
+                trailing_attr,
+                spacing,
+                1000.0,
             );
             if c != 0 {
                 constraints.push(c);
@@ -456,7 +488,10 @@ mod tests {
     fn parse_superview_edges() {
         let (_, elems) = parse_vfl("H:|-[view1]-|");
         // Should have: Superview, StdSpacing, View, StdSpacing, Superview
-        let sv_count = elems.iter().filter(|e| matches!(e, VflElement::Superview)).count();
+        let sv_count = elems
+            .iter()
+            .filter(|e| matches!(e, VflElement::Superview))
+            .count();
         assert_eq!(sv_count, 2);
     }
 
@@ -505,12 +540,14 @@ mod tests {
         let views = crate::nsdictionary::make_nsdictionary(&views_keys, &views_vals);
 
         let format = make_nsstring("H:|-[child]-|");
-        let result = shim_nslayoutconstraint_constraints_with_visual_format(
-            0, 0, format, 0, 0, views,
-        );
+        let result =
+            shim_nslayoutconstraint_constraints_with_visual_format(0, 0, format, 0, 0, views);
         let count = crate::nsarray::shim_nsarray_count(result, 0);
         // Should produce 2 constraints: superview.leading→child.leading, superview.trailing→child.trailing
-        assert_eq!(count, 2, "expected 2 constraints from '|-[child]-|', got {count}");
+        assert_eq!(
+            count, 2,
+            "expected 2 constraints from '|-[child]-|', got {count}"
+        );
 
         free_obj(parent);
     }
@@ -524,9 +561,8 @@ mod tests {
         let views = crate::nsdictionary::make_nsdictionary(&views_keys, &views_vals);
 
         let format = make_nsstring("H:[child(>=100)]");
-        let result = shim_nslayoutconstraint_constraints_with_visual_format(
-            0, 0, format, 0, 0, views,
-        );
+        let result =
+            shim_nslayoutconstraint_constraints_with_visual_format(0, 0, format, 0, 0, views);
         let count = crate::nsarray::shim_nsarray_count(result, 0);
         // 1 size constraint: width >= 100
         assert_eq!(count, 1, "expected 1 size constraint, got {count}");
@@ -550,17 +586,13 @@ mod tests {
         crate::nsview::shim_nsview_add_subview(parent, 0, v1);
         crate::nsview::shim_nsview_add_subview(parent, 0, v2);
 
-        let keys = [
-            make_nsstring("v1"),
-            make_nsstring("v2"),
-        ];
+        let keys = [make_nsstring("v1"), make_nsstring("v2")];
         let vals = [v1, v2];
         let views = crate::nsdictionary::make_nsdictionary(&keys, &vals);
 
         let format = make_nsstring("H:[v1]-[v2]");
-        let result = shim_nslayoutconstraint_constraints_with_visual_format(
-            0, 0, format, 0, 0, views,
-        );
+        let result =
+            shim_nslayoutconstraint_constraints_with_visual_format(0, 0, format, 0, 0, views);
         let count = crate::nsarray::shim_nsarray_count(result, 0);
         // 1 constraint: v2.leading = v1.trailing + 8
         assert_eq!(count, 1, "expected 1 spacing constraint, got {count}");
@@ -579,9 +611,8 @@ mod tests {
         let views = crate::nsdictionary::make_nsdictionary(&keys, &vals);
 
         let format = make_nsstring("V:[child(==100)]");
-        let result = shim_nslayoutconstraint_constraints_with_visual_format(
-            0, 0, format, 0, 0, views,
-        );
+        let result =
+            shim_nslayoutconstraint_constraints_with_visual_format(0, 0, format, 0, 0, views);
         let count = crate::nsarray::shim_nsarray_count(result, 0);
         assert_eq!(count, 1);
 
@@ -616,15 +647,17 @@ mod tests {
         let metrics = crate::nsdictionary::make_nsdictionary(&metric_keys, &metric_vals);
 
         let format = make_nsstring("H:[child(==myWidth)]");
-        let result = shim_nslayoutconstraint_constraints_with_visual_format(
-            0, 0, format, 0, metrics, views,
-        );
+        let result =
+            shim_nslayoutconstraint_constraints_with_visual_format(0, 0, format, 0, metrics, views);
         let count = crate::nsarray::shim_nsarray_count(result, 0);
         assert_eq!(count, 1, "expected 1 constraint, got {count}");
 
         let c = crate::nsarray::shim_nsarray_object_at_index(result, 0, 0);
         let constant = unsafe { *((c as usize + 56) as *const f64) };
-        assert!((constant - 150.0).abs() < f64::EPSILON, "expected metric value 150, got {constant}");
+        assert!(
+            (constant - 150.0).abs() < f64::EPSILON,
+            "expected metric value 150, got {constant}"
+        );
 
         free_obj(parent);
     }
@@ -646,15 +679,17 @@ mod tests {
         let metrics = crate::nsdictionary::make_nsdictionary(&metric_keys, &metric_vals);
 
         let format = make_nsstring("H:[v1]-gap-[v2]");
-        let result = shim_nslayoutconstraint_constraints_with_visual_format(
-            0, 0, format, 0, metrics, views,
-        );
+        let result =
+            shim_nslayoutconstraint_constraints_with_visual_format(0, 0, format, 0, metrics, views);
         let count = crate::nsarray::shim_nsarray_count(result, 0);
         assert_eq!(count, 1, "expected 1 spacing constraint, got {count}");
 
         let c = crate::nsarray::shim_nsarray_object_at_index(result, 0, 0);
         let constant = unsafe { *((c as usize + 56) as *const f64) };
-        assert!((constant - 30.0).abs() < f64::EPSILON, "expected metric spacing 30, got {constant}");
+        assert!(
+            (constant - 30.0).abs() < f64::EPSILON,
+            "expected metric spacing 30, got {constant}"
+        );
 
         free_obj(parent);
     }
@@ -675,7 +710,9 @@ mod tests {
     #[test]
     fn parse_metric_name_in_spacing() {
         let (_, elems) = parse_vfl("H:[v1]-gap-[v2]");
-        let spacing = elems.iter().find(|e| matches!(e, VflElement::MetricSpacing(_)));
+        let spacing = elems
+            .iter()
+            .find(|e| matches!(e, VflElement::MetricSpacing(_)));
         assert!(spacing.is_some(), "expected MetricSpacing element");
         if let Some(VflElement::MetricSpacing(name)) = spacing {
             assert_eq!(name, "gap");

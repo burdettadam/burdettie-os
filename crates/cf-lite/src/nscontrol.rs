@@ -126,11 +126,7 @@ pub extern "C" fn shim_nscontrol_string_value(obj: u64, _cmd: u64) -> u64 {
         return ptr;
     }
     // Return empty string if none set
-    crate::cfstring::shim_cf_string_create_with_cstring(
-        0,
-        b"\0".as_ptr().cast(),
-        0,
-    )
+    crate::cfstring::shim_cf_string_create_with_cstring(0, b"\0".as_ptr().cast(), 0)
 }
 
 /// `-[NSControl setStringValue:]`
@@ -196,7 +192,7 @@ pub extern "C" fn shim_nscontrol_send_action(obj: u64, _cmd: u64, action: u64, t
     if action == 0 {
         return 0;
     }
-    let nsapp = crate::nsapplication::nsapp_global_addr();
+    let nsapp = crate::nsapplication::shim_nsapplication_shared_application(0, 0);
     crate::nsapplication::shim_nsapplication_send_action_to_from(nsapp, 0, action, target, obj)
 }
 

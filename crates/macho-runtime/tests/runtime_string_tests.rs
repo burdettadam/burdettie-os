@@ -2,13 +2,15 @@
 
 mod common;
 
-use common::{RUNTIME_LOCK, ShimSet, fixtures_dir};
+use common::{fixtures_dir, ShimSet, RUNTIME_LOCK};
 
 // ── NSString/CFString ops tests (Phase 25, T9) ────────────────────
 
 #[test]
 fn runtime_nsstring_ops_exit_zero() {
-    let Some(result) = common::run_fixture("nsstring_ops/app") else { return };
+    let Some(result) = common::run_fixture("nsstring_ops/app") else {
+        return;
+    };
 
     assert_eq!(result.exit_code, 0, "nsstring_ops should exit 0");
 }
@@ -52,7 +54,9 @@ fn runtime_nsstring_ops_cfstring_shims_resolved() {
 
 #[test]
 fn runtime_block_basics_exit_zero() {
-    let Some(result) = common::run_fixture("block_basics/app") else { return };
+    let Some(result) = common::run_fixture("block_basics/app") else {
+        return;
+    };
 
     assert_eq!(result.exit_code, 0, "block_basics should exit 0");
 }
@@ -98,14 +102,18 @@ fn runtime_block_basics_shims_resolved() {
 
 #[test]
 fn runtime_objc_inherit_exit_zero() {
-    let Some(result) = common::run_fixture("objc_inherit/app") else { return };
+    let Some(result) = common::run_fixture("objc_inherit/app") else {
+        return;
+    };
 
     assert_eq!(result.exit_code, 0, "objc_inherit should exit 0");
 }
 
 #[test]
 fn runtime_objc_inherit_superclass_chain() {
-    let Some(_result) = common::run_fixture("objc_inherit/app") else { return };
+    let Some(_result) = common::run_fixture("objc_inherit/app") else {
+        return;
+    };
 
     // Verify superclass chain is parsed
     let guard = objc_runtime::OBJC_RUNTIME.read().unwrap();

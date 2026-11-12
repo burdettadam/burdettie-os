@@ -55,11 +55,28 @@ pub struct MachoArchStubs;
 impl MachoArchStubs {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
-        register_shims!(table,
-            ("_NXGetLocalArchInfo", shim_nx_get_local_arch_info as *const () as u64, "NXGetLocalArchInfo → arm64"),
-            ("_NXGetArchInfoFromCpuType", shim_nx_get_arch_info_from_cpu_type as *const () as u64, "NXGetArchInfoFromCpuType lookup"),
-            ("_NXGetArchInfoFromName", shim_nx_get_arch_info_from_name as *const () as u64, "NXGetArchInfoFromName lookup"),
-            ("_NXGetAllArchInfos", shim_nx_get_all_arch_infos as *const () as u64, "NXGetAllArchInfos → static table")
+        register_shims!(
+            table,
+            (
+                "_NXGetLocalArchInfo",
+                shim_nx_get_local_arch_info as *const () as u64,
+                "NXGetLocalArchInfo → arm64"
+            ),
+            (
+                "_NXGetArchInfoFromCpuType",
+                shim_nx_get_arch_info_from_cpu_type as *const () as u64,
+                "NXGetArchInfoFromCpuType lookup"
+            ),
+            (
+                "_NXGetArchInfoFromName",
+                shim_nx_get_arch_info_from_name as *const () as u64,
+                "NXGetArchInfoFromName lookup"
+            ),
+            (
+                "_NXGetAllArchInfos",
+                shim_nx_get_all_arch_infos as *const () as u64,
+                "NXGetAllArchInfos → static table"
+            )
         );
         log::debug!("MachoArchStubs: registered 4 stubs");
     }

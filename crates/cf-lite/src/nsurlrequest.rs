@@ -37,7 +37,9 @@ const REQ_BODY_OFF: usize = 32;
 /// `+[NSURLRequest requestWithURL:]`
 pub extern "C" fn shim_nsurlrequest_with_url(_cls: u64, _cmd: u64, url: u64) -> u64 {
     let obj = crate::pal_alloc().calloc(1, 40) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *(obj as *mut u64) = nsobj::nsurlrequest_class_addr();
         *((obj as usize + REQ_URL_OFF) as *mut u64) = url;
@@ -47,30 +49,40 @@ pub extern "C" fn shim_nsurlrequest_with_url(_cls: u64, _cmd: u64, url: u64) -> 
 }
 
 pub extern "C" fn shim_nsurlrequest_url(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + REQ_URL_OFF) as *const u64) }
 }
 
 pub extern "C" fn shim_nsurlrequest_http_method(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return make_nsstring("GET"); }
+    if obj == 0 {
+        return make_nsstring("GET");
+    }
     unsafe { *((obj as usize + REQ_METHOD_OFF) as *const u64) }
 }
 
 pub extern "C" fn shim_nsurlrequest_all_http_header_fields(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + REQ_HEADERS_OFF) as *const u64) }
 }
 
 /// `-[NSURLRequest HTTPBody]`
 pub extern "C" fn shim_nsurlrequest_http_body(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + REQ_BODY_OFF) as *const u64) }
 }
 
 pub extern "C" fn shim_nsurlrequest_description(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
-    let method = cfstring::extract_cfstring_cstr(shim_nsurlrequest_http_method(obj, 0))
-        .unwrap_or("GET");
+    if obj == 0 {
+        return 0;
+    }
+    let method =
+        cfstring::extract_cfstring_cstr(shim_nsurlrequest_http_method(obj, 0)).unwrap_or("GET");
     let url_ptr = shim_nsurlrequest_url(obj, 0);
     let url = if url_ptr != 0 {
         cfstring::extract_cfstring_cstr(crate::nsurl::shim_nsurl_absolute_string(url_ptr, 0))
@@ -88,7 +100,9 @@ pub extern "C" fn shim_nsurlrequest_description(obj: u64, _cmd: u64) -> u64 {
 /// `+[NSMutableURLRequest requestWithURL:]`
 pub extern "C" fn shim_nsmutableurlrequest_with_url(_cls: u64, _cmd: u64, url: u64) -> u64 {
     let obj = crate::pal_alloc().calloc(1, 40) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *(obj as *mut u64) = nsobj::nsmutableurlrequest_class_addr();
         *((obj as usize + REQ_URL_OFF) as *mut u64) = url;
@@ -97,27 +111,46 @@ pub extern "C" fn shim_nsmutableurlrequest_with_url(_cls: u64, _cmd: u64, url: u
     obj
 }
 
-pub extern "C" fn shim_nsmutableurlrequest_set_http_method(obj: u64, _cmd: u64, method: u64) -> u64 {
-    if obj == 0 { return 0; }
-    unsafe { *((obj as usize + REQ_METHOD_OFF) as *mut u64) = method; }
+pub extern "C" fn shim_nsmutableurlrequest_set_http_method(
+    obj: u64,
+    _cmd: u64,
+    method: u64,
+) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *((obj as usize + REQ_METHOD_OFF) as *mut u64) = method;
+    }
     0
 }
 
 pub extern "C" fn shim_nsmutableurlrequest_set_url(obj: u64, _cmd: u64, url: u64) -> u64 {
-    if obj == 0 { return 0; }
-    unsafe { *((obj as usize + REQ_URL_OFF) as *mut u64) = url; }
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *((obj as usize + REQ_URL_OFF) as *mut u64) = url;
+    }
     0
 }
 
 pub extern "C" fn shim_nsmutableurlrequest_set_value_for_header(
-    obj: u64, _cmd: u64, value: u64, field: u64,
+    obj: u64,
+    _cmd: u64,
+    value: u64,
+    field: u64,
 ) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     // Get or create headers dict
     let headers = unsafe { *((obj as usize + REQ_HEADERS_OFF) as *const u64) };
     if headers == 0 {
         let dict = crate::nsmutabledict::shim_nsmutabledict_dictionary(0, 0);
-        unsafe { *((obj as usize + REQ_HEADERS_OFF) as *mut u64) = dict; }
+        unsafe {
+            *((obj as usize + REQ_HEADERS_OFF) as *mut u64) = dict;
+        }
         crate::nsmutabledict::shim_nsmutabledict_set_object_for_key(dict, 0, value, field);
     } else {
         crate::nsmutabledict::shim_nsmutabledict_set_object_for_key(headers, 0, value, field);
@@ -127,8 +160,12 @@ pub extern "C" fn shim_nsmutableurlrequest_set_value_for_header(
 
 /// `-[NSMutableURLRequest setHTTPBody:]`
 pub extern "C" fn shim_nsmutableurlrequest_set_http_body(obj: u64, _cmd: u64, data: u64) -> u64 {
-    if obj == 0 { return 0; }
-    unsafe { *((obj as usize + REQ_BODY_OFF) as *mut u64) = data; }
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *((obj as usize + REQ_BODY_OFF) as *mut u64) = data;
+    }
     0
 }
 
@@ -141,22 +178,30 @@ const RESP_MIME_OFF: usize = 16;
 const RESP_LENGTH_OFF: usize = 24;
 
 pub extern "C" fn shim_nsurlresponse_url(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + RESP_URL_OFF) as *const u64) }
 }
 
 pub extern "C" fn shim_nsurlresponse_mime_type(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + RESP_MIME_OFF) as *const u64) }
 }
 
 pub extern "C" fn shim_nsurlresponse_expected_content_length(obj: u64, _cmd: u64) -> i64 {
-    if obj == 0 { return -1; }
+    if obj == 0 {
+        return -1;
+    }
     unsafe { *((obj as usize + RESP_LENGTH_OFF) as *const i64) }
 }
 
 pub extern "C" fn shim_nsurlresponse_description(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     make_nsstring("<NSURLResponse>")
 }
 
@@ -169,7 +214,9 @@ const HTTP_STATUS_OFF: usize = 32;
 /// Create an NSHTTPURLResponse (used internally, not from ObjC code).
 pub fn make_http_response(url: u64, status: i64, mime: u64, length: i64) -> u64 {
     let obj = crate::pal_alloc().calloc(1, 40) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *(obj as *mut u64) = nsobj::nshttpurlresponse_class_addr();
         *((obj as usize + RESP_URL_OFF) as *mut u64) = url;
@@ -181,14 +228,14 @@ pub fn make_http_response(url: u64, status: i64, mime: u64, length: i64) -> u64 
 }
 
 pub extern "C" fn shim_nshttpurlresponse_status_code(obj: u64, _cmd: u64) -> i64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + HTTP_STATUS_OFF) as *const i64) }
 }
 
 /// `+[NSHTTPURLResponse localizedStringForStatusCode:]`
-pub extern "C" fn shim_nshttpurlresponse_localized_string(
-    _cls: u64, _cmd: u64, code: i64,
-) -> u64 {
+pub extern "C" fn shim_nshttpurlresponse_localized_string(_cls: u64, _cmd: u64, code: i64) -> u64 {
     let s = match code {
         200 => "OK",
         201 => "Created",
@@ -210,7 +257,9 @@ pub extern "C" fn shim_nshttpurlresponse_localized_string(
 }
 
 pub extern "C" fn shim_nshttpurlresponse_description(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let status = shim_nshttpurlresponse_status_code(obj, 0);
     make_nsstring(&format!("<NSHTTPURLResponse: {status}>"))
 }
@@ -425,7 +474,8 @@ mod tests {
         let req = shim_nsmutableurlrequest_with_url(0, 0, 0);
         // Pre-create a headers dict so set_value_for_header appends to it
         let dict = crate::nsmutabledict::shim_nsmutabledict_dictionary(
-            nsobj::nsmutabledictionary_class_addr(), 0,
+            nsobj::nsmutabledictionary_class_addr(),
+            0,
         );
         write_field(req, REQ_HEADERS_OFF, dict);
         let key = make_string("Content-Type");

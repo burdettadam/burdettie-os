@@ -4,7 +4,6 @@ pub use super::*;
 
 pub use macho_objc::{ObjcClassRef, ObjcMetadata, ObjcMethodInfo};
 
-
 fn make_metadata(name: &str, methods: Vec<(&str, u64)>) -> macho_objc::ObjcMetadata {
     let class_ref = ObjcClassRef {
         pointer_addr: 0x1000,
@@ -43,7 +42,6 @@ fn make_metadata(name: &str, methods: Vec<(&str, u64)>) -> macho_objc::ObjcMetad
     }
 }
 
-
 mod class_tests;
-mod protocol_tests;
 mod dynamic_and_load_tests;
+mod protocol_tests;

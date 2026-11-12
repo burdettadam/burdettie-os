@@ -18,7 +18,9 @@ const BEZIER_PATH_SIZE: usize = 24;
 fn alloc_bezier_path() -> u64 {
     let handle = cg_shims::bridge::path_create();
     let obj = crate::pal_alloc().calloc(1, BEZIER_PATH_SIZE) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *(obj as *mut u64) = crate::nsobj::nsbezierpath_class_addr();
         *((obj as usize + PATH_HANDLE_OFF) as *mut u64) = handle;
@@ -28,7 +30,9 @@ fn alloc_bezier_path() -> u64 {
 }
 
 fn path_handle(obj: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + PATH_HANDLE_OFF) as *const u64) }
 }
 
@@ -41,10 +45,17 @@ pub extern "C" fn shim_nsbezierpath_bezier_path(_cls: u64, _cmd: u64) -> u64 {
 
 /// `+[NSBezierPath bezierPathWithRect:]`
 pub extern "C" fn shim_nsbezierpath_with_rect(
-    _cls: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64,
+    _cls: u64,
+    _cmd: u64,
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
 ) -> u64 {
     let obj = alloc_bezier_path();
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let h_path = path_handle(obj);
     cg_shims::bridge::with_path(h_path, |p| {
         p.move_to(graphics_core::Point::new(x, y));
@@ -58,11 +69,18 @@ pub extern "C" fn shim_nsbezierpath_with_rect(
 
 /// `+[NSBezierPath bezierPathWithOvalInRect:]`
 pub extern "C" fn shim_nsbezierpath_with_oval(
-    _cls: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64,
+    _cls: u64,
+    _cmd: u64,
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
 ) -> u64 {
     // Approximate oval with 4 cubic Bézier curves (standard technique).
     let obj = alloc_bezier_path();
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let h_path = path_handle(obj);
     let kappa = 0.552_284_75; // 4*(sqrt(2)-1)/3
     let cx = x + w / 2.0;
@@ -100,10 +118,19 @@ pub extern "C" fn shim_nsbezierpath_with_oval(
 
 /// `+[NSBezierPath bezierPathWithRoundedRect:xRadius:yRadius:]`
 pub extern "C" fn shim_nsbezierpath_with_rounded_rect(
-    _cls: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64, xr: f64, yr: f64,
+    _cls: u64,
+    _cmd: u64,
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
+    xr: f64,
+    yr: f64,
 ) -> u64 {
     let obj = alloc_bezier_path();
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let h_path = path_handle(obj);
     let kappa = 0.552_284_75_f64;
     let ox = xr * kappa;
@@ -146,7 +173,12 @@ pub extern "C" fn shim_nsbezierpath_with_rounded_rect(
 
 /// `+[NSBezierPath fillRect:]`
 pub extern "C" fn shim_nsbezierpath_fill_rect(
-    _cls: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64,
+    _cls: u64,
+    _cmd: u64,
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
 ) {
     let cg_ctx = crate::nsgraphicscontext::current_cg_context_handle();
     if cg_ctx != 0 {
@@ -156,7 +188,12 @@ pub extern "C" fn shim_nsbezierpath_fill_rect(
 
 /// `+[NSBezierPath strokeRect:]`
 pub extern "C" fn shim_nsbezierpath_stroke_rect(
-    _cls: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64,
+    _cls: u64,
+    _cmd: u64,
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
 ) {
     let cg_ctx = crate::nsgraphicscontext::current_cg_context_handle();
     if cg_ctx != 0 {
@@ -188,10 +225,14 @@ pub extern "C" fn shim_nsbezierpath_line_to(obj: u64, _cmd: u64, x: f64, y: f64)
 
 /// `-[NSBezierPath curveToPoint:controlPoint1:controlPoint2:]`
 pub extern "C" fn shim_nsbezierpath_curve_to(
-    obj: u64, _cmd: u64,
-    x: f64, y: f64,     // endpoint
-    cp1x: f64, cp1y: f64, // control point 1
-    cp2x: f64, cp2y: f64, // control point 2
+    obj: u64,
+    _cmd: u64,
+    x: f64,
+    y: f64, // endpoint
+    cp1x: f64,
+    cp1y: f64, // control point 1
+    cp2x: f64,
+    cp2y: f64, // control point 2
 ) {
     let h = path_handle(obj);
     if h != 0 {
@@ -209,7 +250,9 @@ pub extern "C" fn shim_nsbezierpath_curve_to(
 pub extern "C" fn shim_nsbezierpath_close_path(obj: u64, _cmd: u64) {
     let h = path_handle(obj);
     if h != 0 {
-        cg_shims::bridge::with_path(h, |p| { p.close(); });
+        cg_shims::bridge::with_path(h, |p| {
+            p.close();
+        });
     }
 }
 
@@ -217,7 +260,9 @@ pub extern "C" fn shim_nsbezierpath_close_path(obj: u64, _cmd: u64) {
 pub extern "C" fn shim_nsbezierpath_fill(obj: u64, _cmd: u64) {
     let h = path_handle(obj);
     let cg_ctx = crate::nsgraphicscontext::current_cg_context_handle();
-    if h == 0 || cg_ctx == 0 { return; }
+    if h == 0 || cg_ctx == 0 {
+        return;
+    }
 
     // Copy the path elements into the context's path, then fill.
     cg_shims::bridge::copy_path_to_context(h, cg_ctx);
@@ -228,7 +273,9 @@ pub extern "C" fn shim_nsbezierpath_fill(obj: u64, _cmd: u64) {
 pub extern "C" fn shim_nsbezierpath_stroke(obj: u64, _cmd: u64) {
     let h = path_handle(obj);
     let cg_ctx = crate::nsgraphicscontext::current_cg_context_handle();
-    if h == 0 || cg_ctx == 0 { return; }
+    if h == 0 || cg_ctx == 0 {
+        return;
+    }
 
     cg_shims::bridge::copy_path_to_context(h, cg_ctx);
     // Use NSBezierPath's lineWidth
@@ -245,14 +292,20 @@ pub extern "C" fn shim_nsbezierpath_stroke(obj: u64, _cmd: u64) {
 
 /// `-[NSBezierPath lineWidth]`
 pub extern "C" fn shim_nsbezierpath_line_width(obj: u64, _cmd: u64) -> f64 {
-    if obj == 0 { return 1.0; }
+    if obj == 0 {
+        return 1.0;
+    }
     unsafe { *((obj as usize + LINE_WIDTH_OFF) as *const f64) }
 }
 
 /// `-[NSBezierPath setLineWidth:]`
 pub extern "C" fn shim_nsbezierpath_set_line_width(obj: u64, _cmd: u64, width: f64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as usize + LINE_WIDTH_OFF) as *mut f64) = width; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + LINE_WIDTH_OFF) as *mut f64) = width;
+    }
 }
 
 /// `-[NSBezierPath addClip]` — stub (no-op for now).
@@ -262,18 +315,33 @@ pub extern "C" fn shim_nsbezierpath_add_clip(_obj: u64, _cmd: u64) {
 
 /// `-[NSBezierPath appendBezierPath:]` — appends elements from another path.
 pub extern "C" fn shim_nsbezierpath_append_bezier_path(obj: u64, _cmd: u64, other: u64) {
-    if obj == 0 || other == 0 { return; }
+    if obj == 0 || other == 0 {
+        return;
+    }
     let dst = path_handle(obj);
     let src = path_handle(other);
-    if dst == 0 || src == 0 { return; }
+    if dst == 0 || src == 0 {
+        return;
+    }
     cg_shims::bridge::path_append_path(dst, src);
 }
 
 /// `-[NSBezierPath appendBezierPathWithRect:]` — appends a rectangle.
-pub extern "C" fn shim_nsbezierpath_append_rect(obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64) {
-    if obj == 0 { return; }
+pub extern "C" fn shim_nsbezierpath_append_rect(
+    obj: u64,
+    _cmd: u64,
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
+) {
+    if obj == 0 {
+        return;
+    }
     let h_path = path_handle(obj);
-    if h_path == 0 { return; }
+    if h_path == 0 {
+        return;
+    }
     cg_shims::bridge::with_path(h_path, |p| {
         p.move_to(graphics_core::Point::new(x, y));
         p.line_to(graphics_core::Point::new(x + w, y));
@@ -284,10 +352,21 @@ pub extern "C" fn shim_nsbezierpath_append_rect(obj: u64, _cmd: u64, x: f64, y: 
 }
 
 /// `-[NSBezierPath appendBezierPathWithOvalInRect:]` — appends an oval.
-pub extern "C" fn shim_nsbezierpath_append_oval(obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64) {
-    if obj == 0 { return; }
+pub extern "C" fn shim_nsbezierpath_append_oval(
+    obj: u64,
+    _cmd: u64,
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
+) {
+    if obj == 0 {
+        return;
+    }
     let h_path = path_handle(obj);
-    if h_path == 0 { return; }
+    if h_path == 0 {
+        return;
+    }
     cg_shims::bridge::with_path(h_path, |p| {
         p.add_ellipse(graphics_core::Rect::new(x, y, w, h));
     });
@@ -296,7 +375,9 @@ pub extern "C" fn shim_nsbezierpath_append_oval(obj: u64, _cmd: u64, x: f64, y: 
 /// `-[NSBezierPath isEmpty]`
 pub extern "C" fn shim_nsbezierpath_is_empty(obj: u64, _cmd: u64) -> u8 {
     let h = path_handle(obj);
-    if h == 0 { return 1; }
+    if h == 0 {
+        return 1;
+    }
     let empty = cg_shims::bridge::path_is_empty(h);
     u8::from(empty)
 }

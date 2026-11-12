@@ -152,7 +152,11 @@ pub extern "C" fn shim_signature_with_objc_types(_cls: u64, _cmd: u64, types_ptr
 
     let parsed = parse_type_encoding(encoding);
     // First type is the return type; remaining are arguments (including self and _cmd)
-    let num_args = if parsed.len() > 1 { parsed.len() - 1 } else { 0 };
+    let num_args = if parsed.len() > 1 {
+        parsed.len() - 1
+    } else {
+        0
+    };
 
     // Allocate the object
     let obj = crate::pal_alloc().calloc(1, INSTANCE_SIZE as usize) as u64;
@@ -167,8 +171,7 @@ pub extern "C" fn shim_signature_with_objc_types(_cls: u64, _cmd: u64, types_ptr
     }
 
     // Copy the encoding string to a heap-allocated C string
-    let c_encoding =
-        std::ffi::CString::new(encoding).unwrap_or_default();
+    let c_encoding = std::ffi::CString::new(encoding).unwrap_or_default();
     let encoding_ptr = c_encoding.into_raw() as u64;
     unsafe {
         *((obj + 8) as *mut u64) = encoding_ptr;
@@ -244,8 +247,7 @@ pub extern "C" fn shim_get_argument_type_at_index(obj: u64, _cmd: u64, index: u6
         return 0;
     }
     // Return a pointer to a leaked C string of this type
-    let c_type = std::ffi::CString::new(parsed[type_index].as_str())
-        .unwrap_or_default();
+    let c_type = std::ffi::CString::new(parsed[type_index].as_str()).unwrap_or_default();
     c_type.into_raw() as u64
 }
 
@@ -285,7 +287,9 @@ pub extern "C" fn shim_dealloc(obj: u64, _cmd: u64) {
     let enc_ptr = unsafe { *((obj + 8) as *const u64) };
     if enc_ptr != 0 {
         unsafe {
-            drop(std::ffi::CString::from_raw(enc_ptr as *mut std::ffi::c_char));
+            drop(std::ffi::CString::from_raw(
+                enc_ptr as *mut std::ffi::c_char,
+            ));
         }
     }
     crate::pal_alloc().free(obj as *mut u8);
@@ -296,8 +300,7 @@ pub extern "C" fn shim_dealloc(obj: u64, _cmd: u64) {
 /// Create an NSMethodSignature from a Rust type encoding string.
 /// Used internally by methodSignatureForSelector: and the forwarding chain.
 pub fn create_method_signature(encoding: &str) -> u64 {
-    let c_encoding =
-        std::ffi::CString::new(encoding).unwrap_or_default();
+    let c_encoding = std::ffi::CString::new(encoding).unwrap_or_default();
     shim_signature_with_objc_types(
         nsobj::nsmethodsignature_class_addr(),
         0,

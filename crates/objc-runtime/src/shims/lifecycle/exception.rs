@@ -9,6 +9,7 @@
 //!    the exception path work identically on Linux and macOS.
 //!  * `objc_begin_catch` returns the guest object from `CURRENT_EXCEPTION`.
 
+#[cfg(unix)]
 use std::ffi::c_void;
 
 /// Global storage for the current in-flight exception thrown via
@@ -16,6 +17,7 @@ use std::ffi::c_void;
 static CURRENT_EXCEPTION: std::sync::Mutex<Option<u64>> = std::sync::Mutex::new(None);
 
 // ─── C++ ABI imports (libc++abi / libgcc) ──────────────────────────
+#[cfg(unix)]
 extern "C" {
     fn __cxa_allocate_exception(thrown_size: usize) -> *mut c_void;
     // NOTE: NOT declared `-> !` intentionally.  Declaring a C++ unwinding function
@@ -34,6 +36,7 @@ extern "C" {
 }
 
 // ─── Libunwind ABI (available on both macOS and Linux) ─────────────
+#[cfg(unix)]
 extern "C" {
     fn _Unwind_GetIP(ctx: *mut u8) -> u64;
     fn _Unwind_GetRegionStart(ctx: *mut u8) -> u64;
@@ -53,6 +56,7 @@ extern "C" {
 /// };
 /// ```
 #[repr(C)]
+#[cfg(unix)]
 struct ObjcException {
     obj: u64,
     vtable: *const c_void,
@@ -143,9 +147,11 @@ pub fn host_nsexception_ehtype_addr() -> u64 {
 
 /// Destructor passed to `__cxa_throw`.  The ObjC object itself is
 /// managed by the runtime; we only free the wrapper slot.
+#[cfg(unix)]
 unsafe extern "C" fn _objc_exception_destructor(_exc: *mut c_void) {}
 
 /// Static class name used when we cannot resolve the real class.
+#[cfg_attr(not(unix), allow(dead_code))]
 static FALLBACK_CLASS_NAME: &[u8] = b"NSException\0";
 
 /// `void objc_exception_throw(id exception)`
@@ -154,6 +160,7 @@ static FALLBACK_CLASS_NAME: &[u8] = b"NSException\0";
 /// The guest exception object is stored in `CURRENT_EXCEPTION`; our
 /// `shim_objc_personality_v0` uses the guest ObjcRuntime for @catch matching
 /// and `shim_objc_begin_catch` returns the guest object from there.
+#[cfg(unix)]
 pub extern "C-unwind" fn shim_objc_exception_throw(exception: u64) {
     log::debug!("shim_objc_exception_throw: exception={:#x}", exception);
 
@@ -161,8 +168,8 @@ pub extern "C-unwind" fn shim_objc_exception_throw(exception: u64) {
     *CURRENT_EXCEPTION.lock().unwrap_or_else(|e| e.into_inner()) = Some(exception);
 
     unsafe {
-        let exc_ptr = __cxa_allocate_exception(std::mem::size_of::<ObjcException>())
-            as *mut ObjcException;
+        let exc_ptr =
+            __cxa_allocate_exception(std::mem::size_of::<ObjcException>()) as *mut ObjcException;
         (*exc_ptr).obj = exception;
 
         #[cfg(target_os = "macos")]
@@ -197,12 +204,20 @@ pub extern "C-unwind" fn shim_objc_exception_throw(exception: u64) {
     }
 }
 
+#[cfg(not(unix))]
+pub extern "C-unwind" fn shim_objc_exception_throw(exception: u64) {
+    log::warn!("objc_exception_throw requested on a non-Unix host; ObjC unwinding is unavailable");
+    *CURRENT_EXCEPTION.lock().unwrap_or_else(|e| e.into_inner()) = Some(exception);
+    std::process::abort();
+}
+
 /// Resolve a fallback class address and stable name pointer for an exception
 /// object by looking up its ISA in our `ObjcRuntime`.
 ///
 /// This is only used when the host `NSException` exception-type metadata is
 /// unavailable; the preferred path is to reuse the host Foundation typeinfo so
 /// host `__objc_personality_v0` sees a real host `Class` pointer.
+#[cfg(unix)]
 fn resolve_exception_class(exc: u64) -> (u64, *const u8) {
     if exc == 0 {
         return (0, FALLBACK_CLASS_NAME.as_ptr());
@@ -232,6 +247,7 @@ fn resolve_exception_class(exc: u64) -> (u64, *const u8) {
 ///
 /// Called at the entry of a `@catch` block.  Delegates to `__cxa_begin_catch`
 /// and extracts the ObjC object from our `ObjcException` wrapper.
+#[cfg(unix)]
 pub extern "C" fn shim_objc_begin_catch(exc_buf: u64) -> u64 {
     // Must always call __cxa_begin_catch to advance the C++ EH state machine.
     let thrown = unsafe { __cxa_begin_catch(exc_buf as *mut c_void) };
@@ -263,18 +279,41 @@ pub extern "C" fn shim_objc_begin_catch(exc_buf: u64) -> u64 {
     0
 }
 
+#[cfg(not(unix))]
+pub extern "C" fn shim_objc_begin_catch(_exc_buf: u64) -> u64 {
+    CURRENT_EXCEPTION
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .unwrap_or(0)
+}
+
 /// `void objc_end_catch(void)`
 ///
 /// Called at the exit of a `@catch` block.
+#[cfg(unix)]
 pub extern "C" fn shim_objc_end_catch() {
     unsafe { __cxa_end_catch() };
+}
+
+#[cfg(not(unix))]
+pub extern "C" fn shim_objc_end_catch() {
+    *CURRENT_EXCEPTION.lock().unwrap_or_else(|e| e.into_inner()) = None;
 }
 
 /// `void objc_exception_rethrow(void)`
 ///
 /// Re-throws the current exception (used by `@finally` blocks).
+#[cfg(unix)]
 pub extern "C-unwind" fn shim_objc_exception_rethrow() {
     unsafe { __cxa_rethrow() };
+}
+
+#[cfg(not(unix))]
+pub extern "C-unwind" fn shim_objc_exception_rethrow() {
+    log::warn!(
+        "objc_exception_rethrow requested on a non-Unix host; ObjC unwinding is unavailable"
+    );
+    std::process::abort();
 }
 
 /// `void objc_terminate(void)`
@@ -325,7 +364,9 @@ pub extern "C" fn shim_objc_exception_try_enter(data: u64) {
 /// Called when leaving an `@try` block normally (no exception thrown).
 pub extern "C" fn shim_objc_exception_try_exit(data: u64) {
     log::debug!("objc_exception_tryExit: data={:#x}", data);
-    let mut stack = EXCEPTION_STACK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let mut stack = EXCEPTION_STACK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     if let Some(pos) = stack.iter().rposition(|d| *d == data) {
         stack.remove(pos);
     }
@@ -400,7 +441,8 @@ pub extern "C" fn shim_ns_set_uncaught_exception_handler(handler: u64) {
     log::debug!("NSSetUncaughtExceptionHandler: handler={:#x}", handler);
     *UNCAUGHT_EXCEPTION_HANDLER
         .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner) = if handler != 0 { Some(handler) } else { None };
+        .unwrap_or_else(std::sync::PoisonError::into_inner) =
+        if handler != 0 { Some(handler) } else { None };
 }
 
 // ─── Pure guest-side ObjC personality function ─────────────────────
@@ -417,8 +459,10 @@ pub extern "C" fn shim_ns_set_uncaught_exception_handler(handler: u64) {
 // Call site encoding is typically DW_EH_PE_uleb128 (0x01).
 // Type table encoding is typically DW_EH_PE_indirect|DW_EH_PE_pcrel|DW_EH_PE_sdata4 (0x9b).
 
+#[cfg(unix)]
 const DW_EH_PE_OMIT: u8 = 0xff;
 
+#[cfg(unix)]
 unsafe fn lsda_read_uleb128(p: &mut *const u8) -> u64 {
     let mut result = 0u64;
     let mut shift = 0u32;
@@ -434,6 +478,7 @@ unsafe fn lsda_read_uleb128(p: &mut *const u8) -> u64 {
     result
 }
 
+#[cfg(unix)]
 unsafe fn lsda_read_sleb128(p: &mut *const u8) -> i64 {
     let mut result = 0i64;
     let mut shift = 0u32;
@@ -456,6 +501,7 @@ unsafe fn lsda_read_sleb128(p: &mut *const u8) -> i64 {
 ///
 /// The "pc" for pc-relative encodings is the address of the field, i.e. the
 /// value of `*p` BEFORE any bytes are consumed.
+#[cfg(unix)]
 unsafe fn lsda_read_encoded(p: &mut *const u8, encoding: u8) -> u64 {
     if encoding == DW_EH_PE_OMIT {
         return 0;
@@ -510,8 +556,8 @@ unsafe fn lsda_read_encoded(p: &mut *const u8, encoding: u8) -> u64 {
     };
 
     let based: u64 = match base_enc {
-        0x00 => raw,                               // absolute
-        0x10 => raw.wrapping_add(field_addr),      // pc-relative
+        0x00 => raw,                             // absolute
+        0x10 => raw.wrapping_add(field_addr),    // pc-relative
         0x20 | 0x30 | 0x40 | 0x50 | 0x60 => raw, // textrel/datarel/funcrel etc — treat as abs
         _ => raw,
     };
@@ -524,6 +570,7 @@ unsafe fn lsda_read_encoded(p: &mut *const u8, encoding: u8) -> u64 {
     }
 }
 
+#[cfg(unix)]
 struct CallSiteResult {
     lp_addr: u64,
     /// 0 = cleanup only, positive = catch type index in type table
@@ -532,7 +579,13 @@ struct CallSiteResult {
 
 /// Scan the LSDA for a handler for `ip` (adjusted to point at the throwing call).
 /// Returns `None` if no handler exists in this frame.
-unsafe fn scan_lsda(lsda: *const u8, func_start: u64, ip: u64, guest_exc: u64) -> Option<CallSiteResult> {
+#[cfg(unix)]
+unsafe fn scan_lsda(
+    lsda: *const u8,
+    func_start: u64,
+    ip: u64,
+    guest_exc: u64,
+) -> Option<CallSiteResult> {
     let mut p = lsda;
 
     // lpstart
@@ -583,7 +636,10 @@ unsafe fn scan_lsda(lsda: *const u8, func_start: u64, ip: u64, guest_exc: u64) -
 
         if cs_action == 0 {
             // Cleanup-only landing pad (e.g. @finally only, no @catch).
-            return Some(CallSiteResult { lp_addr, action_index: 0 });
+            return Some(CallSiteResult {
+                lp_addr,
+                action_index: 0,
+            });
         }
 
         // Walk the action chain starting at cs_action-1 (0-based into action table).
@@ -595,7 +651,10 @@ unsafe fn scan_lsda(lsda: *const u8, func_start: u64, ip: u64, guest_exc: u64) -
 
             if type_filter == 0 {
                 // @catch (...) — catches everything.
-                return Some(CallSiteResult { lp_addr, action_index: 0 });
+                return Some(CallSiteResult {
+                    lp_addr,
+                    action_index: 0,
+                });
             }
 
             if type_filter > 0 && !ttype_end.is_null() {
@@ -614,13 +673,19 @@ unsafe fn scan_lsda(lsda: *const u8, func_start: u64, ip: u64, guest_exc: u64) -
 
                 if catch_cls == 0 {
                     // Null class = @catch (...) represented as typed catch-all.
-                    return Some(CallSiteResult { lp_addr, action_index: type_filter });
+                    return Some(CallSiteResult {
+                        lp_addr,
+                        action_index: type_filter,
+                    });
                 }
 
                 // Check whether the guest exception is an instance of `catch_cls`.
                 // `catch_cls` is our synthetic class address (after macho-exec fixup).
                 if shim_objc_exception_match(catch_cls, guest_exc) != 0 {
-                    return Some(CallSiteResult { lp_addr, action_index: type_filter });
+                    return Some(CallSiteResult {
+                        lp_addr,
+                        action_index: type_filter,
+                    });
                 }
             }
 
@@ -644,6 +709,7 @@ unsafe fn scan_lsda(lsda: *const u8, func_start: u64, ip: u64, guest_exc: u64) -
 /// in the shim table, superseding the host libobjc implementation.  Uses our
 /// synthetic ObjcRuntime class hierarchy for @catch type matching so no host
 /// ObjC calls are needed.  Works identically on Linux and macOS.
+#[cfg(unix)]
 pub extern "C" fn shim_objc_personality_v0(
     _version: i32,
     actions: i32,
@@ -702,6 +768,17 @@ pub extern "C" fn shim_objc_personality_v0(
     }
 }
 
+#[cfg(not(unix))]
+pub extern "C" fn shim_objc_personality_v0(
+    _version: i32,
+    _actions: i32,
+    _exception_class: u64,
+    _exception_object: *mut u8,
+    _context: *mut u8,
+) -> i32 {
+    8
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -727,7 +804,8 @@ mod tests {
     #[test]
     #[cfg(target_os = "macos")]
     fn host_nsexception_ehtype_resolves() {
-        let ehtype = host_nsexception_ehtype().expect("host NSException EHTYPE should resolve on macOS");
+        let ehtype =
+            host_nsexception_ehtype().expect("host NSException EHTYPE should resolve on macOS");
         assert!(!ehtype.vtable.is_null());
         assert!(!ehtype.name.is_null());
         assert!(!ehtype.cls.is_null());

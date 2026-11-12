@@ -159,14 +159,12 @@ pub extern "C" fn shim_set_value_for_undefined_key_method(
     );
 }
 
-
 mod helpers;
-use self::helpers::{
-    value_for_key_direct, set_value_for_key_direct,
-    value_for_undefined_key, set_value_for_undefined_key,
-    handle_collection_operator,
-};
 pub use self::helpers::shim_dict_value_for_key_path;
+use self::helpers::{
+    handle_collection_operator, set_value_for_key_direct, set_value_for_undefined_key,
+    value_for_key_direct, value_for_undefined_key,
+};
 
 #[cfg(test)]
 mod tests {

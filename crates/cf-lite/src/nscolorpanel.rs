@@ -16,7 +16,9 @@ pub extern "C" fn shim_nscolorpanel_shared(_cls: u64, _cmd: u64) -> u64 {
     if *guard == 0 {
         let obj = crate::pal_alloc().calloc(1, 8) as u64;
         if obj != 0 {
-            unsafe { *(obj as *mut u64) = nsobj::nscolorpanel_class_addr(); }
+            unsafe {
+                *(obj as *mut u64) = nsobj::nscolorpanel_class_addr();
+            }
         }
         *guard = obj;
     }
@@ -54,7 +56,9 @@ pub extern "C" fn shim_nsfontpanel_shared(_cls: u64, _cmd: u64) -> u64 {
     if *guard == 0 {
         let obj = crate::pal_alloc().calloc(1, 8) as u64;
         if obj != 0 {
-            unsafe { *(obj as *mut u64) = nsobj::nsfontpanel_class_addr(); }
+            unsafe {
+                *(obj as *mut u64) = nsobj::nsfontpanel_class_addr();
+            }
         }
         *guard = obj;
     }

@@ -1,9 +1,9 @@
 //! NSUnit, NSDimension, NSMeasurement, and concrete unit class registrations.
 
-use std::collections::HashMap;
-use objc_runtime::ClassInfo;
 use super::me;
 use crate::{nsmeasurement, nsobj};
+use objc_runtime::ClassInfo;
+use std::collections::HashMap;
 
 pub fn register_nsunit_class(rt: &mut objc_runtime::ObjcRuntime) {
     let class_addr = nsobj::nsunit_class_addr();
@@ -12,15 +12,32 @@ pub fn register_nsunit_class(rt: &mut objc_runtime::ObjcRuntime) {
         name: "NSUnit".to_string(),
         mapped_addr: class_addr,
         methods: vec![
-            me("symbol", nsmeasurement::shim_nsunit_symbol as *const () as u64, "@@:"),
-            me("initWithSymbol:", nsmeasurement::shim_nsunit_init_with_symbol as *const () as u64, "@@:@"),
-            me("description", nsmeasurement::shim_nsunit_description as *const () as u64, "@@:"),
+            me(
+                "symbol",
+                nsmeasurement::shim_nsunit_symbol as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "initWithSymbol:",
+                nsmeasurement::shim_nsunit_init_with_symbol as *const () as u64,
+                "@@:@",
+            ),
+            me(
+                "description",
+                nsmeasurement::shim_nsunit_description as *const () as u64,
+                "@@:",
+            ),
         ],
         class_methods: vec![],
-        ivars: vec![], properties: vec![], protocol_names: Vec::new(),
-        instance_size: nsmeasurement::NSUNIT_SIZE as u32, is_root: false, is_meta: false,
+        ivars: vec![],
+        properties: vec![],
+        protocol_names: Vec::new(),
+        instance_size: nsmeasurement::NSUNIT_SIZE as u32,
+        is_root: false,
+        is_meta: false,
         superclass_addr: Some(nsobj::nsobject_class_addr()),
-        method_index: HashMap::new(), class_method_index: HashMap::new(),
+        method_index: HashMap::new(),
+        class_method_index: HashMap::new(),
     };
     rt.register_synthetic_class(info);
     rt.register_metaclass_addr(metaclass_addr, "NSUnit");
@@ -33,16 +50,37 @@ pub fn register_nsdimension_class(rt: &mut objc_runtime::ObjcRuntime) {
         name: "NSDimension".to_string(),
         mapped_addr: class_addr,
         methods: vec![
-            me("symbol", nsmeasurement::shim_nsunit_symbol as *const () as u64, "@@:"),
-            me("initWithSymbol:", nsmeasurement::shim_nsdimension_init_with_symbol as *const () as u64, "@@:@"),
-            me("description", nsmeasurement::shim_nsunit_description as *const () as u64, "@@:"),
-            me("baseUnit", nsmeasurement::shim_nsdimension_base_unit as *const () as u64, "@@:"),
+            me(
+                "symbol",
+                nsmeasurement::shim_nsunit_symbol as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "initWithSymbol:",
+                nsmeasurement::shim_nsdimension_init_with_symbol as *const () as u64,
+                "@@:@",
+            ),
+            me(
+                "description",
+                nsmeasurement::shim_nsunit_description as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "baseUnit",
+                nsmeasurement::shim_nsdimension_base_unit as *const () as u64,
+                "@@:",
+            ),
         ],
         class_methods: vec![],
-        ivars: vec![], properties: vec![], protocol_names: Vec::new(),
-        instance_size: nsmeasurement::NSUNIT_SIZE as u32, is_root: false, is_meta: false,
+        ivars: vec![],
+        properties: vec![],
+        protocol_names: Vec::new(),
+        instance_size: nsmeasurement::NSUNIT_SIZE as u32,
+        is_root: false,
+        is_meta: false,
         superclass_addr: Some(nsobj::nsunit_class_addr()),
-        method_index: HashMap::new(), class_method_index: HashMap::new(),
+        method_index: HashMap::new(),
+        class_method_index: HashMap::new(),
     };
     rt.register_synthetic_class(info);
     rt.register_metaclass_addr(metaclass_addr, "NSDimension");
@@ -55,18 +93,48 @@ pub fn register_nsmeasurement_class(rt: &mut objc_runtime::ObjcRuntime) {
         name: "NSMeasurement".to_string(),
         mapped_addr: class_addr,
         methods: vec![
-            me("doubleValue", nsmeasurement::shim_nsmeasurement_double_value as *const () as u64, "d@:"),
-            me("unit", nsmeasurement::shim_nsmeasurement_unit as *const () as u64, "@@:"),
-            me("initWithDoubleValue:unit:", nsmeasurement::shim_nsmeasurement_init_with_double_value_unit as *const () as u64, "@@:d@"),
-            me("measurementByConvertingToUnit:", nsmeasurement::shim_nsmeasurement_measurement_by_converting_to_unit as *const () as u64, "@@:@"),
-            me("isEqualToMeasurement:", nsmeasurement::shim_nsmeasurement_is_equal_to_measurement as *const () as u64, "B@:@"),
-            me("description", nsmeasurement::shim_nsmeasurement_description as *const () as u64, "@@:"),
+            me(
+                "doubleValue",
+                nsmeasurement::shim_nsmeasurement_double_value as *const () as u64,
+                "d@:",
+            ),
+            me(
+                "unit",
+                nsmeasurement::shim_nsmeasurement_unit as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "initWithDoubleValue:unit:",
+                nsmeasurement::shim_nsmeasurement_init_with_double_value_unit as *const () as u64,
+                "@@:d@",
+            ),
+            me(
+                "measurementByConvertingToUnit:",
+                nsmeasurement::shim_nsmeasurement_measurement_by_converting_to_unit as *const ()
+                    as u64,
+                "@@:@",
+            ),
+            me(
+                "isEqualToMeasurement:",
+                nsmeasurement::shim_nsmeasurement_is_equal_to_measurement as *const () as u64,
+                "B@:@",
+            ),
+            me(
+                "description",
+                nsmeasurement::shim_nsmeasurement_description as *const () as u64,
+                "@@:",
+            ),
         ],
         class_methods: vec![],
-        ivars: vec![], properties: vec![], protocol_names: Vec::new(),
-        instance_size: nsmeasurement::NSMEASUREMENT_SIZE as u32, is_root: false, is_meta: false,
+        ivars: vec![],
+        properties: vec![],
+        protocol_names: Vec::new(),
+        instance_size: nsmeasurement::NSMEASUREMENT_SIZE as u32,
+        is_root: false,
+        is_meta: false,
         superclass_addr: Some(nsobj::nsobject_class_addr()),
-        method_index: HashMap::new(), class_method_index: HashMap::new(),
+        method_index: HashMap::new(),
+        class_method_index: HashMap::new(),
     };
     rt.register_synthetic_class(info);
     rt.register_metaclass_addr(metaclass_addr, "NSMeasurement");
@@ -200,22 +268,59 @@ pub fn register_nsmeasurementformatter_class(rt: &mut objc_runtime::ObjcRuntime)
         name: "NSMeasurementFormatter".to_string(),
         mapped_addr: class_addr,
         methods: vec![
-            me("init", nsmeasurement::shim_nsmeasurementformatter_init as *const () as u64, "@@:"),
-            me("unitStyle", nsmeasurement::shim_nsmeasurementformatter_unit_style as *const () as u64, "Q@:"),
-            me("setUnitStyle:", nsmeasurement::shim_nsmeasurementformatter_set_unit_style as *const () as u64, "v@:Q"),
-            me("numberFormatter", nsmeasurement::shim_nsmeasurementformatter_number_formatter as *const () as u64, "@@:"),
-            me("setNumberFormatter:", nsmeasurement::shim_nsmeasurementformatter_set_number_formatter as *const () as u64, "v@:@"),
-            me("stringFromMeasurement:", nsmeasurement::shim_nsmeasurementformatter_string_from_measurement as *const () as u64, "@@:@"),
+            me(
+                "init",
+                nsmeasurement::shim_nsmeasurementformatter_init as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "unitStyle",
+                nsmeasurement::shim_nsmeasurementformatter_unit_style as *const () as u64,
+                "Q@:",
+            ),
+            me(
+                "setUnitStyle:",
+                nsmeasurement::shim_nsmeasurementformatter_set_unit_style as *const () as u64,
+                "v@:Q",
+            ),
+            me(
+                "numberFormatter",
+                nsmeasurement::shim_nsmeasurementformatter_number_formatter as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "setNumberFormatter:",
+                nsmeasurement::shim_nsmeasurementformatter_set_number_formatter as *const () as u64,
+                "v@:@",
+            ),
+            me(
+                "stringFromMeasurement:",
+                nsmeasurement::shim_nsmeasurementformatter_string_from_measurement as *const ()
+                    as u64,
+                "@@:@",
+            ),
         ],
         class_methods: vec![
-            me("new", nsmeasurement::shim_nsmeasurementformatter_new as *const () as u64, "@@:"),
-            me("alloc", nsmeasurement::shim_nsmeasurementformatter_alloc as *const () as u64, "@@:"),
+            me(
+                "new",
+                nsmeasurement::shim_nsmeasurementformatter_new as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "alloc",
+                nsmeasurement::shim_nsmeasurementformatter_alloc as *const () as u64,
+                "@@:",
+            ),
         ],
-        ivars: vec![], properties: vec![], protocol_names: Vec::new(),
+        ivars: vec![],
+        properties: vec![],
+        protocol_names: Vec::new(),
         instance_size: nsmeasurement::NSMEASUREMENTFORMATTER_SIZE as u32,
-        is_root: false, is_meta: false,
+        is_root: false,
+        is_meta: false,
         superclass_addr: Some(nsobj::nsobject_class_addr()),
-        method_index: HashMap::new(), class_method_index: HashMap::new(),
+        method_index: HashMap::new(),
+        class_method_index: HashMap::new(),
     };
     rt.register_synthetic_class(info);
     rt.register_metaclass_addr(metaclass_addr, "NSMeasurementFormatter");

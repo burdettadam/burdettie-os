@@ -25,8 +25,8 @@
 // Function pointers are cast to u64 addresses for the emulated Mach-O address space.
 #![allow(dead_code, clippy::fn_to_numeric_cast)]
 
-mod collation;
 mod calendar;
+mod collation;
 mod datetime;
 mod decimal;
 mod locale;

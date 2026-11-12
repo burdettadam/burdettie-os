@@ -112,12 +112,7 @@ pub extern "C" fn shim_nsvalue_value_with_pointer(_cls: u64, _cmd: u64, pointer:
 
 /// `+[NSValue valueWithPoint:]` — wraps a CGPoint.
 /// On ARM64, CGPoint (16 bytes) is passed in x2/x3 (two f64 args).
-pub extern "C" fn shim_nsvalue_value_with_point(
-    _cls: u64,
-    _cmd: u64,
-    x: f64,
-    y: f64,
-) -> u64 {
+pub extern "C" fn shim_nsvalue_value_with_point(_cls: u64, _cmd: u64, x: f64, y: f64) -> u64 {
     let data = crate::cg_types::CGPoint { x, y };
     alloc_nsvalue_raw(
         unsafe { std::slice::from_raw_parts(&data as *const _ as *const u8, 16) },
@@ -280,7 +275,11 @@ pub extern "C" fn shim_nsvalue_is_equal_to_value(obj: u64, _cmd: u64, other: u64
     // Compare the 32 bytes of value storage (offsets 8..40)
     let a = unsafe { std::slice::from_raw_parts((obj as *const u8).add(8), 32) };
     let b = unsafe { std::slice::from_raw_parts((other as *const u8).add(8), 32) };
-    if a == b { 1 } else { 0 }
+    if a == b {
+        1
+    } else {
+        0
+    }
 }
 
 /// Estimate byte size for a simple ObjC type encoding.

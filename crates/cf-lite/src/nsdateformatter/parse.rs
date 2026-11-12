@@ -4,11 +4,7 @@ use crate::cfstring;
 ///
 /// Supports ISO-8601-like patterns (yyyy-MM-dd HH:mm:ss) and basic
 /// numeric format patterns.  Returns 0 (nil) if the string can't be parsed.
-pub extern "C" fn shim_nsdateformatter_date_from_string(
-    obj: u64,
-    _cmd: u64,
-    string: u64,
-) -> u64 {
+pub extern "C" fn shim_nsdateformatter_date_from_string(obj: u64, _cmd: u64, string: u64) -> u64 {
     if obj == 0 || string == 0 {
         return 0;
     }
@@ -28,7 +24,11 @@ pub extern "C" fn shim_nsdateformatter_date_from_string(
     // Parse using a simplified approach that matches the format string
     let parsed = parse_date_with_format(format, input);
     let Some((year, month, day, hour, min, sec)) = parsed else {
-        log::debug!("dateFromString: failed to parse '{}' with format '{}'", input, format);
+        log::debug!(
+            "dateFromString: failed to parse '{}' with format '{}'",
+            input,
+            format
+        );
         return 0;
     };
 
@@ -58,10 +58,7 @@ fn ymd_to_days(year: i64, month: i64, day: i64) -> (i64, i64) {
 /// Parse a date string given a simplified Unicode TR35 format pattern.
 ///
 /// Returns `Some((year, month, day, hour, minute, second))` on success.
-fn parse_date_with_format(
-    format: &str,
-    input: &str,
-) -> Option<(i64, i64, i64, i64, i64, i64)> {
+fn parse_date_with_format(format: &str, input: &str) -> Option<(i64, i64, i64, i64, i64, i64)> {
     let mut year: i64 = 0;
     let mut month: i64 = 1;
     let mut day: i64 = 1;
@@ -180,7 +177,10 @@ mod tests {
         let date = shim_nsdateformatter_date_from_string(fmt, 0, s);
         assert_ne!(date, 0);
         let ti = crate::nsdate::shim_nsdate_ti_since_ref(date, 0);
-        assert!(ti.abs() < 2.0, "expected CF time ~0 for CF reference date, got {ti}");
+        assert!(
+            ti.abs() < 2.0,
+            "expected CF time ~0 for CF reference date, got {ti}"
+        );
         free_obj(fmt);
         free_obj(s);
         free_obj(date);
@@ -191,7 +191,9 @@ mod tests {
         let fmt = make_formatter();
         let fmt_str = make_string("yyyy/MM/dd");
         // Set format_ptr at offset 24
-        unsafe { *((fmt as usize + 24) as *mut u64) = fmt_str; }
+        unsafe {
+            *((fmt as usize + 24) as *mut u64) = fmt_str;
+        }
         let s = make_string("2001/01/01");
         let date = shim_nsdateformatter_date_from_string(fmt, 0, s);
         assert_ne!(date, 0);

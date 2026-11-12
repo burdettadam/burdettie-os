@@ -241,5 +241,4 @@ impl FoundationShims {
     pub fn register_nspropertylistserialization_class(rt: &mut objc_runtime::ObjcRuntime) {
         register::register_nspropertylistserialization_class(rt);
     }
-
 }

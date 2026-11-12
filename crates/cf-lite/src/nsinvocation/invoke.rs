@@ -123,14 +123,15 @@ unsafe fn call_imp(imp: u64, args: &[u64; MAX_REG_ARGS], num_args: usize) -> u64
             f(args[0], args[1], args[2], args[3], args[4])
         }
         6 => {
-            let f: extern "C" fn(u64, u64, u64, u64, u64, u64) -> u64 =
-                std::mem::transmute(imp);
+            let f: extern "C" fn(u64, u64, u64, u64, u64, u64) -> u64 = std::mem::transmute(imp);
             f(args[0], args[1], args[2], args[3], args[4], args[5])
         }
         7 => {
             let f: extern "C" fn(u64, u64, u64, u64, u64, u64, u64) -> u64 =
                 std::mem::transmute(imp);
-            f(args[0], args[1], args[2], args[3], args[4], args[5], args[6])
+            f(
+                args[0], args[1], args[2], args[3], args[4], args[5], args[6],
+            )
         }
         _ => {
             let f: extern "C" fn(u64, u64, u64, u64, u64, u64, u64, u64) -> u64 =
@@ -148,11 +149,8 @@ unsafe fn call_imp(imp: u64, args: &[u64; MAX_REG_ARGS], num_args: usize) -> u64
 /// and arguments. Used by the forwarding trampoline.
 #[allow(dead_code)]
 pub fn create_invocation(sig: u64, target: u64, sel: u64, args: &[u64]) -> u64 {
-    let inv = super::shim_invocation_with_method_signature(
-        nsobj::nsinvocation_class_addr(),
-        0,
-        sig,
-    );
+    let inv =
+        super::shim_invocation_with_method_signature(nsobj::nsinvocation_class_addr(), 0, sig);
     if inv == 0 {
         return 0;
     }

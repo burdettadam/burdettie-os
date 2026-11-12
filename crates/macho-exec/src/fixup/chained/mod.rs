@@ -21,6 +21,11 @@ use crate::{ExecError, MappedImage, MappedSegment};
 /// Counter of how many unresolved-bind GOT slots have been written.
 static UNRESOLVED_BIND_COUNT: AtomicU64 = AtomicU64::new(0);
 
+/// Record that an unresolved bind slot was installed.
+pub(crate) fn note_unresolved_bind() {
+    UNRESOLVED_BIND_COUNT.fetch_add(1, Ordering::Relaxed);
+}
+
 /// Trap function installed in every GOT slot whose symbol could not be
 /// resolved.  When guest code calls through such a slot it lands here
 /// instead of crashing on a garbage pointer.
@@ -240,13 +245,11 @@ fn resolve_and_write_bind(
         Some(a) => a,
         None => {
             // Install the trap so the slot is callable without crashing.
-            UNRESOLVED_BIND_COUNT.fetch_add(1, Ordering::Relaxed);
+            note_unresolved_bind();
             trap_addr()
         }
     };
-    log::trace!(
-        "  write_bind: seg+{offset:#x} = {addr:#x} (ordinal={ordinal}, '{import_name}')"
-    );
+    log::trace!("  write_bind: seg+{offset:#x} = {addr:#x} (ordinal={ordinal}, '{import_name}')");
     unsafe {
         let ptr = seg.base.add(offset) as *mut u64;
         ptr.write_unaligned(addr);

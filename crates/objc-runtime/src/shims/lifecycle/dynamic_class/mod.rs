@@ -48,7 +48,11 @@ impl StagedClassInit for std::sync::MutexGuard<'_, Option<HashMap<u64, StagedCla
     }
 }
 
-fn add_method_entry(methods: &mut Vec<MethodEntry>, index: &mut HashMap<std::borrow::Cow<'static, str>, usize>, entry: MethodEntry) -> bool {
+fn add_method_entry(
+    methods: &mut Vec<MethodEntry>,
+    index: &mut HashMap<std::borrow::Cow<'static, str>, usize>,
+    entry: MethodEntry,
+) -> bool {
     if methods.iter().any(|m| m.selector == entry.selector) {
         return false;
     }
@@ -60,22 +64,17 @@ fn add_method_entry(methods: &mut Vec<MethodEntry>, index: &mut HashMap<std::bor
 }
 
 pub(crate) fn add_method_to_staged_class(cls: u64, entry: MethodEntry) -> bool {
-    let mut staged = STAGED_CLASSES
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
+    let mut staged = STAGED_CLASSES.lock().unwrap_or_else(|e| e.into_inner());
 
     if let Some(pair) = staged.get_mut(&cls) {
-        return add_method_entry(
-            &mut pair.class.methods,
-            &mut pair.class.method_index,
-            entry,
-        );
+        return add_method_entry(&mut pair.class.methods, &mut pair.class.method_index, entry);
     }
 
-    if let Some((_addr, pair)) = staged
-        .as_mut()
-        .and_then(|pairs| pairs.iter_mut().find(|(_addr, pair)| pair.metaclass_addr == cls))
-    {
+    if let Some((_addr, pair)) = staged.as_mut().and_then(|pairs| {
+        pairs
+            .iter_mut()
+            .find(|(_addr, pair)| pair.metaclass_addr == cls)
+    }) {
         return add_method_entry(
             &mut pair.class.class_methods,
             &mut pair.class.class_method_index,
@@ -91,7 +90,6 @@ pub(crate) fn add_method_to_staged_class(cls: u64, entry: MethodEntry) -> bool {
 /// `Class objc_allocateClassPair(Class superclass, const char *name, size_t extraBytes)`
 ///
 /// Creates a new class and metaclass pair. The class is not yet visible
-
 mod class_pair_shims;
 mod member_shims;
 

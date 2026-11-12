@@ -30,8 +30,7 @@ fn is_dict_isa(isa: u64) -> bool {
 
 /// Check if ISA matches a number class (dynamic or constant).
 fn is_number_isa(isa: u64) -> bool {
-    isa == nsobj::nsnumber_class_addr()
-        || isa == nsobj::nsconstantintegernumber_class_addr()
+    isa == nsobj::nsnumber_class_addr() || isa == nsobj::nsconstantintegernumber_class_addr()
 }
 
 /// `NSPropertyListXMLFormat_v1_0 = 100`
@@ -113,8 +112,13 @@ fn foundation_to_xml(obj: u64, indent: usize) -> String {
     if is_number_isa(isa) {
         let (tag, raw) = nsnumber::read_number_pub(obj);
         return match tag {
-            2 => { // bool
-                if raw != 0 { format!("{pad}<true/>") } else { format!("{pad}<false/>") }
+            2 => {
+                // bool
+                if raw != 0 {
+                    format!("{pad}<true/>")
+                } else {
+                    format!("{pad}<false/>")
+                }
             }
             0 => format!("{pad}<integer>{}</integer>", raw as i64), // int
             1 => format!("{pad}<real>{}</real>", f64::from_bits(raw)), // double
@@ -230,7 +234,11 @@ fn parse_xml_value(xml: &str) -> (u64, &str) {
                 if let Some(end) = r.find("</key>") {
                     let key_str = xml_unescape(&r[..end]);
                     let c_key = std::ffi::CString::new(key_str).unwrap_or_default();
-                    keys.push(cfstring::shim_cf_string_create_with_cstring(0, c_key.as_ptr(), 0));
+                    keys.push(cfstring::shim_cf_string_create_with_cstring(
+                        0,
+                        c_key.as_ptr(),
+                        0,
+                    ));
                     remaining = r[end + 6..].trim_start();
                     let (val, r2) = parse_xml_value(remaining);
                     vals.push(val);
@@ -290,7 +298,9 @@ fn parse_plist_xml(xml: &str) -> u64 {
 fn extract_xml_plist(bytes: &[u8]) -> Option<&[u8]> {
     let start = bytes.windows(5).position(|window| window == b"<?xml")?;
     let end_marker = b"</plist>";
-    let end = bytes.windows(end_marker.len()).position(|window| window == end_marker)?;
+    let end = bytes
+        .windows(end_marker.len())
+        .position(|window| window == end_marker)?;
     (end >= start).then_some(&bytes[start..end + end_marker.len()])
 }
 
@@ -306,7 +316,11 @@ pub extern "C" fn shim_plist_data_with_object(
     error_out: u64,
 ) -> u64 {
     if plist == 0 {
-        if error_out != 0 { unsafe { *(error_out as *mut u64) = 0; } }
+        if error_out != 0 {
+            unsafe {
+                *(error_out as *mut u64) = 0;
+            }
+        }
         return 0;
     }
 
@@ -329,11 +343,15 @@ pub extern "C" fn shim_plist_with_data(
     format_out: u64,
     error_out: u64,
 ) -> u64 {
-    if data == 0 { return 0; }
+    if data == 0 {
+        return 0;
+    }
 
     let length = unsafe { *((data + 8) as *const u64) } as usize;
     let bytes_ptr = unsafe { *((data + 16) as *const u64) } as *const u8;
-    if bytes_ptr.is_null() || length == 0 { return 0; }
+    if bytes_ptr.is_null() || length == 0 {
+        return 0;
+    }
 
     let slice = unsafe { std::slice::from_raw_parts(bytes_ptr, length) };
     if format_out != 0 {
@@ -342,7 +360,9 @@ pub extern "C" fn shim_plist_with_data(
         } else {
             100
         };
-        unsafe { *(format_out as *mut u64) = format; }
+        unsafe {
+            *(format_out as *mut u64) = format;
+        }
     }
 
     let result = parse_plist_bytes(slice);
@@ -351,7 +371,9 @@ pub extern "C" fn shim_plist_with_data(
             "NSCocoaErrorDomain",
             3840, // NSPropertyListReadCorruptError
         );
-        unsafe { *(error_out as *mut u64) = err; }
+        unsafe {
+            *(error_out as *mut u64) = err;
+        }
         log::debug!("NSPropertyListSerialization: failed to parse plist data");
     }
     result
@@ -385,7 +407,9 @@ pub(crate) fn parse_embedded_plist_file(path: &str) -> u64 {
 
 /// `+[NSPropertyListSerialization propertyListIsValidForFormat:]` (simplified)
 pub extern "C" fn shim_plist_is_valid(_cls: u64, _cmd: u64, plist: u64, _format: u64) -> u8 {
-    if plist == 0 { return 0; }
+    if plist == 0 {
+        return 0;
+    }
     let isa = unsafe { *(plist as *const u64) };
     if isa == nsobj::nsarray_class_addr()
         || isa == nsobj::nsmutablearray_class_addr()
@@ -417,7 +441,10 @@ mod tests {
 
     #[test]
     fn parse_plist_file_nonexistent_returns_zero() {
-        assert_eq!(parse_plist_file("/tmp/cf_lite_missing_plist_9999999.plist"), 0);
+        assert_eq!(
+            parse_plist_file("/tmp/cf_lite_missing_plist_9999999.plist"),
+            0
+        );
     }
 
     #[cfg(target_os = "macos")]
@@ -444,7 +471,10 @@ mod tests {
             .arg(&path)
             .status()
             .unwrap();
-        assert!(status.success(), "plutil should create a binary plist for the test");
+        assert!(
+            status.success(),
+            "plutil should create a binary plist for the test"
+        );
 
         let dict = parse_plist_file(path.to_string_lossy().as_ref());
         assert_ne!(dict, 0);

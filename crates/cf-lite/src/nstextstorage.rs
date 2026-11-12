@@ -23,13 +23,19 @@ const STRING_OFF: usize = 8;
 const _DELEGATE_OFF: usize = 16;
 
 fn read_u64(obj: u64, offset: usize) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as *const u8).add(offset) as *const u64) }
 }
 
 fn write_u64(obj: u64, offset: usize, val: u64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as *mut u8).add(offset) as *mut u64) = val; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as *mut u8).add(offset) as *mut u64) = val;
+    }
 }
 
 // ── Side-table: storage ↔ view linkage ─────────────────────────
@@ -39,7 +45,9 @@ static VIEW_STORAGE: Mutex<Option<HashMap<u64, u64>>> = Mutex::new(None);
 
 /// Link a storage to a text view (bidirectional).
 pub fn link_storage_to_view(storage: u64, view: u64) {
-    if storage == 0 || view == 0 { return; }
+    if storage == 0 || view == 0 {
+        return;
+    }
     {
         let mut guard = STORAGE_VIEWS.lock().unwrap();
         let map = guard.get_or_insert_with(HashMap::new);
@@ -57,7 +65,9 @@ pub fn link_storage_to_view(storage: u64, view: u64) {
 
 /// Remove a view from its linked storage.
 pub fn unlink_view(view: u64) {
-    if view == 0 { return; }
+    if view == 0 {
+        return;
+    }
     let storage = {
         let mut guard = VIEW_STORAGE.lock().unwrap();
         guard.as_mut().and_then(|m| m.remove(&view))
@@ -74,16 +84,21 @@ pub fn unlink_view(view: u64) {
 
 /// Return the storage linked to a view, if any.
 pub fn storage_for_view(view: u64) -> Option<u64> {
-    if view == 0 { return None; }
+    if view == 0 {
+        return None;
+    }
     let guard = VIEW_STORAGE.lock().unwrap();
     guard.as_ref().and_then(|m| m.get(&view).copied())
 }
 
 /// Return the views linked to a storage.
 fn views_for_storage(storage: u64) -> Vec<u64> {
-    if storage == 0 { return vec![]; }
+    if storage == 0 {
+        return vec![];
+    }
     let guard = STORAGE_VIEWS.lock().unwrap();
-    guard.as_ref()
+    guard
+        .as_ref()
         .and_then(|m| m.get(&storage))
         .cloned()
         .unwrap_or_default()
@@ -105,11 +120,17 @@ pub fn sync_storage_from_view(view: u64) {
 /// Push the storage's string content into all linked views' editors.
 fn sync_views_from_storage(storage: u64) {
     let views = views_for_storage(storage);
-    if views.is_empty() { return; }
+    if views.is_empty() {
+        return;
+    }
     let s_ptr = read_u64(storage, STRING_OFF);
-    if s_ptr == 0 { return; }
+    if s_ptr == 0 {
+        return;
+    }
     let utf8 = crate::cfstring::shim_nsstring_utf8string(s_ptr, 0);
-    if utf8.is_null() { return; }
+    if utf8.is_null() {
+        return;
+    }
     let text = match unsafe { std::ffi::CStr::from_ptr(utf8) }.to_str() {
         Ok(t) => t,
         Err(_) => return,
@@ -125,14 +146,20 @@ fn sync_views_from_storage(storage: u64) {
 /// `+[NSTextStorage alloc]`
 pub extern "C" fn shim_nstextstorage_alloc(_cls: u64, _cmd: u64) -> u64 {
     let obj = crate::pal_alloc().calloc(1, SIZE) as u64;
-    if obj == 0 { return 0; }
-    unsafe { *(obj as *mut u64) = crate::nsobj::nstextstorage_class_addr(); }
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *(obj as *mut u64) = crate::nsobj::nstextstorage_class_addr();
+    }
     obj
 }
 
 /// `-[NSTextStorage init]`
 pub extern "C" fn shim_nstextstorage_init(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     // Create empty backing string.
     let empty = crate::cfstring::alloc_nsstring_from_cstr(b"\0".as_ptr() as *const _);
     write_u64(obj, STRING_OFF, empty);
@@ -141,59 +168,79 @@ pub extern "C" fn shim_nstextstorage_init(obj: u64, _cmd: u64) -> u64 {
 
 /// `-[NSTextStorage string]` → backing NSString
 pub extern "C" fn shim_nstextstorage_string(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     read_u64(obj, STRING_OFF)
 }
 
 /// `-[NSTextStorage setString:]`
 pub extern "C" fn shim_nstextstorage_set_string(obj: u64, _cmd: u64, s: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     write_u64(obj, STRING_OFF, s);
     sync_views_from_storage(obj);
 }
 
 /// `-[NSTextStorage length]`
 pub extern "C" fn shim_nstextstorage_length(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let s = read_u64(obj, STRING_OFF);
-    if s == 0 { return 0; }
+    if s == 0 {
+        return 0;
+    }
     crate::cfstring::shim_nsstring_length(s, 0)
 }
 
 /// `-[NSTextStorage replaceCharactersInRange:withString:]`
 /// Simplified: replaces entire string (range ignored), then syncs to linked views.
 pub extern "C" fn shim_nstextstorage_replace_chars(
-    obj: u64, _cmd: u64, _loc: u64, _len: u64, replacement: u64,
+    obj: u64,
+    _cmd: u64,
+    _loc: u64,
+    _len: u64,
+    replacement: u64,
 ) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     write_u64(obj, STRING_OFF, replacement);
     sync_views_from_storage(obj);
 }
 
 /// `-[NSTextStorage mutableString]` → returns self.string (simplified)
 pub extern "C" fn shim_nstextstorage_mutable_string(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     read_u64(obj, STRING_OFF)
 }
 
 /// `-[NSTextStorage addAttribute:value:range:]` → no-op stub
 pub extern "C" fn shim_nstextstorage_add_attribute(
-    _obj: u64, _cmd: u64, _attr: u64, _value: u64, _loc: u64, _len: u64,
-) {}
+    _obj: u64,
+    _cmd: u64,
+    _attr: u64,
+    _value: u64,
+    _loc: u64,
+    _len: u64,
+) {
+}
 
 /// `-[NSTextStorage addLayoutManager:]` — sets textStorage on the layout
 /// manager so the LM can reach back to read our string.
-pub extern "C" fn shim_nstextstorage_add_layout_manager(
-    obj: u64, _cmd: u64, lm: u64,
-) {
-    if obj == 0 || lm == 0 { return; }
+pub extern "C" fn shim_nstextstorage_add_layout_manager(obj: u64, _cmd: u64, lm: u64) {
+    if obj == 0 || lm == 0 {
+        return;
+    }
     crate::nslayoutmanager::shim_nslayoutmanager_set_text_storage(lm, 0, obj);
 }
 
 /// `-[NSTextStorage removeLayoutManager:]` → no-op stub
-pub extern "C" fn shim_nstextstorage_remove_layout_manager(
-    _obj: u64, _cmd: u64, _lm: u64,
-) {}
+pub extern "C" fn shim_nstextstorage_remove_layout_manager(_obj: u64, _cmd: u64, _lm: u64) {}
 
 #[cfg(test)]
 mod tests {
@@ -300,12 +347,18 @@ mod tests {
         let lm = crate::nslayoutmanager::shim_nslayoutmanager_init(lm, 0);
 
         // Before wiring, lm has no text storage.
-        assert_eq!(crate::nslayoutmanager::shim_nslayoutmanager_text_storage(lm, 0), 0);
+        assert_eq!(
+            crate::nslayoutmanager::shim_nslayoutmanager_text_storage(lm, 0),
+            0
+        );
 
         shim_nstextstorage_add_layout_manager(ts, 0, lm);
 
         // After wiring, lm's textStorage should be ts.
-        assert_eq!(crate::nslayoutmanager::shim_nslayoutmanager_text_storage(lm, 0), ts);
+        assert_eq!(
+            crate::nslayoutmanager::shim_nslayoutmanager_text_storage(lm, 0),
+            ts
+        );
 
         free_obj(lm);
         free_obj(ts);

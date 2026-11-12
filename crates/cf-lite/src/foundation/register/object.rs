@@ -16,7 +16,11 @@ pub fn register_nsobject_class(rt: &mut objc_runtime::ObjcRuntime) {
         methods: vec![
             me("init", nsobj::shim_nsobject_init as *const () as u64, "@@:"),
             me("self", nsobj::shim_nsobject_self as *const () as u64, "@@:"),
-            me("class", nsobj::shim_nsobject_class as *const () as u64, "#@:"),
+            me(
+                "class",
+                nsobj::shim_nsobject_class as *const () as u64,
+                "#@:",
+            ),
             me(
                 "respondsToSelector:",
                 nsobj::shim_nsobject_responds_to_selector as *const () as u64,
@@ -32,8 +36,16 @@ pub fn register_nsobject_class(rt: &mut objc_runtime::ObjcRuntime) {
                 nsobj::shim_nsobject_conforms_to_protocol as *const () as u64,
                 "B@:@",
             ),
-            me("retain", objc_runtime::shim_nsobject_retain as *const () as u64, "@@:"),
-            me("release", objc_runtime::shim_nsobject_release as *const () as u64, "v@:"),
+            me(
+                "retain",
+                objc_runtime::shim_nsobject_retain as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "release",
+                objc_runtime::shim_nsobject_release as *const () as u64,
+                "v@:",
+            ),
             me(
                 "autorelease",
                 objc_runtime::shim_nsobject_autorelease as *const () as u64,
@@ -44,7 +56,11 @@ pub fn register_nsobject_class(rt: &mut objc_runtime::ObjcRuntime) {
                 objc_runtime::shim_nsobject_retain_count as *const () as u64,
                 "Q@:",
             ),
-            me("dealloc", objc_runtime::shim_nsobject_dealloc as *const () as u64, "v@:"),
+            me(
+                "dealloc",
+                objc_runtime::shim_nsobject_dealloc as *const () as u64,
+                "v@:",
+            ),
             // KVO methods
             me(
                 "addObserver:forKeyPath:options:context:",
@@ -151,8 +167,16 @@ pub fn register_nsobject_class(rt: &mut objc_runtime::ObjcRuntime) {
             ),
         ],
         class_methods: vec![
-            me("alloc", nsobj::shim_nsobject_class_alloc as *const () as u64, "@@:"),
-            me("new", nsobj::shim_nsobject_class_new as *const () as u64, "@@:"),
+            me(
+                "alloc",
+                nsobj::shim_nsobject_class_alloc as *const () as u64,
+                "@@:",
+            ),
+            me(
+                "new",
+                nsobj::shim_nsobject_class_new as *const () as u64,
+                "@@:",
+            ),
             me(
                 "isSubclassOfClass:",
                 nsobj::shim_nsobject_is_subclass_of_class as *const () as u64,

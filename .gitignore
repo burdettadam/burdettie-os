@@ -19,7 +19,9 @@ dist/
 burdettie-os.tar.gz
 
 # Extracted Mach-O tools for Docker testing
-docker/xcode-tools/
+docker/xcode-tools/*
+!docker/xcode-tools/.gitkeep
+!docker/xcode-tools/README.md
 
 # Swift build artifacts
 vm-image/.build/
@@ -28,3 +30,23 @@ swift/.build/
 swift/.swiftpm/
 examples/swift-client/.build/
 examples/swift-client/.swiftpm/
+
+.mempalace/
+.copilot-bridge/
+
+# Local imports, builds, and debugging state
+/imports/
+/.tmp-*
+/[ ]2
+__pycache__/
+*.py[cod]
+/docker/launchpad-linux-arm64
+
+# Local editor and memory bridge configuration
+/.vscode/
+
+# Local credentials
+.env
+.env.*
+!.env.example
+!.env.sample

@@ -15,8 +15,7 @@ pub use cosmic_text::{Action, Cursor, Edit, Editor, Motion, Selection};
 
 use crate::color::Color;
 use crate::font_manager::{
-    DEJAVU_SANS, DEJAVU_SANS_BOLD, DEJAVU_SANS_BOLD_OBLIQUE, DEJAVU_SANS_MONO,
-    DEJAVU_SANS_OBLIQUE,
+    DEJAVU_SANS, DEJAVU_SANS_BOLD, DEJAVU_SANS_BOLD_OBLIQUE, DEJAVU_SANS_MONO, DEJAVU_SANS_OBLIQUE,
 };
 
 // ── Global singletons ──────────────────────────────────────────
@@ -82,8 +81,9 @@ fn attrs_for_font<'a>(font_name: &'a str) -> Attrs<'a> {
             .weight(cosmic_text::Weight::BOLD)
             .style(cosmic_text::Style::Italic),
         // System font synonyms fall back to generic SansSerif.
-        "System" | ".AppleSystemUIFont" | ".SFUI-Regular"
-        | ".AppleSystemUIFontMonospacedDigit" => Attrs::new().family(Family::SansSerif),
+        "System" | ".AppleSystemUIFont" | ".SFUI-Regular" | ".AppleSystemUIFontMonospacedDigit" => {
+            Attrs::new().family(Family::SansSerif)
+        }
         // Arbitrary font names: pass through to cosmic-text for resolution
         // against system fonts loaded in fontdb.
         _ => Attrs::new().family(Family::Name(font_name)),
@@ -347,7 +347,9 @@ pub fn editor_action(view_id: u64, action: Action) -> bool {
         let mut guard = editors_map();
         if let Some(state) = guard.as_mut().and_then(|m| m.get_mut(&view_id)) {
             state.editor.action(fs, action);
-            state.editor.with_buffer_mut(|buf| buf.shape_until_scroll(fs, false));
+            state
+                .editor
+                .with_buffer_mut(|buf| buf.shape_until_scroll(fs, false));
             true
         } else {
             false
@@ -454,7 +456,16 @@ pub fn editor_draw(
 
                     // Full-line selection for middle lines.
                     if run_line > start.line && run_line < end.line {
-                        fill_rect_alpha(pixels, sw, sh, ox, run_y, run.line_w as i32, run_h, sel_argb);
+                        fill_rect_alpha(
+                            pixels,
+                            sw,
+                            sh,
+                            ox,
+                            run_y,
+                            run.line_w as i32,
+                            run_h,
+                            sel_argb,
+                        );
                         continue;
                     }
 
@@ -479,7 +490,16 @@ pub fn editor_draw(
                         }
                     }
                     if sel_x_min < sel_x_max {
-                        fill_rect_alpha(pixels, sw, sh, sel_x_min, run_y, sel_x_max - sel_x_min, run_h, sel_argb);
+                        fill_rect_alpha(
+                            pixels,
+                            sw,
+                            sh,
+                            sel_x_min,
+                            run_y,
+                            sel_x_max - sel_x_min,
+                            run_h,
+                            sel_argb,
+                        );
                     }
                 }
             });
@@ -533,7 +553,16 @@ pub fn editor_draw(
 }
 
 /// Fill a rectangle with alpha blending onto ARGB32 pixels.
-fn fill_rect_alpha(pixels: &mut [u32], sw: i32, sh: i32, x: i32, y: i32, w: i32, h: i32, argb: u32) {
+fn fill_rect_alpha(
+    pixels: &mut [u32],
+    sw: i32,
+    sh: i32,
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32,
+    argb: u32,
+) {
     let alpha = (argb >> 24) & 0xFF;
     if alpha == 0 {
         return;
@@ -592,7 +621,11 @@ mod tests {
     #[test]
     fn measure_single_line() {
         let m = measure_shaped_text("Hello", 14.0, "System", None);
-        assert!(m.width > 10.0, "expected non-trivial width, got {}", m.width);
+        assert!(
+            m.width > 10.0,
+            "expected non-trivial width, got {}",
+            m.width
+        );
         assert_eq!(m.line_count, 1);
     }
 
@@ -600,7 +633,11 @@ mod tests {
     fn measure_word_wrap() {
         // With a tiny max_width, "Hello World" should wrap to 2+ lines.
         let m = measure_shaped_text("Hello World", 14.0, "System", Some(40.0));
-        assert!(m.line_count >= 2, "expected wrapping, got {} lines", m.line_count);
+        assert!(
+            m.line_count >= 2,
+            "expected wrapping, got {} lines",
+            m.line_count
+        );
     }
 
     #[test]
@@ -803,7 +840,11 @@ mod tests {
     #[test]
     fn measure_empty_text_has_zero_width() {
         let m = measure_shaped_text("", 14.0, "System", None);
-        assert!(m.width < 0.01, "empty text width should be ~0, got {}", m.width);
+        assert!(
+            m.width < 0.01,
+            "empty text width should be ~0, got {}",
+            m.width
+        );
     }
 
     // ── Font name aliases ───────────────────────────────────────────
@@ -888,8 +929,16 @@ mod tests {
     fn draw_italic() {
         let mut pixels = vec![0u32; 200 * 50];
         let advance = draw_shaped_text(
-            &mut pixels, 200, 50, "Italic", 0.0, 0.0, 14.0,
-            "System-Italic", Color::BLACK, None,
+            &mut pixels,
+            200,
+            50,
+            "Italic",
+            0.0,
+            0.0,
+            14.0,
+            "System-Italic",
+            Color::BLACK,
+            None,
         );
         assert!(advance > 0.0);
     }
@@ -898,8 +947,16 @@ mod tests {
     fn draw_bold_italic() {
         let mut pixels = vec![0u32; 200 * 50];
         let advance = draw_shaped_text(
-            &mut pixels, 200, 50, "BoldItalic", 0.0, 0.0, 14.0,
-            "System-BoldItalic", Color::BLACK, None,
+            &mut pixels,
+            200,
+            50,
+            "BoldItalic",
+            0.0,
+            0.0,
+            14.0,
+            "System-BoldItalic",
+            Color::BLACK,
+            None,
         );
         assert!(advance > 0.0);
     }
@@ -908,8 +965,16 @@ mod tests {
     fn draw_empty_text() {
         let mut pixels = vec![0u32; 100 * 50];
         let advance = draw_shaped_text(
-            &mut pixels, 100, 50, "", 0.0, 0.0, 14.0,
-            "System", Color::BLACK, None,
+            &mut pixels,
+            100,
+            50,
+            "",
+            0.0,
+            0.0,
+            14.0,
+            "System",
+            Color::BLACK,
+            None,
         );
         // Empty text → zero or near-zero advance
         assert!(advance < 1.0);
@@ -921,8 +986,16 @@ mod tests {
     fn draw_with_offset() {
         let mut pixels = vec![0u32; 200 * 100];
         let advance = draw_shaped_text(
-            &mut pixels, 200, 100, "Hi", 50.0, 40.0, 14.0,
-            "System", Color::BLACK, None,
+            &mut pixels,
+            200,
+            100,
+            "Hi",
+            50.0,
+            40.0,
+            14.0,
+            "System",
+            Color::BLACK,
+            None,
         );
         assert!(advance > 0.0);
         // Top-left corner should still be clear (text drawn at offset)
@@ -932,10 +1005,23 @@ mod tests {
     #[test]
     fn draw_with_color() {
         let mut pixels = vec![0u32; 200 * 50];
-        let red = Color { r: 1.0, g: 0.0, b: 0.0, a: 1.0 };
+        let red = Color {
+            r: 1.0,
+            g: 0.0,
+            b: 0.0,
+            a: 1.0,
+        };
         let advance = draw_shaped_text(
-            &mut pixels, 200, 50, "Red", 0.0, 0.0, 14.0,
-            "System", red, None,
+            &mut pixels,
+            200,
+            50,
+            "Red",
+            0.0,
+            0.0,
+            14.0,
+            "System",
+            red,
+            None,
         );
         assert!(advance > 0.0);
         // At least one pixel should have a non-zero red channel
@@ -946,8 +1032,16 @@ mod tests {
     fn draw_white_on_black() {
         let mut pixels = vec![0xFF000000u32; 200 * 50]; // black background
         let advance = draw_shaped_text(
-            &mut pixels, 200, 50, "White", 0.0, 0.0, 14.0,
-            "System", Color::WHITE, None,
+            &mut pixels,
+            200,
+            50,
+            "White",
+            0.0,
+            0.0,
+            14.0,
+            "System",
+            Color::WHITE,
+            None,
         );
         assert!(advance > 0.0);
         // Some pixels should have changed from pure black
@@ -958,8 +1052,16 @@ mod tests {
     fn draw_with_word_wrap() {
         let mut pixels = vec![0u32; 100 * 100];
         let advance = draw_shaped_text(
-            &mut pixels, 100, 100, "Hello World Foo Bar",
-            0.0, 0.0, 14.0, "System", Color::BLACK, Some(50.0),
+            &mut pixels,
+            100,
+            100,
+            "Hello World Foo Bar",
+            0.0,
+            0.0,
+            14.0,
+            "System",
+            Color::BLACK,
+            Some(50.0),
         );
         // Should have drawn something
         assert!(pixels.iter().any(|&p| p != 0));
@@ -972,8 +1074,16 @@ mod tests {
         // Drawing with negative origin — glyphs partially off-screen should not panic
         let mut pixels = vec![0u32; 100 * 50];
         let advance = draw_shaped_text(
-            &mut pixels, 100, 50, "Hello", -20.0, -10.0, 14.0,
-            "System", Color::BLACK, None,
+            &mut pixels,
+            100,
+            50,
+            "Hello",
+            -20.0,
+            -10.0,
+            14.0,
+            "System",
+            Color::BLACK,
+            None,
         );
         assert!(advance > 0.0);
     }
@@ -983,8 +1093,16 @@ mod tests {
         // Drawing past the surface edge — should not panic or corrupt memory
         let mut pixels = vec![0u32; 100 * 50];
         let advance = draw_shaped_text(
-            &mut pixels, 100, 50, "Hello", 90.0, 45.0, 14.0,
-            "System", Color::BLACK, None,
+            &mut pixels,
+            100,
+            50,
+            "Hello",
+            90.0,
+            45.0,
+            14.0,
+            "System",
+            Color::BLACK,
+            None,
         );
         assert!(advance > 0.0);
     }
@@ -993,11 +1111,24 @@ mod tests {
     fn draw_zero_alpha_color_does_not_crash() {
         // Fully transparent text — cosmic-text still rasterises glyphs
         // with coverage alpha, but the function must not panic.
-        let transparent = Color { r: 0.0, g: 0.0, b: 0.0, a: 0.0 };
+        let transparent = Color {
+            r: 0.0,
+            g: 0.0,
+            b: 0.0,
+            a: 0.0,
+        };
         let mut pixels = vec![0u32; 200 * 50];
         draw_shaped_text(
-            &mut pixels, 200, 50, "Ghost", 0.0, 0.0, 14.0,
-            "System", transparent, None,
+            &mut pixels,
+            200,
+            50,
+            "Ghost",
+            0.0,
+            0.0,
+            14.0,
+            "System",
+            transparent,
+            None,
         );
     }
 
@@ -1005,8 +1136,16 @@ mod tests {
     fn draw_large_font() {
         let mut pixels = vec![0u32; 400 * 200];
         let advance = draw_shaped_text(
-            &mut pixels, 400, 200, "Big", 0.0, 0.0, 48.0,
-            "System", Color::BLACK, None,
+            &mut pixels,
+            400,
+            200,
+            "Big",
+            0.0,
+            0.0,
+            48.0,
+            "System",
+            Color::BLACK,
+            None,
         );
         assert!(advance > 0.0);
         assert!(pixels.iter().any(|&p| p != 0));
@@ -1016,8 +1155,16 @@ mod tests {
     fn draw_small_font() {
         let mut pixels = vec![0u32; 200 * 50];
         let advance = draw_shaped_text(
-            &mut pixels, 200, 50, "tiny", 0.0, 0.0, 6.0,
-            "System", Color::BLACK, None,
+            &mut pixels,
+            200,
+            50,
+            "tiny",
+            0.0,
+            0.0,
+            6.0,
+            "System",
+            Color::BLACK,
+            None,
         );
         assert!(advance > 0.0);
     }
@@ -1026,8 +1173,16 @@ mod tests {
     fn draw_multiline() {
         let mut pixels = vec![0u32; 200 * 100];
         let advance = draw_shaped_text(
-            &mut pixels, 200, 100, "Line1\nLine2", 0.0, 0.0, 14.0,
-            "System", Color::BLACK, None,
+            &mut pixels,
+            200,
+            100,
+            "Line1\nLine2",
+            0.0,
+            0.0,
+            14.0,
+            "System",
+            Color::BLACK,
+            None,
         );
         // advance is the last line's width
         assert!(advance > 0.0);
@@ -1038,8 +1193,16 @@ mod tests {
     fn draw_unicode() {
         let mut pixels = vec![0u32; 300 * 50];
         let advance = draw_shaped_text(
-            &mut pixels, 300, 50, "café ñ", 0.0, 0.0, 14.0,
-            "System", Color::BLACK, None,
+            &mut pixels,
+            300,
+            50,
+            "café ñ",
+            0.0,
+            0.0,
+            14.0,
+            "System",
+            Color::BLACK,
+            None,
         );
         assert!(advance > 0.0);
     }
@@ -1048,13 +1211,29 @@ mod tests {
     fn draw_advance_increases_with_more_text() {
         let mut pixels1 = vec![0u32; 400 * 50];
         let a1 = draw_shaped_text(
-            &mut pixels1, 400, 50, "Hi", 0.0, 0.0, 14.0,
-            "System", Color::BLACK, None,
+            &mut pixels1,
+            400,
+            50,
+            "Hi",
+            0.0,
+            0.0,
+            14.0,
+            "System",
+            Color::BLACK,
+            None,
         );
         let mut pixels2 = vec![0u32; 400 * 50];
         let a2 = draw_shaped_text(
-            &mut pixels2, 400, 50, "Hello, World!", 0.0, 0.0, 14.0,
-            "System", Color::BLACK, None,
+            &mut pixels2,
+            400,
+            50,
+            "Hello, World!",
+            0.0,
+            0.0,
+            14.0,
+            "System",
+            Color::BLACK,
+            None,
         );
         assert!(
             a2 > a1,
@@ -1064,11 +1243,24 @@ mod tests {
 
     #[test]
     fn draw_semi_transparent() {
-        let semi = Color { r: 0.0, g: 1.0, b: 0.0, a: 0.5 };
+        let semi = Color {
+            r: 0.0,
+            g: 1.0,
+            b: 0.0,
+            a: 0.5,
+        };
         let mut pixels = vec![0xFFFFFFFFu32; 200 * 50]; // white background
         draw_shaped_text(
-            &mut pixels, 200, 50, "Semi", 0.0, 0.0, 14.0,
-            "System", semi, None,
+            &mut pixels,
+            200,
+            50,
+            "Semi",
+            0.0,
+            0.0,
+            14.0,
+            "System",
+            semi,
+            None,
         );
         // Some pixels should have been blended (not all pure white)
         assert!(pixels.iter().any(|&p| p != 0xFFFFFFFF));
@@ -1096,7 +1288,11 @@ mod tests {
                 w[0],
                 w[1]
             );
-            assert_ne!(w[0], w[1], "families should be deduped, found duplicate {:?}", w[0]);
+            assert_ne!(
+                w[0], w[1],
+                "families should be deduped, found duplicate {:?}",
+                w[0]
+            );
         }
     }
 
@@ -1110,17 +1306,36 @@ mod tests {
 
     #[test]
     fn attrs_monospace_variants() {
-        for name in &["Monospace", "DejaVuSansMono", "Courier", "Courier New", "Monaco"] {
+        for name in &[
+            "Monospace",
+            "DejaVuSansMono",
+            "Courier",
+            "Courier New",
+            "Monaco",
+        ] {
             let attrs = attrs_for_font(name);
-            assert_eq!(attrs.family, Family::Monospace, "font {name} should map to Monospace");
+            assert_eq!(
+                attrs.family,
+                Family::Monospace,
+                "font {name} should map to Monospace"
+            );
         }
     }
 
     #[test]
     fn attrs_system_sans_serif() {
-        for name in &["System", ".AppleSystemUIFont", ".SFUI-Regular", ".AppleSystemUIFontMonospacedDigit"] {
+        for name in &[
+            "System",
+            ".AppleSystemUIFont",
+            ".SFUI-Regular",
+            ".AppleSystemUIFontMonospacedDigit",
+        ] {
             let attrs = attrs_for_font(name);
-            assert_eq!(attrs.family, Family::SansSerif, "font {name} should map to SansSerif");
+            assert_eq!(
+                attrs.family,
+                Family::SansSerif,
+                "font {name} should map to SansSerif"
+            );
         }
     }
 
@@ -1128,7 +1343,11 @@ mod tests {
     fn attrs_bold_has_bold_weight() {
         for name in &["System-Bold", "DejaVuSans-Bold", ".AppleSystemUIFontBold"] {
             let attrs = attrs_for_font(name);
-            assert_eq!(attrs.weight, cosmic_text::Weight::BOLD, "font {name} should be bold");
+            assert_eq!(
+                attrs.weight,
+                cosmic_text::Weight::BOLD,
+                "font {name} should be bold"
+            );
         }
     }
 
@@ -1136,7 +1355,11 @@ mod tests {
     fn attrs_italic_has_italic_style() {
         for name in &["System-Italic", "DejaVuSans-Oblique"] {
             let attrs = attrs_for_font(name);
-            assert_eq!(attrs.style, cosmic_text::Style::Italic, "font {name} should be italic");
+            assert_eq!(
+                attrs.style,
+                cosmic_text::Style::Italic,
+                "font {name} should be italic"
+            );
         }
     }
 
@@ -1144,8 +1367,16 @@ mod tests {
     fn attrs_bold_italic_has_both() {
         for name in &["System-BoldItalic", "DejaVuSans-BoldOblique"] {
             let attrs = attrs_for_font(name);
-            assert_eq!(attrs.weight, cosmic_text::Weight::BOLD, "font {name} should be bold");
-            assert_eq!(attrs.style, cosmic_text::Style::Italic, "font {name} should be italic");
+            assert_eq!(
+                attrs.weight,
+                cosmic_text::Weight::BOLD,
+                "font {name} should be bold"
+            );
+            assert_eq!(
+                attrs.style,
+                cosmic_text::Style::Italic,
+                "font {name} should be italic"
+            );
         }
     }
 
@@ -1181,8 +1412,16 @@ mod tests {
         let m = measure_shaped_text("Hello", 14.0, "System", None);
         let mut pixels = vec![0u32; 400 * 50];
         let advance = draw_shaped_text(
-            &mut pixels, 400, 50, "Hello", 0.0, 0.0, 14.0,
-            "System", Color::BLACK, None,
+            &mut pixels,
+            400,
+            50,
+            "Hello",
+            0.0,
+            0.0,
+            14.0,
+            "System",
+            Color::BLACK,
+            None,
         );
         // The draw advance and measure width should be reasonably close
         assert!(

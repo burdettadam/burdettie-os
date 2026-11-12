@@ -61,7 +61,9 @@ mod tests {
     fn noop_register_multiple_times() {
         let reg = NoopUnwindRegistry;
         for i in 0..5 {
-            assert!(reg.register(i * 0x1000, (i + 1) * 0x1000, None, None).is_ok());
+            assert!(reg
+                .register(i * 0x1000, (i + 1) * 0x1000, None, None)
+                .is_ok());
         }
     }
 
@@ -74,12 +76,7 @@ mod tests {
     #[test]
     fn noop_register_with_all_sections() {
         let reg = NoopUnwindRegistry;
-        let result = reg.register(
-            0x1000,
-            0x5000,
-            Some((0x2000, 0x100)),
-            Some((0x3000, 0x200)),
-        );
+        let result = reg.register(0x1000, 0x5000, Some((0x2000, 0x100)), Some((0x3000, 0x200)));
         assert!(result.is_ok());
     }
 }

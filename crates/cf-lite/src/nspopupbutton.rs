@@ -148,10 +148,21 @@ pub extern "C" fn shim_nspopupbutton_item_title_at_index(obj: u64, _cmd: u64, id
 }
 
 /// `-[NSPopUpButton drawRect:]` — renders selected title + dropdown indicator.
-pub extern "C" fn shim_nspopupbutton_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64) {
-    if obj == 0 { return; }
+pub extern "C" fn shim_nspopupbutton_draw_rect(
+    obj: u64,
+    _cmd: u64,
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
+) {
+    if obj == 0 {
+        return;
+    }
     let cg_ctx = crate::nsgraphicscontext::current_cg_context_handle();
-    if cg_ctx == 0 { return; }
+    if cg_ctx == 0 {
+        return;
+    }
 
     cg_shims::bridge::with_context(cg_ctx, |c| {
         // Button background.
@@ -166,7 +177,9 @@ pub extern "C" fn shim_nspopupbutton_draw_rect(obj: u64, _cmd: u64, x: f64, y: f
     if title != 0 {
         let utf8 = crate::cfstring::shim_nsstring_utf8string(title, 0);
         if !utf8.is_null() {
-            let text = unsafe { std::ffi::CStr::from_ptr(utf8) }.to_str().unwrap_or("");
+            let text = unsafe { std::ffi::CStr::from_ptr(utf8) }
+                .to_str()
+                .unwrap_or("");
             if !text.is_empty() {
                 cg_shims::bridge::with_context(cg_ctx, |c| {
                     c.fill_color = graphics_core::Color::BLACK;
@@ -185,13 +198,21 @@ pub extern "C" fn shim_nspopupbutton_draw_rect(obj: u64, _cmd: u64, x: f64, y: f
 
 /// `-[NSPopUpButton mouseDown:]` — cycle to next item, fire action.
 pub extern "C" fn shim_nspopupbutton_mouse_down(obj: u64, _cmd: u64, _event: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
 
     let count = shim_nspopupbutton_number_of_items(obj, 0);
-    if count <= 0 { return; }
+    if count <= 0 {
+        return;
+    }
 
     let current = read_i64(obj, SELECTED_INDEX_OFF);
-    let next = if current < 0 || current >= count - 1 { 0 } else { current + 1 };
+    let next = if current < 0 || current >= count - 1 {
+        0
+    } else {
+        current + 1
+    };
     write_i64(obj, SELECTED_INDEX_OFF, next);
 
     // Fire target/action (inherited NSButton offsets 32/40).
@@ -200,7 +221,7 @@ pub extern "C" fn shim_nspopupbutton_mouse_down(obj: u64, _cmd: u64, _event: u64
     let action = read_u64(obj, ACTION_OFF);
     let target = read_u64(obj, TARGET_OFF);
     if action != 0 {
-        let nsapp = crate::nsapplication::nsapp_global_addr();
+        let nsapp = crate::nsapplication::shim_nsapplication_shared_application(0, 0);
         crate::nsapplication::shim_nsapplication_send_action_to_from(nsapp, 0, action, target, obj);
     }
 
@@ -242,7 +263,9 @@ mod tests {
         // Clean up the items Vec
         let ptr = read_u64(btn, ITEMS_PTR_OFF);
         if ptr != 0 {
-            unsafe { drop(Box::from_raw(ptr as *mut Vec<u64>)); }
+            unsafe {
+                drop(Box::from_raw(ptr as *mut Vec<u64>));
+            }
         }
         free_obj(btn);
     }
@@ -268,7 +291,9 @@ mod tests {
 
         let ptr = read_u64(btn, ITEMS_PTR_OFF);
         if ptr != 0 {
-            unsafe { drop(Box::from_raw(ptr as *mut Vec<u64>)); }
+            unsafe {
+                drop(Box::from_raw(ptr as *mut Vec<u64>));
+            }
         }
         free_obj(btn);
     }
@@ -288,7 +313,9 @@ mod tests {
 
         let ptr = read_u64(btn, ITEMS_PTR_OFF);
         if ptr != 0 {
-            unsafe { drop(Box::from_raw(ptr as *mut Vec<u64>)); }
+            unsafe {
+                drop(Box::from_raw(ptr as *mut Vec<u64>));
+            }
         }
         free_obj(btn);
     }
@@ -305,7 +332,9 @@ mod tests {
 
         let ptr = read_u64(btn, ITEMS_PTR_OFF);
         if ptr != 0 {
-            unsafe { drop(Box::from_raw(ptr as *mut Vec<u64>)); }
+            unsafe {
+                drop(Box::from_raw(ptr as *mut Vec<u64>));
+            }
         }
         free_obj(btn);
     }

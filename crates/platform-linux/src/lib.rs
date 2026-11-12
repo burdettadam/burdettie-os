@@ -95,4 +95,3 @@ impl platform_core::PlatformProvider for LinuxHostPlatform {
         &self.threading
     }
 }
-

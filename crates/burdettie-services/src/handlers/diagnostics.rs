@@ -12,9 +12,13 @@ use tiny_http::Request;
 pub struct DiagnosticsHandler;
 
 impl Handler for DiagnosticsHandler {
-    fn handle(&self, path: &str, _method: &str, _body: &[u8], _request: &Request)
-        -> Option<HandlerResponse>
-    {
+    fn handle(
+        &self,
+        path: &str,
+        _method: &str,
+        _body: &[u8],
+        _request: &Request,
+    ) -> Option<HandlerResponse> {
         if !path.starts_with("/api/v1/diagnostics/") {
             return None;
         }

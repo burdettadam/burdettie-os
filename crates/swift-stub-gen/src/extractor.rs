@@ -43,11 +43,20 @@ impl ExtractedSymbol {
         // segments.  These suffixes are stable across Swift ABI versions.
         let is_data = {
             let n = &ex.name;
-            n.ends_with("Ma") || n.ends_with("Mo") || n.contains("Mn")
-                || n.contains("WP") || n.contains("Wl") || n.contains("WL")
-                || n.contains("_metadata") || n.contains("_conformance")
+            n.ends_with("Ma")
+                || n.ends_with("Mo")
+                || n.contains("Mn")
+                || n.contains("WP")
+                || n.contains("Wl")
+                || n.contains("WL")
+                || n.contains("_metadata")
+                || n.contains("_conformance")
         };
-        ExtractedSymbol { name: ex.name.clone(), kind, is_data }
+        ExtractedSymbol {
+            name: ex.name.clone(),
+            kind,
+            is_data,
+        }
     }
 }
 
@@ -59,9 +68,11 @@ impl ExtractedSymbol {
 /// Only returns **regular** (non-re-export) symbols; re-exports are filtered
 /// out by default because they have no code/data in the current binary.
 #[allow(dead_code)]
-pub fn extract_symbols(path: &Path, include_reexports: bool) -> Result<Vec<ExtractedSymbol>, String> {
-    let raw = std::fs::read(path)
-        .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
+pub fn extract_symbols(
+    path: &Path,
+    include_reexports: bool,
+) -> Result<Vec<ExtractedSymbol>, String> {
+    let raw = std::fs::read(path).map_err(|e| format!("cannot read {}: {e}", path.display()))?;
 
     // Prefer arm64 (subtype 0/Arm64All); fat_slice_for_cpu already prefers
     // Arm64All over Arm64E automatically when CpuType::Arm64 is requested.
@@ -72,8 +83,7 @@ pub fn extract_symbols(path: &Path, include_reexports: bool) -> Result<Vec<Extra
         &raw
     };
 
-    let parsed = parse(slice)
-        .map_err(|e| format!("{}: parse error: {e:?}", path.display()))?;
+    let parsed = parse(slice).map_err(|e| format!("{}: parse error: {e:?}", path.display()))?;
 
     let exports = macho_parse::exports::extract_exports(&parsed, slice);
 
@@ -91,9 +101,11 @@ pub fn extract_symbols(path: &Path, include_reexports: bool) -> Result<Vec<Extra
 /// Like `extract_symbols` but also includes symbols found via the nlist
 /// symbol table (LC_SYMTAB) that aren't in the export trie.  This catches
 /// some older binaries that omit the trie.
-pub fn extract_symbols_full(path: &Path, include_reexports: bool) -> Result<Vec<ExtractedSymbol>, String> {
-    let raw = std::fs::read(path)
-        .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
+pub fn extract_symbols_full(
+    path: &Path,
+    include_reexports: bool,
+) -> Result<Vec<ExtractedSymbol>, String> {
+    let raw = std::fs::read(path).map_err(|e| format!("cannot read {}: {e}", path.display()))?;
 
     let slice: &[u8] = if macho_parse::fat::is_fat(&raw) {
         fat_slice_for_cpu(&raw, CpuType::Arm64)
@@ -102,8 +114,7 @@ pub fn extract_symbols_full(path: &Path, include_reexports: bool) -> Result<Vec<
         &raw
     };
 
-    let parsed = parse(slice)
-        .map_err(|e| format!("{}: parse error: {e:?}", path.display()))?;
+    let parsed = parse(slice).map_err(|e| format!("{}: parse error: {e:?}", path.display()))?;
 
     // Primary: export trie
     let trie_exports = macho_parse::exports::extract_exports(&parsed, slice);

@@ -24,30 +24,81 @@
 //! pointers. They must maintain C ABI compatibility and handle all
 //! inputs defensively.
 
+#[cfg(not(unix))]
+mod non_unix;
+
+#[cfg(unix)]
 pub(crate) mod darwin_compat;
+#[cfg(not(unix))]
+pub(crate) mod darwin_compat {
+    pub use crate::non_unix::DarwinCompatShims;
+}
+#[cfg(unix)]
 pub(crate) mod dispatch;
+#[cfg(not(unix))]
+pub(crate) mod dispatch {
+    pub use crate::non_unix::DispatchShims;
+}
+#[cfg(unix)]
 pub(crate) mod lifecycle;
+#[cfg(not(unix))]
+pub(crate) mod lifecycle {
+    pub use crate::non_unix::LifecycleShims;
+}
+#[cfg(unix)]
 pub(crate) mod mach;
+#[cfg(not(unix))]
+pub(crate) mod mach {
+    pub use crate::non_unix::MachShims;
+}
 pub mod process;
-pub(crate) mod ptrauth;
+#[cfg(unix)]
 pub(crate) mod pthread;
+pub(crate) mod ptrauth;
+#[cfg(not(unix))]
+pub(crate) mod pthread {
+    pub use crate::non_unix::PthreadShims;
+}
 pub(crate) mod random;
+#[cfg(unix)]
 pub(crate) mod socket;
+#[cfg(not(unix))]
+pub(crate) mod socket {
+    pub use crate::non_unix::SocketShims;
+}
 pub mod table;
+#[cfg(unix)]
 pub(crate) mod tls;
+#[cfg(not(unix))]
+pub(crate) mod tls {
+    pub use crate::non_unix::TlsShims;
+}
+#[cfg(unix)]
 pub mod cross_platform;
+#[cfg(not(unix))]
+pub mod cross_platform {
+    use crate::table::ShimTable;
+
+    pub fn install_cross_platform_shims(_table: &mut ShimTable) {
+        log::debug!("cross_platform: Unix-backed shims unavailable on this host");
+    }
+}
+#[cfg(unix)]
+pub mod darwin_stubs;
+#[cfg(not(unix))]
+#[path = "darwin_stubs_non_unix.rs"]
 pub mod darwin_stubs;
 
 pub use darwin_compat::DarwinCompatShims;
+pub use darwin_stubs::install_darwin_stubs;
 pub use dispatch::DispatchShims;
 pub use lifecycle::LifecycleShims;
 pub use mach::MachShims;
 pub use process::ProcessShims;
-pub use ptrauth::PtrauthShims;
 pub use pthread::PthreadShims;
+pub use ptrauth::PtrauthShims;
 pub use random::RandomShims;
 pub use socket::SocketShims;
-pub use darwin_stubs::install_darwin_stubs;
 pub use table::{ShimEntry, ShimTable};
 pub use tls::TlsShims;
 

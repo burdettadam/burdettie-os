@@ -1,6 +1,6 @@
-use std::marker::PhantomData;
 use macho_exec::call_constructors;
 use macho_objc::extract_initializers;
+use std::marker::PhantomData;
 
 use crate::error::RuntimeError;
 use crate::tracer::EventKind;
@@ -16,25 +16,33 @@ impl Loader<Mapped> {
         {
             let ctx = self.inner.ctx.as_ref().expect("ctx set in map_images");
             let data_symbols = macho_exec::DataSymbolStore::global();
-            let composite =
-                CompositeResolver::new(&ctx.shim_table, data_symbols, self.inner.stub_resolver.as_ref());
-            let registry = self.inner
+            let composite = CompositeResolver::new(
+                &ctx.shim_table,
+                data_symbols,
+                self.inner.stub_resolver.as_ref(),
+            );
+            let registry = self
+                .inner
                 .registry
                 .as_mut()
                 .expect("registry set in map_images");
             registry.apply_all_fixups(&composite)?;
             // Patch TLV thunks before protect() makes __DATA read-only
             for loaded in registry.images() {
-                macho_exec::patch_tlv_thunks(&loaded.image, &loaded.parsed, &loaded.data);
+                macho_exec::patch_tlv_thunks(&loaded.image, &loaded.parsed);
             }
             // Strip PAC-authenticated branches when hardware PAC is unavailable
             for loaded in registry.images() {
-                macho_exec::ptrauth::strip_pac_branches(&loaded.image);
+                macho_exec::ptrauth::strip_pac_branches(
+                    &loaded.image,
+                    loaded.parsed.header.cpu_type,
+                );
             }
         }
-        self.inner
-            .tracer
-            .record(EventKind::Pipeline, "fixups applied to all images".to_string());
+        self.inner.tracer.record(
+            EventKind::Pipeline,
+            "fixups applied to all images".to_string(),
+        );
         Ok(Loader {
             inner: self.inner,
             _phase: PhantomData,
@@ -170,19 +178,14 @@ impl Loader<Initialized> {
                 .map(|(k, v)| format!("{k}={v}"))
                 .collect(),
         };
-        let entry_result =
-            macho_exec::call_entry_with_args(&app.image, entry, Some(&entry_args))?;
+        let entry_result = macho_exec::call_entry_with_args(&app.image, entry, Some(&entry_args))?;
 
         inner.tracer.record(
             EventKind::Pipeline,
             format!("entry point returned exit_code={}", entry_result.exit_code),
         );
 
-        let shims_installed = inner
-            .ctx
-            .as_ref()
-            .map(|c| c.shim_table.len())
-            .unwrap_or(0);
+        let shims_installed = inner.ctx.as_ref().map(|c| c.shim_table.len()).unwrap_or(0);
 
         Ok(RuntimeResult {
             exit_code: entry_result.exit_code,

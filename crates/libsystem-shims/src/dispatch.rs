@@ -12,8 +12,9 @@
 
 use std::sync::atomic::{AtomicI64, Ordering};
 
-use crate::table::ShimTable;
+use crate::darwin_stubs::blocks_runtime::{invoke_block0, OwnedBlock};
 use crate::darwin_stubs::dispatch_queue;
+use crate::table::ShimTable;
 
 /// Installs dispatch-related shims.
 pub struct DispatchShims;
@@ -171,57 +172,102 @@ extern "C" fn shim_dispatch_once_f(
 /// - Concurrent queues: submitted to the bounded thread pool
 /// SAFETY: The block must remain valid for the duration of execution.
 extern "C" fn shim_dispatch_async(queue: *const u8, block: *const u8) {
-    if block.is_null() {
+    let Some(block) = OwnedBlock::from_ptr(block) else {
         log::warn!("dispatch_async called with null block");
         return;
-    }
+    };
 
-    let invoke_ptr = unsafe { *(block.add(16) as *const usize) };
-    let block_addr = block as usize;
     let queue_handle = queue as u64;
 
-    dispatch_queue::queue_async(queue_handle, Box::new(move || {
-        unsafe {
-            let invoke: extern "C" fn(*const u8) = std::mem::transmute(invoke_ptr);
-            invoke(block_addr as *const u8);
-        }
-    }));
+    dispatch_queue::queue_async(
+        queue_handle,
+        Box::new(move || {
+            unsafe { invoke_block0(block.addr()) };
+        }),
+    );
 }
 
 /// `void dispatch_sync(dispatch_queue_t queue, dispatch_block_t block)`
 ///
 /// Routes the block through the queue model synchronously (blocks until done).
 extern "C" fn shim_dispatch_sync(queue: *const u8, block: *const u8) {
-    if block.is_null() {
+    let Some(block) = OwnedBlock::from_ptr(block) else {
         log::warn!("dispatch_sync called with null block");
         return;
-    }
+    };
 
-    let invoke_ptr = unsafe { *(block.add(16) as *const usize) };
-    let block_addr = block as usize;
     let queue_handle = queue as u64;
 
-    dispatch_queue::queue_sync(queue_handle, Box::new(move || {
-        unsafe {
-            let invoke: extern "C" fn(*const u8) = std::mem::transmute(invoke_ptr);
-            invoke(block_addr as *const u8);
-        }
-    }));
+    dispatch_queue::queue_sync(
+        queue_handle,
+        Box::new(move || {
+            unsafe { invoke_block0(block.addr()) };
+        }),
+    );
 }
 
 /// `dispatch_queue_t dispatch_get_global_queue(long identifier, unsigned long flags)`
 ///
 /// Returns the global concurrent queue, backed by a real bounded thread pool.
-extern "C" fn shim_dispatch_get_global_queue(
-    _identifier: i64,
-    _flags: u64,
-) -> *const u8 {
+extern "C" fn shim_dispatch_get_global_queue(_identifier: i64, _flags: u64) -> *const u8 {
     DISPATCH_GLOBAL_Q.as_ptr()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicBool, AtomicUsize};
+
+    const BLOCK_HAS_COPY_DISPOSE_FLAG: i32 = 1 << 25;
+
+    #[repr(C)]
+    struct TestBlockDescriptor {
+        reserved: u64,
+        size: u64,
+        copy: extern "C" fn(u64, u64),
+        dispose: extern "C" fn(u64),
+    }
+
+    static TEST_BLOCK_INVOKED: AtomicBool = AtomicBool::new(false);
+    static TEST_BLOCK_COPIED: AtomicUsize = AtomicUsize::new(0);
+    static TEST_BLOCK_DISPOSED: AtomicUsize = AtomicUsize::new(0);
+
+    extern "C" fn test_block_invoke(_block: *const u8) {
+        TEST_BLOCK_INVOKED.store(true, Ordering::SeqCst);
+    }
+
+    extern "C" fn test_block_copy(_dst: u64, _src: u64) {
+        TEST_BLOCK_COPIED.fetch_add(1, Ordering::SeqCst);
+    }
+
+    extern "C" fn test_block_dispose(_block: u64) {
+        TEST_BLOCK_DISPOSED.fetch_add(1, Ordering::SeqCst);
+    }
+
+    static TEST_BLOCK_DESCRIPTOR: TestBlockDescriptor = TestBlockDescriptor {
+        reserved: 0,
+        size: 32,
+        copy: test_block_copy,
+        dispose: test_block_dispose,
+    };
+
+    fn make_copyable_block(buf: &mut [u8; 32]) {
+        buf.fill(0);
+        unsafe {
+            std::ptr::write_unaligned(
+                buf.as_mut_ptr().add(8) as *mut i32,
+                BLOCK_HAS_COPY_DISPOSE_FLAG,
+            );
+            std::ptr::write_unaligned(
+                buf.as_mut_ptr().add(16) as *mut extern "C" fn(*const u8),
+                test_block_invoke,
+            );
+            std::ptr::write_unaligned(
+                buf.as_mut_ptr().add(24) as *mut u64,
+                &TEST_BLOCK_DESCRIPTOR as *const TestBlockDescriptor as u64,
+            );
+        }
+    }
 
     #[test]
     fn dispatch_shims_registered() {
@@ -262,6 +308,24 @@ mod tests {
             Some(increment),
         );
         assert_eq!(counter, 1);
+    }
+
+    #[test]
+    fn dispatch_async_copies_and_releases_block() {
+        TEST_BLOCK_INVOKED.store(false, Ordering::SeqCst);
+        TEST_BLOCK_COPIED.store(0, Ordering::SeqCst);
+        TEST_BLOCK_DISPOSED.store(0, Ordering::SeqCst);
+
+        let queue = dispatch_queue::queue_create("test.dispatch.async.block", false);
+        let mut block = [0u8; 32];
+        make_copyable_block(&mut block);
+
+        shim_dispatch_async(queue as *const u8, block.as_ptr());
+        dispatch_queue::queue_sync(queue, Box::new(|| {}));
+
+        assert!(TEST_BLOCK_INVOKED.load(Ordering::SeqCst));
+        assert_eq!(TEST_BLOCK_COPIED.load(Ordering::SeqCst), 1);
+        assert_eq!(TEST_BLOCK_DISPOSED.load(Ordering::SeqCst), 1);
     }
 
     #[test]
@@ -330,9 +394,10 @@ mod tests {
 
     /// Helper: build a fake block struct on the heap with a given invoke function.
     ///
-    /// Block layout: [isa: u64(8)] [flags: u32(4)] [reserved: u32(4)] [invoke: fn ptr(8)]
+    /// Block layout: [isa: u64(8)] [flags: u32(4)] [reserved: u32(4)]
+    /// [invoke: fn ptr(8)] [descriptor: u64(8)]
     fn make_fake_block(invoke: extern "C" fn(*const u8)) -> *const u8 {
-        let block = vec![0u8; 24].into_boxed_slice();
+        let block = vec![0u8; 32].into_boxed_slice();
         let ptr = Box::into_raw(block) as *mut u8;
         unsafe {
             // Write invoke pointer at offset 16
@@ -364,7 +429,10 @@ mod tests {
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
 
-        assert!(FLAG.load(Ordering::SeqCst), "dispatch_async block should have run");
+        assert!(
+            FLAG.load(Ordering::SeqCst),
+            "dispatch_async block should have run"
+        );
 
         // Leak the block — it's a test and reclaiming is tricky with threads
     }
@@ -384,6 +452,9 @@ mod tests {
         shim_dispatch_sync(std::ptr::null(), block);
 
         // Should have run synchronously — flag is set immediately
-        assert!(FLAG.load(Ordering::SeqCst), "dispatch_sync block should have run inline");
+        assert!(
+            FLAG.load(Ordering::SeqCst),
+            "dispatch_sync block should have run inline"
+        );
     }
 }

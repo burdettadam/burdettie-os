@@ -10,11 +10,11 @@ mod protocol;
 mod util;
 
 pub use category::*;
-pub use protocol::parse_protolist;
 use class::{
     extract_class_details, extract_class_name, extract_metaclass_addr, extract_metaclass_methods,
     extract_superclass_addr,
 };
+pub use protocol::parse_protolist;
 use util::resolve_to_vmaddr;
 
 // ── Pointer list parsing ───────────────────────────────────────────
@@ -60,7 +60,15 @@ pub fn parse_pointer_list(
                 let super_addr = extract_superclass_addr(parsed, data, ptr);
                 let meta_addr = extract_metaclass_addr(parsed, data, ptr);
                 (
-                    name, methods, cm, ivars, properties, isz, flags, super_addr, meta_addr,
+                    name,
+                    methods,
+                    cm,
+                    ivars,
+                    properties,
+                    isz,
+                    flags,
+                    super_addr,
+                    meta_addr,
                     proto_names,
                 )
             } else {

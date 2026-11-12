@@ -43,9 +43,8 @@ impl MemoryMapper for LinuxMemoryMapper {
     fn map_image_pages(&self, size: usize) -> Result<*mut u8, PalError> {
         // Create an anonymous file descriptor via memfd_create.
         let name = b"macho-image\0";
-        let fd = unsafe {
-            libc::memfd_create(name.as_ptr() as *const libc::c_char, libc::MFD_CLOEXEC)
-        };
+        let fd =
+            unsafe { libc::memfd_create(name.as_ptr() as *const libc::c_char, libc::MFD_CLOEXEC) };
         if fd < 0 {
             // Kernel too old for memfd — fall back to anonymous mapping.
             log::debug!("memfd_create unavailable, falling back to anonymous mapping");
@@ -55,7 +54,9 @@ impl MemoryMapper for LinuxMemoryMapper {
         // Size the backing file.
         if unsafe { libc::ftruncate(fd, size as libc::off_t) } != 0 {
             let err = std::io::Error::last_os_error();
-            unsafe { libc::close(fd); }
+            unsafe {
+                libc::close(fd);
+            }
             return Err(PalError::Memory(format!("ftruncate (memfd) failed: {err}")));
         }
 

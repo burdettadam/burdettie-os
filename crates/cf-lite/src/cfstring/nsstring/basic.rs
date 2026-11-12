@@ -4,7 +4,7 @@ use std::ffi::{c_char, CStr, CString};
 
 use crate::cfstring::{
     cfstring_parts, extract_cfstring_cstr, shim_cf_string_create_with_cstring,
-    shim_cf_string_get_cstring_ptr, K_CF_STRING_ENCODING_UTF8, CF_STRING_FLAGS_UTF8,
+    shim_cf_string_get_cstring_ptr, CF_STRING_FLAGS_UTF8, K_CF_STRING_ENCODING_UTF8,
 };
 
 const NS_CASE_INSENSITIVE_SEARCH: u64 = 1;
@@ -262,11 +262,7 @@ pub extern "C" fn shim_nsstring_string_with_cstring_encoding(
 }
 
 /// `+[NSString stringWithString:]`
-pub extern "C" fn shim_nsstring_string_with_string(
-    _cls: u64,
-    _sel: u64,
-    source: u64,
-) -> u64 {
+pub extern "C" fn shim_nsstring_string_with_string(_cls: u64, _sel: u64, source: u64) -> u64 {
     if source == 0 {
         return 0;
     }
@@ -306,7 +302,10 @@ pub extern "C" fn shim_nsstring_string_with_contents_of_file_encoding_error(
     let result = shim_cf_string_create_with_cstring(0, c_str.as_ptr(), 0);
     let path_s = extract_cfstring_cstr(path).unwrap_or("?");
     let len = c_str.to_bytes().len();
-    eprintln!("[stringWithContentsOfFile] path={:?} len={} → {:#x}", path_s, len, result);
+    eprintln!(
+        "[stringWithContentsOfFile] path={:?} len={} → {:#x}",
+        path_s, len, result
+    );
     result
 }
 
@@ -357,26 +356,9 @@ pub extern "C" fn shim_nsstring_is_equal_to_string(obj: u64, _sel: u64, other: u
         return 0;
     }
 
-    unsafe {
-        let a_ptr = *((obj as *const u8).add(16) as *const u64) as *const c_char;
-        let a_len = *((obj as *const u8).add(24) as *const u64);
-        let b_ptr = *((other as *const u8).add(16) as *const u64) as *const c_char;
-        let b_len = *((other as *const u8).add(24) as *const u64);
-
-        if a_len != b_len {
-            return 0;
-        }
-        if a_ptr.is_null() || b_ptr.is_null() {
-            return if a_ptr == b_ptr { 1 } else { 0 };
-        }
-
-        let a_slice = std::slice::from_raw_parts(a_ptr as *const u8, a_len as usize);
-        let b_slice = std::slice::from_raw_parts(b_ptr as *const u8, b_len as usize);
-        if a_slice == b_slice {
-            1
-        } else {
-            0
-        }
+    match (extract_cfstring_cstr(obj), extract_cfstring_cstr(other)) {
+        (Some(a), Some(b)) => u8::from(a == b),
+        _ => 0,
     }
 }
 
@@ -628,7 +610,11 @@ pub extern "C" fn shim_nsstring_write_to_file(
     let Some(path_str) = extract_cfstring_cstr(path) else {
         return 0;
     };
-    log::info!("NSString writeToFile: path={}, encoding={}", path_str, encoding);
+    log::info!(
+        "NSString writeToFile: path={}, encoding={}",
+        path_str,
+        encoding
+    );
     let Some((bytes, _)) = cfstring_parts(obj) else {
         return 0;
     };
@@ -663,7 +649,9 @@ pub extern "C" fn shim_nsstring_write_to_file(
     match std::fs::write(path_str, &data) {
         Ok(()) => {
             if error != 0 {
-                unsafe { *(error as *mut u64) = 0; }
+                unsafe {
+                    *(error as *mut u64) = 0;
+                }
             }
             1
         }
@@ -854,7 +842,10 @@ mod tests {
     fn compare_options_case_insensitive() {
         let a = make_string("Xcode");
         let b = make_string("xcode");
-        assert_eq!(shim_nsstring_compare_options(a, 0, b, NS_CASE_INSENSITIVE_SEARCH), 0);
+        assert_eq!(
+            shim_nsstring_compare_options(a, 0, b, NS_CASE_INSENSITIVE_SEARCH),
+            0
+        );
         free_obj(a);
         free_obj(b);
     }
@@ -995,7 +986,11 @@ mod tests {
         std::fs::write(&path, "hello from disk").unwrap();
 
         let path_ns = make_string(path.to_string_lossy().as_ref());
-        let url = crate::nsurl::shim_nsurl_file_url_with_path(crate::nsobj::nsurl_class_addr(), 0, path_ns);
+        let url = crate::nsurl::shim_nsurl_file_url_with_path(
+            crate::nsobj::nsurl_class_addr(),
+            0,
+            path_ns,
+        );
         let mut encoding = 0u64;
         let mut error = 123u64;
         let result = shim_nsstring_string_with_contents_of_url_used_encoding_error(
@@ -1030,7 +1025,10 @@ mod tests {
     fn localized_case_insensitive_compare_ordering() {
         let a = make_string("apple");
         let b = make_string("Banana");
-        assert_eq!(shim_nsstring_localized_case_insensitive_compare(a, 0, b), -1);
+        assert_eq!(
+            shim_nsstring_localized_case_insensitive_compare(a, 0, b),
+            -1
+        );
         assert_eq!(shim_nsstring_localized_case_insensitive_compare(b, 0, a), 1);
         free_obj(a);
         free_obj(b);
@@ -1059,24 +1057,36 @@ mod tests {
     #[test]
     fn precomposed_returns_self() {
         let s = make_string("hello");
-        assert_eq!(shim_nsstring_precomposed_string_with_canonical_mapping(s, 0), s);
+        assert_eq!(
+            shim_nsstring_precomposed_string_with_canonical_mapping(s, 0),
+            s
+        );
         free_obj(s);
     }
 
     #[test]
     fn precomposed_nil_returns_nil() {
-        assert_eq!(shim_nsstring_precomposed_string_with_canonical_mapping(0, 0), 0);
+        assert_eq!(
+            shim_nsstring_precomposed_string_with_canonical_mapping(0, 0),
+            0
+        );
     }
 
     #[test]
     fn decomposed_returns_self() {
         let s = make_string("hello");
-        assert_eq!(shim_nsstring_decomposed_string_with_canonical_mapping(s, 0), s);
+        assert_eq!(
+            shim_nsstring_decomposed_string_with_canonical_mapping(s, 0),
+            s
+        );
         free_obj(s);
     }
 
     #[test]
     fn decomposed_nil_returns_nil() {
-        assert_eq!(shim_nsstring_decomposed_string_with_canonical_mapping(0, 0), 0);
+        assert_eq!(
+            shim_nsstring_decomposed_string_with_canonical_mapping(0, 0),
+            0
+        );
     }
 }

@@ -33,7 +33,12 @@ fn draw_line_diagonal() {
     let mut s = Surface::new(100, 100);
     {
         let mut r = SoftwareRenderer::new(&mut s);
-        r.draw_line(Point::new(0.0, 0.0), Point::new(30.0, 30.0), Color::GREEN, 1.0);
+        r.draw_line(
+            Point::new(0.0, 0.0),
+            Point::new(30.0, 30.0),
+            Color::GREEN,
+            1.0,
+        );
     }
     // Bresenham diagonal: pixels along y==x should be set
     for i in [0, 10, 20, 30] {
@@ -118,7 +123,11 @@ fn fill_rounded_rect_basic() {
     // Center should be filled
     assert_ne!(pixel_at(&s, 50, 30), 0, "center should be filled");
     // Extreme corner of the bounding box (10,10) should be empty because of rounding
-    assert_eq!(pixel_at(&s, 10, 10), 0, "top-left corner should be empty due to rounding");
+    assert_eq!(
+        pixel_at(&s, 10, 10),
+        0,
+        "top-left corner should be empty due to rounding"
+    );
 }
 
 // ── stroke_rounded_rect ────────────────────────────────────────────
@@ -134,7 +143,11 @@ fn stroke_rounded_rect_basic() {
     let top_mid = pixel_at(&s, 50, 10);
     assert_ne!(top_mid, 0, "top border should have pixels");
     // Interior center should be empty (not filled, only stroked)
-    assert_eq!(pixel_at(&s, 50, 30), 0, "interior should be empty for stroke");
+    assert_eq!(
+        pixel_at(&s, 50, 30),
+        0,
+        "interior should be empty for stroke"
+    );
 }
 
 // ── fill_ellipse ───────────────────────────────────────────────────
@@ -160,9 +173,17 @@ fn stroke_ellipse_basic() {
         r.stroke_ellipse(Rect::new(10.0, 10.0, 80.0, 40.0), Color::GREEN, 1.0);
     }
     // Top-center of the ellipse outline: pixel at (50, 10) should be drawn
-    assert_ne!(pixel_at(&s, 50, 10), 0, "top of ellipse outline should have pixels");
+    assert_ne!(
+        pixel_at(&s, 50, 10),
+        0,
+        "top of ellipse outline should have pixels"
+    );
     // Center should be empty (stroke only)
-    assert_eq!(pixel_at(&s, 50, 30), 0, "interior should be empty for stroke");
+    assert_eq!(
+        pixel_at(&s, 50, 30),
+        0,
+        "interior should be empty for stroke"
+    );
 }
 
 // ── fill_circle ────────────────────────────────────────────────────
@@ -177,8 +198,16 @@ fn fill_circle_basic() {
     // Center should be filled
     assert_ne!(pixel_at(&s, 50, 50), 0, "circle center should be filled");
     // Corners of bounding box (30,30)-(70,70) should be empty (circle doesn't reach)
-    assert_eq!(pixel_at(&s, 30, 30), 0, "top-left corner of bbox should be empty");
-    assert_eq!(pixel_at(&s, 70, 70), 0, "bottom-right corner of bbox should be empty");
+    assert_eq!(
+        pixel_at(&s, 30, 30),
+        0,
+        "top-left corner of bbox should be empty"
+    );
+    assert_eq!(
+        pixel_at(&s, 70, 70),
+        0,
+        "bottom-right corner of bbox should be empty"
+    );
 }
 
 // ── fill_path ──────────────────────────────────────────────────────
@@ -197,7 +226,11 @@ fn fill_path_triangle() {
         r.fill_path(&path, Color::RED);
     }
     // Centroid area should be filled
-    assert_ne!(pixel_at(&s, 50, 60), 0, "triangle interior should be filled");
+    assert_ne!(
+        pixel_at(&s, 50, 60),
+        0,
+        "triangle interior should be filled"
+    );
     // Well outside the triangle should be empty
     assert_eq!(pixel_at(&s, 5, 5), 0, "outside triangle should be empty");
 }
@@ -211,7 +244,11 @@ fn fill_path_rect() {
         let mut r = SoftwareRenderer::new(&mut s);
         r.fill_path(&path, Color::GREEN);
     }
-    assert_ne!(pixel_at(&s, 30, 30), 0, "rect path interior should be filled");
+    assert_ne!(
+        pixel_at(&s, 30, 30),
+        0,
+        "rect path interior should be filled"
+    );
     assert_eq!(pixel_at(&s, 5, 5), 0, "outside rect path should be empty");
 }
 
@@ -231,9 +268,17 @@ fn stroke_path_triangle() {
         r.stroke_path(&path, Color::RED, 1.0);
     }
     // Bottom edge: near (50, 90) should have stroke pixels
-    assert_ne!(pixel_at(&s, 50, 90), 0, "triangle bottom edge should have stroke");
+    assert_ne!(
+        pixel_at(&s, 50, 90),
+        0,
+        "triangle bottom edge should have stroke"
+    );
     // Interior should be empty (stroke only)
-    assert_eq!(pixel_at(&s, 50, 60), 0, "triangle interior should be empty for stroke");
+    assert_eq!(
+        pixel_at(&s, 50, 60),
+        0,
+        "triangle interior should be empty for stroke"
+    );
 }
 
 // ── fill_gradient ──────────────────────────────────────────────────
@@ -268,12 +313,7 @@ fn fill_gradient_linear() {
 
 #[test]
 fn fill_gradient_radial() {
-    let gradient = Gradient::radial_two(
-        Point::new(50.0, 50.0),
-        50.0,
-        Color::WHITE,
-        Color::BLACK,
-    );
+    let gradient = Gradient::radial_two(Point::new(50.0, 50.0), 50.0, Color::WHITE, Color::BLACK);
 
     let mut s = Surface::new(100, 100);
     {
@@ -331,7 +371,11 @@ fn fill_path_complex_quad() {
         r.fill_path(&path, Color::BLUE);
     }
     // Lower interior should be filled
-    assert_ne!(pixel_at(&s, 50, 70), 0, "path with quad_to should fill interior");
+    assert_ne!(
+        pixel_at(&s, 50, 70),
+        0,
+        "path with quad_to should fill interior"
+    );
 }
 
 #[test]
@@ -362,7 +406,11 @@ fn fill_ellipse_produces_round_shape() {
     }
     // The corner of the bounding box should NOT be filled (ellipse is round)
     assert_eq!(pixel_at(&s, 10, 10), 0, "top-left corner should be empty");
-    assert_eq!(pixel_at(&s, 89, 49), 0, "bottom-right corner should be empty");
+    assert_eq!(
+        pixel_at(&s, 89, 49),
+        0,
+        "bottom-right corner should be empty"
+    );
     // But center should be filled
     assert_ne!(pixel_at(&s, 50, 30), 0, "center should be filled");
 }

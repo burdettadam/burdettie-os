@@ -28,7 +28,8 @@ impl ReplayHandler {
         let conn = Connection::open_with_flags(
             db_path,
             rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
-        ).ok()?;
+        )
+        .ok()?;
 
         // Verify the table exists
         let has_table: bool = conn
@@ -45,12 +46,18 @@ impl ReplayHandler {
         }
 
         let count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM requests WHERE source='http'", [], |row| row.get(0))
+            .query_row(
+                "SELECT COUNT(*) FROM requests WHERE source='http'",
+                [],
+                |row| row.get(0),
+            )
             .unwrap_or(0);
 
         log::info!("burdettie-services: replay loaded {count} HTTP records from {db_path}");
 
-        Some(Self { conn: Mutex::new(conn) })
+        Some(Self {
+            conn: Mutex::new(conn),
+        })
     }
 
     /// Look up a recorded response for the given URL and method.
@@ -98,9 +105,13 @@ struct ReplayRecord {
 }
 
 impl Handler for ReplayHandler {
-    fn handle(&self, path: &str, method: &str, _body: &[u8], _request: &Request)
-        -> Option<HandlerResponse>
-    {
+    fn handle(
+        &self,
+        path: &str,
+        method: &str,
+        _body: &[u8],
+        _request: &Request,
+    ) -> Option<HandlerResponse> {
         // Try to find a recorded response matching this request path
         let record = self.lookup(path, method)?;
 
@@ -116,7 +127,11 @@ impl Handler for ReplayHandler {
         let content_type = extract_content_type(&record.headers)
             .unwrap_or_else(|| "application/octet-stream".to_string());
 
-        Some(HandlerResponse::with_status(record.status, content_type, record.body))
+        Some(HandlerResponse::with_status(
+            record.status,
+            content_type,
+            record.body,
+        ))
     }
 }
 
@@ -175,9 +190,12 @@ mod tests {
              VALUES ('http', '/api/v1/telemetry/xp/report', 'POST', 200,
              '{\"content-type\":\"application/json\"}', X'7B7D')",
             [],
-        ).unwrap();
+        )
+        .unwrap();
 
-        let handler = ReplayHandler { conn: Mutex::new(conn) };
+        let handler = ReplayHandler {
+            conn: Mutex::new(conn),
+        };
         let record = handler.lookup("/api/v1/telemetry/xp/report", "POST");
         assert!(record.is_some());
         let r = record.unwrap();
@@ -188,7 +206,9 @@ mod tests {
     #[test]
     fn replay_returns_none_for_missing_record() {
         let conn = create_test_db();
-        let handler = ReplayHandler { conn: Mutex::new(conn) };
+        let handler = ReplayHandler {
+            conn: Mutex::new(conn),
+        };
         assert!(handler.lookup("/nonexistent", "GET").is_none());
     }
 
@@ -201,16 +221,20 @@ mod tests {
              VALUES ('http', '/api/v1/dns/resolve', 'GET', 200,
              '{}', X'6F6C64')",
             [],
-        ).unwrap();
+        )
+        .unwrap();
         conn.execute(
             "INSERT INTO requests (source, rewritten_url, method, response_status,
              response_headers, response_body)
              VALUES ('http', '/api/v1/dns/resolve', 'GET', 200,
              '{}', X'6E6577')",
             [],
-        ).unwrap();
+        )
+        .unwrap();
 
-        let handler = ReplayHandler { conn: Mutex::new(conn) };
+        let handler = ReplayHandler {
+            conn: Mutex::new(conn),
+        };
         let record = handler.lookup("/api/v1/dns/resolve", "GET").unwrap();
         assert_eq!(record.body, b"new");
     }
@@ -236,14 +260,18 @@ mod tests {
              response_headers, response_body)
              VALUES ('http', '/test', 'GET', 200, '{}', X'00')",
             [],
-        ).unwrap();
+        )
+        .unwrap();
         conn.execute(
             "INSERT INTO requests (source, dns_query, dns_resolved)
              VALUES ('dns', 'test.com', '[]')",
             [],
-        ).unwrap();
+        )
+        .unwrap();
 
-        let handler = ReplayHandler { conn: Mutex::new(conn) };
+        let handler = ReplayHandler {
+            conn: Mutex::new(conn),
+        };
         assert_eq!(handler.http_record_count(), 1);
     }
 }

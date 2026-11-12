@@ -1,0 +1,3 @@
+- In arm64 FP 1-source decode, only bits[14:10] are fixed to `10000`; bit15 is opcode[0], so checking bits[15:10] breaks odd-opcode forms such as FABS, FSQRT, and one FCVT encoding.
+- FCSEL decode for single/double forms should match top byte `0x1E`, bit21=`1`, and bits[11:10]=`11`; a bits[23:21]==`100` guard is unreachable for valid encodings.
+- Scalar FABD decode must not hard-code the double top byte `0x7E`; single-precision uses the same pattern with the size bit cleared (`0x5E`), so the guard needs to mask out bit22 and test bit21 separately.

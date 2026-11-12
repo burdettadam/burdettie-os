@@ -47,19 +47,25 @@ fn run_typestate(fixture_rel: &str) -> Option<macho_runtime::RuntimeResult> {
 
 #[test]
 fn typestate_return42() {
-    let Some(result) = run_typestate("return42/return42") else { return };
+    let Some(result) = run_typestate("return42/return42") else {
+        return;
+    };
     assert_eq!(result.exit_code, 42);
 }
 
 #[test]
 fn typestate_simple_cli() {
-    let Some(result) = run_typestate("simple_cli/app") else { return };
+    let Some(result) = run_typestate("simple_cli/app") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0);
 }
 
 #[test]
 fn typestate_constructor_test() {
-    let Some(result) = run_typestate("constructor_test/app") else { return };
+    let Some(result) = run_typestate("constructor_test/app") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0);
     assert!(result.initializers_run > 0);
 }
@@ -108,7 +114,9 @@ fn typestate_accessors_at_each_phase() {
 
 #[test]
 fn typestate_objc_minimal() {
-    let Some(result) = run_typestate("objc_minimal/objc_minimal") else { return };
+    let Some(result) = run_typestate("objc_minimal/objc_minimal") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0);
 }
 
@@ -116,7 +124,12 @@ fn typestate_objc_minimal() {
 
 #[test]
 fn typestate_dylib_chain() {
-    let Some(result) = run_typestate("dylib_chain/app") else { return };
+    let Some(result) = run_typestate("dylib_chain/app") else {
+        return;
+    };
     assert_eq!(result.exit_code, 0);
-    assert!(result.images_loaded > 1, "dylib_chain should load multiple images");
+    assert!(
+        result.images_loaded > 1,
+        "dylib_chain should load multiple images"
+    );
 }

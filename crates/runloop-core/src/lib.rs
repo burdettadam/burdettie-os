@@ -184,7 +184,10 @@ impl RunLoop {
 
     /// Enqueue a block to execute on the next cycle.
     pub fn perform(&self, block: impl FnOnce() + Send + 'static) {
-        self.pending.lock().unwrap_or_else(|e| e.into_inner()).push(Box::new(block));
+        self.pending
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .push(Box::new(block));
     }
 
     /// Schedule a timer.
@@ -203,13 +206,19 @@ impl RunLoop {
             callback: Box::new(callback),
             cancelled: false,
         };
-        self.timers.lock().unwrap_or_else(|e| e.into_inner()).push(entry);
+        self.timers
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .push(entry);
         token
     }
 
     /// Cancel a previously scheduled timer.
     pub fn cancel_timer(&self, token: TimerToken) {
-        self.cancelled.lock().unwrap_or_else(|e| e.into_inner()).push(token);
+        self.cancelled
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .push(token);
     }
 
     /// Schedule a `Timer` on this run loop, returning a `TimerId`.
@@ -223,7 +232,10 @@ impl RunLoop {
             callback: timer.callback,
             cancelled: !timer.valid,
         };
-        self.timers.lock().unwrap_or_else(|e| e.into_inner()).push(entry);
+        self.timers
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .push(entry);
         token
     }
 

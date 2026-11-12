@@ -4,11 +4,11 @@
 //! Service refs are opaque handles with pipe-based fds for event loop integration.
 //! No real network discovery; all responses are synthetic.
 
+use crate::table::ShimTable;
 use std::collections::HashMap;
 use std::os::unix::io::RawFd;
-use std::sync::{Mutex, OnceLock};
 use std::sync::atomic::{AtomicU64, Ordering};
-use crate::table::ShimTable;
+use std::sync::{Mutex, OnceLock};
 
 // ── ServiceRef state ───────────────────────────────────────────
 
@@ -106,7 +106,9 @@ pub extern "C" fn DNSServiceBrowse(
         return -1;
     }
     let handle = alloc_service_ref(ServiceKind::Browse, callback, context);
-    unsafe { *sd_ref = handle; }
+    unsafe {
+        *sd_ref = handle;
+    }
     0
 }
 
@@ -129,7 +131,9 @@ pub extern "C" fn DNSServiceRegister(
         return -1;
     }
     let handle = alloc_service_ref(ServiceKind::Register, callback, context);
-    unsafe { *sd_ref = handle; }
+    unsafe {
+        *sd_ref = handle;
+    }
     0
 }
 
@@ -148,7 +152,9 @@ pub extern "C" fn DNSServiceResolve(
         return -1;
     }
     let handle = alloc_service_ref(ServiceKind::Resolve, callback, context);
-    unsafe { *sd_ref = handle; }
+    unsafe {
+        *sd_ref = handle;
+    }
     0
 }
 
@@ -165,9 +171,32 @@ pub extern "C" fn DNSServiceProcessResult(sd_ref: u64) -> i32 {
     if let Some(r) = refs.get(&sd_ref) {
         // For now, just call the callback with nulls
         if r.callback != 0 {
-            let cb: extern "C" fn(u64, u32, u32, u32, *const u8, *const u8, *const u8, *const u8, u16, *const u8, u64) =
-                unsafe { std::mem::transmute(r.callback as usize) };
-            cb(sd_ref, 0, 0, 0, std::ptr::null(), std::ptr::null(), std::ptr::null(), std::ptr::null(), 0, std::ptr::null(), r.context);
+            let cb: extern "C" fn(
+                u64,
+                u32,
+                u32,
+                u32,
+                *const u8,
+                *const u8,
+                *const u8,
+                *const u8,
+                u16,
+                *const u8,
+                u64,
+            ) = unsafe { std::mem::transmute(r.callback as usize) };
+            cb(
+                sd_ref,
+                0,
+                0,
+                0,
+                std::ptr::null(),
+                std::ptr::null(),
+                std::ptr::null(),
+                std::ptr::null(),
+                0,
+                std::ptr::null(),
+                r.context,
+            );
         }
     }
     0
@@ -177,7 +206,9 @@ pub extern "C" fn DNSServiceProcessResult(sd_ref: u64) -> i32 {
 pub extern "C" fn DNSServiceRefDeallocate(sd_ref: u64) {
     let mut refs = service_refs().lock().unwrap();
     if let Some(r) = refs.remove(&sd_ref) {
-        unsafe { libc::close(r.fd); }
+        unsafe {
+            libc::close(r.fd);
+        }
     }
 }
 
@@ -188,18 +219,63 @@ pub struct DnsSdStubs;
 impl DnsSdStubs {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
-        register_shims!(table,
-            ("_DNSServiceBrowse", DNSServiceBrowse as *const () as u64, "DNSServiceBrowse → stub"),
-            ("_DNSServiceRegister", DNSServiceRegister as *const () as u64, "DNSServiceRegister → stub"),
-            ("_DNSServiceResolve", DNSServiceResolve as *const () as u64, "DNSServiceResolve → stub"),
-            ("_DNSServiceRefSockFD", DNSServiceRefSockFD as *const () as u64, "DNSServiceRefSockFD → stub"),
-            ("_DNSServiceProcessResult", DNSServiceProcessResult as *const () as u64, "DNSServiceProcessResult → stub"),
-            ("_DNSServiceRefDeallocate", DNSServiceRefDeallocate as *const () as u64, "DNSServiceRefDeallocate → stub"),
-            ("_TXTRecordCreate", TXTRecordCreate as *const () as u64, "TXTRecordCreate → stub"),
-            ("_TXTRecordDeallocate", TXTRecordDeallocate as *const () as u64, "TXTRecordDeallocate → stub"),
-            ("_TXTRecordSetValue", TXTRecordSetValue as *const () as u64, "TXTRecordSetValue → stub"),
-            ("_TXTRecordGetLength", TXTRecordGetLength as *const () as u64, "TXTRecordGetLength → stub"),
-            ("_TXTRecordGetBytesPtr", TXTRecordGetBytesPtr as *const () as u64, "TXTRecordGetBytesPtr → stub")
+        register_shims!(
+            table,
+            (
+                "_DNSServiceBrowse",
+                DNSServiceBrowse as *const () as u64,
+                "DNSServiceBrowse → stub"
+            ),
+            (
+                "_DNSServiceRegister",
+                DNSServiceRegister as *const () as u64,
+                "DNSServiceRegister → stub"
+            ),
+            (
+                "_DNSServiceResolve",
+                DNSServiceResolve as *const () as u64,
+                "DNSServiceResolve → stub"
+            ),
+            (
+                "_DNSServiceRefSockFD",
+                DNSServiceRefSockFD as *const () as u64,
+                "DNSServiceRefSockFD → stub"
+            ),
+            (
+                "_DNSServiceProcessResult",
+                DNSServiceProcessResult as *const () as u64,
+                "DNSServiceProcessResult → stub"
+            ),
+            (
+                "_DNSServiceRefDeallocate",
+                DNSServiceRefDeallocate as *const () as u64,
+                "DNSServiceRefDeallocate → stub"
+            ),
+            (
+                "_TXTRecordCreate",
+                TXTRecordCreate as *const () as u64,
+                "TXTRecordCreate → stub"
+            ),
+            (
+                "_TXTRecordDeallocate",
+                TXTRecordDeallocate as *const () as u64,
+                "TXTRecordDeallocate → stub"
+            ),
+            (
+                "_TXTRecordSetValue",
+                TXTRecordSetValue as *const () as u64,
+                "TXTRecordSetValue → stub"
+            ),
+            (
+                "_TXTRecordGetLength",
+                TXTRecordGetLength as *const () as u64,
+                "TXTRecordGetLength → stub"
+            ),
+            (
+                "_TXTRecordGetBytesPtr",
+                TXTRecordGetBytesPtr as *const () as u64,
+                "TXTRecordGetBytesPtr → stub"
+            )
         );
         log::debug!("DnsSdStubs: registered 11 shims");
     }
@@ -217,7 +293,10 @@ mod tests {
     fn browse_register_resolve_fd() {
         let _g = TEST_LOCK.lock().unwrap();
         let mut sd_ref: u64 = 0;
-        assert_eq!(DNSServiceBrowse(&mut sd_ref, 0, 0, std::ptr::null(), std::ptr::null(), 0, 0), 0);
+        assert_eq!(
+            DNSServiceBrowse(&mut sd_ref, 0, 0, std::ptr::null(), std::ptr::null(), 0, 0),
+            0
+        );
         assert!(sd_ref != 0);
         let fd = DNSServiceRefSockFD(sd_ref);
         assert!(fd > 0);
@@ -228,13 +307,40 @@ mod tests {
     fn process_result_invokes_callback() {
         let _g = TEST_LOCK.lock().unwrap();
         static mut CALLED: bool = false;
-        extern "C" fn cb(_sd_ref: u64, _flags: u32, _iface: u32, _err: u32, _fullname: *const u8, _host: *const u8, _regtype: *const u8, _domain: *const u8, _port: u16, _txt: *const u8, _context: u64) {
-            unsafe { CALLED = true; }
+        extern "C" fn cb(
+            _sd_ref: u64,
+            _flags: u32,
+            _iface: u32,
+            _err: u32,
+            _fullname: *const u8,
+            _host: *const u8,
+            _regtype: *const u8,
+            _domain: *const u8,
+            _port: u16,
+            _txt: *const u8,
+            _context: u64,
+        ) {
+            unsafe {
+                CALLED = true;
+            }
         }
         let mut sd_ref: u64 = 0;
-        assert_eq!(DNSServiceBrowse(&mut sd_ref, 0, 0, std::ptr::null(), std::ptr::null(), cb as u64, 0), 0);
+        assert_eq!(
+            DNSServiceBrowse(
+                &mut sd_ref,
+                0,
+                0,
+                std::ptr::null(),
+                std::ptr::null(),
+                cb as u64,
+                0
+            ),
+            0
+        );
         assert_eq!(DNSServiceProcessResult(sd_ref), 0);
-        unsafe { assert!(CALLED); }
+        unsafe {
+            assert!(CALLED);
+        }
         DNSServiceRefDeallocate(sd_ref);
     }
 }

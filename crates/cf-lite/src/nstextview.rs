@@ -14,13 +14,19 @@ const TEXT_PADDING_Y: f64 = 2.0;
 const DEFAULT_FONT_SIZE: f64 = 14.0;
 
 fn read_u64(obj: u64, offset: usize) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as *const u8).add(offset) as *const u64) }
 }
 
 fn write_u64(obj: u64, offset: usize, val: u64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as *mut u8).add(offset) as *mut u64) = val; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as *mut u8).add(offset) as *mut u64) = val;
+    }
 }
 
 pub(crate) const TEXT_VIEW_SIZE: usize = 112;
@@ -50,14 +56,21 @@ fn unpack_selection(packed: u64) -> (i32, i32) {
 
 /// `-[NSTextView initWithFrame:]`
 pub extern "C" fn shim_nstextview_init_with_frame(
-    obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64,
+    obj: u64,
+    _cmd: u64,
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
 ) -> u64 {
     let ptr = if obj == 0 {
         crate::pal_alloc().calloc(1, TEXT_VIEW_SIZE) as u64
     } else {
         obj
     };
-    if ptr == 0 { return 0; }
+    if ptr == 0 {
+        return 0;
+    }
 
     // Preserve ISA if already set, else set to NSTextView.
     let isa = read_u64(ptr, 0);
@@ -69,7 +82,11 @@ pub extern "C" fn shim_nstextview_init_with_frame(
     crate::nsview::shim_nsview_set_frame(ptr, 0, x, y, w, h);
 
     // Default flags: editable + selectable + rich text.
-    write_u64(ptr, FLAGS_OFF, FLAG_IS_EDITABLE | FLAG_IS_SELECTABLE | FLAG_IS_RICH_TEXT | FLAG_ALLOWS_UNDO);
+    write_u64(
+        ptr,
+        FLAGS_OFF,
+        FLAG_IS_EDITABLE | FLAG_IS_SELECTABLE | FLAG_IS_RICH_TEXT | FLAG_ALLOWS_UNDO,
+    );
 
     // Empty string (kept as mirror for callers of -[NSTextView string]).
     let empty = crate::cfstring::alloc_nsstring_from_cstr(b"\0".as_ptr() as *const _);
@@ -84,7 +101,9 @@ pub extern "C" fn shim_nstextview_init_with_frame(
 
 /// `-[NSTextView string]` — syncs from editor buffer before returning.
 pub extern "C" fn shim_nstextview_string(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     // Sync STRING_OFF from editor text.
     let text = graphics_core::text_system::editor_get_text(obj);
     if !text.is_empty() {
@@ -114,7 +133,9 @@ pub extern "C" fn shim_nstextview_set_string(obj: u64, _cmd: u64, str_obj: u64) 
 
 /// `-[NSTextView textStorage]` — lazily creates and links an NSTextStorage.
 pub extern "C" fn shim_nstextview_text_storage(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     // If already linked, return the existing storage.
     if let Some(s) = crate::nstextstorage::storage_for_view(obj) {
         // Sync storage string from editor before returning.
@@ -147,9 +168,15 @@ pub extern "C" fn shim_nstextview_is_editable(obj: u64, _cmd: u64) -> u8 {
 
 /// `-[NSTextView setEditable:]`
 pub extern "C" fn shim_nstextview_set_editable(obj: u64, _cmd: u64, flag: u8) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let mut flags = read_u64(obj, FLAGS_OFF);
-    if flag != 0 { flags |= FLAG_IS_EDITABLE; } else { flags &= !FLAG_IS_EDITABLE; }
+    if flag != 0 {
+        flags |= FLAG_IS_EDITABLE;
+    } else {
+        flags &= !FLAG_IS_EDITABLE;
+    }
     write_u64(obj, FLAGS_OFF, flags);
 }
 
@@ -160,9 +187,15 @@ pub extern "C" fn shim_nstextview_is_selectable(obj: u64, _cmd: u64) -> u8 {
 
 /// `-[NSTextView setSelectable:]`
 pub extern "C" fn shim_nstextview_set_selectable(obj: u64, _cmd: u64, flag: u8) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let mut flags = read_u64(obj, FLAGS_OFF);
-    if flag != 0 { flags |= FLAG_IS_SELECTABLE; } else { flags &= !FLAG_IS_SELECTABLE; }
+    if flag != 0 {
+        flags |= FLAG_IS_SELECTABLE;
+    } else {
+        flags &= !FLAG_IS_SELECTABLE;
+    }
     write_u64(obj, FLAGS_OFF, flags);
 }
 
@@ -173,9 +206,15 @@ pub extern "C" fn shim_nstextview_is_rich_text(obj: u64, _cmd: u64) -> u8 {
 
 /// `-[NSTextView setRichText:]`
 pub extern "C" fn shim_nstextview_set_rich_text(obj: u64, _cmd: u64, flag: u8) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let mut flags = read_u64(obj, FLAGS_OFF);
-    if flag != 0 { flags |= FLAG_IS_RICH_TEXT; } else { flags &= !FLAG_IS_RICH_TEXT; }
+    if flag != 0 {
+        flags |= FLAG_IS_RICH_TEXT;
+    } else {
+        flags &= !FLAG_IS_RICH_TEXT;
+    }
     write_u64(obj, FLAGS_OFF, flags);
 }
 
@@ -186,9 +225,15 @@ pub extern "C" fn shim_nstextview_is_field_editor(obj: u64, _cmd: u64) -> u8 {
 
 /// `-[NSTextView setFieldEditor:]`
 pub extern "C" fn shim_nstextview_set_field_editor(obj: u64, _cmd: u64, flag: u8) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let mut flags = read_u64(obj, FLAGS_OFF);
-    if flag != 0 { flags |= FLAG_IS_FIELD_EDITOR; } else { flags &= !FLAG_IS_FIELD_EDITOR; }
+    if flag != 0 {
+        flags |= FLAG_IS_FIELD_EDITOR;
+    } else {
+        flags &= !FLAG_IS_FIELD_EDITOR;
+    }
     write_u64(obj, FLAGS_OFF, flags);
 }
 
@@ -199,9 +244,15 @@ pub extern "C" fn shim_nstextview_uses_font_panel(obj: u64, _cmd: u64) -> u8 {
 
 /// `-[NSTextView setUsesFontPanel:]`
 pub extern "C" fn shim_nstextview_set_uses_font_panel(obj: u64, _cmd: u64, flag: u8) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let mut flags = read_u64(obj, FLAGS_OFF);
-    if flag != 0 { flags |= FLAG_USES_FONT_PANEL; } else { flags &= !FLAG_USES_FONT_PANEL; }
+    if flag != 0 {
+        flags |= FLAG_USES_FONT_PANEL;
+    } else {
+        flags &= !FLAG_USES_FONT_PANEL;
+    }
     write_u64(obj, FLAGS_OFF, flags);
 }
 
@@ -212,15 +263,23 @@ pub extern "C" fn shim_nstextview_allows_undo(obj: u64, _cmd: u64) -> u8 {
 
 /// `-[NSTextView setAllowsUndo:]`
 pub extern "C" fn shim_nstextview_set_allows_undo(obj: u64, _cmd: u64, flag: u8) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let mut flags = read_u64(obj, FLAGS_OFF);
-    if flag != 0 { flags |= FLAG_ALLOWS_UNDO; } else { flags &= !FLAG_ALLOWS_UNDO; }
+    if flag != 0 {
+        flags |= FLAG_ALLOWS_UNDO;
+    } else {
+        flags &= !FLAG_ALLOWS_UNDO;
+    }
     write_u64(obj, FLAGS_OFF, flags);
 }
 
 /// `-[NSTextView selectedRange]` — returns NSRange as (location, length) via x0/x1.
 pub extern "C" fn shim_nstextview_selected_range(obj: u64, _cmd: u64) -> (u64, u64) {
-    if obj == 0 { return (0, 0); }
+    if obj == 0 {
+        return (0, 0);
+    }
     let packed = read_u64(obj, SELECTION_OFF);
     let (start, length) = unpack_selection(packed);
     (start as u64, length as u64)
@@ -228,27 +287,37 @@ pub extern "C" fn shim_nstextview_selected_range(obj: u64, _cmd: u64) -> (u64, u
 
 /// `-[NSTextView setSelectedRange:]`
 pub extern "C" fn shim_nstextview_set_selected_range(obj: u64, _cmd: u64, loc: u64, len: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     write_u64(obj, SELECTION_OFF, pack_selection(loc as i32, len as i32));
 }
 
 /// `-[NSTextView acceptsFirstResponder]`
 pub extern "C" fn shim_nstextview_accepts_first_responder(obj: u64, _cmd: u64) -> u8 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     u8::from(read_u64(obj, FLAGS_OFF) & FLAG_IS_EDITABLE != 0)
 }
 
 /// `-[NSTextView insertText:]`
 pub extern "C" fn shim_nstextview_insert_text(obj: u64, _cmd: u64, text: u64) {
-    if obj == 0 || text == 0 { return; }
+    if obj == 0 || text == 0 {
+        return;
+    }
 
     let utf8 = crate::cfstring::shim_nsstring_utf8string(text, 0);
-    if utf8.is_null() { return; }
+    if utf8.is_null() {
+        return;
+    }
     let typed = match unsafe { std::ffi::CStr::from_ptr(utf8) }.to_str() {
         Ok(s) => s,
         Err(_) => return,
     };
-    if typed.is_empty() { return; }
+    if typed.is_empty() {
+        return;
+    }
 
     // Insert each character through the editor at the cursor.
     use graphics_core::text_system::Action;
@@ -261,7 +330,9 @@ pub extern "C" fn shim_nstextview_insert_text(obj: u64, _cmd: u64, text: u64) {
 
 /// `-[NSTextView keyDown:]`
 pub extern "C" fn shim_nstextview_key_down(obj: u64, _cmd: u64, event: u64) {
-    if obj == 0 || event == 0 { return; }
+    if obj == 0 || event == 0 {
+        return;
+    }
 
     let flags = read_u64(obj, FLAGS_OFF);
     if flags & FLAG_IS_EDITABLE == 0 {
@@ -274,13 +345,14 @@ pub extern "C" fn shim_nstextview_key_down(obj: u64, _cmd: u64, event: u64) {
     let key_code = crate::nsevent::shim_nsevent_key_code(event, 0);
     let modifiers = crate::nsevent::shim_nsevent_modifier_flags(event, 0);
     let shift = modifiers & 0x20000 != 0; // NSEventModifierFlagShift
-    let cmd = modifiers & 0x100000 != 0;  // NSEventModifierFlagCommand
+    let cmd = modifiers & 0x100000 != 0; // NSEventModifierFlagCommand
 
     let action = match key_code {
-        51 => Some(Action::Backspace),        // Delete/Backspace
-        117 => Some(Action::Delete),           // Forward Delete
-        36 => Some(Action::Enter),             // Return
-        123 => { // Left arrow
+        51 => Some(Action::Backspace), // Delete/Backspace
+        117 => Some(Action::Delete),   // Forward Delete
+        36 => Some(Action::Enter),     // Return
+        123 => {
+            // Left arrow
             if cmd {
                 Some(Action::Motion(Motion::Home))
             } else if shift {
@@ -289,7 +361,8 @@ pub extern "C" fn shim_nstextview_key_down(obj: u64, _cmd: u64, event: u64) {
                 Some(Action::Motion(Motion::Left))
             }
         }
-        124 => { // Right arrow
+        124 => {
+            // Right arrow
             if cmd {
                 Some(Action::Motion(Motion::End))
             } else if shift {
@@ -298,8 +371,8 @@ pub extern "C" fn shim_nstextview_key_down(obj: u64, _cmd: u64, event: u64) {
                 Some(Action::Motion(Motion::Right))
             }
         }
-        125 => Some(Action::Motion(Motion::Down)),  // Down arrow
-        126 => Some(Action::Motion(Motion::Up)),     // Up arrow
+        125 => Some(Action::Motion(Motion::Down)), // Down arrow
+        126 => Some(Action::Motion(Motion::Up)),   // Up arrow
         _ => None,
     };
 
@@ -328,7 +401,9 @@ pub extern "C" fn shim_nstextview_key_down(obj: u64, _cmd: u64, event: u64) {
 
 /// `-[NSTextView mouseDown:]` — set cursor from click position.
 pub extern "C" fn shim_nstextview_mouse_down(obj: u64, _cmd: u64, event: u64) {
-    if obj == 0 || event == 0 { return; }
+    if obj == 0 || event == 0 {
+        return;
+    }
     let flags = read_u64(obj, FLAGS_OFF);
     if flags & FLAG_IS_SELECTABLE == 0 {
         return;
@@ -348,9 +423,18 @@ pub extern "C" fn shim_nstextview_mouse_down(obj: u64, _cmd: u64, event: u64) {
     let click_count = crate::nsevent::shim_nsevent_click_count(event, 0);
     use graphics_core::text_system::Action;
     let action = match click_count {
-        2 => Action::DoubleClick { x: click_x, y: click_y },
-        3 => Action::TripleClick { x: click_x, y: click_y },
-        _ => Action::Click { x: click_x, y: click_y },
+        2 => Action::DoubleClick {
+            x: click_x,
+            y: click_y,
+        },
+        3 => Action::TripleClick {
+            x: click_x,
+            y: click_y,
+        },
+        _ => Action::Click {
+            x: click_x,
+            y: click_y,
+        },
     };
     graphics_core::text_system::editor_action(obj, action);
     crate::nsview::shim_nsview_set_needs_display(obj, 0, 1);
@@ -358,7 +442,9 @@ pub extern "C" fn shim_nstextview_mouse_down(obj: u64, _cmd: u64, event: u64) {
 
 /// `-[NSTextView mouseDragged:]` — extend selection.
 pub extern "C" fn shim_nstextview_mouse_dragged(obj: u64, _cmd: u64, event: u64) {
-    if obj == 0 || event == 0 { return; }
+    if obj == 0 || event == 0 {
+        return;
+    }
     let flags = read_u64(obj, FLAGS_OFF);
     if flags & FLAG_IS_SELECTABLE == 0 {
         return;
@@ -370,16 +456,26 @@ pub extern "C" fn shim_nstextview_mouse_dragged(obj: u64, _cmd: u64, event: u64)
     let drag_y = (loc_y - frame.origin.y - TEXT_PADDING_Y) as i32;
 
     use graphics_core::text_system::Action;
-    graphics_core::text_system::editor_action(obj, Action::Drag { x: drag_x, y: drag_y });
+    graphics_core::text_system::editor_action(
+        obj,
+        Action::Drag {
+            x: drag_x,
+            y: drag_y,
+        },
+    );
     crate::nsview::shim_nsview_set_needs_display(obj, 0, 1);
 }
 
 /// `-[NSTextView drawRect:]`
 pub extern "C" fn shim_nstextview_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
 
     let cg_ctx = crate::nsgraphicscontext::current_cg_context_handle();
-    if cg_ctx == 0 { return; }
+    if cg_ctx == 0 {
+        return;
+    }
 
     // Update editor width in case view was resized.
     let text_width = (w - TEXT_PADDING_X * 2.0).max(1.0);
@@ -445,9 +541,7 @@ mod tests {
         assert_ne!(got, 0);
         let utf8 = crate::cfstring::shim_nsstring_utf8string(got, 0);
         assert!(!utf8.is_null());
-        let text = unsafe { std::ffi::CStr::from_ptr(utf8) }
-            .to_str()
-            .unwrap();
+        let text = unsafe { std::ffi::CStr::from_ptr(utf8) }.to_str().unwrap();
         assert_eq!(text, "Hello World");
         free_obj(tv);
     }

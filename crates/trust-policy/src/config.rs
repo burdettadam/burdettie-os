@@ -257,8 +257,7 @@ impl PolicyConfig {
 
     fn has_custom_entitlement_lists(&self) -> bool {
         let default = EntitlementConfig::default();
-        self.entitlements.warn_on != default.warn_on
-            || self.entitlements.deny_on != default.deny_on
+        self.entitlements.warn_on != default.warn_on || self.entitlements.deny_on != default.deny_on
     }
 }
 
@@ -399,12 +398,19 @@ mod tests {
             exempt_paths = ["/opt/secure/dev/"]
         "#;
         let config = PolicyConfig::from_toml(toml_str).expect("parse");
-        assert_eq!(config.sip.protected_paths, vec!["/opt/secure/", "/private/"]);
+        assert_eq!(
+            config.sip.protected_paths,
+            vec!["/opt/secure/", "/private/"]
+        );
         assert_eq!(config.sip.exempt_paths, vec!["/opt/secure/dev/"]);
 
         let policy = config.build_policy();
-        assert!(policy.sip.is_path_protected(Path::new("/opt/secure/bin/tool")));
-        assert!(!policy.sip.is_path_protected(Path::new("/opt/secure/dev/test")));
+        assert!(policy
+            .sip
+            .is_path_protected(Path::new("/opt/secure/bin/tool")));
+        assert!(!policy
+            .sip
+            .is_path_protected(Path::new("/opt/secure/dev/test")));
         assert!(!policy.sip.is_path_protected(Path::new("/usr/bin/ls")));
     }
 
@@ -426,10 +432,7 @@ mod tests {
 
     #[test]
     fn configurable_entitlements_deny() {
-        let ent = ConfigurableEntitlements::new(
-            vec![],
-            vec!["com.apple.private.dangerous".into()],
-        );
+        let ent = ConfigurableEntitlements::new(vec![], vec!["com.apple.private.dangerous".into()]);
         let keys = vec![("com.apple.private.dangerous".to_string(), true)];
         let verdict = ent.evaluate_with_keys(Path::new("/tmp/app"), &keys);
         assert!(verdict.is_deny());
@@ -460,13 +463,9 @@ mod tests {
         assert!(sip.is_path_protected(Path::new("/custom/protected/bin/tool")));
         assert!(!sip.is_path_protected(Path::new("/custom/protected/exempt/dev")));
         assert!(!sip.is_path_protected(Path::new("/tmp/random")));
-        assert!(sip.should_strip_dyld_env(
-            Path::new("/custom/protected/bin/tool"),
-            MachFlags::empty()
-        ));
-        assert!(!sip.should_strip_dyld_env(
-            Path::new("/tmp/random"),
-            MachFlags::empty()
-        ));
+        assert!(
+            sip.should_strip_dyld_env(Path::new("/custom/protected/bin/tool"), MachFlags::empty())
+        );
+        assert!(!sip.should_strip_dyld_env(Path::new("/tmp/random"), MachFlags::empty()));
     }
 }

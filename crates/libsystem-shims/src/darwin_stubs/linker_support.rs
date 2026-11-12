@@ -24,74 +24,231 @@ impl LinkerSupportStubs {
         use crate::register_shims;
 
         // ── os_unfair_lock (4+3 symbols) ────────────────────────────
-        register_shims!(table,
-            ("_os_unfair_lock_lock", shim_os_unfair_lock_lock as *const () as u64, "os_unfair_lock_lock (pthread_mutex)"),
-            ("_os_unfair_lock_unlock", shim_os_unfair_lock_unlock as *const () as u64, "os_unfair_lock_unlock (pthread_mutex)"),
-            ("_os_unfair_lock_trylock", shim_os_unfair_lock_trylock as *const () as u64, "os_unfair_lock_trylock (pthread_mutex)"),
-            ("_os_unfair_lock_lock_with_options", shim_os_unfair_lock_lock_with_options as *const () as u64, "os_unfair_lock_lock_with_options (pthread_mutex)"),
-            ("_os_unfair_lock_assert_owner", shim_void1_stub as *const () as u64, "os_unfair_lock_assert_owner (nop)"),
-            ("_os_unfair_lock_assert_not_owner", shim_void1_stub as *const () as u64, "os_unfair_lock_assert_not_owner (nop)"),
-            ("__os_lock_type_unfair", &OS_LOCK_TYPE_UNFAIR_SENTINEL as *const _ as u64, "_os_lock_type_unfair (data sentinel)"),
-            ("__os_lock_lock", shim_os_unfair_lock_lock as *const () as u64, "_os_lock_lock (→ os_unfair_lock_lock)"),
-            ("__os_lock_unlock", shim_os_unfair_lock_unlock as *const () as u64, "_os_lock_unlock (→ os_unfair_lock_unlock)"),
-            ("__os_lock_trylock", shim_os_unfair_lock_trylock as *const () as u64, "_os_lock_trylock (→ os_unfair_lock_trylock)"),
+        register_shims!(
+            table,
+            (
+                "_os_unfair_lock_lock",
+                shim_os_unfair_lock_lock as *const () as u64,
+                "os_unfair_lock_lock (pthread_mutex)"
+            ),
+            (
+                "_os_unfair_lock_unlock",
+                shim_os_unfair_lock_unlock as *const () as u64,
+                "os_unfair_lock_unlock (pthread_mutex)"
+            ),
+            (
+                "_os_unfair_lock_trylock",
+                shim_os_unfair_lock_trylock as *const () as u64,
+                "os_unfair_lock_trylock (pthread_mutex)"
+            ),
+            (
+                "_os_unfair_lock_lock_with_options",
+                shim_os_unfair_lock_lock_with_options as *const () as u64,
+                "os_unfair_lock_lock_with_options (pthread_mutex)"
+            ),
+            (
+                "_os_unfair_lock_assert_owner",
+                shim_void1_stub as *const () as u64,
+                "os_unfair_lock_assert_owner (nop)"
+            ),
+            (
+                "_os_unfair_lock_assert_not_owner",
+                shim_void1_stub as *const () as u64,
+                "os_unfair_lock_assert_not_owner (nop)"
+            ),
+            (
+                "__os_lock_type_unfair",
+                &OS_LOCK_TYPE_UNFAIR_SENTINEL as *const _ as u64,
+                "_os_lock_type_unfair (data sentinel)"
+            ),
+            (
+                "__os_lock_lock",
+                shim_os_unfair_lock_lock as *const () as u64,
+                "_os_lock_lock (→ os_unfair_lock_lock)"
+            ),
+            (
+                "__os_lock_unlock",
+                shim_os_unfair_lock_unlock as *const () as u64,
+                "_os_lock_unlock (→ os_unfair_lock_unlock)"
+            ),
+            (
+                "__os_lock_trylock",
+                shim_os_unfair_lock_trylock as *const () as u64,
+                "_os_lock_trylock (→ os_unfair_lock_trylock)"
+            ),
         );
 
         // ── _simple_* (6 symbols) ──────────────────────────────────
-        register_shims!(table,
-            ("__simple_getenv", shim_simple_getenv as *const () as u64, "_simple_getenv (→ libc getenv)"),
-            ("__simple_salloc", shim_simple_salloc as *const () as u64, "_simple_salloc (→ malloc)"),
-            ("__simple_sfree", shim_simple_sfree as *const () as u64, "_simple_sfree (→ free)"),
-            ("__simple_string", shim_simple_string as *const () as u64, "_simple_string (→ return ptr)"),
-            ("__simple_vsprintf", shim_simple_vsprintf as *const () as u64, "_simple_vsprintf (→ vsnprintf)"),
-            ("__simple_sresize", shim_simple_sresize as *const () as u64, "_simple_sresize (→ realloc)"),
+        register_shims!(
+            table,
+            (
+                "__simple_getenv",
+                shim_simple_getenv as *const () as u64,
+                "_simple_getenv (→ libc getenv)"
+            ),
+            (
+                "__simple_salloc",
+                shim_simple_salloc as *const () as u64,
+                "_simple_salloc (→ malloc)"
+            ),
+            (
+                "__simple_sfree",
+                shim_simple_sfree as *const () as u64,
+                "_simple_sfree (→ free)"
+            ),
+            (
+                "__simple_string",
+                shim_simple_string as *const () as u64,
+                "_simple_string (→ return ptr)"
+            ),
+            (
+                "__simple_vsprintf",
+                shim_simple_vsprintf as *const () as u64,
+                "_simple_vsprintf (→ vsnprintf)"
+            ),
+            (
+                "__simple_sresize",
+                shim_simple_sresize as *const () as u64,
+                "_simple_sresize (→ realloc)"
+            ),
         );
 
         // ── BSD extensions (4 symbols) ──────────────────────────────
-        register_shims!(table,
-            ("_mkpath_np", shim_mkpath_np as *const () as u64, "mkpath_np (recursive mkdir)"),
-            ("_dirname_r", shim_dirname_r as *const () as u64, "dirname_r (thread-safe dirname)"),
-            ("_qsort_b", shim_qsort_b as *const () as u64, "qsort_b (qsort with block)"),
-            ("_qsort_r", shim_qsort_r as *const () as u64, "qsort_r (BSD→glibc arg swap)"),
+        register_shims!(
+            table,
+            (
+                "_mkpath_np",
+                shim_mkpath_np as *const () as u64,
+                "mkpath_np (recursive mkdir)"
+            ),
+            (
+                "_dirname_r",
+                shim_dirname_r as *const () as u64,
+                "dirname_r (thread-safe dirname)"
+            ),
+            (
+                "_qsort_b",
+                shim_qsort_b as *const () as u64,
+                "qsort_b (qsort with block)"
+            ),
+            (
+                "_qsort_r",
+                shim_qsort_r as *const () as u64,
+                "qsort_r (BSD→glibc arg swap)"
+            ),
         );
 
         // ── UUID (3 symbols) ────────────────────────────────────────
-        register_shims!(table,
-            ("_uuid_unparse_upper", shim_uuid_unparse_upper as *const () as u64, "uuid_unparse_upper"),
-            ("_uuid_clear", shim_uuid_clear as *const () as u64, "uuid_clear"),
-            ("_uuid_generate_random", shim_uuid_generate_random as *const () as u64, "uuid_generate_random"),
+        register_shims!(
+            table,
+            (
+                "_uuid_unparse_upper",
+                shim_uuid_unparse_upper as *const () as u64,
+                "uuid_unparse_upper"
+            ),
+            (
+                "_uuid_clear",
+                shim_uuid_clear as *const () as u64,
+                "uuid_clear"
+            ),
+            (
+                "_uuid_generate_random",
+                shim_uuid_generate_random as *const () as u64,
+                "uuid_generate_random"
+            ),
         );
 
         // ── corecrypto digest API (4 symbols) ───────────────────────
-        register_shims!(table,
-            ("_ccdigest_init", shim_ccdigest_init as *const () as u64, "ccdigest_init (stub)"),
-            ("_ccdigest_update", shim_ccdigest_update as *const () as u64, "ccdigest_update (stub)"),
-            ("_ccsha256_di", shim_ccsha256_di as *const () as u64, "ccsha256_di (→ digest_info sentinel)"),
-            ("_cc_clear", shim_cc_clear as *const () as u64, "cc_clear (→ memset 0)"),
+        register_shims!(
+            table,
+            (
+                "_ccdigest_init",
+                shim_ccdigest_init as *const () as u64,
+                "ccdigest_init (stub)"
+            ),
+            (
+                "_ccdigest_update",
+                shim_ccdigest_update as *const () as u64,
+                "ccdigest_update (stub)"
+            ),
+            (
+                "_ccsha256_di",
+                shim_ccsha256_di as *const () as u64,
+                "ccsha256_di (→ digest_info sentinel)"
+            ),
+            (
+                "_cc_clear",
+                shim_cc_clear as *const () as u64,
+                "cc_clear (→ memset 0)"
+            ),
         );
 
         // ── Mach VM / process (3 symbols) ───────────────────────────
-        register_shims!(table,
-            ("_proc_pid_rusage", shim_proc_pid_rusage as *const () as u64, "proc_pid_rusage (stub → -1)"),
-            ("_vm_page_mask", shim_vm_page_mask as *const () as u64, "vm_page_mask (→ 0xFFF)"),
-            ("_vm_remap", shim_vm_remap as *const () as u64, "vm_remap (stub → KERN_FAILURE)"),
+        register_shims!(
+            table,
+            (
+                "_proc_pid_rusage",
+                shim_proc_pid_rusage as *const () as u64,
+                "proc_pid_rusage (stub → -1)"
+            ),
+            (
+                "_vm_page_mask",
+                shim_vm_page_mask as *const () as u64,
+                "vm_page_mask (→ 0xFFF)"
+            ),
+            (
+                "_vm_remap",
+                shim_vm_remap as *const () as u64,
+                "vm_remap (stub → KERN_FAILURE)"
+            ),
         );
 
         // ── Observability / analytics (4 symbols) ───────────────────
-        register_shims!(table,
-            ("_os_signpost_enabled", shim_os_signpost_enabled as *const () as u64, "os_signpost_enabled (→ false)"),
-            ("__os_signpost_emit_with_name_impl", shim_void1_stub as *const () as u64, "_os_signpost_emit_with_name_impl (nop)"),
-            ("_analytics_send_event_lazy", shim_void1_stub as *const () as u64, "analytics_send_event_lazy (nop)"),
-            ("_fnd_get_demangled_name", shim_fnd_get_demangled_name as *const () as u64, "fnd_get_demangled_name (→ NULL)"),
+        register_shims!(
+            table,
+            (
+                "_os_signpost_enabled",
+                shim_os_signpost_enabled as *const () as u64,
+                "os_signpost_enabled (→ false)"
+            ),
+            (
+                "__os_signpost_emit_with_name_impl",
+                shim_void1_stub as *const () as u64,
+                "_os_signpost_emit_with_name_impl (nop)"
+            ),
+            (
+                "_analytics_send_event_lazy",
+                shim_void1_stub as *const () as u64,
+                "analytics_send_event_lazy (nop)"
+            ),
+            (
+                "_fnd_get_demangled_name",
+                shim_fnd_get_demangled_name as *const () as u64,
+                "fnd_get_demangled_name (→ NULL)"
+            ),
+            (
+                "_dyld_stub_binder",
+                shim_dyld_stub_binder as *const () as u64,
+                "dyld_stub_binder (no-op after eager fixups)"
+            ),
         );
 
-        log::debug!("LinkerSupportStubs: registered os_unfair_lock/_simple_*/bsd/uuid/corecrypto/vm/signpost stubs");
+        log::debug!(
+            "LinkerSupportStubs: registered os_unfair_lock/_simple_*/bsd/uuid/corecrypto/vm/signpost stubs"
+        );
     }
 }
 
 // ── Generic helpers (re-exported from misc for convenience) ─────────
 
 extern "C" fn shim_void1_stub(_a: u64) {}
+
+extern "C" fn shim_dyld_stub_binder() -> u64 {
+    eprintln!(
+        "[FATAL] dyld_stub_binder called — a lazy bind stub was invoked but the symbol was not eagerly resolved during fixups. This is a bug in the fixup/lazy-bind pipeline."
+    );
+    std::process::abort();
+}
 
 // ── os_unfair_lock ──────────────────────────────────────────────────
 //
@@ -244,7 +401,9 @@ extern "C" fn shim_mkpath_np(path: *const libc::c_char, mode: libc::mode_t) -> i
         };
         let ret = unsafe { libc::mkdir(c_path.as_ptr(), mode) };
         if ret != 0 {
-            let err = std::io::Error::last_os_error().raw_os_error().unwrap_or(libc::EINVAL);
+            let err = std::io::Error::last_os_error()
+                .raw_os_error()
+                .unwrap_or(libc::EINVAL);
             if err != libc::EEXIST {
                 return err;
             }
@@ -299,20 +458,14 @@ extern "C" fn shim_dirname_r(
 /// invoke signature: int (*)(Block*, const void*, const void*)
 ///
 /// We extract invoke and call it, forwarding the block as the first arg.
-extern "C" fn shim_qsort_b(
-    base: *mut u8,
-    nel: usize,
-    width: usize,
-    block: *const u8,
-) {
+extern "C" fn shim_qsort_b(base: *mut u8, nel: usize, width: usize, block: *const u8) {
     if base.is_null() || block.is_null() || nel == 0 || width == 0 {
         return;
     }
 
     // Extract the invoke function pointer from the block.
-    let invoke: extern "C" fn(*const u8, *const u8, *const u8) -> i32 = unsafe {
-        *(block.add(16) as *const extern "C" fn(*const u8, *const u8, *const u8) -> i32)
-    };
+    let invoke: extern "C" fn(*const u8, *const u8, *const u8) -> i32 =
+        unsafe { *(block.add(16) as *const extern "C" fn(*const u8, *const u8, *const u8) -> i32) };
 
     // We need to pass the block pointer through to the comparator.
     // Use a thread-local to carry it through libc qsort_r.
@@ -432,11 +585,22 @@ extern "C" fn shim_uuid_unparse_upper(uu: *const u8, out: *mut u8) {
     let bytes = unsafe { std::slice::from_raw_parts(uu, 16) };
     let formatted = format!(
         "{:02X}{:02X}{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}",
-        bytes[0], bytes[1], bytes[2], bytes[3],
-        bytes[4], bytes[5],
-        bytes[6], bytes[7],
-        bytes[8], bytes[9],
-        bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15],
+        bytes[0],
+        bytes[1],
+        bytes[2],
+        bytes[3],
+        bytes[4],
+        bytes[5],
+        bytes[6],
+        bytes[7],
+        bytes[8],
+        bytes[9],
+        bytes[10],
+        bytes[11],
+        bytes[12],
+        bytes[13],
+        bytes[14],
+        bytes[15],
     );
     let src = formatted.as_bytes();
     unsafe {
@@ -483,10 +647,10 @@ extern "C" fn shim_uuid_generate_random(out: *mut u8) {
 /// ld/libtool pass this to ccdigest_init to select SHA-256.
 /// We use a fixed sentinel address and check for it in ccdigest_init.
 static CCSHA256_DI_SENTINEL: [u64; 4] = [
-    32,  // output_size (SHA-256 = 32 bytes)
-    64,  // block_size
-    32,  // state_size (8 × u32 = 32 bytes)
-    0,   // reserved
+    32, // output_size (SHA-256 = 32 bytes)
+    64, // block_size
+    32, // state_size (8 × u32 = 32 bytes)
+    0,  // reserved
 ];
 
 /// `const struct ccdigest_info *ccsha256_di(void)`

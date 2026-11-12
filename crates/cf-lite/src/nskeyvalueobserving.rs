@@ -98,12 +98,7 @@ pub extern "C" fn shim_nsobject_add_observer(
 /// `- [NSObject removeObserver:forKeyPath:]`
 ///
 /// Type encoding: `v@:@@` (void, self, SEL, observer, keyPath)
-pub extern "C" fn shim_nsobject_remove_observer(
-    obj: u64,
-    _sel: u64,
-    observer: u64,
-    key_path: u64,
-) {
+pub extern "C" fn shim_nsobject_remove_observer(obj: u64, _sel: u64, observer: u64, key_path: u64) {
     if obj == 0 || key_path == 0 {
         return;
     }
@@ -128,11 +123,7 @@ pub extern "C" fn shim_nsobject_remove_observer(
 ///
 /// Currently a no-op — we don't capture old values. The method exists
 /// so fixture code can call it without crashing.
-pub extern "C" fn shim_nsobject_will_change_value_for_key(
-    _obj: u64,
-    _sel: u64,
-    _key: u64,
-) {
+pub extern "C" fn shim_nsobject_will_change_value_for_key(_obj: u64, _sel: u64, _key: u64) {
     // No-op: could capture old values for NSKeyValueObservingOptionOld
 }
 
@@ -144,11 +135,7 @@ pub extern "C" fn shim_nsobject_will_change_value_for_key(
 ///
 /// Notifies all registered observers for `(self, key)` by calling
 /// `observeValueForKeyPath:ofObject:change:context:` on each observer.
-pub extern "C" fn shim_nsobject_did_change_value_for_key(
-    obj: u64,
-    _sel: u64,
-    key: u64,
-) {
+pub extern "C" fn shim_nsobject_did_change_value_for_key(obj: u64, _sel: u64, key: u64) {
     if obj == 0 || key == 0 {
         return;
     }
@@ -159,9 +146,8 @@ pub extern "C" fn shim_nsobject_did_change_value_for_key(
     };
 
     // Collect matching observers under the lock, then dispatch outside the lock
-    let entries: Vec<KvoEntry> = with_observers(|map| {
-        map.get(&(obj, key_str)).cloned().unwrap_or_default()
-    });
+    let entries: Vec<KvoEntry> =
+        with_observers(|map| map.get(&(obj, key_str)).cloned().unwrap_or_default());
 
     for entry in &entries {
         // change dictionary is 0 (nil) for simplicity
@@ -223,8 +209,7 @@ fn dispatch_observation(observer: u64, key_path: u64, object: u64, change: u64, 
     drop(guard);
 
     // Call the IMP: void (*)(id self, SEL _cmd, id keyPath, id object, id change, void *context)
-    let fn_ptr: extern "C" fn(u64, u64, u64, u64, u64, u64) =
-        unsafe { std::mem::transmute(imp) };
+    let fn_ptr: extern "C" fn(u64, u64, u64, u64, u64, u64) = unsafe { std::mem::transmute(imp) };
     fn_ptr(observer, sel_ptr as u64, key_path, object, change, context);
 }
 
@@ -233,10 +218,7 @@ fn dispatch_observation(observer: u64, key_path: u64, object: u64, change: u64, 
 /// Returns the number of observers registered for a given (object, keyPath).
 #[allow(dead_code)]
 pub fn observer_count(obj: u64, key_path: &str) -> usize {
-    with_observers(|map| {
-        map.get(&(obj, key_path.to_string()))
-            .map_or(0, |v| v.len())
-    })
+    with_observers(|map| map.get(&(obj, key_path.to_string())).map_or(0, |v| v.len()))
 }
 
 /// Clear all KVO registrations (for test isolation).

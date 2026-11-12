@@ -26,7 +26,9 @@ fn is_constant_dict(obj: u64) -> bool {
 pub fn make_nsdictionary(keys: &[u64], vals: &[u64]) -> u64 {
     let cnt = keys.len().min(vals.len());
     let obj = crate::pal_alloc().calloc(1, 32) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *(obj as *mut u64) = nsobj::nsdictionary_class_addr();
         *((obj as usize + COUNT_OFF) as *mut u64) = cnt as u64;
@@ -52,19 +54,31 @@ pub fn make_nsdictionary(keys: &[u64], vals: &[u64]) -> u64 {
 
 /// Read count from an NSDictionary or NSConstantDictionary object.
 pub(super) fn dict_count(obj: u64) -> u64 {
-    let off = if is_constant_dict(obj) { CONST_COUNT_OFF } else { COUNT_OFF };
+    let off = if is_constant_dict(obj) {
+        CONST_COUNT_OFF
+    } else {
+        COUNT_OFF
+    };
     unsafe { std::ptr::read_unaligned((obj as usize + off) as *const u64) }
 }
 
 /// Read keys pointer from an NSDictionary or NSConstantDictionary object.
 pub(super) fn dict_keys(obj: u64) -> u64 {
-    let off = if is_constant_dict(obj) { CONST_KEYS_OFF } else { KEYS_OFF };
+    let off = if is_constant_dict(obj) {
+        CONST_KEYS_OFF
+    } else {
+        KEYS_OFF
+    };
     unsafe { std::ptr::read_unaligned((obj as usize + off) as *const u64) }
 }
 
 /// Read values pointer from an NSDictionary or NSConstantDictionary object.
 pub(super) fn dict_vals(obj: u64) -> u64 {
-    let off = if is_constant_dict(obj) { CONST_VALS_OFF } else { VALS_OFF };
+    let off = if is_constant_dict(obj) {
+        CONST_VALS_OFF
+    } else {
+        VALS_OFF
+    };
     unsafe { std::ptr::read_unaligned((obj as usize + off) as *const u64) }
 }
 

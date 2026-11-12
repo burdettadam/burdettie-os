@@ -40,7 +40,10 @@ fn gpu_renderer_save_restore() {
     let mut r = GpuStubRenderer::new(10, 10);
     // save/restore are no-ops on the stub but must not panic
     r.save();
-    r.fill_rect(Rect::new(0.0, 0.0, 5.0, 5.0), Color::new(0.0, 1.0, 0.0, 1.0));
+    r.fill_rect(
+        Rect::new(0.0, 0.0, 5.0, 5.0),
+        Color::new(0.0, 1.0, 0.0, 1.0),
+    );
     r.restore();
 }
 
@@ -49,7 +52,10 @@ fn gpu_renderer_implements_renderer() {
     let mut r = GpuStubRenderer::new(50, 50);
     let dyn_r: &mut dyn Renderer = &mut r;
     dyn_r.clear(Color::new(0.0, 0.0, 0.0, 1.0));
-    dyn_r.fill_rect(Rect::new(0.0, 0.0, 10.0, 10.0), Color::new(1.0, 1.0, 1.0, 1.0));
+    dyn_r.fill_rect(
+        Rect::new(0.0, 0.0, 10.0, 10.0),
+        Color::new(1.0, 1.0, 1.0, 1.0),
+    );
     // Compiles and runs — proves dyn Renderer compatibility
 }
 

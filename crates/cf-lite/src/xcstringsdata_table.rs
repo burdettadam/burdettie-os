@@ -120,10 +120,16 @@ mod tests {
 
     #[test]
     fn nil_safety() {
-        assert_eq!(shim_xcstringsdatatable_init_with_name_entries(0, 0, 1, 2), 0);
+        assert_eq!(
+            shim_xcstringsdatatable_init_with_name_entries(0, 0, 1, 2),
+            0
+        );
         assert_eq!(shim_xcstringsdatatable_name(0, 0), 0);
         assert_eq!(shim_xcstringsdatatable_entries(0, 0), 0);
-        assert_eq!(shim_xcstringsdatatable_find_entry(0, 0, 0, 1, 2, 3, 0, 0), 0);
+        assert_eq!(
+            shim_xcstringsdatatable_find_entry(0, 0, 0, 1, 2, 3, 0, 0),
+            0
+        );
     }
 
     #[test]

@@ -26,7 +26,9 @@ unsafe fn get_set(obj: u64) -> *mut SetStorage {
 /// `+[NSHashTable hashTableWithOptions:]`
 pub extern "C" fn shim_hashtable_with_options(_cls: u64, _cmd: u64, options: u64) -> u64 {
     let obj = crate::pal_alloc().calloc(1, INSTANCE_SIZE as usize) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *(obj as *mut u64) = nsobj::nshashtable_class_addr();
         *((obj + 8) as *mut u64) = options;
@@ -44,42 +46,54 @@ pub extern "C" fn shim_hashtable_weak_objects(_cls: u64, _cmd: u64) -> u64 {
 
 /// `-[NSHashTable addObject:]`
 pub extern "C" fn shim_hashtable_add_object(obj: u64, _cmd: u64, member: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let set = unsafe { &mut *get_set(obj) };
     set.insert(member);
 }
 
 /// `-[NSHashTable removeObject:]`
 pub extern "C" fn shim_hashtable_remove_object(obj: u64, _cmd: u64, member: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let set = unsafe { &mut *get_set(obj) };
     set.remove(&member);
 }
 
 /// `-[NSHashTable removeAllObjects]`
 pub extern "C" fn shim_hashtable_remove_all(obj: u64, _cmd: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let set = unsafe { &mut *get_set(obj) };
     set.clear();
 }
 
 /// `-[NSHashTable containsObject:]`
 pub extern "C" fn shim_hashtable_contains(obj: u64, _cmd: u64, member: u64) -> u8 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let set = unsafe { &mut *get_set(obj) };
     u8::from(set.contains(&member))
 }
 
 /// `-[NSHashTable count]`
 pub extern "C" fn shim_hashtable_count(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let set = unsafe { &mut *get_set(obj) };
     set.len() as u64
 }
 
 /// `-[NSHashTable allObjects]`
 pub extern "C" fn shim_hashtable_all_objects(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let set = unsafe { &mut *get_set(obj) };
     let items: Vec<u64> = set.iter().copied().collect();
     crate::nsarray::make_nsarray(&items)
@@ -87,14 +101,18 @@ pub extern "C" fn shim_hashtable_all_objects(obj: u64, _cmd: u64) -> u64 {
 
 /// `-[NSHashTable anyObject]` — returns any object from the hash table, or 0 if empty.
 pub extern "C" fn shim_hashtable_any_object(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let set = unsafe { &*get_set(obj) };
     set.iter().next().copied().unwrap_or(0)
 }
 
 /// `-[NSHashTable setRepresentation]` — returns an NSSet containing all objects.
 pub extern "C" fn shim_hashtable_set_representation(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let set = unsafe { &*get_set(obj) };
     let items: Vec<u64> = set.iter().copied().collect();
     // Build an NSSet from a temporary buffer
@@ -102,9 +120,13 @@ pub extern "C" fn shim_hashtable_set_representation(obj: u64, _cmd: u64) -> u64 
         return crate::nsset::shim_nsset_set(0, 0);
     }
     let buf = crate::pal_alloc().malloc(items.len() * 8) as u64;
-    if buf == 0 { return 0; }
+    if buf == 0 {
+        return 0;
+    }
     for (i, &item) in items.iter().enumerate() {
-        unsafe { *((buf as usize + i * 8) as *mut u64) = item; }
+        unsafe {
+            *((buf as usize + i * 8) as *mut u64) = item;
+        }
     }
     let result = crate::nsset::shim_nsset_with_objects_count(0, 0, buf, items.len() as u64);
     crate::pal_alloc().free(buf as *mut u8);
@@ -113,7 +135,9 @@ pub extern "C" fn shim_hashtable_set_representation(obj: u64, _cmd: u64) -> u64 
 
 /// `-[NSHashTable description]`
 pub extern "C" fn shim_hashtable_description(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let set = unsafe { &mut *get_set(obj) };
     let desc = format!("<NSHashTable: {} objects>", set.len());
     let c_desc = std::ffi::CString::new(desc).unwrap_or_default();

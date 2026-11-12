@@ -25,11 +25,7 @@ pub extern "C" fn forwarding_trampoline(
     }
 
     let isa = unsafe { *(obj as *const u64) };
-    let sel_str = unsafe {
-        CStr::from_ptr(sel as *const c_char)
-            .to_str()
-            .unwrap_or("")
-    };
+    let sel_str = unsafe { CStr::from_ptr(sel as *const c_char).to_str().unwrap_or("") };
 
     // Step 1: Look up methodSignatureForSelector: IMP
     let sig_imp = {
@@ -63,8 +59,7 @@ pub extern "C" fn forwarding_trampoline(
             rt.msg_lookup(isa, "doesNotRecognizeSelector:")
         };
         if let Some(dnr_imp) = dnr_imp {
-            let dnr_fn: extern "C" fn(u64, u64, u64) =
-                unsafe { std::mem::transmute(dnr_imp) };
+            let dnr_fn: extern "C" fn(u64, u64, u64) = unsafe { std::mem::transmute(dnr_imp) };
             dnr_fn(obj, 0, sel);
         } else {
             eprintln!(
@@ -109,12 +104,24 @@ pub extern "C" fn forwarding_trampoline(
             let buf = arg_buf as *mut u64;
             *buf = obj;
             *buf.add(1) = sel;
-            if num_args > 2 { *buf.add(2) = a2; }
-            if num_args > 3 { *buf.add(3) = a3; }
-            if num_args > 4 { *buf.add(4) = a4; }
-            if num_args > 5 { *buf.add(5) = a5; }
-            if num_args > 6 { *buf.add(6) = a6; }
-            if num_args > 7 { *buf.add(7) = a7; }
+            if num_args > 2 {
+                *buf.add(2) = a2;
+            }
+            if num_args > 3 {
+                *buf.add(3) = a3;
+            }
+            if num_args > 4 {
+                *buf.add(4) = a4;
+            }
+            if num_args > 5 {
+                *buf.add(5) = a5;
+            }
+            if num_args > 6 {
+                *buf.add(6) = a6;
+            }
+            if num_args > 7 {
+                *buf.add(7) = a7;
+            }
         }
 
         let ret_buf = crate::pal_alloc().calloc(1, 8) as u64;

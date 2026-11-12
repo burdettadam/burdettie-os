@@ -8,7 +8,7 @@
 use std::collections::HashMap;
 
 use libsystem_shims::ShimTable;
-use macho_exec::{StubResolver, SymbolResolver, DataSymbolStore};
+use macho_exec::{DataSymbolStore, StubResolver, SymbolResolver};
 
 /// Pre-resolved symbol map from shared cache export tries.
 ///
@@ -27,7 +27,9 @@ impl EagerCacheResolver {
 
     /// Create an empty resolver (no-op, all lookups return None).
     pub fn empty() -> Self {
-        Self { exports: HashMap::new() }
+        Self {
+            exports: HashMap::new(),
+        }
     }
 
     /// Number of pre-resolved symbols.
@@ -153,7 +155,10 @@ mod tests {
 
         // XPC type tokens should resolve via DataSymbolStore
         let addr = composite.resolve("__xpc_type_dictionary");
-        assert!(addr.is_some(), "DataSymbolStore should resolve __xpc_type_dictionary");
+        assert!(
+            addr.is_some(),
+            "DataSymbolStore should resolve __xpc_type_dictionary"
+        );
         assert_ne!(addr.unwrap(), 0, "resolved address must be non-NULL");
     }
 
@@ -176,8 +181,7 @@ mod tests {
         let table = ShimTable::new();
         let data = DataSymbolStore::new();
         let cache = EagerCacheResolver::new(exports);
-        let composite = CompositeResolver::new(&table, &data, None)
-            .with_eager_cache(&cache);
+        let composite = CompositeResolver::new(&table, &data, None).with_eager_cache(&cache);
 
         // Should resolve via the eager cache tier
         let addr = composite.resolve("_my_cached_symbol");
@@ -201,8 +205,7 @@ mod tests {
 
         let data = DataSymbolStore::new();
         let cache = EagerCacheResolver::new(exports);
-        let composite = CompositeResolver::new(&table, &data, None)
-            .with_eager_cache(&cache);
+        let composite = CompositeResolver::new(&table, &data, None).with_eager_cache(&cache);
 
         // Shim table should win over eager cache
         assert_eq!(composite.resolve("_printf"), Some(0x1111));

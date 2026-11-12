@@ -59,7 +59,12 @@ pub trait Renderer {
     fn draw_image_at(&mut self, image: &ImageBuffer, origin: Point) {
         self.draw_image(
             image,
-            Rect::new(origin.x, origin.y, image.width() as f64, image.height() as f64),
+            Rect::new(
+                origin.x,
+                origin.y,
+                image.width() as f64,
+                image.height() as f64,
+            ),
         );
     }
 
@@ -90,7 +95,12 @@ pub trait Renderer {
     /// Fill a circle.
     fn fill_circle(&mut self, center: Point, radius: f64, color: Color) {
         self.fill_ellipse(
-            Rect::new(center.x - radius, center.y - radius, radius * 2.0, radius * 2.0),
+            Rect::new(
+                center.x - radius,
+                center.y - radius,
+                radius * 2.0,
+                radius * 2.0,
+            ),
             color,
         );
     }
@@ -185,19 +195,42 @@ pub trait Renderer {
 
     fn set_line_join(&mut self, _join: LineJoin) {}
     fn set_line_cap(&mut self, _cap: LineCap) {}
-    fn line_join(&self) -> LineJoin { LineJoin::Miter }
-    fn line_cap(&self) -> LineCap { LineCap::Butt }
+    fn line_join(&self) -> LineJoin {
+        LineJoin::Miter
+    }
+    fn line_cap(&self) -> LineCap {
+        LineCap::Butt
+    }
 
     // ── Opacity ────────────────────────────────────────────────────
 
     fn set_opacity(&mut self, _opacity: f64) {}
-    fn opacity(&self) -> f64 { 1.0 }
+    fn opacity(&self) -> f64 {
+        1.0
+    }
 
     // ── Arc / sector ───────────────────────────────────────────────
 
     /// Draw a filled arc (pie sector).
-    fn fill_arc(&mut self, _center: Point, _radius: f64, _start_angle: f64, _end_angle: f64, _color: Color) {}
+    fn fill_arc(
+        &mut self,
+        _center: Point,
+        _radius: f64,
+        _start_angle: f64,
+        _end_angle: f64,
+        _color: Color,
+    ) {
+    }
 
     /// Draw an arc outline.
-    fn stroke_arc(&mut self, _center: Point, _radius: f64, _start_angle: f64, _end_angle: f64, _color: Color, _width: f64) {}
+    fn stroke_arc(
+        &mut self,
+        _center: Point,
+        _radius: f64,
+        _start_angle: f64,
+        _end_angle: f64,
+        _color: Color,
+        _width: f64,
+    ) {
+    }
 }

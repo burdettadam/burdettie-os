@@ -19,45 +19,138 @@ impl DvtFoundationStubs {
         use crate::register_shims;
 
         // ── Core initialization chain ───────────────────────────────
-        register_shims!(table,
-            ("_DVTEnvironmentInitialize", shim_dvt_void_stub as *const () as u64, "DVTEnvironmentInitialize (stub → void)"),
-            ("_DVTFoundationInitialize", shim_dvt_void_stub as *const () as u64, "DVTFoundationInitialize (stub → void)"),
-            ("_DVTFoundationInitializeRegisteredDefaults", shim_dvt_void_stub as *const () as u64, "DVTFoundationInitializeRegisteredDefaults (stub → void)"),
-            ("_IDEInitialize", shim_dvt_ret0_stub as *const () as u64, "IDEInitialize (stub → 0/success)"),
-            ("_IDEInitializeWithOptions", shim_dvt_ret0_stub as *const () as u64, "IDEInitializeWithOptions (stub → 0/success)"),
+        register_shims!(
+            table,
+            (
+                "_DVTEnvironmentInitialize",
+                shim_dvt_void_stub as *const () as u64,
+                "DVTEnvironmentInitialize (stub → void)"
+            ),
+            (
+                "_DVTFoundationInitialize",
+                shim_dvt_void_stub as *const () as u64,
+                "DVTFoundationInitialize (stub → void)"
+            ),
+            (
+                "_DVTFoundationInitializeRegisteredDefaults",
+                shim_dvt_void_stub as *const () as u64,
+                "DVTFoundationInitializeRegisteredDefaults (stub → void)"
+            ),
+            (
+                "_IDEInitialize",
+                shim_dvt_ret0_stub as *const () as u64,
+                "IDEInitialize (stub → 0/success)"
+            ),
+            (
+                "_IDEInitializeWithOptions",
+                shim_dvt_ret0_stub as *const () as u64,
+                "IDEInitializeWithOptions (stub → 0/success)"
+            ),
         );
 
         // ── DVT logging ─────────────────────────────────────────────
-        register_shims!(table,
-            ("_DVTLogEnable", shim_dvt_void_stub as *const () as u64, "DVTLogEnable (stub → void)"),
-            ("_DVTLogSetLevel", shim_dvt_void_stub as *const () as u64, "DVTLogSetLevel (stub → void)"),
-            ("_DVTLogSetLogFileURL", shim_dvt_void_stub as *const () as u64, "DVTLogSetLogFileURL (stub → void)"),
-            ("_DVTLogCreate", shim_dvt_ret0_stub as *const () as u64, "DVTLogCreate (stub → NULL)"),
+        register_shims!(
+            table,
+            (
+                "_DVTLogEnable",
+                shim_dvt_void_stub as *const () as u64,
+                "DVTLogEnable (stub → void)"
+            ),
+            (
+                "_DVTLogSetLevel",
+                shim_dvt_void_stub as *const () as u64,
+                "DVTLogSetLevel (stub → void)"
+            ),
+            (
+                "_DVTLogSetLogFileURL",
+                shim_dvt_void_stub as *const () as u64,
+                "DVTLogSetLogFileURL (stub → void)"
+            ),
+            (
+                "_DVTLogCreate",
+                shim_dvt_ret0_stub as *const () as u64,
+                "DVTLogCreate (stub → NULL)"
+            ),
         );
 
         // ── DVT developer paths ─────────────────────────────────────
-        register_shims!(table,
-            ("_DVTDeveloperPathsXcodeAppPath", shim_dvt_developer_xcode_app_path as *const () as u64, "DVTDeveloperPathsXcodeAppPath → /Applications/Xcode.app"),
-            ("_DVTDeveloperPathsSystemDeveloperDir", shim_dvt_developer_system_developer_dir as *const () as u64, "DVTDeveloperPathsSystemDeveloperDir → /Applications/Xcode.app/Contents/Developer"),
-            ("_DVTDeveloperPathsToolchainDir", shim_dvt_developer_toolchain_dir as *const () as u64, "DVTDeveloperPathsToolchainDir → toolchain path"),
-            ("_DVTDeveloperPathsSDKsDir", shim_dvt_developer_sdks_dir as *const () as u64, "DVTDeveloperPathsSDKsDir → SDKs path"),
-            ("_DVTDeveloperPathsPlatformsDir", shim_dvt_developer_platforms_dir as *const () as u64, "DVTDeveloperPathsPlatformsDir → Platforms path"),
+        register_shims!(
+            table,
+            (
+                "_DVTDeveloperPathsXcodeAppPath",
+                shim_dvt_developer_xcode_app_path as *const () as u64,
+                "DVTDeveloperPathsXcodeAppPath → /Applications/Xcode.app"
+            ),
+            (
+                "_DVTDeveloperPathsSystemDeveloperDir",
+                shim_dvt_developer_system_developer_dir as *const () as u64,
+                "DVTDeveloperPathsSystemDeveloperDir → /Applications/Xcode.app/Contents/Developer"
+            ),
+            (
+                "_DVTDeveloperPathsToolchainDir",
+                shim_dvt_developer_toolchain_dir as *const () as u64,
+                "DVTDeveloperPathsToolchainDir → toolchain path"
+            ),
+            (
+                "_DVTDeveloperPathsSDKsDir",
+                shim_dvt_developer_sdks_dir as *const () as u64,
+                "DVTDeveloperPathsSDKsDir → SDKs path"
+            ),
+            (
+                "_DVTDeveloperPathsPlatformsDir",
+                shim_dvt_developer_platforms_dir as *const () as u64,
+                "DVTDeveloperPathsPlatformsDir → Platforms path"
+            ),
         );
 
         // ── DVT utility functions ───────────────────────────────────
-        register_shims!(table,
-            ("_DVTAssertionFailureHandler", shim_dvt_void_stub as *const () as u64, "DVTAssertionFailureHandler (stub → void)"),
-            ("_DVTAssertionHandler", shim_dvt_ret0_stub as *const () as u64, "DVTAssertionHandler (stub → NULL)"),
-            ("_DVTAddSIGHandlers", shim_dvt_void_stub as *const () as u64, "DVTAddSIGHandlers (stub → void)"),
-            ("_DVTModelObjectGraphSentinel", shim_dvt_ret0_stub as *const () as u64, "DVTModelObjectGraphSentinel (stub → NULL)"),
-            ("_DVTPlugInManagerSetUpOptions", shim_dvt_void_stub as *const () as u64, "DVTPlugInManagerSetUpOptions (stub → void)"),
-            ("_DVTPlugInManagerScan", shim_dvt_void_stub as *const () as u64, "DVTPlugInManagerScan (stub → void)"),
+        register_shims!(
+            table,
+            (
+                "_DVTAssertionFailureHandler",
+                shim_dvt_void_stub as *const () as u64,
+                "DVTAssertionFailureHandler (stub → void)"
+            ),
+            (
+                "_DVTAssertionHandler",
+                shim_dvt_ret0_stub as *const () as u64,
+                "DVTAssertionHandler (stub → NULL)"
+            ),
+            (
+                "_DVTAddSIGHandlers",
+                shim_dvt_void_stub as *const () as u64,
+                "DVTAddSIGHandlers (stub → void)"
+            ),
+            (
+                "_DVTModelObjectGraphSentinel",
+                shim_dvt_ret0_stub as *const () as u64,
+                "DVTModelObjectGraphSentinel (stub → NULL)"
+            ),
+            (
+                "_DVTPlugInManagerSetUpOptions",
+                shim_dvt_void_stub as *const () as u64,
+                "DVTPlugInManagerSetUpOptions (stub → void)"
+            ),
+            (
+                "_DVTPlugInManagerScan",
+                shim_dvt_void_stub as *const () as u64,
+                "DVTPlugInManagerScan (stub → void)"
+            ),
         );
 
         // ── IDE utility functions ───────────────────────────────────
-        register_shims!(table,
-            ("_IDESetSafeToLoadFrameworks", shim_dvt_void_stub as *const () as u64, "IDESetSafeToLoadFrameworks (stub → void)"),
-            ("_IDERegisterStaticAnalyzerCheckers", shim_dvt_void_stub as *const () as u64, "IDERegisterStaticAnalyzerCheckers (stub → void)"),
+        register_shims!(
+            table,
+            (
+                "_IDESetSafeToLoadFrameworks",
+                shim_dvt_void_stub as *const () as u64,
+                "IDESetSafeToLoadFrameworks (stub → void)"
+            ),
+            (
+                "_IDERegisterStaticAnalyzerCheckers",
+                shim_dvt_void_stub as *const () as u64,
+                "IDERegisterStaticAnalyzerCheckers (stub → void)"
+            ),
         );
 
         log::debug!("dvt_foundation: registered DVT/IDE C function stubs");
@@ -223,6 +316,8 @@ mod tests {
         assert!(table.resolve("_DVTFoundationInitialize").is_some());
         assert!(table.resolve("_IDEInitialize").is_some());
         assert!(table.resolve("_DVTDeveloperPathsXcodeAppPath").is_some());
-        assert!(table.resolve("_DVTDeveloperPathsSystemDeveloperDir").is_some());
+        assert!(table
+            .resolve("_DVTDeveloperPathsSystemDeveloperDir")
+            .is_some());
     }
 }

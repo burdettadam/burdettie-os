@@ -27,31 +27,32 @@ pub extern "C" fn shim_accessibility_role(obj: u64, _cmd: u64) -> u64 {
     }
 
     let isa = read_isa(obj);
-    let role_str = if isa == nsobj::nsbutton_class_addr() || isa == nsobj::nspopupbutton_class_addr() {
-        "AXButton"
-    } else if isa == nsobj::nstextfield_class_addr() {
-        "AXTextField"
-    } else if isa == nsobj::nstextview_class_addr() {
-        "AXTextArea"
-    } else if isa == nsobj::nsimageview_class_addr() {
-        "AXImage"
-    } else if isa == nsobj::nsslider_class_addr() {
-        "AXSlider"
-    } else if isa == nsobj::nsprogressindicator_class_addr() {
-        "AXProgressIndicator"
-    } else if isa == nsobj::nsscrollview_class_addr() {
-        "AXScrollArea"
-    } else if isa == nsobj::nstableview_class_addr() {
-        "AXTable"
-    } else if isa == nsobj::nssegmentedcontrol_class_addr() {
-        "AXRadioGroup"
-    } else if isa == nsobj::nscombobox_class_addr() {
-        "AXComboBox"
-    } else if isa == nsobj::nswindow_class_addr() {
-        "AXWindow"
-    } else {
-        "AXGroup"
-    };
+    let role_str =
+        if isa == nsobj::nsbutton_class_addr() || isa == nsobj::nspopupbutton_class_addr() {
+            "AXButton"
+        } else if isa == nsobj::nstextfield_class_addr() {
+            "AXTextField"
+        } else if isa == nsobj::nstextview_class_addr() {
+            "AXTextArea"
+        } else if isa == nsobj::nsimageview_class_addr() {
+            "AXImage"
+        } else if isa == nsobj::nsslider_class_addr() {
+            "AXSlider"
+        } else if isa == nsobj::nsprogressindicator_class_addr() {
+            "AXProgressIndicator"
+        } else if isa == nsobj::nsscrollview_class_addr() {
+            "AXScrollArea"
+        } else if isa == nsobj::nstableview_class_addr() {
+            "AXTable"
+        } else if isa == nsobj::nssegmentedcontrol_class_addr() {
+            "AXRadioGroup"
+        } else if isa == nsobj::nscombobox_class_addr() {
+            "AXComboBox"
+        } else if isa == nsobj::nswindow_class_addr() {
+            "AXWindow"
+        } else {
+            "AXGroup"
+        };
 
     let c_str = std::ffi::CString::new(role_str).unwrap_or_default();
     cfstring::alloc_nsstring_from_cstr(c_str.as_ptr())
@@ -159,7 +160,12 @@ pub extern "C" fn shim_accessibility_frame(obj: u64, _cmd: u64) -> (f64, f64, f6
         return (0.0, 0.0, 0.0, 0.0);
     }
     let frame = crate::nsview::view_frame(obj);
-    (frame.origin.x, frame.origin.y, frame.size.width, frame.size.height)
+    (
+        frame.origin.x,
+        frame.origin.y,
+        frame.size.width,
+        frame.size.height,
+    )
 }
 
 // ── Tests ──────────────────────────────────────────────────────────
@@ -167,8 +173,8 @@ pub extern "C" fn shim_accessibility_frame(obj: u64, _cmd: u64) -> (f64, f64, f6
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::shim_test_helpers::*;
     use crate::nsview::VIEW_SIZE;
+    use crate::shim_test_helpers::*;
 
     #[test]
     fn nil_returns_zero() {

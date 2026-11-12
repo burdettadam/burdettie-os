@@ -1,0 +1,7 @@
+- Prefer Stickies.app as the first imported Apple GUI target for Docker/Compose scoring; it stresses nib, menu, scroll, and text-view paths already present in cf-lite.
+- Defer TextEdit.app until NSDocument or equivalent document-controller coverage exists.
+- The checked-in Compose GUI example now switches guest executables via BURDETTIE_GUEST_APP, defaulting to the cocoa_draw smoke fixture and accepting the Stickies container path when an imported overlay is mounted.
+- The default Docker/Compose GUI session should open the native Launchpad home screen, with BURDETTIE_GUI_MODE=guest reserved for short smoke fixtures or imported app executables.
+- Launchpad now auto-discovers imported GUI apps from /opt/imported-artifacts/manifest.json and from local imports/apps staging during dev, falling back to bundle Info.plist metadata when needed.
+- WezTerm.app is the checked-in open-source terminal example for the imported-app lane; treat it as validation-only until rendering and PTY behavior are proven in Docker.
+- WezTerm's bundled CLI metadata exposes front_end overrides, but the available choices are still native GPU paths (Builtin/System/OpenGL/WebGpu); with no cf-lite support for CAMetalLayer or NSOpenGL classes, config-only retries are unlikely to make the GUI render.

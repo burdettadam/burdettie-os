@@ -65,10 +65,7 @@ impl ScrollView {
 
     /// Scroll by a delta amount.
     pub fn scroll_by(&mut self, dx: f64, dy: f64) {
-        let new_offset = Point::new(
-            self.content_offset.x + dx,
-            self.content_offset.y + dy,
-        );
+        let new_offset = Point::new(self.content_offset.x + dx, self.content_offset.y + dy);
         self.set_content_offset(new_offset);
     }
 
@@ -129,11 +126,7 @@ impl ScrollView {
         }
 
         // Draw border
-        renderer.stroke_rect(
-            self.view.frame,
-            Color::new(0.7, 0.7, 0.7, 1.0),
-            1.0,
-        );
+        renderer.stroke_rect(self.view.frame, Color::new(0.7, 0.7, 0.7, 1.0), 1.0);
 
         // Draw scroll indicators
         if self.shows_indicators {
@@ -150,8 +143,7 @@ impl ScrollView {
         // Vertical indicator
         if self.can_scroll_vertically() {
             let visible_ratio = frame.height / self.content_size.1;
-            let indicator_height =
-                (frame.height * visible_ratio).max(min_indicator_length);
+            let indicator_height = (frame.height * visible_ratio).max(min_indicator_length);
             let max_scroll = self.content_size.1 - frame.height;
             let scroll_ratio = if max_scroll > 0.0 {
                 self.content_offset.y / max_scroll
@@ -172,8 +164,7 @@ impl ScrollView {
         // Horizontal indicator
         if self.can_scroll_horizontally() {
             let visible_ratio = frame.width / self.content_size.0;
-            let indicator_width =
-                (frame.width * visible_ratio).max(min_indicator_length);
+            let indicator_width = (frame.width * visible_ratio).max(min_indicator_length);
             let max_scroll = self.content_size.0 - frame.width;
             let scroll_ratio = if max_scroll > 0.0 {
                 self.content_offset.x / max_scroll
@@ -204,10 +195,7 @@ impl ScrollView {
         } else {
             0.0
         };
-        Point::new(
-            offset.x.clamp(0.0, max_x),
-            offset.y.clamp(0.0, max_y),
-        )
+        Point::new(offset.x.clamp(0.0, max_x), offset.y.clamp(0.0, max_y))
     }
 }
 
@@ -245,7 +233,7 @@ mod tests {
         // Try to scroll past the max
         sv.set_content_offset(Point::new(0.0, 999.0));
         assert_eq!(sv.content_offset().y, 200.0); // 300 - 100
-        // Try negative
+                                                  // Try negative
         sv.set_content_offset(Point::new(0.0, -50.0));
         assert_eq!(sv.content_offset().y, 0.0);
     }

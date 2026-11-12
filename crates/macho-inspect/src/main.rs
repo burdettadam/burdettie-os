@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use macho_parse::{extract_exports, extract_fixups, parse, ExportedSymbol, Fixups, ParsedMachO};
-use macho_types::header::CpuType;
+use macho_types::header::{CpuType, FatBinary};
 use macho_types::segment::TlvDescriptor;
 use serde::Serialize;
 
@@ -11,9 +11,6 @@ mod exec;
 mod print_info;
 mod print_text;
 mod why_failed;
-
-#[cfg(feature = "gui")]
-mod winit_bridge;
 
 #[derive(Parser)]
 #[command(name = "macho-inspect", about = "Inspect Mach-O binary structure")]
@@ -113,6 +110,100 @@ fn parse_cpu_type(s: &str) -> Result<CpuType, String> {
     }
 }
 
+fn cpu_type_for_host_arch(arch: &str) -> CpuType {
+    match arch {
+        "x86_64" => CpuType::X86_64,
+        "aarch64" => CpuType::Arm64,
+        "arm" => CpuType::Arm,
+        "x86" | "i386" | "i686" => CpuType::X86,
+        _ => CpuType::Arm64,
+    }
+}
+
+fn default_preferred_cpu() -> CpuType {
+    cpu_type_for_host_arch(std::env::consts::ARCH)
+}
+
+fn fat_contains_cpu(fat: &FatBinary, cpu: CpuType) -> bool {
+    fat.arches.iter().any(|arch| arch.cpu_type == cpu)
+}
+
+fn best_default_cpu(fat: &FatBinary) -> CpuType {
+    let host_cpu = default_preferred_cpu();
+    if fat_contains_cpu(fat, host_cpu) {
+        host_cpu
+    } else if fat_contains_cpu(fat, CpuType::Arm64) {
+        CpuType::Arm64
+    } else if fat_contains_cpu(fat, CpuType::X86_64) {
+        CpuType::X86_64
+    } else {
+        fat.arches
+            .first()
+            .map(|arch| arch.cpu_type)
+            .unwrap_or(host_cpu)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use macho_types::header::{FatArch, FatHeader};
+
+    fn fat_with_arches(cpus: &[CpuType]) -> FatBinary {
+        FatBinary {
+            header: FatHeader {
+                magic: 0,
+                nfat_arch: cpus.len() as u32,
+            },
+            arches: cpus
+                .iter()
+                .enumerate()
+                .map(|(index, cpu_type)| FatArch {
+                    cpu_type: *cpu_type,
+                    cpu_subtype: 0,
+                    offset: index as u64,
+                    size: 1,
+                    align: 0,
+                })
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn cpu_type_for_host_arch_maps_x86_64() {
+        assert_eq!(cpu_type_for_host_arch("x86_64"), CpuType::X86_64);
+    }
+
+    #[test]
+    fn cpu_type_for_host_arch_maps_aarch64() {
+        assert_eq!(cpu_type_for_host_arch("aarch64"), CpuType::Arm64);
+    }
+
+    #[test]
+    fn best_default_cpu_prefers_host_cpu_when_present() {
+        let host_cpu = default_preferred_cpu();
+        let other_cpu = if host_cpu == CpuType::Arm64 {
+            CpuType::X86_64
+        } else {
+            CpuType::Arm64
+        };
+        let fat = fat_with_arches(&[other_cpu, host_cpu]);
+        assert_eq!(best_default_cpu(&fat), host_cpu);
+    }
+
+    #[test]
+    fn best_default_cpu_falls_back_to_arm64() {
+        let fat = fat_with_arches(&[CpuType::Arm64, CpuType::X86]);
+        assert_eq!(best_default_cpu(&fat), CpuType::Arm64);
+    }
+
+    #[test]
+    fn best_default_cpu_falls_back_to_first_arch() {
+        let fat = fat_with_arches(&[CpuType::Arm]);
+        assert_eq!(best_default_cpu(&fat), CpuType::Arm);
+    }
+}
+
 fn main() {
     // On Linux, ensure the Apple-ABI libc++ is globally visible so all C++
     // code in the process uses the Apple alternate-string-layout ABI.
@@ -138,12 +229,9 @@ fn main() {
                     .map(|a| a.as_ptr())
                     .chain(std::iter::once(std::ptr::null()))
                     .collect();
-                let exe = std::ffi::CString::new(
-                    std::env::current_exe()
-                        .unwrap()
-                        .to_str()
-                        .unwrap()
-                ).unwrap();
+                let exe =
+                    std::ffi::CString::new(std::env::current_exe().unwrap().to_str().unwrap())
+                        .unwrap();
                 unsafe { libc::execv(exe.as_ptr(), c_args.as_ptr()) };
                 // execv only returns on error
                 eprintln!("warning: failed to re-exec with LD_PRELOAD, continuing without Apple-ABI libc++");
@@ -162,16 +250,16 @@ fn main() {
         }
     };
 
-    let parsed = if macho_parse::is_fat(&data) {
-        let preferred = cli.cpu.unwrap_or(CpuType::Arm64);
-        println!(
-            "Fat/universal binary detected — selecting {:?} slice",
-            preferred
-        );
+    let (parsed, effective_data) = if macho_parse::is_fat(&data) {
         let fat = macho_parse::parse_fat(&data).unwrap_or_else(|e| {
             eprintln!("error: failed to parse fat header: {e}");
             std::process::exit(1);
         });
+        let preferred = cli.cpu.unwrap_or_else(|| best_default_cpu(&fat));
+        println!(
+            "Fat/universal binary detected — selecting {:?} slice",
+            preferred
+        );
         println!(
             "  Architectures: {}",
             fat.arches
@@ -180,32 +268,27 @@ fn main() {
                 .collect::<Vec<_>>()
                 .join(", ")
         );
-        match macho_parse::parse_auto(&data, preferred) {
+        let slice = macho_parse::fat_slice_for_cpu(&data, preferred).unwrap_or_else(|e| {
+            eprintln!("error: failed to extract {:?} slice: {e}", preferred);
+            std::process::exit(1);
+        });
+        let parsed = match parse(slice) {
             Ok(p) => p,
             Err(e) => {
                 eprintln!("error: failed to parse {:?} slice: {e}", preferred);
                 std::process::exit(1);
             }
-        }
+        };
+        (parsed, std::borrow::Cow::Owned(slice.to_vec()))
     } else {
-        match parse(&data) {
+        let parsed = match parse(&data) {
             Ok(p) => p,
             Err(e) => {
                 eprintln!("error: failed to parse {}: {e}", cli.path.display());
                 std::process::exit(1);
             }
-        }
-    };
-
-    // For fat binaries, extract the architecture slice for page hash verification
-    let effective_data: std::borrow::Cow<[u8]> = if macho_parse::is_fat(&data) {
-        let preferred = cli.cpu.unwrap_or(CpuType::Arm64);
-        match macho_parse::fat_slice_for_cpu(&data, preferred) {
-            Ok(slice) => std::borrow::Cow::Owned(slice.to_vec()),
-            Err(_) => std::borrow::Cow::Borrowed(&data),
-        }
-    } else {
-        std::borrow::Cow::Borrowed(&data)
+        };
+        (parsed, std::borrow::Cow::Borrowed(data.as_slice()))
     };
 
     let abs_path = fs::canonicalize(&cli.path).unwrap_or_else(|_| cli.path.clone());
@@ -213,7 +296,9 @@ fn main() {
     if cli.exec {
         #[cfg(feature = "gui")]
         if cli.gui {
-            cf_lite::gui_bridge::set_gui_bridge(Box::new(winit_bridge::WinitGuiBridge::new()));
+            cf_lite::gui_bridge::set_gui_bridge(Box::new(
+                window_backend_darwin::WinitGuiBridge::new(),
+            ));
         }
         #[cfg(any(target_os = "macos", target_os = "linux"))]
         exec::print_exec(&parsed, &effective_data, &abs_path, &cli.exec_args);

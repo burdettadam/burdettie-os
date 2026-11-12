@@ -25,190 +25,726 @@ const ERR_AUTH_DENIED: i32 = -60005;
 
 // Static sentinels for opaque Security types
 static SEC_CERT_SENTINEL: u64 = 0x5345_4300_0001; // "SEC" + cert
-static SEC_KEY_SENTINEL: u64 = 0x5345_4B00_0001;  // "SEK" + key
+static SEC_KEY_SENTINEL: u64 = 0x5345_4B00_0001; // "SEK" + key
 static SEC_TRUST_SENTINEL: u64 = 0x5345_5400_0001; // "SET" + trust
 static SEC_POLICY_SENTINEL: u64 = 0x5345_5000_0001; // "SEP" + policy
 static SEC_IDENTITY_SENTINEL: u64 = 0x5345_4900_0001; // "SEI" + identity
+static SEC_SSL_CONTEXT_SENTINEL: u64 = 0x5353_4C00_0001; // "SSL" + context
 
 impl SecurityStubs {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
 
         // ── Keychain / SecItem ──────────────────────────────────
-        register_shims!(table,
-            ("_SecItemAdd", shim_sec_item_add as *const () as u64, "SecItemAdd (real → SQLite)"),
-            ("_SecItemCopyMatching", shim_sec_item_copy_matching as *const () as u64, "SecItemCopyMatching (real → SQLite)"),
-            ("_SecItemUpdate", shim_sec_item_update as *const () as u64, "SecItemUpdate (real → SQLite)"),
-            ("_SecItemDelete", shim_sec_item_delete as *const () as u64, "SecItemDelete (real → SQLite)")
+        register_shims!(
+            table,
+            (
+                "_SecItemAdd",
+                shim_sec_item_add as *const () as u64,
+                "SecItemAdd (real → SQLite)"
+            ),
+            (
+                "_SecItemCopyMatching",
+                shim_sec_item_copy_matching as *const () as u64,
+                "SecItemCopyMatching (real → SQLite)"
+            ),
+            (
+                "_SecItemUpdate",
+                shim_sec_item_update as *const () as u64,
+                "SecItemUpdate (real → SQLite)"
+            ),
+            (
+                "_SecItemDelete",
+                shim_sec_item_delete as *const () as u64,
+                "SecItemDelete (real → SQLite)"
+            )
         );
 
         // ── SecCertificate ──────────────────────────────────────
-        register_shims!(table,
-            ("_SecCertificateCreateWithData", shim_sec_cert_create as *const () as u64, "SecCertificateCreateWithData (real x509 parse)"),
-            ("_SecCertificateCopyData", shim_sec_cert_copy_data as *const () as u64, "SecCertificateCopyData (real DER data)"),
-            ("_SecCertificateCopySubjectSummary", shim_sec_cert_copy_subject_summary as *const () as u64, "SecCertificateCopySubjectSummary (real x509 subject)"),
-            ("_SecCertificateCopyCommonName", shim_sec_copy_common_name as *const () as u64, "SecCertificateCopyCommonName (real x509 CN)"),
-            ("_SecCertificateGetTypeID", shim_sec_get_type_id as *const () as u64, "SecCertificateGetTypeID (stub → 100)")
+        register_shims!(
+            table,
+            (
+                "_SecCertificateCreateWithData",
+                shim_sec_cert_create as *const () as u64,
+                "SecCertificateCreateWithData (real x509 parse)"
+            ),
+            (
+                "_SecCertificateCopyData",
+                shim_sec_cert_copy_data as *const () as u64,
+                "SecCertificateCopyData (real DER data)"
+            ),
+            (
+                "_SecCertificateCopySubjectSummary",
+                shim_sec_cert_copy_subject_summary as *const () as u64,
+                "SecCertificateCopySubjectSummary (real x509 subject)"
+            ),
+            (
+                "_SecCertificateCopyCommonName",
+                shim_sec_copy_common_name as *const () as u64,
+                "SecCertificateCopyCommonName (real x509 CN)"
+            ),
+            (
+                "_SecCertificateGetTypeID",
+                shim_sec_get_type_id as *const () as u64,
+                "SecCertificateGetTypeID (stub → 100)"
+            )
         );
 
         // ── SecKey ──────────────────────────────────────────────
-        register_shims!(table,
-            ("_SecKeyCreateRandomKey", shim_sec_key_create_random as *const () as u64, "SecKeyCreateRandomKey (real ECDSA P-256 via ring)"),
-            ("_SecKeyCopyPublicKey", shim_sec_key_copy_public as *const () as u64, "SecKeyCopyPublicKey (real public key extraction)"),
-            ("_SecKeyCopyExternalRepresentation", shim_sec_return_null as *const () as u64, "SecKeyCopyExternalRepresentation (stub → NULL)"),
-            ("_SecKeyCreateSignature", shim_sec_key_create_signature as *const () as u64, "SecKeyCreateSignature (real ECDSA signing via ring)"),
-            ("_SecKeyCreateEncryptedData", shim_sec_return_null as *const () as u64, "SecKeyCreateEncryptedData (stub → NULL)"),
-            ("_SecKeyCreateDecryptedData", shim_sec_return_null as *const () as u64, "SecKeyCreateDecryptedData (stub → NULL)"),
-            ("_SecKeyGetTypeID", shim_sec_get_type_id as *const () as u64, "SecKeyGetTypeID (stub → 100)"),
-            ("_SecKeyIsAlgorithmSupported", shim_sec_key_is_algo_supported as *const () as u64, "SecKeyIsAlgorithmSupported (real key check)"),
-            ("_SecKeyGetBlockSize", shim_sec_key_get_block_size as *const () as u64, "SecKeyGetBlockSize (real key size)")
+        register_shims!(
+            table,
+            (
+                "_SecKeyCreateRandomKey",
+                shim_sec_key_create_random as *const () as u64,
+                "SecKeyCreateRandomKey (real ECDSA P-256 via ring)"
+            ),
+            (
+                "_SecKeyCopyPublicKey",
+                shim_sec_key_copy_public as *const () as u64,
+                "SecKeyCopyPublicKey (real public key extraction)"
+            ),
+            (
+                "_SecKeyCopyExternalRepresentation",
+                shim_sec_return_null as *const () as u64,
+                "SecKeyCopyExternalRepresentation (stub → NULL)"
+            ),
+            (
+                "_SecKeyCreateSignature",
+                shim_sec_key_create_signature as *const () as u64,
+                "SecKeyCreateSignature (real ECDSA signing via ring)"
+            ),
+            (
+                "_SecKeyCreateEncryptedData",
+                shim_sec_return_null as *const () as u64,
+                "SecKeyCreateEncryptedData (stub → NULL)"
+            ),
+            (
+                "_SecKeyCreateDecryptedData",
+                shim_sec_return_null as *const () as u64,
+                "SecKeyCreateDecryptedData (stub → NULL)"
+            ),
+            (
+                "_SecKeyGetTypeID",
+                shim_sec_get_type_id as *const () as u64,
+                "SecKeyGetTypeID (stub → 100)"
+            ),
+            (
+                "_SecKeyIsAlgorithmSupported",
+                shim_sec_key_is_algo_supported as *const () as u64,
+                "SecKeyIsAlgorithmSupported (real key check)"
+            ),
+            (
+                "_SecKeyGetBlockSize",
+                shim_sec_key_get_block_size as *const () as u64,
+                "SecKeyGetBlockSize (real key size)"
+            )
         );
 
         // ── SecTrust ────────────────────────────────────────────
-        register_shims!(table,
-            ("_SecTrustCreateWithCertificates", shim_sec_trust_create as *const () as u64, "SecTrustCreateWithCertificates (real cert chain store)"),
-            ("_SecTrustEvaluateWithError", shim_sec_trust_evaluate_with_error as *const () as u64, "SecTrustEvaluateWithError (real webpki + Mozilla roots)"),
-            ("_SecTrustEvaluateAsyncWithError", shim_sec_void3 as *const () as u64, "SecTrustEvaluateAsyncWithError (stub → void)"),
-            ("_SecTrustGetCertificateCount", shim_sec_trust_get_cert_count as *const () as u64, "SecTrustGetCertificateCount (real count)"),
-            ("_SecTrustCopyResult", shim_sec_return_null as *const () as u64, "SecTrustCopyResult (stub → NULL)"),
-            ("_SecTrustSetPolicies", shim_sec_return_success as *const () as u64, "SecTrustSetPolicies (accepted)"),
-            ("_SecTrustSetAnchorCertificates", shim_sec_return_success as *const () as u64, "SecTrustSetAnchorCertificates (accepted)"),
-            ("_SecTrustGetTypeID", shim_sec_get_type_id as *const () as u64, "SecTrustGetTypeID (stub → 100)")
+        register_shims!(
+            table,
+            (
+                "_SecTrustCreateWithCertificates",
+                shim_sec_trust_create as *const () as u64,
+                "SecTrustCreateWithCertificates (real cert chain store)"
+            ),
+            (
+                "_SecTrustEvaluate",
+                shim_sec_trust_evaluate as *const () as u64,
+                "SecTrustEvaluate (compat alias)"
+            ),
+            (
+                "_SecTrustEvaluateWithError",
+                shim_sec_trust_evaluate_with_error as *const () as u64,
+                "SecTrustEvaluateWithError (real webpki + Mozilla roots)"
+            ),
+            (
+                "_SecTrustEvaluateAsyncWithError",
+                shim_sec_void3 as *const () as u64,
+                "SecTrustEvaluateAsyncWithError (stub → void)"
+            ),
+            (
+                "_SecTrustGetCertificateCount",
+                shim_sec_trust_get_cert_count as *const () as u64,
+                "SecTrustGetCertificateCount (real count)"
+            ),
+            (
+                "_SecTrustGetCertificateAtIndex",
+                shim_sec_trust_get_cert_at_index as *const () as u64,
+                "SecTrustGetCertificateAtIndex (stored cert handle)"
+            ),
+            (
+                "_SecTrustCopyResult",
+                shim_sec_return_null as *const () as u64,
+                "SecTrustCopyResult (stub → NULL)"
+            ),
+            (
+                "_SecTrustSetPolicies",
+                shim_sec_return_success as *const () as u64,
+                "SecTrustSetPolicies (accepted)"
+            ),
+            (
+                "_SecTrustSetAnchorCertificates",
+                shim_sec_return_success as *const () as u64,
+                "SecTrustSetAnchorCertificates (accepted)"
+            ),
+            (
+                "_SecTrustGetTypeID",
+                shim_sec_get_type_id as *const () as u64,
+                "SecTrustGetTypeID (stub → 100)"
+            )
         );
 
         // ── SecPolicy ───────────────────────────────────────────
-        register_shims!(table,
-            ("_SecPolicyCreateSSL", shim_sec_policy_create as *const () as u64, "SecPolicyCreateSSL (stub → sentinel)"),
-            ("_SecPolicyCreateBasicX509", shim_sec_policy_create_no_args as *const () as u64, "SecPolicyCreateBasicX509 (stub → sentinel)"),
-            ("_SecPolicyGetTypeID", shim_sec_get_type_id as *const () as u64, "SecPolicyGetTypeID (stub → 100)")
+        register_shims!(
+            table,
+            (
+                "_SecPolicyCreateSSL",
+                shim_sec_policy_create as *const () as u64,
+                "SecPolicyCreateSSL (stub → sentinel)"
+            ),
+            (
+                "_SecPolicyCreateBasicX509",
+                shim_sec_policy_create_no_args as *const () as u64,
+                "SecPolicyCreateBasicX509 (stub → sentinel)"
+            ),
+            (
+                "_SecPolicyGetTypeID",
+                shim_sec_get_type_id as *const () as u64,
+                "SecPolicyGetTypeID (stub → 100)"
+            )
         );
 
         // ── SecIdentity ─────────────────────────────────────────
-        register_shims!(table,
-            ("_SecIdentityGetTypeID", shim_sec_get_type_id as *const () as u64, "SecIdentityGetTypeID (stub → 100)"),
-            ("_SecIdentityCopyCertificate", shim_sec_identity_copy_cert as *const () as u64, "SecIdentityCopyCertificate (stub → errSecUnimplemented)"),
-            ("_SecIdentityCopyPrivateKey", shim_sec_identity_copy_key as *const () as u64, "SecIdentityCopyPrivateKey (stub → errSecUnimplemented)")
+        register_shims!(
+            table,
+            (
+                "_SecIdentityGetTypeID",
+                shim_sec_get_type_id as *const () as u64,
+                "SecIdentityGetTypeID (stub → 100)"
+            ),
+            (
+                "_SecIdentityCopyCertificate",
+                shim_sec_identity_copy_cert as *const () as u64,
+                "SecIdentityCopyCertificate (stub → errSecUnimplemented)"
+            ),
+            (
+                "_SecIdentityCopyPrivateKey",
+                shim_sec_identity_copy_key as *const () as u64,
+                "SecIdentityCopyPrivateKey (stub → errSecUnimplemented)"
+            )
         );
 
         // ── SecAccessControl ────────────────────────────────────
-        register_shims!(table,
-            ("_SecAccessControlCreateWithFlags", shim_sec_return_null3 as *const () as u64, "SecAccessControlCreateWithFlags (stub → NULL)")
+        register_shims!(
+            table,
+            (
+                "_SecAccessControlCreateWithFlags",
+                shim_sec_return_null3 as *const () as u64,
+                "SecAccessControlCreateWithFlags (stub → NULL)"
+            )
         );
 
         // ── Randomness ──────────────────────────────────────────
-        register_shims!(table,
-            ("_SecRandomCopyBytes", shim_sec_random_copy_bytes as *const () as u64, "SecRandomCopyBytes (stub → fills with random)")
+        register_shims!(
+            table,
+            (
+                "_SecRandomCopyBytes",
+                shim_sec_random_copy_bytes as *const () as u64,
+                "SecRandomCopyBytes (stub → fills with random)"
+            )
         );
 
         // ── PKCS12 / import-export ──────────────────────────────
-        register_shims!(table,
-            ("_SecPKCS12Import", shim_sec_return_unimplemented as *const () as u64, "SecPKCS12Import (stub → errSecUnimplemented)")
+        register_shims!(
+            table,
+            (
+                "_SecPKCS12Import",
+                shim_sec_return_unimplemented as *const () as u64,
+                "SecPKCS12Import (stub → errSecUnimplemented)"
+            )
         );
 
         // ── Keychain refs (legacy — bridged to SQLite store) ──────
-        register_shims!(table,
-            ("_SecKeychainItemCopyContent", shim_sec_keychain_item_copy_content as *const () as u64, "SecKeychainItemCopyContent (real → SQLite)"),
-            ("_SecKeychainItemModifyContent", shim_sec_keychain_item_modify_content as *const () as u64, "SecKeychainItemModifyContent (real → SQLite)"),
-            ("_SecKeychainItemFreeContent", shim_sec_keychain_item_free_content as *const () as u64, "SecKeychainItemFreeContent (real → free)"),
-            ("_SecKeychainFindGenericPassword", shim_sec_keychain_find_generic_password as *const () as u64, "SecKeychainFindGenericPassword (real → SQLite)"),
-            ("_SecKeychainFindInternetPassword", shim_sec_keychain_find_internet_password as *const () as u64, "SecKeychainFindInternetPassword (real → SQLite)"),
-            ("_SecKeychainAddGenericPassword", shim_sec_keychain_add_generic_password as *const () as u64, "SecKeychainAddGenericPassword (real → SQLite)"),
-            ("_SecKeychainCopyDefault", shim_sec_keychain_copy_default as *const () as u64, "SecKeychainCopyDefault (stub → sentinel)"),
-            ("_SecKeychainOpen", shim_sec_keychain_open as *const () as u64, "SecKeychainOpen (stub → sentinel)"),
-            ("_SecKeychainGetPath", shim_sec_keychain_get_path as *const () as u64, "SecKeychainGetPath (stub → default path)"),
-            ("_SecKeychainCopySearchList", shim_sec_return_null as *const () as u64, "SecKeychainCopySearchList (stub → NULL)"),
-            ("_SecKeychainSetSearchList", shim_sec_return_success as *const () as u64, "SecKeychainSetSearchList (stub → success)")
+        register_shims!(
+            table,
+            (
+                "_SecKeychainItemCopyContent",
+                shim_sec_keychain_item_copy_content as *const () as u64,
+                "SecKeychainItemCopyContent (real → SQLite)"
+            ),
+            (
+                "_SecKeychainItemModifyContent",
+                shim_sec_keychain_item_modify_content as *const () as u64,
+                "SecKeychainItemModifyContent (real → SQLite)"
+            ),
+            (
+                "_SecKeychainItemFreeContent",
+                shim_sec_keychain_item_free_content as *const () as u64,
+                "SecKeychainItemFreeContent (real → free)"
+            ),
+            (
+                "_SecKeychainFindGenericPassword",
+                shim_sec_keychain_find_generic_password as *const () as u64,
+                "SecKeychainFindGenericPassword (real → SQLite)"
+            ),
+            (
+                "_SecKeychainFindInternetPassword",
+                shim_sec_keychain_find_internet_password as *const () as u64,
+                "SecKeychainFindInternetPassword (real → SQLite)"
+            ),
+            (
+                "_SecKeychainAddGenericPassword",
+                shim_sec_keychain_add_generic_password as *const () as u64,
+                "SecKeychainAddGenericPassword (real → SQLite)"
+            ),
+            (
+                "_SecKeychainCopyDefault",
+                shim_sec_keychain_copy_default as *const () as u64,
+                "SecKeychainCopyDefault (stub → sentinel)"
+            ),
+            (
+                "_SecKeychainOpen",
+                shim_sec_keychain_open as *const () as u64,
+                "SecKeychainOpen (stub → sentinel)"
+            ),
+            (
+                "_SecKeychainGetPath",
+                shim_sec_keychain_get_path as *const () as u64,
+                "SecKeychainGetPath (stub → default path)"
+            ),
+            (
+                "_SecKeychainCopySearchList",
+                shim_sec_return_null as *const () as u64,
+                "SecKeychainCopySearchList (stub → NULL)"
+            ),
+            (
+                "_SecKeychainSetSearchList",
+                shim_sec_return_success as *const () as u64,
+                "SecKeychainSetSearchList (stub → success)"
+            )
         );
 
         // ── kSec* string constant data symbols ──────────────────
-        register_shims!(table,
-            ("_kSecClass", &KSEC_CLASS as *const u64 as u64, "kSecClass data symbol"),
-            ("_kSecAttrAccount", &KSEC_ATTR_ACCOUNT as *const u64 as u64, "kSecAttrAccount data symbol"),
-            ("_kSecAttrService", &KSEC_ATTR_SERVICE as *const u64 as u64, "kSecAttrService data symbol"),
-            ("_kSecValueData", &KSEC_VALUE_DATA as *const u64 as u64, "kSecValueData data symbol"),
-            ("_kSecReturnData", &KSEC_RETURN_DATA as *const u64 as u64, "kSecReturnData data symbol"),
-            ("_kSecReturnAttributes", &KSEC_RETURN_ATTRS as *const u64 as u64, "kSecReturnAttributes data symbol"),
-            ("_kSecMatchLimit", &KSEC_MATCH_LIMIT as *const u64 as u64, "kSecMatchLimit data symbol"),
-            ("_kSecClassGenericPassword", &KSEC_CLASS_GENERIC_PW as *const u64 as u64, "kSecClassGenericPassword data symbol"),
-            ("_kSecClassInternetPassword", &KSEC_CLASS_INET_PW as *const u64 as u64, "kSecClassInternetPassword data symbol"),
-            ("_kSecClassCertificate", &KSEC_CLASS_CERT as *const u64 as u64, "kSecClassCertificate data symbol"),
-            ("_kSecClassKey", &KSEC_CLASS_KEY as *const u64 as u64, "kSecClassKey data symbol"),
-            ("_kSecClassIdentity", &KSEC_CLASS_IDENTITY as *const u64 as u64, "kSecClassIdentity data symbol")
+        register_shims!(
+            table,
+            (
+                "_kSecClass",
+                &KSEC_CLASS as *const u64 as u64,
+                "kSecClass data symbol"
+            ),
+            (
+                "_kSecAttrAccount",
+                &KSEC_ATTR_ACCOUNT as *const u64 as u64,
+                "kSecAttrAccount data symbol"
+            ),
+            (
+                "_kSecAttrService",
+                &KSEC_ATTR_SERVICE as *const u64 as u64,
+                "kSecAttrService data symbol"
+            ),
+            (
+                "_kSecValueData",
+                &KSEC_VALUE_DATA as *const u64 as u64,
+                "kSecValueData data symbol"
+            ),
+            (
+                "_kSecReturnData",
+                &KSEC_RETURN_DATA as *const u64 as u64,
+                "kSecReturnData data symbol"
+            ),
+            (
+                "_kSecReturnAttributes",
+                &KSEC_RETURN_ATTRS as *const u64 as u64,
+                "kSecReturnAttributes data symbol"
+            ),
+            (
+                "_kSecMatchLimit",
+                &KSEC_MATCH_LIMIT as *const u64 as u64,
+                "kSecMatchLimit data symbol"
+            ),
+            (
+                "_kSecClassGenericPassword",
+                &KSEC_CLASS_GENERIC_PW as *const u64 as u64,
+                "kSecClassGenericPassword data symbol"
+            ),
+            (
+                "_kSecClassInternetPassword",
+                &KSEC_CLASS_INET_PW as *const u64 as u64,
+                "kSecClassInternetPassword data symbol"
+            ),
+            (
+                "_kSecClassCertificate",
+                &KSEC_CLASS_CERT as *const u64 as u64,
+                "kSecClassCertificate data symbol"
+            ),
+            (
+                "_kSecClassKey",
+                &KSEC_CLASS_KEY as *const u64 as u64,
+                "kSecClassKey data symbol"
+            ),
+            (
+                "_kSecClassIdentity",
+                &KSEC_CLASS_IDENTITY as *const u64 as u64,
+                "kSecClassIdentity data symbol"
+            )
         );
 
         // ── Authorization framework (Security/Authorization.h) ──
         // errAuthorizationDenied (-60005) is the safe default: the guest
         // binary cannot perform privileged operations inside our interpreter.
-        register_shims!(table,
-            ("_AuthorizationCreate",                   shim_auth_denied as *const () as u64,        "AuthorizationCreate (stub → errAuthorizationDenied)"),
-            ("_AuthorizationFree",                     shim_auth_free as *const () as u64,           "AuthorizationFree (stub → void)"),
-            ("_AuthorizationCopyRights",               shim_auth_denied as *const () as u64,        "AuthorizationCopyRights (stub → errAuthorizationDenied)"),
-            ("_AuthorizationCopyRightsAsync",          shim_auth_copy_rights_async as *const () as u64, "AuthorizationCopyRightsAsync (stub → void/denied)"),
-            ("_AuthorizationMakeExternalForm",         shim_auth_denied as *const () as u64,        "AuthorizationMakeExternalForm (stub → errAuthorizationDenied)"),
-            ("_AuthorizationCreateFromExternalForm",   shim_auth_denied as *const () as u64,        "AuthorizationCreateFromExternalForm (stub → errAuthorizationDenied)"),
-            ("_AuthorizationCopyInfo",                 shim_auth_denied as *const () as u64,        "AuthorizationCopyInfo (stub → errAuthorizationDenied)"),
-            ("_AuthorizationExecuteWithPrivileges",    shim_auth_denied as *const () as u64,        "AuthorizationExecuteWithPrivileges (stub → errAuthorizationDenied)"),
-            ("_AuthorizationCancelRight",              shim_auth_cancelled as *const () as u64,     "AuthorizationCancelRight (stub → errAuthorizationCanceled)"),
-            ("_AuthorizationFreeItemSet",              shim_auth_free_item_set as *const () as u64, "AuthorizationFreeItemSet (stub → void)"),
-            ("_AuthorizationRightSet",                 shim_auth_denied as *const () as u64,        "AuthorizationRightSet (stub → errAuthorizationDenied)"),
-            ("_AuthorizationRightGet",                 shim_auth_denied as *const () as u64,        "AuthorizationRightGet (stub → errAuthorizationDenied)"),
-            ("_AuthorizationRightRemove",              shim_auth_denied as *const () as u64,        "AuthorizationRightRemove (stub → errAuthorizationDenied)"),
-            ("_AuthorizationPluginCreate",             shim_auth_denied as *const () as u64,        "AuthorizationPluginCreate (stub → errAuthorizationDenied)"),
+        register_shims!(
+            table,
+            (
+                "_AuthorizationCreate",
+                shim_auth_denied as *const () as u64,
+                "AuthorizationCreate (stub → errAuthorizationDenied)"
+            ),
+            (
+                "_AuthorizationFree",
+                shim_auth_free as *const () as u64,
+                "AuthorizationFree (stub → void)"
+            ),
+            (
+                "_AuthorizationCopyRights",
+                shim_auth_denied as *const () as u64,
+                "AuthorizationCopyRights (stub → errAuthorizationDenied)"
+            ),
+            (
+                "_AuthorizationCopyRightsAsync",
+                shim_auth_copy_rights_async as *const () as u64,
+                "AuthorizationCopyRightsAsync (stub → void/denied)"
+            ),
+            (
+                "_AuthorizationMakeExternalForm",
+                shim_auth_denied as *const () as u64,
+                "AuthorizationMakeExternalForm (stub → errAuthorizationDenied)"
+            ),
+            (
+                "_AuthorizationCreateFromExternalForm",
+                shim_auth_denied as *const () as u64,
+                "AuthorizationCreateFromExternalForm (stub → errAuthorizationDenied)"
+            ),
+            (
+                "_AuthorizationCopyInfo",
+                shim_auth_denied as *const () as u64,
+                "AuthorizationCopyInfo (stub → errAuthorizationDenied)"
+            ),
+            (
+                "_AuthorizationExecuteWithPrivileges",
+                shim_auth_denied as *const () as u64,
+                "AuthorizationExecuteWithPrivileges (stub → errAuthorizationDenied)"
+            ),
+            (
+                "_AuthorizationCancelRight",
+                shim_auth_cancelled as *const () as u64,
+                "AuthorizationCancelRight (stub → errAuthorizationCanceled)"
+            ),
+            (
+                "_AuthorizationFreeItemSet",
+                shim_auth_free_item_set as *const () as u64,
+                "AuthorizationFreeItemSet (stub → void)"
+            ),
+            (
+                "_AuthorizationRightSet",
+                shim_auth_denied as *const () as u64,
+                "AuthorizationRightSet (stub → errAuthorizationDenied)"
+            ),
+            (
+                "_AuthorizationRightGet",
+                shim_auth_denied as *const () as u64,
+                "AuthorizationRightGet (stub → errAuthorizationDenied)"
+            ),
+            (
+                "_AuthorizationRightRemove",
+                shim_auth_denied as *const () as u64,
+                "AuthorizationRightRemove (stub → errAuthorizationDenied)"
+            ),
+            (
+                "_AuthorizationPluginCreate",
+                shim_auth_denied as *const () as u64,
+                "AuthorizationPluginCreate (stub → errAuthorizationDenied)"
+            ),
             // Private Authorization SPI used by /usr/bin/security
-            ("_AuthorizationCopyPreloginUserDatabase", shim_auth_denied as *const () as u64,        "AuthorizationCopyPreloginUserDatabase (stub → errAuthorizationDenied)"),
-            ("_AuthorizationHandlePreloginOverride",   shim_auth_denied as *const () as u64,        "AuthorizationHandlePreloginOverride (stub → errAuthorizationDenied)"),
+            (
+                "_AuthorizationCopyPreloginUserDatabase",
+                shim_auth_denied as *const () as u64,
+                "AuthorizationCopyPreloginUserDatabase (stub → errAuthorizationDenied)"
+            ),
+            (
+                "_AuthorizationHandlePreloginOverride",
+                shim_auth_denied as *const () as u64,
+                "AuthorizationHandlePreloginOverride (stub → errAuthorizationDenied)"
+            ),
         );
 
         // ── Network.framework (nw_* symbols) ───────────────────
         // Network.framework is not available in our stub environment.
         // Return NULL / no-op for all nw_* calls.
-        register_shims!(table,
-            ("_nw_connection_create",              shim_sec_return_null as *const () as u64, "nw_connection_create (stub → NULL)"),
-            ("_nw_connection_start",               shim_void1_stub as *const () as u64,      "nw_connection_start (stub → void)"),
-            ("_nw_connection_send",                shim_void4_stub as *const () as u64,      "nw_connection_send (stub → void)"),
-            ("_nw_connection_receive",             shim_void4_stub as *const () as u64,      "nw_connection_receive (stub → void)"),
-            ("_nw_connection_cancel",              shim_void1_stub as *const () as u64,      "nw_connection_cancel (stub → void)"),
-            ("_nw_connection_set_state_changed_handler", shim_void2_stub as *const () as u64, "nw_connection_set_state_changed_handler (stub → void)"),
-            ("_nw_connection_set_queue",           shim_void2_stub as *const () as u64,      "nw_connection_set_queue (stub → void)"),
-            ("_nw_endpoint_create_host",           shim_sec_return_null as *const () as u64, "nw_endpoint_create_host (stub → NULL)"),
-            ("_nw_parameters_create_secure_tcp",   shim_sec_return_null as *const () as u64, "nw_parameters_create_secure_tcp (stub → NULL)"),
-            ("_nw_parameters_create_secure_udp",   shim_sec_return_null as *const () as u64, "nw_parameters_create_secure_udp (stub → NULL)"),
-            ("_nw_parameters_create",              shim_sec_return_null as *const () as u64, "nw_parameters_create (stub → NULL)"),
-            ("_nw_listener_create",                shim_sec_return_null as *const () as u64, "nw_listener_create (stub → NULL)"),
-            ("_nw_listener_start",                 shim_void1_stub as *const () as u64,      "nw_listener_start (stub → void)"),
-            ("_nw_listener_cancel",                shim_void1_stub as *const () as u64,      "nw_listener_cancel (stub → void)"),
-            ("_nw_listener_set_state_changed_handler", shim_void2_stub as *const () as u64, "nw_listener_set_state_changed_handler (stub → void)"),
-            ("_nw_listener_set_new_connection_handler", shim_void2_stub as *const () as u64, "nw_listener_set_new_connection_handler (stub → void)"),
-            ("_nw_listener_set_queue",             shim_void2_stub as *const () as u64,      "nw_listener_set_queue (stub → void)"),
-            ("_nw_path_monitor_create",            shim_sec_return_null as *const () as u64, "nw_path_monitor_create (stub → NULL)"),
-            ("_nw_path_monitor_start",             shim_void1_stub as *const () as u64,      "nw_path_monitor_start (stub → void)"),
-            ("_nw_path_monitor_set_queue",         shim_void2_stub as *const () as u64,      "nw_path_monitor_set_queue (stub → void)"),
-            ("_nw_path_monitor_set_update_handler",shim_void2_stub as *const () as u64,      "nw_path_monitor_set_update_handler (stub → void)"),
-            ("_nw_path_monitor_cancel",            shim_void1_stub as *const () as u64,      "nw_path_monitor_cancel (stub → void)"),
+        register_shims!(
+            table,
+            (
+                "_nw_connection_create",
+                shim_sec_return_null as *const () as u64,
+                "nw_connection_create (stub → NULL)"
+            ),
+            (
+                "_nw_connection_start",
+                shim_void1_stub as *const () as u64,
+                "nw_connection_start (stub → void)"
+            ),
+            (
+                "_nw_connection_send",
+                shim_void4_stub as *const () as u64,
+                "nw_connection_send (stub → void)"
+            ),
+            (
+                "_nw_connection_receive",
+                shim_void4_stub as *const () as u64,
+                "nw_connection_receive (stub → void)"
+            ),
+            (
+                "_nw_connection_cancel",
+                shim_void1_stub as *const () as u64,
+                "nw_connection_cancel (stub → void)"
+            ),
+            (
+                "_nw_connection_set_state_changed_handler",
+                shim_void2_stub as *const () as u64,
+                "nw_connection_set_state_changed_handler (stub → void)"
+            ),
+            (
+                "_nw_connection_set_queue",
+                shim_void2_stub as *const () as u64,
+                "nw_connection_set_queue (stub → void)"
+            ),
+            (
+                "_nw_endpoint_create_host",
+                shim_sec_return_null as *const () as u64,
+                "nw_endpoint_create_host (stub → NULL)"
+            ),
+            (
+                "_nw_parameters_create_secure_tcp",
+                shim_sec_return_null as *const () as u64,
+                "nw_parameters_create_secure_tcp (stub → NULL)"
+            ),
+            (
+                "_nw_parameters_create_secure_udp",
+                shim_sec_return_null as *const () as u64,
+                "nw_parameters_create_secure_udp (stub → NULL)"
+            ),
+            (
+                "_nw_parameters_create",
+                shim_sec_return_null as *const () as u64,
+                "nw_parameters_create (stub → NULL)"
+            ),
+            (
+                "_nw_listener_create",
+                shim_sec_return_null as *const () as u64,
+                "nw_listener_create (stub → NULL)"
+            ),
+            (
+                "_nw_listener_start",
+                shim_void1_stub as *const () as u64,
+                "nw_listener_start (stub → void)"
+            ),
+            (
+                "_nw_listener_cancel",
+                shim_void1_stub as *const () as u64,
+                "nw_listener_cancel (stub → void)"
+            ),
+            (
+                "_nw_listener_set_state_changed_handler",
+                shim_void2_stub as *const () as u64,
+                "nw_listener_set_state_changed_handler (stub → void)"
+            ),
+            (
+                "_nw_listener_set_new_connection_handler",
+                shim_void2_stub as *const () as u64,
+                "nw_listener_set_new_connection_handler (stub → void)"
+            ),
+            (
+                "_nw_listener_set_queue",
+                shim_void2_stub as *const () as u64,
+                "nw_listener_set_queue (stub → void)"
+            ),
+            (
+                "_nw_path_monitor_create",
+                shim_sec_return_null as *const () as u64,
+                "nw_path_monitor_create (stub → NULL)"
+            ),
+            (
+                "_nw_path_monitor_start",
+                shim_void1_stub as *const () as u64,
+                "nw_path_monitor_start (stub → void)"
+            ),
+            (
+                "_nw_path_monitor_set_queue",
+                shim_void2_stub as *const () as u64,
+                "nw_path_monitor_set_queue (stub → void)"
+            ),
+            (
+                "_nw_path_monitor_set_update_handler",
+                shim_void2_stub as *const () as u64,
+                "nw_path_monitor_set_update_handler (stub → void)"
+            ),
+            (
+                "_nw_path_monitor_cancel",
+                shim_void1_stub as *const () as u64,
+                "nw_path_monitor_cancel (stub → void)"
+            ),
             // Additional nw_* symbols imported by /usr/bin/security
-            ("__nw_parameters_configure_protocol_default_configuration", shim_void1_stub as *const () as u64, "nw_parameters_configure_protocol_default_configuration (stub → void)"),
-            ("_nw_connection_copy_endpoint",       shim_sec_return_null as *const () as u64, "nw_connection_copy_endpoint (stub → NULL)"),
-            ("_nw_endpoint_get_hostname",          shim_sec_return_null as *const () as u64, "nw_endpoint_get_hostname (stub → NULL)"),
-            ("_nw_endpoint_get_port",              shim_sec_return_null as *const () as u64, "nw_endpoint_get_port (stub → NULL)"),
-            ("_nw_error_get_error_code",           shim_sec_return_null as *const () as u64, "nw_error_get_error_code (stub → 0)"),
-            ("_nw_parameters_set_indefinite",      shim_void2_stub as *const () as u64,      "nw_parameters_set_indefinite (stub → void)"),
-            ("_nw_tls_copy_sec_protocol_options",  shim_sec_return_null as *const () as u64, "nw_tls_copy_sec_protocol_options (stub → NULL)"),
+            (
+                "__nw_parameters_configure_protocol_default_configuration",
+                shim_void1_stub as *const () as u64,
+                "nw_parameters_configure_protocol_default_configuration (stub → void)"
+            ),
+            (
+                "_nw_connection_copy_endpoint",
+                shim_sec_return_null as *const () as u64,
+                "nw_connection_copy_endpoint (stub → NULL)"
+            ),
+            (
+                "_nw_endpoint_get_hostname",
+                shim_sec_return_null as *const () as u64,
+                "nw_endpoint_get_hostname (stub → NULL)"
+            ),
+            (
+                "_nw_endpoint_get_port",
+                shim_sec_return_null as *const () as u64,
+                "nw_endpoint_get_port (stub → NULL)"
+            ),
+            (
+                "_nw_error_get_error_code",
+                shim_sec_return_null as *const () as u64,
+                "nw_error_get_error_code (stub → 0)"
+            ),
+            (
+                "_nw_parameters_set_indefinite",
+                shim_void2_stub as *const () as u64,
+                "nw_parameters_set_indefinite (stub → void)"
+            ),
+            (
+                "_nw_tls_copy_sec_protocol_options",
+                shim_sec_return_null as *const () as u64,
+                "nw_tls_copy_sec_protocol_options (stub → NULL)"
+            ),
         );
 
         // ── CSSM (deprecated, legacy CDSA crypto) ───────────────
-        register_shims!(table,
-            ("_CSSM_Init",        shim_auth_denied as *const () as u64, "CSSM_Init (stub → error)"),
-            ("_CSSM_ModuleLoad",  shim_auth_denied as *const () as u64, "CSSM_ModuleLoad (stub → error)"),
-            ("_CSSM_ModuleUnload",shim_auth_denied as *const () as u64, "CSSM_ModuleUnload (stub → error)"),
-            ("_CSSM_Terminate",   shim_auth_denied as *const () as u64, "CSSM_Terminate (stub → error)"),
+        register_shims!(
+            table,
+            (
+                "_CSSM_Init",
+                shim_auth_denied as *const () as u64,
+                "CSSM_Init (stub → error)"
+            ),
+            (
+                "_CSSM_ModuleLoad",
+                shim_auth_denied as *const () as u64,
+                "CSSM_ModuleLoad (stub → error)"
+            ),
+            (
+                "_CSSM_ModuleUnload",
+                shim_auth_denied as *const () as u64,
+                "CSSM_ModuleUnload (stub → error)"
+            ),
+            (
+                "_CSSM_Terminate",
+                shim_auth_denied as *const () as u64,
+                "CSSM_Terminate (stub → error)"
+            ),
             // CSSM string helpers (lowercase prefix, need explicit stubs)
-            ("_cssmErrorString",   shim_sec_return_null as *const () as u64, "cssmErrorString (stub → NULL)"),
-            ("_cssmPerror",        shim_void1_stub as *const () as u64,      "cssmPerror (stub → void)"),
+            (
+                "_cssmErrorString",
+                shim_sec_return_null as *const () as u64,
+                "cssmErrorString (stub → NULL)"
+            ),
+            (
+                "_cssmPerror",
+                shim_void1_stub as *const () as u64,
+                "cssmPerror (stub → void)"
+            ),
         );
 
         // ── SecLogObj / diagnostics ──────────────────────────────
-        register_shims!(table,
-            ("_secLogObjForScope", shim_sec_return_null as *const () as u64, "secLogObjForScope (stub → NULL)"),
+        register_shims!(
+            table,
+            (
+                "_SecCopyErrorMessageString",
+                shim_sec_return_null as *const () as u64,
+                "SecCopyErrorMessageString (stub → NULL)"
+            ),
+            (
+                "_secLogObjForScope",
+                shim_sec_return_null as *const () as u64,
+                "secLogObjForScope (stub → NULL)"
+            ),
+        );
+
+        // ── SecureTransport (legacy Security.framework TLS) ──────
+        register_shims!(
+            table,
+            (
+                "_SSLCreateContext",
+                shim_ssl_create_context as *const () as u64,
+                "SSLCreateContext (stub → sentinel)"
+            ),
+            (
+                "_SSLSetConnection",
+                shim_ssl_set_connection as *const () as u64,
+                "SSLSetConnection (stub → success)"
+            ),
+            (
+                "_SSLSetIOFuncs",
+                shim_ssl_set_io_funcs as *const () as u64,
+                "SSLSetIOFuncs (stub → success)"
+            ),
+            (
+                "_SSLSetPeerDomainName",
+                shim_ssl_set_peer_domain_name as *const () as u64,
+                "SSLSetPeerDomainName (stub → success)"
+            ),
+            (
+                "_SSLSetProtocolVersionMax",
+                shim_ssl_set_protocol_version_max as *const () as u64,
+                "SSLSetProtocolVersionMax (stub → success)"
+            ),
+            (
+                "_SSLSetProtocolVersionMin",
+                shim_ssl_set_protocol_version_min as *const () as u64,
+                "SSLSetProtocolVersionMin (stub → success)"
+            ),
+            (
+                "_SSLSetSessionOption",
+                shim_ssl_set_session_option as *const () as u64,
+                "SSLSetSessionOption (stub → success)"
+            ),
+            (
+                "_SSLHandshake",
+                shim_ssl_handshake as *const () as u64,
+                "SSLHandshake (stub → errSecUnimplemented)"
+            ),
+            (
+                "_SSLRead",
+                shim_ssl_read as *const () as u64,
+                "SSLRead (stub → errSecUnimplemented)"
+            ),
+            (
+                "_SSLWrite",
+                shim_ssl_write as *const () as u64,
+                "SSLWrite (stub → errSecUnimplemented)"
+            ),
+            (
+                "_SSLClose",
+                shim_ssl_close as *const () as u64,
+                "SSLClose (stub → success)"
+            ),
+            (
+                "_SSLCopyPeerTrust",
+                shim_ssl_copy_peer_trust as *const () as u64,
+                "SSLCopyPeerTrust (stub → no trust)"
+            ),
         );
 
         log::debug!("SecurityStubs: registered Security.framework stubs");
@@ -306,7 +842,9 @@ struct KeychainItemRef {
 static KEYCHAIN_ITEM_STORE: Mutex<Option<HashMap<u64, KeychainItemRef>>> = Mutex::new(None);
 
 fn keychain_item_store() -> std::sync::MutexGuard<'static, Option<HashMap<u64, KeychainItemRef>>> {
-    KEYCHAIN_ITEM_STORE.lock().unwrap_or_else(|e| e.into_inner())
+    KEYCHAIN_ITEM_STORE
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
 }
 
 /// Default keychain sentinel — returned by SecKeychainCopyDefault / SecKeychainOpen.
@@ -314,22 +852,21 @@ static SEC_KEYCHAIN_SENTINEL: u64 = 0x5345_4B43_0001; // "SEKC" + keychain
 
 /// Extract a UTF-8 string from a raw C pointer + byte length (no NUL required).
 fn extract_c_buf(ptr: *const u8, len: usize) -> String {
-    if ptr.is_null() || len == 0 { return String::new(); }
+    if ptr.is_null() || len == 0 {
+        return String::new();
+    }
     let slice = unsafe { std::slice::from_raw_parts(ptr, len) };
     String::from_utf8_lossy(slice).into_owned()
 }
 
 fn ensure_keychain(guard: &mut Option<rusqlite::Connection>) -> &mut rusqlite::Connection {
     guard.get_or_insert_with(|| {
-        let path = std::env::var("TMPDIR")
-            .unwrap_or_else(|_| "/tmp".to_string());
+        let path = std::env::var("TMPDIR").unwrap_or_else(|_| "/tmp".to_string());
         let db_path = format!("{}/burdettieOS-keychain.db", path.trim_end_matches('/'));
-        let conn = rusqlite::Connection::open(&db_path)
-            .unwrap_or_else(|_| {
-                log::debug!("keychain: file-backed DB failed, using in-memory");
-                rusqlite::Connection::open_in_memory()
-                    .expect("keychain: in-memory DB failed")
-            });
+        let conn = rusqlite::Connection::open(&db_path).unwrap_or_else(|_| {
+            log::debug!("keychain: file-backed DB failed, using in-memory");
+            rusqlite::Connection::open_in_memory().expect("keychain: in-memory DB failed")
+        });
         let _ = conn.execute(
             "CREATE TABLE IF NOT EXISTS keychain (
                 service TEXT NOT NULL,
@@ -347,27 +884,39 @@ fn ensure_keychain(guard: &mut Option<rusqlite::Connection>) -> &mut rusqlite::C
 
 /// Read a u64 from `obj + offset`, returning 0 if obj is null.
 fn raw_read_u64(obj: u64, offset: usize) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { std::ptr::read_unaligned((obj as usize + offset) as *const u64) }
 }
 
 /// Extract a UTF-8 string from a CFString/NSString object.
 /// CFString layout: [isa:8][flags:8][cstr_ptr:8][len:8]
 fn extract_string(obj: u64) -> Option<String> {
-    if obj < 0x1000 || (obj >> 63) != 0 { return None; }
+    if obj < 0x1000 || (obj >> 63) != 0 {
+        return None;
+    }
     let cstr_ptr = raw_read_u64(obj, 16);
-    if cstr_ptr < 0x1000 || (cstr_ptr >> 63) != 0 { return None; }
+    if cstr_ptr < 0x1000 || (cstr_ptr >> 63) != 0 {
+        return None;
+    }
     let cstr = unsafe { std::ffi::CStr::from_ptr(cstr_ptr as *const std::ffi::c_char) };
     cstr.to_str().ok().map(|s| s.to_string())
 }
 
 /// Read a raw NSData payload: [isa:8][bytes_ptr:8][length:8]
 fn extract_data(obj: u64) -> Option<Vec<u8>> {
-    if obj < 0x1000 || (obj >> 63) != 0 { return None; }
+    if obj < 0x1000 || (obj >> 63) != 0 {
+        return None;
+    }
     let bytes_ptr = raw_read_u64(obj, 8);
     let length = raw_read_u64(obj, 16) as usize;
-    if bytes_ptr == 0 || length == 0 { return Some(Vec::new()); }
-    if bytes_ptr < 0x1000 { return None; }
+    if bytes_ptr == 0 || length == 0 {
+        return Some(Vec::new());
+    }
+    if bytes_ptr < 0x1000 {
+        return None;
+    }
     let slice = unsafe { std::slice::from_raw_parts(bytes_ptr as *const u8, length) };
     Some(slice.to_vec())
 }
@@ -381,7 +930,9 @@ fn extract_data(obj: u64) -> Option<Vec<u8>> {
 /// We try the dynamic layout first; if it yields nothing useful we
 /// fall back to the constant-dictionary offsets.
 fn dict_value_for_sentinel(dict: u64, sentinel: u64) -> u64 {
-    if dict < 0x1000 { return 0; }
+    if dict < 0x1000 {
+        return 0;
+    }
 
     // Try dynamic NSDictionary layout (count@8, keys@16, vals@24)
     if let Some(v) = scan_dict_at(dict, 8, 16, 24, sentinel) {
@@ -426,7 +977,11 @@ fn parse_query(dict: u64) -> (u64, String, String, Option<Vec<u8>>) {
 
     let service = extract_string(service_obj).unwrap_or_default();
     let account = extract_string(account_obj).unwrap_or_default();
-    let data = if data_obj != 0 { extract_data(data_obj) } else { None };
+    let data = if data_obj != 0 {
+        extract_data(data_obj)
+    } else {
+        None
+    };
 
     (class, service, account, data)
 }
@@ -460,35 +1015,60 @@ pub extern "C" fn shim_sec_keychain_find_generic_password(
     match row_data {
         Ok(data) => {
             if !password_len_out.is_null() {
-                unsafe { *password_len_out = data.len() as u32; }
+                unsafe {
+                    *password_len_out = data.len() as u32;
+                }
             }
             if !password_data_out.is_null() {
                 if data.is_empty() {
-                    unsafe { *password_data_out = std::ptr::null_mut(); }
+                    unsafe {
+                        *password_data_out = std::ptr::null_mut();
+                    }
                 } else {
                     let buf = unsafe { libc::malloc(data.len()) as *mut u8 };
                     if !buf.is_null() {
-                        unsafe { std::ptr::copy_nonoverlapping(data.as_ptr(), buf, data.len()); }
+                        unsafe {
+                            std::ptr::copy_nonoverlapping(data.as_ptr(), buf, data.len());
+                        }
                     }
-                    unsafe { *password_data_out = buf; }
+                    unsafe {
+                        *password_data_out = buf;
+                    }
                 }
             }
             if !item_ref_out.is_null() {
                 let handle = next_sec_handle();
                 let mut istore = keychain_item_store();
-                istore.get_or_insert_with(HashMap::new).insert(handle, KeychainItemRef {
-                    service: service.clone(),
-                    account: account.clone(),
-                });
-                unsafe { *item_ref_out = handle; }
+                istore.get_or_insert_with(HashMap::new).insert(
+                    handle,
+                    KeychainItemRef {
+                        service: service.clone(),
+                        account: account.clone(),
+                    },
+                );
+                unsafe {
+                    *item_ref_out = handle;
+                }
             }
             log::trace!("SecKeychainFindGenericPassword: found {service}/{account}");
             ERR_SEC_SUCCESS
         }
         Err(_) => {
-            if !password_len_out.is_null() { unsafe { *password_len_out = 0; } }
-            if !password_data_out.is_null() { unsafe { *password_data_out = std::ptr::null_mut(); } }
-            if !item_ref_out.is_null() { unsafe { *item_ref_out = 0; } }
+            if !password_len_out.is_null() {
+                unsafe {
+                    *password_len_out = 0;
+                }
+            }
+            if !password_data_out.is_null() {
+                unsafe {
+                    *password_data_out = std::ptr::null_mut();
+                }
+            }
+            if !item_ref_out.is_null() {
+                unsafe {
+                    *item_ref_out = 0;
+                }
+            }
             ERR_SEC_ITEM_NOT_FOUND
         }
     }
@@ -519,11 +1099,14 @@ pub extern "C" fn shim_sec_keychain_add_generic_password(
     let mut guard = keychain_db();
     let conn = ensure_keychain(&mut guard);
     // Check for duplicate
-    let exists: bool = conn.query_row(
-        "SELECT COUNT(*) FROM keychain WHERE service = ?1 AND account = ?2",
-        rusqlite::params![&service, &account],
-        |row| row.get::<_, i64>(0),
-    ).unwrap_or(0) > 0;
+    let exists: bool = conn
+        .query_row(
+            "SELECT COUNT(*) FROM keychain WHERE service = ?1 AND account = ?2",
+            rusqlite::params![&service, &account],
+            |row| row.get::<_, i64>(0),
+        )
+        .unwrap_or(0)
+        > 0;
     if exists {
         return ERR_SEC_DUPLICATE_ITEM;
     }
@@ -537,11 +1120,16 @@ pub extern "C" fn shim_sec_keychain_add_generic_password(
     if !item_ref_out.is_null() {
         let handle = next_sec_handle();
         let mut istore = keychain_item_store();
-        istore.get_or_insert_with(HashMap::new).insert(handle, KeychainItemRef {
-            service: service.clone(),
-            account: account.clone(),
-        });
-        unsafe { *item_ref_out = handle; }
+        istore.get_or_insert_with(HashMap::new).insert(
+            handle,
+            KeychainItemRef {
+                service: service.clone(),
+                account: account.clone(),
+            },
+        );
+        unsafe {
+            *item_ref_out = handle;
+        }
     }
     log::trace!("SecKeychainAddGenericPassword: added {service}/{account}");
     ERR_SEC_SUCCESS
@@ -582,34 +1170,59 @@ pub extern "C" fn shim_sec_keychain_find_internet_password(
     match row_data {
         Ok(data) => {
             if !password_len_out.is_null() {
-                unsafe { *password_len_out = data.len() as u32; }
+                unsafe {
+                    *password_len_out = data.len() as u32;
+                }
             }
             if !password_data_out.is_null() {
                 if data.is_empty() {
-                    unsafe { *password_data_out = std::ptr::null_mut(); }
+                    unsafe {
+                        *password_data_out = std::ptr::null_mut();
+                    }
                 } else {
                     let buf = unsafe { libc::malloc(data.len()) as *mut u8 };
                     if !buf.is_null() {
-                        unsafe { std::ptr::copy_nonoverlapping(data.as_ptr(), buf, data.len()); }
+                        unsafe {
+                            std::ptr::copy_nonoverlapping(data.as_ptr(), buf, data.len());
+                        }
                     }
-                    unsafe { *password_data_out = buf; }
+                    unsafe {
+                        *password_data_out = buf;
+                    }
                 }
             }
             if !item_ref_out.is_null() {
                 let handle = next_sec_handle();
                 let mut istore = keychain_item_store();
-                istore.get_or_insert_with(HashMap::new).insert(handle, KeychainItemRef {
-                    service: service.clone(),
-                    account: account.clone(),
-                });
-                unsafe { *item_ref_out = handle; }
+                istore.get_or_insert_with(HashMap::new).insert(
+                    handle,
+                    KeychainItemRef {
+                        service: service.clone(),
+                        account: account.clone(),
+                    },
+                );
+                unsafe {
+                    *item_ref_out = handle;
+                }
             }
             ERR_SEC_SUCCESS
         }
         Err(_) => {
-            if !password_len_out.is_null() { unsafe { *password_len_out = 0; } }
-            if !password_data_out.is_null() { unsafe { *password_data_out = std::ptr::null_mut(); } }
-            if !item_ref_out.is_null() { unsafe { *item_ref_out = 0; } }
+            if !password_len_out.is_null() {
+                unsafe {
+                    *password_len_out = 0;
+                }
+            }
+            if !password_data_out.is_null() {
+                unsafe {
+                    *password_data_out = std::ptr::null_mut();
+                }
+            }
+            if !item_ref_out.is_null() {
+                unsafe {
+                    *item_ref_out = 0;
+                }
+            }
             ERR_SEC_ITEM_NOT_FOUND
         }
     }
@@ -629,8 +1242,16 @@ pub extern "C" fn shim_sec_keychain_item_copy_content(
     let iref = match guard.as_ref().and_then(|s| s.get(&item)) {
         Some(r) => r,
         None => {
-            if !length_out.is_null() { unsafe { *length_out = 0; } }
-            if !data_out.is_null() { unsafe { *data_out = std::ptr::null_mut(); } }
+            if !length_out.is_null() {
+                unsafe {
+                    *length_out = 0;
+                }
+            }
+            if !data_out.is_null() {
+                unsafe {
+                    *data_out = std::ptr::null_mut();
+                }
+            }
             return ERR_SEC_ITEM_NOT_FOUND;
         }
     };
@@ -649,27 +1270,49 @@ pub extern "C" fn shim_sec_keychain_item_copy_content(
         Ok((class, data)) => {
             if !item_class_out.is_null() {
                 // Map to SecItemClass: kSecGenericPasswordItemClass = 'genp' = 0x67656E70
-                unsafe { *item_class_out = if class == KSEC_CLASS_GENERIC_PW as i64 { 0x67656E70 } else { 0 }; }
+                unsafe {
+                    *item_class_out = if class == KSEC_CLASS_GENERIC_PW as i64 {
+                        0x67656E70
+                    } else {
+                        0
+                    };
+                }
             }
             if !length_out.is_null() {
-                unsafe { *length_out = data.len() as u32; }
+                unsafe {
+                    *length_out = data.len() as u32;
+                }
             }
             if !data_out.is_null() {
                 if data.is_empty() {
-                    unsafe { *data_out = std::ptr::null_mut(); }
+                    unsafe {
+                        *data_out = std::ptr::null_mut();
+                    }
                 } else {
                     let buf = unsafe { libc::malloc(data.len()) as *mut u8 };
                     if !buf.is_null() {
-                        unsafe { std::ptr::copy_nonoverlapping(data.as_ptr(), buf, data.len()); }
+                        unsafe {
+                            std::ptr::copy_nonoverlapping(data.as_ptr(), buf, data.len());
+                        }
                     }
-                    unsafe { *data_out = buf; }
+                    unsafe {
+                        *data_out = buf;
+                    }
                 }
             }
             ERR_SEC_SUCCESS
         }
         Err(_) => {
-            if !length_out.is_null() { unsafe { *length_out = 0; } }
-            if !data_out.is_null() { unsafe { *data_out = std::ptr::null_mut(); } }
+            if !length_out.is_null() {
+                unsafe {
+                    *length_out = 0;
+                }
+            }
+            if !data_out.is_null() {
+                unsafe {
+                    *data_out = std::ptr::null_mut();
+                }
+            }
             ERR_SEC_ITEM_NOT_FOUND
         }
     }
@@ -699,17 +1342,25 @@ pub extern "C" fn shim_sec_keychain_item_modify_content(
 
     let mut dbguard = keychain_db();
     let conn = ensure_keychain(&mut dbguard);
-    let rows = conn.execute(
-        "UPDATE keychain SET data = ?1 WHERE service = ?2 AND account = ?3",
-        rusqlite::params![&new_data, &service, &account],
-    ).unwrap_or(0);
-    if rows > 0 { ERR_SEC_SUCCESS } else { ERR_SEC_ITEM_NOT_FOUND }
+    let rows = conn
+        .execute(
+            "UPDATE keychain SET data = ?1 WHERE service = ?2 AND account = ?3",
+            rusqlite::params![&new_data, &service, &account],
+        )
+        .unwrap_or(0);
+    if rows > 0 {
+        ERR_SEC_SUCCESS
+    } else {
+        ERR_SEC_ITEM_NOT_FOUND
+    }
 }
 
 /// SecKeychainItemFreeContent(attrList, data) → OSStatus
 pub extern "C" fn shim_sec_keychain_item_free_content(_attr_list: u64, data: *mut u8) -> i32 {
     if !data.is_null() {
-        unsafe { libc::free(data as *mut libc::c_void); }
+        unsafe {
+            libc::free(data as *mut libc::c_void);
+        }
     }
     ERR_SEC_SUCCESS
 }
@@ -717,7 +1368,9 @@ pub extern "C" fn shim_sec_keychain_item_free_content(_attr_list: u64, data: *mu
 /// SecKeychainCopyDefault(&keychain) → OSStatus
 pub extern "C" fn shim_sec_keychain_copy_default(keychain_out: *mut u64) -> i32 {
     if !keychain_out.is_null() {
-        unsafe { *keychain_out = &SEC_KEYCHAIN_SENTINEL as *const u64 as u64; }
+        unsafe {
+            *keychain_out = &SEC_KEYCHAIN_SENTINEL as *const u64 as u64;
+        }
     }
     ERR_SEC_SUCCESS
 }
@@ -725,7 +1378,9 @@ pub extern "C" fn shim_sec_keychain_copy_default(keychain_out: *mut u64) -> i32 
 /// SecKeychainOpen(path, &keychain) → OSStatus
 pub extern "C" fn shim_sec_keychain_open(_path: *const u8, keychain_out: *mut u64) -> i32 {
     if !keychain_out.is_null() {
-        unsafe { *keychain_out = &SEC_KEYCHAIN_SENTINEL as *const u64 as u64; }
+        unsafe {
+            *keychain_out = &SEC_KEYCHAIN_SENTINEL as *const u64 as u64;
+        }
     }
     ERR_SEC_SUCCESS
 }
@@ -744,10 +1399,14 @@ pub extern "C" fn shim_sec_keychain_get_path(
         default_path.len()
     };
     if !path_buf.is_null() && copy_len > 0 {
-        unsafe { std::ptr::copy_nonoverlapping(default_path.as_ptr(), path_buf, copy_len); }
+        unsafe {
+            std::ptr::copy_nonoverlapping(default_path.as_ptr(), path_buf, copy_len);
+        }
     }
     if !path_len.is_null() {
-        unsafe { *path_len = (default_path.len() - 1) as u32; } // Exclude NUL
+        unsafe {
+            *path_len = (default_path.len() - 1) as u32;
+        } // Exclude NUL
     }
     ERR_SEC_SUCCESS
 }
@@ -764,11 +1423,14 @@ pub extern "C" fn shim_sec_item_add(attrs: u64, result: *mut u64) -> i32 {
     let mut guard = keychain_db();
     let conn = ensure_keychain(&mut guard);
     // Check for duplicate
-    let exists: bool = conn.query_row(
-        "SELECT COUNT(*) FROM keychain WHERE service = ?1 AND account = ?2",
-        rusqlite::params![&service, &account],
-        |row| row.get::<_, i64>(0),
-    ).unwrap_or(0) > 0;
+    let exists: bool = conn
+        .query_row(
+            "SELECT COUNT(*) FROM keychain WHERE service = ?1 AND account = ?2",
+            rusqlite::params![&service, &account],
+            |row| row.get::<_, i64>(0),
+        )
+        .unwrap_or(0)
+        > 0;
     if exists {
         return ERR_SEC_DUPLICATE_ITEM;
     }
@@ -780,7 +1442,9 @@ pub extern "C" fn shim_sec_item_add(attrs: u64, result: *mut u64) -> i32 {
         return ERR_SEC_UNIMPLEMENTED;
     }
     if !result.is_null() {
-        unsafe { *result = 0; }
+        unsafe {
+            *result = 0;
+        }
     }
     ERR_SEC_SUCCESS
 }
@@ -810,17 +1474,23 @@ pub extern "C" fn shim_sec_item_copy_matching(query: u64, result: *mut u64) -> i
                         }
                     }
                 }
-                unsafe { *result = data_obj; }
+                unsafe {
+                    *result = data_obj;
+                }
                 return ERR_SEC_SUCCESS;
             }
             if !result.is_null() {
-                unsafe { *result = 0; }
+                unsafe {
+                    *result = 0;
+                }
             }
             ERR_SEC_SUCCESS
         }
         Err(_) => {
             if !result.is_null() {
-                unsafe { *result = 0; }
+                unsafe {
+                    *result = 0;
+                }
             }
             ERR_SEC_ITEM_NOT_FOUND
         }
@@ -834,10 +1504,12 @@ pub extern "C" fn shim_sec_item_update(query: u64, attrs: u64) -> i32 {
     let mut guard = keychain_db();
     let conn = ensure_keychain(&mut guard);
     if let Some(d) = new_data {
-        let rows = conn.execute(
-            "UPDATE keychain SET data = ?1 WHERE service = ?2 AND account = ?3",
-            rusqlite::params![&d, &service, &account],
-        ).unwrap_or(0);
+        let rows = conn
+            .execute(
+                "UPDATE keychain SET data = ?1 WHERE service = ?2 AND account = ?3",
+                rusqlite::params![&d, &service, &account],
+            )
+            .unwrap_or(0);
         if rows > 0 {
             return ERR_SEC_SUCCESS;
         }
@@ -850,10 +1522,12 @@ pub extern "C" fn shim_sec_item_delete(query: u64) -> i32 {
     let (_class, service, account, _data) = parse_query(query);
     let mut guard = keychain_db();
     let conn = ensure_keychain(&mut guard);
-    let rows = conn.execute(
-        "DELETE FROM keychain WHERE service = ?1 AND account = ?2",
-        rusqlite::params![&service, &account],
-    ).unwrap_or(0);
+    let rows = conn
+        .execute(
+            "DELETE FROM keychain WHERE service = ?1 AND account = ?2",
+            rusqlite::params![&service, &account],
+        )
+        .unwrap_or(0);
     if rows > 0 {
         return ERR_SEC_SUCCESS;
     }
@@ -873,12 +1547,15 @@ pub extern "C" fn shim_sec_cert_create(_alloc: u64, data_obj: u64) -> u64 {
     // Parse with x509-parser to extract subject info
     let (common_name, subject_summary) = match x509_parser::parse_x509_certificate(&der) {
         Ok((_rem, cert)) => {
-            let cn = cert.subject().iter_common_name()
+            let cn = cert
+                .subject()
+                .iter_common_name()
                 .next()
                 .and_then(|cn| cn.as_str().ok())
                 .map(|s| s.to_string());
             let summary = cn.clone().or_else(|| {
-                cert.subject().iter_organization()
+                cert.subject()
+                    .iter_organization()
                     .next()
                     .and_then(|o| o.as_str().ok())
                     .map(|s| s.to_string())
@@ -893,16 +1570,24 @@ pub extern "C" fn shim_sec_cert_create(_alloc: u64, data_obj: u64) -> u64 {
     };
 
     let handle = next_sec_handle();
-    let stored = StoredCert { der, common_name, subject_summary };
+    let stored = StoredCert {
+        der,
+        common_name,
+        subject_summary,
+    };
     let mut guard = cert_store();
-    guard.get_or_insert_with(HashMap::new).insert(handle, stored);
+    guard
+        .get_or_insert_with(HashMap::new)
+        .insert(handle, stored);
     log::trace!("SecCertificateCreateWithData → handle={handle:#x}");
     handle
 }
 
 /// SecCertificateCopyCommonName(cert, &commonName) → OSStatus
 pub extern "C" fn shim_sec_copy_common_name(cert: u64, name_out: *mut u64) -> i32 {
-    if name_out.is_null() { return ERR_SEC_UNIMPLEMENTED; }
+    if name_out.is_null() {
+        return ERR_SEC_UNIMPLEMENTED;
+    }
     let guard = cert_store();
     if let Some(store) = guard.as_ref() {
         if let Some(stored) = store.get(&cert) {
@@ -923,7 +1608,9 @@ pub extern "C" fn shim_sec_copy_common_name(cert: u64, name_out: *mut u64) -> i3
             }
         }
     }
-    unsafe { *name_out = 0; }
+    unsafe {
+        *name_out = 0;
+    }
     ERR_SEC_ITEM_NOT_FOUND
 }
 
@@ -974,14 +1661,37 @@ pub extern "C" fn shim_sec_cert_copy_subject_summary(cert: u64) -> u64 {
 }
 
 /// Generic return-NULL for 1-arg functions
-pub extern "C" fn shim_sec_return_null(_a: u64) -> u64 { 0 }
-pub extern "C" fn shim_sec_return_null3(_a: u64, _b: u64, _c: *mut u64) -> u64 { 0 }
-pub extern "C" fn shim_sec_return_false(_a: u64, _b: u64, _c: u64) -> i32 { 0 }
-pub extern "C" fn shim_sec_return_zero(_a: u64) -> u64 { 0 }
-pub extern "C" fn shim_sec_return_unimplemented(_a: u64) -> i32 { ERR_SEC_UNIMPLEMENTED }
-pub extern "C" fn shim_sec_return_success(_a: u64) -> i32 { ERR_SEC_SUCCESS }
-pub extern "C" fn shim_sec_return_item_not_found(_a: u64, _b: u64, _c: u64, _d: u64, _e: u64, _f: *mut u64) -> i32 { ERR_SEC_ITEM_NOT_FOUND }
-pub extern "C" fn shim_sec_get_type_id() -> u64 { 100 }
+pub extern "C" fn shim_sec_return_null(_a: u64) -> u64 {
+    0
+}
+pub extern "C" fn shim_sec_return_null3(_a: u64, _b: u64, _c: *mut u64) -> u64 {
+    0
+}
+pub extern "C" fn shim_sec_return_false(_a: u64, _b: u64, _c: u64) -> i32 {
+    0
+}
+pub extern "C" fn shim_sec_return_zero(_a: u64) -> u64 {
+    0
+}
+pub extern "C" fn shim_sec_return_unimplemented(_a: u64) -> i32 {
+    ERR_SEC_UNIMPLEMENTED
+}
+pub extern "C" fn shim_sec_return_success(_a: u64) -> i32 {
+    ERR_SEC_SUCCESS
+}
+pub extern "C" fn shim_sec_return_item_not_found(
+    _a: u64,
+    _b: u64,
+    _c: u64,
+    _d: u64,
+    _e: u64,
+    _f: *mut u64,
+) -> i32 {
+    ERR_SEC_ITEM_NOT_FOUND
+}
+pub extern "C" fn shim_sec_get_type_id() -> u64 {
+    100
+}
 pub extern "C" fn shim_sec_void3(_a: u64, _b: u64, _c: u64) {}
 
 // ── Authorization stubs ─────────────────────────────────────────────
@@ -1010,7 +1720,8 @@ pub extern "C" fn shim_auth_copy_rights_async(
     _environment: u64,
     _flags: u64,
     _block: u64,
-) {} // Callback is never invoked — behaves as fire-and-forget.
+) {
+} // Callback is never invoked — behaves as fire-and-forget.
 
 /// Generic 4-arg void stub used by nw_* functions
 pub extern "C" fn shim_void4_stub(_a: u64, _b: u64, _c: u64, _d: u64) {}
@@ -1025,8 +1736,8 @@ pub extern "C" fn shim_void2_stub(_a: u64, _b: u64) {}
 ///
 /// Real implementation: generates an ECDSA P-256 key pair using `ring`.
 pub extern "C" fn shim_sec_key_create_random(_params: u64, error: *mut u64) -> u64 {
-    use ring::signature::{EcdsaKeyPair, ECDSA_P256_SHA256_ASN1_SIGNING};
     use ring::rand::SystemRandom;
+    use ring::signature::{EcdsaKeyPair, ECDSA_P256_SHA256_ASN1_SIGNING};
 
     let rng = SystemRandom::new();
     match EcdsaKeyPair::generate_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, &rng) {
@@ -1038,9 +1749,13 @@ pub extern "C" fn shim_sec_key_create_random(_params: u64, error: *mut u64) -> u
                 is_public: false,
             };
             let mut guard = key_store();
-            guard.get_or_insert_with(HashMap::new).insert(handle, stored);
+            guard
+                .get_or_insert_with(HashMap::new)
+                .insert(handle, stored);
             if !error.is_null() {
-                unsafe { *error = 0; }
+                unsafe {
+                    *error = 0;
+                }
             }
             log::trace!("SecKeyCreateRandomKey → handle={handle:#x} (ECDSA P-256)");
             handle
@@ -1048,7 +1763,9 @@ pub extern "C" fn shim_sec_key_create_random(_params: u64, error: *mut u64) -> u
         Err(e) => {
             log::debug!("SecKeyCreateRandomKey failed: {e}");
             if !error.is_null() {
-                unsafe { *error = 0; }
+                unsafe {
+                    *error = 0;
+                }
             }
             0
         }
@@ -1067,7 +1784,11 @@ pub extern "C" fn shim_sec_key_copy_public(key: u64) -> u64 {
             match stored.algorithm {
                 KeyAlgorithm::EcdsaP256 => {
                     use ring::signature::{EcdsaKeyPair, KeyPair, ECDSA_P256_SHA256_ASN1_SIGNING};
-                    if let Ok(kp) = EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, &stored.key_pair_der, &ring::rand::SystemRandom::new()) {
+                    if let Ok(kp) = EcdsaKeyPair::from_pkcs8(
+                        &ECDSA_P256_SHA256_ASN1_SIGNING,
+                        &stored.key_pair_der,
+                        &ring::rand::SystemRandom::new(),
+                    ) {
                         let pub_bytes = kp.public_key().as_ref().to_vec();
                         drop(guard);
                         let pub_handle = next_sec_handle();
@@ -1077,7 +1798,9 @@ pub extern "C" fn shim_sec_key_copy_public(key: u64) -> u64 {
                             is_public: true,
                         };
                         let mut wguard = key_store();
-                        wguard.get_or_insert_with(HashMap::new).insert(pub_handle, pub_key);
+                        wguard
+                            .get_or_insert_with(HashMap::new)
+                            .insert(pub_handle, pub_key);
                         return pub_handle;
                     }
                 }
@@ -1089,11 +1812,20 @@ pub extern "C" fn shim_sec_key_copy_public(key: u64) -> u64 {
 }
 
 /// SecKeyCreateSignature(key, algorithm, dataToSign, &error) → CFDataRef
-pub extern "C" fn shim_sec_key_create_signature(key: u64, _algo: u64, data_obj: u64, error: *mut u64) -> u64 {
+pub extern "C" fn shim_sec_key_create_signature(
+    key: u64,
+    _algo: u64,
+    data_obj: u64,
+    error: *mut u64,
+) -> u64 {
     let data = match extract_data(data_obj) {
         Some(d) => d,
         None => {
-            if !error.is_null() { unsafe { *error = 0; } }
+            if !error.is_null() {
+                unsafe {
+                    *error = 0;
+                }
+            }
             return 0;
         }
     };
@@ -1103,10 +1835,14 @@ pub extern "C" fn shim_sec_key_create_signature(key: u64, _algo: u64, data_obj: 
         if let Some(stored) = store.get(&key) {
             match stored.algorithm {
                 KeyAlgorithm::EcdsaP256 if !stored.is_public => {
-                    use ring::signature::{EcdsaKeyPair, ECDSA_P256_SHA256_ASN1_SIGNING};
                     use ring::rand::SystemRandom;
+                    use ring::signature::{EcdsaKeyPair, ECDSA_P256_SHA256_ASN1_SIGNING};
                     let rng = SystemRandom::new();
-                    if let Ok(kp) = EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, &stored.key_pair_der, &rng) {
+                    if let Ok(kp) = EcdsaKeyPair::from_pkcs8(
+                        &ECDSA_P256_SHA256_ASN1_SIGNING,
+                        &stored.key_pair_der,
+                        &rng,
+                    ) {
                         if let Ok(sig) = kp.sign(&rng, &data) {
                             let sig_bytes = sig.as_ref();
                             // Return as NSData-like: [isa:8][bytes_ptr:8][length:8]
@@ -1115,13 +1851,21 @@ pub extern "C" fn shim_sec_key_create_signature(key: u64, _algo: u64, data_obj: 
                                 let buf = unsafe { libc::malloc(sig_bytes.len()) as *mut u8 };
                                 if !buf.is_null() {
                                     unsafe {
-                                        std::ptr::copy_nonoverlapping(sig_bytes.as_ptr(), buf, sig_bytes.len());
+                                        std::ptr::copy_nonoverlapping(
+                                            sig_bytes.as_ptr(),
+                                            buf,
+                                            sig_bytes.len(),
+                                        );
                                         *((obj as usize + 8) as *mut u64) = buf as u64;
                                         *((obj as usize + 16) as *mut u64) = sig_bytes.len() as u64;
                                     }
                                 }
                             }
-                            if !error.is_null() { unsafe { *error = 0; } }
+                            if !error.is_null() {
+                                unsafe {
+                                    *error = 0;
+                                }
+                            }
                             return obj;
                         }
                     }
@@ -1130,7 +1874,11 @@ pub extern "C" fn shim_sec_key_create_signature(key: u64, _algo: u64, data_obj: 
             }
         }
     }
-    if !error.is_null() { unsafe { *error = 0; } }
+    if !error.is_null() {
+        unsafe {
+            *error = 0;
+        }
+    }
     0
 }
 
@@ -1151,7 +1899,7 @@ pub extern "C" fn shim_sec_key_get_block_size(key: u64) -> u64 {
     if let Some(store) = guard.as_ref() {
         if let Some(stored) = store.get(&key) {
             return match stored.algorithm {
-                KeyAlgorithm::EcdsaP256 => 32,  // P-256 is 32-byte key size
+                KeyAlgorithm::EcdsaP256 => 32, // P-256 is 32-byte key size
                 KeyAlgorithm::Ed25519 => 32,
                 KeyAlgorithm::Rsa2048 => 256,
             };
@@ -1164,7 +1912,9 @@ pub extern "C" fn shim_sec_key_get_block_size(key: u64) -> u64 {
 ///
 /// Real implementation: stores cert handles for later evaluation.
 pub extern "C" fn shim_sec_trust_create(certs: u64, _policies: u64, trust_out: *mut u64) -> i32 {
-    if trust_out.is_null() { return ERR_SEC_UNIMPLEMENTED; }
+    if trust_out.is_null() {
+        return ERR_SEC_UNIMPLEMENTED;
+    }
 
     // Extract cert handles from CFArray or single cert
     let mut cert_handles = Vec::new();
@@ -1188,8 +1938,12 @@ pub extern "C" fn shim_sec_trust_create(certs: u64, _policies: u64, trust_out: *
     let num_certs = cert_handles.len();
     let stored = StoredTrust { cert_handles };
     let mut guard = trust_store();
-    guard.get_or_insert_with(HashMap::new).insert(handle, stored);
-    unsafe { *trust_out = handle; }
+    guard
+        .get_or_insert_with(HashMap::new)
+        .insert(handle, stored);
+    unsafe {
+        *trust_out = handle;
+    }
     log::trace!("SecTrustCreateWithCertificates → handle={handle:#x} ({num_certs} certs)");
     ERR_SEC_SUCCESS
 }
@@ -1210,9 +1964,11 @@ pub extern "C" fn shim_sec_trust_evaluate_with_error(trust: u64, error: *mut u64
 
     // Collect DER bytes from cert store
     let cguard = cert_store();
-    let certs: Vec<Vec<u8>> = trust_obj.cert_handles.iter().filter_map(|h| {
-        cguard.as_ref()?.get(h).map(|c| c.der.clone())
-    }).collect();
+    let certs: Vec<Vec<u8>> = trust_obj
+        .cert_handles
+        .iter()
+        .filter_map(|h| cguard.as_ref()?.get(h).map(|c| c.der.clone()))
+        .collect();
 
     if certs.is_empty() {
         log::debug!("SecTrustEvaluateWithError: no certs to evaluate");
@@ -1224,11 +1980,32 @@ pub extern "C" fn shim_sec_trust_evaluate_with_error(trust: u64, error: *mut u64
     let valid = trust_eval::validate_trust(&cert_slices);
 
     if !error.is_null() {
-        unsafe { *error = 0; } // No CFError for now
+        unsafe {
+            *error = 0;
+        } // No CFError for now
     }
 
-    log::debug!("SecTrustEvaluateWithError: {} ({} certs)", if valid { "PASS" } else { "FAIL" }, certs.len());
-    if valid { 1 } else { 0 }
+    log::debug!(
+        "SecTrustEvaluateWithError: {} ({} certs)",
+        if valid { "PASS" } else { "FAIL" },
+        certs.len()
+    );
+    if valid {
+        1
+    } else {
+        0
+    }
+}
+
+/// SecTrustEvaluate(trust, &result) → OSStatus
+pub extern "C" fn shim_sec_trust_evaluate(trust: u64, result: *mut u32) -> i32 {
+    let valid = shim_sec_trust_evaluate_with_error(trust, std::ptr::null_mut()) != 0;
+    if !result.is_null() {
+        unsafe {
+            *result = if valid { 4 } else { 5 };
+        }
+    }
+    ERR_SEC_SUCCESS
 }
 
 /// SecTrustGetCertificateCount(trust) → CFIndex
@@ -1240,6 +2017,99 @@ pub extern "C" fn shim_sec_trust_get_cert_count(trust: u64) -> u64 {
         }
     }
     0
+}
+
+/// SecTrustGetCertificateAtIndex(trust, ix) → SecCertificateRef
+pub extern "C" fn shim_sec_trust_get_cert_at_index(trust: u64, index: u64) -> u64 {
+    let guard = trust_store();
+    if let Some(store) = guard.as_ref() {
+        if let Some(stored) = store.get(&trust) {
+            return stored
+                .cert_handles
+                .get(index as usize)
+                .copied()
+                .unwrap_or(0);
+        }
+    }
+    0
+}
+
+/// SSLCreateContext(alloc, side, type) → SSLContextRef
+pub extern "C" fn shim_ssl_create_context(_alloc: u64, _side: u32, _kind: u32) -> u64 {
+    &SEC_SSL_CONTEXT_SENTINEL as *const u64 as u64
+}
+
+pub extern "C" fn shim_ssl_set_connection(_ctx: u64, _connection: u64) -> i32 {
+    ERR_SEC_SUCCESS
+}
+
+pub extern "C" fn shim_ssl_set_io_funcs(_ctx: u64, _read_fn: u64, _write_fn: u64) -> i32 {
+    ERR_SEC_SUCCESS
+}
+
+pub extern "C" fn shim_ssl_set_peer_domain_name(
+    _ctx: u64,
+    _name: *const u8,
+    _name_len: usize,
+) -> i32 {
+    ERR_SEC_SUCCESS
+}
+
+pub extern "C" fn shim_ssl_set_protocol_version_max(_ctx: u64, _version: u32) -> i32 {
+    ERR_SEC_SUCCESS
+}
+
+pub extern "C" fn shim_ssl_set_protocol_version_min(_ctx: u64, _version: u32) -> i32 {
+    ERR_SEC_SUCCESS
+}
+
+pub extern "C" fn shim_ssl_set_session_option(_ctx: u64, _option: u32, _value: u8) -> i32 {
+    ERR_SEC_SUCCESS
+}
+
+pub extern "C" fn shim_ssl_handshake(_ctx: u64) -> i32 {
+    ERR_SEC_UNIMPLEMENTED
+}
+
+pub extern "C" fn shim_ssl_read(
+    _ctx: u64,
+    _data: *mut u8,
+    _len: usize,
+    processed: *mut usize,
+) -> i32 {
+    if !processed.is_null() {
+        unsafe {
+            *processed = 0;
+        }
+    }
+    ERR_SEC_UNIMPLEMENTED
+}
+
+pub extern "C" fn shim_ssl_write(
+    _ctx: u64,
+    _data: *const u8,
+    _len: usize,
+    processed: *mut usize,
+) -> i32 {
+    if !processed.is_null() {
+        unsafe {
+            *processed = 0;
+        }
+    }
+    ERR_SEC_UNIMPLEMENTED
+}
+
+pub extern "C" fn shim_ssl_close(_ctx: u64) -> i32 {
+    ERR_SEC_SUCCESS
+}
+
+pub extern "C" fn shim_ssl_copy_peer_trust(_ctx: u64, trust_out: *mut u64) -> i32 {
+    if !trust_out.is_null() {
+        unsafe {
+            *trust_out = 0;
+        }
+    }
+    ERR_SEC_UNIMPLEMENTED
 }
 
 /// SecPolicyCreateSSL(server, hostname) → SecPolicyRef
@@ -1287,10 +2157,22 @@ mod tests {
     fn authorization_stubs_registered() {
         let mut table = ShimTable::new();
         SecurityStubs::install(&mut table);
-        assert!(table.resolve("_AuthorizationCreate").is_some(), "_AuthorizationCreate not found");
-        assert!(table.resolve("_AuthorizationCopyRights").is_some(), "_AuthorizationCopyRights not found");
-        assert!(table.resolve("_nw_connection_create").is_some(), "_nw_connection_create not found");
-        assert!(table.resolve("_secLogObjForScope").is_some(), "_secLogObjForScope not found");
+        assert!(
+            table.resolve("_AuthorizationCreate").is_some(),
+            "_AuthorizationCreate not found"
+        );
+        assert!(
+            table.resolve("_AuthorizationCopyRights").is_some(),
+            "_AuthorizationCopyRights not found"
+        );
+        assert!(
+            table.resolve("_nw_connection_create").is_some(),
+            "_nw_connection_create not found"
+        );
+        assert!(
+            table.resolve("_secLogObjForScope").is_some(),
+            "_secLogObjForScope not found"
+        );
     }
 
     #[test]
@@ -1341,7 +2223,9 @@ mod tests {
         let count = entries.len();
         let dict = unsafe { libc::calloc(1, 32) } as u64;
         // isa = 0 (doesn't matter for our raw reads)
-        unsafe { *((dict as usize + 8) as *mut u64) = count as u64; }
+        unsafe {
+            *((dict as usize + 8) as *mut u64) = count as u64;
+        }
         if count > 0 {
             let keys = unsafe { libc::malloc(count * 8) } as *mut u64;
             let vals = unsafe { libc::malloc(count * 8) } as *mut u64;
@@ -1458,8 +2342,14 @@ mod tests {
             (KSEC_VALUE_DATA, data),
         ]);
 
-        assert_eq!(shim_sec_item_add(dict, std::ptr::null_mut()), ERR_SEC_SUCCESS);
-        assert_eq!(shim_sec_item_add(dict, std::ptr::null_mut()), ERR_SEC_DUPLICATE_ITEM);
+        assert_eq!(
+            shim_sec_item_add(dict, std::ptr::null_mut()),
+            ERR_SEC_SUCCESS
+        );
+        assert_eq!(
+            shim_sec_item_add(dict, std::ptr::null_mut()),
+            ERR_SEC_DUPLICATE_ITEM
+        );
     }
 
     #[test]
@@ -1483,7 +2373,10 @@ mod tests {
             (KSEC_ATTR_ACCOUNT, acct),
             (KSEC_VALUE_DATA, data1),
         ]);
-        assert_eq!(shim_sec_item_add(add_dict, std::ptr::null_mut()), ERR_SEC_SUCCESS);
+        assert_eq!(
+            shim_sec_item_add(add_dict, std::ptr::null_mut()),
+            ERR_SEC_SUCCESS
+        );
 
         let query = make_fake_dict(&[
             (KSEC_CLASS, KSEC_CLASS_GENERIC_PW),
@@ -1501,7 +2394,10 @@ mod tests {
             (KSEC_RETURN_DATA, 1),
         ]);
         let mut result: u64 = 0;
-        assert_eq!(shim_sec_item_copy_matching(q2, &mut result), ERR_SEC_SUCCESS);
+        assert_eq!(
+            shim_sec_item_copy_matching(q2, &mut result),
+            ERR_SEC_SUCCESS
+        );
         let length = raw_read_u64(result, 16) as usize;
         assert_eq!(length, 12); // "new_password".len()
     }
@@ -1527,7 +2423,10 @@ mod tests {
         ]);
         let _ = shim_sec_item_delete(del_query);
 
-        assert_eq!(shim_sec_item_add(add_dict, std::ptr::null_mut()), ERR_SEC_SUCCESS);
+        assert_eq!(
+            shim_sec_item_add(add_dict, std::ptr::null_mut()),
+            ERR_SEC_SUCCESS
+        );
         assert_eq!(shim_sec_item_delete(del_query), ERR_SEC_SUCCESS);
         // Delete again → not found
         assert_eq!(shim_sec_item_delete(del_query), ERR_SEC_ITEM_NOT_FOUND);
@@ -1543,7 +2442,10 @@ mod tests {
             (KSEC_ATTR_ACCOUNT, acct),
         ]);
         let mut result: u64 = 42;
-        assert_eq!(shim_sec_item_copy_matching(query, &mut result), ERR_SEC_ITEM_NOT_FOUND);
+        assert_eq!(
+            shim_sec_item_copy_matching(query, &mut result),
+            ERR_SEC_ITEM_NOT_FOUND
+        );
         assert_eq!(result, 0);
     }
 
@@ -1567,9 +2469,12 @@ mod tests {
 
         let status = shim_sec_keychain_add_generic_password(
             0, // default keychain
-            svc.len() as u32, svc.as_ptr(),
-            acct.len() as u32, acct.as_ptr(),
-            6, b"secret".as_ptr(),
+            svc.len() as u32,
+            svc.as_ptr(),
+            acct.len() as u32,
+            acct.as_ptr(),
+            6,
+            b"secret".as_ptr(),
             std::ptr::null_mut(), // no item ref
         );
         assert_eq!(status, ERR_SEC_SUCCESS);
@@ -1579,9 +2484,13 @@ mod tests {
         let mut item_ref: u64 = 0;
         let status = shim_sec_keychain_find_generic_password(
             0,
-            svc.len() as u32, svc.as_ptr(),
-            acct.len() as u32, acct.as_ptr(),
-            &mut pw_len, &mut pw_data, &mut item_ref,
+            svc.len() as u32,
+            svc.as_ptr(),
+            acct.len() as u32,
+            acct.as_ptr(),
+            &mut pw_len,
+            &mut pw_data,
+            &mut item_ref,
         );
         assert_eq!(status, ERR_SEC_SUCCESS);
         assert_eq!(pw_len, 6);
@@ -1600,12 +2509,18 @@ mod tests {
         let acct = "bob_legacy";
         legacy_cleanup(svc, acct);
 
-        let add = |pw: &[u8]| shim_sec_keychain_add_generic_password(
-            0, svc.len() as u32, svc.as_ptr(),
-            acct.len() as u32, acct.as_ptr(),
-            pw.len() as u32, pw.as_ptr(),
-            std::ptr::null_mut(),
-        );
+        let add = |pw: &[u8]| {
+            shim_sec_keychain_add_generic_password(
+                0,
+                svc.len() as u32,
+                svc.as_ptr(),
+                acct.len() as u32,
+                acct.as_ptr(),
+                pw.len() as u32,
+                pw.as_ptr(),
+                std::ptr::null_mut(),
+            )
+        };
         assert_eq!(add(b"pw1"), ERR_SEC_SUCCESS);
         assert_eq!(add(b"pw2"), ERR_SEC_DUPLICATE_ITEM);
     }
@@ -1618,9 +2533,13 @@ mod tests {
         let mut pw_data: *mut u8 = 0x42 as *mut u8;
         let status = shim_sec_keychain_find_generic_password(
             0,
-            svc.len() as u32, svc.as_ptr(),
-            acct.len() as u32, acct.as_ptr(),
-            &mut pw_len, &mut pw_data, std::ptr::null_mut(),
+            svc.len() as u32,
+            svc.as_ptr(),
+            acct.len() as u32,
+            acct.as_ptr(),
+            &mut pw_len,
+            &mut pw_data,
+            std::ptr::null_mut(),
         );
         assert_eq!(status, ERR_SEC_ITEM_NOT_FOUND);
         assert_eq!(pw_len, 0);
@@ -1635,18 +2554,27 @@ mod tests {
 
         // Add via legacy API
         shim_sec_keychain_add_generic_password(
-            0, svc.len() as u32, svc.as_ptr(),
-            acct.len() as u32, acct.as_ptr(),
-            3, b"abc".as_ptr(),
+            0,
+            svc.len() as u32,
+            svc.as_ptr(),
+            acct.len() as u32,
+            acct.as_ptr(),
+            3,
+            b"abc".as_ptr(),
             std::ptr::null_mut(),
         );
 
         // Find to get an item ref
         let mut item_ref: u64 = 0;
         shim_sec_keychain_find_generic_password(
-            0, svc.len() as u32, svc.as_ptr(),
-            acct.len() as u32, acct.as_ptr(),
-            std::ptr::null_mut(), std::ptr::null_mut(), &mut item_ref,
+            0,
+            svc.len() as u32,
+            svc.as_ptr(),
+            acct.len() as u32,
+            acct.as_ptr(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            &mut item_ref,
         );
         assert_ne!(item_ref, 0);
 
@@ -1655,7 +2583,11 @@ mod tests {
         let mut length: u32 = 0;
         let mut data_out: *mut u8 = std::ptr::null_mut();
         let status = shim_sec_keychain_item_copy_content(
-            item_ref, &mut item_class, 0, &mut length, &mut data_out,
+            item_ref,
+            &mut item_class,
+            0,
+            &mut length,
+            &mut data_out,
         );
         assert_eq!(status, ERR_SEC_SUCCESS);
         assert_eq!(item_class, 0x67656E70); // 'genp'
@@ -1672,24 +2604,36 @@ mod tests {
         legacy_cleanup(svc, acct);
 
         shim_sec_keychain_add_generic_password(
-            0, svc.len() as u32, svc.as_ptr(),
-            acct.len() as u32, acct.as_ptr(),
-            3, b"old".as_ptr(),
+            0,
+            svc.len() as u32,
+            svc.as_ptr(),
+            acct.len() as u32,
+            acct.as_ptr(),
+            3,
+            b"old".as_ptr(),
             std::ptr::null_mut(),
         );
 
         // Get item ref
         let mut item_ref: u64 = 0;
         shim_sec_keychain_find_generic_password(
-            0, svc.len() as u32, svc.as_ptr(),
-            acct.len() as u32, acct.as_ptr(),
-            std::ptr::null_mut(), std::ptr::null_mut(), &mut item_ref,
+            0,
+            svc.len() as u32,
+            svc.as_ptr(),
+            acct.len() as u32,
+            acct.as_ptr(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            &mut item_ref,
         );
 
         // Modify
         let new_pw = b"new_password";
         let status = shim_sec_keychain_item_modify_content(
-            item_ref, 0, new_pw.len() as u32, new_pw.as_ptr(),
+            item_ref,
+            0,
+            new_pw.len() as u32,
+            new_pw.as_ptr(),
         );
         assert_eq!(status, ERR_SEC_SUCCESS);
 
@@ -1697,9 +2641,14 @@ mod tests {
         let mut pw_len: u32 = 0;
         let mut pw_data: *mut u8 = std::ptr::null_mut();
         shim_sec_keychain_find_generic_password(
-            0, svc.len() as u32, svc.as_ptr(),
-            acct.len() as u32, acct.as_ptr(),
-            &mut pw_len, &mut pw_data, std::ptr::null_mut(),
+            0,
+            svc.len() as u32,
+            svc.as_ptr(),
+            acct.len() as u32,
+            acct.as_ptr(),
+            &mut pw_len,
+            &mut pw_data,
+            std::ptr::null_mut(),
         );
         assert_eq!(pw_len, 12);
         let found = unsafe { std::slice::from_raw_parts(pw_data, pw_len as usize) };
@@ -1721,7 +2670,10 @@ mod tests {
         let status = shim_sec_keychain_get_path(0, &mut path_len, path_buf.as_mut_ptr());
         assert_eq!(status, ERR_SEC_SUCCESS);
         let path = std::str::from_utf8(&path_buf[..path_len as usize]).unwrap();
-        assert!(path.contains("burdettieOS-keychain"), "path should reference keychain db: {path}");
+        assert!(
+            path.contains("burdettieOS-keychain"),
+            "path should reference keychain db: {path}"
+        );
     }
 
     #[test]
@@ -1743,7 +2695,10 @@ mod tests {
 
     #[test]
     fn legacy_free_content_null_safe() {
-        assert_eq!(shim_sec_keychain_item_free_content(0, std::ptr::null_mut()), ERR_SEC_SUCCESS);
+        assert_eq!(
+            shim_sec_keychain_item_free_content(0, std::ptr::null_mut()),
+            ERR_SEC_SUCCESS
+        );
     }
 
     #[test]
@@ -1751,7 +2706,11 @@ mod tests {
         let mut length: u32 = 99;
         let mut data_out: *mut u8 = 0x42 as *mut u8;
         let status = shim_sec_keychain_item_copy_content(
-            0xDEAD, std::ptr::null_mut(), 0, &mut length, &mut data_out,
+            0xDEAD,
+            std::ptr::null_mut(),
+            0,
+            &mut length,
+            &mut data_out,
         );
         assert_eq!(status, ERR_SEC_ITEM_NOT_FOUND);
         assert_eq!(length, 0);

@@ -44,10 +44,8 @@ impl NSPasteboard {
         if let Ok(mut cb) = arboard::Clipboard::new() {
             if let Ok(text) = cb.get_text() {
                 if !text.is_empty() {
-                    self.contents.insert(
-                        NS_PASTEBOARD_TYPE_STRING.to_string(),
-                        text.into_bytes(),
-                    );
+                    self.contents
+                        .insert(NS_PASTEBOARD_TYPE_STRING.to_string(), text.into_bytes());
                 }
             }
         }
@@ -137,13 +135,17 @@ mod shared {
     static STATE: OnceLock<Mutex<PasteboardState>> = OnceLock::new();
 
     pub(super) fn load_snapshot(contents: &mut PasteboardContents) -> u64 {
-        let state = state().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let state = state()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         *contents = state.contents.clone();
         state.change_count
     }
 
     pub(super) fn store_snapshot(contents: &PasteboardContents, change_count: u64) -> u64 {
-        let mut state = state().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut state = state()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         state.contents = contents.clone();
         state.change_count = change_count;
         state.change_count
@@ -156,7 +158,10 @@ mod shared {
 
 #[cfg(all(target_os = "macos", not(test)))]
 mod native {
-    use super::{PasteboardContents, NS_PASTEBOARD_TYPE_PDF, NS_PASTEBOARD_TYPE_PNG, NS_PASTEBOARD_TYPE_STRING};
+    use super::{
+        PasteboardContents, NS_PASTEBOARD_TYPE_PDF, NS_PASTEBOARD_TYPE_PNG,
+        NS_PASTEBOARD_TYPE_STRING,
+    };
     use objc2_app_kit::NSPasteboard as NativeNSPasteboard;
     use objc2_foundation::{NSData, NSString};
 
@@ -258,7 +263,10 @@ mod tests {
         let mut pb = fresh_pasteboard();
         let data = b"\x89PNG\r\n\x1a\n";
         assert!(pb.set_data(data, NS_PASTEBOARD_TYPE_PNG));
-        assert_eq!(pb.data_for_type(NS_PASTEBOARD_TYPE_PNG), Some(data.as_slice()));
+        assert_eq!(
+            pb.data_for_type(NS_PASTEBOARD_TYPE_PNG),
+            Some(data.as_slice())
+        );
         assert_eq!(pb.data_for_type("missing"), None);
     }
 

@@ -1,9 +1,9 @@
-use std::ffi::{c_char, CStr};
 use std::collections::HashMap;
+use std::ffi::{c_char, CStr};
 
 use crate::class::{ClassInfo, OBJC_RUNTIME};
 
-use super::{STAGED_CLASSES, StagedClassPair, StagedClassInit, alloc_synth_addr};
+use super::{alloc_synth_addr, StagedClassInit, StagedClassPair, STAGED_CLASSES};
 
 /// to `objc_getClass`; call `objc_registerClassPair` to finalize.
 pub extern "C" fn shim_objc_allocate_class_pair(
@@ -14,9 +14,7 @@ pub extern "C" fn shim_objc_allocate_class_pair(
     if name.is_null() {
         return 0;
     }
-    let name_str = unsafe { CStr::from_ptr(name) }
-        .to_str()
-        .unwrap_or("");
+    let name_str = unsafe { CStr::from_ptr(name) }.to_str().unwrap_or("");
     if name_str.is_empty() {
         return 0;
     }
@@ -139,9 +137,7 @@ pub extern "C" fn shim_objc_dispose_class_pair(cls: u64) {
 
     // First check if it's still in staging (never registered).
     {
-        let mut staged = STAGED_CLASSES
-            .lock()
-            .unwrap_or_else(|e| e.into_inner());
+        let mut staged = STAGED_CLASSES.lock().unwrap_or_else(|e| e.into_inner());
         if staged.remove(&cls).is_some() {
             log::debug!("objc_disposeClassPair: removed staged class {:#x}", cls);
             return;
@@ -178,9 +174,7 @@ pub extern "C" fn shim_objc_duplicate_class(
     if original == 0 || name.is_null() {
         return 0;
     }
-    let name_str = unsafe { CStr::from_ptr(name) }
-        .to_str()
-        .unwrap_or("");
+    let name_str = unsafe { CStr::from_ptr(name) }.to_str().unwrap_or("");
     if name_str.is_empty() {
         return 0;
     }
@@ -224,8 +218,8 @@ pub extern "C" fn shim_objc_duplicate_class(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::class::{ObjcRuntime, OBJC_RUNTIME};
     use std::ffi::CString;
-    use crate::class::{OBJC_RUNTIME, ObjcRuntime};
 
     fn ensure_runtime() {
         let mut guard = OBJC_RUNTIME.write().unwrap();
@@ -287,4 +281,3 @@ mod tests {
         shim_objc_register_class_pair(0);
     }
 }
-

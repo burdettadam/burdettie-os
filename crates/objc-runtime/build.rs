@@ -13,9 +13,11 @@ fn main() {
         println!("cargo:rerun-if-changed=src/trampoline.S");
     }
 
-    if target_arch == "x86_64" && target_os == "macos" {
+    if target_arch == "x86_64" && (target_os == "macos" || target_os == "linux") {
         cc::Build::new()
             .file("src/trampoline_x86_64.s")
+            .flag("-x")
+            .flag("assembler-with-cpp")
             .compile("objc_trampoline");
 
         println!("cargo:rustc-link-lib=static=objc_trampoline");

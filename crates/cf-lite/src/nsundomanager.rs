@@ -31,13 +31,19 @@ struct UndoAction {
 }
 
 fn read_u64(obj: u64, offset: usize) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + offset) as *const u64) }
 }
 
 fn write_u64(obj: u64, offset: usize, value: u64) {
-    if obj == 0 { return; }
-    unsafe { *((obj as usize + offset) as *mut u64) = value; }
+    if obj == 0 {
+        return;
+    }
+    unsafe {
+        *((obj as usize + offset) as *mut u64) = value;
+    }
 }
 
 fn undo_stack(obj: u64) -> &'static mut Vec<UndoAction> {
@@ -53,8 +59,12 @@ fn redo_stack(obj: u64) -> &'static mut Vec<UndoAction> {
 /// Allocate a new NSUndoManager.
 pub(crate) fn alloc_undo_manager() -> u64 {
     let obj = crate::pal_alloc().calloc(1, UNDO_MANAGER_SIZE) as u64;
-    if obj == 0 { return 0; }
-    unsafe { *(obj as *mut u64) = crate::nsobj::nsundomanager_class_addr(); }
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *(obj as *mut u64) = crate::nsobj::nsundomanager_class_addr();
+    }
     // Allocate undo/redo stacks on the heap
     let undo_vec = Box::into_raw(Box::new(Vec::<UndoAction>::new()));
     let redo_vec = Box::into_raw(Box::new(Vec::<UndoAction>::new()));
@@ -68,10 +78,20 @@ pub(crate) fn alloc_undo_manager() -> u64 {
 
 /// `-[NSUndoManager registerUndoWithTarget:selector:object:]`
 pub extern "C" fn shim_nsundomanager_register_undo(
-    obj: u64, _cmd: u64, target: u64, selector: u64, object: u64,
+    obj: u64,
+    _cmd: u64,
+    target: u64,
+    selector: u64,
+    object: u64,
 ) {
-    if obj == 0 { return; }
-    let action = UndoAction { target, selector, object };
+    if obj == 0 {
+        return;
+    }
+    let action = UndoAction {
+        target,
+        selector,
+        object,
+    };
     let is_undoing = read_u64(obj, IS_UNDOING_OFF) != 0;
     if is_undoing {
         redo_stack(obj).push(action);
@@ -87,7 +107,9 @@ pub extern "C" fn shim_nsundomanager_register_undo(
 /// Pops the last undo action.  In our shim we don't actually invoke the
 /// target/selector — we just move the action to the redo stack.
 pub extern "C" fn shim_nsundomanager_undo(obj: u64, _cmd: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let action = undo_stack(obj).pop();
     if let Some(a) = action {
         write_u64(obj, IS_UNDOING_OFF, 1);
@@ -100,7 +122,9 @@ pub extern "C" fn shim_nsundomanager_undo(obj: u64, _cmd: u64) {
 
 /// `-[NSUndoManager redo]`
 pub extern "C" fn shim_nsundomanager_redo(obj: u64, _cmd: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let action = redo_stack(obj).pop();
     if let Some(a) = action {
         // Move back to undo stack
@@ -110,30 +134,42 @@ pub extern "C" fn shim_nsundomanager_redo(obj: u64, _cmd: u64) {
 
 /// `-[NSUndoManager canUndo]`
 pub extern "C" fn shim_nsundomanager_can_undo(obj: u64, _cmd: u64) -> u8 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     u8::from(!undo_stack(obj).is_empty())
 }
 
 /// `-[NSUndoManager canRedo]`
 pub extern "C" fn shim_nsundomanager_can_redo(obj: u64, _cmd: u64) -> u8 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     u8::from(!redo_stack(obj).is_empty())
 }
 
 /// `-[NSUndoManager undoActionName]`
 pub extern "C" fn shim_nsundomanager_undo_action_name(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let name = read_u64(obj, ACTION_NAME_OFF);
-    if name != 0 { return name; }
+    if name != 0 {
+        return name;
+    }
     // Return empty NSString
     crate::cfstring::alloc_nsstring_from_cstr(c"".as_ptr())
 }
 
 /// `-[NSUndoManager redoActionName]`
 pub extern "C" fn shim_nsundomanager_redo_action_name(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let name = read_u64(obj, ACTION_NAME_OFF);
-    if name != 0 { return name; }
+    if name != 0 {
+        return name;
+    }
     crate::cfstring::alloc_nsstring_from_cstr(c"".as_ptr())
 }
 
@@ -144,7 +180,9 @@ pub extern "C" fn shim_nsundomanager_set_action_name(obj: u64, _cmd: u64, name: 
 
 /// `-[NSUndoManager removeAllActions]`
 pub extern "C" fn shim_nsundomanager_remove_all_actions(obj: u64, _cmd: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     undo_stack(obj).clear();
     redo_stack(obj).clear();
     write_u64(obj, ACTION_NAME_OFF, 0);
@@ -152,9 +190,13 @@ pub extern "C" fn shim_nsundomanager_remove_all_actions(obj: u64, _cmd: u64) {
 
 /// `-[NSUndoManager removeAllActionsWithTarget:]`
 pub extern "C" fn shim_nsundomanager_remove_all_actions_with_target(
-    obj: u64, _cmd: u64, target: u64,
+    obj: u64,
+    _cmd: u64,
+    target: u64,
 ) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     undo_stack(obj).retain(|a| a.target != target);
     redo_stack(obj).retain(|a| a.target != target);
 }
@@ -171,14 +213,18 @@ pub extern "C" fn shim_nsundomanager_set_groups_by_event(obj: u64, _cmd: u64, fl
 
 /// `-[NSUndoManager beginUndoGrouping]`
 pub extern "C" fn shim_nsundomanager_begin_undo_grouping(obj: u64, _cmd: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let depth = read_u64(obj, GROUP_DEPTH_OFF);
     write_u64(obj, GROUP_DEPTH_OFF, depth + 1);
 }
 
 /// `-[NSUndoManager endUndoGrouping]`
 pub extern "C" fn shim_nsundomanager_end_undo_grouping(obj: u64, _cmd: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let depth = read_u64(obj, GROUP_DEPTH_OFF);
     if depth > 0 {
         write_u64(obj, GROUP_DEPTH_OFF, depth - 1);
@@ -196,10 +242,14 @@ pub extern "C" fn shim_nsundomanager_is_undoing(obj: u64, _cmd: u64) -> u8 {
 }
 
 /// `-[NSUndoManager isRedoing]` — always false in this shim.
-pub extern "C" fn shim_nsundomanager_is_redoing(_obj: u64, _cmd: u64) -> u8 { 0 }
+pub extern "C" fn shim_nsundomanager_is_redoing(_obj: u64, _cmd: u64) -> u8 {
+    0
+}
 
 /// `-[NSUndoManager levelsOfUndo]` — returns 0 (unlimited).
-pub extern "C" fn shim_nsundomanager_levels_of_undo(_obj: u64, _cmd: u64) -> u64 { 0 }
+pub extern "C" fn shim_nsundomanager_levels_of_undo(_obj: u64, _cmd: u64) -> u64 {
+    0
+}
 
 /// `-[NSUndoManager setLevelsOfUndo:]` — no-op.
 pub extern "C" fn shim_nsundomanager_set_levels_of_undo(_obj: u64, _cmd: u64, _levels: u64) {}
@@ -221,11 +271,21 @@ mod tests {
 
     fn drop_um(obj: u64) {
         // Must free the heap-allocated Vecs first
-        if obj == 0 { return; }
+        if obj == 0 {
+            return;
+        }
         let undo_ptr = read_u64(obj, UNDO_STACK_OFF) as *mut Vec<UndoAction>;
         let redo_ptr = read_u64(obj, REDO_STACK_OFF) as *mut Vec<UndoAction>;
-        if !undo_ptr.is_null() { unsafe { drop(Box::from_raw(undo_ptr)); } }
-        if !redo_ptr.is_null() { unsafe { drop(Box::from_raw(redo_ptr)); } }
+        if !undo_ptr.is_null() {
+            unsafe {
+                drop(Box::from_raw(undo_ptr));
+            }
+        }
+        if !redo_ptr.is_null() {
+            unsafe {
+                drop(Box::from_raw(redo_ptr));
+            }
+        }
         free_obj(obj);
     }
 

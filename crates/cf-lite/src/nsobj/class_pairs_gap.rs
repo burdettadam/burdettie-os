@@ -5,10 +5,9 @@
 use std::cell::UnsafeCell;
 
 use super::{
-    SyncArray, nsobject_class_addr, nsobject_metaclass_addr,
-    nsdata_class_addr, nsdata_metaclass_addr,
-    nsmutableset_class_addr, nsmutableset_metaclass_addr,
-    nscharacterset_class_addr, nscharacterset_metaclass_addr,
+    nscharacterset_class_addr, nscharacterset_metaclass_addr, nsdata_class_addr,
+    nsdata_metaclass_addr, nsmutableset_class_addr, nsmutableset_metaclass_addr,
+    nsobject_class_addr, nsobject_metaclass_addr, SyncArray,
 };
 
 // ── Gap-analysis classes (Phase C8) ─────────────────────────────

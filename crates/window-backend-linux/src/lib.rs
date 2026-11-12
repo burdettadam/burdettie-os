@@ -16,9 +16,7 @@ use std::num::NonZeroU32;
 use std::sync::{Arc, Mutex};
 
 use graphics_core::Surface;
-use window_backend::{
-    WindowConfig, WindowEvent, WindowId, WindowBackend,
-};
+use window_backend::{WindowBackend, WindowConfig, WindowEvent, WindowId};
 
 /// Winit-based window backend.
 ///
@@ -116,7 +114,11 @@ impl WindowBackend for WinitBackend {
         let id = WindowId(inner.next_id);
         inner.next_id += 1;
 
-        log::debug!("window-backend-linux: created window {:?} \"{}\"", id, config.title);
+        log::debug!(
+            "window-backend-linux: created window {:?} \"{}\"",
+            id,
+            config.title
+        );
         inner.windows.insert(id, WinitWindow { window, surface });
         id
     }
@@ -149,13 +151,19 @@ impl WindowBackend for WinitBackend {
 
     fn is_resizable(&self, id: WindowId) -> bool {
         let inner = self.inner.lock().expect("lock poisoned");
-        inner.windows.get(&id).map(|w| w.window.is_resizable()).unwrap_or(true)
+        inner
+            .windows
+            .get(&id)
+            .map(|w| w.window.is_resizable())
+            .unwrap_or(true)
     }
 
     fn set_size(&self, id: WindowId, width: f64, height: f64) {
         let inner = self.inner.lock().expect("lock poisoned");
         if let Some(w) = inner.windows.get(&id) {
-            let _ = w.window.request_inner_size(winit::dpi::LogicalSize::new(width, height));
+            let _ = w
+                .window
+                .request_inner_size(winit::dpi::LogicalSize::new(width, height));
         }
     }
 
@@ -205,15 +213,23 @@ impl WindowBackend for WinitBackend {
 
     fn window_size(&self, id: WindowId) -> (f64, f64) {
         let inner = self.inner.lock().expect("lock poisoned");
-        inner.windows.get(&id).map(|w| {
-            let size = w.window.inner_size();
-            let scale = w.window.scale_factor();
-            (size.width as f64 / scale, size.height as f64 / scale)
-        }).unwrap_or((0.0, 0.0))
+        inner
+            .windows
+            .get(&id)
+            .map(|w| {
+                let size = w.window.inner_size();
+                let scale = w.window.scale_factor();
+                (size.width as f64 / scale, size.height as f64 / scale)
+            })
+            .unwrap_or((0.0, 0.0))
     }
 
     fn scale_factor(&self, id: WindowId) -> f64 {
         let inner = self.inner.lock().expect("lock poisoned");
-        inner.windows.get(&id).map(|w| w.window.scale_factor()).unwrap_or(1.0)
+        inner
+            .windows
+            .get(&id)
+            .map(|w| w.window.scale_factor())
+            .unwrap_or(1.0)
     }
 }

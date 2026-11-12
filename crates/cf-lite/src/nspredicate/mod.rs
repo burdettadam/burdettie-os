@@ -26,7 +26,9 @@ pub const INSTANCE_SIZE: u32 = 32;
 
 fn make_predicate(format: u64, pred_fn: Box<dyn Fn(u64) -> bool + Send + Sync>) -> u64 {
     let obj = crate::pal_alloc().calloc(1, INSTANCE_SIZE as usize) as u64;
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe {
         *(obj as *mut u64) = nsobj::nspredicate_class_addr();
         *((obj + 8) as *mut u64) = format;
@@ -51,9 +53,7 @@ pub unsafe extern "C" fn shim_predicate_with_format() {
 }
 
 #[cfg(not(target_arch = "aarch64"))]
-pub extern "C" fn shim_predicate_with_format(
-    _cls: u64, _cmd: u64, format: u64, arg0: u64,
-) -> u64 {
+pub extern "C" fn shim_predicate_with_format(_cls: u64, _cmd: u64, format: u64, arg0: u64) -> u64 {
     shim_predicate_with_format_inner(_cls, _cmd, format, arg0)
 }
 
@@ -99,8 +99,7 @@ pub extern "C" fn shim_predicate_with_block(_cls: u64, _cmd: u64, block: u64) ->
     make_predicate(
         0,
         Box::new(move |target| {
-            let f: extern "C" fn(u64, u64, u64) -> u8 =
-                unsafe { std::mem::transmute(invoke_ptr) };
+            let f: extern "C" fn(u64, u64, u64) -> u8 = unsafe { std::mem::transmute(invoke_ptr) };
             f(blk, target, 0) != 0
         }),
     )
@@ -110,9 +109,13 @@ pub extern "C" fn shim_predicate_with_block(_cls: u64, _cmd: u64, block: u64) ->
 
 /// `-[NSPredicate evaluateWithObject:]`
 pub extern "C" fn shim_predicate_evaluate(obj: u64, _cmd: u64, target: u64) -> u8 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let fn_ptr = unsafe { *((obj + 16) as *const u64) };
-    if fn_ptr == 0 { return 0; }
+    if fn_ptr == 0 {
+        return 0;
+    }
     let predicate: &(dyn Fn(u64) -> bool + Send + Sync) =
         unsafe { &*(fn_ptr as *const Box<dyn Fn(u64) -> bool + Send + Sync>) };
     u8::from(predicate(target))
@@ -120,19 +123,24 @@ pub extern "C" fn shim_predicate_evaluate(obj: u64, _cmd: u64, target: u64) -> u
 
 /// `-[NSPredicate predicateFormat]`
 pub extern "C" fn shim_predicate_format(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj + 8) as *const u64) }
 }
 
 /// `-[NSPredicate description]`
 pub extern "C" fn shim_predicate_description(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let fmt = unsafe { *((obj + 8) as *const u64) };
-    if fmt != 0 { return fmt; }
+    if fmt != 0 {
+        return fmt;
+    }
     let c_str = c"<NSPredicate>";
     cfstring::shim_cf_string_create_with_cstring(0, c_str.as_ptr(), 0)
 }
-
 
 mod parser;
 use self::parser::parse_format;
@@ -217,7 +225,9 @@ mod tests {
     fn predicate_with_block_always_true() {
         // Build a fake ObjC block: [isa, flags, reserved, invoke, descriptor]
         // invoke at offset 16 returns 1 for any input.
-        extern "C" fn always_true(_blk: u64, _obj: u64, _bindings: u64) -> u8 { 1 }
+        extern "C" fn always_true(_blk: u64, _obj: u64, _bindings: u64) -> u8 {
+            1
+        }
         let mut block = [0u64; 5];
         block[2] = always_true as *const () as u64; // offset 16 = invoke
         let pred = shim_predicate_with_block(0, 0, block.as_ptr() as u64);
@@ -228,7 +238,9 @@ mod tests {
 
     #[test]
     fn predicate_with_block_always_false() {
-        extern "C" fn always_false(_blk: u64, _obj: u64, _bindings: u64) -> u8 { 0 }
+        extern "C" fn always_false(_blk: u64, _obj: u64, _bindings: u64) -> u8 {
+            0
+        }
         let mut block = [0u64; 5];
         block[2] = always_false as *const () as u64; // offset 16 = invoke
         let pred = shim_predicate_with_block(0, 0, block.as_ptr() as u64);

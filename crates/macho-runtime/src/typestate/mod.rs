@@ -130,10 +130,8 @@ impl<S: sealed::Phase> Loader<S> {
     }
 }
 
-
 mod phases_1_3;
 mod phases_4_7;
-
 
 #[cfg(test)]
 mod tests {
@@ -142,8 +140,8 @@ mod tests {
 
     #[test]
     fn typestate_return42() {
-        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../fixtures/return42/return42");
+        let path =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/return42/return42");
         if !path.exists() {
             eprintln!("Skipping: fixture not found");
             return;

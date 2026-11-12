@@ -123,9 +123,13 @@ pub extern "C" fn shim_nscolorwell_deactivate(_obj: u64, _cmd: u64) {}
 
 /// `-[NSColorWell drawRect:]` — renders the color swatch.
 pub extern "C" fn shim_nscolorwell_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let cg_ctx = crate::nsgraphicscontext::current_cg_context_handle();
-    if cg_ctx == 0 { return; }
+    if cg_ctx == 0 {
+        return;
+    }
 
     let color_ptr = read_u64(obj, COLOR_OFF);
     let (r, g, b, a) = if color_ptr != 0 {
@@ -157,8 +161,12 @@ pub extern "C" fn shim_nscolorwell_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64
 
 /// `-[NSColorWell mouseDown:]` — activates the color well.
 pub extern "C" fn shim_nscolorwell_mouse_down(obj: u64, _cmd: u64, _event: u64) {
-    if obj == 0 { return; }
-    if read_flags(obj) & FLAG_IS_ENABLED == 0 { return; }
+    if obj == 0 {
+        return;
+    }
+    if read_flags(obj) & FLAG_IS_ENABLED == 0 {
+        return;
+    }
     // Activate the well (which would normally open the color panel).
     shim_nscolorwell_activate(obj, 0, 1);
 }

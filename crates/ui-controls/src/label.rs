@@ -115,7 +115,10 @@ mod tests {
     fn label_intrinsic_content_size() {
         let l = Label::new(Rect::new(0.0, 0.0, 200.0, 30.0), "Some text");
         let size = l.intrinsic_content_size();
-        assert!(size.width.unwrap() > 0.0, "width should be positive for non-empty text");
+        assert!(
+            size.width.unwrap() > 0.0,
+            "width should be positive for non-empty text"
+        );
         assert!(size.height.unwrap() > 0.0, "height should be positive");
     }
 
@@ -126,14 +129,20 @@ mod tests {
         // Width should be minimal (just padding) for empty text
         let l2 = Label::new(Rect::new(0.0, 0.0, 200.0, 30.0), "Hello");
         let size2 = l2.intrinsic_content_size();
-        assert!(size.width.unwrap() < size2.width.unwrap(), "empty text should have smaller width");
+        assert!(
+            size.width.unwrap() < size2.width.unwrap(),
+            "empty text should have smaller width"
+        );
     }
 
     #[test]
     fn label_set_font() {
         let mut l = Label::new(Rect::new(0.0, 0.0, 200.0, 30.0), "Text");
         let size_before = l.intrinsic_content_size();
-        l.set_font(Font { size: 24.0, ..Font::default() });
+        l.set_font(Font {
+            size: 24.0,
+            ..Font::default()
+        });
         let size_after = l.intrinsic_content_size();
         // Bigger font should change intrinsic size
         assert_ne!(size_before.width.unwrap(), size_after.width.unwrap());

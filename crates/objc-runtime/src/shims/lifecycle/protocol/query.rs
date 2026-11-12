@@ -4,16 +4,13 @@ use std::ffi::{c_char, CStr, CString};
 
 use crate::class::OBJC_RUNTIME;
 
-use super::helpers::{protocol_name_to_sentinel, sentinel_to_protocol_name,
-};
+use super::helpers::{protocol_name_to_sentinel, sentinel_to_protocol_name};
 
 pub extern "C" fn shim_objc_get_protocol(name: *const c_char) -> u64 {
     if name.is_null() {
         return 0;
     }
-    let name_str = unsafe { CStr::from_ptr(name) }
-        .to_str()
-        .unwrap_or("");
+    let name_str = unsafe { CStr::from_ptr(name) }.to_str().unwrap_or("");
     if name_str.is_empty() {
         return 0;
     }
@@ -241,8 +238,8 @@ pub extern "C" fn shim_protocol_copy_protocol_list(proto: u64, out_count: *mut u
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::class::{ObjcRuntime, OBJC_RUNTIME};
     use std::ffi::CString;
-    use crate::class::{OBJC_RUNTIME, ObjcRuntime};
 
     fn ensure_runtime() {
         let mut guard = OBJC_RUNTIME.write().unwrap();
@@ -271,12 +268,18 @@ mod tests {
 
     #[test]
     fn protocol_is_equal_same() {
-        assert_eq!(shim_protocol_is_equal(0x7000_0000_0000_1234, 0x7000_0000_0000_1234), 1);
+        assert_eq!(
+            shim_protocol_is_equal(0x7000_0000_0000_1234, 0x7000_0000_0000_1234),
+            1
+        );
     }
 
     #[test]
     fn protocol_is_equal_different() {
-        assert_eq!(shim_protocol_is_equal(0x7000_0000_0000_1234, 0x7000_0000_0000_5678), 0);
+        assert_eq!(
+            shim_protocol_is_equal(0x7000_0000_0000_1234, 0x7000_0000_0000_5678),
+            0
+        );
     }
 
     #[test]
@@ -297,4 +300,3 @@ mod tests {
         assert_eq!(count, 0);
     }
 }
-

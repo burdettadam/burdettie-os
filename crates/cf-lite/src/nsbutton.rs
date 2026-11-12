@@ -81,6 +81,143 @@ fn get_flag(obj: u64, flag: u64) -> u8 {
 
 // ── Instance method shims ──────────────────────────────────────
 
+fn resolve_archived_image(candidate: u64) -> u64 {
+    if candidate == 0 || candidate % 8 != 0 {
+        return 0;
+    }
+
+    if unsafe { *(candidate as *const u64) } == crate::nsobj::nsimage_class_addr() {
+        return candidate;
+    }
+
+    if crate::cfstring::extract_cfstring_cstr(candidate).is_some() {
+        return crate::nsimage::shim_nsimage_image_named(0, 0, candidate);
+    }
+
+    0
+}
+
+fn selector_ptr_for_name(name: &str) -> u64 {
+    if name.is_empty() {
+        return 0;
+    }
+
+    {
+        let mut guard = objc_runtime::OBJC_RUNTIME
+            .write()
+            .unwrap_or_else(|e| e.into_inner());
+        if let Some(rt) = guard.as_mut() {
+            return rt.intern_selector(name) as u64;
+        }
+    }
+
+    let Ok(cstr) = std::ffi::CString::new(name) else {
+        return 0;
+    };
+    let ptr = cstr.as_ptr() as u64;
+    std::mem::forget(cstr);
+    ptr
+}
+
+/// `-[NSButton initWithCoder:]`.
+pub extern "C" fn shim_nsbutton_init_with_coder(obj: u64, _cmd: u64, coder: u64) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
+
+    crate::nsview::shim_nsview_init_with_coder(obj, 0, coder);
+    write_flags(obj, FLAG_IS_ENABLED | FLAG_IS_BORDERED);
+
+    let title = crate::nskeyedarchiver::decode_object_for_any_key(
+        coder,
+        &["NSTitle", "NS.title", "title", "_title", "NSButtonTitle"],
+    );
+    if title != 0 {
+        shim_nsbutton_set_title(obj, 0, title);
+    }
+
+    let alternate_title = crate::nskeyedarchiver::decode_object_for_any_key(
+        coder,
+        &[
+            "NSAlternateTitle",
+            "alternateTitle",
+            "_alternateTitle",
+            "NS.altTitle",
+        ],
+    );
+    if alternate_title != 0 {
+        shim_nsbutton_set_alternate_title(obj, 0, alternate_title);
+    }
+
+    let archived_image = crate::nskeyedarchiver::decode_object_for_any_key(
+        coder,
+        &[
+            "NSImage",
+            "NS.image",
+            "image",
+            "_image",
+            "NSImageName",
+            "imageName",
+        ],
+    );
+    let image = resolve_archived_image(archived_image);
+    if image != 0 {
+        shim_nsbutton_set_image(obj, 0, image);
+    }
+
+    let target = crate::nskeyedarchiver::decode_object_for_any_key(
+        coder,
+        &["NSTarget", "target", "_target"],
+    );
+    if target != 0 {
+        shim_nsbutton_set_target(obj, 0, target);
+    }
+
+    if let Some(action) = crate::nskeyedarchiver::decode_string_for_any_key(
+        coder,
+        &["NSAction", "action", "_action", "selector"],
+    ) {
+        let sel = selector_ptr_for_name(&action);
+        if sel != 0 {
+            shim_nsbutton_set_action(obj, 0, sel);
+        }
+    }
+
+    if let Some(enabled) = crate::nskeyedarchiver::decode_bool_for_any_key(
+        coder,
+        &["NSEnabled", "enabled", "isEnabled", "_enabled"],
+    ) {
+        shim_nsbutton_set_enabled(obj, 0, u8::from(enabled));
+    }
+
+    if let Some(bordered) = crate::nskeyedarchiver::decode_bool_for_any_key(
+        coder,
+        &["NSBordered", "bordered", "isBordered", "_bordered"],
+    ) {
+        shim_nsbutton_set_bordered(obj, 0, u8::from(bordered));
+    }
+
+    if let Some(allows_mixed) = crate::nskeyedarchiver::decode_bool_for_any_key(
+        coder,
+        &[
+            "NSAllowsMixedState",
+            "allowsMixedState",
+            "_allowsMixedState",
+        ],
+    ) {
+        shim_nsbutton_set_allows_mixed_state(obj, 0, u8::from(allows_mixed));
+    }
+
+    if let Some(state) = crate::nskeyedarchiver::decode_integer_for_any_key(
+        coder,
+        &["NSState", "state", "_state", "NSCellState"],
+    ) {
+        shim_nsbutton_set_state(obj, 0, state);
+    }
+
+    obj
+}
+
 /// `-[NSButton title]`
 pub extern "C" fn shim_nsbutton_title(obj: u64, _cmd: u64) -> u64 {
     if obj == 0 {
@@ -234,7 +371,9 @@ pub extern "C" fn shim_nsbutton_mouse_down(obj: u64, _cmd: u64, _event: u64) {
 
 /// `-[NSButton acceptsFirstResponder]` — buttons accept first responder.
 pub extern "C" fn shim_nsbutton_accepts_first_responder(obj: u64, _cmd: u64) -> u8 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     u8::from(read_flags(obj) & FLAG_IS_ENABLED != 0)
 }
 
@@ -246,7 +385,7 @@ fn fire_action(obj: u64) {
         return;
     }
     // Use NSApp sendAction:to:from: for proper target resolution
-    let nsapp = crate::nsapplication::nsapp_global_addr();
+    let nsapp = crate::nsapplication::shim_nsapplication_shared_application(0, 0);
     crate::nsapplication::shim_nsapplication_send_action_to_from(nsapp, 0, action, target, obj);
 }
 
@@ -307,10 +446,14 @@ pub extern "C" fn shim_nsbutton_checkbox_with_title(
 ///
 /// Draws a bordered rounded rectangle with the button title centered inside.
 pub extern "C" fn shim_nsbutton_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
 
     let cg_ctx = crate::nsgraphicscontext::current_cg_context_handle();
-    if cg_ctx == 0 { return; }
+    if cg_ctx == 0 {
+        return;
+    }
 
     let flags = read_flags(obj);
 
@@ -335,6 +478,26 @@ pub extern "C" fn shim_nsbutton_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64, w
         }
     });
 
+    let mut text_x = x + 8.0;
+    let image_ptr = read_u64(obj, IMAGE_OFF);
+    if image_ptr != 0 {
+        let cg_image = crate::nsimage::image_to_cg_handle(image_ptr);
+        if cg_image != 0 {
+            let icon_extent = (h - 8.0).max(1.0).min((w - 8.0).max(1.0));
+            let icon_x = x + 6.0;
+            let icon_y = y + ((h - icon_extent) / 2.0).max(0.0);
+            cg_shims::bridge::draw_image_in_context(
+                cg_ctx,
+                cg_image,
+                icon_x,
+                icon_y,
+                icon_extent,
+                icon_extent,
+            );
+            text_x = (icon_x + icon_extent + 6.0).min(x + w - 2.0);
+        }
+    }
+
     // Draw title text centered.
     let title_ptr = read_u64(obj, TITLE_OFF);
     if title_ptr != 0 {
@@ -353,7 +516,7 @@ pub extern "C" fn shim_nsbutton_draw_rect(obj: u64, _cmd: u64, x: f64, y: f64, w
                     c.fill_color = text_color;
                     // Center text vertically, left-pad slightly.
                     let text_y = y + (h * 0.65);
-                    c.draw_text(text, x + 8.0, text_y);
+                    c.draw_text(text, text_x, text_y);
                 });
             }
         }

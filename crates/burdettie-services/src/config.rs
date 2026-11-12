@@ -26,6 +26,8 @@ pub struct ServiceConfig {
     pub remote: RemoteConfig,
     /// Instance identifier for multi-tenant tagging.
     pub instance_id: String,
+    /// Workspace root used by repo-local admin subsystems.
+    pub workspace_root: String,
 }
 
 /// Admin API settings.
@@ -151,6 +153,11 @@ impl ServiceConfig {
             .or(toml.remote.instance_id)
             .unwrap_or_else(|| "default".into());
 
+        let workspace_root = std::env::var("BURDETTIE_WORKSPACE_ROOT")
+            .ok()
+            .or(toml.services.workspace_root)
+            .unwrap_or_else(|| ".".into());
+
         Self {
             bind_addr,
             record_requests,
@@ -158,9 +165,16 @@ impl ServiceConfig {
             replay_db_path,
             log_format,
             log_sink,
-            admin: AdminConfig { enabled: admin_enabled, token: admin_token },
-            remote: RemoteConfig { endpoint: remote_endpoint, auth_token: remote_auth_token },
+            admin: AdminConfig {
+                enabled: admin_enabled,
+                token: admin_token,
+            },
+            remote: RemoteConfig {
+                endpoint: remote_endpoint,
+                auth_token: remote_auth_token,
+            },
             instance_id,
+            workspace_root,
         }
     }
 }
@@ -194,6 +208,7 @@ struct TomlServices {
     record_requests: Option<bool>,
     record_db: Option<String>,
     replay_db: Option<String>,
+    workspace_root: Option<String>,
 }
 
 #[derive(Debug, serde::Deserialize, Default)]
@@ -235,8 +250,7 @@ struct TomlRemote {
 /// Try to load a TOML configuration file.
 /// Checks `BURDETTIE_CONFIG` env var, then `./burdettie.toml`.
 fn load_toml_config() -> Option<TomlConfig> {
-    let config_path = std::env::var("BURDETTIE_CONFIG")
-        .unwrap_or_else(|_| "burdettie.toml".into());
+    let config_path = std::env::var("BURDETTIE_CONFIG").unwrap_or_else(|_| "burdettie.toml".into());
 
     let contents = std::fs::read_to_string(&config_path).ok()?;
     match toml::from_str::<TomlConfig>(&contents) {
@@ -303,7 +317,10 @@ domains = ["developer.apple.com"]
         assert_eq!(cfg.services.record_requests, Some(false));
         assert_eq!(cfg.domain_rewrite.enabled, Some(true));
         assert_eq!(cfg.domain_rewrite.target_port, Some(8080));
-        assert_eq!(cfg.domain_rewrite.passthrough.domains, vec!["developer.apple.com"]);
+        assert_eq!(
+            cfg.domain_rewrite.passthrough.domains,
+            vec!["developer.apple.com"]
+        );
     }
 
     #[test]

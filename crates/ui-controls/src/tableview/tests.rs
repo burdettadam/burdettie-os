@@ -68,7 +68,10 @@ fn table_view_row_at_point() {
 fn table_view_draw() {
     let mut tv = TableView::new(
         Rect::new(0.0, 0.0, 300.0, 200.0),
-        vec![TableColumn::new("Name", 150.0), TableColumn::new("Val", 150.0)],
+        vec![
+            TableColumn::new("Name", 150.0),
+            TableColumn::new("Val", 150.0),
+        ],
     );
     let ds = sample_data();
     tv.set_selected_row(Some(1));

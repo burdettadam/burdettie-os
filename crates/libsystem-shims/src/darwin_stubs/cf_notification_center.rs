@@ -163,10 +163,7 @@ extern "C" fn shim_cf_notification_center_remove_observer(
 
 /// void CFNotificationCenterRemoveEveryObserver(
 ///     CFNotificationCenterRef center, const void *observer)
-extern "C" fn shim_cf_notification_center_remove_every_observer(
-    center: u64,
-    observer: u64,
-) {
+extern "C" fn shim_cf_notification_center_remove_every_observer(center: u64, observer: u64) {
     log::trace!(
         "CFNotificationCenterRemoveEveryObserver: center={:#x} observer={:#x}",
         center,
@@ -203,8 +200,8 @@ extern "C" fn shim_cf_notification_center_post_notification(
                     return false;
                 }
                 match (&o.name, &name_str) {
-                    (None, _) => true,        // observer watches all
-                    (_, None) => false,        // shouldn't happen (posting nil name)
+                    (None, _) => true,  // observer watches all
+                    (_, None) => false, // shouldn't happen (posting nil name)
                     (Some(a), Some(b)) => a == b,
                 }
             })
@@ -218,8 +215,7 @@ extern "C" fn shim_cf_notification_center_post_notification(
     //     const void *object, CFDictionaryRef userInfo)
     for (cb, obs_ptr) in callbacks {
         unsafe {
-            let f: extern "C" fn(u64, u64, u64, u64, u64) =
-                std::mem::transmute(cb as usize);
+            let f: extern "C" fn(u64, u64, u64, u64, u64) = std::mem::transmute(cb as usize);
             f(center, obs_ptr, name, object, user_info);
         }
     }
@@ -247,15 +243,48 @@ pub struct CfNotificationCenterStubs;
 impl CfNotificationCenterStubs {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
-        register_shims!(table,
-            ("_CFNotificationCenterGetLocalCenter", shim_cf_notification_center_get_local as *const () as u64, "CFNotificationCenterGetLocalCenter → handle"),
-            ("_CFNotificationCenterGetDistributedCenter", shim_cf_notification_center_get_distributed as *const () as u64, "CFNotificationCenterGetDistributedCenter → handle"),
-            ("_CFNotificationCenterGetDarwinNotifyCenter", shim_cf_notification_center_get_darwin as *const () as u64, "CFNotificationCenterGetDarwinNotifyCenter → handle"),
-            ("_CFNotificationCenterAddObserver", shim_cf_notification_center_add_observer as *const () as u64, "CFNotificationCenterAddObserver → add callback"),
-            ("_CFNotificationCenterRemoveObserver", shim_cf_notification_center_remove_observer as *const () as u64, "CFNotificationCenterRemoveObserver → remove"),
-            ("_CFNotificationCenterRemoveEveryObserver", shim_cf_notification_center_remove_every_observer as *const () as u64, "CFNotificationCenterRemoveEveryObserver → remove all"),
-            ("_CFNotificationCenterPostNotification", shim_cf_notification_center_post_notification as *const () as u64, "CFNotificationCenterPostNotification → dispatch"),
-            ("_CFNotificationCenterPostNotificationWithOptions", shim_cf_notification_center_post_with_options as *const () as u64, "CFNotificationCenterPostNotificationWithOptions → dispatch")
+        register_shims!(
+            table,
+            (
+                "_CFNotificationCenterGetLocalCenter",
+                shim_cf_notification_center_get_local as *const () as u64,
+                "CFNotificationCenterGetLocalCenter → handle"
+            ),
+            (
+                "_CFNotificationCenterGetDistributedCenter",
+                shim_cf_notification_center_get_distributed as *const () as u64,
+                "CFNotificationCenterGetDistributedCenter → handle"
+            ),
+            (
+                "_CFNotificationCenterGetDarwinNotifyCenter",
+                shim_cf_notification_center_get_darwin as *const () as u64,
+                "CFNotificationCenterGetDarwinNotifyCenter → handle"
+            ),
+            (
+                "_CFNotificationCenterAddObserver",
+                shim_cf_notification_center_add_observer as *const () as u64,
+                "CFNotificationCenterAddObserver → add callback"
+            ),
+            (
+                "_CFNotificationCenterRemoveObserver",
+                shim_cf_notification_center_remove_observer as *const () as u64,
+                "CFNotificationCenterRemoveObserver → remove"
+            ),
+            (
+                "_CFNotificationCenterRemoveEveryObserver",
+                shim_cf_notification_center_remove_every_observer as *const () as u64,
+                "CFNotificationCenterRemoveEveryObserver → remove all"
+            ),
+            (
+                "_CFNotificationCenterPostNotification",
+                shim_cf_notification_center_post_notification as *const () as u64,
+                "CFNotificationCenterPostNotification → dispatch"
+            ),
+            (
+                "_CFNotificationCenterPostNotificationWithOptions",
+                shim_cf_notification_center_post_with_options as *const () as u64,
+                "CFNotificationCenterPostNotificationWithOptions → dispatch"
+            )
         );
 
         log::debug!("CfNotificationCenterStubs: registered 8 shims");
@@ -372,10 +401,20 @@ mod tests {
         let name_b = b"EveryB\0".as_ptr() as u64;
 
         shim_cf_notification_center_add_observer(
-            center, 0x44, test_callback as *const () as u64, name_a, 0, 0,
+            center,
+            0x44,
+            test_callback as *const () as u64,
+            name_a,
+            0,
+            0,
         );
         shim_cf_notification_center_add_observer(
-            center, 0x44, test_callback as *const () as u64, name_b, 0, 0,
+            center,
+            0x44,
+            test_callback as *const () as u64,
+            name_b,
+            0,
+            0,
         );
 
         shim_cf_notification_center_remove_every_observer(center, 0x44);
@@ -392,7 +431,12 @@ mod tests {
 
         // Add observer with nil name (matches all)
         shim_cf_notification_center_add_observer(
-            center, 0x45, test_callback as *const () as u64, 0, 0, 0,
+            center,
+            0x45,
+            test_callback as *const () as u64,
+            0,
+            0,
+            0,
         );
 
         let name_x = b"AnyName\0".as_ptr() as u64;
@@ -416,7 +460,12 @@ mod tests {
 
         // Add observer on local center
         shim_cf_notification_center_add_observer(
-            local, 0x46, test_callback as *const () as u64, name, 0, 0,
+            local,
+            0x46,
+            test_callback as *const () as u64,
+            name,
+            0,
+            0,
         );
 
         // Post on distributed center — should NOT invoke callback

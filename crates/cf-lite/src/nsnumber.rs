@@ -50,7 +50,9 @@ pub fn read_number_pub(obj: u64) -> (u64, u64) {
 
 /// Check if an object is an NSNumber (dynamic or constant integer).
 pub fn is_nsnumber(obj: u64) -> bool {
-    if obj == 0 { return false; }
+    if obj == 0 {
+        return false;
+    }
     let isa = unsafe { std::ptr::read_unaligned(obj as *const u64) };
     isa == crate::nsobj::nsnumber_class_addr()
         || isa == crate::nsobj::nsconstantintegernumber_class_addr()
@@ -64,7 +66,9 @@ pub fn nsnumber_values_equal(a: u64, b: u64) -> bool {
     let (_, rb) = read_number(b);
     let (tb, _) = read_number(b);
     // Fast path: same tag and same raw bits
-    if ta == tb && ra == rb { return true; }
+    if ta == tb && ra == rb {
+        return true;
+    }
     // Slow path: compare as f64
     shim_nsnumber_double_value(a, 0) == shim_nsnumber_double_value(b, 0)
 }
@@ -154,7 +158,11 @@ pub extern "C" fn shim_nsnumber_number_with_unsigned_int(_cls: u64, _cmd: u64, v
 }
 
 /// `+[NSNumber numberWithUnsignedInteger:]`
-pub extern "C" fn shim_nsnumber_number_with_unsigned_integer(_cls: u64, _cmd: u64, value: u64) -> u64 {
+pub extern "C" fn shim_nsnumber_number_with_unsigned_integer(
+    _cls: u64,
+    _cmd: u64,
+    value: u64,
+) -> u64 {
     alloc_nsnumber(TAG_INT, value)
 }
 
@@ -208,8 +216,20 @@ pub extern "C" fn shim_nsnumber_bool_value(obj: u64, _cmd: u64) -> u8 {
     }
     let (tag, raw) = read_number(obj);
     match tag {
-        TAG_INT | TAG_BOOL => if raw as i64 != 0 { 1 } else { 0 },
-        TAG_DOUBLE => if f64::from_bits(raw) != 0.0 { 1 } else { 0 },
+        TAG_INT | TAG_BOOL => {
+            if raw as i64 != 0 {
+                1
+            } else {
+                0
+            }
+        }
+        TAG_DOUBLE => {
+            if f64::from_bits(raw) != 0.0 {
+                1
+            } else {
+                0
+            }
+        }
         _ => 0,
     }
 }
@@ -291,7 +311,11 @@ pub extern "C" fn shim_nsnumber_is_equal(obj: u64, _cmd: u64, other: u64) -> u8 
         shim_nsnumber_is_equal_to_number(obj, _cmd, other)
     } else {
         // Pointer equality
-        if obj == other { 1 } else { 0 }
+        if obj == other {
+            1
+        } else {
+            0
+        }
     }
 }
 

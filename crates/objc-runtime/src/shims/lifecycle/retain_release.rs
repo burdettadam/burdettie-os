@@ -80,12 +80,7 @@ pub extern "C" fn shim_objc_set_property_nonatomic_copy(
 /// Returns the object stored at `offset` bytes into `self`.
 /// Atomic: retain+autorelease to ensure the caller gets a stable reference.
 /// Non-atomic: direct load.
-pub extern "C" fn shim_objc_get_property(
-    obj: u64,
-    _sel: u64,
-    offset: isize,
-    atomic: u8,
-) -> u64 {
+pub extern "C" fn shim_objc_get_property(obj: u64, _sel: u64, offset: isize, atomic: u8) -> u64 {
     if obj == 0 {
         return 0;
     }
@@ -118,7 +113,9 @@ pub extern "C" fn shim_objc_set_property_atomic(
     if new_value != 0 {
         shim_objc_retain(new_value);
     }
-    unsafe { *slot = new_value; }
+    unsafe {
+        *slot = new_value;
+    }
     if old != 0 {
         shim_objc_release(old);
     }
@@ -280,7 +277,10 @@ mod tests {
     fn autorelease_return_value_passthrough() {
         assert_eq!(shim_objc_autorelease_return_value(0), 0);
         // Non-zero goes through autorelease path; just verify it returns the value
-        assert_eq!(shim_objc_unsafe_claim_autoreleased_return_value(0xABC), 0xABC);
+        assert_eq!(
+            shim_objc_unsafe_claim_autoreleased_return_value(0xABC),
+            0xABC
+        );
     }
 
     #[test]
@@ -291,7 +291,10 @@ mod tests {
     #[test]
     fn unsafe_claim_passthrough() {
         assert_eq!(shim_objc_unsafe_claim_autoreleased_return_value(0), 0);
-        assert_eq!(shim_objc_unsafe_claim_autoreleased_return_value(0xDEAD), 0xDEAD);
+        assert_eq!(
+            shim_objc_unsafe_claim_autoreleased_return_value(0xDEAD),
+            0xDEAD
+        );
     }
 
     #[test]
@@ -357,7 +360,9 @@ mod tests {
     fn get_property_nonatomic_reads_slot() {
         let buf = crate::pal_alloc().calloc(1, 24) as u64;
         assert_ne!(buf, 0);
-        unsafe { *((buf as *mut u8).add(8) as *mut u64) = 0xBEEF_FACE; }
+        unsafe {
+            *((buf as *mut u8).add(8) as *mut u64) = 0xBEEF_FACE;
+        }
         let val = shim_objc_get_property(buf, 0, 8, 0);
         assert_eq!(val, 0xBEEF_FACE);
         crate::pal_alloc().free(buf as *mut u8);

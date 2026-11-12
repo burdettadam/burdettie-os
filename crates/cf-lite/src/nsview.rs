@@ -15,7 +15,7 @@
 //!
 //! Total: 80 bytes.
 
-use crate::cg_types::{CGRect, CGPoint, CGSize};
+use crate::cg_types::{CGPoint, CGRect, CGSize};
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -60,7 +60,7 @@ struct ViewLayoutPriorities {
 impl Default for ViewLayoutPriorities {
     fn default() -> Self {
         Self {
-            hugging_h: 250.0,     // NSLayoutPriorityDefaultLow
+            hugging_h: 250.0, // NSLayoutPriorityDefaultLow
             hugging_v: 250.0,
             compression_h: 750.0, // NSLayoutPriorityDefaultHigh
             compression_v: 750.0,
@@ -118,6 +118,19 @@ fn read_f64(obj: u64, offset: usize) -> f64 {
         return 0.0;
     }
     unsafe { *((obj as usize + offset) as *const f64) }
+}
+
+fn object_is_kind_of(obj: u64, class_addr: u64) -> bool {
+    if obj == 0 || class_addr == 0 {
+        return false;
+    }
+
+    let isa = read_u64(obj, 0);
+    if isa == class_addr {
+        return true;
+    }
+
+    crate::nsobj::shim_nsobject_is_kind_of_class(obj, 0, class_addr) != 0
 }
 
 fn write_f64(obj: u64, offset: usize, value: f64) {
@@ -272,6 +285,74 @@ pub(crate) fn alloc_view_with_frame(x: f64, y: f64, w: f64, h: f64) -> u64 {
     obj
 }
 
+fn add_archived_subviews(view: u64, archived_subviews: u64) {
+    if view == 0 || archived_subviews == 0 {
+        return;
+    }
+
+    let isa = read_u64(archived_subviews, 0);
+    if isa == crate::nsobj::nsarray_class_addr() || isa == crate::nsobj::nsmutablearray_class_addr()
+    {
+        let count = crate::nsarray::shim_nsarray_count(archived_subviews, 0);
+        for index in 0..count {
+            let child = crate::nsarray::shim_nsarray_object_at_index(archived_subviews, 0, index);
+            if object_is_kind_of(child, crate::nsobj::nsview_class_addr()) {
+                shim_nsview_add_subview(view, 0, child);
+            }
+        }
+        return;
+    }
+
+    if object_is_kind_of(archived_subviews, crate::nsobj::nsview_class_addr()) {
+        shim_nsview_add_subview(view, 0, archived_subviews);
+    }
+}
+
+/// `-[NSView initWithCoder:]`.
+///
+/// Compiled nibs/storyboards usually create views via keyed unarchiving.  We
+/// decode the common AppKit keys here so generic scene archives produce a real
+/// frame and child tree instead of a zeroed placeholder.
+pub extern "C" fn shim_nsview_init_with_coder(obj: u64, _cmd: u64, coder: u64) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
+
+    if let Some((x, y, w, h)) = crate::nskeyedarchiver::decode_rect_for_any_key(
+        coder,
+        &["NSFrame", "NSFrameRect", "NS.frame", "frame", "_frame"],
+    ) {
+        write_frame(obj, x, y, w, h);
+    }
+
+    if let Some(mask) = crate::nskeyedarchiver::decode_integer_for_any_key(
+        coder,
+        &[
+            "NSAutoresizingMask",
+            "NSAutoresizingMaskOptions",
+            "autoresizingMask",
+            "_autoresizingMask",
+        ],
+    ) {
+        shim_nsview_set_autoresizing_mask(obj, 0, mask.max(0) as u64);
+    }
+
+    if let Some(wants_layer) = crate::nskeyedarchiver::decode_bool_for_any_key(
+        coder,
+        &["NSWantsLayer", "wantsLayer", "_wantsLayer"],
+    ) {
+        shim_nsview_set_wants_layer(obj, 0, u8::from(wants_layer));
+    }
+
+    let subviews = crate::nskeyedarchiver::decode_object_for_any_key(
+        coder,
+        &["NSSubviews", "NS.subviews", "subviews", "_subviews"],
+    );
+    add_archived_subviews(obj, subviews);
+
+    obj
+}
+
 /// `-[NSView initWithFrame:]`
 ///
 /// If obj was already allocated by `+[CustomViewSubclass alloc]`, we must preserve
@@ -280,7 +361,10 @@ pub(crate) fn alloc_view_with_frame(x: f64, y: f64, w: f64, h: f64) -> u64 {
 pub extern "C" fn shim_nsview_init_with_frame(
     obj: u64,
     _cmd: u64,
-    x: f64, y: f64, w: f64, h: f64,
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
 ) -> u64 {
     if obj == 0 {
         // No object provided — allocate with base NSView ISA.
@@ -327,11 +411,7 @@ pub extern "C" fn shim_nsview_remove_from_superview(obj: u64, _cmd: u64) {
 }
 
 /// `-[NSView setFrame:]`
-pub extern "C" fn shim_nsview_set_frame(
-    obj: u64,
-    _cmd: u64,
-    x: f64, y: f64, w: f64, h: f64,
-) {
+pub extern "C" fn shim_nsview_set_frame(obj: u64, _cmd: u64, x: f64, y: f64, w: f64, h: f64) {
     let old_w = read_f64(obj, FRAME_W_OFF);
     let old_h = read_f64(obj, FRAME_H_OFF);
     write_frame(obj, x, y, w, h);
@@ -446,8 +526,7 @@ pub extern "C" fn shim_nsview_layer(obj: u64, _cmd: u64) -> u64 {
 fn view_layer_or_create(obj: u64) -> u64 {
     use std::collections::HashMap;
     use std::sync::Mutex;
-    static VIEW_LAYERS: std::sync::OnceLock<Mutex<HashMap<u64, u64>>> =
-        std::sync::OnceLock::new();
+    static VIEW_LAYERS: std::sync::OnceLock<Mutex<HashMap<u64, u64>>> = std::sync::OnceLock::new();
     let map = VIEW_LAYERS.get_or_init(|| Mutex::new(HashMap::new()));
     let mut guard = map.lock().unwrap_or_else(|e| e.into_inner());
     *guard.entry(obj).or_insert_with(crate::calayer::alloc_layer)
@@ -460,7 +539,9 @@ pub extern "C" fn shim_nsview_superview(obj: u64, _cmd: u64) -> u64 {
 
 /// `-[NSView frame]` — returns CGRect (32 bytes, x8 indirect return on ARM64).
 pub extern "C" fn shim_nsview_frame(obj: u64, _cmd: u64) -> CGRect {
-    if obj == 0 { return CGRect::ZERO; }
+    if obj == 0 {
+        return CGRect::ZERO;
+    }
     CGRect::new(
         read_f64(obj, FRAME_X_OFF),
         read_f64(obj, FRAME_Y_OFF),
@@ -544,8 +625,10 @@ fn view_origin_in_window(view: u64) -> (f64, f64) {
 /// Converts a point from the coordinate system of `from_view` to this view.
 /// If `from_view` is nil (0), the point is assumed to be in window coordinates.
 pub extern "C" fn shim_nsview_convert_point_from_view(
-    obj: u64, _cmd: u64,
-    px: f64, py: f64,
+    obj: u64,
+    _cmd: u64,
+    px: f64,
+    py: f64,
     from_view: u64,
 ) -> CGPoint {
     if obj == 0 {
@@ -562,7 +645,10 @@ pub extern "C" fn shim_nsview_convert_point_from_view(
 
     // Convert from window coordinates to destination (self).
     let (dx, dy) = view_origin_in_window(obj);
-    CGPoint { x: wx - dx, y: wy - dy }
+    CGPoint {
+        x: wx - dx,
+        y: wy - dy,
+    }
 }
 
 /// `-[NSView convertPoint:toView:]`
@@ -570,8 +656,10 @@ pub extern "C" fn shim_nsview_convert_point_from_view(
 /// Converts a point from this view's coordinate system to `to_view`.
 /// If `to_view` is nil (0), the point is converted to window coordinates.
 pub extern "C" fn shim_nsview_convert_point_to_view(
-    obj: u64, _cmd: u64,
-    px: f64, py: f64,
+    obj: u64,
+    _cmd: u64,
+    px: f64,
+    py: f64,
     to_view: u64,
 ) -> CGPoint {
     if obj == 0 {
@@ -586,7 +674,10 @@ pub extern "C" fn shim_nsview_convert_point_to_view(
     // Convert from window to destination view.
     if to_view != 0 {
         let (dx, dy) = view_origin_in_window(to_view);
-        CGPoint { x: wx - dx, y: wy - dy }
+        CGPoint {
+            x: wx - dx,
+            y: wy - dy,
+        }
     } else {
         CGPoint { x: wx, y: wy }
     }
@@ -594,8 +685,12 @@ pub extern "C" fn shim_nsview_convert_point_to_view(
 
 /// `-[NSView convertRect:fromView:]`
 pub extern "C" fn shim_nsview_convert_rect_from_view(
-    obj: u64, _cmd: u64,
-    rx: f64, ry: f64, rw: f64, rh: f64,
+    obj: u64,
+    _cmd: u64,
+    rx: f64,
+    ry: f64,
+    rw: f64,
+    rh: f64,
     from_view: u64,
 ) -> CGRect {
     let origin = shim_nsview_convert_point_from_view(obj, 0, rx, ry, from_view);
@@ -604,8 +699,12 @@ pub extern "C" fn shim_nsview_convert_rect_from_view(
 
 /// `-[NSView convertRect:toView:]`
 pub extern "C" fn shim_nsview_convert_rect_to_view(
-    obj: u64, _cmd: u64,
-    rx: f64, ry: f64, rw: f64, rh: f64,
+    obj: u64,
+    _cmd: u64,
+    rx: f64,
+    ry: f64,
+    rw: f64,
+    rh: f64,
     to_view: u64,
 ) -> CGRect {
     let origin = shim_nsview_convert_point_to_view(obj, 0, rx, ry, to_view);
@@ -700,48 +799,98 @@ pub extern "C" fn shim_nsview_invalidate_intrinsic_content_size(obj: u64, _cmd: 
 
 /// `-[NSView contentHuggingPriorityForOrientation:]`
 /// Orientation 0 = horizontal, 1 = vertical. Default 250 (NSLayoutPriorityDefaultLow).
-pub extern "C" fn shim_nsview_content_hugging_priority(obj: u64, _cmd: u64, orientation: u64) -> f64 {
-    if obj == 0 { return 250.0; }
+pub extern "C" fn shim_nsview_content_hugging_priority(
+    obj: u64,
+    _cmd: u64,
+    orientation: u64,
+) -> f64 {
+    if obj == 0 {
+        return 250.0;
+    }
     view_layout_priorities(obj, |p| {
-        if orientation == 1 { p.hugging_v } else { p.hugging_h }
+        if orientation == 1 {
+            p.hugging_v
+        } else {
+            p.hugging_h
+        }
     })
 }
 
 /// `-[NSView setContentHuggingPriority:forOrientation:]`
-pub extern "C" fn shim_nsview_set_content_hugging_priority(obj: u64, _cmd: u64, priority: f64, orientation: u64) {
-    if obj == 0 { return; }
+pub extern "C" fn shim_nsview_set_content_hugging_priority(
+    obj: u64,
+    _cmd: u64,
+    priority: f64,
+    orientation: u64,
+) {
+    if obj == 0 {
+        return;
+    }
     view_layout_priorities_mut(obj, |p| {
-        if orientation == 1 { p.hugging_v = priority; } else { p.hugging_h = priority; }
+        if orientation == 1 {
+            p.hugging_v = priority;
+        } else {
+            p.hugging_h = priority;
+        }
     });
 }
 
 /// `-[NSView contentCompressionResistancePriorityForOrientation:]`
 /// Default 750 (NSLayoutPriorityDefaultHigh).
-pub extern "C" fn shim_nsview_content_compression_resistance_priority(obj: u64, _cmd: u64, orientation: u64) -> f64 {
-    if obj == 0 { return 750.0; }
+pub extern "C" fn shim_nsview_content_compression_resistance_priority(
+    obj: u64,
+    _cmd: u64,
+    orientation: u64,
+) -> f64 {
+    if obj == 0 {
+        return 750.0;
+    }
     view_layout_priorities(obj, |p| {
-        if orientation == 1 { p.compression_v } else { p.compression_h }
+        if orientation == 1 {
+            p.compression_v
+        } else {
+            p.compression_h
+        }
     })
 }
 
 /// `-[NSView setContentCompressionResistancePriority:forOrientation:]`
-pub extern "C" fn shim_nsview_set_content_compression_resistance_priority(obj: u64, _cmd: u64, priority: f64, orientation: u64) {
-    if obj == 0 { return; }
+pub extern "C" fn shim_nsview_set_content_compression_resistance_priority(
+    obj: u64,
+    _cmd: u64,
+    priority: f64,
+    orientation: u64,
+) {
+    if obj == 0 {
+        return;
+    }
     view_layout_priorities_mut(obj, |p| {
-        if orientation == 1 { p.compression_v = priority; } else { p.compression_h = priority; }
+        if orientation == 1 {
+            p.compression_v = priority;
+        } else {
+            p.compression_h = priority;
+        }
     });
 }
 
 /// `-[NSView fittingSize]` — returns intrinsic content size (or 0,0 if no intrinsic).
 pub extern "C" fn shim_nsview_fitting_size_w(obj: u64, _cmd: u64) -> f64 {
     let w = shim_nsview_intrinsic_content_size_w(obj, 0);
-    if w < 0.0 { 0.0 } else { w }
+    if w < 0.0 {
+        0.0
+    } else {
+        w
+    }
 }
 
 /// Second half of fittingSize (height).
 pub extern "C" fn shim_nsview_fitting_size_h(obj: u64, _cmd: u64) -> f64 {
     let h = shim_nsview_intrinsic_content_size_h(obj, 0);
-    if h < 0.0 { 0.0 } else { h }
+    if h < 0.0 {
+        0.0
+    } else {
+        h
+    }
 }
 
 // ── Safe area / layout margins ──────────────────────────────────
@@ -765,7 +914,9 @@ fn get_or_create_guides(view: u64) -> (u64, u64) {
 ///
 /// On macOS there is no notch/status bar, so the safe area equals the view bounds.
 pub extern "C" fn shim_nsview_safe_area_layout_guide(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     get_or_create_guides(obj).0
 }
 
@@ -773,41 +924,63 @@ pub extern "C" fn shim_nsview_safe_area_layout_guide(obj: u64, _cmd: u64) -> u64
 ///
 /// Returns an NSLayoutGuide inset by `layoutMargins` (default 8pt on all sides).
 pub extern "C" fn shim_nsview_layout_margins_guide(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     get_or_create_guides(obj).1
 }
 
 /// `-[NSView safeAreaInsets]` — returns (0,0,0,0) on macOS (no notch).
 /// We return the top inset; companion shims below return the other edges.
-pub extern "C" fn shim_nsview_safe_area_insets_top(_obj: u64, _cmd: u64) -> f64 { 0.0 }
+pub extern "C" fn shim_nsview_safe_area_insets_top(_obj: u64, _cmd: u64) -> f64 {
+    0.0
+}
 /// Safe area inset — left.
-pub extern "C" fn shim_nsview_safe_area_insets_left(_obj: u64, _cmd: u64) -> f64 { 0.0 }
+pub extern "C" fn shim_nsview_safe_area_insets_left(_obj: u64, _cmd: u64) -> f64 {
+    0.0
+}
 /// Safe area inset — bottom.
-pub extern "C" fn shim_nsview_safe_area_insets_bottom(_obj: u64, _cmd: u64) -> f64 { 0.0 }
+pub extern "C" fn shim_nsview_safe_area_insets_bottom(_obj: u64, _cmd: u64) -> f64 {
+    0.0
+}
 /// Safe area inset — right.
-pub extern "C" fn shim_nsview_safe_area_insets_right(_obj: u64, _cmd: u64) -> f64 { 0.0 }
+pub extern "C" fn shim_nsview_safe_area_insets_right(_obj: u64, _cmd: u64) -> f64 {
+    0.0
+}
 
 /// Default layout margin (8pt on each side, matching AppKit defaults).
 const DEFAULT_LAYOUT_MARGIN: f64 = 8.0;
 
 /// `-[NSView layoutMargins]` — returns default 8pt edges (top).
-pub extern "C" fn shim_nsview_layout_margins_top(_obj: u64, _cmd: u64) -> f64 { DEFAULT_LAYOUT_MARGIN }
+pub extern "C" fn shim_nsview_layout_margins_top(_obj: u64, _cmd: u64) -> f64 {
+    DEFAULT_LAYOUT_MARGIN
+}
 /// Layout margins — left.
-pub extern "C" fn shim_nsview_layout_margins_left(_obj: u64, _cmd: u64) -> f64 { DEFAULT_LAYOUT_MARGIN }
+pub extern "C" fn shim_nsview_layout_margins_left(_obj: u64, _cmd: u64) -> f64 {
+    DEFAULT_LAYOUT_MARGIN
+}
 /// Layout margins — bottom.
-pub extern "C" fn shim_nsview_layout_margins_bottom(_obj: u64, _cmd: u64) -> f64 { DEFAULT_LAYOUT_MARGIN }
+pub extern "C" fn shim_nsview_layout_margins_bottom(_obj: u64, _cmd: u64) -> f64 {
+    DEFAULT_LAYOUT_MARGIN
+}
 /// Layout margins — right.
-pub extern "C" fn shim_nsview_layout_margins_right(_obj: u64, _cmd: u64) -> f64 { DEFAULT_LAYOUT_MARGIN }
+pub extern "C" fn shim_nsview_layout_margins_right(_obj: u64, _cmd: u64) -> f64 {
+    DEFAULT_LAYOUT_MARGIN
+}
 
 /// `-[NSView addLayoutGuide:]`
 pub extern "C" fn shim_nsview_add_layout_guide(obj: u64, _cmd: u64, guide: u64) {
-    if obj == 0 || guide == 0 { return; }
+    if obj == 0 || guide == 0 {
+        return;
+    }
     crate::nslayoutguide::shim_nslayoutguide_set_owning_view(guide, 0, obj);
 }
 
 /// `-[NSView removeLayoutGuide:]`
 pub extern "C" fn shim_nsview_remove_layout_guide(_obj: u64, _cmd: u64, guide: u64) {
-    if guide == 0 { return; }
+    if guide == 0 {
+        return;
+    }
     crate::nslayoutguide::shim_nslayoutguide_set_owning_view(guide, 0, 0);
 }
 
@@ -821,22 +994,30 @@ pub extern "C" fn shim_nsview_remove_layout_guide(_obj: u64, _cmd: u64, guide: u
 /// 4. Recursively displays all subviews.
 /// 5. Pops the graphics context.
 pub extern "C" fn shim_nsview_display(obj: u64, _cmd: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let w = read_f64(obj, FRAME_W_OFF);
     let h = read_f64(obj, FRAME_H_OFF);
-    if w <= 0.0 || h <= 0.0 { return; }
+    if w <= 0.0 || h <= 0.0 {
+        return;
+    }
 
     // Find or create a per-window CGContext.
     let window = read_u64(obj, WINDOW_OFF);
     let cg_ctx = crate::nswindow::get_or_create_window_cg_context(window);
-    if cg_ctx == 0 { return; }
+    if cg_ctx == 0 {
+        return;
+    }
 
     display_view_recursive(obj, cg_ctx);
 }
 
 /// Recursively display a view tree into the given CGContext.
 pub(crate) fn display_view_recursive(view: u64, cg_ctx: u64) {
-    if view == 0 || cg_ctx == 0 { return; }
+    if view == 0 || cg_ctx == 0 {
+        return;
+    }
 
     // Run the auto-layout pass before drawing, so constraint-solved frames
     // are applied to views before they paint.
@@ -876,7 +1057,8 @@ pub(crate) fn display_view_recursive(view: u64, cg_ctx: u64) {
             cg_shims::bridge::with_context(offscreen_ctx, |c| {
                 let color = cg_shims::bridge::color_get(bg_color);
                 if let Some(col) = color {
-                    c.surface.clear(graphics_core::Color::new(col.r, col.g, col.b, col.a));
+                    c.surface
+                        .clear(graphics_core::Color::new(col.r, col.g, col.b, col.a));
                 }
             });
         }
@@ -887,8 +1069,13 @@ pub(crate) fn display_view_recursive(view: u64, cg_ctx: u64) {
                 let sw = c.surface.width();
                 let sh = c.surface.height();
                 crate::layer_compositor::render_layer_contents(
-                    c.surface.pixels_mut(), sw, sh,
-                    0, 0, vw, vh,
+                    c.surface.pixels_mut(),
+                    sw,
+                    sh,
+                    0,
+                    0,
+                    vw,
+                    vh,
                     props.contents,
                 );
             });
@@ -905,9 +1092,8 @@ pub(crate) fn display_view_recursive(view: u64, cg_ctx: u64) {
         crate::nsgraphicscontext::pop_current_context(prev_ctx);
 
         // Extract the offscreen pixels and composite them onto the window surface.
-        let offscreen_pixels: Option<Vec<u32>> = cg_shims::bridge::with_context(offscreen_ctx, |c| {
-            c.surface.pixels().to_vec()
-        });
+        let offscreen_pixels: Option<Vec<u32>> =
+            cg_shims::bridge::with_context(offscreen_ctx, |c| c.surface.pixels().to_vec());
 
         if let Some(src_pixels) = offscreen_pixels {
             // Get the window surface pixels and composite the offscreen result.
@@ -916,9 +1102,14 @@ pub(crate) fn display_view_recursive(view: u64, cg_ctx: u64) {
                 let dst_h = c.surface.height();
                 #[allow(clippy::cast_possible_truncation)]
                 crate::layer_compositor::composite_layer(
-                    &src_pixels, vw, vh,
-                    c.surface.pixels_mut(), dst_w, dst_h,
-                    x as i32, y as i32,
+                    &src_pixels,
+                    vw,
+                    vh,
+                    c.surface.pixels_mut(),
+                    dst_w,
+                    dst_h,
+                    x as i32,
+                    y as i32,
                     &props,
                 );
             });
@@ -937,10 +1128,15 @@ pub(crate) fn display_view_recursive(view: u64, cg_ctx: u64) {
                     let dst_h = c.surface.height();
                     #[allow(clippy::cast_possible_truncation)]
                     crate::layer_compositor::draw_layer_background(
-                        c.surface.pixels_mut(), dst_w, dst_h,
-                        x as i32, y as i32,
-                        w.max(0.0) as u32, h.max(0.0) as u32,
-                        bg_color, &props,
+                        c.surface.pixels_mut(),
+                        dst_w,
+                        dst_h,
+                        x as i32,
+                        y as i32,
+                        w.max(0.0) as u32,
+                        h.max(0.0) as u32,
+                        bg_color,
+                        &props,
                     );
                 });
             }
@@ -952,9 +1148,13 @@ pub(crate) fn display_view_recursive(view: u64, cg_ctx: u64) {
                     let dst_h = c.surface.height();
                     #[allow(clippy::cast_possible_truncation)]
                     crate::layer_compositor::render_layer_contents(
-                        c.surface.pixels_mut(), dst_w, dst_h,
-                        x as i32, y as i32,
-                        w.max(0.0) as u32, h.max(0.0) as u32,
+                        c.surface.pixels_mut(),
+                        dst_w,
+                        dst_h,
+                        x as i32,
+                        y as i32,
+                        w.max(0.0) as u32,
+                        h.max(0.0) as u32,
                         props.contents,
                     );
                 });
@@ -997,19 +1197,22 @@ fn call_draw_rect(view: u64, x: f64, y: f64, w: f64, h: f64) {
     });
 
     let imp = unsafe { objc_msg_lookup_imp(view, sel) };
-    if imp == 0 { return; }
+    if imp == 0 {
+        return;
+    }
 
     // drawRect: takes (self, _cmd, CGRect{x,y,w,h}) — on ARM64 CGRect is passed
     // as 4 f64 args in d0-d3 (or x2-x5 on stack for the Apple variadic ABI).
     // Since our shim and guest code both use the same ABI, we call directly with 4 f64s.
-    let f: extern "C" fn(u64, u64, f64, f64, f64, f64) =
-        unsafe { std::mem::transmute(imp) };
+    let f: extern "C" fn(u64, u64, f64, f64, f64, f64) = unsafe { std::mem::transmute(imp) };
     f(view, sel, x, y, w, h);
 }
 
 /// `-[NSView displayIfNeeded]` — display only if needsDisplay is set.
 pub extern "C" fn shim_nsview_display_if_needed(obj: u64, _cmd: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     if read_u64(obj, FLAGS_OFF) & FLAG_NEEDS_DISPLAY != 0 {
         shim_nsview_display(obj, _cmd);
     }
@@ -1017,7 +1220,9 @@ pub extern "C" fn shim_nsview_display_if_needed(obj: u64, _cmd: u64) {
 
 /// `-[NSView lockFocus]` — push a drawing context for this view.
 pub extern "C" fn shim_nsview_lock_focus(obj: u64, _cmd: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let window = read_u64(obj, WINDOW_OFF);
     let cg_ctx = crate::nswindow::get_or_create_window_cg_context(window);
     if cg_ctx != 0 {
@@ -1034,15 +1239,19 @@ pub extern "C" fn shim_nsview_unlock_focus(_obj: u64, _cmd: u64) {
 
 /// `-[NSView autoresizingMask]` — returns the 6-bit mask (NSAutoresizingMaskOptions).
 pub extern "C" fn shim_nsview_autoresizing_mask(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     (read_u64(obj, FLAGS_OFF) & AUTORESIZE_MASK_BITS) >> AUTORESIZE_SHIFT
 }
 
 /// `-[NSView setAutoresizingMask:]`
 pub extern "C" fn shim_nsview_set_autoresizing_mask(obj: u64, _cmd: u64, mask: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     let mut flags = read_u64(obj, FLAGS_OFF);
-    flags &= !AUTORESIZE_MASK_BITS;          // clear old mask
+    flags &= !AUTORESIZE_MASK_BITS; // clear old mask
     flags |= (mask & 0x3F) << AUTORESIZE_SHIFT; // set new
     write_u64(obj, FLAGS_OFF, flags);
 }
@@ -1052,16 +1261,22 @@ pub extern "C" fn shim_nsview_set_autoresizing_mask(obj: u64, _cmd: u64, mask: u
 ///
 /// Called from `resizeSubviewsWithOldSize:`.
 pub(crate) fn apply_autoresizing(parent: u64, old_w: f64, old_h: f64) {
-    if parent == 0 { return; }
+    if parent == 0 {
+        return;
+    }
     let new_w = read_f64(parent, FRAME_W_OFF);
     let new_h = read_f64(parent, FRAME_H_OFF);
     let dw = new_w - old_w;
     let dh = new_h - old_h;
-    if dw == 0.0 && dh == 0.0 { return; }
+    if dw == 0.0 && dh == 0.0 {
+        return;
+    }
 
     for child in snapshot_subviews(parent) {
         let mask = shim_nsview_autoresizing_mask(child, 0);
-        if mask == 0 { continue; }
+        if mask == 0 {
+            continue;
+        }
 
         let cx = read_f64(child, FRAME_X_OFF);
         let cy = read_f64(child, FRAME_Y_OFF);
@@ -1069,7 +1284,7 @@ pub(crate) fn apply_autoresizing(parent: u64, old_w: f64, old_h: f64) {
         let ch = read_f64(child, FRAME_H_OFF);
 
         // Horizontal: MinXMargin(1), WidthSizable(2), MaxXMargin(4)
-        let flex_left  = mask & 1 != 0;
+        let flex_left = mask & 1 != 0;
         let flex_width = mask & 2 != 0;
         let flex_right = mask & 4 != 0;
         let h_flex_count = u32::from(flex_left) + u32::from(flex_width) + u32::from(flex_right);
@@ -1085,7 +1300,7 @@ pub(crate) fn apply_autoresizing(parent: u64, old_w: f64, old_h: f64) {
         // Vertical: MinYMargin(8), HeightSizable(16), MaxYMargin(32)
         let flex_bottom = mask & 8 != 0;
         let flex_height = mask & 16 != 0;
-        let flex_top    = mask & 32 != 0;
+        let flex_top = mask & 32 != 0;
         let v_flex_count = u32::from(flex_bottom) + u32::from(flex_height) + u32::from(flex_top);
         let (ny, nh) = if v_flex_count == 0 {
             (cy, ch)
@@ -1102,7 +1317,10 @@ pub(crate) fn apply_autoresizing(parent: u64, old_w: f64, old_h: f64) {
 
 /// `-[NSView resizeSubviewsWithOldSize:]`
 pub extern "C" fn shim_nsview_resize_subviews_with_old_size(
-    obj: u64, _cmd: u64, old_w: f64, old_h: f64,
+    obj: u64,
+    _cmd: u64,
+    old_w: f64,
+    old_h: f64,
 ) {
     apply_autoresizing(obj, old_w, old_h);
 }
@@ -1123,13 +1341,17 @@ where
 
 /// `-[NSView nextKeyView]`
 pub extern "C" fn shim_nsview_next_key_view(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     with_key_view_map(|m| m.get(&obj).copied().unwrap_or(0))
 }
 
 /// `-[NSView setNextKeyView:]`
 pub extern "C" fn shim_nsview_set_next_key_view(obj: u64, _cmd: u64, next: u64) {
-    if obj == 0 { return; }
+    if obj == 0 {
+        return;
+    }
     with_key_view_map(|m| {
         if next == 0 {
             m.remove(&obj);
@@ -1141,7 +1363,9 @@ pub extern "C" fn shim_nsview_set_next_key_view(obj: u64, _cmd: u64, next: u64) 
 
 /// `-[NSView previousKeyView]` — walks all views looking for one whose nextKeyView == self.
 pub extern "C" fn shim_nsview_previous_key_view(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     with_key_view_map(|m| {
         for (&view, &next) in m.iter() {
             if next == obj {
@@ -1155,7 +1379,9 @@ pub extern "C" fn shim_nsview_previous_key_view(obj: u64, _cmd: u64) -> u64 {
 /// `-[NSView nextValidKeyView]` — walks the nextKeyView chain to find one that accepts
 /// first responder (any non-nil nextKeyView is assumed valid for now).
 pub extern "C" fn shim_nsview_next_valid_key_view(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let cursor = shim_nsview_next_key_view(obj, 0);
     let start = obj;
     while cursor != 0 && cursor != start {
@@ -1197,6 +1423,37 @@ mod tests {
 
     fn make_view() -> u64 {
         alloc_obj(SIZE, isa())
+    }
+
+    fn make_coder() -> u64 {
+        crate::nskeyedarchiver::shim_nskeyedarchiver_alloc(0, 0)
+    }
+
+    fn encode_object(coder: u64, key: &str, value: u64) {
+        crate::nskeyedarchiver::shim_nskeyedarchiver_encode_object_for_key(
+            coder,
+            0,
+            value,
+            make_string(key),
+        );
+    }
+
+    fn encode_integer(coder: u64, key: &str, value: i64) {
+        crate::nskeyedarchiver::shim_nskeyedarchiver_encode_integer_for_key(
+            coder,
+            0,
+            value,
+            make_string(key),
+        );
+    }
+
+    fn encode_bool(coder: u64, key: &str, value: bool) {
+        crate::nskeyedarchiver::shim_nskeyedarchiver_encode_bool_for_key(
+            coder,
+            0,
+            u8::from(value),
+            make_string(key),
+        );
     }
 
     // ── shim_nsview_init_with_frame ──────────────────────────────
@@ -1243,6 +1500,33 @@ mod tests {
     // ── shim_nsview_add_subview ──────────────────────────────────
 
     #[test]
+    fn init_with_coder_decodes_frame_subviews_and_flags() {
+        let obj = make_view();
+        let child = alloc_view_with_frame(1.0, 2.0, 30.0, 40.0);
+        let subviews = crate::nsarray::make_nsarray(&[child]);
+        let coder = make_coder();
+
+        encode_object(coder, "NSFrame", make_string("{{10, 20}, {300, 400}}"));
+        encode_object(coder, "NSSubviews", subviews);
+        encode_integer(coder, "NSAutoresizingMask", 18);
+        encode_bool(coder, "NSWantsLayer", true);
+
+        assert_eq!(shim_nsview_init_with_coder(obj, 0, coder), obj);
+        assert_eq!(read_f64(obj, FRAME_X_OFF), 10.0);
+        assert_eq!(read_f64(obj, FRAME_Y_OFF), 20.0);
+        assert_eq!(read_f64(obj, FRAME_W_OFF), 300.0);
+        assert_eq!(read_f64(obj, FRAME_H_OFF), 400.0);
+        assert_eq!(read_field(obj, SUBVIEW_COUNT_OFF), 1);
+        assert_eq!(child_at(obj, 0), child);
+        assert_eq!(read_field(child, SUPERVIEW_OFF), obj);
+        assert_eq!(shim_nsview_autoresizing_mask(obj, 0), 18);
+        assert_eq!(shim_nsview_wants_layer(obj, 0), 1);
+
+        free_obj(child);
+        free_obj(obj);
+    }
+
+    #[test]
     fn add_subview_nil_obj() {
         // Should not crash with nil receiver
         shim_nsview_add_subview(0, 0, 0);
@@ -1260,7 +1544,10 @@ mod tests {
         assert_eq!(child_at(obj, 0), sub);
         let subviews = shim_nsview_subviews(obj, 0);
         assert_eq!(crate::nsarray::shim_nsarray_count(subviews, 0), 1);
-        assert_eq!(crate::nsarray::shim_nsarray_object_at_index(subviews, 0, 0), sub);
+        assert_eq!(
+            crate::nsarray::shim_nsarray_object_at_index(subviews, 0, 0),
+            sub
+        );
         free_obj(sub);
         free_obj(obj);
     }
@@ -1612,8 +1899,14 @@ mod tests {
     #[test]
     fn intrinsic_content_size_default_no_metric() {
         let view = make_view();
-        assert!((shim_nsview_intrinsic_content_size_w(view, 0) - NO_INTRINSIC_METRIC).abs() < f64::EPSILON);
-        assert!((shim_nsview_intrinsic_content_size_h(view, 0) - NO_INTRINSIC_METRIC).abs() < f64::EPSILON);
+        assert!(
+            (shim_nsview_intrinsic_content_size_w(view, 0) - NO_INTRINSIC_METRIC).abs()
+                < f64::EPSILON
+        );
+        assert!(
+            (shim_nsview_intrinsic_content_size_h(view, 0) - NO_INTRINSIC_METRIC).abs()
+                < f64::EPSILON
+        );
         free_obj(view);
     }
 
@@ -1628,7 +1921,10 @@ mod tests {
     #[test]
     fn compression_resistance_default_high() {
         let view = make_view();
-        assert!((shim_nsview_content_compression_resistance_priority(view, 0, 0) - 750.0).abs() < f64::EPSILON);
+        assert!(
+            (shim_nsview_content_compression_resistance_priority(view, 0, 0) - 750.0).abs()
+                < f64::EPSILON
+        );
         free_obj(view);
     }
 
@@ -1651,7 +1947,9 @@ mod tests {
 
     #[test]
     fn intrinsic_nil_safety() {
-        assert!((shim_nsview_intrinsic_content_size_w(0, 0) - NO_INTRINSIC_METRIC).abs() < f64::EPSILON);
+        assert!(
+            (shim_nsview_intrinsic_content_size_w(0, 0) - NO_INTRINSIC_METRIC).abs() < f64::EPSILON
+        );
         shim_nsview_invalidate_intrinsic_content_size(0, 0);
         shim_nsview_set_content_hugging_priority(0, 0, 500.0, 0);
         shim_nsview_set_content_compression_resistance_priority(0, 0, 500.0, 0);
@@ -1675,8 +1973,14 @@ mod tests {
         let view = make_view();
         shim_nsview_set_content_compression_resistance_priority(view, 0, 900.0, 0);
         shim_nsview_set_content_compression_resistance_priority(view, 0, 800.0, 1);
-        assert!((shim_nsview_content_compression_resistance_priority(view, 0, 0) - 900.0).abs() < f64::EPSILON);
-        assert!((shim_nsview_content_compression_resistance_priority(view, 0, 1) - 800.0).abs() < f64::EPSILON);
+        assert!(
+            (shim_nsview_content_compression_resistance_priority(view, 0, 0) - 900.0).abs()
+                < f64::EPSILON
+        );
+        assert!(
+            (shim_nsview_content_compression_resistance_priority(view, 0, 1) - 800.0).abs()
+                < f64::EPSILON
+        );
         free_obj(view);
         reset_layout_priority_state();
     }
@@ -1758,7 +2062,10 @@ mod tests {
         let view = make_view();
         let guide = crate::nslayoutguide::make_layout_guide(0);
         shim_nsview_add_layout_guide(view, 0, guide);
-        assert_eq!(crate::nslayoutguide::shim_nslayoutguide_owning_view(guide, 0), view);
+        assert_eq!(
+            crate::nslayoutguide::shim_nslayoutguide_owning_view(guide, 0),
+            view
+        );
         free_obj(guide);
         free_obj(view);
     }
@@ -1768,7 +2075,10 @@ mod tests {
         let view = make_view();
         let guide = crate::nslayoutguide::make_layout_guide(view);
         shim_nsview_remove_layout_guide(view, 0, guide);
-        assert_eq!(crate::nslayoutguide::shim_nslayoutguide_owning_view(guide, 0), 0);
+        assert_eq!(
+            crate::nslayoutguide::shim_nslayoutguide_owning_view(guide, 0),
+            0
+        );
         free_obj(guide);
         free_obj(view);
     }

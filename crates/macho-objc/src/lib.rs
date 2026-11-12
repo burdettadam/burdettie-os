@@ -5,8 +5,8 @@ pub use types::*;
 
 use macho_parse::ParsedMachO;
 use parse::{
-    parse_catlist, parse_function_pointer_array, parse_image_info,
-    parse_init_offsets, parse_pointer_list, parse_protolist, parse_selrefs,
+    parse_catlist, parse_function_pointer_array, parse_image_info, parse_init_offsets,
+    parse_pointer_list, parse_protolist, parse_selrefs,
 };
 use types::OBJC_SECTIONS;
 

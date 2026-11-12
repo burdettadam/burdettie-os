@@ -8,8 +8,8 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use icu_datetime::DateTimeFormatter;
 use icu_datetime::fieldsets;
+use icu_datetime::DateTimeFormatter;
 use icu_locale::locale;
 use libsystem_shims::register_shims;
 use libsystem_shims::table::ShimTable;
@@ -57,11 +57,28 @@ fn make_formatter() -> Option<DateTimeFormatter<fieldsets::YMDT>> {
 // ── Registration ───────────────────────────────────────────────
 
 pub fn install(table: &mut ShimTable) {
-    register_shims!(table,
-        ("_udat_open", shim_udat_open as *const () as u64, "udat_open (icu4x → real date formatter)"),
-        ("_udat_close", shim_udat_close as *const () as u64, "udat_close (icu4x)"),
-        ("_udat_format", shim_udat_format as *const () as u64, "udat_format (icu4x → real formatting)"),
-        ("_udat_parse", shim_udat_parse as *const () as u64, "udat_parse (ISO 8601 + ICU medium format parser)")
+    register_shims!(
+        table,
+        (
+            "_udat_open",
+            shim_udat_open as *const () as u64,
+            "udat_open (icu4x → real date formatter)"
+        ),
+        (
+            "_udat_close",
+            shim_udat_close as *const () as u64,
+            "udat_close (icu4x)"
+        ),
+        (
+            "_udat_format",
+            shim_udat_format as *const () as u64,
+            "udat_format (icu4x → real formatting)"
+        ),
+        (
+            "_udat_parse",
+            shim_udat_parse as *const () as u64,
+            "udat_parse (ISO 8601 + ICU medium format parser)"
+        )
     );
 }
 
@@ -82,13 +99,20 @@ pub extern "C" fn shim_udat_open(
     status: *mut i32,
 ) -> u64 {
     let handle = NEXT_HANDLE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    with_table(|t| t.insert(handle, FormatterConfig {
-        _time_style: time_style,
-        _date_style: date_style,
-    }));
+    with_table(|t| {
+        t.insert(
+            handle,
+            FormatterConfig {
+                _time_style: time_style,
+                _date_style: date_style,
+            },
+        )
+    });
 
     if !status.is_null() {
-        unsafe { *status = U_ZERO_ERROR; }
+        unsafe {
+            *status = U_ZERO_ERROR;
+        }
     }
     handle
 }
@@ -111,7 +135,9 @@ pub extern "C" fn shim_udat_format(
     status: *mut i32,
 ) -> i32 {
     if !status.is_null() {
-        unsafe { *status = U_ZERO_ERROR; }
+        unsafe {
+            *status = U_ZERO_ERROR;
+        }
     }
 
     // Convert milliseconds-since-epoch to a readable date string
@@ -158,7 +184,9 @@ pub extern "C" fn shim_udat_format(
     }
 
     #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
-    { utf16.len() as i32 }
+    {
+        utf16.len() as i32
+    }
 }
 
 /// `udat_parse(fmt, text, textLength, parsePos, status) → UDate`
@@ -177,7 +205,9 @@ pub extern "C" fn shim_udat_parse(
     status: *mut i32,
 ) -> f64 {
     if !status.is_null() {
-        unsafe { *status = U_ZERO_ERROR; }
+        unsafe {
+            *status = U_ZERO_ERROR;
+        }
     }
 
     let s = read_utf16(text, text_len);
@@ -313,10 +343,18 @@ fn parse_ymd(s: &str) -> Option<f64> {
 /// Month name abbreviations for ICU medium format parsing.
 fn month_from_abbrev(s: &str) -> Option<u32> {
     match s {
-        "Jan" => Some(1), "Feb" => Some(2), "Mar" => Some(3),
-        "Apr" => Some(4), "May" => Some(5), "Jun" => Some(6),
-        "Jul" => Some(7), "Aug" => Some(8), "Sep" => Some(9),
-        "Oct" => Some(10), "Nov" => Some(11), "Dec" => Some(12),
+        "Jan" => Some(1),
+        "Feb" => Some(2),
+        "Mar" => Some(3),
+        "Apr" => Some(4),
+        "May" => Some(5),
+        "Jun" => Some(6),
+        "Jul" => Some(7),
+        "Aug" => Some(8),
+        "Sep" => Some(9),
+        "Oct" => Some(10),
+        "Nov" => Some(11),
+        "Dec" => Some(12),
         _ => None,
     }
 }
@@ -324,7 +362,8 @@ fn month_from_abbrev(s: &str) -> Option<u32> {
 /// Parse ICU medium format like "Jan 15, 2024, 10:30:00 AM" or "Jan 1, 2024".
 fn parse_icu_medium(s: &str) -> Option<f64> {
     // Split on whitespace and commas for flexible parsing.
-    let tokens: Vec<&str> = s.split(|c: char| c == ',' || c.is_whitespace())
+    let tokens: Vec<&str> = s
+        .split(|c: char| c == ',' || c.is_whitespace())
         .map(|t| t.trim())
         .filter(|t| !t.is_empty())
         .collect();
@@ -334,7 +373,9 @@ fn parse_icu_medium(s: &str) -> Option<f64> {
     }
 
     // Find month abbreviation
-    let (month, month_idx) = tokens.iter().enumerate()
+    let (month, month_idx) = tokens
+        .iter()
+        .enumerate()
         .find_map(|(i, t)| month_from_abbrev(t).map(|m| (m, i)))?;
 
     // Day and year should be adjacent to month
@@ -350,8 +391,14 @@ fn parse_icu_medium(s: &str) -> Option<f64> {
             // Check for AM/PM
             let (h, _, _) = if let Some(ampm) = tokens.get(month_idx + 4) {
                 match ampm.to_uppercase().as_str() {
-                    "AM" => { let h = if h == 12 { 0 } else { h }; (h, m, sec) }
-                    "PM" => { let h = if h == 12 { 12 } else { h + 12 }; (h, m, sec) }
+                    "AM" => {
+                        let h = if h == 12 { 0 } else { h };
+                        (h, m, sec)
+                    }
+                    "PM" => {
+                        let h = if h == 12 { 12 } else { h + 12 };
+                        (h, m, sec)
+                    }
                     _ => (h, m, sec),
                 }
             } else {
@@ -375,8 +422,16 @@ fn parse_icu_medium(s: &str) -> Option<f64> {
 /// Convert year/month/day/hour/minute/second to milliseconds since Unix epoch (UTC).
 fn ymd_hms_to_ms(year: i32, month: u32, day: u32, hour: u32, min: u32, sec: u32) -> f64 {
     // Reverse of days_to_ymd using the Hinnant algorithm.
-    let y = if month <= 2 { year as i64 - 1 } else { year as i64 };
-    let m = if month <= 2 { month as i64 + 9 } else { month as i64 - 3 };
+    let y = if month <= 2 {
+        year as i64 - 1
+    } else {
+        year as i64
+    };
+    let m = if month <= 2 {
+        month as i64 + 9
+    } else {
+        month as i64 - 3
+    };
     let era = if y >= 0 { y } else { y - 399 } / 400;
     let yoe = (y - era * 400) as u64;
     let doy = (153 * m as u64 + 2) / 5 + day as u64 - 1;
@@ -434,7 +489,10 @@ mod tests {
 
         let text = String::from_utf16_lossy(&buf[..len as usize]);
         // Should contain "1970" (epoch year) and "Jan" or "January" or "1"
-        assert!(text.contains("1970"), "formatted epoch should mention 1970: {text}");
+        assert!(
+            text.contains("1970"),
+            "formatted epoch should mention 1970: {text}"
+        );
 
         shim_udat_close(h);
     }

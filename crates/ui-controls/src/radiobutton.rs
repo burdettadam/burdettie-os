@@ -168,7 +168,12 @@ impl RadioButton {
         };
         let text_x = frame.x + radius * 2.0 + 8.0;
         let text_y = frame.y + (frame.height - self.font.size) / 2.0;
-        renderer.draw_text(&self.title, Point::new(text_x, text_y), &self.font, text_color);
+        renderer.draw_text(
+            &self.title,
+            Point::new(text_x, text_y),
+            &self.font,
+            text_color,
+        );
     }
 }
 

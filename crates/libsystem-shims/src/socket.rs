@@ -56,13 +56,13 @@ impl DarwinMsghdr {
     unsafe fn read_from(ptr: u64) -> Self {
         let base = ptr as *const u8;
         Self {
-            msg_name:       unsafe { *(base.add(0) as *const *mut libc::c_void) },
-            msg_namelen:    unsafe { *(base.add(8) as *const u32) },
-            msg_iov:        unsafe { *(base.add(16) as *const *mut libc::iovec) },
-            msg_iovlen:     unsafe { *(base.add(24) as *const i32) },
-            msg_control:    unsafe { *(base.add(32) as *const *mut libc::c_void) },
+            msg_name: unsafe { *(base.add(0) as *const *mut libc::c_void) },
+            msg_namelen: unsafe { *(base.add(8) as *const u32) },
+            msg_iov: unsafe { *(base.add(16) as *const *mut libc::iovec) },
+            msg_iovlen: unsafe { *(base.add(24) as *const i32) },
+            msg_control: unsafe { *(base.add(32) as *const *mut libc::c_void) },
             msg_controllen: unsafe { *(base.add(40) as *const u32) },
-            msg_flags:      unsafe { *(base.add(44) as *const i32) },
+            msg_flags: unsafe { *(base.add(44) as *const i32) },
         }
     }
 
@@ -123,10 +123,10 @@ fn translate_af(darwin_af: i32) -> Option<i32> {
 fn linux_af_to_darwin(linux_af: u16) -> (u8, u8) {
     // Returns (sa_len, darwin_sa_family).
     match linux_af as i32 {
-        libc::AF_INET => (16, DARWIN_AF_INET as u8),    // sockaddr_in = 16 bytes
-        libc::AF_INET6 => (28, DARWIN_AF_INET6 as u8),  // sockaddr_in6 = 28 bytes
-        libc::AF_UNIX => (106, DARWIN_AF_UNIX as u8),    // sockaddr_un ~106 bytes
-        _ => (0, linux_af as u8),                         // unknown — pass through
+        libc::AF_INET => (16, DARWIN_AF_INET as u8), // sockaddr_in = 16 bytes
+        libc::AF_INET6 => (28, DARWIN_AF_INET6 as u8), // sockaddr_in6 = 28 bytes
+        libc::AF_UNIX => (106, DARWIN_AF_UNIX as u8), // sockaddr_un ~106 bytes
+        _ => (0, linux_af as u8),                    // unknown — pass through
     }
 }
 
@@ -162,9 +162,9 @@ fn translate_sockaddr_linux_to_darwin(buf: *mut u8, len: u32) {
 /// Returns the new macOS-layout total controllen.
 #[cfg(target_os = "linux")]
 fn translate_cmsg_linux_to_darwin(buf: *mut u8, total_len: usize) -> u32 {
-    const LINUX_CMSG_HDR: usize = 16;  // sizeof(struct cmsghdr) on Linux arm64
+    const LINUX_CMSG_HDR: usize = 16; // sizeof(struct cmsghdr) on Linux arm64
     const LINUX_CMSG_ALIGN: usize = 8;
-    const DARWIN_CMSG_HDR: usize = 12;  // sizeof(struct cmsghdr) on macOS arm64
+    const DARWIN_CMSG_HDR: usize = 12; // sizeof(struct cmsghdr) on macOS arm64
     const DARWIN_CMSG_ALIGN: usize = 4;
 
     let mut linux_off = 0usize;
@@ -268,12 +268,12 @@ const DARWIN_SO_RCVTIMEO: i32 = 0x1006;
 const DARWIN_SO_ERROR: i32 = 0x1007;
 const DARWIN_SO_TYPE: i32 = 0x1008;
 const DARWIN_SO_NOSIGPIPE: i32 = 0x1022; // macOS-only, no Linux equivalent
-const DARWIN_SO_NREAD: i32 = 0x1020;     // macOS-only (use FIONREAD ioctl)
+const DARWIN_SO_NREAD: i32 = 0x1020; // macOS-only (use FIONREAD ioctl)
 const DARWIN_SO_NUMRCVPKT: i32 = 0x1112; // macOS-only
 
 // macOS IPPROTO_IP option constants that differ.
-const DARWIN_IP_RECVDSTADDR: i32 = 7;  // macOS=7, Linux has IP_PKTINFO=8
-const DARWIN_IP_RECVTOS: i32 = 27;     // macOS=27, Linux IP_RECVTOS=13
+const DARWIN_IP_RECVDSTADDR: i32 = 7; // macOS=7, Linux has IP_PKTINFO=8
+const DARWIN_IP_RECVTOS: i32 = 27; // macOS=27, Linux IP_RECVTOS=13
 
 /// Translate a macOS socket option name to the Linux equivalent.
 /// Returns `Some(linux_optname)` for translatable options,
@@ -408,13 +408,17 @@ unsafe fn errno_ptr() -> *mut i32 {
 
 /// Set errno to `EOPNOTSUPP` and return `-1` (i32).
 fn deny_i32() -> i32 {
-    unsafe { *errno_ptr() = libc::EOPNOTSUPP; }
+    unsafe {
+        *errno_ptr() = libc::EOPNOTSUPP;
+    }
     -1
 }
 
 /// Set errno to `EOPNOTSUPP` and return `-1` (i64).
 fn deny_i64() -> i64 {
-    unsafe { *errno_ptr() = libc::EOPNOTSUPP; }
+    unsafe {
+        *errno_ptr() = libc::EOPNOTSUPP;
+    }
     -1
 }
 
@@ -426,7 +430,9 @@ fn translate_errno_to_darwin() {
     let e = unsafe { *errno_ptr() };
     let darwin_e = linux_errno_to_darwin(e);
     if darwin_e != e {
-        unsafe { *errno_ptr() = darwin_e; }
+        unsafe {
+            *errno_ptr() = darwin_e;
+        }
     }
 }
 
@@ -544,7 +550,9 @@ pub extern "C" fn shim_connect(fd: i32, addr: u64, len: u32) -> i32 {
     #[cfg(target_os = "linux")]
     return with_errno_i32(|| unsafe { libc::connect(fd, ptr, tlen) });
     #[cfg(target_os = "macos")]
-    unsafe { libc::connect(fd, ptr, tlen) }
+    unsafe {
+        libc::connect(fd, ptr, tlen)
+    }
 }
 
 /// `int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)`
@@ -579,7 +587,9 @@ pub extern "C" fn shim_accept(fd: i32, addr: u64, len: u64) -> i32 {
     if ret >= 0 && addr != 0 {
         let actual_len = if len != 0 {
             unsafe { *(len as *const libc::socklen_t) }
-        } else { 0 };
+        } else {
+            0
+        };
         translate_sockaddr_linux_to_darwin(addr as *mut u8, actual_len);
     }
     ret
@@ -588,12 +598,15 @@ pub extern "C" fn shim_accept(fd: i32, addr: u64, len: u64) -> i32 {
 /// `int getsockname(int sockfd, struct sockaddr *addr, socklen_t *addrlen)`
 pub extern "C" fn shim_getsockname(fd: i32, addr: u64, len: u64) -> i32 {
     log::debug!("getsockname(fd={fd}) — passthrough + sockaddr translation");
-    let ret = unsafe { libc::getsockname(fd, addr as *mut libc::sockaddr, len as *mut libc::socklen_t) };
+    let ret =
+        unsafe { libc::getsockname(fd, addr as *mut libc::sockaddr, len as *mut libc::socklen_t) };
     #[cfg(target_os = "linux")]
     if ret >= 0 && addr != 0 {
         let actual_len = if len != 0 {
             unsafe { *(len as *const libc::socklen_t) }
-        } else { 0 };
+        } else {
+            0
+        };
         translate_sockaddr_linux_to_darwin(addr as *mut u8, actual_len);
     }
     ret
@@ -602,12 +615,15 @@ pub extern "C" fn shim_getsockname(fd: i32, addr: u64, len: u64) -> i32 {
 /// `int getpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen)`
 pub extern "C" fn shim_getpeername(fd: i32, addr: u64, len: u64) -> i32 {
     log::debug!("getpeername(fd={fd}) — passthrough + sockaddr translation");
-    let ret = unsafe { libc::getpeername(fd, addr as *mut libc::sockaddr, len as *mut libc::socklen_t) };
+    let ret =
+        unsafe { libc::getpeername(fd, addr as *mut libc::sockaddr, len as *mut libc::socklen_t) };
     #[cfg(target_os = "linux")]
     if ret >= 0 && addr != 0 {
         let actual_len = if len != 0 {
             unsafe { *(len as *const libc::socklen_t) }
-        } else { 0 };
+        } else {
+            0
+        };
         translate_sockaddr_linux_to_darwin(addr as *mut u8, actual_len);
     }
     ret
@@ -729,10 +745,14 @@ pub extern "C" fn shim_getsockopt(
     let linux_level = translate_sockopt_level(level);
     let Some(linux_optname) = translate_sockopt_name(linux_level, optname) else {
         log::debug!("getsockopt(fd={fd}, level={level}, opt={optname}) — no-op (macOS-only)");
-        unsafe { *errno_ptr() = libc::ENOPROTOOPT; }
+        unsafe {
+            *errno_ptr() = libc::ENOPROTOOPT;
+        }
         return -1;
     };
-    log::debug!("getsockopt(fd={fd}, level={level}→{linux_level}, opt={optname}→{linux_optname}) — passthrough");
+    log::debug!(
+        "getsockopt(fd={fd}, level={level}→{linux_level}, opt={optname}→{linux_optname}) — passthrough"
+    );
     unsafe {
         libc::getsockopt(
             fd,
@@ -758,8 +778,18 @@ pub extern "C" fn shim_setsockopt(
         log::debug!("setsockopt(fd={fd}, level={level}, opt={optname}) — no-op (macOS-only)");
         return 0;
     };
-    log::debug!("setsockopt(fd={fd}, level={level}→{linux_level}, opt={optname}→{linux_optname}) — passthrough");
-    unsafe { libc::setsockopt(fd, linux_level, linux_optname, optval as *const libc::c_void, optlen) }
+    log::debug!(
+        "setsockopt(fd={fd}, level={level}→{linux_level}, opt={optname}→{linux_optname}) — passthrough"
+    );
+    unsafe {
+        libc::setsockopt(
+            fd,
+            linux_level,
+            linux_optname,
+            optval as *const libc::c_void,
+            optlen,
+        )
+    }
 }
 
 /// `int shutdown(int sockfd, int how)`
@@ -768,7 +798,9 @@ pub extern "C" fn shim_shutdown(fd: i32, how: i32) -> i32 {
     #[cfg(target_os = "linux")]
     return with_errno_i32(|| unsafe { libc::shutdown(fd, how) });
     #[cfg(target_os = "macos")]
-    unsafe { libc::shutdown(fd, how) }
+    unsafe {
+        libc::shutdown(fd, how)
+    }
 }
 
 // ── read/write shims (errno translation) ────────────────────────────────────
@@ -785,7 +817,9 @@ pub extern "C" fn shim_read(fd: i32, buf: u64, count: u64) -> i64 {
         return ret;
     }
     #[cfg(target_os = "macos")]
-    unsafe { libc::read(fd, buf as *mut libc::c_void, count as usize) as i64 }
+    unsafe {
+        libc::read(fd, buf as *mut libc::c_void, count as usize) as i64
+    }
 }
 
 /// `ssize_t write(int fd, const void *buf, size_t count)`
@@ -799,7 +833,9 @@ pub extern "C" fn shim_write(fd: i32, buf: u64, count: u64) -> i64 {
         return ret;
     }
     #[cfg(target_os = "macos")]
-    unsafe { libc::write(fd, buf as *const libc::c_void, count as usize) as i64 }
+    unsafe {
+        libc::write(fd, buf as *const libc::c_void, count as usize) as i64
+    }
 }
 
 /// `int close(int fd)`
@@ -807,7 +843,9 @@ pub extern "C" fn shim_close(fd: i32) -> i32 {
     #[cfg(target_os = "linux")]
     return with_errno_i32(|| unsafe { libc::close(fd) });
     #[cfg(target_os = "macos")]
-    unsafe { libc::close(fd) }
+    unsafe {
+        libc::close(fd)
+    }
 }
 
 // ── sendmsg/recvmsg shims (sockaddr + errno translation) ────────────────────
@@ -820,9 +858,7 @@ pub extern "C" fn shim_sendmsg(fd: i32, msg_ptr: u64, flags: i32) -> i64 {
     #[cfg(target_os = "linux")]
     {
         if msg_ptr == 0 {
-            return with_errno_i64(|| unsafe {
-                libc::sendmsg(fd, std::ptr::null(), flags) as i64
-            });
+            return with_errno_i64(|| unsafe { libc::sendmsg(fd, std::ptr::null(), flags) as i64 });
         }
         // Read macOS-layout msghdr and convert to Linux layout.
         let darwin_msg = unsafe { DarwinMsghdr::read_from(msg_ptr) };
@@ -838,22 +874,31 @@ pub extern "C" fn shim_sendmsg(fd: i32, msg_ptr: u64, flags: i32) -> i64 {
             );
             linux_msg.msg_name = sa_buf.as_mut_ptr() as *mut libc::c_void;
             linux_msg.msg_namelen = tlen;
-            log::debug!("sendmsg(fd={fd}) — sockaddr translated (family={}, namelen={tlen}, addr_bytes={:?})", {
-                if tlen >= 2 { u16::from_ne_bytes([sa_buf[0], sa_buf[1]]) } else { 0 }
-            }, &sa_buf[..std::cmp::min(tlen as usize, 16)]);
-            let ret = with_errno_i64(|| unsafe {
-                libc::sendmsg(fd, &linux_msg, flags) as i64
-            });
+            log::debug!(
+                "sendmsg(fd={fd}) — sockaddr translated (family={}, namelen={tlen}, addr_bytes={:?})",
+                {
+                    if tlen >= 2 {
+                        u16::from_ne_bytes([sa_buf[0], sa_buf[1]])
+                    } else {
+                        0
+                    }
+                },
+                &sa_buf[..std::cmp::min(tlen as usize, 16)]
+            );
+            let ret = with_errno_i64(|| unsafe { libc::sendmsg(fd, &linux_msg, flags) as i64 });
             log::debug!("sendmsg(fd={fd}) returned {ret}");
             return ret;
         }
-        log::debug!("sendmsg(fd={fd}) — no name, iovlen={}", darwin_msg.msg_iovlen);
-        with_errno_i64(|| unsafe {
-            libc::sendmsg(fd, &linux_msg, flags) as i64
-        })
+        log::debug!(
+            "sendmsg(fd={fd}) — no name, iovlen={}",
+            darwin_msg.msg_iovlen
+        );
+        with_errno_i64(|| unsafe { libc::sendmsg(fd, &linux_msg, flags) as i64 })
     }
     #[cfg(target_os = "macos")]
-    unsafe { libc::sendmsg(fd, msg_ptr as *const libc::msghdr, flags) as i64 }
+    unsafe {
+        libc::sendmsg(fd, msg_ptr as *const libc::msghdr, flags) as i64
+    }
 }
 
 /// `ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags)`
@@ -873,12 +918,12 @@ pub extern "C" fn shim_recvmsg(fd: i32, msg_ptr: u64, flags: i32) -> i64 {
         let darwin_msg = unsafe { DarwinMsghdr::read_from(msg_ptr) };
         let mut linux_msg = darwin_msg.to_linux();
 
-        let ret = with_errno_i64(|| unsafe {
-            libc::recvmsg(fd, &mut linux_msg, flags) as i64
-        });
+        let ret = with_errno_i64(|| unsafe { libc::recvmsg(fd, &mut linux_msg, flags) as i64 });
         if ret >= 0 {
             // Write back the output fields to the macOS-layout msghdr.
-            unsafe { darwin_msg.write_back(msg_ptr, &linux_msg); }
+            unsafe {
+                darwin_msg.write_back(msg_ptr, &linux_msg);
+            }
 
             // Translate the returned source sockaddr from Linux → macOS layout.
             if !linux_msg.msg_name.is_null() && linux_msg.msg_namelen >= 2 {
@@ -902,13 +947,17 @@ pub extern "C" fn shim_recvmsg(fd: i32, msg_ptr: u64, flags: i32) -> i64 {
             }
             log::debug!(
                 "recvmsg(fd={fd}) → {ret} bytes, namelen={}, controllen={}, flags={:#x}",
-                linux_msg.msg_namelen, linux_msg.msg_controllen, linux_msg.msg_flags
+                linux_msg.msg_namelen,
+                linux_msg.msg_controllen,
+                linux_msg.msg_flags
             );
         }
         return ret;
     }
     #[cfg(target_os = "macos")]
-    unsafe { libc::recvmsg(fd, msg_ptr as *mut libc::msghdr, flags) as i64 }
+    unsafe {
+        libc::recvmsg(fd, msg_ptr as *mut libc::msghdr, flags) as i64
+    }
 }
 
 // ── fcntl shim (O_NONBLOCK translation) ─────────────────────────────────────
@@ -920,6 +969,16 @@ const DARWIN_O_NONBLOCK: i32 = 0x0004;
 const DARWIN_O_APPEND: i32 = 0x0008;
 #[cfg(target_os = "linux")]
 const DARWIN_O_ASYNC: i32 = 0x0040;
+#[cfg(target_os = "linux")]
+const DARWIN_FIOCLEX: u64 = 0x2000_6601;
+#[cfg(target_os = "linux")]
+const DARWIN_FIONREAD: u64 = 0x4004_667f;
+#[cfg(target_os = "linux")]
+const DARWIN_FIONBIO: u64 = 0x8004_667e;
+#[cfg(target_os = "linux")]
+const DARWIN_TIOCEXCL: u64 = 0x2000_740d;
+#[cfg(target_os = "linux")]
+const DARWIN_TIOCGWINSZ: u64 = 0x4008_7468;
 
 /// Translate macOS file-status flags (F_SETFL arg) to Linux equivalents.
 /// Flags below 0x100 differ significantly between macOS and Linux, so we
@@ -958,6 +1017,78 @@ fn translate_file_flags_to_darwin(linux_flags: i32) -> i32 {
     darwin_flags
 }
 
+#[cfg(target_os = "linux")]
+fn translate_ioctl_request(request: u64) -> u64 {
+    match request {
+        DARWIN_FIOCLEX => libc::FIOCLEX as u64,
+        DARWIN_FIONREAD => libc::FIONREAD as u64,
+        DARWIN_FIONBIO => libc::FIONBIO as u64,
+        DARWIN_TIOCEXCL => libc::TIOCEXCL as u64,
+        DARWIN_TIOCGWINSZ => libc::TIOCGWINSZ as u64,
+        _ => request,
+    }
+}
+
+/// `int ioctl(int fd, unsigned long request, ...)`
+///
+/// Apple ARM64 ABI puts variadic arguments on the stack, not in registers.
+/// This mirrors `shim_fcntl` so the first variadic argument is loaded into x2.
+#[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+#[unsafe(naked)]
+pub extern "C" fn shim_ioctl() -> i32 {
+    core::arch::naked_asm!(
+        "ldr  x2, [sp]",
+        "b    {impl_fn}",
+        impl_fn = sym shim_ioctl_impl,
+    )
+}
+
+#[cfg(all(target_os = "linux", not(target_arch = "aarch64")))]
+pub extern "C" fn shim_ioctl(fd: i32, request: u64, arg: u64) -> i32 {
+    shim_ioctl_impl(fd, request, arg)
+}
+
+#[cfg(target_os = "macos")]
+pub extern "C" fn shim_ioctl(fd: i32, request: u64, arg: u64) -> i32 {
+    unsafe { libc::ioctl(fd, request as libc::c_ulong, arg as libc::c_ulong) }
+}
+
+#[cfg(target_os = "linux")]
+extern "C" fn shim_ioctl_impl(fd: i32, request: u64, arg: u64) -> i32 {
+    let translated_request = translate_ioctl_request(request);
+    log::debug!("ioctl(fd={fd}, request={request:#x}) → {translated_request:#x}");
+
+    let ret = match translated_request {
+        v if v == libc::FIOCLEX as u64 || v == libc::TIOCEXCL as u64 => {
+            with_errno_i32(|| unsafe { libc::ioctl(fd, translated_request as libc::c_ulong) })
+        }
+        v if v == libc::FIONREAD as u64 || v == libc::FIONBIO as u64 => with_errno_i32(|| unsafe {
+            libc::ioctl(
+                fd,
+                translated_request as libc::c_ulong,
+                arg as *mut libc::c_int,
+            )
+        }),
+        v if v == libc::TIOCGWINSZ as u64 => with_errno_i32(|| unsafe {
+            libc::ioctl(
+                fd,
+                translated_request as libc::c_ulong,
+                arg as *mut libc::winsize,
+            )
+        }),
+        _ => with_errno_i32(|| unsafe {
+            libc::ioctl(
+                fd,
+                translated_request as libc::c_ulong,
+                arg as libc::c_ulong,
+            )
+        }),
+    };
+
+    log::debug!("ioctl(fd={fd}, request={request:#x}) returned {ret}");
+    ret
+}
+
 /// `int fcntl(int fd, int cmd, ...)`
 ///
 /// Apple ARM64 ABI puts variadic arguments on the stack, not in registers.
@@ -971,6 +1102,12 @@ pub extern "C" fn shim_fcntl() -> i32 {
         "b    {impl_fn}",          // Tail-call implementation
         impl_fn = sym shim_fcntl_impl,
     )
+}
+
+/// Non-aarch64 Linux hosts call the translated implementation directly.
+#[cfg(all(target_os = "linux", not(target_arch = "aarch64")))]
+pub extern "C" fn shim_fcntl(fd: i32, cmd: i32, arg: i64) -> i32 {
+    shim_fcntl_impl(fd, cmd, arg)
 }
 
 /// macOS-host shim (no ABI translation needed).
@@ -1015,27 +1152,105 @@ pub struct SocketShims;
 impl SocketShims {
     pub fn install(table: &mut ShimTable) {
         use crate::register_shims;
-        register_shims!(table,
-            ("_socket",        shim_socket as *const () as u64,        "socket — AF translation passthrough"),
-            ("_connect",       shim_connect as *const () as u64,       "connect — sockaddr translation passthrough"),
-            ("_bind",          shim_bind as *const () as u64,          "bind — sockaddr translation passthrough"),
-            ("_listen",        shim_listen as *const () as u64,        "listen — passthrough"),
-            ("_accept",        shim_accept as *const () as u64,        "accept — sockaddr translation"),
-            ("_send",          shim_send as *const () as u64,          "send — passthrough"),
-            ("_recv",          shim_recv as *const () as u64,          "recv — passthrough"),
-            ("_sendto",        shim_sendto as *const () as u64,        "sendto — sockaddr translation passthrough"),
-            ("_recvfrom",      shim_recvfrom as *const () as u64,      "recvfrom — sockaddr + errno translation"),
-            ("_getsockopt",    shim_getsockopt as *const () as u64,    "getsockopt — passthrough"),
-            ("_setsockopt",    shim_setsockopt as *const () as u64,    "setsockopt — passthrough"),
-            ("_shutdown",      shim_shutdown as *const () as u64,      "shutdown — passthrough"),
-            ("_getsockname",   shim_getsockname as *const () as u64,   "getsockname — sockaddr translation"),
-            ("_getpeername",   shim_getpeername as *const () as u64,   "getpeername — sockaddr translation"),
-            ("_fcntl",         shim_fcntl as *const () as u64,         "fcntl — O_NONBLOCK translation"),
-            ("_read",          shim_read as *const () as u64,          "read — errno translation"),
-            ("_write",         shim_write as *const () as u64,         "write — errno translation"),
-            ("_close",         shim_close as *const () as u64,         "close — errno translation"),
-            ("_sendmsg",       shim_sendmsg as *const () as u64,      "sendmsg — sockaddr + errno translation"),
-            ("_recvmsg",       shim_recvmsg as *const () as u64,      "recvmsg — msghdr + cmsg + errno translation"),
+        register_shims!(
+            table,
+            (
+                "_socket",
+                shim_socket as *const () as u64,
+                "socket — AF translation passthrough"
+            ),
+            (
+                "_connect",
+                shim_connect as *const () as u64,
+                "connect — sockaddr translation passthrough"
+            ),
+            (
+                "_bind",
+                shim_bind as *const () as u64,
+                "bind — sockaddr translation passthrough"
+            ),
+            (
+                "_listen",
+                shim_listen as *const () as u64,
+                "listen — passthrough"
+            ),
+            (
+                "_accept",
+                shim_accept as *const () as u64,
+                "accept — sockaddr translation"
+            ),
+            ("_send", shim_send as *const () as u64, "send — passthrough"),
+            ("_recv", shim_recv as *const () as u64, "recv — passthrough"),
+            (
+                "_sendto",
+                shim_sendto as *const () as u64,
+                "sendto — sockaddr translation passthrough"
+            ),
+            (
+                "_recvfrom",
+                shim_recvfrom as *const () as u64,
+                "recvfrom — sockaddr + errno translation"
+            ),
+            (
+                "_getsockopt",
+                shim_getsockopt as *const () as u64,
+                "getsockopt — passthrough"
+            ),
+            (
+                "_setsockopt",
+                shim_setsockopt as *const () as u64,
+                "setsockopt — passthrough"
+            ),
+            (
+                "_shutdown",
+                shim_shutdown as *const () as u64,
+                "shutdown — passthrough"
+            ),
+            (
+                "_getsockname",
+                shim_getsockname as *const () as u64,
+                "getsockname — sockaddr translation"
+            ),
+            (
+                "_getpeername",
+                shim_getpeername as *const () as u64,
+                "getpeername — sockaddr translation"
+            ),
+            (
+                "_ioctl",
+                shim_ioctl as *const () as u64,
+                "ioctl — Darwin request translation"
+            ),
+            (
+                "_fcntl",
+                shim_fcntl as *const () as u64,
+                "fcntl — O_NONBLOCK translation"
+            ),
+            (
+                "_read",
+                shim_read as *const () as u64,
+                "read — errno translation"
+            ),
+            (
+                "_write",
+                shim_write as *const () as u64,
+                "write — errno translation"
+            ),
+            (
+                "_close",
+                shim_close as *const () as u64,
+                "close — errno translation"
+            ),
+            (
+                "_sendmsg",
+                shim_sendmsg as *const () as u64,
+                "sendmsg — sockaddr + errno translation"
+            ),
+            (
+                "_recvmsg",
+                shim_recvmsg as *const () as u64,
+                "recvmsg — msghdr + cmsg + errno translation"
+            ),
         );
     }
 }
@@ -1051,13 +1266,17 @@ mod tests {
 
     /// Clear errno before a test call.
     fn clear_errno() {
-        unsafe { *errno_ptr() = 0; }
+        unsafe {
+            *errno_ptr() = 0;
+        }
     }
 
     /// Close a file descriptor, ignoring errors.
     fn close_fd(fd: i32) {
         if fd >= 0 {
-            unsafe { libc::close(fd); }
+            unsafe {
+                libc::close(fd);
+            }
         }
     }
 
@@ -1067,7 +1286,11 @@ mod tests {
     fn test_socket_unix_allowed() {
         clear_errno();
         let fd = shim_socket(libc::AF_UNIX, libc::SOCK_STREAM, 0);
-        assert!(fd >= 0, "AF_UNIX socket should succeed, got fd={fd} errno={}", get_errno());
+        assert!(
+            fd >= 0,
+            "AF_UNIX socket should succeed, got fd={fd} errno={}",
+            get_errno()
+        );
         close_fd(fd);
     }
 
@@ -1075,7 +1298,11 @@ mod tests {
     fn test_socket_inet_allowed() {
         clear_errno();
         let fd = shim_socket(libc::AF_INET, libc::SOCK_STREAM, 0);
-        assert!(fd >= 0, "AF_INET socket should succeed, got fd={fd} errno={}", get_errno());
+        assert!(
+            fd >= 0,
+            "AF_INET socket should succeed, got fd={fd} errno={}",
+            get_errno()
+        );
         close_fd(fd);
     }
 
@@ -1100,7 +1327,7 @@ mod tests {
         {
             sa.sin_len = std::mem::size_of::<libc::sockaddr_in>() as u8;
         }
-        sa.sin_family = libc::AF_INET as u8;
+        sa.sin_family = libc::AF_INET as libc::sa_family_t;
         sa.sin_port = 0; // port 0
         sa.sin_addr.s_addr = u32::to_be(0x7f00_0001); // 127.0.0.1
 
@@ -1132,7 +1359,7 @@ mod tests {
         {
             sa.sin_len = std::mem::size_of::<libc::sockaddr_in>() as u8;
         }
-        sa.sin_family = libc::AF_INET as u8;
+        sa.sin_family = libc::AF_INET as libc::sa_family_t;
         sa.sin_port = 53u16.to_be(); // DNS port
         sa.sin_addr.s_addr = u32::to_be(0x0808_0808); // 8.8.8.8
 
@@ -1166,7 +1393,7 @@ mod tests {
         {
             sa.sin_len = std::mem::size_of::<libc::sockaddr_in>() as u8;
         }
-        sa.sin_family = libc::AF_INET as u8;
+        sa.sin_family = libc::AF_INET as libc::sa_family_t;
         sa.sin_port = 0; // ephemeral
         sa.sin_addr.s_addr = u32::to_be(0x7f00_0001); // 127.0.0.1
 
@@ -1176,7 +1403,12 @@ mod tests {
             &sa as *const libc::sockaddr_in as u64,
             std::mem::size_of::<libc::sockaddr_in>() as u32,
         );
-        assert_eq!(ret, 0, "bind to 127.0.0.1:0 should succeed, errno={}", get_errno());
+        assert_eq!(
+            ret,
+            0,
+            "bind to 127.0.0.1:0 should succeed, errno={}",
+            get_errno()
+        );
         close_fd(fd);
     }
 
@@ -1218,8 +1450,85 @@ mod tests {
             &mut val as *mut i32 as u64,
             &mut len as *mut libc::socklen_t as u64,
         );
-        assert_eq!(ret, 0, "getsockopt SO_REUSEADDR should succeed, errno={}", get_errno());
+        assert_eq!(
+            ret,
+            0,
+            "getsockopt SO_REUSEADDR should succeed, errno={}",
+            get_errno()
+        );
         close_fd(fd);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_ioctl_fioclex_translates() {
+        let fd = shim_socket(libc::AF_UNIX, libc::SOCK_STREAM, 0);
+        assert!(fd >= 0);
+
+        clear_errno();
+        let ret = shim_ioctl(fd, DARWIN_FIOCLEX, 0);
+        assert_eq!(
+            ret,
+            0,
+            "ioctl FIOCLEX should succeed, errno={}",
+            get_errno()
+        );
+
+        let flags = unsafe { libc::fcntl(fd, libc::F_GETFD) };
+        assert_ne!(flags & libc::FD_CLOEXEC, 0, "FD_CLOEXEC should be set");
+        close_fd(fd);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_ioctl_fionbio_translates() {
+        let fd = shim_socket(libc::AF_UNIX, libc::SOCK_STREAM, 0);
+        assert!(fd >= 0);
+
+        let mut enabled: i32 = 1;
+        clear_errno();
+        let ret = shim_ioctl(fd, DARWIN_FIONBIO, &mut enabled as *mut i32 as u64);
+        assert_eq!(
+            ret,
+            0,
+            "ioctl FIONBIO should succeed, errno={}",
+            get_errno()
+        );
+
+        let flags = unsafe { libc::fcntl(fd, libc::F_GETFL) };
+        assert_ne!(flags & libc::O_NONBLOCK, 0, "O_NONBLOCK should be set");
+        close_fd(fd);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_ioctl_fionread_translates() {
+        let mut fds: [i32; 2] = [-1, -1];
+        let ret =
+            unsafe { libc::socketpair(libc::AF_UNIX, libc::SOCK_STREAM, 0, fds.as_mut_ptr()) };
+        assert_eq!(ret, 0, "socketpair failed, errno={}", get_errno());
+
+        let msg = b"hello";
+        let sent = unsafe { libc::write(fds[0], msg.as_ptr() as *const libc::c_void, msg.len()) };
+        assert_eq!(sent, msg.len() as isize, "write should enqueue all bytes");
+
+        let mut available: i32 = 0;
+        clear_errno();
+        let ret = shim_ioctl(fds[1], DARWIN_FIONREAD, &mut available as *mut i32 as u64);
+        assert_eq!(
+            ret,
+            0,
+            "ioctl FIONREAD should succeed, errno={}",
+            get_errno()
+        );
+        assert_eq!(
+            available,
+            msg.len() as i32,
+            "FIONREAD should report queued bytes"
+        );
+
+        close_fd(fds[0]);
+        close_fd(fds[1]);
     }
 
     // ── send/recv over unix socketpair ──────────────────────────────────
@@ -1227,9 +1536,8 @@ mod tests {
     #[test]
     fn test_send_recv_unix_pair() {
         let mut fds: [i32; 2] = [-1, -1];
-        let ret = unsafe {
-            libc::socketpair(libc::AF_UNIX, libc::SOCK_STREAM, 0, fds.as_mut_ptr())
-        };
+        let ret =
+            unsafe { libc::socketpair(libc::AF_UNIX, libc::SOCK_STREAM, 0, fds.as_mut_ptr()) };
         assert_eq!(ret, 0, "socketpair failed, errno={}", get_errno());
 
         let msg = b"hello";
@@ -1263,6 +1571,7 @@ mod tests {
         assert!(table.resolve("_getsockopt").is_some());
         assert!(table.resolve("_setsockopt").is_some());
         assert!(table.resolve("_shutdown").is_some());
-        assert_eq!(table.len(), 20);
+        assert!(table.resolve("_ioctl").is_some());
+        assert_eq!(table.len(), 21);
     }
 }

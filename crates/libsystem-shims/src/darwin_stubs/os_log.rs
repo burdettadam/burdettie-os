@@ -60,44 +60,133 @@ impl OsLogStubs {
         use crate::register_shims;
 
         // ── Core os_log ─────────────────────────────────────────
-        register_shims!(table,
-            ("_os_log_create", shim_os_log_create as *const () as u64, "os_log_create (stub → sentinel handle)"),
-            ("_os_log_type_enabled", shim_os_log_type_enabled as *const () as u64, "os_log_type_enabled (stub → true)"),
-            ("__os_log_impl", shim_os_log_impl as *const () as u64, "_os_log_impl (stub → log::debug)"),
-            ("__os_log_debug_impl", shim_os_log_impl as *const () as u64, "_os_log_debug_impl (stub → log::debug)"),
-            ("__os_log_error_impl", shim_os_log_error_impl as *const () as u64, "_os_log_error_impl (stub → log::error)"),
-            ("__os_log_fault_impl", shim_os_log_error_impl as *const () as u64, "_os_log_fault_impl (stub → log::error)"),
-            ("__os_log_pack_send", shim_os_log_void_stub as *const () as u64, "_os_log_pack_send (stub → void)"),
-            ("__os_log_is_debug_enabled", shim_os_log_true_stub as *const () as u64, "_os_log_is_debug_enabled (stub → 1)")
+        register_shims!(
+            table,
+            (
+                "_os_log_create",
+                shim_os_log_create as *const () as u64,
+                "os_log_create (stub → sentinel handle)"
+            ),
+            (
+                "_os_log_type_enabled",
+                shim_os_log_type_enabled as *const () as u64,
+                "os_log_type_enabled (stub → true)"
+            ),
+            (
+                "__os_log_impl",
+                shim_os_log_impl as *const () as u64,
+                "_os_log_impl (stub → log::debug)"
+            ),
+            (
+                "__os_log_debug_impl",
+                shim_os_log_impl as *const () as u64,
+                "_os_log_debug_impl (stub → log::debug)"
+            ),
+            (
+                "__os_log_error_impl",
+                shim_os_log_error_impl as *const () as u64,
+                "_os_log_error_impl (stub → log::error)"
+            ),
+            (
+                "__os_log_fault_impl",
+                shim_os_log_error_impl as *const () as u64,
+                "_os_log_fault_impl (stub → log::error)"
+            ),
+            (
+                "__os_log_pack_send",
+                shim_os_log_void_stub as *const () as u64,
+                "_os_log_pack_send (stub → void)"
+            ),
+            (
+                "__os_log_is_debug_enabled",
+                shim_os_log_true_stub as *const () as u64,
+                "_os_log_is_debug_enabled (stub → 1)"
+            )
         );
 
         // ── os_log data symbols ─────────────────────────────────
-        register_shims!(table,
-            ("__os_log_default", &OS_LOG_DEFAULT_SENTINEL as *const u64 as u64, "_os_log_default data symbol"),
-            ("___os_log_disabled", &OS_LOG_DISABLED_SENTINEL as *const u64 as u64, "__os_log_disabled data symbol")
+        register_shims!(
+            table,
+            (
+                "__os_log_default",
+                &OS_LOG_DEFAULT_SENTINEL as *const u64 as u64,
+                "_os_log_default data symbol"
+            ),
+            (
+                "___os_log_disabled",
+                &OS_LOG_DISABLED_SENTINEL as *const u64 as u64,
+                "__os_log_disabled data symbol"
+            )
         );
 
         // ── os_signpost ─────────────────────────────────────────
-        register_shims!(table,
-            ("_os_signpost_interval_begin", shim_os_log_void_stub as *const () as u64, "os_signpost_interval_begin (stub → void)"),
-            ("_os_signpost_interval_end", shim_os_log_void_stub as *const () as u64, "os_signpost_interval_end (stub → void)"),
-            ("_os_signpost_event_emit", shim_os_log_void_stub as *const () as u64, "os_signpost_event_emit (stub → void)"),
-            ("_os_signpost_id_generate", shim_os_signpost_id_generate as *const () as u64, "os_signpost_id_generate (stub → counter)"),
-            ("_os_signpost_id_make_with_pointer", shim_os_signpost_id_make_with_pointer as *const () as u64, "os_signpost_id_make_with_pointer (stub → ptr)")
+        register_shims!(
+            table,
+            (
+                "_os_signpost_interval_begin",
+                shim_os_log_void_stub as *const () as u64,
+                "os_signpost_interval_begin (stub → void)"
+            ),
+            (
+                "_os_signpost_interval_end",
+                shim_os_log_void_stub as *const () as u64,
+                "os_signpost_interval_end (stub → void)"
+            ),
+            (
+                "_os_signpost_event_emit",
+                shim_os_log_void_stub as *const () as u64,
+                "os_signpost_event_emit (stub → void)"
+            ),
+            (
+                "_os_signpost_id_generate",
+                shim_os_signpost_id_generate as *const () as u64,
+                "os_signpost_id_generate (stub → counter)"
+            ),
+            (
+                "_os_signpost_id_make_with_pointer",
+                shim_os_signpost_id_make_with_pointer as *const () as u64,
+                "os_signpost_id_make_with_pointer (stub → ptr)"
+            )
         );
 
         // ── os_activity ─────────────────────────────────────────
-        register_shims!(table,
-            ("_os_activity_initiate", shim_os_activity_initiate as *const () as u64, "os_activity_initiate (stub → inline block)"),
-            ("_os_activity_scope_enter", shim_os_log_void2_stub as *const () as u64, "os_activity_scope_enter (stub → void)"),
-            ("_os_activity_scope_leave", shim_os_log_void1_stub as *const () as u64, "os_activity_scope_leave (stub → void)"),
-            ("__os_activity_create", shim_os_activity_create as *const () as u64, "_os_activity_create (stub → sentinel)"),
-            ("__os_activity_current", shim_os_activity_current as *const () as u64, "_os_activity_current (stub → sentinel)")
+        register_shims!(
+            table,
+            (
+                "_os_activity_initiate",
+                shim_os_activity_initiate as *const () as u64,
+                "os_activity_initiate (stub → inline block)"
+            ),
+            (
+                "_os_activity_scope_enter",
+                shim_os_log_void2_stub as *const () as u64,
+                "os_activity_scope_enter (stub → void)"
+            ),
+            (
+                "_os_activity_scope_leave",
+                shim_os_log_void1_stub as *const () as u64,
+                "os_activity_scope_leave (stub → void)"
+            ),
+            (
+                "__os_activity_create",
+                shim_os_activity_create as *const () as u64,
+                "_os_activity_create (stub → sentinel)"
+            ),
+            (
+                "__os_activity_current",
+                shim_os_activity_current as *const () as u64,
+                "_os_activity_current (stub → sentinel)"
+            )
         );
 
         // ── Private utility used by Xcode tools ─────────────────
-        register_shims!(table,
-            ("_os_log_set_default_behavior", shim_os_log_void1_stub as *const () as u64, "os_log_set_default_behavior (stub → void)")
+        register_shims!(
+            table,
+            (
+                "_os_log_set_default_behavior",
+                shim_os_log_void1_stub as *const () as u64,
+                "os_log_set_default_behavior (stub → void)"
+            )
         );
 
         log::debug!("OsLogStubs: registered 22 os_log/signpost/activity stubs");
@@ -128,7 +217,12 @@ pub extern "C" fn shim_os_log_type_enabled(_log: u64, _type: u8) -> i32 {
 /// subsystem/category/level metadata.  Decodes the Apple binary argument
 /// buffer to produce the actual formatted message.
 pub extern "C" fn shim_os_log_impl(
-    _dso: u64, log_obj: u64, log_type: u8, format: u64, buf: u64, size: u32,
+    _dso: u64,
+    log_obj: u64,
+    log_type: u8,
+    format: u64,
+    buf: u64,
+    size: u32,
 ) {
     let fmt = extract_format_string(format);
     let msg = if buf != 0 && size >= 2 {
@@ -151,7 +245,12 @@ pub extern "C" fn shim_os_log_impl(
 
 /// _os_log_error_impl — same as _os_log_impl but forces error level.
 pub extern "C" fn shim_os_log_error_impl(
-    _dso: u64, log_obj: u64, _type: u8, format: u64, buf: u64, size: u32,
+    _dso: u64,
+    log_obj: u64,
+    _type: u8,
+    format: u64,
+    buf: u64,
+    size: u32,
 ) {
     let fmt = extract_format_string(format);
     let msg = if buf != 0 && size >= 2 {
@@ -281,19 +380,35 @@ enum OsLogArg {
 fn read_scalar(data: &[u8], signed: bool) -> i64 {
     match data.len() {
         1 => {
-            if signed { data[0] as i8 as i64 } else { data[0] as i64 }
+            if signed {
+                data[0] as i8 as i64
+            } else {
+                data[0] as i64
+            }
         }
         2 => {
             let v = u16::from_le_bytes(data[..2].try_into().unwrap_or([0; 2]));
-            if signed { v as i16 as i64 } else { v as i64 }
+            if signed {
+                v as i16 as i64
+            } else {
+                v as i64
+            }
         }
         4 => {
             let v = u32::from_le_bytes(data[..4].try_into().unwrap_or([0; 4]));
-            if signed { v as i32 as i64 } else { v as i64 }
+            if signed {
+                v as i32 as i64
+            } else {
+                v as i64
+            }
         }
         8 => {
             let v = u64::from_le_bytes(data[..8].try_into().unwrap_or([0; 8]));
-            if signed { v as i64 } else { v as i64 }
+            if signed {
+                v as i64
+            } else {
+                v as i64
+            }
         }
         _ => 0,
     }
@@ -476,7 +591,9 @@ fn extract_format_string(format: u64) -> &'static str {
     let mut len = 0usize;
     unsafe {
         while len < 512 {
-            if *ptr.add(len) == 0 { break; }
+            if *ptr.add(len) == 0 {
+                break;
+            }
             len += 1;
         }
         let slice = std::slice::from_raw_parts(ptr, len);
@@ -494,7 +611,9 @@ fn extract_cstring(ptr: u64) -> &'static str {
     let mut len = 0usize;
     unsafe {
         while len < 256 {
-            if *p.add(len) == 0 { break; }
+            if *p.add(len) == 0 {
+                break;
+            }
             len += 1;
         }
         let slice = std::slice::from_raw_parts(p, len);
@@ -507,7 +626,9 @@ fn extract_cstring(ptr: u64) -> &'static str {
 pub extern "C" fn shim_os_log_void_stub() {}
 pub extern "C" fn shim_os_log_void1_stub(_a: u64) {}
 pub extern "C" fn shim_os_log_void2_stub(_a: u64, _b: u64) {}
-pub extern "C" fn shim_os_log_true_stub() -> i32 { 1 }
+pub extern "C" fn shim_os_log_true_stub() -> i32 {
+    1
+}
 
 // ── os_signpost ─────────────────────────────────────────────────
 
@@ -604,8 +725,12 @@ mod tests {
             b"unit\0".as_ptr() as u64,
         );
         shim_os_log_impl(
-            0, handle, 0x01, // OS_LOG_TYPE_INFO
-            b"pipeline test message\0".as_ptr() as u64, 0, 0,
+            0,
+            handle,
+            0x01, // OS_LOG_TYPE_INFO
+            b"pipeline test message\0".as_ptr() as u64,
+            0,
+            0,
         );
         let after = burdettie_log_pipeline::event_count();
         assert!(after > before, "pipeline event count should increase");
@@ -672,8 +797,8 @@ mod tests {
         // Two args: signed int 7, unsigned int 42
         let buf: Vec<u8> = vec![
             0x00, 0x02, // summary, 2 args
-            0x01, 0x04, 7, 0, 0, 0,   // signed i32 = 7
-            0x00, 0x04, 42, 0, 0, 0,  // unsigned u32 = 42
+            0x01, 0x04, 7, 0, 0, 0, // signed i32 = 7
+            0x00, 0x04, 42, 0, 0, 0, // unsigned u32 = 42
         ];
         let msg = decode_os_log_message("x=%d y=%u", buf.as_ptr() as u64, buf.len() as u32);
         assert_eq!(msg, "x=7 y=42");
@@ -724,8 +849,7 @@ mod tests {
     #[test]
     fn decode_pointer_format() {
         let buf: Vec<u8> = vec![
-            0x00, 0x01, 0x00, 0x08,
-            0x78, 0x56, 0x34, 0x12, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x01, 0x00, 0x08, 0x78, 0x56, 0x34, 0x12, 0x00, 0x00, 0x00, 0x00,
         ];
         let msg = decode_os_log_message("ptr=%p", buf.as_ptr() as u64, buf.len() as u32);
         assert_eq!(msg, "ptr=0x12345678");

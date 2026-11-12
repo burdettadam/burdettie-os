@@ -180,9 +180,7 @@ fn read_meta(dir: &Path) -> (String, i32) {
 }
 
 /// Extract missing symbols/classes/selectors from tracer events.
-fn extract_gaps_from_tracer(
-    tracer: &RuntimeTracer,
-) -> (Vec<String>, Vec<String>, Vec<String>) {
+fn extract_gaps_from_tracer(tracer: &RuntimeTracer) -> (Vec<String>, Vec<String>, Vec<String>) {
     let mut missing_symbols = BTreeSet::new();
     let mut missing_classes = BTreeSet::new();
     let mut missing_selectors = BTreeSet::new();
@@ -381,7 +379,10 @@ mod tests {
 
     #[test]
     fn extract_quoted_simple() {
-        assert_eq!(extract_quoted("unresolved symbol '_foo'"), Some("_foo".into()));
+        assert_eq!(
+            extract_quoted("unresolved symbol '_foo'"),
+            Some("_foo".into())
+        );
     }
 
     #[test]

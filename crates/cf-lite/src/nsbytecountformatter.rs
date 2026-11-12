@@ -13,8 +13,12 @@ const ALLOWED_UNITS_OFF: usize = 16;
 
 fn alloc_formatter() -> u64 {
     let obj = crate::pal_alloc().calloc(1, 24) as u64;
-    if obj == 0 { return 0; }
-    unsafe { *(obj as *mut u64) = nsobj::nsbytecountformatter_class_addr(); }
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *(obj as *mut u64) = nsobj::nsbytecountformatter_class_addr();
+    }
     obj
 }
 
@@ -41,7 +45,9 @@ fn format_bytes(count: i64, is_binary: bool) -> String {
         val /= divisor;
         idx += 1;
     }
-    if count < 0 { val = -val; }
+    if count < 0 {
+        val = -val;
+    }
 
     if val.fract().abs() < 0.05 {
         format!("{:.0} {}", val, units[idx])
@@ -54,7 +60,10 @@ fn format_bytes(count: i64, is_binary: bool) -> String {
 
 /// `+[NSByteCountFormatter stringFromByteCount:countStyle:]`
 pub extern "C" fn shim_bytecountformatter_string_from(
-    _cls: u64, _cmd: u64, byte_count: i64, count_style: u64,
+    _cls: u64,
+    _cmd: u64,
+    byte_count: i64,
+    count_style: u64,
 ) -> u64 {
     let is_binary = count_style == 3; // NSByteCountFormatterCountStyleBinary
     make_nsstring(&format_bytes(byte_count, is_binary))
@@ -74,46 +83,64 @@ pub extern "C" fn shim_bytecountformatter_init(obj: u64, _cmd: u64) -> u64 {
 
 /// `-[NSByteCountFormatter stringFromByteCount:]`
 pub extern "C" fn shim_bytecountformatter_string_from_instance(
-    obj: u64, _cmd: u64, byte_count: i64,
+    obj: u64,
+    _cmd: u64,
+    byte_count: i64,
 ) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     let style = unsafe { *((obj as usize + COUNT_STYLE_OFF) as *const u64) };
     let is_binary = style == 3;
     make_nsstring(&format_bytes(byte_count, is_binary))
 }
 
 /// `-[NSByteCountFormatter setCountStyle:]`
-pub extern "C" fn shim_bytecountformatter_set_count_style(
-    obj: u64, _cmd: u64, style: u64,
-) -> u64 {
-    if obj == 0 { return 0; }
-    unsafe { *((obj as usize + COUNT_STYLE_OFF) as *mut u64) = style; }
+pub extern "C" fn shim_bytecountformatter_set_count_style(obj: u64, _cmd: u64, style: u64) -> u64 {
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *((obj as usize + COUNT_STYLE_OFF) as *mut u64) = style;
+    }
     0
 }
 
 /// `-[NSByteCountFormatter countStyle]`
 pub extern "C" fn shim_bytecountformatter_count_style(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + COUNT_STYLE_OFF) as *const u64) }
 }
 
 /// `-[NSByteCountFormatter setAllowedUnits:]`
 pub extern "C" fn shim_bytecountformatter_set_allowed_units(
-    obj: u64, _cmd: u64, units: u64,
+    obj: u64,
+    _cmd: u64,
+    units: u64,
 ) -> u64 {
-    if obj == 0 { return 0; }
-    unsafe { *((obj as usize + ALLOWED_UNITS_OFF) as *mut u64) = units; }
+    if obj == 0 {
+        return 0;
+    }
+    unsafe {
+        *((obj as usize + ALLOWED_UNITS_OFF) as *mut u64) = units;
+    }
     0
 }
 
 /// `-[NSByteCountFormatter allowedUnits]`
 pub extern "C" fn shim_bytecountformatter_allowed_units(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     unsafe { *((obj as usize + ALLOWED_UNITS_OFF) as *const u64) }
 }
 
 pub extern "C" fn shim_bytecountformatter_description(obj: u64, _cmd: u64) -> u64 {
-    if obj == 0 { return 0; }
+    if obj == 0 {
+        return 0;
+    }
     make_nsstring("<NSByteCountFormatter>")
 }
 

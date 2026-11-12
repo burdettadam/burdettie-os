@@ -18,6 +18,12 @@ fn default_platform() -> impl PlatformProvider {
     platform_linux::LinuxHostPlatform::new()
 }
 
+/// Return the default platform provider for the current OS.
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
+fn default_platform() -> impl PlatformProvider {
+    crate::platform_fallback::FallbackPlatform::new()
+}
+
 /// Controls which shim categories are installed.
 #[derive(Debug, Clone)]
 pub struct ShimSet {

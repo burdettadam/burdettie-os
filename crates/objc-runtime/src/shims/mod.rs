@@ -23,9 +23,8 @@ pub use dispatch::objc_msg_send_addr;
 
 // Re-export NSObject memory-management method shims for Foundation registration.
 pub use lifecycle::{
-    host_nsexception_ehtype_addr,
-    shim_nsobject_autorelease, shim_nsobject_dealloc, shim_nsobject_release, shim_nsobject_retain,
-    shim_nsobject_retain_count,
+    host_nsexception_ehtype_addr, shim_nsobject_autorelease, shim_nsobject_dealloc,
+    shim_nsobject_release, shim_nsobject_retain, shim_nsobject_retain_count,
 };
 
 // Re-export exception shim for NSException's -raise method.

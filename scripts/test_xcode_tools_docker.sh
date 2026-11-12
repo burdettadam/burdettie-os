@@ -2,7 +2,9 @@
 # test_xcode_tools_docker.sh — Run Mach-O tool compatibility tests inside burdettie-os.
 #
 # This script iterates over extracted Xcode/system tool binaries and executes
-# each through macho-inspect --exec, classifying results by outcome.
+# each through macho-inspect --exec, classifying results by outcome. When no
+# imported Apple tool overlay is staged, it smoke-tests the native Rust
+# replacements baked into the base runtime instead.
 #
 # Usage: test-xcode-tools [category]
 # Categories: all, xcode-tc, xcode-dev, system
@@ -29,6 +31,47 @@ NC='\033[0m'
 
 cleanup() { rm -f "$TMPFILE" "$TMPFILE.err"; }
 trap cleanup EXIT
+
+have_imported_tools() {
+    find "$TOOLS_DIR" -type f \
+        ! -name '.gitkeep' \
+        ! -name 'README.md' \
+        ! -name '.DS_Store' \
+        | grep -q .
+}
+
+smoke_test_native_tools() {
+    local developer_dir
+    local sdk_path
+
+    developer_dir=$(/usr/bin/xcode-select -p) || {
+        printf "%b\n" "${RED}Native xcode-select smoke test failed.${NC}"
+        return 1
+    }
+    sdk_path=$(/usr/bin/xcrun --show-sdk-path) || {
+        printf "%b\n" "${RED}Native xcrun smoke test failed.${NC}"
+        return 1
+    }
+
+    if [ ! -d "$developer_dir" ]; then
+        printf "%b\n" "${RED}Native developer dir is missing: ${developer_dir}${NC}"
+        return 1
+    fi
+    if [ ! -d "$sdk_path" ]; then
+        printf "%b\n" "${RED}Native SDK path is missing: ${sdk_path}${NC}"
+        return 1
+    fi
+
+    printf "%b\n" "${GREEN}NATIVE${NC}   xcode-select -p -> ${developer_dir}"
+    printf "%b\n" "${GREEN}NATIVE${NC}   xcrun --show-sdk-path -> ${sdk_path}"
+}
+
+if ! have_imported_tools; then
+    printf "%b\n" "${CYAN}No imported Apple tool overlay staged under ${TOOLS_DIR}.${NC}"
+    printf "%b\n" "${CYAN}Base Docker runtime is usable; running native Xcode tool smoke tests instead.${NC}"
+    smoke_test_native_tools || exit 1
+    exit 0
+fi
 
 # Run a tool through the loader and classify the result.
 # Args: $1=binary_path $2=category $3...=args

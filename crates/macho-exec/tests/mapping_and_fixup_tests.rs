@@ -3,9 +3,10 @@
 
 mod common;
 
-use macho_exec::{apply_chained_fixups, MappedImage};
+use macho_exec::{apply_binds, apply_chained_fixups, ExecError, MappedImage};
 use macho_map::MappingPlan;
-use macho_parse::parse;
+use macho_parse::{parse, BindEntry, FixupModel, Fixups};
+use macho_resolve::BindingReport;
 
 use common::{default_mapper, default_stub_resolver, default_unwind, read_fixture};
 
@@ -118,6 +119,80 @@ fn map_dylib_chain_app() {
 
     let image = MappedImage::map(&plan, &data, default_mapper(), default_unwind()).unwrap();
     assert!(image.segment("__TEXT").is_some());
+}
+
+#[test]
+fn apply_binds_skips_out_of_bounds_lazy_binds() {
+    let Some(data) = read_fixture("simple_cli/app") else {
+        return;
+    };
+    let parsed = parse(&data).unwrap();
+    let plan = MappingPlan::from_parsed(&parsed);
+    let image = MappedImage::map(&plan, &data, default_mapper(), default_unwind()).unwrap();
+
+    let fixups = Fixups {
+        model: FixupModel::Classic,
+        rebases: Vec::new(),
+        binds: Vec::new(),
+        weak_binds: Vec::new(),
+        lazy_binds: vec![BindEntry {
+            segment_index: 0,
+            segment_offset: image.segments[0].size as u64 + 8,
+            bind_type: 1,
+            dylib_ordinal: 1,
+            symbol_name: "_missing_lazy".to_string(),
+            addend: 0,
+            is_weak: false,
+            is_lazy: true,
+        }],
+        chained: Vec::new(),
+    };
+    let bindings = BindingReport {
+        bindings: Vec::new(),
+        failed: Vec::new(),
+        bound_count: 0,
+        weak_unbound_count: 0,
+    };
+
+    let applied = apply_binds(&image, &fixups, &bindings).unwrap();
+    assert_eq!(applied, 0, "malformed lazy binds should be skipped");
+}
+
+#[test]
+fn apply_binds_keeps_regular_bind_bounds_strict() {
+    let Some(data) = read_fixture("simple_cli/app") else {
+        return;
+    };
+    let parsed = parse(&data).unwrap();
+    let plan = MappingPlan::from_parsed(&parsed);
+    let image = MappedImage::map(&plan, &data, default_mapper(), default_unwind()).unwrap();
+
+    let fixups = Fixups {
+        model: FixupModel::Classic,
+        rebases: Vec::new(),
+        binds: vec![BindEntry {
+            segment_index: 0,
+            segment_offset: image.segments[0].size as u64 + 8,
+            bind_type: 1,
+            dylib_ordinal: 1,
+            symbol_name: "_regular".to_string(),
+            addend: 0,
+            is_weak: false,
+            is_lazy: false,
+        }],
+        weak_binds: Vec::new(),
+        lazy_binds: Vec::new(),
+        chained: Vec::new(),
+    };
+    let bindings = BindingReport {
+        bindings: Vec::new(),
+        failed: Vec::new(),
+        bound_count: 0,
+        weak_unbound_count: 0,
+    };
+
+    let err = apply_binds(&image, &fixups, &bindings).unwrap_err();
+    assert!(matches!(err, ExecError::FixupOffsetOutOfBounds { .. }));
 }
 
 #[test]

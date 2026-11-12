@@ -182,7 +182,11 @@ mod tests {
     fn protection_read_write() {
         assert_eq!(
             Protection::READ_WRITE,
-            Protection { read: true, write: true, execute: false }
+            Protection {
+                read: true,
+                write: true,
+                execute: false
+            }
         );
     }
 
@@ -190,7 +194,11 @@ mod tests {
     fn protection_read_only() {
         assert_eq!(
             Protection::READ_ONLY,
-            Protection { read: true, write: false, execute: false }
+            Protection {
+                read: true,
+                write: false,
+                execute: false
+            }
         );
     }
 
@@ -198,7 +206,11 @@ mod tests {
     fn protection_read_execute() {
         assert_eq!(
             Protection::READ_EXECUTE,
-            Protection { read: true, write: false, execute: true }
+            Protection {
+                read: true,
+                write: false,
+                execute: true
+            }
         );
     }
 
@@ -206,7 +218,11 @@ mod tests {
     fn protection_none() {
         assert_eq!(
             Protection::NONE,
-            Protection { read: false, write: false, execute: false }
+            Protection {
+                read: false,
+                write: false,
+                execute: false
+            }
         );
     }
 
@@ -236,7 +252,11 @@ mod tests {
 
     #[test]
     fn protection_custom() {
-        let p = Protection { read: false, write: true, execute: true };
+        let p = Protection {
+            read: false,
+            write: true,
+            execute: true,
+        };
         assert!(!p.read);
         assert!(p.write);
         assert!(p.execute);

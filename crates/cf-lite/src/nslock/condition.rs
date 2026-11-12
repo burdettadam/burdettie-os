@@ -110,7 +110,7 @@ mod tests {
         assert_ne!(obj, 0);
         let isa = read_field(obj, 0);
         assert_eq!(isa, nsobj::nscondition_class_addr());
-        free_obj(obj);  // no init, skip dealloc to avoid destroying uninit mutex
+        free_obj(obj); // no init, skip dealloc to avoid destroying uninit mutex
     }
 
     #[test]
