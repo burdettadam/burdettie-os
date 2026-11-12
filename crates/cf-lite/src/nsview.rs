@@ -1399,6 +1399,9 @@ mod tests {
 
     const SIZE: usize = VIEW_SIZE;
 
+    // Protect each priority test through allocation, assertions, free, and reset.
+    static VIEW_PRIORITIES_TEST_LOCK: Mutex<()> = Mutex::new(());
+
     fn isa() -> u64 {
         crate::nsobj::nsview_class_addr()
     }
@@ -1902,6 +1905,9 @@ mod tests {
 
     #[test]
     fn content_hugging_default_low() {
+        let _guard = VIEW_PRIORITIES_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let view = make_view();
         assert!((shim_nsview_content_hugging_priority(view, 0, 0) - 250.0).abs() < f64::EPSILON);
         assert!((shim_nsview_content_hugging_priority(view, 0, 1) - 250.0).abs() < f64::EPSILON);
@@ -1910,6 +1916,9 @@ mod tests {
 
     #[test]
     fn compression_resistance_default_high() {
+        let _guard = VIEW_PRIORITIES_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let view = make_view();
         assert!(
             (shim_nsview_content_compression_resistance_priority(view, 0, 0) - 750.0).abs()
@@ -1947,6 +1956,9 @@ mod tests {
 
     #[test]
     fn set_content_hugging_priority_roundtrip() {
+        let _guard = VIEW_PRIORITIES_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         reset_layout_priority_state();
         let view = make_view();
         shim_nsview_set_content_hugging_priority(view, 0, 500.0, 0); // horizontal
@@ -1959,6 +1971,9 @@ mod tests {
 
     #[test]
     fn set_compression_resistance_roundtrip() {
+        let _guard = VIEW_PRIORITIES_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         reset_layout_priority_state();
         let view = make_view();
         shim_nsview_set_content_compression_resistance_priority(view, 0, 900.0, 0);
@@ -1977,6 +1992,9 @@ mod tests {
 
     #[test]
     fn priorities_independent_per_view() {
+        let _guard = VIEW_PRIORITIES_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         reset_layout_priority_state();
         let v1 = make_view();
         let v2 = make_view();
