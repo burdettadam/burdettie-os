@@ -914,15 +914,30 @@ pub extern "C" fn shim_nsrunloop_description(_obj: u64, _cmd: u64) -> u64 {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
+pub(crate) mod test_support {
     use std::sync::Mutex;
 
     static RUN_LOOP_TEST_LOCK: Mutex<()> = Mutex::new(());
 
-    fn lock_runloop_state() -> std::sync::MutexGuard<'static, ()> {
+    pub(crate) fn lock_runloop_state() -> std::sync::MutexGuard<'static, ()> {
         RUN_LOOP_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner())
     }
+
+    pub(crate) fn unschedule_timer(timer: u64) {
+        // fire_due_timers keeps this mutex locked throughout every timer
+        // dereference and callback. Once removal completes, that consumer
+        // cannot retain this timer's raw address past the lock release.
+        super::pending_timers()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .retain(|pending| pending.timer != timer);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::test_support::lock_runloop_state;
+    use super::*;
 
     #[test]
     fn current_run_loop_returns_nonzero() {
@@ -932,10 +947,16 @@ mod tests {
 
     #[test]
     fn main_equals_current() {
-        let main = shim_nsrunloop_main_run_loop(0, 0);
-        let curr = shim_nsrunloop_current_run_loop(0, 0);
-        assert_ne!(main, 0);
-        assert_eq!(main, curr);
+        crate::shim_test_helpers::with_isolated_test_process(
+            "nsrunloop::tests::main_equals_current",
+            || {
+                crate::nsthread::init_main_thread_id();
+                let main = shim_nsrunloop_main_run_loop(0, 0);
+                let curr = shim_nsrunloop_current_run_loop(0, 0);
+                assert_ne!(main, 0);
+                assert_eq!(main, curr);
+            },
+        );
     }
 
     #[test]
@@ -946,11 +967,13 @@ mod tests {
 
     #[test]
     fn run_nil_is_safe() {
+        let _guard = lock_runloop_state();
         shim_nsrunloop_run(0, 0);
     }
 
     #[test]
     fn run_until_date_nil_is_safe() {
+        let _guard = lock_runloop_state();
         shim_nsrunloop_run_until_date(0, 0, 0);
     }
 
@@ -1304,34 +1327,44 @@ mod tests {
 
     #[test]
     fn per_thread_run_loop_is_same_on_main() {
-        let _guard = lock_runloop_state();
-        crate::nsthread::init_main_thread_id();
-        let rl1 = shim_nsrunloop_current_run_loop(0, 0);
-        let rl2 = shim_nsrunloop_main_run_loop(0, 0);
-        assert_eq!(
-            rl1, rl2,
-            "main thread currentRunLoop should equal mainRunLoop"
+        crate::shim_test_helpers::with_isolated_test_process(
+            "nsrunloop::tests::per_thread_run_loop_is_same_on_main",
+            || {
+                let _guard = lock_runloop_state();
+                crate::nsthread::init_main_thread_id();
+                let rl1 = shim_nsrunloop_current_run_loop(0, 0);
+                let rl2 = shim_nsrunloop_main_run_loop(0, 0);
+                assert_eq!(
+                    rl1, rl2,
+                    "main thread currentRunLoop should equal mainRunLoop"
+                );
+            },
         );
     }
 
     #[test]
     fn worker_thread_cannot_claim_main_run_loop() {
-        let _guard = lock_runloop_state();
-        crate::nsthread::init_main_thread_id();
+        crate::shim_test_helpers::with_isolated_test_process(
+            "nsrunloop::tests::worker_thread_cannot_claim_main_run_loop",
+            || {
+                let _guard = lock_runloop_state();
+                crate::nsthread::init_main_thread_id();
 
-        let main_rl = shim_nsrunloop_main_run_loop(0, 0);
-        let worker_rl = std::thread::spawn(|| shim_nsrunloop_current_run_loop(0, 0))
-            .join()
-            .unwrap();
-        let current_main = shim_nsrunloop_current_run_loop(0, 0);
+                let main_rl = shim_nsrunloop_main_run_loop(0, 0);
+                let worker_rl = std::thread::spawn(|| shim_nsrunloop_current_run_loop(0, 0))
+                    .join()
+                    .unwrap();
+                let current_main = shim_nsrunloop_current_run_loop(0, 0);
 
-        assert_eq!(
-            current_main, main_rl,
-            "main thread must retain the main run loop"
-        );
-        assert_ne!(
-            worker_rl, main_rl,
-            "worker thread must not steal the main run loop"
+                assert_eq!(
+                    current_main, main_rl,
+                    "main thread must retain the main run loop"
+                );
+                assert_ne!(
+                    worker_rl, main_rl,
+                    "worker thread must not steal the main run loop"
+                );
+            },
         );
     }
 

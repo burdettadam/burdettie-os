@@ -1,4 +1,4 @@
-//! NSTimer shim: single-threaded timer with block invocation.
+//! NSTimer shim: run-loop scheduling with block and selector callbacks.
 //!
 //! Object layout: 48 bytes
 //!   [0..8):   ISA pointer
@@ -8,9 +8,9 @@
 //!   [32..40): target (u64) — target object for target/selector variant
 //!   [40..48): selector_ptr (u64) — SEL name pointer for target/selector variant
 //!
-//! Since we're single-threaded with no run loop, `scheduledTimerWithTimeInterval:`
-//! creates the timer but does NOT automatically fire it. The fixture must
-//! call `[timer fire]` explicitly. This is sufficient for testing.
+//! `scheduledTimerWithTimeInterval:` enqueues a timer on the shim run loop.
+//! Due timers fire when that loop runs. Timers can also be fired explicitly
+//! with `[timer fire]`, including timers created without scheduling.
 
 use crate::cfstring;
 use crate::nsobj;
@@ -208,6 +208,7 @@ pub extern "C" fn shim_nstimer_set_tolerance(_obj: u64, _cmd: u64, _tolerance: f
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::nsrunloop::test_support::{lock_runloop_state, unschedule_timer};
     use crate::shim_test_helpers::*;
 
     #[test]
@@ -222,10 +223,12 @@ mod tests {
 
     #[test]
     fn scheduled_with_block_also_valid() {
+        let _guard = lock_runloop_state();
         let t = shim_nstimer_scheduled_with_block(0, 0, 2.0, 1, 0);
         assert_ne!(t, 0);
         assert_eq!(shim_nstimer_is_valid(t, 0), 1);
         assert!((shim_nstimer_time_interval(t, 0) - 2.0).abs() < 1e-9);
+        unschedule_timer(t);
         free_obj(t);
     }
 
@@ -255,6 +258,7 @@ mod tests {
 
     #[test]
     fn fire_non_repeating_without_block_auto_invalidates() {
+        let _guard = lock_runloop_state();
         // repeats=0, block=0: fire should auto-invalidate a non-repeating timer
         let t = shim_nstimer_scheduled_with_block(0, 0, 0.1, 0, 0);
         assert_eq!(shim_nstimer_is_valid(t, 0), 1);
@@ -264,15 +268,18 @@ mod tests {
             0,
             "non-repeating timer must auto-invalidate after fire"
         );
+        unschedule_timer(t);
         free_obj(t);
     }
 
     #[test]
     fn scheduled_with_target_stores_interval() {
+        let _guard = lock_runloop_state();
         let t = shim_nstimer_scheduled_with_target(0, 0, 5.0, 0, 0, 0, 0);
         assert_ne!(t, 0);
         assert_eq!(shim_nstimer_is_valid(t, 0), 1);
         assert!((shim_nstimer_time_interval(t, 0) - 5.0).abs() < 1e-9);
+        unschedule_timer(t);
         free_obj(t);
     }
 
@@ -291,9 +298,11 @@ mod tests {
 
     #[test]
     fn nstimer_create_valid() {
+        let _guard = lock_runloop_state();
         let t = shim_nstimer_scheduled_with_block(0, 0, 1.0, 0, 0);
         assert_ne!(t, 0);
         assert_eq!(shim_nstimer_is_valid(t, 0), 1);
+        unschedule_timer(t);
         free_obj(t);
     }
 
@@ -308,9 +317,17 @@ mod tests {
 
     #[test]
     fn fire_date_returns_nsdate() {
+        #[cfg(target_os = "macos")]
+        crate::set_platform(std::sync::Arc::new(
+            platform_darwin_host::DarwinHostPlatform::new(),
+        ));
+        #[cfg(target_os = "linux")]
+        crate::set_platform(std::sync::Arc::new(platform_linux::LinuxHostPlatform::new()));
+
         let t = shim_nstimer_timer_with_block(0, 0, 1.0, 0, 0);
         let date = shim_nstimer_fire_date(t, 0);
         assert_ne!(date, 0, "fireDate should return a non-nil NSDate");
+        free_obj(date);
         free_obj(t);
     }
 

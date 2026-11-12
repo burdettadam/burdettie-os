@@ -410,13 +410,14 @@ mod tests {
 
     #[test]
     fn nsthread_current_returns_object() {
-        // Ensure main thread ID is captured
-        init_main_thread_id();
-        let t = shim_nsthread_current_thread(0, 0);
-        assert_ne!(t, 0, "currentThread must return non-null");
-        // On the test runner thread (which IS main), is_main should be set
-        let is_main = shim_nsthread_is_main_thread(t, 0);
-        assert_eq!(is_main, 1);
+        with_isolated_test_process("nsthread::tests::nsthread_current_returns_object", || {
+            // Capture this fresh runtime's main thread before querying it.
+            init_main_thread_id();
+            let t = shim_nsthread_current_thread(0, 0);
+            assert_ne!(t, 0, "currentThread must return non-null");
+            let is_main = shim_nsthread_is_main_thread(t, 0);
+            assert_eq!(is_main, 1);
+        });
     }
 
     #[test]

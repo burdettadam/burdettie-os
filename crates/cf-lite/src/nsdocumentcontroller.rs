@@ -846,6 +846,9 @@ mod tests {
     use super::*;
     use crate::shim_test_helpers::*;
 
+    // Each document-list test owns its reset/operations/assertions as one unit.
+    static DOCUMENT_TEST_LOCK: Mutex<()> = Mutex::new(());
+
     #[test]
     fn shared_controller_is_singleton() {
         let a = shim_nsdocumentcontroller_shared_document_controller(
@@ -862,6 +865,7 @@ mod tests {
 
     #[test]
     fn add_and_remove_document_tracks_documents() {
+        let _guard = DOCUMENT_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         reset_runtime_state_for_reuse();
         let doc = alloc_obj(
             crate::nsdocument::DOCUMENT_SIZE,
@@ -888,6 +892,7 @@ mod tests {
 
     #[test]
     fn panel_selection_opens_selected_urls_as_documents() {
+        let _guard = DOCUMENT_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         reset_runtime_state_for_reuse();
         let panel = crate::nsopenpanel::shim_nsopenpanel_open_panel(0, 0);
         let path = make_string("/tmp/document-controller-panel.txt");

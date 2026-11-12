@@ -149,9 +149,6 @@ pub extern "C" fn shim_nsmutablearray_remove_objects_at_indexes(
 }
 
 /// `-[NSMutableArray sortUsingDescriptors:]` — sort using NSSortDescriptor array.
-/// No-op stub: descriptor-based sorting requires runtime introspection of key paths
-/// and comparator selectors that the shim environment doesn't fully support yet.
-/// `-[NSMutableArray sortUsingDescriptors:]` — sort using NSSortDescriptor array.
 /// Implements real sorting using the provided descriptors.
 pub extern "C" fn shim_nsmutablearray_sort_using_descriptors(
     obj: u64,
@@ -421,15 +418,29 @@ mod tests {
     }
 
     #[test]
-    fn sort_using_descriptors_is_noop_stub() {
-        let arr = make_array_with(&[0xCC, 0xAA, 0xBB]);
-        shim_nsmutablearray_sort_using_descriptors(arr, 0, 0xDEAD);
-        // Order should be unchanged (no-op)
+    fn sort_using_empty_descriptors_preserves_order() {
+        let first = alloc_obj(8, crate::nsobj::nsobject_class_addr());
+        let second = alloc_obj(8, crate::nsobj::nsobject_class_addr());
+        let third = alloc_obj(8, crate::nsobj::nsobject_class_addr());
+        let arr = make_array_with(&[third, first, second]);
+        write_field(arr, 0, crate::nsobj::nsmutablearray_class_addr());
+        let descriptors = crate::nsarray::make_nsarray(&[]);
+        assert_ne!(descriptors, 0);
+        assert_eq!(crate::nsarray::shim_nsarray_count(descriptors, 0), 0);
+
+        shim_nsmutablearray_sort_using_descriptors(arr, 0, descriptors);
+
+        // With no descriptors, all comparisons are equal and stable sort preserves order.
+        assert_eq!(read_field(arr, NSMUTABLEARRAY_COUNT_OFF), 3);
         let buf = read_field(arr, NSMUTABLEARRAY_ELEMS_OFF);
-        assert_eq!(read_field(buf, 0), 0xCC);
-        assert_eq!(read_field(buf, 8), 0xAA);
-        assert_eq!(read_field(buf, 16), 0xBB);
+        assert_eq!(read_field(buf, 0), third);
+        assert_eq!(read_field(buf, 8), first);
+        assert_eq!(read_field(buf, 16), second);
         free_array(arr);
+        free_array(descriptors);
+        free_obj(first);
+        free_obj(second);
+        free_obj(third);
     }
 
     #[test]
