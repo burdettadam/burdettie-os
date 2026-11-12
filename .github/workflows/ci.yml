@@ -135,7 +135,7 @@ jobs:
 
       - name: Clippy (strict)
         run: |
-          cargo clippy --locked --workspace --all-targets -- \
+          cargo clippy --locked --workspace --all-targets --keep-going -- \
             -D warnings \
             -A clippy::unwrap-used \
             -A clippy::expect-used \

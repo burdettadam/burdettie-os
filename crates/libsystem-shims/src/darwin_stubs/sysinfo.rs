@@ -333,9 +333,9 @@ pub extern "C" fn shim_getgrouplist_2(name: u64, basegid: u32, groups_out: u64) 
         }
         // Copy as u32 (gid_t) for the macOS ABI caller
         let out = ptr as *mut u32;
-        for i in 0..ngroups as usize {
+        for (i, &group) in buf[..ngroups as usize].iter().enumerate() {
             unsafe {
-                *out.add(i) = buf[i] as u32;
+                *out.add(i) = group as u32;
             }
         }
         unsafe {
