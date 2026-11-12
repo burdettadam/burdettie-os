@@ -593,7 +593,7 @@ mod tests {
         let h = (day_secs / 3600) as u32;
         let min = ((day_secs % 3600) / 60) as u32;
         let sec = (day_secs % 60) as u32;
-        let roundtrip = ymd_hms_to_ms(y as i32, m as u32, d as u32, h, min, sec);
+        let roundtrip = ymd_hms_to_ms(y, m as u32, d as u32, h, min, sec);
         assert_eq!(roundtrip, original_ms);
     }
 

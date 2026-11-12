@@ -304,8 +304,8 @@ fn parse_number_string(s: &str, style: i32) -> f64 {
     }
 
     // Check for percent suffix
-    let (s, is_percent) = if s.ends_with('%') {
-        (&s[..s.len() - 1], true)
+    let (s, is_percent) = if let Some(number) = s.strip_suffix('%') {
+        (number, true)
     } else {
         (s, style == 3) // percent style (3) implies division
     };
@@ -381,13 +381,13 @@ mod tests {
         let h = shim_unum_open(1, 0, 0, 0, 0, &mut status);
 
         let mut buf = [0u16; 32];
-        let len = shim_unum_format_double(h, 3.14, buf.as_mut_ptr(), 32, 0, &mut status);
+        let len = shim_unum_format_double(h, 3.25, buf.as_mut_ptr(), 32, 0, &mut status);
         assert!(len > 0);
 
         let text = String::from_utf16_lossy(&buf[..len as usize]);
         assert!(
             text.contains("3"),
-            "formatted 3.14 should contain '3': {text}"
+            "formatted 3.25 should contain '3': {text}"
         );
 
         shim_unum_close(h);
@@ -417,7 +417,7 @@ mod tests {
 
     #[test]
     fn parse_decimal() {
-        assert_eq!(parse_number_string("3.14", 1), 3.14);
+        assert_eq!(parse_number_string("3.25", 1), 3.25);
     }
 
     #[test]
@@ -462,14 +462,14 @@ mod tests {
         let mut status = 0i32;
         let h = shim_unum_open(1, 0, 0, 0, 0, &mut status);
 
-        let input = "3.14";
+        let input = "3.25";
         let utf16: Vec<u16> = input.encode_utf16().collect();
         let mut pos = 0i32;
 
         let val =
             shim_unum_parse_double(h, utf16.as_ptr(), utf16.len() as i32, &mut pos, &mut status);
         assert_eq!(status, 0);
-        assert!((val - 3.14).abs() < 0.001);
+        assert!((val - 3.25).abs() < 0.001);
 
         shim_unum_close(h);
     }

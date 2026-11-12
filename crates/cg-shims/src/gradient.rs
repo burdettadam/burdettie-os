@@ -108,13 +108,10 @@ fn composite_pixel(pixel: &mut u32, r: f64, g: f64, b: f64, a: f64) {
 }
 
 fn radial_gradient_t(
-    px: f64,
-    py: f64,
-    start_x: f64,
-    start_y: f64,
+    (px, py): (f64, f64),
+    (start_x, start_y): (f64, f64),
     start_radius: f64,
-    end_x: f64,
-    end_y: f64,
+    (end_x, end_y): (f64, f64),
     end_radius: f64,
 ) -> f64 {
     let mx = px - start_x;
@@ -334,13 +331,10 @@ pub extern "C" fn shim_draw_radial_gradient(
                 let fx = px as f64 + 0.5;
                 let fy = py as f64 + 0.5;
                 let t = radial_gradient_t(
-                    fx,
-                    fy,
-                    start_x,
-                    start_y,
+                    (fx, fy),
+                    (start_x, start_y),
                     start_radius,
-                    end_x,
-                    end_y,
+                    (end_x, end_y),
                     end_radius,
                 );
                 let (r, g, b, a) = grad.color_at(t.clamp(0.0, 1.0));

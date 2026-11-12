@@ -65,7 +65,7 @@ fn days_from_epoch(y: i64, m: i32, d: i32) -> i64 {
     let m = m as u32;
     let doy = (153 * (if m > 2 { m - 3 } else { m + 9 }) + 2) / 5 + d as u32 - 1;
     let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-    era as i64 * 146097 + doe as i64 - 719468
+    era * 146097 + doe as i64 - 719468
 }
 
 /// Decompose epoch millis into (year, month 0-based, day 1-based, hour, min, sec, ms).

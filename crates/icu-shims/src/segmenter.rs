@@ -49,9 +49,9 @@ struct BreakIterState {
     cursor: usize,
 }
 
-/// We store break iterator state in a leaked Box (since guest code
-/// holds the pointer and calls ubrk_close to free it).
-/// The ubrk_open/ubrk_close pattern means each iterator is independent.
+// We store break iterator state in a leaked Box (since guest code
+// holds the pointer and calls ubrk_close to free it).
+// The ubrk_open/ubrk_close pattern means each iterator is independent.
 
 /// UBRK_DONE sentinel value
 const UBRK_DONE: i32 = -1;
