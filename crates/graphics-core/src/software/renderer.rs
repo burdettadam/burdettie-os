@@ -278,10 +278,7 @@ impl SoftwareRenderer<'_> {
                             bounds.min.x as i32 + rx as i32,
                             bounds.min.y as i32 + ry as i32,
                             coverage,
-                            cr,
-                            cg,
-                            cb,
-                            ca,
+                            [cr, cg, cb, ca],
                             sw,
                             sh,
                         );
@@ -318,10 +315,7 @@ impl SoftwareRenderer<'_> {
                         bounds.min.x as i32 + rx as i32,
                         bounds.min.y as i32 + ry as i32,
                         coverage,
-                        cr,
-                        cg,
-                        cb,
-                        ca,
+                        [cr, cg, cb, ca],
                         sw,
                         sh,
                     );
@@ -339,13 +333,11 @@ impl SoftwareRenderer<'_> {
         px: i32,
         py: i32,
         coverage: f32,
-        cr: u32,
-        cg: u32,
-        cb: u32,
-        ca: u32,
+        rgba: [u32; 4],
         sw: i32,
         sh: i32,
     ) {
+        let [cr, cg, cb, ca] = rgba;
         if coverage <= 0.0 || px < 0 || py < 0 || px >= sw || py >= sh {
             return;
         }

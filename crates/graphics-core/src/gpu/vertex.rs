@@ -25,11 +25,11 @@ impl Vertex {
         }
     }
 
-    pub(super) fn textured(x: f32, y: f32, u: f32, v: f32, r: f32, g: f32, b: f32, a: f32) -> Self {
+    pub(super) fn textured(position: [f32; 2], tex_coord: [f32; 2], color: [f32; 4]) -> Self {
         Self {
-            position: [x, y],
-            color: [r, g, b, a],
-            tex_coord: [u, v],
+            position,
+            color,
+            tex_coord,
             use_texture: 1.0,
             _pad: 0.0,
         }

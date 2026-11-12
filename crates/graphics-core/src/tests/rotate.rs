@@ -94,7 +94,7 @@ fn rotation_field_saved() {
 
 fn make_red_image(w: u32, h: u32) -> ImageBuffer {
     // RGBA8: every pixel is opaque red.
-    let data = vec![255u8, 0, 0, 255].repeat((w * h) as usize);
+    let data = [255u8, 0, 0, 255].repeat((w * h) as usize);
     ImageBuffer::from_rgba(w, h, data).unwrap()
 }
 

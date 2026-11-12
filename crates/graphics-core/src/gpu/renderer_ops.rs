@@ -79,14 +79,8 @@ impl Renderer for GpuRenderer {
         for (entry, gx, gy) in prepared {
             self.atlas_dirty = true;
             self.push_textured_quad(
-                gx,
-                gy,
-                gx + entry.width,
-                gy + entry.height,
-                entry.u0,
-                entry.v0,
-                entry.u1,
-                entry.v1,
+                [gx, gy, gx + entry.width, gy + entry.height],
+                [entry.u0, entry.v0, entry.u1, entry.v1],
                 color,
             );
         }
@@ -196,14 +190,8 @@ impl Renderer for GpuRenderer {
                 } => {
                     self.atlas_dirty = true;
                     self.push_textured_quad(
-                        gx,
-                        gy,
-                        gx + entry.width,
-                        gy + entry.height,
-                        entry.u0,
-                        entry.v0,
-                        entry.u1,
-                        entry.v1,
+                        [gx, gy, gx + entry.width, gy + entry.height],
+                        [entry.u0, entry.v0, entry.u1, entry.v1],
                         color,
                     );
                 }
