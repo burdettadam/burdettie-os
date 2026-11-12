@@ -907,23 +907,30 @@ mod tests {
         let menu = alloc_obj_fake(MENU_SIZE);
         let first = alloc_menu_item();
         let second = alloc_menu_item();
+        // Non-identical objects may receive isEqual:, so their ISA must be readable.
+        let first_object = alloc_obj(8, crate::nsobj::nsobject_class_addr());
+        let second_object = alloc_obj(8, crate::nsobj::nsobject_class_addr());
+        let missing_object = alloc_obj(8, crate::nsobj::nsobject_class_addr());
 
         shim_nsmenuitem_init_with_title(first, 0, make_string("Copy"), 0, 0);
         shim_nsmenuitem_init_with_title(second, 0, make_string("Paste"), 0, 0);
-        shim_nsmenuitem_set_represented_object(first, 0, 0xAAA0);
-        shim_nsmenuitem_set_represented_object(second, 0, 0xBBB0);
+        shim_nsmenuitem_set_represented_object(first, 0, first_object);
+        shim_nsmenuitem_set_represented_object(second, 0, second_object);
         shim_nsmenu_add_item(menu, 0, first);
         shim_nsmenu_add_item(menu, 0, second);
 
         assert_eq!(
-            shim_nsmenu_index_of_item_with_represented_object(menu, 0, 0xBBB0),
+            shim_nsmenu_index_of_item_with_represented_object(menu, 0, second_object),
             1
         );
         assert_eq!(
-            shim_nsmenu_index_of_item_with_represented_object(menu, 0, 0xCCC0),
+            shim_nsmenu_index_of_item_with_represented_object(menu, 0, missing_object),
             -1
         );
 
+        free_obj(missing_object);
+        free_obj(second_object);
+        free_obj(first_object);
         free_obj(menu);
     }
 
