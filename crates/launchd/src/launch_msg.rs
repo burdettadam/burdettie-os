@@ -26,16 +26,22 @@ pub fn launch_get_fd() -> i32 {
 /// - Dictionary: first key determines the command
 ///
 /// Returns a reply `launch_data_t` (caller owns it) or NULL on error.
-pub fn launch_msg(request: LaunchDataT) -> LaunchDataT {
+///
+/// # Safety
+/// `request` must be null or a live, aligned `LaunchData` handle. Its complete
+/// value tree must remain exclusively accessible for the duration of the call;
+/// lookup helpers borrow its containers mutably. The request remains owned by
+/// the caller. Any non-null reply is a new owned handle.
+pub unsafe fn launch_msg(request: LaunchDataT) -> LaunchDataT {
     if request.is_null() {
         return LAUNCH_DATA_NULL;
     }
 
-    let ty = launch_data::get_type(request);
+    let ty = unsafe { launch_data::get_type(request) };
 
     // String request: the string itself is the command key
     if ty == LaunchDataType::String as u32 {
-        let sptr = launch_data::get_string(request);
+        let sptr = unsafe { launch_data::get_string(request) };
         if sptr.is_null() {
             return make_errno_reply(libc::EINVAL);
         }
@@ -48,7 +54,7 @@ pub fn launch_msg(request: LaunchDataT) -> LaunchDataT {
 
     // Dictionary request: look for command key
     if ty == LaunchDataType::Dictionary as u32 {
-        return handle_dict_request(request);
+        return unsafe { handle_dict_request(request) };
     }
 
     make_errno_reply(libc::EINVAL)
@@ -58,61 +64,61 @@ pub fn launch_msg(request: LaunchDataT) -> LaunchDataT {
 ///
 /// The dictionary should have one top-level key which is the command
 /// (e.g. "SubmitJob" → value is the job dictionary).
-fn handle_dict_request(dict: LaunchDataT) -> LaunchDataT {
+unsafe fn handle_dict_request(dict: LaunchDataT) -> LaunchDataT {
     // Try known command keys in order of likelihood
 
     // SubmitJob
-    let val = lookup_key(dict, LAUNCH_KEY_SUBMITJOB);
+    let val = unsafe { lookup_key(dict, LAUNCH_KEY_SUBMITJOB) };
     if !val.is_null() {
-        return handle_submit_job(val);
+        return unsafe { handle_submit_job(val) };
     }
 
     // RemoveJob
-    let val = lookup_key(dict, LAUNCH_KEY_REMOVEJOB);
+    let val = unsafe { lookup_key(dict, LAUNCH_KEY_REMOVEJOB) };
     if !val.is_null() {
-        return handle_remove_job(val);
+        return unsafe { handle_remove_job(val) };
     }
 
     // StartJob
-    let val = lookup_key(dict, LAUNCH_KEY_STARTJOB);
+    let val = unsafe { lookup_key(dict, LAUNCH_KEY_STARTJOB) };
     if !val.is_null() {
-        return handle_start_job(val);
+        return unsafe { handle_start_job(val) };
     }
 
     // StopJob
-    let val = lookup_key(dict, LAUNCH_KEY_STOPJOB);
+    let val = unsafe { lookup_key(dict, LAUNCH_KEY_STOPJOB) };
     if !val.is_null() {
-        return handle_stop_job(val);
+        return unsafe { handle_stop_job(val) };
     }
 
     // GetJob
-    let val = lookup_key(dict, LAUNCH_KEY_GETJOB);
+    let val = unsafe { lookup_key(dict, LAUNCH_KEY_GETJOB) };
     if !val.is_null() {
-        return handle_get_job(val);
+        return unsafe { handle_get_job(val) };
     }
 
     // GetJobs
-    let val = lookup_key(dict, LAUNCH_KEY_GETJOBS);
+    let val = unsafe { lookup_key(dict, LAUNCH_KEY_GETJOBS) };
     if !val.is_null() {
         return handle_get_jobs();
     }
 
     // CheckIn
-    let val = lookup_key(dict, LAUNCH_KEY_CHECKIN);
+    let val = unsafe { lookup_key(dict, LAUNCH_KEY_CHECKIN) };
     if !val.is_null() {
-        return handle_checkin(val);
+        return unsafe { handle_checkin(val) };
     }
 
     // SetUserEnvironment
-    let val = lookup_key(dict, LAUNCH_KEY_SETUSERENVIRONMENT);
+    let val = unsafe { lookup_key(dict, LAUNCH_KEY_SETUSERENVIRONMENT) };
     if !val.is_null() {
-        return handle_set_user_environment(val);
+        return unsafe { handle_set_user_environment(val) };
     }
 
     // UnsetUserEnvironment
-    let val = lookup_key(dict, LAUNCH_KEY_UNSETUSERENVIRONMENT);
+    let val = unsafe { lookup_key(dict, LAUNCH_KEY_UNSETUSERENVIRONMENT) };
     if !val.is_null() {
-        return handle_unset_user_environment(val);
+        return unsafe { handle_unset_user_environment(val) };
     }
 
     log::debug!("launch_msg: unrecognized dictionary request");
@@ -151,8 +157,12 @@ fn handle_string_command(cmd: &str, _value: LaunchDataT) -> LaunchDataT {
 
 // ── Command handlers ────────────────────────────────────────────────
 
-fn handle_submit_job(job_dict: LaunchDataT) -> LaunchDataT {
-    match job::Job::from_launch_data(job_dict) {
+// SAFETY: Pointer-taking handlers receive borrowed children of the live,
+// exclusively accessible request supplied to launch_msg. They do not retain,
+// transfer, or free those handles. Only newly allocated replies are returned.
+
+unsafe fn handle_submit_job(job_dict: LaunchDataT) -> LaunchDataT {
+    match unsafe { job::Job::from_launch_data(job_dict) } {
         Some(j) => {
             let label = j.label.clone();
             match job::submit_job(j) {
@@ -173,8 +183,8 @@ fn handle_submit_job(job_dict: LaunchDataT) -> LaunchDataT {
     }
 }
 
-fn handle_remove_job(value: LaunchDataT) -> LaunchDataT {
-    let label = extract_string(value);
+unsafe fn handle_remove_job(value: LaunchDataT) -> LaunchDataT {
+    let label = unsafe { extract_string(value) };
     match label {
         Some(l) => match job::remove_job(&l) {
             Ok(()) => make_errno_reply(0),
@@ -184,8 +194,8 @@ fn handle_remove_job(value: LaunchDataT) -> LaunchDataT {
     }
 }
 
-fn handle_start_job(value: LaunchDataT) -> LaunchDataT {
-    let label = extract_string(value);
+unsafe fn handle_start_job(value: LaunchDataT) -> LaunchDataT {
+    let label = unsafe { extract_string(value) };
     match label {
         Some(l) => {
             if job::get_job(&l).is_some() {
@@ -199,8 +209,8 @@ fn handle_start_job(value: LaunchDataT) -> LaunchDataT {
     }
 }
 
-fn handle_stop_job(value: LaunchDataT) -> LaunchDataT {
-    let label = extract_string(value);
+unsafe fn handle_stop_job(value: LaunchDataT) -> LaunchDataT {
+    let label = unsafe { extract_string(value) };
     match label {
         Some(l) => {
             if job::get_job(&l).is_some() {
@@ -214,8 +224,8 @@ fn handle_stop_job(value: LaunchDataT) -> LaunchDataT {
     }
 }
 
-fn handle_get_job(value: LaunchDataT) -> LaunchDataT {
-    let label = extract_string(value);
+unsafe fn handle_get_job(value: LaunchDataT) -> LaunchDataT {
+    let label = unsafe { extract_string(value) };
     match label {
         Some(l) => match job::get_job(&l) {
             Some(j) => j.to_launch_data(),
@@ -226,23 +236,25 @@ fn handle_get_job(value: LaunchDataT) -> LaunchDataT {
 }
 
 fn handle_get_jobs() -> LaunchDataT {
+    // SAFETY: All handles are newly allocated here, values are transferred once, and
+    // each CString remains alive until dict_insert has copied its key.
     let labels = job::get_all_job_labels();
     let dict = launch_data::alloc(LaunchDataType::Dictionary as u32);
     for label in &labels {
         if let Some(j) = job::get_job(label) {
             let pid = launch_data::new_integer(i64::from(j.pid));
             let c_key = std::ffi::CString::new(label.as_str()).unwrap_or_default();
-            launch_data::dict_insert(dict, pid, c_key.as_ptr());
+            unsafe { launch_data::dict_insert(dict, pid, c_key.as_ptr()) };
         }
     }
     dict
 }
 
-fn handle_checkin(value: LaunchDataT) -> LaunchDataT {
+unsafe fn handle_checkin(value: LaunchDataT) -> LaunchDataT {
     // value may be a bool (true = check in current job) or a string (label)
-    let ty = launch_data::get_type(value);
+    let ty = unsafe { launch_data::get_type(value) };
     let label = if ty == LaunchDataType::String as u32 {
-        extract_string(value)
+        unsafe { extract_string(value) }
     } else {
         // Use env var as label hint
         std::env::var("LAUNCHD_JOB_LABEL").ok()
@@ -257,9 +269,9 @@ fn handle_checkin(value: LaunchDataT) -> LaunchDataT {
     }
 }
 
-fn handle_set_user_environment(value: LaunchDataT) -> LaunchDataT {
+unsafe fn handle_set_user_environment(value: LaunchDataT) -> LaunchDataT {
     // Expect a dictionary of key=value pairs
-    if launch_data::get_type(value) != LaunchDataType::Dictionary as u32 {
+    if unsafe { launch_data::get_type(value) } != LaunchDataType::Dictionary as u32 {
         return make_errno_reply(libc::EINVAL);
     }
 
@@ -268,10 +280,12 @@ fn handle_set_user_environment(value: LaunchDataT) -> LaunchDataT {
         key: *const libc::c_char,
         _ctx: *mut libc::c_void,
     ) {
+        // SAFETY: dict_iterate supplies live borrowed key/value pointers for
+        // this callback. It only reads them and does not access the dictionary.
         if key.is_null() || val.is_null() {
             return;
         }
-        let sptr = launch_data::get_string(val);
+        let sptr = unsafe { launch_data::get_string(val) };
         if sptr.is_null() {
             return;
         }
@@ -283,12 +297,14 @@ fn handle_set_user_environment(value: LaunchDataT) -> LaunchDataT {
         }
     }
 
-    launch_data::dict_iterate(value, set_env, std::ptr::null_mut());
+    // SAFETY: value is part of the exclusively accessible request. The callback
+    // uses no context and keeps neither the key nor the value beyond this call.
+    unsafe { launch_data::dict_iterate(value, set_env, std::ptr::null_mut()) };
     make_errno_reply(0)
 }
 
-fn handle_unset_user_environment(value: LaunchDataT) -> LaunchDataT {
-    let name = extract_string(value);
+unsafe fn handle_unset_user_environment(value: LaunchDataT) -> LaunchDataT {
+    let name = unsafe { extract_string(value) };
     if let Some(n) = name {
         unsafe { std::env::remove_var(&n) };
         log::debug!("launch_msg: unsetenv {}", n);
@@ -300,18 +316,18 @@ fn handle_unset_user_environment(value: LaunchDataT) -> LaunchDataT {
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
-fn lookup_key(dict: LaunchDataT, key: &str) -> LaunchDataT {
+unsafe fn lookup_key(dict: LaunchDataT, key: &str) -> LaunchDataT {
     let c_key = std::ffi::CString::new(key).unwrap_or_default();
-    launch_data::dict_lookup(dict, c_key.as_ptr())
+    unsafe { launch_data::dict_lookup(dict, c_key.as_ptr()) }
 }
 
-fn extract_string(handle: LaunchDataT) -> Option<String> {
+unsafe fn extract_string(handle: LaunchDataT) -> Option<String> {
     if handle.is_null() {
         return None;
     }
-    let ty = launch_data::get_type(handle);
+    let ty = unsafe { launch_data::get_type(handle) };
     if ty == LaunchDataType::String as u32 {
-        let ptr = launch_data::get_string(handle);
+        let ptr = unsafe { launch_data::get_string(handle) };
         if ptr.is_null() {
             return None;
         }
@@ -326,7 +342,7 @@ fn make_errno_reply(errno: i32) -> LaunchDataT {
     let d = launch_data::alloc(LaunchDataType::Errno as u32);
     if !d.is_null() {
         // Replace with the right errno
-        if let Some(data) = unsafe { (d as *mut LaunchData).as_mut() } {
+        if let Some(data) = unsafe { d.as_mut() } {
             *data = LaunchData::Errno(errno);
         }
     }
@@ -339,6 +355,10 @@ fn make_errno_reply(errno: i32) -> LaunchDataT {
 
 #[cfg(test)]
 mod tests {
+    // SAFETY: Request trees are locally owned and remain live through each
+    // call. Child ownership is transferred once; requests and replies are
+    // freed only through their owning handles.
+
     use super::*;
     use crate::launch_data::*;
     use std::sync::atomic::{AtomicU32, Ordering};
@@ -357,267 +377,301 @@ mod tests {
 
     #[test]
     fn null_request_returns_null() {
-        assert!(launch_msg(LAUNCH_DATA_NULL).is_null());
+        let _state_guard = crate::lock_test_state();
+        assert!(unsafe { launch_msg(LAUNCH_DATA_NULL) }.is_null());
     }
 
     #[test]
     fn submit_and_get_via_launch_msg() {
+        let _state_guard = crate::lock_test_state();
         let label = unique_label("sub");
         let c_label = std::ffi::CString::new(label.clone()).unwrap();
 
         // Build a SubmitJob request
         let job_dict = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(job_dict, new_string(c_label.as_ptr()), c"Label".as_ptr());
-        dict_insert(
-            job_dict,
-            new_string(c"/bin/true".as_ptr()),
-            c"Program".as_ptr(),
-        );
+        unsafe { dict_insert(job_dict, new_string(c_label.as_ptr()), c"Label".as_ptr()) };
+        unsafe {
+            dict_insert(
+                job_dict,
+                new_string(c"/bin/true".as_ptr()),
+                c"Program".as_ptr(),
+            )
+        };
 
         let request = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(request, job_dict, c"SubmitJob".as_ptr());
+        unsafe { dict_insert(request, job_dict, c"SubmitJob".as_ptr()) };
 
-        let reply = launch_msg(request);
+        let reply = unsafe { launch_msg(request) };
         assert!(!reply.is_null());
-        assert_eq!(get_type(reply), LaunchDataType::Errno as u32);
-        assert_eq!(get_errno(reply), 0); // success
-        free(reply);
-        free(request);
+        assert_eq!(unsafe { get_type(reply) }, LaunchDataType::Errno as u32);
+        assert_eq!(unsafe { get_errno(reply) }, 0); // success
+        unsafe { free(reply) };
+        unsafe { free(request) };
 
         // GetJob
         let get_req = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(get_req, new_string(c_label.as_ptr()), c"GetJob".as_ptr());
-        let reply = launch_msg(get_req);
+        unsafe { dict_insert(get_req, new_string(c_label.as_ptr()), c"GetJob".as_ptr()) };
+        let reply = unsafe { launch_msg(get_req) };
         assert!(!reply.is_null());
-        assert_eq!(get_type(reply), LaunchDataType::Dictionary as u32);
         assert_eq!(
-            dict_get_string_value(reply, "Label").as_deref(),
+            unsafe { get_type(reply) },
+            LaunchDataType::Dictionary as u32
+        );
+        assert_eq!(
+            unsafe { dict_get_string_value(reply, "Label") }.as_deref(),
             Some(label.as_str())
         );
-        free(reply);
-        free(get_req);
+        unsafe { free(reply) };
+        unsafe { free(get_req) };
     }
 
     #[test]
     fn remove_via_launch_msg() {
+        let _state_guard = crate::lock_test_state();
         let label = unique_label("rm");
         let c_label = std::ffi::CString::new(label.clone()).unwrap();
         job::submit_job(job::Job::new(&label)).unwrap();
 
         let request = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(request, new_string(c_label.as_ptr()), c"RemoveJob".as_ptr());
+        unsafe { dict_insert(request, new_string(c_label.as_ptr()), c"RemoveJob".as_ptr()) };
 
-        let reply = launch_msg(request);
-        assert_eq!(get_errno(reply), 0);
-        free(reply);
-        free(request);
+        let reply = unsafe { launch_msg(request) };
+        assert_eq!(unsafe { get_errno(reply) }, 0);
+        unsafe { free(reply) };
+        unsafe { free(request) };
 
         assert!(job::get_job(&label).is_none());
     }
 
     #[test]
     fn get_jobs_returns_dict() {
+        let _state_guard = crate::lock_test_state();
         let l1 = unique_label("gj1");
         let l2 = unique_label("gj2");
         job::submit_job(job::Job::new(&l1)).unwrap();
         job::submit_job(job::Job::new(&l2)).unwrap();
 
         let request = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(request, new_bool(true), c"GetJobs".as_ptr());
+        unsafe { dict_insert(request, new_bool(true), c"GetJobs".as_ptr()) };
 
-        let reply = launch_msg(request);
-        assert_eq!(get_type(reply), LaunchDataType::Dictionary as u32);
+        let reply = unsafe { launch_msg(request) };
+        assert_eq!(
+            unsafe { get_type(reply) },
+            LaunchDataType::Dictionary as u32
+        );
         // At least 2 jobs (may be more from parallel tests)
-        assert!(dict_get_count(reply) >= 2);
-        free(reply);
-        free(request);
+        assert!(unsafe { dict_get_count(reply) } >= 2);
+        unsafe { free(reply) };
+        unsafe { free(request) };
     }
 
     #[test]
     fn string_command_getjobs() {
+        let _state_guard = crate::lock_test_state();
         let label = unique_label("strj");
         job::submit_job(job::Job::new(&label)).unwrap();
 
-        let request = new_string(c"GetJobs".as_ptr());
-        let reply = launch_msg(request);
-        assert_eq!(get_type(reply), LaunchDataType::Dictionary as u32);
+        let request = unsafe { new_string(c"GetJobs".as_ptr()) };
+        let reply = unsafe { launch_msg(request) };
+        assert_eq!(
+            unsafe { get_type(reply) },
+            LaunchDataType::Dictionary as u32
+        );
         // At least 1 job
-        assert!(dict_get_count(reply) >= 1);
-        free(reply);
-        free(request);
+        assert!(unsafe { dict_get_count(reply) } >= 1);
+        unsafe { free(reply) };
+        unsafe { free(request) };
     }
 
     #[test]
     fn duplicate_submit_returns_eexist() {
+        let _state_guard = crate::lock_test_state();
         let label = unique_label("dup");
         let c_label = std::ffi::CString::new(label.clone()).unwrap();
         job::submit_job(job::Job::new(&label)).unwrap();
 
         let job_dict = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(job_dict, new_string(c_label.as_ptr()), c"Label".as_ptr());
+        unsafe { dict_insert(job_dict, new_string(c_label.as_ptr()), c"Label".as_ptr()) };
 
         let request = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(request, job_dict, c"SubmitJob".as_ptr());
+        unsafe { dict_insert(request, job_dict, c"SubmitJob".as_ptr()) };
 
-        let reply = launch_msg(request);
-        assert_eq!(get_errno(reply), libc::EEXIST);
-        free(reply);
-        free(request);
+        let reply = unsafe { launch_msg(request) };
+        assert_eq!(unsafe { get_errno(reply) }, libc::EEXIST);
+        unsafe { free(reply) };
+        unsafe { free(request) };
     }
 
     // ── Additional coverage ─────────────────────────────────────
 
     #[test]
     fn start_job_via_launch_msg() {
+        let _state_guard = crate::lock_test_state();
         let label = unique_label("start");
         let c_label = std::ffi::CString::new(label.clone()).unwrap();
         job::submit_job(job::Job::new(&label)).unwrap();
 
         let request = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(request, new_string(c_label.as_ptr()), c"StartJob".as_ptr());
-        let reply = launch_msg(request);
-        assert_eq!(get_errno(reply), 0);
-        free(reply);
-        free(request);
+        unsafe { dict_insert(request, new_string(c_label.as_ptr()), c"StartJob".as_ptr()) };
+        let reply = unsafe { launch_msg(request) };
+        assert_eq!(unsafe { get_errno(reply) }, 0);
+        unsafe { free(reply) };
+        unsafe { free(request) };
     }
 
     #[test]
     fn stop_job_via_launch_msg() {
+        let _state_guard = crate::lock_test_state();
         let label = unique_label("stop");
         let c_label = std::ffi::CString::new(label.clone()).unwrap();
         job::submit_job(job::Job::new(&label)).unwrap();
 
         let request = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(request, new_string(c_label.as_ptr()), c"StopJob".as_ptr());
-        let reply = launch_msg(request);
-        assert_eq!(get_errno(reply), 0);
-        free(reply);
-        free(request);
+        unsafe { dict_insert(request, new_string(c_label.as_ptr()), c"StopJob".as_ptr()) };
+        let reply = unsafe { launch_msg(request) };
+        assert_eq!(unsafe { get_errno(reply) }, 0);
+        unsafe { free(reply) };
+        unsafe { free(request) };
     }
 
     #[test]
     fn start_nonexistent_job_returns_esrch() {
+        let _state_guard = crate::lock_test_state();
         let c_label = std::ffi::CString::new("com.nonexistent.start.42").unwrap();
         let request = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(request, new_string(c_label.as_ptr()), c"StartJob".as_ptr());
-        let reply = launch_msg(request);
-        assert_eq!(get_errno(reply), libc::ESRCH);
-        free(reply);
-        free(request);
+        unsafe { dict_insert(request, new_string(c_label.as_ptr()), c"StartJob".as_ptr()) };
+        let reply = unsafe { launch_msg(request) };
+        assert_eq!(unsafe { get_errno(reply) }, libc::ESRCH);
+        unsafe { free(reply) };
+        unsafe { free(request) };
     }
 
     #[test]
     fn stop_nonexistent_job_returns_esrch() {
+        let _state_guard = crate::lock_test_state();
         let c_label = std::ffi::CString::new("com.nonexistent.stop.42").unwrap();
         let request = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(request, new_string(c_label.as_ptr()), c"StopJob".as_ptr());
-        let reply = launch_msg(request);
-        assert_eq!(get_errno(reply), libc::ESRCH);
-        free(reply);
-        free(request);
+        unsafe { dict_insert(request, new_string(c_label.as_ptr()), c"StopJob".as_ptr()) };
+        let reply = unsafe { launch_msg(request) };
+        assert_eq!(unsafe { get_errno(reply) }, libc::ESRCH);
+        unsafe { free(reply) };
+        unsafe { free(request) };
     }
 
     #[test]
     fn get_nonexistent_job_returns_esrch() {
+        let _state_guard = crate::lock_test_state();
         let c_label = std::ffi::CString::new("com.nonexistent.get.42").unwrap();
         let request = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(request, new_string(c_label.as_ptr()), c"GetJob".as_ptr());
-        let reply = launch_msg(request);
-        assert_eq!(get_errno(reply), libc::ESRCH);
-        free(reply);
-        free(request);
+        unsafe { dict_insert(request, new_string(c_label.as_ptr()), c"GetJob".as_ptr()) };
+        let reply = unsafe { launch_msg(request) };
+        assert_eq!(unsafe { get_errno(reply) }, libc::ESRCH);
+        unsafe { free(reply) };
+        unsafe { free(request) };
     }
 
     #[test]
     fn remove_nonexistent_job_returns_esrch() {
+        let _state_guard = crate::lock_test_state();
         let c_label = std::ffi::CString::new("com.nonexistent.rm.42").unwrap();
         let request = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(request, new_string(c_label.as_ptr()), c"RemoveJob".as_ptr());
-        let reply = launch_msg(request);
-        assert_eq!(get_errno(reply), libc::ESRCH);
-        free(reply);
-        free(request);
+        unsafe { dict_insert(request, new_string(c_label.as_ptr()), c"RemoveJob".as_ptr()) };
+        let reply = unsafe { launch_msg(request) };
+        assert_eq!(unsafe { get_errno(reply) }, libc::ESRCH);
+        unsafe { free(reply) };
+        unsafe { free(request) };
     }
 
     #[test]
     fn submit_invalid_job_dict_returns_einval() {
+        let _state_guard = crate::lock_test_state();
         // Job dict with no Label
         let job_dict = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(
-            job_dict,
-            new_string(c"/bin/true".as_ptr()),
-            c"Program".as_ptr(),
-        );
+        unsafe {
+            dict_insert(
+                job_dict,
+                new_string(c"/bin/true".as_ptr()),
+                c"Program".as_ptr(),
+            )
+        };
 
         let request = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(request, job_dict, c"SubmitJob".as_ptr());
-        let reply = launch_msg(request);
-        assert_eq!(get_errno(reply), libc::EINVAL);
-        free(reply);
-        free(request);
+        unsafe { dict_insert(request, job_dict, c"SubmitJob".as_ptr()) };
+        let reply = unsafe { launch_msg(request) };
+        assert_eq!(unsafe { get_errno(reply) }, libc::EINVAL);
+        unsafe { free(reply) };
+        unsafe { free(request) };
     }
 
     #[test]
     fn unrecognized_dict_command_returns_enotsup() {
+        let _state_guard = crate::lock_test_state();
         let request = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(request, new_bool(true), c"BogusCommand".as_ptr());
-        let reply = launch_msg(request);
-        assert_eq!(get_errno(reply), libc::ENOTSUP);
-        free(reply);
-        free(request);
+        unsafe { dict_insert(request, new_bool(true), c"BogusCommand".as_ptr()) };
+        let reply = unsafe { launch_msg(request) };
+        assert_eq!(unsafe { get_errno(reply) }, libc::ENOTSUP);
+        unsafe { free(reply) };
+        unsafe { free(request) };
     }
 
     #[test]
     fn unrecognized_string_command_returns_enotsup() {
-        let request = new_string(c"BogusStringCmd".as_ptr());
-        let reply = launch_msg(request);
-        assert_eq!(get_errno(reply), libc::ENOTSUP);
-        free(reply);
-        free(request);
+        let _state_guard = crate::lock_test_state();
+        let request = unsafe { new_string(c"BogusStringCmd".as_ptr()) };
+        let reply = unsafe { launch_msg(request) };
+        assert_eq!(unsafe { get_errno(reply) }, libc::ENOTSUP);
+        unsafe { free(reply) };
+        unsafe { free(request) };
     }
 
     #[test]
     fn integer_request_returns_einval() {
+        let _state_guard = crate::lock_test_state();
         let request = new_integer(42);
-        let reply = launch_msg(request);
-        assert_eq!(get_errno(reply), libc::EINVAL);
-        free(reply);
-        free(request);
+        let reply = unsafe { launch_msg(request) };
+        assert_eq!(unsafe { get_errno(reply) }, libc::EINVAL);
+        unsafe { free(reply) };
+        unsafe { free(request) };
     }
 
     #[test]
     fn shutdown_string_command() {
-        let request = new_string(c"Shutdown".as_ptr());
-        let reply = launch_msg(request);
-        assert_eq!(get_errno(reply), 0);
-        free(reply);
-        free(request);
+        let _state_guard = crate::lock_test_state();
+        let request = unsafe { new_string(c"Shutdown".as_ptr()) };
+        let reply = unsafe { launch_msg(request) };
+        assert_eq!(unsafe { get_errno(reply) }, 0);
+        unsafe { free(reply) };
+        unsafe { free(request) };
     }
 
     #[test]
     fn single_user_string_command() {
-        let request = new_string(c"SingleUser".as_ptr());
-        let reply = launch_msg(request);
-        assert_eq!(get_errno(reply), 0);
-        free(reply);
-        free(request);
+        let _state_guard = crate::lock_test_state();
+        let request = unsafe { new_string(c"SingleUser".as_ptr()) };
+        let reply = unsafe { launch_msg(request) };
+        assert_eq!(unsafe { get_errno(reply) }, 0);
+        unsafe { free(reply) };
+        unsafe { free(request) };
     }
 
     #[test]
     fn set_user_environment_via_launch_msg() {
+        let _state_guard = crate::lock_test_state();
         let env_dict = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(
-            env_dict,
-            new_string(c"bar".as_ptr()),
-            c"LAUNCHD_TEST_FOO".as_ptr(),
-        );
+        unsafe {
+            dict_insert(
+                env_dict,
+                new_string(c"bar".as_ptr()),
+                c"LAUNCHD_TEST_FOO".as_ptr(),
+            )
+        };
 
         let request = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(request, env_dict, c"SetUserEnvironment".as_ptr());
-        let reply = launch_msg(request);
-        assert_eq!(get_errno(reply), 0);
-        free(reply);
-        free(request);
+        unsafe { dict_insert(request, env_dict, c"SetUserEnvironment".as_ptr()) };
+        let reply = unsafe { launch_msg(request) };
+        assert_eq!(unsafe { get_errno(reply) }, 0);
+        unsafe { free(reply) };
+        unsafe { free(request) };
 
         assert_eq!(std::env::var("LAUNCHD_TEST_FOO").as_deref(), Ok("bar"));
         // Cleanup
@@ -628,74 +682,88 @@ mod tests {
 
     #[test]
     fn set_user_environment_non_dict_returns_einval() {
+        let _state_guard = crate::lock_test_state();
         let request = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(
-            request,
-            new_string(c"not_a_dict".as_ptr()),
-            c"SetUserEnvironment".as_ptr(),
-        );
-        let reply = launch_msg(request);
-        assert_eq!(get_errno(reply), libc::EINVAL);
-        free(reply);
-        free(request);
+        unsafe {
+            dict_insert(
+                request,
+                new_string(c"not_a_dict".as_ptr()),
+                c"SetUserEnvironment".as_ptr(),
+            )
+        };
+        let reply = unsafe { launch_msg(request) };
+        assert_eq!(unsafe { get_errno(reply) }, libc::EINVAL);
+        unsafe { free(reply) };
+        unsafe { free(request) };
     }
 
     #[test]
     fn unset_user_environment_via_launch_msg() {
+        let _state_guard = crate::lock_test_state();
         std::env::set_var("LAUNCHD_TEST_UNSET", "value");
         let request = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(
-            request,
-            new_string(c"LAUNCHD_TEST_UNSET".as_ptr()),
-            c"UnsetUserEnvironment".as_ptr(),
-        );
-        let reply = launch_msg(request);
-        assert_eq!(get_errno(reply), 0);
-        free(reply);
-        free(request);
+        unsafe {
+            dict_insert(
+                request,
+                new_string(c"LAUNCHD_TEST_UNSET".as_ptr()),
+                c"UnsetUserEnvironment".as_ptr(),
+            )
+        };
+        let reply = unsafe { launch_msg(request) };
+        assert_eq!(unsafe { get_errno(reply) }, 0);
+        unsafe { free(reply) };
+        unsafe { free(request) };
         assert!(std::env::var("LAUNCHD_TEST_UNSET").is_err());
     }
 
     #[test]
     fn unset_user_environment_non_string_returns_einval() {
+        let _state_guard = crate::lock_test_state();
         let request = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(request, new_integer(42), c"UnsetUserEnvironment".as_ptr());
-        let reply = launch_msg(request);
-        assert_eq!(get_errno(reply), libc::EINVAL);
-        free(reply);
-        free(request);
+        unsafe { dict_insert(request, new_integer(42), c"UnsetUserEnvironment".as_ptr()) };
+        let reply = unsafe { launch_msg(request) };
+        assert_eq!(unsafe { get_errno(reply) }, libc::EINVAL);
+        unsafe { free(reply) };
+        unsafe { free(request) };
     }
 
     #[test]
     fn checkin_with_string_label_via_dict() {
+        let _state_guard = crate::lock_test_state();
         let label = unique_label("checkin_dict");
         let c_label = std::ffi::CString::new(label.clone()).unwrap();
         job::submit_job(job::Job::new(&label)).unwrap();
 
         let request = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(request, new_string(c_label.as_ptr()), c"CheckIn".as_ptr());
-        let reply = launch_msg(request);
+        unsafe { dict_insert(request, new_string(c_label.as_ptr()), c"CheckIn".as_ptr()) };
+        let reply = unsafe { launch_msg(request) };
         // Should return the job dict
-        assert_eq!(get_type(reply), LaunchDataType::Dictionary as u32);
         assert_eq!(
-            dict_get_string_value(reply, "Label").as_deref(),
+            unsafe { get_type(reply) },
+            LaunchDataType::Dictionary as u32
+        );
+        assert_eq!(
+            unsafe { dict_get_string_value(reply, "Label") }.as_deref(),
             Some(label.as_str())
         );
-        free(reply);
-        free(request);
+        unsafe { free(reply) };
+        unsafe { free(request) };
     }
 
     #[test]
     fn checkin_nonexistent_returns_esrch() {
+        let _state_guard = crate::lock_test_state();
         let request = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(
-            request,
-            new_string(c"com.nonexistent.checkin.42".as_ptr()),
-            c"CheckIn".as_ptr(),
-        );
-        let reply = launch_msg(request);
-        assert_eq!(get_errno(reply), libc::ESRCH);
-        free(reply);
-        free(request);
+        unsafe {
+            dict_insert(
+                request,
+                new_string(c"com.nonexistent.checkin.42".as_ptr()),
+                c"CheckIn".as_ptr(),
+            )
+        };
+        let reply = unsafe { launch_msg(request) };
+        assert_eq!(unsafe { get_errno(reply) }, libc::ESRCH);
+        unsafe { free(reply) };
+        unsafe { free(request) };
     }
 }

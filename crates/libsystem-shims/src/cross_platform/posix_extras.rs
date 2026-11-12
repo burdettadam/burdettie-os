@@ -530,12 +530,20 @@ pub extern "C" fn shim_atexit_b(block: u64) -> c_int {
 /// Resolves a service name to a synthetic Mach port via the launchd
 /// bootstrap service registry. Returns `KERN_SUCCESS` (0) on success,
 /// or `BOOTSTRAP_UNKNOWN_SERVICE` (1102) if the name is NULL.
-pub extern "C" fn shim_bootstrap_look_up(
+///
+/// # Safety
+/// `service_name` must be null or a readable, NUL-terminated string that
+/// remains unchanged for the call. `sp` must be null or an aligned,
+/// exclusively writable `u32`, as required by
+/// [`launchd::bootstrap::bootstrap_look_up`].
+pub unsafe extern "C" fn shim_bootstrap_look_up(
     bp: u32,
     service_name: *const c_char,
     sp: *mut u32,
 ) -> c_int {
-    launchd::bootstrap::bootstrap_look_up(bp, service_name, sp) as c_int
+    // SAFETY: The caller supplies the readable C string and writable output
+    // required by bootstrap_look_up; the wrapper forwards them unchanged.
+    unsafe { launchd::bootstrap::bootstrap_look_up(bp, service_name, sp) as c_int }
 }
 
 // ── posix_spawn core ────────────────────────────────────────────────
@@ -1332,14 +1340,17 @@ mod tests {
     fn test_bootstrap_look_up() {
         // NULL service name + NULL sp → BOOTSTRAP_BAD_COUNT (1104)
         // (sp is checked first in launchd::bootstrap::bootstrap_look_up)
+        // SAFETY: Null inputs are explicitly accepted as an error case.
         assert_eq!(
-            shim_bootstrap_look_up(0, std::ptr::null(), std::ptr::null_mut()),
+            unsafe { shim_bootstrap_look_up(0, std::ptr::null(), std::ptr::null_mut()) },
             1104
         );
         // Valid service name → KERN_SUCCESS (0) + non-zero port
         let name = b"com.apple.test.service\0";
         let mut port: u32 = 0;
-        let result = shim_bootstrap_look_up(0, name.as_ptr() as *const c_char, &mut port);
+        // SAFETY: name is NUL-terminated and alive; port is an exclusive local output.
+        let result =
+            unsafe { shim_bootstrap_look_up(0, name.as_ptr() as *const c_char, &mut port) };
         assert_eq!(result, 0);
         assert!(port >= 0x1000);
     }

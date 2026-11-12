@@ -51,65 +51,86 @@ pub fn install_defaults() {
     log::debug!("launchd: installed default bootstrap services");
 }
 
+/// Keep shared-state unit tests isolated across registry resets and assertions.
+#[cfg(test)]
+pub(crate) fn lock_test_state() -> std::sync::MutexGuard<'static, ()> {
+    static TEST_STATE: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    TEST_STATE.lock().unwrap_or_else(|error| error.into_inner())
+}
+
 #[cfg(test)]
 mod tests {
+    // SAFETY: Calls below use live C strings, exclusive local outputs, and
+    // owned launch-data trees whose children are transferred exactly once.
+
     use super::*;
 
     #[test]
     fn full_lifecycle() {
+        let _state_guard = crate::lock_test_state();
         // Install defaults (idempotent — already-registered services are skipped)
         install_defaults();
 
         // Bootstrap look up a default service
         let mut port: u32 = 0;
-        let r = bootstrap::bootstrap_look_up(
-            bootstrap::get_bootstrap_port(),
-            c"com.apple.xpc.launchd".as_ptr(),
-            &mut port,
-        );
+        let r = unsafe {
+            bootstrap::bootstrap_look_up(
+                bootstrap::get_bootstrap_port(),
+                c"com.apple.xpc.launchd".as_ptr(),
+                &mut port,
+            )
+        };
         assert_eq!(r, constants::BOOTSTRAP_SUCCESS);
         assert_ne!(port, 0);
 
         // Submit a job with a unique label
         use launch_data::*;
         let job_dict = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(
-            job_dict,
-            new_string(c"com.test.lifecycle.integ".as_ptr()),
-            c"Label".as_ptr(),
-        );
-        dict_insert(
-            job_dict,
-            new_string(c"/bin/sleep".as_ptr()),
-            c"Program".as_ptr(),
-        );
-        dict_insert(job_dict, new_bool(true), c"RunAtLoad".as_ptr());
+        unsafe {
+            dict_insert(
+                job_dict,
+                new_string(c"com.test.lifecycle.integ".as_ptr()),
+                c"Label".as_ptr(),
+            )
+        };
+        unsafe {
+            dict_insert(
+                job_dict,
+                new_string(c"/bin/sleep".as_ptr()),
+                c"Program".as_ptr(),
+            )
+        };
+        unsafe { dict_insert(job_dict, new_bool(true), c"RunAtLoad".as_ptr()) };
 
         // Add MachServices
         let mach_dict = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(
-            mach_dict,
-            new_bool(true),
-            c"com.test.lifecycle.integ.port".as_ptr(),
-        );
-        dict_insert(job_dict, mach_dict, c"MachServices".as_ptr());
+        unsafe {
+            dict_insert(
+                mach_dict,
+                new_bool(true),
+                c"com.test.lifecycle.integ.port".as_ptr(),
+            )
+        };
+        unsafe { dict_insert(job_dict, mach_dict, c"MachServices".as_ptr()) };
 
         let req = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(req, job_dict, c"SubmitJob".as_ptr());
-        let reply = launch_msg::launch_msg(req);
+        unsafe { dict_insert(req, job_dict, c"SubmitJob".as_ptr()) };
+        let reply = unsafe { launch_msg::launch_msg(req) };
         // May fail with EEXIST from a previous run — both are fine
-        let errno = get_errno(reply);
+        let errno = unsafe { get_errno(reply) };
         assert!(errno == 0 || errno == libc::EEXIST);
-        free(reply);
-        free(req);
+        unsafe { free(reply) };
+        unsafe { free(req) };
 
         // Check in the mach service via bootstrap (always succeeds even if auto-created)
         let mut svc_port: u32 = 0;
-        let r = bootstrap::bootstrap_check_in(
-            0,
-            c"com.test.lifecycle.integ.port".as_ptr(),
-            &mut svc_port,
-        );
+        let r = unsafe {
+            bootstrap::bootstrap_check_in(
+                0,
+                c"com.test.lifecycle.integ.port".as_ptr(),
+                &mut svc_port,
+            )
+        };
         // Might already be checked in from another run
         assert!(r == constants::BOOTSTRAP_SUCCESS || r == constants::BOOTSTRAP_SERVICE_ACTIVE);
 
@@ -120,11 +141,11 @@ mod tests {
     }
 
     /// This test verifies `reset_all_state()` clears all registries.
-    /// It calls `reset_all_state()` which affects global state and may
-    /// interfere with parallel tests. Run with `--test-threads=1` for
-    /// strict isolation.
+    /// The shared test guard keeps this reset from invalidating another
+    /// test's active registry entries or transaction counters.
     #[test]
     fn reset_clears_specific_items() {
+        let _state_guard = crate::lock_test_state();
         let label = "com.test.reset_unique_82";
         let svc = "com.test.reset_svc_unique_82";
 

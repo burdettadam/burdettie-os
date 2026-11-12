@@ -299,7 +299,8 @@ fn handle_bootstrap_look_up_mig(msg: u64, rcv_size: u32) -> u32 {
     // Look up via the launchd bootstrap registry (auto-creates if missing).
     let mut port: u32 = 0;
     let c_name = std::ffi::CString::new(name).unwrap_or_default();
-    launchd::bootstrap::bootstrap_look_up(0, c_name.as_ptr(), &mut port);
+    // SAFETY: c_name stays alive through the call and port is an exclusive local output.
+    unsafe { launchd::bootstrap::bootstrap_look_up(0, c_name.as_ptr(), &mut port) };
 
     // Write the reply message.
     // Minimum reply = 24 (hdr) + 16 (NDR) + 4 (retcode) + 4 (port) = 48 bytes
@@ -786,31 +787,37 @@ mod tests {
 
     #[test]
     fn bootstrap_look_up_creates_ports() {
+        // SAFETY: Each CString stays alive and all output pointers refer to
+        // exclusive local u32 values for the duration of their calls.
         let name = std::ffi::CString::new("com.test.creates_ports").unwrap();
         let mut port: u32 = 0;
-        let r = launchd::bootstrap::bootstrap_look_up(0, name.as_ptr(), &mut port);
+        let r = unsafe { launchd::bootstrap::bootstrap_look_up(0, name.as_ptr(), &mut port) };
         assert_eq!(r, 0);
         assert!(port >= 0x1000, "port {:#x} should be >= 0x1000", port);
     }
 
     #[test]
     fn bootstrap_look_up_same_service_same_port() {
+        // SAFETY: Each CString stays alive and all output pointers refer to
+        // exclusive local u32 values for the duration of their calls.
         let name = std::ffi::CString::new("com.test.same_service_shim").unwrap();
         let mut p1: u32 = 0;
         let mut p2: u32 = 0;
-        launchd::bootstrap::bootstrap_look_up(0, name.as_ptr(), &mut p1);
-        launchd::bootstrap::bootstrap_look_up(0, name.as_ptr(), &mut p2);
+        unsafe { launchd::bootstrap::bootstrap_look_up(0, name.as_ptr(), &mut p1) };
+        unsafe { launchd::bootstrap::bootstrap_look_up(0, name.as_ptr(), &mut p2) };
         assert_eq!(p1, p2);
     }
 
     #[test]
     fn bootstrap_look_up_different_services_different_ports() {
+        // SAFETY: Each CString stays alive and all output pointers refer to
+        // exclusive local u32 values for the duration of their calls.
         let a = std::ffi::CString::new("com.test.service_a_shim").unwrap();
         let b = std::ffi::CString::new("com.test.service_b_shim").unwrap();
         let mut p1: u32 = 0;
         let mut p2: u32 = 0;
-        launchd::bootstrap::bootstrap_look_up(0, a.as_ptr(), &mut p1);
-        launchd::bootstrap::bootstrap_look_up(0, b.as_ptr(), &mut p2);
+        unsafe { launchd::bootstrap::bootstrap_look_up(0, a.as_ptr(), &mut p1) };
+        unsafe { launchd::bootstrap::bootstrap_look_up(0, b.as_ptr(), &mut p2) };
         assert_ne!(p1, p2);
     }
 

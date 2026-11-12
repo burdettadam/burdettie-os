@@ -61,6 +61,8 @@ fn alloc_handle() -> usize {
 // ═══════════════════════════════════════════════════════════════════
 
 /// `vproc_strerror(err)` → string.
+///
+/// Only tests whether `err` is null; it never dereferences the pointer.
 pub fn vproc_strerror(err: VprocErrT) -> &'static str {
     if err.is_null() {
         "Success"
@@ -106,17 +108,23 @@ pub fn vproc_standby_end(_vp: VprocT, _handle: VprocStandbyT) {
 // ═══════════════════════════════════════════════════════════════════
 
 /// `vprocmgr_lookup_vproc(label)` → vproc_t.
+///
+/// The label is ignored and never dereferenced in this emulation.
 pub fn vprocmgr_lookup_vproc(_label: *const libc::c_char) -> VprocT {
     // Return a non-null sentinel so callers don't think it failed.
     1usize as VprocT
 }
 
 /// `vproc_retain(vp)` → vp.
+///
+/// Passes the opaque sentinel through without dereferencing it.
 pub fn vproc_retain(vp: VprocT) -> VprocT {
     vp
 }
 
 /// `vproc_release(vp)`.
+///
+/// The opaque sentinel is ignored, not dereferenced or deallocated.
 pub fn vproc_release(_vp: VprocT) {}
 
 // ── Swap operations ─────────────────────────────────────────────────
@@ -155,7 +163,18 @@ fn with_swap<R>(f: impl FnOnce(&mut SwapState) -> R) -> R {
 }
 
 /// `vproc_swap_integer(vp, key, inval, outval)` → vproc_err_t.
-pub fn vproc_swap_integer(_vp: VprocT, key: u32, inval: *const i64, outval: *mut i64) -> VprocErrT {
+///
+/// # Safety
+/// A non-null `inval` must point to an aligned, initialized, readable `i64`;
+/// a non-null `outval` must point to an aligned, writable `i64`. Both must remain
+/// valid for the call, with no conflicting access while the value is read or
+/// written. `_vp` is ignored and is never dereferenced.
+pub unsafe fn vproc_swap_integer(
+    _vp: VprocT,
+    key: u32,
+    inval: *const i64,
+    outval: *mut i64,
+) -> VprocErrT {
     let Some(gsk) = gsk_from_raw(key) else {
         return err_generic();
     };
@@ -200,7 +219,12 @@ pub fn vproc_swap_integer(_vp: VprocT, key: u32, inval: *const i64, outval: *mut
 }
 
 /// `vproc_swap_complex(vp, key, inval, outval)` → vproc_err_t.
-pub fn vproc_swap_complex(
+///
+/// # Safety
+/// `outval` must be null or point to an aligned, exclusively writable
+/// `LaunchDataT`. A returned non-null handle is owned by the caller and must be
+/// freed with `launch_data::free`. `_vp` and `_inval` are never dereferenced.
+pub unsafe fn vproc_swap_complex(
     _vp: VprocT,
     key: u32,
     _inval: crate::launch_data::LaunchDataT,
@@ -219,7 +243,7 @@ pub fn vproc_swap_complex(
                 for (k, v) in std::env::vars() {
                     let c_key = std::ffi::CString::new(k).unwrap_or_default();
                     let c_val = std::ffi::CString::new(v).unwrap_or_default();
-                    dict_insert(dict, new_string(c_val.as_ptr()), c_key.as_ptr());
+                    unsafe { dict_insert(dict, new_string(c_val.as_ptr()), c_key.as_ptr()) };
                 }
                 unsafe {
                     *outval = dict;
@@ -234,7 +258,7 @@ pub fn vproc_swap_complex(
                 let dict = alloc(LaunchDataType::Dictionary as u32);
                 for label in crate::job::get_all_job_labels() {
                     let c_key = std::ffi::CString::new(label).unwrap_or_default();
-                    dict_insert(dict, new_integer(0), c_key.as_ptr());
+                    unsafe { dict_insert(dict, new_integer(0), c_key.as_ptr()) };
                 }
                 unsafe {
                     *outval = dict;
@@ -247,7 +271,12 @@ pub fn vproc_swap_complex(
 }
 
 /// `vproc_swap_string(vp, key, instr, outstr)` → vproc_err_t.
-pub fn vproc_swap_string(
+///
+/// # Safety
+/// `outstr` must be null or point to an aligned, exclusively writable string
+/// pointer. A returned non-null string is owned by the caller and must be freed
+/// with `libc::free`. `_vp` and `_instr` are never dereferenced.
+pub unsafe fn vproc_swap_string(
     _vp: VprocT,
     key: u32,
     _instr: *const libc::c_char,
@@ -279,7 +308,11 @@ pub fn vproc_swap_string(
 static LAST_EXIT_STATUS: AtomicI32 = AtomicI32::new(0);
 
 /// `_vproc_get_last_exit_status(&wstatus)` → vproc_err_t.
-pub fn _vproc_get_last_exit_status(wstatus: *mut i32) -> VprocErrT {
+///
+/// # Safety
+/// `wstatus` must be null or point to an aligned, exclusively writable `i32`
+/// that remains valid for the duration of the call.
+pub unsafe fn _vproc_get_last_exit_status(wstatus: *mut i32) -> VprocErrT {
     if wstatus.is_null() {
         return err_generic();
     }
@@ -295,7 +328,11 @@ pub fn _vproc_set_global_on_demand(_val: bool) -> VprocErrT {
 }
 
 /// `_vproc_send_signal_by_label(label, sig)` → vproc_err_t.
-pub fn _vproc_send_signal_by_label(label: *const libc::c_char, sig: i32) -> VprocErrT {
+///
+/// # Safety
+/// `label` must be null or point to a readable, NUL-terminated C string that
+/// remains unchanged for the duration of the call.
+pub unsafe fn _vproc_send_signal_by_label(label: *const libc::c_char, sig: i32) -> VprocErrT {
     if label.is_null() {
         return err_generic();
     }
@@ -359,7 +396,16 @@ pub fn _vproc_standby_timeout() -> usize {
 }
 
 /// `_vproc_transaction_count_for_pid(pid, &count, &condemned)` → kern_return_t.
-pub fn _vproc_transaction_count_for_pid(_pid: i32, count: *mut i32, condemned: *mut bool) -> u32 {
+///
+/// # Safety
+/// A non-null `count` must point to an aligned, exclusively writable `i32`;
+/// a non-null `condemned` must point to an exclusively writable `bool`. Both
+/// must remain valid for the duration of the call.
+pub unsafe fn _vproc_transaction_count_for_pid(
+    _pid: i32,
+    count: *mut i32,
+    condemned: *mut bool,
+) -> u32 {
     if !count.is_null() {
         unsafe {
             *count = TRANSACTION_COUNT.load(Ordering::Relaxed) as i32;
@@ -436,6 +482,10 @@ pub fn reset_state() {
 
 #[cfg(test)]
 mod tests {
+    // SAFETY: Non-null pointer arguments refer to live local values or owned
+    // launch-data handles. Outputs are exclusive, and returned allocations
+    // remain alive until explicitly freed by the test.
+
     use super::*;
 
     fn setup() {
@@ -444,6 +494,7 @@ mod tests {
 
     #[test]
     fn transaction_begin_end() {
+        let _state_guard = crate::lock_test_state();
         setup();
         assert_eq!(_vproc_transaction_count(), 0);
         let h = vproc_transaction_begin(std::ptr::null_mut());
@@ -455,6 +506,7 @@ mod tests {
 
     #[test]
     fn multiple_transactions() {
+        let _state_guard = crate::lock_test_state();
         setup();
         _vproc_transaction_begin();
         _vproc_transaction_begin();
@@ -466,6 +518,7 @@ mod tests {
 
     #[test]
     fn standby_begin_end() {
+        let _state_guard = crate::lock_test_state();
         setup();
         assert_eq!(_vproc_standby_count(), 0);
         _vproc_standby_begin();
@@ -476,48 +529,59 @@ mod tests {
 
     #[test]
     fn swap_integer_last_exit_status() {
+        let _state_guard = crate::lock_test_state();
         setup();
         let mut out: i64 = -1;
-        let r = vproc_swap_integer(
-            std::ptr::null_mut(),
-            VprocGsk::LastExitStatus as u32,
-            std::ptr::null(),
-            &mut out,
-        );
+        let r = unsafe {
+            vproc_swap_integer(
+                std::ptr::null_mut(),
+                VprocGsk::LastExitStatus as u32,
+                std::ptr::null(),
+                &mut out,
+            )
+        };
         assert!(r.is_null()); // success
         assert_eq!(out, 0);
     }
 
     #[test]
     fn swap_integer_write_and_read() {
+        let _state_guard = crate::lock_test_state();
         setup();
         let new_val: i64 = 42;
-        vproc_swap_integer(
-            std::ptr::null_mut(),
-            VprocGsk::IdleTimeout as u32,
-            &new_val,
-            std::ptr::null_mut(),
-        );
+        unsafe {
+            vproc_swap_integer(
+                std::ptr::null_mut(),
+                VprocGsk::IdleTimeout as u32,
+                &new_val,
+                std::ptr::null_mut(),
+            )
+        };
 
         let mut out: i64 = 0;
-        vproc_swap_integer(
-            std::ptr::null_mut(),
-            VprocGsk::IdleTimeout as u32,
-            std::ptr::null(),
-            &mut out,
-        );
+        unsafe {
+            vproc_swap_integer(
+                std::ptr::null_mut(),
+                VprocGsk::IdleTimeout as u32,
+                std::ptr::null(),
+                &mut out,
+            )
+        };
         assert_eq!(out, 42);
     }
 
     #[test]
     fn swap_string_mgr_name() {
+        let _state_guard = crate::lock_test_state();
         let mut outstr: *mut libc::c_char = std::ptr::null_mut();
-        let r = vproc_swap_string(
-            std::ptr::null_mut(),
-            VprocGsk::MgrName as u32,
-            std::ptr::null(),
-            &mut outstr,
-        );
+        let r = unsafe {
+            vproc_swap_string(
+                std::ptr::null_mut(),
+                VprocGsk::MgrName as u32,
+                std::ptr::null(),
+                &mut outstr,
+            )
+        };
         assert!(r.is_null());
         assert!(!outstr.is_null());
         let name = unsafe { std::ffi::CStr::from_ptr(outstr) }
@@ -531,10 +595,11 @@ mod tests {
 
     #[test]
     fn last_exit_status() {
+        let _state_guard = crate::lock_test_state();
         setup();
         _vproc_transaction_try_exit(7);
         let mut wstatus: i32 = 0;
-        let r = _vproc_get_last_exit_status(&mut wstatus);
+        let r = unsafe { _vproc_get_last_exit_status(&mut wstatus) };
         assert!(r.is_null());
         assert_eq!(wstatus, 7);
     }
@@ -560,6 +625,7 @@ mod tests {
 
     #[test]
     fn enable_transactions() {
+        let _state_guard = crate::lock_test_state();
         setup();
         _vproc_transactions_enable();
         assert!(TRANSACTIONS_ENABLED.load(Ordering::Relaxed));
@@ -567,12 +633,13 @@ mod tests {
 
     #[test]
     fn transaction_count_for_pid() {
+        let _state_guard = crate::lock_test_state();
         setup();
         _vproc_transaction_begin();
         _vproc_transaction_begin();
         let mut count: i32 = 0;
         let mut condemned = true;
-        _vproc_transaction_count_for_pid(1, &mut count, &mut condemned);
+        unsafe { _vproc_transaction_count_for_pid(1, &mut count, &mut condemned) };
         assert_eq!(count, 2);
         assert!(!condemned);
     }
@@ -581,6 +648,7 @@ mod tests {
 
     #[test]
     fn handle_based_standby() {
+        let _state_guard = crate::lock_test_state();
         let h1 = vproc_standby_begin(std::ptr::null_mut());
         assert!(!h1.is_null());
         let h2 = vproc_standby_begin(std::ptr::null_mut());
@@ -592,6 +660,7 @@ mod tests {
 
     #[test]
     fn swap_integer_all_readable_keys() {
+        let _state_guard = crate::lock_test_state();
         // Read all GSK keys that have meaningful values
         for key in [
             VprocGsk::LastExitStatus,
@@ -604,8 +673,9 @@ mod tests {
             VprocGsk::TransactionsEnabled,
         ] {
             let mut out: i64 = -999;
-            let r =
-                vproc_swap_integer(std::ptr::null_mut(), key as u32, std::ptr::null(), &mut out);
+            let r = unsafe {
+                vproc_swap_integer(std::ptr::null_mut(), key as u32, std::ptr::null(), &mut out)
+            };
             assert!(r.is_null(), "swap_integer({:?}) should succeed", key);
             // We just verify it doesn't crash and returns *some* value
         }
@@ -613,189 +683,232 @@ mod tests {
 
     #[test]
     fn swap_integer_invalid_key() {
+        let _state_guard = crate::lock_test_state();
         let mut out: i64 = 0;
-        let r = vproc_swap_integer(
-            std::ptr::null_mut(),
-            999, // invalid key
-            std::ptr::null(),
-            &mut out,
-        );
+        let r = unsafe {
+            vproc_swap_integer(
+                std::ptr::null_mut(),
+                999, // invalid key
+                std::ptr::null(),
+                &mut out,
+            )
+        };
         assert!(!r.is_null()); // error
     }
 
     #[test]
     fn swap_integer_write_global_on_demand() {
+        let _state_guard = crate::lock_test_state();
         let val: i64 = 0; // off
-        let r = vproc_swap_integer(
-            std::ptr::null_mut(),
-            VprocGsk::GlobalOnDemand as u32,
-            &val,
-            std::ptr::null_mut(),
-        );
+        let r = unsafe {
+            vproc_swap_integer(
+                std::ptr::null_mut(),
+                VprocGsk::GlobalOnDemand as u32,
+                &val,
+                std::ptr::null_mut(),
+            )
+        };
         assert!(r.is_null());
 
         let mut out: i64 = -1;
-        vproc_swap_integer(
-            std::ptr::null_mut(),
-            VprocGsk::GlobalOnDemand as u32,
-            std::ptr::null(),
-            &mut out,
-        );
+        unsafe {
+            vproc_swap_integer(
+                std::ptr::null_mut(),
+                VprocGsk::GlobalOnDemand as u32,
+                std::ptr::null(),
+                &mut out,
+            )
+        };
         assert_eq!(out, 0);
 
         // Restore
         let val: i64 = 1;
-        vproc_swap_integer(
-            std::ptr::null_mut(),
-            VprocGsk::GlobalOnDemand as u32,
-            &val,
-            std::ptr::null_mut(),
-        );
+        unsafe {
+            vproc_swap_integer(
+                std::ptr::null_mut(),
+                VprocGsk::GlobalOnDemand as u32,
+                &val,
+                std::ptr::null_mut(),
+            )
+        };
     }
 
     #[test]
     fn swap_integer_write_exit_timeout() {
+        let _state_guard = crate::lock_test_state();
         let val: i64 = 60;
-        vproc_swap_integer(
-            std::ptr::null_mut(),
-            VprocGsk::ExitTimeout as u32,
-            &val,
-            std::ptr::null_mut(),
-        );
+        unsafe {
+            vproc_swap_integer(
+                std::ptr::null_mut(),
+                VprocGsk::ExitTimeout as u32,
+                &val,
+                std::ptr::null_mut(),
+            )
+        };
         let mut out: i64 = 0;
-        vproc_swap_integer(
-            std::ptr::null_mut(),
-            VprocGsk::ExitTimeout as u32,
-            std::ptr::null(),
-            &mut out,
-        );
+        unsafe {
+            vproc_swap_integer(
+                std::ptr::null_mut(),
+                VprocGsk::ExitTimeout as u32,
+                std::ptr::null(),
+                &mut out,
+            )
+        };
         assert_eq!(out, 60);
     }
 
     #[test]
     fn swap_integer_write_transactions_enabled() {
+        let _state_guard = crate::lock_test_state();
         let val: i64 = 1;
-        vproc_swap_integer(
-            std::ptr::null_mut(),
-            VprocGsk::TransactionsEnabled as u32,
-            &val,
-            std::ptr::null_mut(),
-        );
+        unsafe {
+            vproc_swap_integer(
+                std::ptr::null_mut(),
+                VprocGsk::TransactionsEnabled as u32,
+                &val,
+                std::ptr::null_mut(),
+            )
+        };
         let mut out: i64 = 0;
-        vproc_swap_integer(
-            std::ptr::null_mut(),
-            VprocGsk::TransactionsEnabled as u32,
-            std::ptr::null(),
-            &mut out,
-        );
+        unsafe {
+            vproc_swap_integer(
+                std::ptr::null_mut(),
+                VprocGsk::TransactionsEnabled as u32,
+                std::ptr::null(),
+                &mut out,
+            )
+        };
         assert_eq!(out, 1);
     }
 
     #[test]
     fn swap_integer_read_only_keys_ignore_writes() {
+        let _state_guard = crate::lock_test_state();
         // MgrUid and MgrPid are read-only; writes are no-ops
         let mut original: i64 = 0;
-        vproc_swap_integer(
-            std::ptr::null_mut(),
-            VprocGsk::MgrUid as u32,
-            std::ptr::null(),
-            &mut original,
-        );
+        unsafe {
+            vproc_swap_integer(
+                std::ptr::null_mut(),
+                VprocGsk::MgrUid as u32,
+                std::ptr::null(),
+                &mut original,
+            )
+        };
         let val: i64 = 9999;
-        vproc_swap_integer(
-            std::ptr::null_mut(),
-            VprocGsk::MgrUid as u32,
-            &val,
-            std::ptr::null_mut(),
-        );
+        unsafe {
+            vproc_swap_integer(
+                std::ptr::null_mut(),
+                VprocGsk::MgrUid as u32,
+                &val,
+                std::ptr::null_mut(),
+            )
+        };
         let mut after: i64 = 0;
-        vproc_swap_integer(
-            std::ptr::null_mut(),
-            VprocGsk::MgrUid as u32,
-            std::ptr::null(),
-            &mut after,
-        );
+        unsafe {
+            vproc_swap_integer(
+                std::ptr::null_mut(),
+                VprocGsk::MgrUid as u32,
+                std::ptr::null(),
+                &mut after,
+            )
+        };
         assert_eq!(after, original); // unchanged
     }
 
     #[test]
     fn swap_string_non_mgr_name_key_returns_error() {
+        let _state_guard = crate::lock_test_state();
         let mut outstr: *mut libc::c_char = std::ptr::null_mut();
-        let r = vproc_swap_string(
-            std::ptr::null_mut(),
-            VprocGsk::LastExitStatus as u32, // not MgrName
-            std::ptr::null(),
-            &mut outstr,
-        );
+        let r = unsafe {
+            vproc_swap_string(
+                std::ptr::null_mut(),
+                VprocGsk::LastExitStatus as u32, // not MgrName
+                std::ptr::null(),
+                &mut outstr,
+            )
+        };
         assert!(!r.is_null()); // error
     }
 
     #[test]
     fn swap_string_null_outstr() {
+        let _state_guard = crate::lock_test_state();
         // Should succeed without crashing even if outstr is null
-        let r = vproc_swap_string(
-            std::ptr::null_mut(),
-            VprocGsk::MgrName as u32,
-            std::ptr::null(),
-            std::ptr::null_mut(),
-        );
+        let r = unsafe {
+            vproc_swap_string(
+                std::ptr::null_mut(),
+                VprocGsk::MgrName as u32,
+                std::ptr::null(),
+                std::ptr::null_mut(),
+            )
+        };
         assert!(r.is_null()); // success
     }
 
     #[test]
     fn swap_complex_environment() {
+        let _state_guard = crate::lock_test_state();
         let mut outval: crate::launch_data::LaunchDataT = crate::launch_data::LAUNCH_DATA_NULL;
-        let r = vproc_swap_complex(
-            std::ptr::null_mut(),
-            VprocGsk::Environment as u32,
-            crate::launch_data::LAUNCH_DATA_NULL,
-            &mut outval,
-        );
+        let r = unsafe {
+            vproc_swap_complex(
+                std::ptr::null_mut(),
+                VprocGsk::Environment as u32,
+                crate::launch_data::LAUNCH_DATA_NULL,
+                &mut outval,
+            )
+        };
         assert!(r.is_null()); // success
         assert!(!outval.is_null());
         assert_eq!(
-            crate::launch_data::get_type(outval),
+            unsafe { crate::launch_data::get_type(outval) },
             crate::launch_data::LaunchDataType::Dictionary as u32
         );
         // Should contain at least PATH (most environments have it)
-        let count = crate::launch_data::dict_get_count(outval);
+        let count = unsafe { crate::launch_data::dict_get_count(outval) };
         assert!(count > 0, "environment should have at least one variable");
-        crate::launch_data::free(outval);
+        unsafe { crate::launch_data::free(outval) };
     }
 
     #[test]
     fn swap_complex_all_jobs() {
+        let _state_guard = crate::lock_test_state();
         let mut outval: crate::launch_data::LaunchDataT = crate::launch_data::LAUNCH_DATA_NULL;
-        let r = vproc_swap_complex(
-            std::ptr::null_mut(),
-            VprocGsk::AllJobs as u32,
-            crate::launch_data::LAUNCH_DATA_NULL,
-            &mut outval,
-        );
+        let r = unsafe {
+            vproc_swap_complex(
+                std::ptr::null_mut(),
+                VprocGsk::AllJobs as u32,
+                crate::launch_data::LAUNCH_DATA_NULL,
+                &mut outval,
+            )
+        };
         assert!(r.is_null()); // success
         assert!(!outval.is_null());
         assert_eq!(
-            crate::launch_data::get_type(outval),
+            unsafe { crate::launch_data::get_type(outval) },
             crate::launch_data::LaunchDataType::Dictionary as u32
         );
-        crate::launch_data::free(outval);
+        unsafe { crate::launch_data::free(outval) };
     }
 
     #[test]
     fn swap_complex_invalid_key() {
+        let _state_guard = crate::lock_test_state();
         let mut outval: crate::launch_data::LaunchDataT = crate::launch_data::LAUNCH_DATA_NULL;
-        let r = vproc_swap_complex(
-            std::ptr::null_mut(),
-            VprocGsk::LastExitStatus as u32, // only Environment and AllJobs supported
-            crate::launch_data::LAUNCH_DATA_NULL,
-            &mut outval,
-        );
+        let r = unsafe {
+            vproc_swap_complex(
+                std::ptr::null_mut(),
+                VprocGsk::LastExitStatus as u32, // only Environment and AllJobs supported
+                crate::launch_data::LAUNCH_DATA_NULL,
+                &mut outval,
+            )
+        };
         assert!(!r.is_null()); // error
     }
 
     #[test]
     fn get_last_exit_status_null_ptr() {
-        let r = _vproc_get_last_exit_status(std::ptr::null_mut());
+        let _state_guard = crate::lock_test_state();
+        let r = unsafe { _vproc_get_last_exit_status(std::ptr::null_mut()) };
         assert!(!r.is_null()); // error
     }
 
@@ -807,13 +920,13 @@ mod tests {
 
     #[test]
     fn send_signal_by_label_null_returns_error() {
-        let r = _vproc_send_signal_by_label(std::ptr::null(), 15);
+        let r = unsafe { _vproc_send_signal_by_label(std::ptr::null(), 15) };
         assert!(!r.is_null());
     }
 
     #[test]
     fn send_signal_by_label_valid() {
-        let r = _vproc_send_signal_by_label(c"com.test.svc".as_ptr(), libc::SIGTERM);
+        let r = unsafe { _vproc_send_signal_by_label(c"com.test.svc".as_ptr(), libc::SIGTERM) };
         assert!(r.is_null()); // success
     }
 
@@ -844,9 +957,10 @@ mod tests {
 
     #[test]
     fn set_last_exit_status_helper() {
+        let _state_guard = crate::lock_test_state();
         set_last_exit_status(42);
         let mut wstatus: i32 = 0;
-        _vproc_get_last_exit_status(&mut wstatus);
+        unsafe { _vproc_get_last_exit_status(&mut wstatus) };
         assert_eq!(wstatus, 42);
         set_last_exit_status(0); // cleanup
     }
@@ -869,6 +983,7 @@ mod tests {
 
     #[test]
     fn concurrent_transaction_tracking() {
+        let _state_guard = crate::lock_test_state();
         use std::sync::Arc;
         let barrier = Arc::new(std::sync::Barrier::new(4));
         let handles: Vec<_> = (0..4)

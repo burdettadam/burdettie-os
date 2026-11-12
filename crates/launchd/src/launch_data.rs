@@ -86,6 +86,12 @@ impl LaunchData {
 /// This is a raw pointer to a heap-allocated `LaunchData` obtained via
 /// `Box::into_raw`.  The caller is responsible for calling
 /// `launch_data_free` when done (like C does).
+///
+/// Handles returned by dictionary/array lookup are borrowed from the container:
+/// they must not be freed or transferred into another container. Any handle must
+/// remain live and aligned while accessed, and mutations require exclusive
+/// access to the value and any affected children. Freeing or replacing an owning
+/// container also invalidates its borrowed child handles.
 pub type LaunchDataT = *mut LaunchData;
 
 /// Sentinel null handle.
@@ -102,18 +108,21 @@ fn into_raw(data: LaunchData) -> LaunchDataT {
 /// Borrow the `LaunchData` behind a handle, returning `None` if null.
 ///
 /// # Safety
-/// Caller must ensure `handle` points to a valid `LaunchData` (or is null).
-unsafe fn borrow(handle: LaunchDataT) -> Option<&'static LaunchData> {
-    handle.as_ref()
+/// `handle` must be null or live and aligned for the returned borrow, with no
+/// mutation or deallocation for that lifetime.
+unsafe fn borrow<'a>(handle: LaunchDataT) -> Option<&'a LaunchData> {
+    // SAFETY: The caller guarantees validity and shared access for the borrow.
+    unsafe { handle.as_ref() }
 }
 
 /// Mutably borrow the `LaunchData` behind a handle.
 ///
 /// # Safety
-/// Caller must ensure `handle` points to a valid `LaunchData` (or is null)
-/// and that no other references exist.
-unsafe fn borrow_mut(handle: LaunchDataT) -> Option<&'static mut LaunchData> {
-    handle.as_mut()
+/// `handle` must be null or live and aligned for the returned borrow, and
+/// exclusively accessible for that lifetime.
+unsafe fn borrow_mut<'a>(handle: LaunchDataT) -> Option<&'a mut LaunchData> {
+    // SAFETY: The caller guarantees validity and exclusive access for the borrow.
+    unsafe { handle.as_mut() }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -141,7 +150,11 @@ pub fn alloc(ty: u32) -> LaunchDataT {
 }
 
 /// `launch_data_copy(d)` — deep copy.
-pub fn copy(handle: LaunchDataT) -> LaunchDataT {
+///
+/// # Safety
+/// `handle` must be null or point to a live, aligned `LaunchData` that is
+/// not mutated or freed for the duration of the call.
+pub unsafe fn copy(handle: LaunchDataT) -> LaunchDataT {
     let data = unsafe { borrow(handle) };
     match data {
         Some(d) => into_raw(d.clone()),
@@ -150,7 +163,11 @@ pub fn copy(handle: LaunchDataT) -> LaunchDataT {
 }
 
 /// `launch_data_get_type(d)` — return the type tag.
-pub fn get_type(handle: LaunchDataT) -> u32 {
+///
+/// # Safety
+/// `handle` must be null or point to a live, aligned `LaunchData` that is
+/// not mutated or freed for the duration of the call.
+pub unsafe fn get_type(handle: LaunchDataT) -> u32 {
     let data = unsafe { borrow(handle) };
     match data {
         Some(d) => d.get_type() as u32,
@@ -161,9 +178,12 @@ pub fn get_type(handle: LaunchDataT) -> u32 {
 /// `launch_data_free(d)` — free a handle.
 ///
 /// # Safety
-/// The handle must have been returned by one of the `alloc`/`new_*`/`copy`
-/// functions and must not have been freed already.
-pub fn free(handle: LaunchDataT) {
+/// `handle` must be null or an exclusively owned pointer returned by this
+/// module's allocation functions. It must not have been freed or transferred
+/// into a dictionary/array. All active borrows and accesses to it or its
+/// children must have ended before this call; no borrowed handles may be used
+/// afterward. Borrowed lookup results must not be freed separately.
+pub unsafe fn free(handle: LaunchDataT) {
     if !handle.is_null() {
         unsafe {
             drop(Box::from_raw(handle));
@@ -178,7 +198,17 @@ pub fn free(handle: LaunchDataT) {
 /// Inserts `value` into `dict` under `key`. On success the dict owns
 /// the value (caller must not free it separately). Returns false if
 /// `dict` is not a dictionary.
-pub fn dict_insert(dict: LaunchDataT, value: LaunchDataT, key: *const libc::c_char) -> bool {
+///
+/// # Safety
+/// `dict` must be null or point to a live, aligned `LaunchData` that is
+/// exclusively accessible for the duration of the call.
+/// `key` must be null or a readable, NUL-terminated C string that remains
+/// unchanged while read. A non-null `value`
+/// must be a uniquely owned allocation from this module, with no live references
+/// or owning container. It must not be `dict`, an ancestor of `dict`, or any
+/// borrowed child. On success ownership transfers to `dict`; on failure it
+/// remains with the caller. Replaced values and their borrowed handles expire.
+pub unsafe fn dict_insert(dict: LaunchDataT, value: LaunchDataT, key: *const libc::c_char) -> bool {
     if dict.is_null() || key.is_null() || value.is_null() {
         return false;
     }
@@ -201,7 +231,15 @@ pub fn dict_insert(dict: LaunchDataT, value: LaunchDataT, key: *const libc::c_ch
 }
 
 /// `launch_data_dict_lookup(dict, key)` → handle (borrowed, not owned by caller).
-pub fn dict_lookup(dict: LaunchDataT, key: *const libc::c_char) -> LaunchDataT {
+///
+/// # Safety
+/// `dict` must be null or point to a live, aligned `LaunchData` that is
+/// exclusively accessible for the duration of the call.
+/// `key` must be null or a readable, NUL-terminated C string that remains
+/// unchanged while read. The returned handle
+/// is borrowed from `dict`; do not free it or transfer its ownership, and do not
+/// use it after its entry is removed/replaced or the dictionary is freed.
+pub unsafe fn dict_lookup(dict: LaunchDataT, key: *const libc::c_char) -> LaunchDataT {
     if dict.is_null() || key.is_null() {
         return LAUNCH_DATA_NULL;
     }
@@ -219,7 +257,14 @@ pub fn dict_lookup(dict: LaunchDataT, key: *const libc::c_char) -> LaunchDataT {
 }
 
 /// `launch_data_dict_remove(dict, key)` → bool.
-pub fn dict_remove(dict: LaunchDataT, key: *const libc::c_char) -> bool {
+///
+/// # Safety
+/// `dict` must be null or point to a live, aligned `LaunchData` that is
+/// exclusively accessible for the duration of the call.
+/// `key` must be null or a readable, NUL-terminated C string that remains
+/// unchanged while read. References and
+/// borrowed handles to the removed value or its children must no longer be used.
+pub unsafe fn dict_remove(dict: LaunchDataT, key: *const libc::c_char) -> bool {
     if dict.is_null() || key.is_null() {
         return false;
     }
@@ -240,7 +285,20 @@ pub type DictIterateCallback =
 /// `launch_data_dict_iterate(dict, callback, context)`.
 ///
 /// Calls `callback(value, key, context)` for each entry.
-pub fn dict_iterate(dict: LaunchDataT, callback: DictIterateCallback, context: *mut libc::c_void) {
+///
+/// # Safety
+/// `dict` must be null or point to a live, aligned `LaunchData` that is
+/// exclusively accessible for the duration of the call.
+/// `callback` must be valid to call with each borrowed value/key and `context`;
+/// the caller must satisfy the callback's requirements for `context`. It must
+/// not unwind, access or mutate the parent dictionary, or free/transfer the
+/// borrowed value. The key pointer is valid only during that callback. Any
+/// references to the value must end before the callback returns.
+pub unsafe fn dict_iterate(
+    dict: LaunchDataT,
+    callback: DictIterateCallback,
+    context: *mut libc::c_void,
+) {
     let Some(LaunchData::Dictionary(map)) = (unsafe { borrow_mut(dict) }) else {
         return;
     };
@@ -257,7 +315,11 @@ pub fn dict_iterate(dict: LaunchDataT, callback: DictIterateCallback, context: *
 }
 
 /// `launch_data_dict_get_count(dict)` → number of entries.
-pub fn dict_get_count(dict: LaunchDataT) -> usize {
+///
+/// # Safety
+/// `dict` must be null or point to a live, aligned `LaunchData` that is
+/// not mutated or freed for the duration of the call.
+pub unsafe fn dict_get_count(dict: LaunchDataT) -> usize {
     match unsafe { borrow(dict) } {
         Some(LaunchData::Dictionary(map)) => map.len(),
         _ => 0,
@@ -270,7 +332,16 @@ pub fn dict_get_count(dict: LaunchDataT) -> usize {
 ///
 /// Sets or extends the array. If index > len, the gap is filled with
 /// empty dictionaries (matching Apple's plist array semantics).
-pub fn array_set_index(array: LaunchDataT, value: LaunchDataT, index: usize) -> bool {
+///
+/// # Safety
+/// `array` must be null or point to a live, aligned `LaunchData` that is
+/// exclusively accessible for the duration of the call.
+/// A non-null `value` must be a uniquely owned allocation from this module,
+/// with no live references or owning container. It must not be `array`, an
+/// ancestor of `array`, or a borrowed child. On success ownership transfers to
+/// `array`; on failure it remains with the caller. Replaced values and their
+/// borrowed handles expire.
+pub unsafe fn array_set_index(array: LaunchDataT, value: LaunchDataT, index: usize) -> bool {
     if array.is_null() || value.is_null() {
         return false;
     }
@@ -291,7 +362,13 @@ pub fn array_set_index(array: LaunchDataT, value: LaunchDataT, index: usize) -> 
 }
 
 /// `launch_data_array_get_index(array, index)` → handle (borrowed).
-pub fn array_get_index(array: LaunchDataT, index: usize) -> LaunchDataT {
+///
+/// # Safety
+/// `array` must be null or point to a live, aligned `LaunchData` that is
+/// exclusively accessible for the duration of the call.
+/// The returned handle is borrowed from `array`; do not free it or transfer its
+/// ownership, and do not use it after the element is replaced or array is freed.
+pub unsafe fn array_get_index(array: LaunchDataT, index: usize) -> LaunchDataT {
     match unsafe { borrow_mut(array) } {
         Some(LaunchData::Array(vec)) => match vec.get_mut(index) {
             Some(v) => v.as_mut() as *mut LaunchData,
@@ -302,7 +379,11 @@ pub fn array_get_index(array: LaunchDataT, index: usize) -> LaunchDataT {
 }
 
 /// `launch_data_array_get_count(array)` → element count.
-pub fn array_get_count(array: LaunchDataT) -> usize {
+///
+/// # Safety
+/// `array` must be null or point to a live, aligned `LaunchData` that is
+/// not mutated or freed for the duration of the call.
+pub unsafe fn array_get_count(array: LaunchDataT) -> usize {
     match unsafe { borrow(array) } {
         Some(LaunchData::Array(vec)) => vec.len(),
         _ => 0,
@@ -337,7 +418,11 @@ pub fn new_real(val: f64) -> LaunchDataT {
 }
 
 /// `launch_data_new_string(s)` → handle.
-pub fn new_string(s: *const libc::c_char) -> LaunchDataT {
+///
+/// # Safety
+/// `s` must be null or point to a readable, NUL-terminated C string
+/// that remains unchanged for the duration of the call.
+pub unsafe fn new_string(s: *const libc::c_char) -> LaunchDataT {
     if s.is_null() {
         return LAUNCH_DATA_NULL;
     }
@@ -346,7 +431,13 @@ pub fn new_string(s: *const libc::c_char) -> LaunchDataT {
 }
 
 /// `launch_data_new_opaque(data, len)` → handle.
-pub fn new_opaque(data: *const libc::c_void, len: usize) -> LaunchDataT {
+///
+/// # Safety
+/// When `data` is non-null and `len` is nonzero, it must identify `len`
+/// initialized, readable bytes in a single allocation, with `len <= isize::MAX`.
+/// Those bytes must remain unchanged for the duration of the copy. A null
+/// pointer is accepted: zero length creates an empty value; nonzero length fails.
+pub unsafe fn new_opaque(data: *const libc::c_void, len: usize) -> LaunchDataT {
     if data.is_null() && len > 0 {
         return LAUNCH_DATA_NULL;
     }
@@ -361,7 +452,11 @@ pub fn new_opaque(data: *const libc::c_void, len: usize) -> LaunchDataT {
 // ── Value setters ───────────────────────────────────────────────────
 
 /// `launch_data_set_fd(d, fd)` → bool.
-pub fn set_fd(handle: LaunchDataT, fd: i32) -> bool {
+///
+/// # Safety
+/// `handle` must be null or point to a live, aligned `LaunchData` that is
+/// exclusively accessible for the duration of the call.
+pub unsafe fn set_fd(handle: LaunchDataT, fd: i32) -> bool {
     match unsafe { borrow_mut(handle) } {
         Some(d @ LaunchData::Fd(_)) => {
             *d = LaunchData::Fd(fd);
@@ -372,7 +467,11 @@ pub fn set_fd(handle: LaunchDataT, fd: i32) -> bool {
 }
 
 /// `launch_data_set_machport(d, port)` → bool.
-pub fn set_machport(handle: LaunchDataT, port: u32) -> bool {
+///
+/// # Safety
+/// `handle` must be null or point to a live, aligned `LaunchData` that is
+/// exclusively accessible for the duration of the call.
+pub unsafe fn set_machport(handle: LaunchDataT, port: u32) -> bool {
     match unsafe { borrow_mut(handle) } {
         Some(d @ LaunchData::MachPort(_)) => {
             *d = LaunchData::MachPort(port);
@@ -383,7 +482,11 @@ pub fn set_machport(handle: LaunchDataT, port: u32) -> bool {
 }
 
 /// `launch_data_set_integer(d, val)` → bool.
-pub fn set_integer(handle: LaunchDataT, val: i64) -> bool {
+///
+/// # Safety
+/// `handle` must be null or point to a live, aligned `LaunchData` that is
+/// exclusively accessible for the duration of the call.
+pub unsafe fn set_integer(handle: LaunchDataT, val: i64) -> bool {
     match unsafe { borrow_mut(handle) } {
         Some(d @ LaunchData::Integer(_)) => {
             *d = LaunchData::Integer(val);
@@ -394,7 +497,11 @@ pub fn set_integer(handle: LaunchDataT, val: i64) -> bool {
 }
 
 /// `launch_data_set_bool(d, val)` → bool.
-pub fn set_bool(handle: LaunchDataT, val: bool) -> bool {
+///
+/// # Safety
+/// `handle` must be null or point to a live, aligned `LaunchData` that is
+/// exclusively accessible for the duration of the call.
+pub unsafe fn set_bool(handle: LaunchDataT, val: bool) -> bool {
     match unsafe { borrow_mut(handle) } {
         Some(d @ LaunchData::Bool(_)) => {
             *d = LaunchData::Bool(val);
@@ -405,7 +512,11 @@ pub fn set_bool(handle: LaunchDataT, val: bool) -> bool {
 }
 
 /// `launch_data_set_real(d, val)` → bool.
-pub fn set_real(handle: LaunchDataT, val: f64) -> bool {
+///
+/// # Safety
+/// `handle` must be null or point to a live, aligned `LaunchData` that is
+/// exclusively accessible for the duration of the call.
+pub unsafe fn set_real(handle: LaunchDataT, val: f64) -> bool {
     match unsafe { borrow_mut(handle) } {
         Some(d @ LaunchData::Real(_)) => {
             *d = LaunchData::Real(val);
@@ -416,7 +527,13 @@ pub fn set_real(handle: LaunchDataT, val: f64) -> bool {
 }
 
 /// `launch_data_set_string(d, s)` → bool.
-pub fn set_string(handle: LaunchDataT, s: *const libc::c_char) -> bool {
+///
+/// # Safety
+/// `handle` must be null or point to a live, aligned `LaunchData` that is
+/// exclusively accessible for the duration of the call.
+/// `s` must be null or a readable, NUL-terminated C string that remains unchanged
+/// for the call and does not alias storage owned by `handle`.
+pub unsafe fn set_string(handle: LaunchDataT, s: *const libc::c_char) -> bool {
     if s.is_null() {
         return false;
     }
@@ -431,7 +548,15 @@ pub fn set_string(handle: LaunchDataT, s: *const libc::c_char) -> bool {
 }
 
 /// `launch_data_set_opaque(d, data, len)` → bool.
-pub fn set_opaque(handle: LaunchDataT, data: *const libc::c_void, len: usize) -> bool {
+///
+/// # Safety
+/// `handle` must be null or point to a live, aligned `LaunchData` that is
+/// exclusively accessible for the duration of the call.
+/// When `data` is non-null and `len` is nonzero, it must identify `len`
+/// initialized, readable bytes in a single allocation, with `len <= isize::MAX`.
+/// Those bytes must remain unchanged for the duration of the copy. A null
+/// pointer is accepted: zero length sets an empty value; nonzero length fails.
+pub unsafe fn set_opaque(handle: LaunchDataT, data: *const libc::c_void, len: usize) -> bool {
     if data.is_null() && len > 0 {
         return false;
     }
@@ -452,7 +577,11 @@ pub fn set_opaque(handle: LaunchDataT, data: *const libc::c_void, len: usize) ->
 // ── Value getters ───────────────────────────────────────────────────
 
 /// `launch_data_get_fd(d)` → fd value or -1.
-pub fn get_fd(handle: LaunchDataT) -> i32 {
+///
+/// # Safety
+/// `handle` must be null or point to a live, aligned `LaunchData` that is
+/// not mutated or freed for the duration of the call.
+pub unsafe fn get_fd(handle: LaunchDataT) -> i32 {
     match unsafe { borrow(handle) } {
         Some(LaunchData::Fd(fd)) => *fd,
         _ => -1,
@@ -460,7 +589,11 @@ pub fn get_fd(handle: LaunchDataT) -> i32 {
 }
 
 /// `launch_data_get_machport(d)` → port or 0.
-pub fn get_machport(handle: LaunchDataT) -> u32 {
+///
+/// # Safety
+/// `handle` must be null or point to a live, aligned `LaunchData` that is
+/// not mutated or freed for the duration of the call.
+pub unsafe fn get_machport(handle: LaunchDataT) -> u32 {
     match unsafe { borrow(handle) } {
         Some(LaunchData::MachPort(port)) => *port,
         _ => 0,
@@ -468,7 +601,11 @@ pub fn get_machport(handle: LaunchDataT) -> u32 {
 }
 
 /// `launch_data_get_integer(d)` → integer value or 0.
-pub fn get_integer(handle: LaunchDataT) -> i64 {
+///
+/// # Safety
+/// `handle` must be null or point to a live, aligned `LaunchData` that is
+/// not mutated or freed for the duration of the call.
+pub unsafe fn get_integer(handle: LaunchDataT) -> i64 {
     match unsafe { borrow(handle) } {
         Some(LaunchData::Integer(val)) => *val,
         _ => 0,
@@ -476,7 +613,11 @@ pub fn get_integer(handle: LaunchDataT) -> i64 {
 }
 
 /// `launch_data_get_bool(d)` → bool or false.
-pub fn get_bool(handle: LaunchDataT) -> bool {
+///
+/// # Safety
+/// `handle` must be null or point to a live, aligned `LaunchData` that is
+/// not mutated or freed for the duration of the call.
+pub unsafe fn get_bool(handle: LaunchDataT) -> bool {
     match unsafe { borrow(handle) } {
         Some(LaunchData::Bool(val)) => *val,
         _ => false,
@@ -484,7 +625,11 @@ pub fn get_bool(handle: LaunchDataT) -> bool {
 }
 
 /// `launch_data_get_real(d)` → double or 0.0.
-pub fn get_real(handle: LaunchDataT) -> f64 {
+///
+/// # Safety
+/// `handle` must be null or point to a live, aligned `LaunchData` that is
+/// not mutated or freed for the duration of the call.
+pub unsafe fn get_real(handle: LaunchDataT) -> f64 {
     match unsafe { borrow(handle) } {
         Some(LaunchData::Real(val)) => *val,
         _ => 0.0,
@@ -492,7 +637,13 @@ pub fn get_real(handle: LaunchDataT) -> f64 {
 }
 
 /// `launch_data_get_string(d)` → `const char *` pointer or null.
-pub fn get_string(handle: LaunchDataT) -> *const libc::c_char {
+///
+/// # Safety
+/// `handle` must be null or point to a live, aligned `LaunchData` that is
+/// not mutated or freed for the duration of the call.
+/// The returned pointer is borrowed and must not be used after the value or
+/// its owning container is mutated or freed.
+pub unsafe fn get_string(handle: LaunchDataT) -> *const libc::c_char {
     match unsafe { borrow(handle) } {
         Some(LaunchData::String(cs)) => cs.as_ptr(),
         _ => std::ptr::null(),
@@ -500,7 +651,13 @@ pub fn get_string(handle: LaunchDataT) -> *const libc::c_char {
 }
 
 /// `launch_data_get_opaque(d)` → pointer to data or null.
-pub fn get_opaque(handle: LaunchDataT) -> *const libc::c_void {
+///
+/// # Safety
+/// `handle` must be null or point to a live, aligned `LaunchData` that is
+/// not mutated or freed for the duration of the call.
+/// The returned pointer is borrowed and must not be used after the value or
+/// its owning container is mutated or freed.
+pub unsafe fn get_opaque(handle: LaunchDataT) -> *const libc::c_void {
     match unsafe { borrow(handle) } {
         Some(LaunchData::Opaque(bytes)) => bytes.as_ptr() as *const libc::c_void,
         _ => std::ptr::null(),
@@ -508,7 +665,11 @@ pub fn get_opaque(handle: LaunchDataT) -> *const libc::c_void {
 }
 
 /// `launch_data_get_opaque_size(d)` → byte count.
-pub fn get_opaque_size(handle: LaunchDataT) -> usize {
+///
+/// # Safety
+/// `handle` must be null or point to a live, aligned `LaunchData` that is
+/// not mutated or freed for the duration of the call.
+pub unsafe fn get_opaque_size(handle: LaunchDataT) -> usize {
     match unsafe { borrow(handle) } {
         Some(LaunchData::Opaque(bytes)) => bytes.len(),
         _ => 0,
@@ -516,7 +677,11 @@ pub fn get_opaque_size(handle: LaunchDataT) -> usize {
 }
 
 /// `launch_data_get_errno(d)` → errno value or 0.
-pub fn get_errno(handle: LaunchDataT) -> i32 {
+///
+/// # Safety
+/// `handle` must be null or point to a live, aligned `LaunchData` that is
+/// not mutated or freed for the duration of the call.
+pub unsafe fn get_errno(handle: LaunchDataT) -> i32 {
     match unsafe { borrow(handle) } {
         Some(LaunchData::Errno(val)) => *val,
         _ => 0,
@@ -528,23 +693,33 @@ pub fn get_errno(handle: LaunchDataT) -> i32 {
 // ═══════════════════════════════════════════════════════════════════
 
 /// Create a dictionary from Rust key-value pairs.
-pub fn dict_from_pairs(pairs: &[(&str, LaunchDataT)]) -> LaunchDataT {
+///
+/// # Safety
+/// Every non-null value in `pairs` must be a distinct, uniquely owned
+/// allocation from this module, with no live references or owning container.
+/// Values must not own each other. Ownership of these values transfers to the
+/// returned dictionary; the caller must not subsequently free or reuse them.
+pub unsafe fn dict_from_pairs(pairs: &[(&str, LaunchDataT)]) -> LaunchDataT {
     let dict = alloc(LaunchDataType::Dictionary as u32);
     for (key, value) in pairs {
         let c_key = CString::new(*key).unwrap_or_default();
-        dict_insert(dict, *value, c_key.as_ptr());
+        unsafe { dict_insert(dict, *value, c_key.as_ptr()) };
     }
     dict
 }
 
 /// Read a string value from a dictionary key. Returns `None` if missing/wrong type.
-pub fn dict_get_string_value(dict: LaunchDataT, key: &str) -> Option<String> {
+///
+/// # Safety
+/// `dict` must be null or point to a live, aligned `LaunchData` that is
+/// exclusively accessible for the duration of the call.
+pub unsafe fn dict_get_string_value(dict: LaunchDataT, key: &str) -> Option<String> {
     let c_key = CString::new(key).ok()?;
-    let val = dict_lookup(dict, c_key.as_ptr());
+    let val = unsafe { dict_lookup(dict, c_key.as_ptr()) };
     if val.is_null() {
         return None;
     }
-    let ptr = get_string(val);
+    let ptr = unsafe { get_string(val) };
     if ptr.is_null() {
         return None;
     }
@@ -553,9 +728,13 @@ pub fn dict_get_string_value(dict: LaunchDataT, key: &str) -> Option<String> {
 }
 
 /// Read an integer value from a dictionary key.
-pub fn dict_get_integer_value(dict: LaunchDataT, key: &str) -> Option<i64> {
+///
+/// # Safety
+/// `dict` must be null or point to a live, aligned `LaunchData` that is
+/// exclusively accessible for the duration of the call.
+pub unsafe fn dict_get_integer_value(dict: LaunchDataT, key: &str) -> Option<i64> {
     let c_key = CString::new(key).ok()?;
-    let val = dict_lookup(dict, c_key.as_ptr());
+    let val = unsafe { dict_lookup(dict, c_key.as_ptr()) };
     if val.is_null() {
         return None;
     }
@@ -566,9 +745,13 @@ pub fn dict_get_integer_value(dict: LaunchDataT, key: &str) -> Option<i64> {
 }
 
 /// Read a bool value from a dictionary key.
-pub fn dict_get_bool_value(dict: LaunchDataT, key: &str) -> Option<bool> {
+///
+/// # Safety
+/// `dict` must be null or point to a live, aligned `LaunchData` that is
+/// exclusively accessible for the duration of the call.
+pub unsafe fn dict_get_bool_value(dict: LaunchDataT, key: &str) -> Option<bool> {
     let c_key = CString::new(key).ok()?;
-    let val = dict_lookup(dict, c_key.as_ptr());
+    let val = unsafe { dict_lookup(dict, c_key.as_ptr()) };
     if val.is_null() {
         return None;
     }
@@ -586,22 +769,27 @@ pub fn dict_get_bool_value(dict: LaunchDataT, key: &str) -> Option<bool> {
 mod tests {
     use super::*;
 
+    // SAFETY: These tests use live local buffers and handles allocated by this
+    // module. Children are transferred once, borrowed only while their parent
+    // lives, and freed through their owning container. Nulls exercise the
+    // explicitly supported error paths.
+
     #[test]
     fn alloc_dictionary() {
         let d = alloc(LaunchDataType::Dictionary as u32);
         assert!(!d.is_null());
-        assert_eq!(get_type(d), LaunchDataType::Dictionary as u32);
-        assert_eq!(dict_get_count(d), 0);
-        free(d);
+        assert_eq!(unsafe { get_type(d) }, LaunchDataType::Dictionary as u32);
+        assert_eq!(unsafe { dict_get_count(d) }, 0);
+        unsafe { free(d) };
     }
 
     #[test]
     fn alloc_array() {
         let a = alloc(LaunchDataType::Array as u32);
         assert!(!a.is_null());
-        assert_eq!(get_type(a), LaunchDataType::Array as u32);
-        assert_eq!(array_get_count(a), 0);
-        free(a);
+        assert_eq!(unsafe { get_type(a) }, LaunchDataType::Array as u32);
+        assert_eq!(unsafe { array_get_count(a) }, 0);
+        unsafe { free(a) };
     }
 
     #[test]
@@ -609,32 +797,32 @@ mod tests {
         let dict = alloc(LaunchDataType::Dictionary as u32);
         let val = new_integer(42);
         let key = c"foo";
-        assert!(dict_insert(dict, val, key.as_ptr()));
-        assert_eq!(dict_get_count(dict), 1);
+        assert!(unsafe { dict_insert(dict, val, key.as_ptr()) });
+        assert_eq!(unsafe { dict_get_count(dict) }, 1);
 
-        let found = dict_lookup(dict, key.as_ptr());
+        let found = unsafe { dict_lookup(dict, key.as_ptr()) };
         assert!(!found.is_null());
-        assert_eq!(get_integer(found), 42);
-        free(dict);
+        assert_eq!(unsafe { get_integer(found) }, 42);
+        unsafe { free(dict) };
     }
 
     #[test]
     fn dict_remove_entry() {
         let dict = alloc(LaunchDataType::Dictionary as u32);
-        let val = new_string(c"hello".as_ptr());
-        assert!(dict_insert(dict, val, c"key".as_ptr()));
-        assert_eq!(dict_get_count(dict), 1);
-        assert!(dict_remove(dict, c"key".as_ptr()));
-        assert_eq!(dict_get_count(dict), 0);
-        assert!(!dict_remove(dict, c"missing".as_ptr()));
-        free(dict);
+        let val = unsafe { new_string(c"hello".as_ptr()) };
+        assert!(unsafe { dict_insert(dict, val, c"key".as_ptr()) });
+        assert_eq!(unsafe { dict_get_count(dict) }, 1);
+        assert!(unsafe { dict_remove(dict, c"key".as_ptr()) });
+        assert_eq!(unsafe { dict_get_count(dict) }, 0);
+        assert!(!unsafe { dict_remove(dict, c"missing".as_ptr()) });
+        unsafe { free(dict) };
     }
 
     #[test]
     fn dict_iterate_callback() {
         let dict = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(dict, new_integer(1), c"a".as_ptr());
-        dict_insert(dict, new_integer(2), c"b".as_ptr());
+        unsafe { dict_insert(dict, new_integer(1), c"a".as_ptr()) };
+        unsafe { dict_insert(dict, new_integer(2), c"b".as_ptr()) };
 
         static mut COUNT: usize = 0;
         unsafe extern "C" fn cb(
@@ -649,143 +837,146 @@ mod tests {
         unsafe {
             COUNT = 0;
         }
-        dict_iterate(dict, cb, std::ptr::null_mut());
+        unsafe { dict_iterate(dict, cb, std::ptr::null_mut()) };
         assert_eq!(unsafe { COUNT }, 2);
-        free(dict);
+        unsafe { free(dict) };
     }
 
     #[test]
     fn array_set_and_get() {
         let arr = alloc(LaunchDataType::Array as u32);
         let val = new_bool(true);
-        assert!(array_set_index(arr, val, 0));
-        assert_eq!(array_get_count(arr), 1);
-        let found = array_get_index(arr, 0);
-        assert!(get_bool(found));
-        free(arr);
+        assert!(unsafe { array_set_index(arr, val, 0) });
+        assert_eq!(unsafe { array_get_count(arr) }, 1);
+        let found = unsafe { array_get_index(arr, 0) };
+        assert!(unsafe { get_bool(found) });
+        unsafe { free(arr) };
     }
 
     #[test]
     fn array_sparse_set() {
         let arr = alloc(LaunchDataType::Array as u32);
         let val = new_integer(99);
-        assert!(array_set_index(arr, val, 5));
-        assert_eq!(array_get_count(arr), 6);
-        assert_eq!(get_integer(array_get_index(arr, 5)), 99);
-        free(arr);
+        assert!(unsafe { array_set_index(arr, val, 5) });
+        assert_eq!(unsafe { array_get_count(arr) }, 6);
+        assert_eq!(unsafe { get_integer(array_get_index(arr, 5)) }, 99);
+        unsafe { free(arr) };
     }
 
     #[test]
     fn value_constructors_and_getters() {
         let fd = new_fd(7);
-        assert_eq!(get_fd(fd), 7);
-        free(fd);
+        assert_eq!(unsafe { get_fd(fd) }, 7);
+        unsafe { free(fd) };
 
         let mp = new_machport(0x1234);
-        assert_eq!(get_machport(mp), 0x1234);
-        free(mp);
+        assert_eq!(unsafe { get_machport(mp) }, 0x1234);
+        unsafe { free(mp) };
 
         let i = new_integer(-100);
-        assert_eq!(get_integer(i), -100);
-        free(i);
+        assert_eq!(unsafe { get_integer(i) }, -100);
+        unsafe { free(i) };
 
         let b = new_bool(true);
-        assert!(get_bool(b));
-        free(b);
+        assert!(unsafe { get_bool(b) });
+        unsafe { free(b) };
 
-        let r = new_real(3.14);
-        assert!((get_real(r) - 3.14).abs() < f64::EPSILON);
-        free(r);
+        let r = new_real(3.5);
+        assert!((unsafe { get_real(r) } - 3.5).abs() < f64::EPSILON);
+        unsafe { free(r) };
 
-        let s = new_string(c"test".as_ptr());
+        let s = unsafe { new_string(c"test".as_ptr()) };
         assert_eq!(
             unsafe { CStr::from_ptr(get_string(s)) }
                 .to_str()
                 .unwrap_or(""),
             "test"
         );
-        free(s);
+        unsafe { free(s) };
     }
 
     #[test]
     fn opaque_roundtrip() {
         let data = b"hello world";
-        let o = new_opaque(data.as_ptr() as *const libc::c_void, data.len());
-        assert_eq!(get_opaque_size(o), 11);
-        let ptr = get_opaque(o) as *const u8;
+        let o = unsafe { new_opaque(data.as_ptr() as *const libc::c_void, data.len()) };
+        assert_eq!(unsafe { get_opaque_size(o) }, 11);
+        let ptr = unsafe { get_opaque(o) } as *const u8;
         assert!(!ptr.is_null());
         let slice = unsafe { std::slice::from_raw_parts(ptr, 11) };
         assert_eq!(slice, b"hello world");
-        free(o);
+        unsafe { free(o) };
     }
 
     #[test]
     fn deep_copy() {
         let dict = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(dict, new_integer(42), c"num".as_ptr());
-        dict_insert(dict, new_string(c"hi".as_ptr()), c"str".as_ptr());
+        unsafe { dict_insert(dict, new_integer(42), c"num".as_ptr()) };
+        unsafe { dict_insert(dict, new_string(c"hi".as_ptr()), c"str".as_ptr()) };
 
-        let dict2 = copy(dict);
+        let dict2 = unsafe { copy(dict) };
         assert!(!dict2.is_null());
-        assert_eq!(dict_get_count(dict2), 2);
-        assert_eq!(get_integer(dict_lookup(dict2, c"num".as_ptr())), 42);
+        assert_eq!(unsafe { dict_get_count(dict2) }, 2);
+        assert_eq!(
+            unsafe { get_integer(dict_lookup(dict2, c"num".as_ptr())) },
+            42
+        );
 
         // Mutate original, copy unaffected
-        dict_remove(dict, c"num".as_ptr());
-        assert_eq!(dict_get_count(dict), 1);
-        assert_eq!(dict_get_count(dict2), 2);
+        unsafe { dict_remove(dict, c"num".as_ptr()) };
+        assert_eq!(unsafe { dict_get_count(dict) }, 1);
+        assert_eq!(unsafe { dict_get_count(dict2) }, 2);
 
-        free(dict);
-        free(dict2);
+        unsafe { free(dict) };
+        unsafe { free(dict2) };
     }
 
     #[test]
     fn setters() {
         let d = alloc(LaunchDataType::Fd as u32);
-        assert!(set_fd(d, 42));
-        assert_eq!(get_fd(d), 42);
-        free(d);
+        assert!(unsafe { set_fd(d, 42) });
+        assert_eq!(unsafe { get_fd(d) }, 42);
+        unsafe { free(d) };
 
         let d = alloc(LaunchDataType::Integer as u32);
-        assert!(set_integer(d, 999));
-        assert_eq!(get_integer(d), 999);
-        free(d);
+        assert!(unsafe { set_integer(d, 999) });
+        assert_eq!(unsafe { get_integer(d) }, 999);
+        unsafe { free(d) };
 
         let d = alloc(LaunchDataType::Bool as u32);
-        assert!(set_bool(d, true));
-        assert!(get_bool(d));
-        free(d);
+        assert!(unsafe { set_bool(d, true) });
+        assert!(unsafe { get_bool(d) });
+        unsafe { free(d) };
 
         let d = alloc(LaunchDataType::Real as u32);
-        assert!(set_real(d, 2.5));
-        assert!((get_real(d) - 2.5).abs() < f64::EPSILON);
-        free(d);
+        assert!(unsafe { set_real(d, 2.5) });
+        assert!((unsafe { get_real(d) } - 2.5).abs() < f64::EPSILON);
+        unsafe { free(d) };
 
         let d = alloc(LaunchDataType::String as u32);
-        assert!(set_string(d, c"updated".as_ptr()));
+        assert!(unsafe { set_string(d, c"updated".as_ptr()) });
         assert_eq!(
             unsafe { CStr::from_ptr(get_string(d)) }
                 .to_str()
                 .unwrap_or(""),
             "updated"
         );
-        free(d);
+        unsafe { free(d) };
     }
 
     #[test]
     fn errno_type() {
         let d = alloc(LaunchDataType::Errno as u32);
-        assert_eq!(get_errno(d), 0);
-        free(d);
+        assert_eq!(unsafe { get_errno(d) }, 0);
+        unsafe { free(d) };
     }
 
     #[test]
     fn null_handle_safety() {
-        assert_eq!(get_type(LAUNCH_DATA_NULL), 0);
-        assert_eq!(get_integer(LAUNCH_DATA_NULL), 0);
-        assert_eq!(get_string(LAUNCH_DATA_NULL), std::ptr::null());
-        assert!(copy(LAUNCH_DATA_NULL).is_null());
-        free(LAUNCH_DATA_NULL); // should not crash
+        assert_eq!(unsafe { get_type(LAUNCH_DATA_NULL) }, 0);
+        assert_eq!(unsafe { get_integer(LAUNCH_DATA_NULL) }, 0);
+        assert_eq!(unsafe { get_string(LAUNCH_DATA_NULL) }, std::ptr::null());
+        assert!(unsafe { copy(LAUNCH_DATA_NULL) }.is_null());
+        unsafe { free(LAUNCH_DATA_NULL) }; // should not crash
     }
 
     #[test]
@@ -797,27 +988,27 @@ mod tests {
     #[test]
     fn type_mismatch_setters_return_false() {
         let d = new_integer(10);
-        assert!(!set_fd(d, 1));
-        assert!(!set_bool(d, true));
-        assert!(!set_string(d, c"x".as_ptr()));
-        free(d);
+        assert!(!unsafe { set_fd(d, 1) });
+        assert!(!unsafe { set_bool(d, true) });
+        assert!(!unsafe { set_string(d, c"x".as_ptr()) });
+        unsafe { free(d) };
     }
 
     #[test]
     fn dict_helpers() {
         let dict = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(dict, new_string(c"world".as_ptr()), c"hello".as_ptr());
-        dict_insert(dict, new_integer(42), c"num".as_ptr());
+        unsafe { dict_insert(dict, new_string(c"world".as_ptr()), c"hello".as_ptr()) };
+        unsafe { dict_insert(dict, new_integer(42), c"num".as_ptr()) };
 
         assert_eq!(
-            dict_get_string_value(dict, "hello").as_deref(),
+            unsafe { dict_get_string_value(dict, "hello") }.as_deref(),
             Some("world")
         );
-        assert_eq!(dict_get_integer_value(dict, "num"), Some(42));
-        assert!(dict_get_string_value(dict, "missing").is_none());
-        assert!(dict_get_integer_value(dict, "hello").is_none());
+        assert_eq!(unsafe { dict_get_integer_value(dict, "num") }, Some(42));
+        assert!(unsafe { dict_get_string_value(dict, "missing") }.is_none());
+        assert!(unsafe { dict_get_integer_value(dict, "hello") }.is_none());
 
-        free(dict);
+        unsafe { free(dict) };
     }
 
     // ── Additional coverage ─────────────────────────────────────
@@ -825,79 +1016,85 @@ mod tests {
     #[test]
     fn set_machport_and_set_opaque() {
         let mp = alloc(LaunchDataType::MachPort as u32);
-        assert_eq!(get_machport(mp), 0);
-        assert!(set_machport(mp, 0xABCD));
-        assert_eq!(get_machport(mp), 0xABCD);
+        assert_eq!(unsafe { get_machport(mp) }, 0);
+        assert!(unsafe { set_machport(mp, 0xABCD) });
+        assert_eq!(unsafe { get_machport(mp) }, 0xABCD);
         // Type mismatch
-        assert!(!set_machport(new_integer(0), 1));
-        free(mp);
+        assert!(!unsafe { set_machport(new_integer(0), 1) });
+        unsafe { free(mp) };
 
         let op = alloc(LaunchDataType::Opaque as u32);
-        assert_eq!(get_opaque_size(op), 0);
+        assert_eq!(unsafe { get_opaque_size(op) }, 0);
         let data = b"\x01\x02\x03";
-        assert!(set_opaque(op, data.as_ptr() as *const libc::c_void, 3));
-        assert_eq!(get_opaque_size(op), 3);
-        let ptr = get_opaque(op) as *const u8;
+        assert!(unsafe { set_opaque(op, data.as_ptr() as *const libc::c_void, 3) });
+        assert_eq!(unsafe { get_opaque_size(op) }, 3);
+        let ptr = unsafe { get_opaque(op) } as *const u8;
         assert_eq!(unsafe { std::slice::from_raw_parts(ptr, 3) }, &[1, 2, 3]);
         // Type mismatch
-        assert!(!set_opaque(new_integer(0), data.as_ptr() as *const _, 3));
-        free(op);
+        assert!(!unsafe { set_opaque(new_integer(0), data.as_ptr() as *const _, 3) });
+        unsafe { free(op) };
     }
 
     #[test]
     fn new_string_null_returns_null() {
-        assert!(new_string(std::ptr::null()).is_null());
+        assert!(unsafe { new_string(std::ptr::null()) }.is_null());
     }
 
     #[test]
     fn new_opaque_null_with_zero_len() {
         // null + len=0 is valid: creates empty opaque
-        let o = new_opaque(std::ptr::null(), 0);
+        let o = unsafe { new_opaque(std::ptr::null(), 0) };
         assert!(!o.is_null());
-        assert_eq!(get_opaque_size(o), 0);
-        free(o);
+        assert_eq!(unsafe { get_opaque_size(o) }, 0);
+        unsafe { free(o) };
     }
 
     #[test]
     fn new_opaque_null_with_nonzero_len() {
         // null + len>0 is invalid
-        assert!(new_opaque(std::ptr::null(), 5).is_null());
+        assert!(unsafe { new_opaque(std::ptr::null(), 5) }.is_null());
     }
 
     #[test]
     fn set_string_null_returns_false() {
         let s = alloc(LaunchDataType::String as u32);
-        assert!(!set_string(s, std::ptr::null()));
-        free(s);
+        assert!(!unsafe { set_string(s, std::ptr::null()) });
+        unsafe { free(s) };
     }
 
     #[test]
     fn set_opaque_null_with_nonzero_len_returns_false() {
         let o = alloc(LaunchDataType::Opaque as u32);
-        assert!(!set_opaque(o, std::ptr::null(), 10));
-        free(o);
+        assert!(!unsafe { set_opaque(o, std::ptr::null(), 10) });
+        unsafe { free(o) };
     }
 
     #[test]
     fn set_opaque_null_with_zero_len_succeeds() {
         let o = alloc(LaunchDataType::Opaque as u32);
-        assert!(set_opaque(o, std::ptr::null(), 0));
-        assert_eq!(get_opaque_size(o), 0);
-        free(o);
+        assert!(unsafe { set_opaque(o, std::ptr::null(), 0) });
+        assert_eq!(unsafe { get_opaque_size(o) }, 0);
+        unsafe { free(o) };
     }
 
     #[test]
     fn nested_dict_in_dict() {
         let outer = alloc(LaunchDataType::Dictionary as u32);
         let inner = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(inner, new_integer(99), c"nested_key".as_ptr());
-        dict_insert(outer, inner, c"child".as_ptr());
+        unsafe { dict_insert(inner, new_integer(99), c"nested_key".as_ptr()) };
+        unsafe { dict_insert(outer, inner, c"child".as_ptr()) };
 
-        let found = dict_lookup(outer, c"child".as_ptr());
+        let found = unsafe { dict_lookup(outer, c"child".as_ptr()) };
         assert!(!found.is_null());
-        assert_eq!(get_type(found), LaunchDataType::Dictionary as u32);
-        assert_eq!(get_integer(dict_lookup(found, c"nested_key".as_ptr())), 99);
-        free(outer);
+        assert_eq!(
+            unsafe { get_type(found) },
+            LaunchDataType::Dictionary as u32
+        );
+        assert_eq!(
+            unsafe { get_integer(dict_lookup(found, c"nested_key".as_ptr())) },
+            99
+        );
+        unsafe { free(outer) };
     }
 
     #[test]
@@ -905,27 +1102,36 @@ mod tests {
         let arr = alloc(LaunchDataType::Array as u32);
         for i in 0..3 {
             let d = alloc(LaunchDataType::Dictionary as u32);
-            dict_insert(d, new_integer(i as i64), c"val".as_ptr());
-            array_set_index(arr, d, i);
+            unsafe { dict_insert(d, new_integer(i as i64), c"val".as_ptr()) };
+            unsafe { array_set_index(arr, d, i) };
         }
-        assert_eq!(array_get_count(arr), 3);
+        assert_eq!(unsafe { array_get_count(arr) }, 3);
         for i in 0..3 {
-            let elem = array_get_index(arr, i);
-            assert_eq!(get_type(elem), LaunchDataType::Dictionary as u32);
-            assert_eq!(get_integer(dict_lookup(elem, c"val".as_ptr())), i as i64);
+            let elem = unsafe { array_get_index(arr, i) };
+            assert_eq!(unsafe { get_type(elem) }, LaunchDataType::Dictionary as u32);
+            assert_eq!(
+                unsafe { get_integer(dict_lookup(elem, c"val".as_ptr())) },
+                i as i64
+            );
         }
-        free(arr);
+        unsafe { free(arr) };
     }
 
     #[test]
     fn dict_insert_overwrites_existing_key() {
         let dict = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(dict, new_integer(1), c"key".as_ptr());
-        assert_eq!(get_integer(dict_lookup(dict, c"key".as_ptr())), 1);
-        dict_insert(dict, new_integer(2), c"key".as_ptr());
-        assert_eq!(dict_get_count(dict), 1); // still 1 entry
-        assert_eq!(get_integer(dict_lookup(dict, c"key".as_ptr())), 2);
-        free(dict);
+        unsafe { dict_insert(dict, new_integer(1), c"key".as_ptr()) };
+        assert_eq!(
+            unsafe { get_integer(dict_lookup(dict, c"key".as_ptr())) },
+            1
+        );
+        unsafe { dict_insert(dict, new_integer(2), c"key".as_ptr()) };
+        assert_eq!(unsafe { dict_get_count(dict) }, 1); // still 1 entry
+        assert_eq!(
+            unsafe { get_integer(dict_lookup(dict, c"key".as_ptr())) },
+            2
+        );
+        unsafe { free(dict) };
     }
 
     #[test]
@@ -933,23 +1139,23 @@ mod tests {
         let arr = alloc(LaunchDataType::Array as u32);
         // Trying to dict_insert on an array should fail and not leak
         let val = new_integer(5);
-        assert!(!dict_insert(arr, val, c"key".as_ptr()));
-        free(val); // caller still owns it
-        free(arr);
+        assert!(!unsafe { dict_insert(arr, val, c"key".as_ptr()) });
+        unsafe { free(val) }; // caller still owns it
+        unsafe { free(arr) };
     }
 
     #[test]
     fn dict_lookup_missing_key_returns_null() {
         let dict = alloc(LaunchDataType::Dictionary as u32);
-        assert!(dict_lookup(dict, c"nope".as_ptr()).is_null());
-        free(dict);
+        assert!(unsafe { dict_lookup(dict, c"nope".as_ptr()) }.is_null());
+        unsafe { free(dict) };
     }
 
     #[test]
     fn dict_remove_on_non_dict_returns_false() {
         let arr = alloc(LaunchDataType::Array as u32);
-        assert!(!dict_remove(arr, c"key".as_ptr()));
-        free(arr);
+        assert!(!unsafe { dict_remove(arr, c"key".as_ptr()) });
+        unsafe { free(arr) };
     }
 
     #[test]
@@ -964,9 +1170,9 @@ mod tests {
         unsafe {
             CALLED = false;
         }
-        dict_iterate(dict, cb, std::ptr::null_mut());
+        unsafe { dict_iterate(dict, cb, std::ptr::null_mut()) };
         assert!(!unsafe { CALLED });
-        free(dict);
+        unsafe { free(dict) };
     }
 
     #[test]
@@ -981,159 +1187,162 @@ mod tests {
         unsafe {
             CALLED = false;
         }
-        dict_iterate(arr, cb, std::ptr::null_mut());
+        unsafe { dict_iterate(arr, cb, std::ptr::null_mut()) };
         assert!(!unsafe { CALLED });
-        free(arr);
+        unsafe { free(arr) };
     }
 
     #[test]
     fn array_get_index_out_of_bounds() {
         let arr = alloc(LaunchDataType::Array as u32);
-        array_set_index(arr, new_integer(1), 0);
-        assert!(array_get_index(arr, 5).is_null());
-        free(arr);
+        unsafe { array_set_index(arr, new_integer(1), 0) };
+        assert!(unsafe { array_get_index(arr, 5) }.is_null());
+        unsafe { free(arr) };
     }
 
     #[test]
     fn array_set_index_on_non_array_returns_false() {
         let dict = alloc(LaunchDataType::Dictionary as u32);
         let val = new_integer(10);
-        assert!(!array_set_index(dict, val, 0));
-        free(val);
-        free(dict);
+        assert!(!unsafe { array_set_index(dict, val, 0) });
+        unsafe { free(val) };
+        unsafe { free(dict) };
     }
 
     #[test]
     fn array_get_count_on_non_array() {
         let dict = alloc(LaunchDataType::Dictionary as u32);
-        assert_eq!(array_get_count(dict), 0);
-        free(dict);
+        assert_eq!(unsafe { array_get_count(dict) }, 0);
+        unsafe { free(dict) };
     }
 
     #[test]
     fn dict_get_count_on_non_dict() {
         let arr = alloc(LaunchDataType::Array as u32);
-        assert_eq!(dict_get_count(arr), 0);
-        free(arr);
+        assert_eq!(unsafe { dict_get_count(arr) }, 0);
+        unsafe { free(arr) };
     }
 
     #[test]
     fn deep_copy_nested_structure() {
         let outer = alloc(LaunchDataType::Dictionary as u32);
         let inner_arr = alloc(LaunchDataType::Array as u32);
-        array_set_index(inner_arr, new_string(c"hello".as_ptr()), 0);
-        array_set_index(inner_arr, new_integer(42), 1);
+        unsafe { array_set_index(inner_arr, new_string(c"hello".as_ptr()), 0) };
+        unsafe { array_set_index(inner_arr, new_integer(42), 1) };
         let inner_dict = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(inner_dict, new_bool(true), c"flag".as_ptr());
-        dict_insert(outer, inner_arr, c"arr".as_ptr());
-        dict_insert(outer, inner_dict, c"sub".as_ptr());
-        dict_insert(
-            outer,
-            new_opaque(b"\xDE\xAD".as_ptr() as *const _, 2),
-            c"bin".as_ptr(),
-        );
+        unsafe { dict_insert(inner_dict, new_bool(true), c"flag".as_ptr()) };
+        unsafe { dict_insert(outer, inner_arr, c"arr".as_ptr()) };
+        unsafe { dict_insert(outer, inner_dict, c"sub".as_ptr()) };
+        unsafe {
+            dict_insert(
+                outer,
+                new_opaque(b"\xDE\xAD".as_ptr() as *const _, 2),
+                c"bin".as_ptr(),
+            )
+        };
 
-        let cloned = copy(outer);
-        assert_eq!(dict_get_count(cloned), 3);
+        let cloned = unsafe { copy(outer) };
+        assert_eq!(unsafe { dict_get_count(cloned) }, 3);
 
         // Verify nested array survived copy
-        let arr_copy = dict_lookup(cloned, c"arr".as_ptr());
-        assert_eq!(array_get_count(arr_copy), 2);
-        assert_eq!(get_integer(array_get_index(arr_copy, 1)), 42);
+        let arr_copy = unsafe { dict_lookup(cloned, c"arr".as_ptr()) };
+        assert_eq!(unsafe { array_get_count(arr_copy) }, 2);
+        assert_eq!(unsafe { get_integer(array_get_index(arr_copy, 1)) }, 42);
 
         // Verify nested dict survived copy
-        let sub_copy = dict_lookup(cloned, c"sub".as_ptr());
-        assert!(get_bool(dict_lookup(sub_copy, c"flag".as_ptr())));
+        let sub_copy = unsafe { dict_lookup(cloned, c"sub".as_ptr()) };
+        assert!(unsafe { get_bool(dict_lookup(sub_copy, c"flag".as_ptr())) });
 
         // Verify opaque survived copy
-        let bin_copy = dict_lookup(cloned, c"bin".as_ptr());
-        assert_eq!(get_opaque_size(bin_copy), 2);
+        let bin_copy = unsafe { dict_lookup(cloned, c"bin".as_ptr()) };
+        assert_eq!(unsafe { get_opaque_size(bin_copy) }, 2);
 
         // Mutations to original don't affect copy
-        dict_remove(outer, c"arr".as_ptr());
-        assert_eq!(dict_get_count(outer), 2);
-        assert_eq!(dict_get_count(cloned), 3);
+        unsafe { dict_remove(outer, c"arr".as_ptr()) };
+        assert_eq!(unsafe { dict_get_count(outer) }, 2);
+        assert_eq!(unsafe { dict_get_count(cloned) }, 3);
 
-        free(outer);
-        free(cloned);
+        unsafe { free(outer) };
+        unsafe { free(cloned) };
     }
 
     #[test]
     fn dict_from_pairs_helper() {
-        let dict = dict_from_pairs(&[
-            ("name", new_string(c"test".as_ptr())),
-            ("count", new_integer(3)),
-            ("enabled", new_bool(true)),
-        ]);
-        assert_eq!(dict_get_count(dict), 3);
-        assert_eq!(dict_get_string_value(dict, "name").as_deref(), Some("test"));
-        assert_eq!(dict_get_integer_value(dict, "count"), Some(3));
-        assert_eq!(dict_get_bool_value(dict, "enabled"), Some(true));
-        free(dict);
+        let dict = unsafe {
+            dict_from_pairs(&[
+                ("name", new_string(c"test".as_ptr())),
+                ("count", new_integer(3)),
+                ("enabled", new_bool(true)),
+            ])
+        };
+        assert_eq!(unsafe { dict_get_count(dict) }, 3);
+        assert_eq!(
+            unsafe { dict_get_string_value(dict, "name") }.as_deref(),
+            Some("test")
+        );
+        assert_eq!(unsafe { dict_get_integer_value(dict, "count") }, Some(3));
+        assert_eq!(unsafe { dict_get_bool_value(dict, "enabled") }, Some(true));
+        unsafe { free(dict) };
     }
 
     #[test]
     fn dict_get_bool_value_helper() {
         let dict = alloc(LaunchDataType::Dictionary as u32);
-        dict_insert(dict, new_bool(false), c"off".as_ptr());
-        assert_eq!(dict_get_bool_value(dict, "off"), Some(false));
-        assert!(dict_get_bool_value(dict, "missing").is_none());
+        unsafe { dict_insert(dict, new_bool(false), c"off".as_ptr()) };
+        assert_eq!(unsafe { dict_get_bool_value(dict, "off") }, Some(false));
+        assert!(unsafe { dict_get_bool_value(dict, "missing") }.is_none());
         // Wrong type returns None
-        dict_insert(dict, new_integer(1), c"num".as_ptr());
-        assert!(dict_get_bool_value(dict, "num").is_none());
-        free(dict);
+        unsafe { dict_insert(dict, new_integer(1), c"num".as_ptr()) };
+        assert!(unsafe { dict_get_bool_value(dict, "num") }.is_none());
+        unsafe { free(dict) };
     }
 
     #[test]
     fn machport_alloc_and_get() {
         let mp = alloc(LaunchDataType::MachPort as u32);
-        assert_eq!(get_type(mp), LaunchDataType::MachPort as u32);
-        assert_eq!(get_machport(mp), 0); // default
-        free(mp);
+        assert_eq!(unsafe { get_type(mp) }, LaunchDataType::MachPort as u32);
+        assert_eq!(unsafe { get_machport(mp) }, 0); // default
+        unsafe { free(mp) };
     }
 
     #[test]
     fn getter_type_mismatches_return_defaults() {
-        let s = new_string(c"text".as_ptr());
-        assert_eq!(get_integer(s), 0);
-        assert_eq!(get_fd(s), -1);
-        assert_eq!(get_machport(s), 0);
-        assert_eq!(get_bool(s), false);
-        assert!((get_real(s) - 0.0).abs() < f64::EPSILON);
-        assert!(get_opaque(s).is_null());
-        assert_eq!(get_opaque_size(s), 0);
-        assert_eq!(get_errno(s), 0);
-        free(s);
+        let s = unsafe { new_string(c"text".as_ptr()) };
+        assert_eq!(unsafe { get_integer(s) }, 0);
+        assert_eq!(unsafe { get_fd(s) }, -1);
+        assert_eq!(unsafe { get_machport(s) }, 0);
+        assert!(!unsafe { get_bool(s) });
+        assert!((unsafe { get_real(s) } - 0.0).abs() < f64::EPSILON);
+        assert!(unsafe { get_opaque(s) }.is_null());
+        assert_eq!(unsafe { get_opaque_size(s) }, 0);
+        assert_eq!(unsafe { get_errno(s) }, 0);
+        unsafe { free(s) };
 
         let i = new_integer(42);
-        assert!(get_string(i).is_null());
-        free(i);
+        assert!(unsafe { get_string(i) }.is_null());
+        unsafe { free(i) };
     }
 
     #[test]
     fn dict_null_args_safety() {
-        assert!(!dict_insert(
-            LAUNCH_DATA_NULL,
-            new_integer(1),
-            c"k".as_ptr()
-        ));
+        assert!(!unsafe { dict_insert(LAUNCH_DATA_NULL, new_integer(1), c"k".as_ptr()) });
         let dict = alloc(LaunchDataType::Dictionary as u32);
-        assert!(!dict_insert(dict, LAUNCH_DATA_NULL, c"k".as_ptr()));
-        assert!(!dict_insert(dict, new_integer(1), std::ptr::null()));
-        assert!(dict_lookup(LAUNCH_DATA_NULL, c"k".as_ptr()).is_null());
-        assert!(dict_lookup(dict, std::ptr::null()).is_null());
-        assert!(!dict_remove(LAUNCH_DATA_NULL, c"k".as_ptr()));
-        assert!(!dict_remove(dict, std::ptr::null()));
-        free(dict);
+        assert!(!unsafe { dict_insert(dict, LAUNCH_DATA_NULL, c"k".as_ptr()) });
+        assert!(!unsafe { dict_insert(dict, new_integer(1), std::ptr::null()) });
+        assert!(unsafe { dict_lookup(LAUNCH_DATA_NULL, c"k".as_ptr()) }.is_null());
+        assert!(unsafe { dict_lookup(dict, std::ptr::null()) }.is_null());
+        assert!(!unsafe { dict_remove(LAUNCH_DATA_NULL, c"k".as_ptr()) });
+        assert!(!unsafe { dict_remove(dict, std::ptr::null()) });
+        unsafe { free(dict) };
     }
 
     #[test]
     fn array_null_args_safety() {
-        assert!(!array_set_index(LAUNCH_DATA_NULL, new_integer(1), 0));
+        assert!(!unsafe { array_set_index(LAUNCH_DATA_NULL, new_integer(1), 0) });
         let arr = alloc(LaunchDataType::Array as u32);
-        assert!(!array_set_index(arr, LAUNCH_DATA_NULL, 0));
-        assert!(array_get_index(LAUNCH_DATA_NULL, 0).is_null());
-        free(arr);
+        assert!(!unsafe { array_set_index(arr, LAUNCH_DATA_NULL, 0) });
+        assert!(unsafe { array_get_index(LAUNCH_DATA_NULL, 0) }.is_null());
+        unsafe { free(arr) };
     }
 
     #[test]
@@ -1152,13 +1361,13 @@ mod tests {
     fn large_array() {
         let arr = alloc(LaunchDataType::Array as u32);
         for i in 0..100 {
-            array_set_index(arr, new_integer(i as i64), i);
+            unsafe { array_set_index(arr, new_integer(i as i64), i) };
         }
-        assert_eq!(array_get_count(arr), 100);
-        assert_eq!(get_integer(array_get_index(arr, 0)), 0);
-        assert_eq!(get_integer(array_get_index(arr, 50)), 50);
-        assert_eq!(get_integer(array_get_index(arr, 99)), 99);
-        free(arr);
+        assert_eq!(unsafe { array_get_count(arr) }, 100);
+        assert_eq!(unsafe { get_integer(array_get_index(arr, 0)) }, 0);
+        assert_eq!(unsafe { get_integer(array_get_index(arr, 50)) }, 50);
+        assert_eq!(unsafe { get_integer(array_get_index(arr, 99)) }, 99);
+        unsafe { free(arr) };
     }
 
     #[test]
@@ -1166,25 +1375,25 @@ mod tests {
         let dict = alloc(LaunchDataType::Dictionary as u32);
         for i in 0..100 {
             let key = CString::new(format!("key_{}", i)).unwrap();
-            dict_insert(dict, new_integer(i as i64), key.as_ptr());
+            unsafe { dict_insert(dict, new_integer(i as i64), key.as_ptr()) };
         }
-        assert_eq!(dict_get_count(dict), 100);
-        assert_eq!(dict_get_integer_value(dict, "key_0"), Some(0));
-        assert_eq!(dict_get_integer_value(dict, "key_99"), Some(99));
-        free(dict);
+        assert_eq!(unsafe { dict_get_count(dict) }, 100);
+        assert_eq!(unsafe { dict_get_integer_value(dict, "key_0") }, Some(0));
+        assert_eq!(unsafe { dict_get_integer_value(dict, "key_99") }, Some(99));
+        unsafe { free(dict) };
     }
 
     #[test]
     fn errno_value_preservation() {
         // Errno values can be set by creating a new Errno type and mutating
         let d = alloc(LaunchDataType::Errno as u32);
-        assert_eq!(get_errno(d), 0);
+        assert_eq!(unsafe { get_errno(d) }, 0);
         // Mutate via raw pointer (simulating how launch_msg builds replies)
         unsafe {
             let data = &mut *d;
             *data = LaunchData::Errno(libc::ENOENT);
         }
-        assert_eq!(get_errno(d), libc::ENOENT);
-        free(d);
+        assert_eq!(unsafe { get_errno(d) }, libc::ENOENT);
+        unsafe { free(d) };
     }
 }
