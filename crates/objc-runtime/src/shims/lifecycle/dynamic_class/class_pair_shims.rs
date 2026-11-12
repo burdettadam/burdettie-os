@@ -65,7 +65,7 @@ pub extern "C" fn shim_objc_allocate_class_pair(
         instance_size,
         is_root,
         is_meta: false,
-        superclass_addr: superclass_addr,
+        superclass_addr,
         method_index: HashMap::new(),
         class_method_index: HashMap::new(),
     };

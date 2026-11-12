@@ -44,6 +44,12 @@ pub struct ShardedRefCounts {
     shards: [Mutex<HashMap<u64, usize>>; SHARD_COUNT],
 }
 
+impl Default for ShardedRefCounts {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ShardedRefCounts {
     /// Create a new empty sharded table.
     pub fn new() -> Self {

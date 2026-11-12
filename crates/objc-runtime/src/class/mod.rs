@@ -310,20 +310,18 @@ impl ObjcRuntime {
 
     /// Iterate over all registered classes mutably (values only).
     pub fn classes_by_name_iter_mut(&mut self) -> impl Iterator<Item = &mut ClassInfo> {
-        self.classes_by_name.values_mut().map(|a| Arc::make_mut(a))
+        self.classes_by_name.values_mut().map(Arc::make_mut)
     }
 
     /// Get mutable access to a class by name.
     pub fn get_class_mut(&mut self, name: &str) -> Option<&mut ClassInfo> {
-        self.classes_by_name.get_mut(name).map(|a| Arc::make_mut(a))
+        self.classes_by_name.get_mut(name).map(Arc::make_mut)
     }
 
     /// Get mutable access to a class by mapped address.
     pub fn get_class_by_addr_mut(&mut self, addr: u64) -> Option<&mut ClassInfo> {
         let name = self.classes_by_addr.get(&addr)?.clone();
-        self.classes_by_name
-            .get_mut(&name)
-            .map(|a| Arc::make_mut(a))
+        self.classes_by_name.get_mut(&name).map(Arc::make_mut)
     }
 
     /// Register a host ISA address as an alias for an existing class.

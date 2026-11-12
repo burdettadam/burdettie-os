@@ -73,7 +73,7 @@ pub extern "C" fn objc_msg_lookup_imp(obj: u64, sel: u64) -> u64 {
         return unrecognized_selector_stub as *const () as u64;
     }
 
-    if obj % 8 != 0 {
+    if !obj.is_multiple_of(8) {
         let sel_str = unsafe { CStr::from_ptr(sel as *const c_char) }
             .to_str()
             .unwrap_or("");
@@ -342,7 +342,7 @@ mod tests {
     use std::collections::HashMap;
     use std::ffi::CString;
 
-    fn setup_lookup_class(name: &str, addr: u64, methods: Vec<(&'static str, u64)>) {
+    fn setup_lookup_class(name: &str, addr: u64, methods: &[(&'static str, u64)]) {
         let mut guard = OBJC_RUNTIME.write().unwrap();
         let rt = guard.get_or_insert_with(ObjcRuntime::new);
         let mut info = ClassInfo {
@@ -371,7 +371,7 @@ mod tests {
         rt.register_synthetic_class(info);
     }
 
-    fn setup_lookup_metaclass(name: &str, addr: u64, class_methods: Vec<(&'static str, u64)>) {
+    fn setup_lookup_metaclass(name: &str, addr: u64, class_methods: &[(&'static str, u64)]) {
         let mut guard = OBJC_RUNTIME.write().unwrap();
         let rt = guard.get_or_insert_with(ObjcRuntime::new);
         let mut info = ClassInfo {
@@ -413,8 +413,8 @@ mod tests {
         let meta_addr = 0x0000_0001_0000_4000u64;
         let imp_addr = 0x0000_0002_0000_1234u64;
 
-        setup_lookup_class("DispatchClass", class_addr, vec![]);
-        setup_lookup_metaclass("DispatchClass", meta_addr, vec![("alloc", imp_addr)]);
+        setup_lookup_class("DispatchClass", class_addr, &[]);
+        setup_lookup_metaclass("DispatchClass", meta_addr, &[("alloc", imp_addr)]);
 
         let sel = CString::new("alloc").unwrap();
         assert_eq!(
@@ -441,7 +441,7 @@ mod tests {
         // Address must survive ISA masking (& 0x007ffffffffffff8 on aarch64).
         let class_addr = 0x0000_0001_0000_1000u64;
         let imp_addr = 0x0000_0002_0000_0001u64;
-        setup_lookup_class("LkTestHasA", class_addr, vec![("doStuff", imp_addr)]);
+        setup_lookup_class("LkTestHasA", class_addr, &[("doStuff", imp_addr)]);
 
         // Intern the selector so it resolves.
         {
@@ -462,7 +462,7 @@ mod tests {
     fn lookup_preserves_known_high_synthetic_isa() {
         let class_addr = 0x0050_0000_0001_0000u64;
         let imp_addr = 0x0000_0002_0000_4321u64;
-        setup_lookup_class("HighSynthDispatch", class_addr, vec![("init", imp_addr)]);
+        setup_lookup_class("HighSynthDispatch", class_addr, &[("init", imp_addr)]);
 
         let fake_obj: Box<u64> = Box::new(class_addr);
         let obj_addr = &*fake_obj as *const u64 as u64;
@@ -475,7 +475,7 @@ mod tests {
     #[test]
     fn has_method_not_found() {
         let class_addr = 0x0000_0001_0000_2000u64;
-        setup_lookup_class("LkTestHasB", class_addr, vec![]);
+        setup_lookup_class("LkTestHasB", class_addr, &[]);
 
         let fake_obj: Box<u64> = Box::new(class_addr);
         let obj_addr = &*fake_obj as *const u64 as u64;

@@ -466,7 +466,7 @@ mod tests {
     use std::collections::HashMap;
     use std::ffi::CString;
 
-    fn setup_test_class(name: &str, addr: u64, methods: Vec<(&'static str, u64)>) {
+    fn setup_test_class(name: &str, addr: u64, methods: &[(&'static str, u64)]) {
         let mut guard = OBJC_RUNTIME.write().unwrap();
         let rt = guard.get_or_insert_with(ObjcRuntime::new);
         let mut info = ClassInfo {
@@ -512,7 +512,7 @@ mod tests {
 
     #[test]
     fn class_get_superclass_root() {
-        setup_test_class("IntroTestA", 0xA001_0000, vec![]);
+        setup_test_class("IntroTestA", 0xA001_0000, &[]);
         assert_eq!(shim_class_get_superclass(0xA001_0000), 0);
     }
 
@@ -524,13 +524,13 @@ mod tests {
 
     #[test]
     fn class_responds_to_selector_null_sel() {
-        setup_test_class("IntroTestB", 0xA002_0000, vec![("init", 0xBEEF)]);
+        setup_test_class("IntroTestB", 0xA002_0000, &[("init", 0xBEEF)]);
         assert_eq!(shim_class_responds_to_selector(0xA002_0000, 0), 0);
     }
 
     #[test]
     fn class_responds_to_selector_found() {
-        setup_test_class("IntroTestC", 0xA003_0000, vec![("init", 0xBEEF)]);
+        setup_test_class("IntroTestC", 0xA003_0000, &[("init", 0xBEEF)]);
         let sel = CString::new("init").unwrap();
         assert_eq!(
             shim_class_responds_to_selector(0xA003_0000, sel.as_ptr() as u64),
@@ -540,7 +540,7 @@ mod tests {
 
     #[test]
     fn class_responds_to_selector_not_found() {
-        setup_test_class("IntroTestD", 0xA004_0000, vec![("init", 0xBEEF)]);
+        setup_test_class("IntroTestD", 0xA004_0000, &[("init", 0xBEEF)]);
         let sel = CString::new("dealloc").unwrap();
         assert_eq!(
             shim_class_responds_to_selector(0xA004_0000, sel.as_ptr() as u64),
@@ -556,7 +556,7 @@ mod tests {
     #[test]
     fn class_get_instance_method_found() {
         let imp_val = 0xCAFE_0000u64;
-        setup_test_class("IntroTestE", 0xA005_0000, vec![("alloc", imp_val)]);
+        setup_test_class("IntroTestE", 0xA005_0000, &[("alloc", imp_val)]);
         let sel = CString::new("alloc").unwrap();
         let method = shim_class_get_instance_method(0xA005_0000, sel.as_ptr() as u64);
         assert_ne!(method, 0, "should return a Method pointer");
@@ -574,7 +574,7 @@ mod tests {
 
     #[test]
     fn class_copy_method_list_empty() {
-        setup_test_class("IntroTestF", 0xA006_0000, vec![]);
+        setup_test_class("IntroTestF", 0xA006_0000, &[]);
         let mut count: u32 = 99;
         let arr = shim_class_copy_method_list(0xA006_0000, &mut count as *mut u32);
         assert_eq!(arr, 0);
@@ -588,13 +588,13 @@ mod tests {
 
     #[test]
     fn class_get_instance_size_valid() {
-        setup_test_class("IntroTestG", 0xA007_0000, vec![]);
+        setup_test_class("IntroTestG", 0xA007_0000, &[]);
         assert_eq!(shim_class_get_instance_size(0xA007_0000), 16);
     }
 
     #[test]
     fn class_is_meta_class_not_meta() {
-        setup_test_class("IntroTestH", 0xA008_0000, vec![]);
+        setup_test_class("IntroTestH", 0xA008_0000, &[]);
         assert_eq!(shim_class_is_meta_class(0xA008_0000), 0);
     }
 
