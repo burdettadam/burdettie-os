@@ -405,6 +405,12 @@ unsafe fn init_shadow(shadow: *mut u8, real_fp: *mut libc::FILE) {
 /// If the pointer is not a registered shadow, returns it as-is
 /// (it's already a glibc FILE* from e.g. a direct fopen on the safe-list
 /// before our shim was installed).
+///
+/// # Safety
+/// A non-null `darwin_fp` must be a live registered shadow or a live host
+/// `FILE` pointer. A shadow and its host stream must not be closed, freed, or
+/// have their cookie changed concurrently with this call. The returned pointer
+/// is borrowed and remains valid only while the underlying stream is open.
 #[cfg(not(target_os = "macos"))]
 pub unsafe fn extract_real_fp(darwin_fp: *mut u8) -> *mut libc::FILE {
     if darwin_fp.is_null() {
@@ -492,9 +498,11 @@ pub fn stdio_shadow_ptr_addr(stream: u8) -> *const () {
     unsafe {
         init_stdio_shadows();
         match stream {
-            0 => &STDIN_SHADOW_PTR as *const *mut u8 as *const (),
-            1 => &STDOUT_SHADOW_PTR as *const *mut u8 as *const (),
-            2 => &STDERR_SHADOW_PTR as *const *mut u8 as *const (),
+            // Export raw addresses without creating references to cells the
+            // guest can access through its FILE** data symbols.
+            0 => std::ptr::addr_of!(STDIN_SHADOW_PTR).cast(),
+            1 => std::ptr::addr_of!(STDOUT_SHADOW_PTR).cast(),
+            2 => std::ptr::addr_of!(STDERR_SHADOW_PTR).cast(),
             _ => std::ptr::null(),
         }
     }
@@ -831,42 +839,64 @@ extern "C" fn shim_swbuf(c: libc::c_int, darwin_fp: *mut u8) -> libc::c_int {
 
 /// `vfprintf` wrapper: translates shadow FILE* → glibc FILE*, then calls
 /// the real `vfprintf`.
+///
+/// # Safety
+/// `darwin_fp` must be a non-null live stream satisfying [`extract_real_fp`]
+/// and remain open for the call. `fmt` must be a readable, NUL-terminated
+/// format string. `ap` must point to an initialized host-ABI `va_list`,
+/// exclusively accessible during the call, whose arguments match the format
+/// and satisfy its pointer/buffer requirements, including any `%n` writes.
 #[cfg(not(target_os = "macos"))]
 #[no_mangle]
-pub extern "C" fn vfprintf_shadow(
+pub unsafe extern "C" fn vfprintf_shadow(
     darwin_fp: *mut u8,
     fmt: *const libc::c_char,
     ap: *mut libc::c_void, // va_list
 ) -> libc::c_int {
+    // SAFETY: The caller guarantees the stream, format, and host va_list contract.
     let real_fp = unsafe { extract_real_fp(darwin_fp) };
     unsafe { vfprintf(real_fp, fmt, ap as _) }
 }
 
 /// `vfscanf` wrapper: translates shadow FILE* → glibc FILE*, then calls
 /// the real `vfscanf`.
+///
+/// # Safety
+/// `darwin_fp` must be a non-null live stream satisfying [`extract_real_fp`]
+/// and remain open for the call. `fmt` must be a readable, NUL-terminated
+/// format string. `ap` must point to an initialized host-ABI `va_list`,
+/// exclusively accessible during the call, with correctly typed, aligned,
+/// writable destinations of sufficient size for every format conversion.
 #[cfg(not(target_os = "macos"))]
 #[no_mangle]
-pub extern "C" fn vfscanf_shadow(
+pub unsafe extern "C" fn vfscanf_shadow(
     darwin_fp: *mut u8,
     fmt: *const libc::c_char,
     ap: *mut libc::c_void, // va_list
 ) -> libc::c_int {
+    // SAFETY: The caller guarantees the stream, format, va_list, and output buffers.
     let real_fp = unsafe { extract_real_fp(darwin_fp) };
     unsafe { vfscanf(real_fp, fmt, ap as _) }
 }
 
-/// `__vfprintf_chk` wrapper: translates shadow FILE* → glibc FILE*, then
-/// calls the real `__vfprintf_chk`.
+/// `__vfprintf_chk` compatibility wrapper: translates the shadow FILE* and
+/// delegates to `vfprintf`; the fortification flag is not emulated.
+///
+/// # Safety
+/// The caller must satisfy [`vfprintf_shadow`]'s stream, format, host-ABI
+/// `va_list`, and argument validity requirements. The compatibility flag does
+/// not validate pointers or extend their lifetimes.
 #[cfg(not(target_os = "macos"))]
 #[no_mangle]
-pub extern "C" fn vfprintf_chk_shadow(
+pub unsafe extern "C" fn vfprintf_chk_shadow(
     darwin_fp: *mut u8,
     flag: libc::c_int,
     fmt: *const libc::c_char,
     ap: *mut libc::c_void, // va_list
 ) -> libc::c_int {
+    // SAFETY: The caller supplies a live stream and format-matching host va_list.
     let real_fp = unsafe { extract_real_fp(darwin_fp) };
-    // __vfprintf_chk is just vfprintf with a flag; fall through to vfprintf
+    // Preserve the existing compatibility behavior: delegate without fortification.
     let _ = flag;
     unsafe { vfprintf(real_fp, fmt, ap as _) }
 }
@@ -920,22 +950,24 @@ extern "C" fn shim_fprintf_x86_64() -> libc::c_int {
 }
 
 #[cfg(all(not(target_os = "macos"), not(target_arch = "aarch64")))]
-extern "C" fn shim_vfprintf_non_aarch64(
+unsafe extern "C" fn shim_vfprintf_non_aarch64(
     darwin_fp: *mut u8,
     fmt: *const libc::c_char,
     ap: *mut libc::c_void,
 ) -> libc::c_int {
-    vfprintf_shadow(darwin_fp, fmt, ap)
+    // SAFETY: The foreign caller supplies vfprintf's live stream and host va_list.
+    unsafe { vfprintf_shadow(darwin_fp, fmt, ap) }
 }
 
 #[cfg(all(not(target_os = "macos"), not(target_arch = "aarch64")))]
-extern "C" fn shim_vfprintf_chk_non_aarch64(
+unsafe extern "C" fn shim_vfprintf_chk_non_aarch64(
     darwin_fp: *mut u8,
     flag: libc::c_int,
     fmt: *const libc::c_char,
     ap: *mut libc::c_void,
 ) -> libc::c_int {
-    vfprintf_chk_shadow(darwin_fp, flag, fmt, ap)
+    // SAFETY: The foreign caller supplies the same contract as vfprintf_shadow.
+    unsafe { vfprintf_chk_shadow(darwin_fp, flag, fmt, ap) }
 }
 
 // ── BIO_new_fp / BIO_dump_fp shims ──────────────────────────────────
@@ -949,7 +981,7 @@ extern "C" fn shim_vfprintf_chk_non_aarch64(
 extern "C" fn shim_bio_new_fp(darwin_fp: *mut u8, close_flag: libc::c_int) -> *mut libc::c_void {
     let real_fp = unsafe { extract_real_fp(darwin_fp) };
     // Resolve BIO_new_fp at runtime — it's in the preloaded LibreSSL .so
-    let sym = unsafe { libc::dlsym(libc::RTLD_DEFAULT, b"BIO_new_fp\0".as_ptr().cast()) };
+    let sym = unsafe { libc::dlsym(libc::RTLD_DEFAULT, c"BIO_new_fp".as_ptr()) };
     if sym.is_null() {
         return std::ptr::null_mut();
     }
@@ -974,7 +1006,7 @@ extern "C" fn shim_bio_ctrl(
 ) -> libc::c_long {
     const BIO_C_SET_FILE_PTR: libc::c_int = 106;
 
-    let sym = unsafe { libc::dlsym(libc::RTLD_DEFAULT, b"BIO_ctrl\0".as_ptr().cast()) };
+    let sym = unsafe { libc::dlsym(libc::RTLD_DEFAULT, c"BIO_ctrl".as_ptr()) };
     if sym.is_null() {
         return -1;
     }
@@ -1001,7 +1033,7 @@ extern "C" fn shim_bio_dump_fp(
     len: libc::c_int,
 ) -> libc::c_int {
     let real_fp = unsafe { extract_real_fp(darwin_fp) };
-    let sym = unsafe { libc::dlsym(libc::RTLD_DEFAULT, b"BIO_dump_fp\0".as_ptr().cast()) };
+    let sym = unsafe { libc::dlsym(libc::RTLD_DEFAULT, c"BIO_dump_fp".as_ptr()) };
     if sym.is_null() {
         return -1;
     }
@@ -1018,7 +1050,7 @@ extern "C" fn shim_bio_dump_indent_fp(
     indent: libc::c_int,
 ) -> libc::c_int {
     let real_fp = unsafe { extract_real_fp(darwin_fp) };
-    let sym = unsafe { libc::dlsym(libc::RTLD_DEFAULT, b"BIO_dump_indent_fp\0".as_ptr().cast()) };
+    let sym = unsafe { libc::dlsym(libc::RTLD_DEFAULT, c"BIO_dump_indent_fp".as_ptr()) };
     if sym.is_null() {
         return -1;
     }

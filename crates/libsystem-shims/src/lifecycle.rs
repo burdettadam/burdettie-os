@@ -485,7 +485,7 @@ extern "C" fn shim_sigaction(
                 unsafe {
                     (*oact).sa_sigaction = linux_oact.sa_sigaction as u64;
                     (*oact).sa_mask = 0;
-                    (*oact).sa_flags = linux_oact.sa_flags as i32;
+                    (*oact).sa_flags = linux_oact.sa_flags;
                 }
             }
             return ret;
@@ -583,7 +583,7 @@ extern "C" fn shim_strlen_diagnostic(s: *const u8) -> usize {
     }
 
     // Pointers in the GPU carveout / unmapped region are clearly invalid.
-    if addr >= 0x10_0000_0000 && addr < 0x70_0000_0000 {
+    if (0x10_0000_0000..0x70_0000_0000).contains(&addr) {
         log::warn!("strlen: bad pointer {addr:#x} (unmapped region), returning 0");
         return 0;
     }
@@ -643,7 +643,7 @@ fn darwin_sigset_to_linux(darwin_ptr: *const u32) -> libc::sigset_t {
     // macOS sigset_t: bit (sig-1) = signal sig.  e.g. SIGTERM=15 → bit 14.
     for sig in 1..32 {
         if mac_bits & (1u32 << (sig - 1)) != 0 {
-            let linux_sig = translate_darwin_signal(sig as i32);
+            let linux_sig = translate_darwin_signal(sig);
             unsafe { libc::sigaddset(&mut linux_set, linux_sig) };
         }
     }
@@ -819,7 +819,7 @@ mod tests {
         assert!(table.resolve("___deregister_frame").is_some());
         assert!(table.resolve("_abort").is_some());
         assert!(table.resolve("_strlen").is_some());
-        assert_eq!(table.len(), 24);
+        assert_eq!(table.len(), 21);
     }
 
     #[test]

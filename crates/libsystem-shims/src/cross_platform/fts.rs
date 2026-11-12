@@ -134,13 +134,13 @@ mod inner {
     // Safety: these are thread-local and only accessed from the owning thread.
     // We use UnsafeCell because we need interior mutability without RefCell overhead.
     thread_local! {
-        static SHADOW: UnsafeCell<FtsShadowBuffers> = UnsafeCell::new(FtsShadowBuffers {
+        static SHADOW: UnsafeCell<FtsShadowBuffers> = const { UnsafeCell::new(FtsShadowBuffers {
             entry: [0u8; SHADOW_SIZE],
             stat_buf: [0u8; DARWIN_STAT_SIZE],
             parent: [0u8; SHADOW_SIZE],
             parent_stat: [0u8; DARWIN_STAT_SIZE],
             nostat: false,
-        });
+        }) };
     }
 
     // ── Linux FTSENT field offsets ────────────────────────────────────
@@ -385,7 +385,7 @@ mod inner {
         unsafe { fts_close(ftsp) }
     }
 
-    pub extern "C" fn shim_fts_set(ftsp: *mut u8, f: *mut u8, instr: libc::c_int) -> libc::c_int {
+    pub extern "C" fn shim_fts_set(ftsp: *mut u8, _f: *mut u8, instr: libc::c_int) -> libc::c_int {
         // fts_set takes the original Linux FTSENT pointer.
         // Since we return shadow pointers from fts_read, the caller passes
         // our shadow. We need to recover the original Linux pointer.

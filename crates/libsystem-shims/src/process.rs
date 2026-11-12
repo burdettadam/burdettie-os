@@ -277,7 +277,7 @@ extern "C" fn shim_nsgetenviron() -> *const *const *const std::ffi::c_char {
         extern "C" {
             static mut environ: *const *const std::ffi::c_char;
         }
-        std::ptr::addr_of!(environ) as *const *const *const std::ffi::c_char
+        std::ptr::addr_of!(environ)
     }
 
     #[cfg(not(unix))]

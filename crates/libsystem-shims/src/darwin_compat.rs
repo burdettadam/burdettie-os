@@ -720,7 +720,7 @@ mod rune_flags {
 fn ascii_rune_flags(c: i32) -> libc::c_ulong {
     use rune_flags::*;
 
-    if c < 0 || c > 127 {
+    if !(0..=127).contains(&c) {
         return 0;
     }
     let c = c as u8;
@@ -854,8 +854,8 @@ fn ensure_rune_locale() {
 #[cfg(not(target_os = "macos"))]
 fn shim_default_rune_locale_addr() -> *const () {
     ensure_rune_locale();
-    // Safety: address of a static — stable for the process lifetime.
-    unsafe { &DEFAULT_RUNE_LOCALE as *const RuneLocale as *const () }
+    // Export its stable raw address without borrowing guest-accessible storage.
+    std::ptr::addr_of!(DEFAULT_RUNE_LOCALE).cast()
 }
 
 // ── stdio file pointers ─────────────────────────────────────────────
@@ -874,6 +874,7 @@ static mut STDIN_PTR: *mut libc::FILE = std::ptr::null_mut();
 static INIT_STDIO: Once = Once::new();
 
 #[cfg(not(target_os = "macos"))]
+#[derive(Clone, Copy)]
 enum StdioStream {
     Stderr,
     Stdout,
@@ -904,12 +905,11 @@ fn init_stdio_pointers() {
 /// Return the address of one of the stdio FILE** cells.
 #[cfg(not(target_os = "macos"))]
 fn stdio_ptr_addr(stream: StdioStream) -> *const () {
-    unsafe {
-        match stream {
-            StdioStream::Stderr => &STDERR_PTR as *const *mut libc::FILE as *const (),
-            StdioStream::Stdout => &STDOUT_PTR as *const *mut libc::FILE as *const (),
-            StdioStream::Stdin => &STDIN_PTR as *const *mut libc::FILE as *const (),
-        }
+    // Form raw addresses; the exported FILE** slots must not be Rust references.
+    match stream {
+        StdioStream::Stderr => std::ptr::addr_of!(STDERR_PTR).cast(),
+        StdioStream::Stdout => std::ptr::addr_of!(STDOUT_PTR).cast(),
+        StdioStream::Stdin => std::ptr::addr_of!(STDIN_PTR).cast(),
     }
 }
 
@@ -1787,7 +1787,7 @@ extern "C" fn shim_fgetln(stream: *mut libc::FILE, len: *mut libc::size_t) -> *m
     // Translate shadow DarwinFile* → real glibc FILE*
     let real_stream = unsafe { crate::cross_platform::stdio::extract_real_fp(stream as *mut u8) };
     thread_local! {
-        static BUF: RefCell<(*mut libc::c_char, libc::size_t)> = RefCell::new((std::ptr::null_mut(), 0));
+        static BUF: RefCell<(*mut libc::c_char, libc::size_t)> = const { RefCell::new((std::ptr::null_mut(), 0)) };
     }
     BUF.with(|cell| {
         let mut guard = cell.borrow_mut();
@@ -1816,7 +1816,7 @@ extern "C" fn shim_fgetln(stream: *mut libc::FILE, len: *mut libc::size_t) -> *m
 extern "C" fn shim_user_from_uid(uid: libc::uid_t, nouser: libc::c_int) -> *const libc::c_char {
     use std::cell::RefCell;
     thread_local! {
-        static BUF: RefCell<[u8; 64]> = RefCell::new([0u8; 64]);
+        static BUF: RefCell<[u8; 64]> = const { RefCell::new([0u8; 64]) };
     }
     let pw = unsafe { libc::getpwuid(uid) };
     if !pw.is_null() {
@@ -1840,7 +1840,7 @@ extern "C" fn shim_user_from_uid(uid: libc::uid_t, nouser: libc::c_int) -> *cons
 extern "C" fn shim_group_from_gid(gid: libc::gid_t, nogroup: libc::c_int) -> *const libc::c_char {
     use std::cell::RefCell;
     thread_local! {
-        static BUF: RefCell<[u8; 64]> = RefCell::new([0u8; 64]);
+        static BUF: RefCell<[u8; 64]> = const { RefCell::new([0u8; 64]) };
     }
     let gr = unsafe { libc::getgrgid(gid) };
     if !gr.is_null() {
@@ -1998,7 +1998,7 @@ extern "C" fn shim_lchflags(_path: *const libc::c_char, _flags: libc::c_ulong) -
 /// `char *devname(dev_t dev, mode_t type)` — returns "??".
 #[cfg(not(target_os = "macos"))]
 extern "C" fn shim_devname(_dev: libc::dev_t, _type: libc::mode_t) -> *const libc::c_char {
-    b"??\0".as_ptr() as *const libc::c_char
+    c"??".as_ptr()
 }
 
 // ── __darwin_check_fd_set_overflow ──────────────────────────────────
@@ -2184,7 +2184,7 @@ extern "C" fn shim_fgetwln(
 /// `const char *_qtn_error(int error)` — returns empty string.
 #[cfg(not(target_os = "macos"))]
 extern "C" fn shim_qtn_error(_error: libc::c_int) -> *const libc::c_char {
-    b"quarantine not supported\0".as_ptr() as *const libc::c_char
+    c"quarantine not supported".as_ptr()
 }
 
 /// `void *_qtn_file_alloc(void)` — returns a fake handle.
@@ -2237,11 +2237,11 @@ unsafe impl Sync for NxArchInfo {}
 extern "C" fn shim_nx_get_all_arch_infos() -> *const NxArchInfo {
     static TABLE: [NxArchInfo; 2] = [
         NxArchInfo {
-            name: b"arm64\0".as_ptr() as *const libc::c_char,
+            name: c"arm64".as_ptr(),
             cputype: 0x0100000C, // CPU_TYPE_ARM64
             cpusubtype: 0,
             byteorder: 1, // NX_LittleEndian
-            description: b"ARM64\0".as_ptr() as *const libc::c_char,
+            description: c"ARM64".as_ptr(),
         },
         NxArchInfo {
             name: std::ptr::null(),

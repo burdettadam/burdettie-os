@@ -212,7 +212,7 @@ pub(super) extern "C" fn shim_pthread_attr_init(attr: *mut libc::pthread_attr_t)
         if let Some(mut old_attr) = registry.insert(key, host_attr) {
             let _ = unsafe { libc::pthread_attr_destroy(&mut *old_attr) };
         }
-        return 0;
+        0
     }
 
     #[cfg(target_os = "macos")]
@@ -234,7 +234,7 @@ pub(super) extern "C" fn shim_pthread_attr_destroy(attr: *mut libc::pthread_attr
         let Some(mut host_attr) = registry.remove(&key) else {
             return 0;
         };
-        return unsafe { libc::pthread_attr_destroy(&mut *host_attr) };
+        unsafe { libc::pthread_attr_destroy(&mut *host_attr) }
     }
 
     #[cfg(target_os = "macos")]
@@ -259,7 +259,7 @@ pub(super) extern "C" fn shim_pthread_attr_setdetachstate(
         let Some(host_attr) = registry.get_mut(&key) else {
             return libc::EINVAL;
         };
-        return unsafe { libc::pthread_attr_setdetachstate(&mut **host_attr, detachstate) };
+        unsafe { libc::pthread_attr_setdetachstate(&mut **host_attr, detachstate) }
     }
 
     #[cfg(target_os = "macos")]
@@ -292,7 +292,7 @@ pub(super) extern "C" fn shim_pthread_attr_getdetachstate(
         let Some(host_attr) = registry.get(&key) else {
             return libc::EINVAL;
         };
-        return unsafe { pthread_attr_getdetachstate(&**host_attr, detachstate) };
+        unsafe { pthread_attr_getdetachstate(&**host_attr, detachstate) }
     }
 
     #[cfg(target_os = "macos")]
@@ -317,7 +317,7 @@ pub(super) extern "C" fn shim_pthread_attr_setstacksize(
         let Some(host_attr) = registry.get_mut(&key) else {
             return libc::EINVAL;
         };
-        return unsafe { libc::pthread_attr_setstacksize(&mut **host_attr, stacksize) };
+        unsafe { libc::pthread_attr_setstacksize(&mut **host_attr, stacksize) }
     }
 
     #[cfg(target_os = "macos")]
@@ -342,7 +342,7 @@ pub(super) extern "C" fn shim_pthread_attr_getstacksize(
         let Some(host_attr) = registry.get(&key) else {
             return libc::EINVAL;
         };
-        return unsafe { libc::pthread_attr_getstacksize(&**host_attr, stacksize) };
+        unsafe { libc::pthread_attr_getstacksize(&**host_attr, stacksize) }
     }
 
     #[cfg(target_os = "macos")]
@@ -893,7 +893,7 @@ pub(super) extern "C" fn shim_pthread_once(
                 // Linux PTHREAD_ONCE_INIT: first 4 bytes = 0.
                 // If we see the macOS magic, zero it so Linux treats it as "not yet run".
                 unsafe {
-                    let raw = once_control as *mut i32;
+                    let raw = once_control.cast::<i32>();
                     let first_word = raw.read_unaligned();
                     // macOS magic signature in little-endian:
                     if first_word == DARWIN_PTHREAD_ONCE_SIG as i32 {

@@ -374,7 +374,7 @@ fn translate_sockaddr(src: u64, src_len: u32, out_buf: &mut [u8]) -> u32 {
 
 /// On macOS host, no translation needed — just return the pointer as-is.
 #[cfg(target_os = "macos")]
-fn translate_sockaddr(src: u64, src_len: u32, _out_buf: &mut [u8]) -> u32 {
+fn translate_sockaddr(_src: u64, src_len: u32, _out_buf: &mut [u8]) -> u32 {
     src_len
 }
 
@@ -719,7 +719,7 @@ pub extern "C" fn shim_recvfrom(
             };
             translate_sockaddr_linux_to_darwin(src as *mut u8, actual_len);
         }
-        return ret;
+        ret
     }
     #[cfg(target_os = "macos")]
     unsafe {
@@ -814,7 +814,7 @@ pub extern "C" fn shim_read(fd: i32, buf: u64, count: u64) -> i64 {
             libc::read(fd, buf as *mut libc::c_void, count as usize) as i64
         });
         log::trace!("read(fd={fd}, count={count}) → {ret}");
-        return ret;
+        ret
     }
     #[cfg(target_os = "macos")]
     unsafe {
@@ -830,7 +830,7 @@ pub extern "C" fn shim_write(fd: i32, buf: u64, count: u64) -> i64 {
             libc::write(fd, buf as *const libc::c_void, count as usize) as i64
         });
         log::trace!("write(fd={fd}, count={count}) → {ret}");
-        return ret;
+        ret
     }
     #[cfg(target_os = "macos")]
     unsafe {
@@ -952,7 +952,7 @@ pub extern "C" fn shim_recvmsg(fd: i32, msg_ptr: u64, flags: i32) -> i64 {
                 linux_msg.msg_flags
             );
         }
-        return ret;
+        ret
     }
     #[cfg(target_os = "macos")]
     unsafe {
@@ -1018,6 +1018,9 @@ fn translate_file_flags_to_darwin(linux_flags: i32) -> i32 {
 }
 
 #[cfg(target_os = "linux")]
+// libc's ioctl constants are c_ulong on GNU and c_int on musl. Keep the
+// conversion to the guest's u64 representation on both libc families.
+#[allow(clippy::unnecessary_cast)]
 fn translate_ioctl_request(request: u64) -> u64 {
     match request {
         DARWIN_FIOCLEX => libc::FIOCLEX as u64,
@@ -1054,6 +1057,9 @@ pub extern "C" fn shim_ioctl(fd: i32, request: u64, arg: u64) -> i32 {
 }
 
 #[cfg(target_os = "linux")]
+// libc's ioctl constants differ between GNU (c_ulong) and musl (c_int), so
+// request comparisons must normalize them to the guest's u64 representation.
+#[allow(clippy::unnecessary_cast)]
 extern "C" fn shim_ioctl_impl(fd: i32, request: u64, arg: u64) -> i32 {
     let translated_request = translate_ioctl_request(request);
     log::debug!("ioctl(fd={fd}, request={request:#x}) → {translated_request:#x}");
@@ -1259,6 +1265,26 @@ impl SocketShims {
 mod tests {
     use super::*;
 
+    /// The shims consume Darwin sockaddr bytes even when tests run on Linux.
+    #[repr(C)]
+    struct DarwinSockaddrIn {
+        len: u8,
+        family: u8,
+        port: u16,
+        address: u32,
+        padding: [u8; 8],
+    }
+
+    fn darwin_ipv4_address(address: [u8; 4], port: u16) -> DarwinSockaddrIn {
+        DarwinSockaddrIn {
+            len: std::mem::size_of::<DarwinSockaddrIn>() as u8,
+            family: DARWIN_AF_INET as u8,
+            port: port.to_be(),
+            address: u32::from_ne_bytes(address),
+            padding: [0; 8],
+        }
+    }
+
     /// Read current errno value.
     fn get_errno() -> i32 {
         unsafe { *errno_ptr() }
@@ -1319,66 +1345,41 @@ mod tests {
 
     #[test]
     fn test_connect_localhost_allowed() {
+        let listener = std::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).unwrap();
         let fd = shim_socket(libc::AF_INET, libc::SOCK_STREAM, 0);
         assert!(fd >= 0);
 
-        let mut sa: libc::sockaddr_in = unsafe { std::mem::zeroed() };
-        #[cfg(target_os = "macos")]
-        {
-            sa.sin_len = std::mem::size_of::<libc::sockaddr_in>() as u8;
-        }
-        sa.sin_family = libc::AF_INET as libc::sa_family_t;
-        sa.sin_port = 0; // port 0
-        sa.sin_addr.s_addr = u32::to_be(0x7f00_0001); // 127.0.0.1
+        let sa = darwin_ipv4_address([127, 0, 0, 1], listener.local_addr().unwrap().port());
 
         clear_errno();
         let ret = shim_connect(
             fd,
-            &sa as *const libc::sockaddr_in as u64,
-            std::mem::size_of::<libc::sockaddr_in>() as u32,
+            &sa as *const DarwinSockaddrIn as u64,
+            std::mem::size_of::<DarwinSockaddrIn>() as u32,
         );
-        // connect() will fail (ECONNREFUSED — nothing listening) but NOT
-        // with EOPNOTSUPP, proving the policy allowed the attempt.
-        if ret == -1 {
-            assert_ne!(
-                get_errno(),
-                libc::EOPNOTSUPP,
-                "connect to 127.0.0.1 should not be denied by policy"
-            );
-        }
+        assert_eq!(
+            ret,
+            0,
+            "loopback connect should succeed, errno={}",
+            get_errno()
+        );
         close_fd(fd);
     }
 
     #[test]
     fn test_connect_external_allowed() {
-        let fd = shim_socket(libc::AF_INET, libc::SOCK_STREAM, 0);
-        assert!(fd >= 0);
-
-        let mut sa: libc::sockaddr_in = unsafe { std::mem::zeroed() };
-        #[cfg(target_os = "macos")]
-        {
-            sa.sin_len = std::mem::size_of::<libc::sockaddr_in>() as u8;
-        }
-        sa.sin_family = libc::AF_INET as libc::sa_family_t;
-        sa.sin_port = 53u16.to_be(); // DNS port
-        sa.sin_addr.s_addr = u32::to_be(0x0808_0808); // 8.8.8.8
-
+        let sa = darwin_ipv4_address([8, 8, 8, 8], 53);
+        // An invalid descriptor makes the host return EBADF immediately. That
+        // proves the external address reached the host call without sending
+        // network traffic or depending on a remote service.
         clear_errno();
         let ret = shim_connect(
-            fd,
-            &sa as *const libc::sockaddr_in as u64,
-            std::mem::size_of::<libc::sockaddr_in>() as u32,
+            -1,
+            &sa as *const DarwinSockaddrIn as u64,
+            std::mem::size_of::<DarwinSockaddrIn>() as u32,
         );
-        // External addresses are now allowed through — connect may fail
-        // (ECONNREFUSED, ETIMEDOUT, etc.) but NOT with EOPNOTSUPP.
-        if ret == -1 {
-            assert_ne!(
-                get_errno(),
-                libc::EOPNOTSUPP,
-                "connect to 8.8.8.8 should not be denied by policy"
-            );
-        }
-        close_fd(fd);
+        assert_eq!(ret, -1);
+        assert_eq!(get_errno(), libc::EBADF);
     }
 
     // ── bind() tests ────────────────────────────────────────────────────
@@ -1388,20 +1389,13 @@ mod tests {
         let fd = shim_socket(libc::AF_INET, libc::SOCK_STREAM, 0);
         assert!(fd >= 0);
 
-        let mut sa: libc::sockaddr_in = unsafe { std::mem::zeroed() };
-        #[cfg(target_os = "macos")]
-        {
-            sa.sin_len = std::mem::size_of::<libc::sockaddr_in>() as u8;
-        }
-        sa.sin_family = libc::AF_INET as libc::sa_family_t;
-        sa.sin_port = 0; // ephemeral
-        sa.sin_addr.s_addr = u32::to_be(0x7f00_0001); // 127.0.0.1
+        let sa = darwin_ipv4_address([127, 0, 0, 1], 0);
 
         clear_errno();
         let ret = shim_bind(
             fd,
-            &sa as *const libc::sockaddr_in as u64,
-            std::mem::size_of::<libc::sockaddr_in>() as u32,
+            &sa as *const DarwinSockaddrIn as u64,
+            std::mem::size_of::<DarwinSockaddrIn>() as u32,
         );
         assert_eq!(
             ret,
@@ -1462,7 +1456,8 @@ mod tests {
     #[cfg(target_os = "linux")]
     #[test]
     fn test_ioctl_fioclex_translates() {
-        let fd = shim_socket(libc::AF_UNIX, libc::SOCK_STREAM, 0);
+        // Descriptor flags do not depend on Unix-domain transport support.
+        let fd = shim_socket(libc::AF_INET, libc::SOCK_STREAM, 0);
         assert!(fd >= 0);
 
         clear_errno();
@@ -1482,7 +1477,8 @@ mod tests {
     #[cfg(target_os = "linux")]
     #[test]
     fn test_ioctl_fionbio_translates() {
-        let fd = shim_socket(libc::AF_UNIX, libc::SOCK_STREAM, 0);
+        // Descriptor flags do not depend on Unix-domain transport support.
+        let fd = shim_socket(libc::AF_INET, libc::SOCK_STREAM, 0);
         assert!(fd >= 0);
 
         let mut enabled: i32 = 1;

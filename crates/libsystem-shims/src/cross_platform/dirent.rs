@@ -84,13 +84,13 @@ struct DarwinDirent {
     _pad: [u8; 3],      // 1045 (pad to 1048)
 }
 
-/// Thread-local buffer for translated dirent results.
-/// `readdir()` returns a pointer valid until the next `readdir()` call
-/// on the same DIR stream — a thread-local buffer satisfies this contract.
+// Thread-local buffer for translated dirent results.
+// `readdir()` returns a pointer valid until the next `readdir()` call
+// on the same DIR stream — a thread-local buffer satisfies this contract.
 #[cfg(not(target_os = "macos"))]
 std::thread_local! {
     static DIRENT_BUF: std::cell::UnsafeCell<[u8; DARWIN_DIRENT_SIZE]> =
-        std::cell::UnsafeCell::new([0u8; DARWIN_DIRENT_SIZE]);
+        const { std::cell::UnsafeCell::new([0u8; DARWIN_DIRENT_SIZE]) };
 }
 
 #[cfg(not(target_os = "macos"))]

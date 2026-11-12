@@ -560,16 +560,7 @@ pub extern "C" fn shim_posix_spawn(
     if path.is_null() || argv.is_null() {
         return libc::EINVAL;
     }
-    unsafe {
-        libc::posix_spawn(
-            pid,
-            path,
-            file_actions,
-            attrp,
-            argv as *const *mut _,
-            envp as *const *mut _,
-        )
-    }
+    unsafe { libc::posix_spawn(pid, path, file_actions, attrp, argv, envp) }
 }
 
 /// `posix_spawnp(pid, file, file_actions, attrp, argv, envp)` → libc (PATH search).
@@ -584,16 +575,7 @@ pub extern "C" fn shim_posix_spawnp(
     if file.is_null() || argv.is_null() {
         return libc::EINVAL;
     }
-    unsafe {
-        libc::posix_spawnp(
-            pid,
-            file,
-            file_actions,
-            attrp,
-            argv as *const *mut _,
-            envp as *const *mut _,
-        )
-    }
+    unsafe { libc::posix_spawnp(pid, file, file_actions, attrp, argv, envp) }
 }
 
 // ── posix_spawn_file_actions ─────────────────────────────────────────
@@ -1125,7 +1107,6 @@ fn translate_regcomp_flags(darwin_cflags: c_int) -> c_int {
 /// corrupts adjacent memory. We allocate glibc-size regex_t on the heap
 /// and store its pointer in the macOS struct's `re_g` field (offset 24).
 /// On Darwin, `re_nsub` at offset 8 receives the sub-expression count.
-
 #[cfg(target_os = "linux")]
 mod regex_shims {
     use super::*;
@@ -1260,10 +1241,10 @@ mod regex_shims {
 
             // Convert output pmatch from Linux to macOS layout
             if darwin_pmatch != 0 && ret == 0 {
-                for i in 0..nm {
+                for (i, linux_match) in linux_pmatch.iter().take(nm).enumerate() {
                     let darwin = unsafe { &mut *((darwin_pmatch as *mut DarwinRegmatch).add(i)) };
-                    darwin.rm_so = linux_pmatch[i].rm_so as i64;
-                    darwin.rm_eo = linux_pmatch[i].rm_eo as i64;
+                    darwin.rm_so = i64::from(linux_match.rm_so);
+                    darwin.rm_eo = i64::from(linux_match.rm_eo);
                 }
             }
 
@@ -1540,7 +1521,7 @@ mod tests {
 
     #[test]
     fn test_posix_optstring_prepends_plus() {
-        let result = posix_optstring(b"abc:\0".as_ptr() as *const c_char);
+        let result = posix_optstring(c"abc:".as_ptr());
         assert!(result.is_some());
         let cstr = result.unwrap();
         assert_eq!(cstr.to_bytes(), b"+abc:");
@@ -1548,7 +1529,7 @@ mod tests {
 
     #[test]
     fn test_posix_optstring_already_posix() {
-        let result = posix_optstring(b"+abc:\0".as_ptr() as *const c_char);
+        let result = posix_optstring(c"+abc:".as_ptr());
         assert!(result.is_none()); // already has +, no change needed
     }
 
@@ -1560,7 +1541,7 @@ mod tests {
 
     #[test]
     fn test_posix_optstring_empty() {
-        let result = posix_optstring(b"\0".as_ptr() as *const c_char);
+        let result = posix_optstring(c"".as_ptr());
         assert!(result.is_some());
         let cstr = result.unwrap();
         assert_eq!(cstr.to_bytes(), b"+");
