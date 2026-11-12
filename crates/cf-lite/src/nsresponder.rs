@@ -359,6 +359,8 @@ mod tests {
 
     const SIZE: usize = 16;
 
+    // Event-dispatch tests run in exact child processes because app/window roles
+    // and the ObjC runtime are also replaced by fixtures in other modules.
     static RESPONDER_TEST_LOCK: Mutex<()> = Mutex::new(());
     static EVENT_CALL_COUNT: AtomicU64 = AtomicU64::new(0);
     static LAST_EVENT_TARGET: AtomicU64 = AtomicU64::new(0);
@@ -552,42 +554,49 @@ mod tests {
 
     #[test]
     fn key_down_does_not_crash() {
-        let obj = alloc_responder();
-        shim_nsresponder_key_down(obj, 0, 0);
-        free_obj(obj);
+        with_isolated_test_process("nsresponder::tests::key_down_does_not_crash", || {
+            let obj = alloc_responder();
+            shim_nsresponder_key_down(obj, 0, 0);
+            free_obj(obj);
+        });
     }
 
     #[test]
     fn key_down_forwards_to_next_responder_and_sets_current_event() {
-        let _guard = RESPONDER_TEST_LOCK.lock().unwrap();
-        crate::nsapplication::reset_runtime_state_for_reuse();
-        reset_event_probe();
+        with_isolated_test_process(
+            "nsresponder::tests::key_down_forwards_to_next_responder_and_sets_current_event",
+            || {
+                let _guard = RESPONDER_TEST_LOCK.lock().unwrap();
+                crate::nsapplication::reset_runtime_state_for_reuse();
+                reset_event_probe();
 
-        with_responder_runtime(|| {
-            let app = crate::nsapplication::shim_nsapplication_shared_application(0, 0);
-            let obj = alloc_responder();
-            let next = alloc_obj(SIZE, EVENT_PROBE_CLASS_ADDR);
-            let event = alloc_obj(64, crate::nsobj::nsevent_class_addr());
+                with_responder_runtime(|| {
+                    let app = crate::nsapplication::shim_nsapplication_shared_application(0, 0);
+                    let obj = alloc_responder();
+                    let next = alloc_obj(SIZE, EVENT_PROBE_CLASS_ADDR);
+                    let event = alloc_obj(64, crate::nsobj::nsevent_class_addr());
 
-            shim_nsresponder_set_next_responder(obj, 0, next);
-            shim_nsresponder_key_down(obj, 0, event);
+                    shim_nsresponder_set_next_responder(obj, 0, next);
+                    shim_nsresponder_key_down(obj, 0, event);
 
-            assert_eq!(EVENT_CALL_COUNT.load(Ordering::SeqCst), 1);
-            assert_eq!(LAST_EVENT_TARGET.load(Ordering::SeqCst), next);
-            assert_eq!(LAST_EVENT_ARG.load(Ordering::SeqCst), event);
-            assert_eq!(CURRENT_EVENT_DURING_CALL.load(Ordering::SeqCst), event);
-            assert_eq!(EVENT_WINDOW_DURING_CALL.load(Ordering::SeqCst), 0);
-            assert_eq!(
-                crate::nsapplication::shim_nsapplication_current_event(app, 0),
-                event
-            );
+                    assert_eq!(EVENT_CALL_COUNT.load(Ordering::SeqCst), 1);
+                    assert_eq!(LAST_EVENT_TARGET.load(Ordering::SeqCst), next);
+                    assert_eq!(LAST_EVENT_ARG.load(Ordering::SeqCst), event);
+                    assert_eq!(CURRENT_EVENT_DURING_CALL.load(Ordering::SeqCst), event);
+                    assert_eq!(EVENT_WINDOW_DURING_CALL.load(Ordering::SeqCst), 0);
+                    assert_eq!(
+                        crate::nsapplication::shim_nsapplication_current_event(app, 0),
+                        event
+                    );
 
-            free_obj(event);
-            free_obj(next);
-            free_obj(obj);
-        });
+                    free_obj(event);
+                    free_obj(next);
+                    free_obj(obj);
+                });
 
-        crate::nsapplication::reset_runtime_state_for_reuse();
+                crate::nsapplication::reset_runtime_state_for_reuse();
+            },
+        );
     }
 
     #[test]
@@ -597,104 +606,122 @@ mod tests {
 
     #[test]
     fn key_down_on_view_derives_event_window_from_receiver() {
-        let _guard = RESPONDER_TEST_LOCK.lock().unwrap();
-        crate::nsapplication::reset_runtime_state_for_reuse();
+        with_isolated_test_process(
+            "nsresponder::tests::key_down_on_view_derives_event_window_from_receiver",
+            || {
+                let _guard = RESPONDER_TEST_LOCK.lock().unwrap();
+                crate::nsapplication::reset_runtime_state_for_reuse();
 
-        with_responder_runtime(|| {
-            let app = crate::nsapplication::shim_nsapplication_shared_application(0, 0);
-            let window = crate::nswindow::shim_nswindow_init_with_content_rect(
-                0, 0, 10.0, 20.0, 300.0, 200.0, 1, 2, 0,
-            );
-            let content = crate::nswindow::shim_nswindow_content_view(window, 0);
-            let view = crate::nsview::shim_nsview_init_with_frame(0, 0, 1.0, 2.0, 50.0, 40.0);
-            let event = alloc_obj(64, crate::nsobj::nsevent_class_addr());
+                with_responder_runtime(|| {
+                    let app = crate::nsapplication::shim_nsapplication_shared_application(0, 0);
+                    let window = crate::nswindow::shim_nswindow_init_with_content_rect(
+                        0, 0, 10.0, 20.0, 300.0, 200.0, 1, 2, 0,
+                    );
+                    let content = crate::nswindow::shim_nswindow_content_view(window, 0);
+                    let view =
+                        crate::nsview::shim_nsview_init_with_frame(0, 0, 1.0, 2.0, 50.0, 40.0);
+                    let event = alloc_obj(64, crate::nsobj::nsevent_class_addr());
 
-            crate::nsview::shim_nsview_add_subview(content, 0, view);
-            shim_nsresponder_key_down(view, 0, event);
+                    crate::nsview::shim_nsview_add_subview(content, 0, view);
+                    shim_nsresponder_key_down(view, 0, event);
 
-            assert_eq!(crate::nsevent::shim_nsevent_window(event, 0), window);
-            assert_eq!(
-                crate::nsapplication::shim_nsapplication_current_event(app, 0),
-                event
-            );
+                    assert_eq!(crate::nsevent::shim_nsevent_window(event, 0), window);
+                    assert_eq!(
+                        crate::nsapplication::shim_nsapplication_current_event(app, 0),
+                        event
+                    );
 
-            free_obj(event);
-            free_obj(view);
-            free_obj(window);
-        });
+                    free_obj(event);
+                    free_obj(view);
+                    free_obj(window);
+                });
 
-        crate::nsapplication::reset_runtime_state_for_reuse();
+                crate::nsapplication::reset_runtime_state_for_reuse();
+            },
+        );
     }
 
     #[test]
     fn key_down_without_next_uses_key_window_for_event_context() {
-        let _guard = RESPONDER_TEST_LOCK.lock().unwrap();
-        crate::nsapplication::reset_runtime_state_for_reuse();
+        with_isolated_test_process(
+            "nsresponder::tests::key_down_without_next_uses_key_window_for_event_context",
+            || {
+                let _guard = RESPONDER_TEST_LOCK.lock().unwrap();
+                crate::nsapplication::reset_runtime_state_for_reuse();
 
-        with_responder_runtime(|| {
-            let app = crate::nsapplication::shim_nsapplication_shared_application(0, 0);
-            let window = crate::nswindow::shim_nswindow_init_with_content_rect(
-                0, 0, 10.0, 20.0, 300.0, 200.0, 1, 2, 0,
-            );
-            let responder = alloc_responder();
-            let event = alloc_obj(64, crate::nsobj::nsevent_class_addr());
+                with_responder_runtime(|| {
+                    let app = crate::nsapplication::shim_nsapplication_shared_application(0, 0);
+                    let window = crate::nswindow::shim_nswindow_init_with_content_rect(
+                        0, 0, 10.0, 20.0, 300.0, 200.0, 1, 2, 0,
+                    );
+                    let responder = alloc_responder();
+                    let event = alloc_obj(64, crate::nsobj::nsevent_class_addr());
 
-            crate::nswindow::shim_nswindow_make_key_and_order_front(window, 0, 0);
-            shim_nsresponder_key_down(responder, 0, event);
+                    crate::nswindow::shim_nswindow_make_key_and_order_front(window, 0, 0);
+                    shim_nsresponder_key_down(responder, 0, event);
 
-            assert_eq!(crate::nsevent::shim_nsevent_window(event, 0), window);
-            assert_eq!(
-                crate::nsapplication::shim_nsapplication_current_event(app, 0),
-                event
-            );
+                    assert_eq!(crate::nsevent::shim_nsevent_window(event, 0), window);
+                    assert_eq!(
+                        crate::nsapplication::shim_nsapplication_current_event(app, 0),
+                        event
+                    );
 
-            free_obj(event);
-            free_obj(responder);
-            free_obj(window);
-        });
+                    free_obj(event);
+                    free_obj(responder);
+                    free_obj(window);
+                });
 
-        crate::nsapplication::reset_runtime_state_for_reuse();
+                crate::nsapplication::reset_runtime_state_for_reuse();
+            },
+        );
     }
 
     #[test]
     fn nested_event_dispatch_restores_previous_current_event() {
-        let _guard = RESPONDER_TEST_LOCK.lock().unwrap();
-        crate::nsapplication::reset_runtime_state_for_reuse();
-        reset_event_probe();
+        with_isolated_test_process(
+            "nsresponder::tests::nested_event_dispatch_restores_previous_current_event",
+            || {
+                let _guard = RESPONDER_TEST_LOCK.lock().unwrap();
+                crate::nsapplication::reset_runtime_state_for_reuse();
+                reset_event_probe();
 
-        with_responder_runtime(|| {
-            let app = crate::nsapplication::shim_nsapplication_shared_application(0, 0);
-            let obj = alloc_responder();
-            let next = alloc_obj(SIZE, EVENT_PROBE_CLASS_ADDR);
-            let previous_event = alloc_obj(64, crate::nsobj::nsevent_class_addr());
-            let event = alloc_obj(64, crate::nsobj::nsevent_class_addr());
+                with_responder_runtime(|| {
+                    let app = crate::nsapplication::shim_nsapplication_shared_application(0, 0);
+                    let obj = alloc_responder();
+                    let next = alloc_obj(SIZE, EVENT_PROBE_CLASS_ADDR);
+                    let previous_event = alloc_obj(64, crate::nsobj::nsevent_class_addr());
+                    let event = alloc_obj(64, crate::nsobj::nsevent_class_addr());
 
-            crate::nsapplication::set_current_event(previous_event);
-            shim_nsresponder_set_next_responder(obj, 0, next);
-            shim_nsresponder_key_down(obj, 0, event);
+                    crate::nsapplication::set_current_event(previous_event);
+                    shim_nsresponder_set_next_responder(obj, 0, next);
+                    shim_nsresponder_key_down(obj, 0, event);
 
-            assert_eq!(CURRENT_EVENT_DURING_CALL.load(Ordering::SeqCst), event);
-            assert_eq!(
-                crate::nsapplication::shim_nsapplication_current_event(app, 0),
-                previous_event
-            );
+                    assert_eq!(CURRENT_EVENT_DURING_CALL.load(Ordering::SeqCst), event);
+                    assert_eq!(
+                        crate::nsapplication::shim_nsapplication_current_event(app, 0),
+                        previous_event
+                    );
 
-            free_obj(event);
-            free_obj(previous_event);
-            free_obj(next);
-            free_obj(obj);
-        });
+                    free_obj(event);
+                    free_obj(previous_event);
+                    free_obj(next);
+                    free_obj(obj);
+                });
 
-        crate::nsapplication::reset_runtime_state_for_reuse();
+                crate::nsapplication::reset_runtime_state_for_reuse();
+            },
+        );
     }
 
     // ── key_up (stub) ───────────────────────────────────────────
 
     #[test]
     fn key_up_does_not_crash() {
-        let obj = alloc_responder();
-        shim_nsresponder_key_up(obj, 0, 0);
-        free_obj(obj);
+        with_isolated_test_process("nsresponder::tests::key_up_does_not_crash", || {
+            let obj = alloc_responder();
+            shim_nsresponder_key_up(obj, 0, 0);
+            free_obj(obj);
+        });
     }
 
     #[test]
@@ -704,9 +731,11 @@ mod tests {
 
     #[test]
     fn flags_changed_does_not_crash() {
-        let obj = alloc_responder();
-        shim_nsresponder_flags_changed(obj, 0, 0);
-        free_obj(obj);
+        with_isolated_test_process("nsresponder::tests::flags_changed_does_not_crash", || {
+            let obj = alloc_responder();
+            shim_nsresponder_flags_changed(obj, 0, 0);
+            free_obj(obj);
+        });
     }
 
     #[test]
@@ -718,33 +747,40 @@ mod tests {
 
     #[test]
     fn mouse_down_does_not_crash() {
-        let obj = alloc_responder();
-        shim_nsresponder_mouse_down(obj, 0, 0);
-        free_obj(obj);
+        with_isolated_test_process("nsresponder::tests::mouse_down_does_not_crash", || {
+            let obj = alloc_responder();
+            shim_nsresponder_mouse_down(obj, 0, 0);
+            free_obj(obj);
+        });
     }
 
     #[test]
     fn mouse_down_without_next_updates_current_event() {
-        let _guard = RESPONDER_TEST_LOCK.lock().unwrap();
-        crate::nsapplication::reset_runtime_state_for_reuse();
+        with_isolated_test_process(
+            "nsresponder::tests::mouse_down_without_next_updates_current_event",
+            || {
+                let _guard = RESPONDER_TEST_LOCK.lock().unwrap();
+                crate::nsapplication::reset_runtime_state_for_reuse();
 
-        with_responder_runtime(|| {
-            let app = crate::nsapplication::shim_nsapplication_shared_application(0, 0);
-            let obj = alloc_responder();
-            let event = alloc_obj(64, crate::nsobj::nsevent_class_addr());
+                with_responder_runtime(|| {
+                    let app = crate::nsapplication::shim_nsapplication_shared_application(0, 0);
+                    let obj = alloc_responder();
+                    let event = alloc_obj(64, crate::nsobj::nsevent_class_addr());
 
-            shim_nsresponder_mouse_down(obj, 0, event);
+                    shim_nsresponder_mouse_down(obj, 0, event);
 
-            assert_eq!(
-                crate::nsapplication::shim_nsapplication_current_event(app, 0),
-                event
-            );
+                    assert_eq!(
+                        crate::nsapplication::shim_nsapplication_current_event(app, 0),
+                        event
+                    );
 
-            free_obj(event);
-            free_obj(obj);
-        });
+                    free_obj(event);
+                    free_obj(obj);
+                });
 
-        crate::nsapplication::reset_runtime_state_for_reuse();
+                crate::nsapplication::reset_runtime_state_for_reuse();
+            },
+        );
     }
 
     #[test]
@@ -754,9 +790,11 @@ mod tests {
 
     #[test]
     fn mouse_moved_does_not_crash() {
-        let obj = alloc_responder();
-        shim_nsresponder_mouse_moved(obj, 0, 0);
-        free_obj(obj);
+        with_isolated_test_process("nsresponder::tests::mouse_moved_does_not_crash", || {
+            let obj = alloc_responder();
+            shim_nsresponder_mouse_moved(obj, 0, 0);
+            free_obj(obj);
+        });
     }
 
     #[test]
@@ -768,9 +806,11 @@ mod tests {
 
     #[test]
     fn mouse_up_does_not_crash() {
-        let obj = alloc_responder();
-        shim_nsresponder_mouse_up(obj, 0, 0);
-        free_obj(obj);
+        with_isolated_test_process("nsresponder::tests::mouse_up_does_not_crash", || {
+            let obj = alloc_responder();
+            shim_nsresponder_mouse_up(obj, 0, 0);
+            free_obj(obj);
+        });
     }
 
     #[test]
@@ -780,9 +820,11 @@ mod tests {
 
     #[test]
     fn scroll_wheel_does_not_crash() {
-        let obj = alloc_responder();
-        shim_nsresponder_scroll_wheel(obj, 0, 0);
-        free_obj(obj);
+        with_isolated_test_process("nsresponder::tests::scroll_wheel_does_not_crash", || {
+            let obj = alloc_responder();
+            shim_nsresponder_scroll_wheel(obj, 0, 0);
+            free_obj(obj);
+        });
     }
 
     #[test]
@@ -834,73 +876,88 @@ mod tests {
 
     #[test]
     fn try_to_perform_dispatches_on_self() {
-        let _guard = RESPONDER_TEST_LOCK.lock().unwrap();
-        crate::nsapplication::reset_runtime_state_for_reuse();
-        reset_event_probe();
+        with_isolated_test_process(
+            "nsresponder::tests::try_to_perform_dispatches_on_self",
+            || {
+                let _guard = RESPONDER_TEST_LOCK.lock().unwrap();
+                crate::nsapplication::reset_runtime_state_for_reuse();
+                reset_event_probe();
 
-        with_responder_runtime(|| {
-            let obj = alloc_obj(SIZE, EVENT_PROBE_CLASS_ADDR);
-            let action = intern_selector("performAction:");
+                with_responder_runtime(|| {
+                    let obj = alloc_obj(SIZE, EVENT_PROBE_CLASS_ADDR);
+                    let action = intern_selector("performAction:");
 
-            assert_eq!(
-                shim_nsresponder_try_to_perform_with(obj, 0, action, 0xCAFE),
-                1
-            );
-            assert_eq!(ACTION_CALL_COUNT.load(Ordering::SeqCst), 1);
-            assert_eq!(LAST_ACTION_TARGET.load(Ordering::SeqCst), obj);
-            assert_eq!(LAST_ACTION_ARG.load(Ordering::SeqCst), 0xCAFE);
+                    assert_eq!(
+                        shim_nsresponder_try_to_perform_with(obj, 0, action, 0xCAFE),
+                        1
+                    );
+                    assert_eq!(ACTION_CALL_COUNT.load(Ordering::SeqCst), 1);
+                    assert_eq!(LAST_ACTION_TARGET.load(Ordering::SeqCst), obj);
+                    assert_eq!(LAST_ACTION_ARG.load(Ordering::SeqCst), 0xCAFE);
 
-            free_obj(obj);
-        });
+                    free_obj(obj);
+                });
 
-        crate::nsapplication::reset_runtime_state_for_reuse();
+                crate::nsapplication::reset_runtime_state_for_reuse();
+            },
+        );
     }
 
     #[test]
     fn try_to_perform_walks_next_responder_chain() {
-        let _guard = RESPONDER_TEST_LOCK.lock().unwrap();
-        crate::nsapplication::reset_runtime_state_for_reuse();
-        reset_event_probe();
+        with_isolated_test_process(
+            "nsresponder::tests::try_to_perform_walks_next_responder_chain",
+            || {
+                let _guard = RESPONDER_TEST_LOCK.lock().unwrap();
+                crate::nsapplication::reset_runtime_state_for_reuse();
+                reset_event_probe();
 
-        with_responder_runtime(|| {
-            let obj = alloc_responder();
-            let next = alloc_obj(SIZE, EVENT_PROBE_CLASS_ADDR);
-            let action = intern_selector("performAction:");
+                with_responder_runtime(|| {
+                    let obj = alloc_responder();
+                    let next = alloc_obj(SIZE, EVENT_PROBE_CLASS_ADDR);
+                    let action = intern_selector("performAction:");
 
-            shim_nsresponder_set_next_responder(obj, 0, next);
-            assert_eq!(
-                shim_nsresponder_try_to_perform_with(obj, 0, action, 0xBEEF),
-                1
-            );
-            assert_eq!(ACTION_CALL_COUNT.load(Ordering::SeqCst), 1);
-            assert_eq!(LAST_ACTION_TARGET.load(Ordering::SeqCst), next);
-            assert_eq!(LAST_ACTION_ARG.load(Ordering::SeqCst), 0xBEEF);
+                    shim_nsresponder_set_next_responder(obj, 0, next);
+                    assert_eq!(
+                        shim_nsresponder_try_to_perform_with(obj, 0, action, 0xBEEF),
+                        1
+                    );
+                    assert_eq!(ACTION_CALL_COUNT.load(Ordering::SeqCst), 1);
+                    assert_eq!(LAST_ACTION_TARGET.load(Ordering::SeqCst), next);
+                    assert_eq!(LAST_ACTION_ARG.load(Ordering::SeqCst), 0xBEEF);
 
-            free_obj(next);
-            free_obj(obj);
-        });
+                    free_obj(next);
+                    free_obj(obj);
+                });
 
-        crate::nsapplication::reset_runtime_state_for_reuse();
+                crate::nsapplication::reset_runtime_state_for_reuse();
+            },
+        );
     }
 
     #[test]
     fn try_to_perform_returns_no_when_unhandled() {
-        let _guard = RESPONDER_TEST_LOCK.lock().unwrap();
-        crate::nsapplication::reset_runtime_state_for_reuse();
+        with_isolated_test_process(
+            "nsresponder::tests::try_to_perform_returns_no_when_unhandled",
+            || {
+                let _guard = RESPONDER_TEST_LOCK.lock().unwrap();
+                crate::nsapplication::reset_runtime_state_for_reuse();
 
-        with_responder_runtime(|| {
-            let obj = alloc_responder();
-            let action = intern_selector("performAction:");
+                with_responder_runtime(|| {
+                    let obj = alloc_responder();
+                    let action = intern_selector("performAction:");
 
-            assert_eq!(
-                shim_nsresponder_try_to_perform_with(obj, 0, action, 0xDEAD),
-                0
-            );
+                    assert_eq!(
+                        shim_nsresponder_try_to_perform_with(obj, 0, action, 0xDEAD),
+                        0
+                    );
 
-            free_obj(obj);
-        });
+                    free_obj(obj);
+                });
 
-        crate::nsapplication::reset_runtime_state_for_reuse();
+                crate::nsapplication::reset_runtime_state_for_reuse();
+            },
+        );
     }
 
     // ── accepts_first_responder ─────────────────────────────────
