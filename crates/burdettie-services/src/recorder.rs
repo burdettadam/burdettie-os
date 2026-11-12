@@ -216,9 +216,8 @@ impl RequestRecorder {
 
     /// Return the total number of recorded requests.
     pub fn count(&self) -> i64 {
-        let conn = match self.conn.lock() {
-            Ok(c) => c,
-            Err(_) => return -1,
+        let Ok(conn) = self.conn.lock() else {
+            return -1;
         };
         conn.query_row("SELECT COUNT(*) FROM requests", [], |row| row.get(0))
             .unwrap_or(-1)
@@ -231,9 +230,8 @@ impl RequestRecorder {
         limit: usize,
         offset: usize,
     ) -> Vec<serde_json::Value> {
-        let conn = match self.conn.lock() {
-            Ok(c) => c,
-            Err(_) => return Vec::new(),
+        let Ok(conn) = self.conn.lock() else {
+            return Vec::new();
         };
 
         let (sql, params): (&str, Vec<Box<dyn rusqlite::types::ToSql>>) = match source {
@@ -258,9 +256,8 @@ impl RequestRecorder {
             ),
         };
 
-        let mut stmt = match conn.prepare(sql) {
-            Ok(s) => s,
-            Err(_) => return Vec::new(),
+        let Ok(mut stmt) = conn.prepare(sql) else {
+            return Vec::new();
         };
 
         let params_refs: Vec<&dyn rusqlite::types::ToSql> =
@@ -293,15 +290,13 @@ impl RequestRecorder {
 
     /// Count requests grouped by source.
     pub fn count_by_source(&self) -> Vec<(String, i64)> {
-        let conn = match self.conn.lock() {
-            Ok(c) => c,
-            Err(_) => return Vec::new(),
+        let Ok(conn) = self.conn.lock() else {
+            return Vec::new();
         };
-        let mut stmt = match conn
-            .prepare("SELECT source, COUNT(*) FROM requests GROUP BY source ORDER BY source")
-        {
-            Ok(s) => s,
-            Err(_) => return Vec::new(),
+        let Ok(mut stmt) =
+            conn.prepare("SELECT source, COUNT(*) FROM requests GROUP BY source ORDER BY source")
+        else {
+            return Vec::new();
         };
         stmt.query_map([], |row| {
             Ok((

@@ -120,8 +120,8 @@ impl ServiceConfig {
                 }
             })
             .map(|s| {
-                if s.starts_with("file:") {
-                    LogSink::File(s[5..].to_string())
+                if let Some(path) = s.strip_prefix("file:") {
+                    LogSink::File(path.to_string())
                 } else if s.starts_with("http://") || s.starts_with("https://") {
                     LogSink::Http(s.to_string())
                 } else {

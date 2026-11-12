@@ -85,9 +85,8 @@ impl ReplayHandler {
 
     /// Count the number of HTTP records available for replay.
     pub fn http_record_count(&self) -> i64 {
-        let conn = match self.conn.lock() {
-            Ok(c) => c,
-            Err(_) => return -1,
+        let Ok(conn) = self.conn.lock() else {
+            return -1;
         };
         conn.query_row(
             "SELECT COUNT(*) FROM requests WHERE source='http'",
