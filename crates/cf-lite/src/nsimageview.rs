@@ -69,7 +69,7 @@ fn resolve_archived_image(candidate: u64) -> u64 {
     if candidate == 0 {
         return 0;
     }
-    if candidate % 8 != 0 {
+    if !candidate.is_multiple_of(8) {
         return 0;
     }
 

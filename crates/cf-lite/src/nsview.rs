@@ -1070,12 +1070,10 @@ pub(crate) fn display_view_recursive(view: u64, cg_ctx: u64) {
                 let sh = c.surface.height();
                 crate::layer_compositor::render_layer_contents(
                     c.surface.pixels_mut(),
-                    sw,
-                    sh,
+                    (sw, sh),
                     0,
                     0,
-                    vw,
-                    vh,
+                    (vw, vh),
                     props.contents,
                 );
             });
@@ -1103,11 +1101,9 @@ pub(crate) fn display_view_recursive(view: u64, cg_ctx: u64) {
                 #[allow(clippy::cast_possible_truncation)]
                 crate::layer_compositor::composite_layer(
                     &src_pixels,
-                    vw,
-                    vh,
+                    (vw, vh),
                     c.surface.pixels_mut(),
-                    dst_w,
-                    dst_h,
+                    (dst_w, dst_h),
                     x as i32,
                     y as i32,
                     &props,
@@ -1129,12 +1125,10 @@ pub(crate) fn display_view_recursive(view: u64, cg_ctx: u64) {
                     #[allow(clippy::cast_possible_truncation)]
                     crate::layer_compositor::draw_layer_background(
                         c.surface.pixels_mut(),
-                        dst_w,
-                        dst_h,
+                        (dst_w, dst_h),
                         x as i32,
                         y as i32,
-                        w.max(0.0) as u32,
-                        h.max(0.0) as u32,
+                        (w.max(0.0) as u32, h.max(0.0) as u32),
                         bg_color,
                         &props,
                     );
@@ -1149,12 +1143,10 @@ pub(crate) fn display_view_recursive(view: u64, cg_ctx: u64) {
                     #[allow(clippy::cast_possible_truncation)]
                     crate::layer_compositor::render_layer_contents(
                         c.surface.pixels_mut(),
-                        dst_w,
-                        dst_h,
+                        (dst_w, dst_h),
                         x as i32,
                         y as i32,
-                        w.max(0.0) as u32,
-                        h.max(0.0) as u32,
+                        (w.max(0.0) as u32, h.max(0.0) as u32),
                         props.contents,
                     );
                 });
@@ -1376,16 +1368,14 @@ pub extern "C" fn shim_nsview_previous_key_view(obj: u64, _cmd: u64) -> u64 {
     })
 }
 
-/// `-[NSView nextValidKeyView]` — walks the nextKeyView chain to find one that accepts
-/// first responder (any non-nil nextKeyView is assumed valid for now).
+/// `-[NSView nextValidKeyView]` — returns the immediate next key view unless
+/// it is nil or self. Any other next key view is assumed valid for now.
 pub extern "C" fn shim_nsview_next_valid_key_view(obj: u64, _cmd: u64) -> u64 {
     if obj == 0 {
         return 0;
     }
     let cursor = shim_nsview_next_key_view(obj, 0);
-    let start = obj;
-    while cursor != 0 && cursor != start {
-        // For now, any view in the chain is considered valid.
+    if cursor != 0 && cursor != obj {
         return cursor;
     }
     0

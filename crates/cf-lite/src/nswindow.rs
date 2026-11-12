@@ -984,7 +984,7 @@ pub(crate) fn display_window_content(window: u64) {
                 let copy_h = (src_h).min(dst_h) as usize;
                 // Copy row by row (ARGB32 → u32 per pixel).
                 unsafe {
-                    let src = src_ptr as *const u32;
+                    let src = src_ptr;
                     let dst = dst_ptr as *mut u32;
                     for row in 0..copy_h {
                         std::ptr::copy_nonoverlapping(
@@ -1011,11 +1011,13 @@ pub(crate) fn release_window_cg_context(window: u64) {
 
 use std::collections::HashMap as StdHashMap;
 
+type SavedWindowFrame = (f64, f64, f64, f64);
+
 /// Saved pre-full-screen frames, keyed by window pointer.
-static FULLSCREEN_SAVED_FRAMES: std::sync::Mutex<Option<StdHashMap<u64, (f64, f64, f64, f64)>>> =
+static FULLSCREEN_SAVED_FRAMES: std::sync::Mutex<Option<StdHashMap<u64, SavedWindowFrame>>> =
     std::sync::Mutex::new(None);
 
-fn fullscreen_saved_frame(obj: u64) -> Option<(f64, f64, f64, f64)> {
+fn fullscreen_saved_frame(obj: u64) -> Option<SavedWindowFrame> {
     FULLSCREEN_SAVED_FRAMES
         .lock()
         .unwrap_or_else(|e| e.into_inner())
@@ -1023,7 +1025,7 @@ fn fullscreen_saved_frame(obj: u64) -> Option<(f64, f64, f64, f64)> {
         .and_then(|m| m.get(&obj).copied())
 }
 
-fn set_fullscreen_saved_frame(obj: u64, frame: Option<(f64, f64, f64, f64)>) {
+fn set_fullscreen_saved_frame(obj: u64, frame: Option<SavedWindowFrame>) {
     let mut guard = FULLSCREEN_SAVED_FRAMES
         .lock()
         .unwrap_or_else(|e| e.into_inner());

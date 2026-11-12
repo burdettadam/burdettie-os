@@ -501,28 +501,28 @@ mod tests {
 
     #[test]
     fn enumerate_indexes_using_block() {
+        // Keep the fake block's captured state local to this test. The shim
+        // calls it synchronously and reads its invoke pointer at offset 16.
         let set = shim_nsindexset_with_range(0, 0, 5, 3); // {5,6,7}
-                                                          // We'll use a fake block struct to verify the enumerate logic.
-                                                          // Block layout: isa(0), flags(8), invoke(16), ...
-                                                          // We need a real callable function pointer at offset 16.
-        static mut COLLECTED: Vec<u64> = Vec::new();
-
-        extern "C" fn test_block_invoke(block: u64, idx: u64, stop: *mut u8) {
-            let _ = block;
-            let _ = stop;
-            unsafe {
-                COLLECTED.push(idx);
-            }
+        #[repr(C)]
+        struct TestBlock {
+            header: [u64; 2],
+            invoke: extern "C" fn(u64, u64, *mut u8),
+            collected: Vec<u64>,
         }
 
-        let block = crate::pal_alloc().calloc(1, 24) as *mut u64;
-        unsafe {
-            *block.add(2) = test_block_invoke as *const () as u64;
-            COLLECTED.clear();
+        extern "C" fn test_block_invoke(block: u64, idx: u64, _stop: *mut u8) {
+            let block = unsafe { &mut *(block as *mut TestBlock) };
+            block.collected.push(idx);
         }
-        shim_nsindexset_enumerate_indexes_using_block(set, 0, block as u64);
-        let collected = unsafe { COLLECTED.clone() };
-        assert_eq!(collected, vec![5, 6, 7]);
+
+        let mut block = TestBlock {
+            header: [0; 2],
+            invoke: test_block_invoke,
+            collected: Vec::new(),
+        };
+        shim_nsindexset_enumerate_indexes_using_block(set, 0, (&raw mut block) as u64);
+        assert_eq!(block.collected, vec![5, 6, 7]);
         free_obj(set);
     }
 
@@ -538,7 +538,7 @@ mod tests {
 
         // Block that returns true for even indexes
         extern "C" fn even_block(_block: u64, idx: u64, _stop: *mut u8) -> u8 {
-            u8::from(idx % 2 == 0)
+            u8::from(idx.is_multiple_of(2))
         }
 
         let block = crate::pal_alloc().calloc(1, 24) as *mut u64;

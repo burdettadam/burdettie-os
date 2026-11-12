@@ -720,7 +720,7 @@ fn deadline_from_nsdate(date: u64) -> Option<Instant> {
 }
 
 fn get_or_create_main_run_loop() -> u64 {
-    *MAIN_RUN_LOOP.get_or_init(|| alloc_run_loop_obj())
+    *MAIN_RUN_LOOP.get_or_init(alloc_run_loop_obj)
 }
 
 /// Allocate a fresh 16-byte NSRunLoop object (isa + flags).
@@ -905,6 +905,12 @@ pub extern "C" fn shim_nsrunloop_accept_input(_obj: u64, _cmd: u64, _mode: u64, 
     let deadline = deadline_from_nsdate(_date);
     run_loop_blocking(deadline, true);
     0
+}
+
+/// `-[NSRunLoop description]`
+pub extern "C" fn shim_nsrunloop_description(_obj: u64, _cmd: u64) -> u64 {
+    let c = std::ffi::CString::new("<NSRunLoop: kCFRunLoopDefaultMode>").unwrap();
+    crate::cfstring::shim_cf_string_create_with_cstring(0, c.as_ptr(), 0)
 }
 
 #[cfg(test)]
@@ -1142,7 +1148,7 @@ mod tests {
         remove_observer(obs);
         let guard = observers().lock().unwrap();
         assert!(
-            guard.iter().find(|o| o.addr == obs).is_none(),
+            !guard.iter().any(|o| o.addr == obs),
             "observer should be removed"
         );
         drop(guard);
@@ -1337,7 +1343,7 @@ mod tests {
         let _guard = lock_runloop_state();
         reset_runtime_state_for_reuse();
         let src = create_source(0);
-        register_fd_source(999, src, libc::POLLIN as i16);
+        register_fd_source(999, src, libc::POLLIN);
         assert!(has_fd_sources(), "should have fd sources after registering");
         unregister_fd_source(999);
         assert!(
@@ -1353,7 +1359,7 @@ mod tests {
         let _guard = lock_runloop_state();
         reset_runtime_state_for_reuse();
         let src = create_source(0);
-        register_fd_source(998, src, libc::POLLIN as i16);
+        register_fd_source(998, src, libc::POLLIN);
 
         // With an fd source registered, the run loop should NOT exit due to being empty.
         // It should block — so use a short deadline.
@@ -1383,7 +1389,7 @@ mod tests {
 
         // Create a source and register its fd
         let src = create_source(0);
-        register_fd_source(read_fd, src, libc::POLLIN as i16);
+        register_fd_source(read_fd, src, libc::POLLIN);
 
         // Write to the pipe from another thread to make the read end readable
         std::thread::spawn(move || {
@@ -1394,7 +1400,7 @@ mod tests {
 
         // The fd poller should detect readability, signal the source, and wake the loop
         let deadline = Some(Instant::now() + Duration::from_millis(500));
-        let result = run_loop_blocking(deadline, false);
+        let _result = run_loop_blocking(deadline, false);
         // Should either time out (the source was signaled and fired in a cycle,
         // then with no valid sources left it might exit) or be stopped.
         // The key assertion is that source was signaled:
@@ -1427,15 +1433,9 @@ mod tests {
     fn reset_clears_fd_sources() {
         let _guard = lock_runloop_state();
         let src = create_source(0);
-        register_fd_source(997, src, libc::POLLIN as i16);
+        register_fd_source(997, src, libc::POLLIN);
         assert!(has_fd_sources());
         reset_runtime_state_for_reuse();
         assert!(!has_fd_sources(), "reset should clear fd sources");
     }
-}
-
-/// `-[NSRunLoop description]`
-pub extern "C" fn shim_nsrunloop_description(_obj: u64, _cmd: u64) -> u64 {
-    let c = std::ffi::CString::new("<NSRunLoop: kCFRunLoopDefaultMode>").unwrap();
-    crate::cfstring::shim_cf_string_create_with_cstring(0, c.as_ptr(), 0)
 }

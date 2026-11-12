@@ -6,6 +6,7 @@ mod shim_core;
 pub(crate) use cfconstant_string::cfconstant_string_class_addr;
 
 use libsystem_shims::table::ShimTable;
+#[cfg(target_os = "macos")]
 use std::sync::OnceLock;
 
 const HOST_ISA_ALIAS_SYMBOLS: [(&str, &str); 4] = [
