@@ -200,8 +200,7 @@ pub(super) fn emit_block(code: &mut CodeBuffer, block: &[Instruction]) -> Option
                     0,
                     0,
                     1,
-                    shift_type,
-                    shift_amount,
+                    (shift_type, shift_amount),
                 ));
                 emit_store_guest_gpr(code, 0, rd, sf);
             }
@@ -302,10 +301,8 @@ pub(super) fn emit_block(code: &mut CodeBuffer, block: &[Instruction]) -> Option
                 // imm is the byte offset already scaled by decoder
                 emit_load_guest_gpr(code, 0, rn, true); // base addr always 64-bit
                                                         // Add offset if non-zero
-                if imm > 0 {
-                    if !emit_add_imm_flexible(code, 0, 0, imm) {
-                        return None;
-                    }
+                if imm > 0 && !emit_add_imm_flexible(code, 0, 0, imm) {
+                    return None;
                 }
                 // Native LDR from [x0] → x1
                 if sf {
@@ -319,10 +316,8 @@ pub(super) fn emit_block(code: &mut CodeBuffer, block: &[Instruction]) -> Option
             Instruction::StrImm { sf, rt, rn, imm } => {
                 emit_load_guest_gpr(code, 1, rt, sf); // value
                 emit_load_guest_gpr(code, 0, rn, true); // base addr
-                if imm > 0 {
-                    if !emit_add_imm_flexible(code, 0, 0, imm) {
-                        return None;
-                    }
+                if imm > 0 && !emit_add_imm_flexible(code, 0, 0, imm) {
+                    return None;
                 }
                 if sf {
                     code.emit32(enc_str_imm(true, 1, 0, 0)); // STR X1, [X0]
@@ -341,10 +336,8 @@ pub(super) fn emit_block(code: &mut CodeBuffer, block: &[Instruction]) -> Option
             } => {
                 emit_load_guest_gpr(code, 0, rn, true); // base addr
                 let byte_offset = imm as i32;
-                if byte_offset != 0 {
-                    if !emit_add_imm_signed(code, 0, 0, byte_offset) {
-                        return None;
-                    }
+                if byte_offset != 0 && !emit_add_imm_signed(code, 0, 0, byte_offset) {
+                    return None;
                 }
                 let scale = if sf { 8u32 } else { 4 };
                 // LDR first reg from [x0], second from [x0+scale]
@@ -370,10 +363,8 @@ pub(super) fn emit_block(code: &mut CodeBuffer, block: &[Instruction]) -> Option
                 emit_load_guest_gpr(code, 2, rt2, sf);
                 emit_load_guest_gpr(code, 0, rn, true); // base addr
                 let byte_offset = imm as i32;
-                if byte_offset != 0 {
-                    if !emit_add_imm_signed(code, 0, 0, byte_offset) {
-                        return None;
-                    }
+                if byte_offset != 0 && !emit_add_imm_signed(code, 0, 0, byte_offset) {
+                    return None;
                 }
                 let scale = if sf { 8u32 } else { 4 };
                 if sf {
@@ -388,10 +379,8 @@ pub(super) fn emit_block(code: &mut CodeBuffer, block: &[Instruction]) -> Option
             // ── Byte/halfword loads/stores ─────────────────────────────
             Instruction::Ldrb { rt, rn, imm } => {
                 emit_load_guest_gpr(code, 0, rn, true);
-                if imm > 0 {
-                    if !emit_add_imm_flexible(code, 0, 0, imm as u32) {
-                        return None;
-                    }
+                if imm > 0 && !emit_add_imm_flexible(code, 0, 0, imm as u32) {
+                    return None;
                 }
                 code.emit32(enc_ldrb_imm_unsigned(1, 0, 0)); // LDRB W1, [X0]
                 emit_store_guest_gpr(code, 1, rt, false); // zero-extend to 64
@@ -400,20 +389,16 @@ pub(super) fn emit_block(code: &mut CodeBuffer, block: &[Instruction]) -> Option
             Instruction::Strb { rt, rn, imm } => {
                 emit_load_guest_gpr(code, 1, rt, false);
                 emit_load_guest_gpr(code, 0, rn, true);
-                if imm > 0 {
-                    if !emit_add_imm_flexible(code, 0, 0, imm as u32) {
-                        return None;
-                    }
+                if imm > 0 && !emit_add_imm_flexible(code, 0, 0, imm as u32) {
+                    return None;
                 }
                 code.emit32(enc_strb_imm_unsigned(1, 0, 0)); // STRB W1, [X0]
             }
 
             Instruction::Ldrh { rt, rn, imm } => {
                 emit_load_guest_gpr(code, 0, rn, true);
-                if imm > 0 {
-                    if !emit_add_imm_flexible(code, 0, 0, imm as u32) {
-                        return None;
-                    }
+                if imm > 0 && !emit_add_imm_flexible(code, 0, 0, imm as u32) {
+                    return None;
                 }
                 code.emit32(enc_ldrh_imm_unsigned(1, 0, 0)); // LDRH W1, [X0]
                 emit_store_guest_gpr(code, 1, rt, false);
@@ -422,10 +407,8 @@ pub(super) fn emit_block(code: &mut CodeBuffer, block: &[Instruction]) -> Option
             Instruction::Strh { rt, rn, imm } => {
                 emit_load_guest_gpr(code, 1, rt, false);
                 emit_load_guest_gpr(code, 0, rn, true);
-                if imm > 0 {
-                    if !emit_add_imm_flexible(code, 0, 0, imm as u32) {
-                        return None;
-                    }
+                if imm > 0 && !emit_add_imm_flexible(code, 0, 0, imm as u32) {
+                    return None;
                 }
                 code.emit32(enc_strh_imm_unsigned(1, 0, 0)); // STRH W1, [X0]
             }
@@ -793,16 +776,8 @@ fn enc_sub_reg(sf: bool, rd: u8, rn: u8, rm: u8, shift: u8, amount: u8) -> u32 {
 }
 
 /// Logical (shifted register): sf opc 01010 shift N Rm imm6 Rn Rd
-fn enc_logical_reg(
-    sf: bool,
-    opc: u8,
-    n: bool,
-    rd: u8,
-    rn: u8,
-    rm: u8,
-    shift: u8,
-    amount: u8,
-) -> u32 {
+fn enc_logical_reg(sf: bool, opc: u8, n: bool, rd: u8, rn: u8, rm: u8, shift: (u8, u8)) -> u32 {
+    let (shift, amount) = shift;
     (u32::from(sf) << 31)
         | ((opc as u32 & 0x3) << 29)
         | (0b01010 << 24)
@@ -816,10 +791,9 @@ fn enc_logical_reg(
 
 /// MADD: sf 00 11011 000 Rm 0 Ra Rn Rd
 fn enc_madd(sf: bool, rd: u8, rn: u8, rm: u8, ra: u8) -> u32 {
-    (u32::from(sf) << 31)
+    ((u32::from(sf) << 31)
         | (0b0011011000 << 21)
-        | ((rm as u32 & 0x1F) << 16)
-        | (0 << 15) // o0=0
+        | ((rm as u32 & 0x1F) << 16)) // o0=0
         | ((ra as u32 & 0x1F) << 10)
         | ((rn as u32 & 0x1F) << 5)
         | (rd as u32 & 0x1F)
@@ -872,7 +846,7 @@ fn enc_mov_reg(rd: u8, rm: u8) -> u32 {
 fn enc_ldr_imm(sf: bool, rt: u8, rn: u8, scaled_imm: u32) -> u32 {
     let size = if sf { 0b11u32 } else { 0b10 };
     (size << 30)
-        | (0b111001_01 << 22)
+        | (0b1110_0101 << 22)
         | ((scaled_imm & 0xFFF) << 10)
         | ((rn as u32 & 0x1F) << 5)
         | (rt as u32 & 0x1F)
@@ -882,7 +856,7 @@ fn enc_ldr_imm(sf: bool, rt: u8, rn: u8, scaled_imm: u32) -> u32 {
 fn enc_str_imm(sf: bool, rt: u8, rn: u8, scaled_imm: u32) -> u32 {
     let size = if sf { 0b11u32 } else { 0b10 };
     (size << 30)
-        | (0b111001_00 << 22)
+        | (0b1110_0100 << 22)
         | ((scaled_imm & 0xFFF) << 10)
         | ((rn as u32 & 0x1F) << 5)
         | (rt as u32 & 0x1F)
@@ -891,7 +865,7 @@ fn enc_str_imm(sf: bool, rt: u8, rn: u8, scaled_imm: u32) -> u32 {
 /// STP Xt1, Xt2, [Xn, #imm]! (pre-index)
 fn enc_stp_pre(rt: u8, rt2: u8, rn: u8, imm: i32) -> u32 {
     let imm7 = ((imm / 8) as u32) & 0x7F;
-    (0b10_101_0_011 << 23)
+    (0b1_0101_0011 << 23)
         | (imm7 << 15)
         | ((rt2 as u32 & 0x1F) << 10)
         | ((rn as u32 & 0x1F) << 5)
@@ -901,7 +875,7 @@ fn enc_stp_pre(rt: u8, rt2: u8, rn: u8, imm: i32) -> u32 {
 /// STP Xt1, Xt2, [Xn, #imm] (signed offset)
 fn enc_stp_offset(rt: u8, rt2: u8, rn: u8, imm: i32) -> u32 {
     let imm7 = ((imm / 8) as u32) & 0x7F;
-    (0b10_101_0_010 << 23)
+    (0b1_0101_0010 << 23)
         | (imm7 << 15)
         | ((rt2 as u32 & 0x1F) << 10)
         | ((rn as u32 & 0x1F) << 5)
@@ -911,7 +885,7 @@ fn enc_stp_offset(rt: u8, rt2: u8, rn: u8, imm: i32) -> u32 {
 /// LDP Xt1, Xt2, [Xn, #imm] (signed offset)
 fn enc_ldp_offset(rt: u8, rt2: u8, rn: u8, imm: i32) -> u32 {
     let imm7 = ((imm / 8) as u32) & 0x7F;
-    (0b10_101_0_010 << 23)
+    (0b1_0101_0010 << 23)
         | (1 << 22) // L=1
         | (imm7 << 15)
         | ((rt2 as u32 & 0x1F) << 10)
@@ -922,7 +896,7 @@ fn enc_ldp_offset(rt: u8, rt2: u8, rn: u8, imm: i32) -> u32 {
 /// LDP Xt1, Xt2, [Xn], #imm (post-index)
 fn enc_ldp_post(rt: u8, rt2: u8, rn: u8, imm: i32) -> u32 {
     let imm7 = ((imm / 8) as u32) & 0x7F;
-    (0b10_101_0_001 << 23)
+    (0b1_0101_0001 << 23)
         | (1 << 22) // L=1
         | (imm7 << 15)
         | ((rt2 as u32 & 0x1F) << 10)
@@ -1008,7 +982,7 @@ fn enc_bitfield(sf: bool, opc: u8, rd: u8, rn: u8, immr: u8, imms: u8) -> u32 {
 /// AND Xd, Xn, Xm (register, no shift)
 fn enc_and_reg(sf: bool, rd: u8, rn: u8, rm: u8) -> u32 {
     (u32::from(sf) << 31)
-        | (0b00_01010_00 << 22)
+        | (0b0_0010_1000 << 22)
         | ((rm as u32 & 0x1F) << 16)
         | ((rn as u32 & 0x1F) << 5)
         | (rd as u32 & 0x1F)
@@ -1017,7 +991,7 @@ fn enc_and_reg(sf: bool, rd: u8, rn: u8, rm: u8) -> u32 {
 /// ORR Xd, Xn, Xm (register, no shift)
 fn enc_orr_reg_simple(sf: bool, rd: u8, rn: u8, rm: u8) -> u32 {
     (u32::from(sf) << 31)
-        | (0b01_01010_00 << 22)
+        | (0b0_1010_1000 << 22)
         | ((rm as u32 & 0x1F) << 16)
         | ((rn as u32 & 0x1F) << 5)
         | (rd as u32 & 0x1F)
@@ -1026,7 +1000,7 @@ fn enc_orr_reg_simple(sf: bool, rd: u8, rn: u8, rm: u8) -> u32 {
 /// EOR Xd, Xn, Xm (register, no shift)
 fn enc_eor_reg(sf: bool, rd: u8, rn: u8, rm: u8) -> u32 {
     (u32::from(sf) << 31)
-        | (0b10_01010_00 << 22)
+        | (0b1_0010_1000 << 22)
         | ((rm as u32 & 0x1F) << 16)
         | ((rn as u32 & 0x1F) << 5)
         | (rd as u32 & 0x1F)
@@ -1035,7 +1009,7 @@ fn enc_eor_reg(sf: bool, rd: u8, rn: u8, rm: u8) -> u32 {
 /// ANDS Xd, Xn, Xm (register, no shift, flag-setting)
 fn enc_ands_reg(sf: bool, rd: u8, rn: u8, rm: u8) -> u32 {
     (u32::from(sf) << 31)
-        | (0b11_01010_00 << 22)
+        | (0b1_1010_1000 << 22)
         | ((rm as u32 & 0x1F) << 16)
         | ((rn as u32 & 0x1F) << 5)
         | (rd as u32 & 0x1F)
@@ -1046,11 +1020,9 @@ fn enc_and_imm1(sf: bool, rd: u8, rn: u8) -> u32 {
     // AND Xd, Xn, #1 uses logical immediate encoding:
     // sf=1: N=1, immr=0, imms=0 → bitmask = 1
     // sf=0: N=0, immr=0, imms=0 → bitmask = 1
-    (u32::from(sf) << 31)
+    ((u32::from(sf) << 31)
         | (0b00_100100 << 23)
-        | (u32::from(sf) << 22) // N
-        | (0 << 16) // immr=0
-        | (0 << 10) // imms=0
+        | (u32::from(sf) << 22)) // imms=0
         | ((rn as u32 & 0x1F) << 5)
         | (rd as u32 & 0x1F)
 }
@@ -1058,7 +1030,7 @@ fn enc_and_imm1(sf: bool, rd: u8, rn: u8) -> u32 {
 /// STRB Wt, [Xn, #offset] — store byte to CpuState via x19
 fn enc_strb_to_cpu(rt: u8, offset: u32) -> u32 {
     // STRB Wt, [X19, #imm12] — size=00, V=0, opc=00
-    (0b00_111_0_01_00 << 22)
+    (0b00_1110_0100 << 22)
         | ((offset & 0xFFF) << 10)
         | (19u32 << 5) // base = x19 (CpuState pointer)
         | (rt as u32 & 0x1F)
@@ -1067,12 +1039,12 @@ fn enc_strb_to_cpu(rt: u8, offset: u32) -> u32 {
 /// LDRB Wt, [Xn, #offset] — load byte from CpuState via x19
 fn enc_ldrb_from_cpu(rt: u8, offset: u32) -> u32 {
     // LDRB Wt, [X19, #imm12] — size=00, V=0, opc=01
-    (0b00_111_0_01_01 << 22) | ((offset & 0xFFF) << 10) | (19u32 << 5) | (rt as u32 & 0x1F)
+    (0b00_1110_0101 << 22) | ((offset & 0xFFF) << 10) | (19u32 << 5) | (rt as u32 & 0x1F)
 }
 
 /// LDRB Wt, [Xn, #0] (unsigned offset, scaled)
 fn enc_ldrb_imm_unsigned(rt: u8, rn: u8, imm12: u32) -> u32 {
-    (0b00_111_0_01_01 << 22)
+    (0b00_1110_0101 << 22)
         | ((imm12 & 0xFFF) << 10)
         | ((rn as u32 & 0x1F) << 5)
         | (rt as u32 & 0x1F)
@@ -1080,7 +1052,7 @@ fn enc_ldrb_imm_unsigned(rt: u8, rn: u8, imm12: u32) -> u32 {
 
 /// STRB Wt, [Xn, #0] (unsigned offset, scaled)
 fn enc_strb_imm_unsigned(rt: u8, rn: u8, imm12: u32) -> u32 {
-    (0b00_111_0_01_00 << 22)
+    (0b00_1110_0100 << 22)
         | ((imm12 & 0xFFF) << 10)
         | ((rn as u32 & 0x1F) << 5)
         | (rt as u32 & 0x1F)
@@ -1088,7 +1060,7 @@ fn enc_strb_imm_unsigned(rt: u8, rn: u8, imm12: u32) -> u32 {
 
 /// LDRH Wt, [Xn, #0] (unsigned offset, scaled)
 fn enc_ldrh_imm_unsigned(rt: u8, rn: u8, imm12: u32) -> u32 {
-    (0b01_111_0_01_01 << 22)
+    (0b01_1110_0101 << 22)
         | ((imm12 & 0xFFF) << 10)
         | ((rn as u32 & 0x1F) << 5)
         | (rt as u32 & 0x1F)
@@ -1096,7 +1068,7 @@ fn enc_ldrh_imm_unsigned(rt: u8, rn: u8, imm12: u32) -> u32 {
 
 /// STRH Wt, [Xn, #0] (unsigned offset, scaled)
 fn enc_strh_imm_unsigned(rt: u8, rn: u8, imm12: u32) -> u32 {
-    (0b01_111_0_01_00 << 22)
+    (0b01_1110_0100 << 22)
         | ((imm12 & 0xFFF) << 10)
         | ((rn as u32 & 0x1F) << 5)
         | (rt as u32 & 0x1F)
@@ -1115,11 +1087,10 @@ fn enc_div(sf: bool, rd: u8, rn: u8, rm: u8, is_signed: bool) -> u32 {
 
 /// CSEL: sf 0 0 11010100 Rm cond 0 0 Rn Rd
 fn enc_csel(sf: bool, rd: u8, rn: u8, rm: u8, cond: Condition) -> u32 {
-    (u32::from(sf) << 31)
+    ((u32::from(sf) << 31)
         | (0b0011010100 << 21)
         | ((rm as u32 & 0x1F) << 16)
-        | (cond.to_bits() << 12)
-        | (0b00 << 10)
+        | (cond.to_bits() << 12))
         | ((rn as u32 & 0x1F) << 5)
         | (rd as u32 & 0x1F)
 }
@@ -1137,11 +1108,10 @@ fn enc_csinc(sf: bool, rd: u8, rn: u8, rm: u8, cond: Condition) -> u32 {
 
 /// CSINV: sf 1 0 11010100 Rm cond 0 0 Rn Rd
 fn enc_csinv(sf: bool, rd: u8, rn: u8, rm: u8, cond: Condition) -> u32 {
-    (u32::from(sf) << 31)
+    ((u32::from(sf) << 31)
         | (0b1011010100 << 21)
         | ((rm as u32 & 0x1F) << 16)
-        | (cond.to_bits() << 12)
-        | (0b00 << 10)
+        | (cond.to_bits() << 12))
         | ((rn as u32 & 0x1F) << 5)
         | (rd as u32 & 0x1F)
 }

@@ -1,4 +1,3 @@
-use super::*;
 use crate::color::Color;
 use crate::geometry::Point;
 use crate::gradient::{Gradient, GradientStop};

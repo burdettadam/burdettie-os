@@ -362,7 +362,7 @@ pub(super) fn decode_fp_dp(raw: u32) -> Instruction {
     }
 
     // ── Advanced SIMD copy (DUP/INS/UMOV/SMOV): 0 Q op 01110000 imm5 0 imm4 1 Rn Rd ──
-    if (raw >> 21) & 0x7FF == 0b01110000_000 >> 0 {
+    if (raw >> 21) & 0x7FF == 0b011_1000_0000 {
         // More precise: bits[28:21] = 01110000 (without Q, op)
         // Actually: 0 Q op 01110000 imm5 0 imm4 1 Rn Rd
         // bits[28:24] = 01110, bits[23:21] = 000 → bits[28:21] = 01110000

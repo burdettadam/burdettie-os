@@ -665,7 +665,7 @@ impl RealQuarantine {
         use std::ffi::CString;
         let c_path = CString::new(path.to_str()?).ok()?;
         // Linux uses "user." namespace for quarantine simulation
-        let attr_name = b"user.quarantine\0".as_ptr() as *const libc::c_char;
+        let attr_name = c"user.quarantine".as_ptr();
 
         let size = unsafe { libc::getxattr(c_path.as_ptr(), attr_name, std::ptr::null_mut(), 0) };
         if size <= 0 {

@@ -64,7 +64,7 @@ impl CodeBuffer {
         {
             let _ = min_size;
             log::debug!("JIT code buffer allocation unsupported on this host — JIT disabled");
-            return false;
+            false
         }
 
         #[cfg(all(target_arch = "aarch64", target_family = "unix"))]
@@ -266,7 +266,7 @@ impl JitCache {
         }
 
         let start = self.code.current_offset();
-        let result = if let Some(()) = emit::emit_block(&mut self.code, block) {
+        if let Some(()) = emit::emit_block(&mut self.code, block) {
             self.code.flush_icache(start, self.code.current_offset());
             // Switch back to executable before running JIT code.
             #[cfg(target_os = "macos")]
@@ -286,8 +286,7 @@ impl JitCache {
                 pthread_jit_write_protect_np(true);
             }
             None
-        };
-        result
+        }
     }
 
     /// On non-aarch64, compilation always fails (fall back to interpreter).

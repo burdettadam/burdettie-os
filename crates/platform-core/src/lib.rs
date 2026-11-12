@@ -170,7 +170,7 @@ mod tests {
 
     #[test]
     fn pal_error_io_debug() {
-        let io_err = std::io::Error::new(std::io::ErrorKind::Other, "disk");
+        let io_err = std::io::Error::other("disk");
         let e = PalError::Io(io_err);
         let dbg = format!("{e:?}");
         assert!(dbg.contains("Io"));
@@ -231,7 +231,7 @@ mod tests {
     #[test]
     fn protection_clone_and_copy() {
         let p = Protection::READ_WRITE;
-        let cloned = p.clone();
+        let cloned = p;
         let copied = p; // Copy
         assert_eq!(p, cloned);
         assert_eq!(p, copied);

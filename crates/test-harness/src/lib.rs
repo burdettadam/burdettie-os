@@ -286,7 +286,7 @@ Load command 1
   fileoff 16384
  filesize 4096
 ";
-        let (segments, entry) = parse_otool_load_commands(input);
+        let (segments, _) = parse_otool_load_commands(input);
         assert_eq!(segments.len(), 2);
         assert_eq!(segments[0].name, "__TEXT");
         assert_eq!(segments[0].vmaddr, 0x100000000);

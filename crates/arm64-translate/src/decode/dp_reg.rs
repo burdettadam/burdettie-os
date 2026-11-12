@@ -256,7 +256,7 @@ fn decode_dp_2source(raw: u32) -> Instruction {
         // 010000=CRC32B, 010001=CRC32H, 010010=CRC32W, 010011=CRC32X
         // 010100=CRC32CB, 010101=CRC32CH, 010110=CRC32CW, 010111=CRC32CX
         0b010000..=0b010111 => {
-            let sz = ((opcode >> 0) & 0x3) as u8;
+            let sz = (opcode & 0x3) as u8;
             let c = (opcode >> 2) & 1 == 1;
             Instruction::Crc32 {
                 sf,
@@ -381,23 +381,14 @@ fn decode_ccmp(raw: u32) -> Instruction {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::cpu::Condition;
     use crate::decode::{decode, Instruction};
     use crate::test_helpers::*;
 
     // ── Helper: build a logical shifted-register encoding ────────────
     // sf opc 01010 shift N Rm imm6 Rn Rd
-    fn enc_logical_reg(
-        sf: bool,
-        opc: u8,
-        shift_type: u8,
-        n: bool,
-        rm: u8,
-        imm6: u8,
-        rn: u8,
-        rd: u8,
-    ) -> u32 {
+    fn enc_logical_reg(sf: bool, opc: u8, shift: (u8, u8), n: bool, rm: u8, rn: u8, rd: u8) -> u32 {
+        let (shift_type, imm6) = shift;
         (u32::from(sf) << 31)
             | ((opc as u32 & 0x3) << 29)
             | (0b01010 << 24)
@@ -412,12 +403,11 @@ mod tests {
     // ── Helper: build CSINV encoding ─────────────────────────────────
     // sf 1 0 11010100 Rm cond 00 Rn Rd
     fn enc_csinv(sf: bool, rd: u8, rn: u8, rm: u8, cond: u8) -> u32 {
-        (u32::from(sf) << 31)
+        ((u32::from(sf) << 31)
             | (1 << 30) // op=1
             | (0b0011010100 << 21)
             | ((rm as u32 & 0x1F) << 16)
-            | ((cond as u32 & 0xF) << 12)
-            | (0b00 << 10) // op2=00
+            | ((cond as u32 & 0xF) << 12)) // op2=00
             | ((rn as u32 & 0x1F) << 5)
             | (rd as u32 & 0x1F)
     }
@@ -450,14 +440,11 @@ mod tests {
     // ── Helper: build CCMP/CCMN register encoding ────────────────────
     // sf op 1 11010010 Rm cond 00 0 Rn 0 nzcv
     fn enc_ccmp_reg(sf: bool, op: u8, rm: u8, cond: u8, rn: u8, nzcv: u8) -> u32 {
-        (u32::from(sf) << 31)
+        ((u32::from(sf) << 31)
             | ((op as u32 & 1) << 30)
             | (0b111010010 << 21)
             | ((rm as u32 & 0x1F) << 16)
-            | ((cond as u32 & 0xF) << 12)
-            | (0b0 << 11) // register form
-            | (0b0 << 10)
-            | (0b0 << 4) // o3=0
+            | ((cond as u32 & 0xF) << 12)) // o3=0
             | ((rn as u32 & 0x1F) << 5)
             | (nzcv as u32 & 0xF)
     }
@@ -465,14 +452,12 @@ mod tests {
     // ── Helper: build CCMP/CCMN immediate encoding ───────────────────
     // sf op 1 11010010 imm5 cond 10 0 Rn 0 nzcv
     fn enc_ccmp_imm(sf: bool, op: u8, imm5: u8, cond: u8, rn: u8, nzcv: u8) -> u32 {
-        (u32::from(sf) << 31)
+        ((u32::from(sf) << 31)
             | ((op as u32 & 1) << 30)
             | (0b111010010 << 21)
             | ((imm5 as u32 & 0x1F) << 16)
             | ((cond as u32 & 0xF) << 12)
-            | (1 << 11) // immediate form
-            | (0b0 << 10)
-            | (0b0 << 4)
+            | (1 << 11))
             | ((rn as u32 & 0x1F) << 5)
             | (nzcv as u32 & 0xF)
     }
@@ -767,7 +752,7 @@ mod tests {
     // BIC (opc=00, N=1)
     #[test]
     fn test_decode_bic_reg_64() {
-        let insn = decode(enc_logical_reg(true, 0b00, 0, true, 2, 0, 1, 0), 0x1000);
+        let insn = decode(enc_logical_reg(true, 0b00, (0, 0), true, 2, 1, 0), 0x1000);
         assert!(matches!(
             insn,
             Instruction::LogicalReg {
@@ -841,7 +826,7 @@ mod tests {
     // ORN (opc=01, N=1)
     #[test]
     fn test_decode_orn_reg_64() {
-        let insn = decode(enc_logical_reg(true, 0b01, 0, true, 2, 0, 1, 0), 0x1000);
+        let insn = decode(enc_logical_reg(true, 0b01, (0, 0), true, 2, 1, 0), 0x1000);
         assert!(matches!(
             insn,
             Instruction::LogicalReg {
@@ -860,7 +845,7 @@ mod tests {
     // EOR (opc=10, N=0)
     #[test]
     fn test_decode_eor_reg_64() {
-        let insn = decode(enc_logical_reg(true, 0b10, 0, false, 2, 0, 1, 0), 0x1000);
+        let insn = decode(enc_logical_reg(true, 0b10, (0, 0), false, 2, 1, 0), 0x1000);
         assert!(matches!(
             insn,
             Instruction::LogicalReg {
@@ -878,7 +863,7 @@ mod tests {
 
     #[test]
     fn test_decode_eor_reg_32() {
-        let insn = decode(enc_logical_reg(false, 0b10, 0, false, 5, 0, 4, 3), 0x1000);
+        let insn = decode(enc_logical_reg(false, 0b10, (0, 0), false, 5, 4, 3), 0x1000);
         assert!(matches!(
             insn,
             Instruction::LogicalReg {
@@ -897,7 +882,7 @@ mod tests {
     // EON (opc=10, N=1)
     #[test]
     fn test_decode_eon_reg_64() {
-        let insn = decode(enc_logical_reg(true, 0b10, 0, true, 2, 0, 1, 0), 0x1000);
+        let insn = decode(enc_logical_reg(true, 0b10, (0, 0), true, 2, 1, 0), 0x1000);
         assert!(matches!(
             insn,
             Instruction::LogicalReg {
@@ -916,7 +901,7 @@ mod tests {
     // ANDS (opc=11, N=0)
     #[test]
     fn test_decode_ands_reg_64() {
-        let insn = decode(enc_logical_reg(true, 0b11, 0, false, 2, 0, 1, 0), 0x1000);
+        let insn = decode(enc_logical_reg(true, 0b11, (0, 0), false, 2, 1, 0), 0x1000);
         assert!(matches!(
             insn,
             Instruction::LogicalReg {
@@ -934,7 +919,7 @@ mod tests {
 
     #[test]
     fn test_decode_ands_reg_32() {
-        let insn = decode(enc_logical_reg(false, 0b11, 0, false, 5, 0, 4, 3), 0x1000);
+        let insn = decode(enc_logical_reg(false, 0b11, (0, 0), false, 5, 4, 3), 0x1000);
         assert!(matches!(
             insn,
             Instruction::LogicalReg {
@@ -953,7 +938,7 @@ mod tests {
     // BICS (opc=11, N=1)
     #[test]
     fn test_decode_bics_reg_64() {
-        let insn = decode(enc_logical_reg(true, 0b11, 0, true, 2, 0, 1, 0), 0x1000);
+        let insn = decode(enc_logical_reg(true, 0b11, (0, 0), true, 2, 1, 0), 0x1000);
         assert!(matches!(
             insn,
             Instruction::LogicalReg {

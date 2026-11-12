@@ -1,5 +1,5 @@
 use crate::color::Color;
-use crate::geometry::{Point, Rect};
+use crate::geometry::Rect;
 use crate::renderer::Renderer;
 use crate::software::SoftwareRenderer;
 use crate::surface::Surface;

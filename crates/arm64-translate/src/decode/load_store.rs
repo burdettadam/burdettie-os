@@ -205,7 +205,7 @@ pub(super) fn decode_load_store_reg(raw: u32) -> Instruction {
         || (raw >> 24) & 0x3F == 0b011001
         || (raw >> 24) & 0x3F == 0b001001
     {
-        let imm12 = ((raw >> 10) & 0xFFF) as u32;
+        let imm12 = (raw >> 10) & 0xFFF;
         let scale = 1u32 << size;
         let offset = imm12 * scale;
 
@@ -611,7 +611,6 @@ pub(super) fn decode_load_store_reg(raw: u32) -> Instruction {
 }
 
 /// Decode SIMD/FP scalar load/store (v=1 path from decode_load_store_reg).
-
 ///
 /// size:opc determines the register width:
 ///   size=00, opc=0x → B (8-bit)
@@ -643,7 +642,7 @@ fn decode_fp_load_store_reg(raw: u32, size: u32, opc: u32, rn: u8, rt: u8) -> In
         || (raw >> 24) & 0x3F == 0b011101
         || (raw >> 24) & 0x3F == 0b001101
     {
-        let imm12 = ((raw >> 10) & 0xFFF) as u32;
+        let imm12 = (raw >> 10) & 0xFFF;
         let offset = imm12 << log2_sz;
         return if is_load {
             Instruction::FpLdrImm {
@@ -823,7 +822,7 @@ fn decode_exclusive_group(raw: u32) -> Instruction {
     // STXR / STLXR: L=0, o0=0 (bit[15]=0)
     {
         let release = o2 == 1; // STLXR
-        return match size {
+        match size {
             0b11 | 0b10 => Instruction::StoreExclusive {
                 sf,
                 release,
@@ -844,7 +843,7 @@ fn decode_exclusive_group(raw: u32) -> Instruction {
                 rn,
             },
             _ => Instruction::Unknown { raw },
-        };
+        }
     }
 }
 
@@ -896,7 +895,6 @@ fn decode_lse_atomics(raw: u32) -> Option<Instruction> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::decode::{decode, Instruction};
     use crate::test_helpers::*;
 

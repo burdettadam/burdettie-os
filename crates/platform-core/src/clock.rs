@@ -63,26 +63,29 @@ mod tests {
 
     #[test]
     fn calendar_components_fields_writable() {
-        let mut c = CalendarComponents::default();
-        c.sec = 30;
-        c.min = 45;
-        c.hour = 14;
-        c.mday = 29;
-        c.mon = 2;
-        c.year = 126;
-        c.wday = 0;
-        c.yday = 87;
-        c.isdst = 1;
-        c.gmtoff = -18000;
+        let c = CalendarComponents {
+            sec: 30,
+            min: 45,
+            hour: 14,
+            mday: 29,
+            mon: 2,
+            year: 126,
+            wday: 0,
+            yday: 87,
+            isdst: 1,
+            gmtoff: -18000,
+        };
         assert_eq!(c.sec, 30);
         assert_eq!(c.gmtoff, -18000);
     }
 
     #[test]
     fn calendar_components_clone() {
-        let mut c = CalendarComponents::default();
-        c.hour = 12;
-        c.year = 126;
+        let c = CalendarComponents {
+            hour: 12,
+            year: 126,
+            ..Default::default()
+        };
         let c2 = c.clone();
         assert_eq!(c2.hour, 12);
         assert_eq!(c2.year, 126);

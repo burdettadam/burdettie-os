@@ -2,12 +2,9 @@
 
 use crate::color::Color;
 use crate::font_manager::FontManager;
-use crate::surface::Surface;
 
 use super::atlas::{GlyphAtlas, ATLAS_SIZE};
 use super::vertex::Vertex;
-
-use wgpu::util::DeviceExt;
 
 /// GPU-accelerated renderer using wgpu.
 ///

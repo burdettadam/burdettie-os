@@ -51,17 +51,17 @@ fn pac_strip(ptr: u64) -> u64 {
 // Formula: (o0 << 15) | (1 << 14) | (op1 << 11) | (CRn << 7) | (CRm << 3) | op2
 // where o0=1 for op0=3, bit14=1 is always set in register access form.
 /// TPIDR_EL0 (Thread Pointer ID, EL0): op0=3, op1=3, CRn=13, CRm=0, op2=2
-const SYSREG_TPIDR_EL0: u16 = (1 << 15) | (1 << 14) | (3 << 11) | (13 << 7) | (0 << 3) | 2;
+const SYSREG_TPIDR_EL0: u16 = ((1 << 15) | (1 << 14) | (3 << 11) | (13 << 7)) | 2;
 /// CTR_EL0 (Cache Type Register): op0=3, op1=3, CRn=0, CRm=0, op2=1
-const SYSREG_CTR_EL0: u16 = (1 << 15) | (1 << 14) | (3 << 11) | (0 << 7) | (0 << 3) | 1;
+const SYSREG_CTR_EL0: u16 = ((1 << 15) | (1 << 14) | (3 << 11)) | 1;
 /// CNTVCT_EL0 (Virtual Timer Counter): op0=3, op1=3, CRn=14, CRm=0, op2=2
-const SYSREG_CNTVCT_EL0: u16 = (1 << 15) | (1 << 14) | (3 << 11) | (14 << 7) | (0 << 3) | 2;
+const SYSREG_CNTVCT_EL0: u16 = ((1 << 15) | (1 << 14) | (3 << 11) | (14 << 7)) | 2;
 /// DAIF (Debug/Async/IRQ/FIQ mask): op0=3, op1=3, CRn=4, CRm=2, op2=1
 const SYSREG_DAIF: u16 = (1 << 15) | (1 << 14) | (3 << 11) | (4 << 7) | (2 << 3) | 1;
 /// NZCV (Condition flags): op0=3, op1=3, CRn=4, CRm=2, op2=0
-const SYSREG_NZCV: u16 = (1 << 15) | (1 << 14) | (3 << 11) | (4 << 7) | (2 << 3) | 0;
+const SYSREG_NZCV: u16 = (1 << 15) | (1 << 14) | (3 << 11) | (4 << 7) | (2 << 3);
 /// FPCR (FP Control Register): op0=3, op1=3, CRn=4, CRm=4, op2=0
-const SYSREG_FPCR: u16 = (1 << 15) | (1 << 14) | (3 << 11) | (4 << 7) | (4 << 3) | 0;
+const SYSREG_FPCR: u16 = (1 << 15) | (1 << 14) | (3 << 11) | (4 << 7) | (4 << 3);
 /// FPSR (FP Status Register): op0=3, op1=3, CRn=4, CRm=4, op2=1
 const SYSREG_FPSR: u16 = (1 << 15) | (1 << 14) | (3 << 11) | (4 << 7) | (4 << 3) | 1;
 

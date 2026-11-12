@@ -99,6 +99,9 @@ pub static OBJC_RUNTIME: RwLock<Option<ObjcRuntime>> = RwLock::new(None);
 pub struct ObjcRuntime {
     classes_by_name: HashMap<Arc<str>, Arc<ClassInfo>>,
     classes_by_addr: HashMap<u64, Arc<str>>,
+    /// Classes whose superclass field must be reread from mapped image data.
+    /// Synthetic class handles need not point at an `objc_class_t` record.
+    mapped_class_addrs: HashMap<Arc<str>, u64>,
     metaclass_addrs: HashSet<u64>,
     protocols_by_name: HashMap<Arc<str>, Arc<ProtocolInfo>>,
     selectors: HashMap<Arc<str>, Arc<std::ffi::CString>>,
@@ -123,6 +126,7 @@ impl ObjcRuntime {
         Self {
             classes_by_name: HashMap::new(),
             classes_by_addr: HashMap::new(),
+            mapped_class_addrs: HashMap::new(),
             metaclass_addrs: HashSet::new(),
             protocols_by_name: HashMap::new(),
             selectors: HashMap::new(),
@@ -142,6 +146,7 @@ impl ObjcRuntime {
     ) {
         self.classes_by_name.reserve(classes);
         self.classes_by_addr.reserve(classes.saturating_mul(2));
+        self.mapped_class_addrs.reserve(classes);
         self.metaclass_addrs.reserve(classes);
         self.protocols_by_name.reserve(protocols);
         self.selectors.reserve(selectors);
@@ -182,6 +187,18 @@ impl ObjcRuntime {
         );
         self.metaclass_addrs
             .extend(other.metaclass_addrs.iter().copied());
+        // The winning class definition also owns its storage provenance. In
+        // particular, a Foundation overlay can replace an image class with a
+        // synthetic class whose address must never be dereferenced for fixups.
+        for name in other.classes_by_name.keys() {
+            self.mapped_class_addrs.remove(name);
+        }
+        self.mapped_class_addrs.extend(
+            other
+                .mapped_class_addrs
+                .iter()
+                .map(|(name, &addr)| (Arc::clone(name), addr)),
+        );
         self.classes_by_name.extend(
             other
                 .classes_by_name
@@ -442,6 +459,7 @@ impl ObjcRuntime {
             return false;
         };
         self.classes_by_name.remove(&name);
+        self.mapped_class_addrs.remove(&name);
         self.metaclass_addrs.remove(&addr);
         log::debug!("ObjcRuntime: removed class '{}' at {:#x}", name, addr);
         true

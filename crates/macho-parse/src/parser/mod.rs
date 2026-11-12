@@ -212,32 +212,50 @@ pub fn parse(data: &[u8]) -> Result<ParsedMachO, ParseError> {
                 }
             }
             LoadCommandType::UnixThread => {
-                // LC_UNIXTHREAD contains a flavor + count + register state.
-                // We extract the instruction pointer (RIP for x86_64, PC for arm64).
-                let _flavor = r.read_u32()?;
+                // Darwin thread-state flavors describe CPU-specific layouts.
+                // Both ARM64 and x86_64 have 64-bit headers but different PC
+                // offsets; header width alone cannot select the register.
+                let flavor = r.read_u32()?;
                 let count = r.read_u32()?;
-                // Read the full register state
-                let state_bytes = count as usize * 4;
-                let state = r.read_bytes(state_bytes.min(payload_end.saturating_sub(r.pos)))?;
-                // x86_64: RIP is at offset 16*8 = 128 bytes into the state
-                // arm64:  PC is at offset 32*8 = 256 bytes into the state
-                let entry_address = if is_64 && state.len() >= 136 {
-                    // x86_64 thread state: RIP at offset 128
-                    u64::from_le_bytes([
-                        state[128], state[129], state[130], state[131], state[132], state[133],
-                        state[134], state[135],
-                    ])
-                } else if state.len() >= 264 {
-                    // arm64 thread state: PC at offset 256
-                    u64::from_le_bytes([
-                        state[256], state[257], state[258], state[259], state[260], state[261],
-                        state[262], state[263],
-                    ])
-                } else if state.len() >= 44 {
-                    // i386: EIP at offset 40
-                    u32::from_le_bytes([state[40], state[41], state[42], state[43]]) as u64
+                let state_bytes = usize::try_from(count)
+                    .ok()
+                    .and_then(|count| count.checked_mul(4))
+                    .ok_or_else(|| {
+                        ParseError::Other("thread state length overflows the host size".into())
+                    })?;
+                let available = payload_end.saturating_sub(r.pos);
+                if state_bytes > available {
+                    return Err(ParseError::UnexpectedEof {
+                        offset: r.pos,
+                        needed: state_bytes,
+                        available,
+                    });
+                }
+                let state_start = r.pos;
+                let state = r.read_bytes(state_bytes)?;
+                let (pc_offset, width) = match (header.cpu_type, flavor) {
+                    (CpuType::Arm64, 6) => (256, 8),  // ARM_THREAD_STATE64
+                    (CpuType::X86_64, 4) => (128, 8), // x86_THREAD_STATE64
+                    (CpuType::X86, 1) => (40, 4),     // x86_THREAD_STATE32
+                    (CpuType::Arm, 1) => (60, 4),     // ARM_THREAD_STATE
+                    _ => {
+                        return Err(ParseError::Other(format!(
+                            "unsupported thread state flavor {flavor} for {:?}",
+                            header.cpu_type
+                        )))
+                    }
+                };
+                let Some(pc) = state.get(pc_offset..pc_offset + width) else {
+                    return Err(ParseError::UnexpectedEof {
+                        offset: state_start + pc_offset,
+                        needed: width,
+                        available: state.len().saturating_sub(pc_offset),
+                    });
+                };
+                let entry_address = if width == 8 {
+                    u64::from_le_bytes([pc[0], pc[1], pc[2], pc[3], pc[4], pc[5], pc[6], pc[7]])
                 } else {
-                    0
+                    u64::from(u32::from_le_bytes([pc[0], pc[1], pc[2], pc[3]]))
                 };
                 entry = Some(EntryPoint::UnixThread { entry_address });
                 LoadCommandPayload::UnixThread { entry_address }
@@ -372,7 +390,7 @@ fn parse_symbol_table(
         let n_value = if is_64 {
             r.read_u64()?
         } else {
-            r.read_u32()? as u64
+            u64::from(r.read_u32()?)
         };
 
         let name = if str_index < str_table.len() {

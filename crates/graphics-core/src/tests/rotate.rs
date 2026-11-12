@@ -8,8 +8,6 @@ fn px(surface: &Surface, x: u32, y: u32) -> u32 {
 
 const WHITE_ARGB: u32 = 0xFFFFFFFF;
 const RED_ARGB: u32 = 0xFFFF0000;
-const GREEN_ARGB: u32 = 0xFF00FF00;
-const BLACK_ARGB: u32 = 0xFF000000;
 
 // ── Rotation tests ─────────────────────────────────────────────────
 

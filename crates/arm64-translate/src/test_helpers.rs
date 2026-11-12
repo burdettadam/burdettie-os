@@ -179,7 +179,6 @@ pub fn enc_movk(sf: bool, rd: u8, imm16: u16, hw: u8) -> u32 {
 /// MOVN Xd, #imm16{, LSL #shift}
 pub fn enc_movn(sf: bool, rd: u8, imm16: u16, hw: u8) -> u32 {
     (u32::from(sf) << 31)
-        | (0b00 << 29)
         | (0b100101 << 23)
         | ((hw as u32 & 0x3) << 21)
         | ((imm16 as u32) << 5)
@@ -216,10 +215,9 @@ pub fn enc_subs_reg(sf: bool, rd: u8, rn: u8, rm: u8, shift_type: u8, amount: u8
 
 /// MADD Xd, Xn, Xm, Xa  (Xd = Xa + Xn*Xm; MUL when Xa=XZR)
 pub fn enc_madd(sf: bool, rd: u8, rn: u8, rm: u8, ra: u8) -> u32 {
-    (u32::from(sf) << 31)
+    ((u32::from(sf) << 31)
         | (0b0011011000 << 21)
-        | ((rm as u32 & 0x1F) << 16)
-        | (0 << 15)  // o0=0 for MADD
+        | ((rm as u32 & 0x1F) << 16))  // o0=0 for MADD
         | ((ra as u32 & 0x1F) << 10)
         | ((rn as u32 & 0x1F) << 5)
         | (rd as u32 & 0x1F)
@@ -257,11 +255,10 @@ pub fn enc_mov_reg(sf: bool, rd: u8, rm: u8) -> u32 {
 
 /// ORR (shifted register)
 pub fn enc_orr_reg(sf: bool, rd: u8, rn: u8, rm: u8, shift_type: u8, amount: u8) -> u32 {
-    (u32::from(sf) << 31)
+    ((u32::from(sf) << 31)
         | (0b01 << 29)
         | (0b01010 << 24)
-        | ((shift_type as u32 & 0x3) << 22)
-        | (0 << 21) // N=0
+        | ((shift_type as u32 & 0x3) << 22)) // N=0
         | ((rm as u32 & 0x1F) << 16)
         | ((amount as u32 & 0x3F) << 10)
         | ((rn as u32 & 0x1F) << 5)
@@ -270,11 +267,9 @@ pub fn enc_orr_reg(sf: bool, rd: u8, rn: u8, rm: u8, shift_type: u8, amount: u8)
 
 /// AND (shifted register)
 pub fn enc_and_reg(sf: bool, rd: u8, rn: u8, rm: u8, shift_type: u8, amount: u8) -> u32 {
-    (u32::from(sf) << 31)
-        | (0b00 << 29)
+    ((u32::from(sf) << 31)
         | (0b01010 << 24)
-        | ((shift_type as u32 & 0x3) << 22)
-        | (0 << 21) // N=0
+        | ((shift_type as u32 & 0x3) << 22)) // N=0
         | ((rm as u32 & 0x1F) << 16)
         | ((amount as u32 & 0x3F) << 10)
         | ((rn as u32 & 0x1F) << 5)
@@ -283,11 +278,10 @@ pub fn enc_and_reg(sf: bool, rd: u8, rn: u8, rm: u8, shift_type: u8, amount: u8)
 
 /// CSEL Xd, Xn, Xm, cond
 pub fn enc_csel(sf: bool, rd: u8, rn: u8, rm: u8, cond: u8) -> u32 {
-    (u32::from(sf) << 31)
+    ((u32::from(sf) << 31)
         | (0b0011010100 << 21)
         | ((rm as u32 & 0x1F) << 16)
-        | ((cond as u32 & 0xF) << 12)
-        | (0b00 << 10)
+        | ((cond as u32 & 0xF) << 12))
         | ((rn as u32 & 0x1F) << 5)
         | (rd as u32 & 0x1F)
 }
@@ -337,7 +331,7 @@ pub fn enc_ret(rn: u8) -> u32 {
 /// CBZ Xt, offset
 pub fn enc_cbz(sf: bool, rt: u8, offset_bytes: i32) -> u32 {
     let imm19 = ((offset_bytes >> 2) as u32) & 0x7_FFFF;
-    (u32::from(sf) << 31) | (0b011010 << 25) | (0 << 24) | (imm19 << 5) | (rt as u32 & 0x1F)
+    ((u32::from(sf) << 31) | (0b011010 << 25)) | (imm19 << 5) | (rt as u32 & 0x1F)
 }
 
 /// CBNZ Xt, offset
@@ -356,9 +350,7 @@ pub fn enc_tbz(rt: u8, bit: u8, offset_bytes: i32) -> u32 {
     let b5 = (bit >> 5) & 1;
     let b40 = bit & 0x1F;
     let imm14 = ((offset_bytes >> 2) as u32) & 0x3FFF;
-    ((b5 as u32) << 31)
-        | (0b011011 << 25)
-        | (0 << 24)
+    (((b5 as u32) << 31) | (0b011011 << 25))
         | ((b40 as u32) << 19)
         | (imm14 << 5)
         | (rt as u32 & 0x1F)
@@ -396,9 +388,7 @@ pub fn enc_ldr_imm32(rt: u8, rn: u8, byte_offset: u32) -> u32 {
 /// STR Xt, [Xn, #imm] (64-bit)
 pub fn enc_str_imm64(rt: u8, rn: u8, byte_offset: u32) -> u32 {
     let imm12 = byte_offset / 8;
-    (0b11 << 30)
-        | (0b111001 << 24)
-        | (0b00 << 22)
+    ((0b11 << 30) | (0b111001 << 24))
         | ((imm12 & 0xFFF) << 10)
         | ((rn as u32 & 0x1F) << 5)
         | (rt as u32 & 0x1F)
@@ -407,9 +397,7 @@ pub fn enc_str_imm64(rt: u8, rn: u8, byte_offset: u32) -> u32 {
 /// STR Wt, [Xn, #imm] (32-bit)
 pub fn enc_str_imm32(rt: u8, rn: u8, byte_offset: u32) -> u32 {
     let imm12 = byte_offset / 4;
-    (0b10 << 30)
-        | (0b111001 << 24)
-        | (0b00 << 22)
+    ((0b10 << 30) | (0b111001 << 24))
         | ((imm12 & 0xFFF) << 10)
         | ((rn as u32 & 0x1F) << 5)
         | (rt as u32 & 0x1F)
@@ -417,8 +405,7 @@ pub fn enc_str_imm32(rt: u8, rn: u8, byte_offset: u32) -> u32 {
 
 /// LDRB Wt, [Xn, #imm] (byte load)
 pub fn enc_ldrb_imm(rt: u8, rn: u8, byte_offset: u32) -> u32 {
-    (0b00 << 30)
-        | (0b111001 << 24)
+    (0b111001 << 24)
         | (0b01 << 22)
         | ((byte_offset & 0xFFF) << 10)
         | ((rn as u32 & 0x1F) << 5)
@@ -427,9 +414,7 @@ pub fn enc_ldrb_imm(rt: u8, rn: u8, byte_offset: u32) -> u32 {
 
 /// STRB Wt, [Xn, #imm] (byte store)
 pub fn enc_strb_imm(rt: u8, rn: u8, byte_offset: u32) -> u32 {
-    (0b00 << 30)
-        | (0b111001 << 24)
-        | (0b00 << 22)
+    (0b111001 << 24)
         | ((byte_offset & 0xFFF) << 10)
         | ((rn as u32 & 0x1F) << 5)
         | (rt as u32 & 0x1F)
@@ -449,9 +434,7 @@ pub fn enc_ldrh_imm(rt: u8, rn: u8, byte_offset: u32) -> u32 {
 /// STRH Wt, [Xn, #imm]
 pub fn enc_strh_imm(rt: u8, rn: u8, byte_offset: u32) -> u32 {
     let imm12 = byte_offset / 2;
-    (0b01 << 30)
-        | (0b111001 << 24)
-        | (0b00 << 22)
+    ((0b01 << 30) | (0b111001 << 24))
         | ((imm12 & 0xFFF) << 10)
         | ((rn as u32 & 0x1F) << 5)
         | (rt as u32 & 0x1F)
@@ -460,9 +443,7 @@ pub fn enc_strh_imm(rt: u8, rn: u8, byte_offset: u32) -> u32 {
 /// STP Xt1, Xt2, [Xn, #imm] (64-bit pair, signed offset, imm must be 8-aligned)
 pub fn enc_stp64(rt: u8, rt2: u8, rn: u8, byte_offset: i32) -> u32 {
     let imm7 = ((byte_offset / 8) as u32) & 0x7F;
-    (0b10 << 30)
-        | (0b101 << 27)
-        | (0b0 << 26)
+    ((0b10 << 30) | (0b101 << 27))
         | (0b010 << 23)
         | (imm7 << 15)
         | ((rt2 as u32 & 0x1F) << 10)
@@ -478,9 +459,7 @@ pub fn enc_ldp64(rt: u8, rt2: u8, rn: u8, byte_offset: i32) -> u32 {
 /// STP Wt1, Wt2, [Xn, #imm] (32-bit pair, imm must be 4-aligned)
 pub fn enc_stp32(rt: u8, rt2: u8, rn: u8, byte_offset: i32) -> u32 {
     let imm7 = ((byte_offset / 4) as u32) & 0x7F;
-    (0b00 << 30)
-        | (0b101 << 27)
-        | (0b0 << 26)
+    (0b101 << 27)
         | (0b010 << 23)
         | (imm7 << 15)
         | ((rt2 as u32 & 0x1F) << 10)
@@ -526,7 +505,6 @@ pub fn enc_ubfm(sf: bool, rd: u8, rn: u8, immr: u8, imms: u8) -> u32 {
 pub fn enc_sbfm(sf: bool, rd: u8, rn: u8, immr: u8, imms: u8) -> u32 {
     let n = u32::from(sf);
     (u32::from(sf) << 31)
-        | (0b00 << 29)
         | (0b100110 << 23)
         | (n << 22)
         | ((immr as u32 & 0x3F) << 16)
@@ -542,7 +520,7 @@ pub fn enc_fmov_reg(sf: bool, rd: u8, rn: u8) -> u32 {
     let ftype = if sf { 0b01u32 } else { 0b00 };
     (0b00011110 << 24)
         | (ftype << 22)
-        | (0b10000_00_10000 << 10)
+        | (0b1000_0001_0000 << 10)
         | ((rn as u32 & 0x1F) << 5)
         | (rd as u32 & 0x1F)
 }
@@ -616,7 +594,6 @@ pub fn enc_fcmp(sf: bool, rn: u8, rm: u8) -> u32 {
         | ((rm as u32 & 0x1F) << 16)
         | (0b001000 << 10)
         | ((rn as u32 & 0x1F) << 5)
-        | (0b00000)
 }
 
 /// FNEG Dd, Dn (opcode=000010)
@@ -624,7 +601,7 @@ pub fn enc_fneg(sf: bool, rd: u8, rn: u8) -> u32 {
     let ftype = if sf { 0b01u32 } else { 0b00 };
     (0b00011110 << 24)
         | (ftype << 22)
-        | (0b10000_10_10000 << 10)
+        | (0b1000_0101_0000 << 10)
         | ((rn as u32 & 0x1F) << 5)
         | (rd as u32 & 0x1F)
 }
@@ -634,7 +611,7 @@ pub fn enc_fabs(sf: bool, rd: u8, rn: u8) -> u32 {
     let ftype = if sf { 0b01u32 } else { 0b00 };
     (0b00011110 << 24)
         | (ftype << 22)
-        | (0b10000_01_10000 << 10)
+        | (0b1000_0011_0000 << 10)
         | ((rn as u32 & 0x1F) << 5)
         | (rd as u32 & 0x1F)
 }
@@ -642,11 +619,7 @@ pub fn enc_fabs(sf: bool, rd: u8, rn: u8) -> u32 {
 /// SCVTF Dd, Xn (signed int to double)  sf_fp=true→double, sf_int=true→64-bit int
 pub fn enc_scvtf(sf_fp: bool, sf_int: bool, rd: u8, rn: u8) -> u32 {
     let ftype = if sf_fp { 0b01u32 } else { 0b00 };
-    (u32::from(sf_int) << 31)
-        | (0b0011110 << 24)
-        | (ftype << 22)
-        | (0b100010 << 16)
-        | (0b000000 << 10)
+    ((u32::from(sf_int) << 31) | (0b0011110 << 24) | (ftype << 22) | (0b100010 << 16))
         | ((rn as u32 & 0x1F) << 5)
         | (rd as u32 & 0x1F)
 }
@@ -654,11 +627,7 @@ pub fn enc_scvtf(sf_fp: bool, sf_int: bool, rd: u8, rn: u8) -> u32 {
 /// FCVTZS Xd, Dn (double to signed int, round toward zero)
 pub fn enc_fcvtzs(sf_int: bool, sf_fp: bool, rd: u8, rn: u8) -> u32 {
     let ftype = if sf_fp { 0b01u32 } else { 0b00 };
-    (u32::from(sf_int) << 31)
-        | (0b0011110 << 24)
-        | (ftype << 22)
-        | (0b111000 << 16)
-        | (0b000000 << 10)
+    ((u32::from(sf_int) << 31) | (0b0011110 << 24) | (ftype << 22) | (0b111000 << 16))
         | ((rn as u32 & 0x1F) << 5)
         | (rd as u32 & 0x1F)
 }
@@ -689,9 +658,7 @@ pub fn enc_fp_ldr_imm64(rt: u8, rn: u8, byte_offset: u32) -> u32 {
 /// STR Dt, [Xn, #imm] (64-bit FP unsigned offset)
 pub fn enc_fp_str_imm64(rt: u8, rn: u8, byte_offset: u32) -> u32 {
     let imm12 = byte_offset / 8;
-    (0b11 << 30)
-        | (0b111101 << 24)
-        | (0b00 << 22)
+    ((0b11 << 30) | (0b111101 << 24))
         | ((imm12 & 0xFFF) << 10)
         | ((rn as u32 & 0x1F) << 5)
         | (rt as u32 & 0x1F)
@@ -711,9 +678,7 @@ pub fn enc_fp_ldr_imm32(rt: u8, rn: u8, byte_offset: u32) -> u32 {
 /// STR St, [Xn, #imm] (32-bit FP unsigned offset)
 pub fn enc_fp_str_imm32(rt: u8, rn: u8, byte_offset: u32) -> u32 {
     let imm12 = byte_offset / 4;
-    (0b10 << 30)
-        | (0b111101 << 24)
-        | (0b00 << 22)
+    ((0b10 << 30) | (0b111101 << 24))
         | ((imm12 & 0xFFF) << 10)
         | ((rn as u32 & 0x1F) << 5)
         | (rt as u32 & 0x1F)

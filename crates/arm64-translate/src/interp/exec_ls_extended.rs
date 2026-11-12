@@ -642,32 +642,26 @@ impl Interpreter {
                 let addr = self.cpu.read_reg(rn);
                 let src = self.cpu.read_reg_zr(rs);
                 let orig = match size {
-                    8 => {
-                        let orig = match Self::lse_atomic_op64(&self.mem, op, addr, src) {
-                            Some(v) => v,
-                            None => {
-                                return StepResult::Exit(ExitReason::MemoryFault {
-                                    pc,
-                                    addr,
-                                    is_write: true,
-                                })
-                            }
-                        };
-                        orig
-                    }
-                    4 => {
-                        let orig = match Self::lse_atomic_op32(&self.mem, op, addr, src as u32) {
-                            Some(v) => v as u64,
-                            None => {
-                                return StepResult::Exit(ExitReason::MemoryFault {
-                                    pc,
-                                    addr,
-                                    is_write: true,
-                                })
-                            }
-                        };
-                        orig
-                    }
+                    8 => match Self::lse_atomic_op64(&self.mem, op, addr, src) {
+                        Some(v) => v,
+                        None => {
+                            return StepResult::Exit(ExitReason::MemoryFault {
+                                pc,
+                                addr,
+                                is_write: true,
+                            })
+                        }
+                    },
+                    4 => match Self::lse_atomic_op32(&self.mem, op, addr, src as u32) {
+                        Some(v) => v as u64,
+                        None => {
+                            return StepResult::Exit(ExitReason::MemoryFault {
+                                pc,
+                                addr,
+                                is_write: true,
+                            })
+                        }
+                    },
                     2 => {
                         let orig = match self.mem.read_u16(addr) {
                             Some(v) => v as u64,
@@ -915,7 +909,6 @@ impl Interpreter {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::test_helpers::*;
 
     // ── Helper encoders for instructions without test_helpers ──────
@@ -1048,7 +1041,6 @@ mod tests {
         let expected_base = t.data_base + 16;
         let cpu = t.run_ok();
         assert_eq!(cpu.x[2], expected_base, "base register must be updated");
-        drop(cpu);
         assert_eq!(t.read_data_u64(16), 0xAAAA);
         assert_eq!(t.read_data_u64(24), 0xBBBB);
     }
@@ -1077,7 +1069,6 @@ mod tests {
         let expected_base = t.data_base + 16;
         let cpu = t.run_ok();
         assert_eq!(cpu.x[2], expected_base, "base updated AFTER store");
-        drop(cpu);
         assert_eq!(t.read_data_u64(0), 0x5555);
         assert_eq!(t.read_data_u64(8), 0x6666);
     }

@@ -45,3 +45,4 @@ fn make_metadata(name: &str, methods: Vec<(&str, u64)>) -> macho_objc::ObjcMetad
 mod class_tests;
 mod dynamic_and_load_tests;
 mod protocol_tests;
+mod superclass_repair_tests;

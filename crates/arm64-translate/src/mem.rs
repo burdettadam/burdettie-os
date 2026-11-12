@@ -491,7 +491,6 @@ unsafe impl Sync for Memory {}
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::test_helpers::*;
 
     #[test]

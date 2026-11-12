@@ -260,7 +260,6 @@ static EDITORS: Mutex<Option<HashMap<u64, EditorState>>> = Mutex::new(None);
 
 struct EditorState {
     editor: Editor<'static>,
-    font_size: f32,
     line_height: f32,
 }
 
@@ -291,7 +290,6 @@ pub fn editor_create(view_id: u64, text: &str, font_size: f64, max_width: f64) {
         });
         let state = EditorState {
             editor,
-            font_size: fs_val,
             line_height: lh,
         };
         ensure_editors();

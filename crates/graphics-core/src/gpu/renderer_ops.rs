@@ -4,7 +4,7 @@ use crate::color::Color;
 use crate::font::Font;
 use crate::geometry::{Point, Rect};
 use crate::renderer::Renderer;
-use crate::text_layout::AttributedLayout;
+use crate::text_layout::{layout_single_line, AttributedLayout};
 
 use super::atlas::GlyphEntry;
 use super::renderer::GpuRenderer;
@@ -54,31 +54,23 @@ impl Renderer for GpuRenderer {
         }
 
         let px_size = font.size as f32;
-        let mut cursor_x = origin.x as f32;
-        let cursor_y = origin.y as f32 + px_size; // Baseline
 
         // Phase 1: rasterize glyphs (borrows font_manager + atlas)
         let mut prepared: Vec<(GlyphEntry, f32, f32)> = Vec::new();
         {
             let fm = self.font_manager.as_ref().unwrap();
-            for ch in text.chars() {
-                if let Some(face) = fm.face_by_index(0) {
-                    let font_inner = face.inner();
-                    let glyph_id = ab_glyph::Font::glyph_id(font_inner, ch);
-                    let scaled = ab_glyph::Font::as_scaled(font_inner, px_size);
-                    let advance = ab_glyph::ScaleFont::h_advance(&scaled, glyph_id);
-
-                    if let Some(&entry) =
-                        self.atlas
-                            .rasterize_glyph(fm, glyph_id.0 as u32, px_size, 0)
-                    {
-                        prepared.push((
-                            entry,
-                            cursor_x + entry.offset_x,
-                            cursor_y + entry.offset_y,
-                        ));
-                    }
-                    cursor_x += advance;
+            let face = fm.resolve_font(font);
+            let layout = layout_single_line(text, face, font.size);
+            for glyph in &layout.glyphs {
+                if let Some(&entry) =
+                    self.atlas
+                        .rasterize_glyph(face, glyph.glyph_id.0 as u32, px_size)
+                {
+                    prepared.push((
+                        entry,
+                        origin.x as f32 + glyph.x as f32 + entry.offset_x,
+                        origin.y as f32 + glyph.y as f32 + entry.offset_y,
+                    ));
                 }
             }
         }
@@ -163,10 +155,8 @@ impl Renderer for GpuRenderer {
         }
         let mut ops: Vec<GlyphOp> = Vec::new();
         {
-            let fm = self.font_manager.as_ref().unwrap();
             for glyph in &layout.glyphs {
                 let color = glyph.color.unwrap_or(default_color);
-                let font_index = glyph.font_index;
                 let px_size = glyph.size as f32;
 
                 if glyph.missing {
@@ -184,10 +174,7 @@ impl Renderer for GpuRenderer {
                     continue;
                 }
 
-                if let Some(&entry) =
-                    self.atlas
-                        .rasterize_glyph(fm, glyph.glyph_id.0 as u32, px_size, font_index)
-                {
+                if let Some(&entry) = self.atlas.rasterize_layout_glyph(layout, glyph) {
                     ops.push(GlyphOp::Textured {
                         entry,
                         gx: origin.x as f32 + glyph.x as f32 + entry.offset_x,
@@ -198,7 +185,7 @@ impl Renderer for GpuRenderer {
             }
         }
 
-        // Phase 2: push quads (fm borrow dropped)
+        // Phase 2: push quads (atlas borrow dropped)
         for op in ops {
             match op {
                 GlyphOp::Textured {

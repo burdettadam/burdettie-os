@@ -24,7 +24,9 @@ use std::cell::UnsafeCell;
 
 /// A wrapper around a byte array that can be safely shared across threads.
 /// Interior mutation is synchronized via `std::sync::Once`.
-#[repr(transparent)]
+/// Guest code and runtime shims read this storage as an `objc_class_t`, whose
+/// pointer fields require eight-byte alignment on the supported 64-bit targets.
+#[repr(C, align(8))]
 pub(crate) struct SyncArray(pub(crate) UnsafeCell<[u8; 40]>);
 
 // SAFETY: Mutation is guarded by `std::sync::Once`; after init the data is read-only.
@@ -149,6 +151,39 @@ pub use methods::*;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn class_storage_has_pointer_alignment() {
+        assert_eq!(std::mem::size_of::<SyncArray>(), 40);
+        assert!(std::mem::align_of::<SyncArray>() >= std::mem::align_of::<u64>());
+
+        // Check both root and child storage: the initializer writes byte slices,
+        // but Objective-C dispatch and superclass repair perform pointer reads.
+        for addr in [
+            nsobject_class_addr(),
+            nsobject_metaclass_addr(),
+            nsstring_class_addr(),
+            nsstring_metaclass_addr(),
+            nsmutablestring_class_addr(),
+            nsmutablestring_metaclass_addr(),
+        ] {
+            assert_eq!(addr % 8, 0);
+        }
+    }
+
+    #[test]
+    fn child_class_pointers_preserve_the_hierarchy() {
+        let class_addr = nsmutablestring_class_addr();
+        let meta_addr = nsmutablestring_metaclass_addr();
+        // SAFETY: The class-pair initializers return live, aligned 40-byte
+        // records, and their Once guards have completed before these reads.
+        unsafe {
+            assert_eq!(*(class_addr as *const u64), meta_addr);
+            assert_eq!(*((class_addr + 8) as *const u64), nsstring_class_addr());
+            assert_eq!(*(meta_addr as *const u64), nsobject_metaclass_addr());
+            assert_eq!(*((meta_addr + 8) as *const u64), nsstring_metaclass_addr());
+        }
+    }
 
     #[test]
     fn nsobject_class_addr_nonzero() {
