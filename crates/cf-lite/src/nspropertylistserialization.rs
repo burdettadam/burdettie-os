@@ -382,9 +382,8 @@ pub extern "C" fn shim_plist_with_data(
 /// Parse a plist file at the given filesystem path and return a Foundation object.
 /// Returns 0 on failure (not found, not parseable).
 pub(crate) fn parse_plist_file(path: &str) -> u64 {
-    let bytes = match std::fs::read(path) {
-        Ok(b) => b,
-        Err(_) => return 0,
+    let Ok(bytes) = std::fs::read(path) else {
+        return 0;
     };
     parse_plist_bytes(&bytes)
 }
@@ -392,9 +391,8 @@ pub(crate) fn parse_plist_file(path: &str) -> u64 {
 /// Parse an XML plist embedded inside a non-plist file (for example a Mach-O
 /// `__TEXT,__info_plist` section stored in an executable).
 pub(crate) fn parse_embedded_plist_file(path: &str) -> u64 {
-    let bytes = match std::fs::read(path) {
-        Ok(b) => b,
-        Err(_) => return 0,
+    let Ok(bytes) = std::fs::read(path) else {
+        return 0;
     };
     let Some(xml_bytes) = extract_xml_plist(&bytes) else {
         return 0;

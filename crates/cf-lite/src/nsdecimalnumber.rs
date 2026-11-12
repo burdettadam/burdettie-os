@@ -199,7 +199,7 @@ pub extern "C" fn shim_nsdecimalnumber_description(obj: u64, _cmd: u64) -> u64 {
 
 /// `-[NSDecimalNumber objCType]` — returns "d" (double).
 pub extern "C" fn shim_nsdecimalnumber_objc_type(_obj: u64, _cmd: u64) -> u64 {
-    b"d\0".as_ptr() as u64
+    c"d".as_ptr() as u64
 }
 
 /// `-[NSDecimalNumber isEqual:]` — uses NSNumber comparison path.

@@ -134,9 +134,8 @@ pub extern "C" fn shim_nsdata_write_to_file_atomically(
     if obj == 0 || path_obj == 0 {
         return 0;
     }
-    let path_str = match crate::cfstring::extract_cfstring_cstr(path_obj) {
-        Some(s) => s,
-        None => return 0,
+    let Some(path_str) = crate::cfstring::extract_cfstring_cstr(path_obj) else {
+        return 0;
     };
 
     let length = unsafe { *((obj as usize + NSDATA_LENGTH_OFF) as *const u64) } as usize;
@@ -207,7 +206,7 @@ pub extern "C" fn shim_nsdata_is_equal_to_data(obj: u64, _cmd: u64, other: u64) 
 const B64_ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 fn base64_encode(input: &[u8]) -> String {
-    let mut out = String::with_capacity((input.len() + 2) / 3 * 4);
+    let mut out = String::with_capacity(input.len().div_ceil(3) * 4);
     for chunk in input.chunks(3) {
         let b0 = chunk[0] as u32;
         let b1 = if chunk.len() > 1 { chunk[1] as u32 } else { 0 };
@@ -249,7 +248,7 @@ fn base64_decode(input: &str) -> Option<Vec<u8>> {
     if clean.is_empty() {
         return Some(Vec::new());
     }
-    if clean.len() % 4 != 0 {
+    if !clean.len().is_multiple_of(4) {
         return None;
     }
     let mut out = Vec::with_capacity(clean.len() / 4 * 3);
@@ -321,13 +320,11 @@ pub extern "C" fn shim_nsdata_init_with_base64_encoded_string(
     if string == 0 {
         return 0;
     }
-    let text = match crate::cfstring::extract_cfstring_cstr(string) {
-        Some(s) => s,
-        None => return 0,
+    let Some(text) = crate::cfstring::extract_cfstring_cstr(string) else {
+        return 0;
     };
-    let decoded = match base64_decode(text) {
-        Some(d) => d,
-        None => return 0,
+    let Some(decoded) = base64_decode(text) else {
+        return 0;
     };
     let len = decoded.len();
     if len > 0 {
@@ -428,9 +425,8 @@ pub extern "C" fn shim_nsdata_data_with_contents_of_file(
     if path_obj == 0 {
         return 0;
     }
-    let path_str = match crate::cfstring::extract_cfstring_cstr(path_obj) {
-        Some(s) => s,
-        None => return 0,
+    let Some(path_str) = crate::cfstring::extract_cfstring_cstr(path_obj) else {
+        return 0;
     };
     match std::fs::read(path_str) {
         Ok(bytes) => make_nsdata(&bytes),
@@ -452,9 +448,8 @@ pub extern "C" fn shim_nsdata_write_to_file_options_error(
     if obj == 0 || path_obj == 0 {
         return 0;
     }
-    let path_str = match crate::cfstring::extract_cfstring_cstr(path_obj) {
-        Some(s) => s,
-        None => return 0,
+    let Some(path_str) = crate::cfstring::extract_cfstring_cstr(path_obj) else {
+        return 0;
     };
     let data = nsdata_bytes_slice(obj);
     match std::fs::write(path_str, data) {
@@ -485,9 +480,8 @@ pub extern "C" fn shim_nsdata_write_to_url_atomically(
     if path_nsstring == 0 {
         return 0;
     }
-    let path_str = match crate::cfstring::extract_cfstring_cstr(path_nsstring) {
-        Some(s) => s,
-        None => return 0,
+    let Some(path_str) = crate::cfstring::extract_cfstring_cstr(path_nsstring) else {
+        return 0;
     };
     let data = nsdata_bytes_slice(obj);
     match std::fs::write(path_str, data) {
@@ -749,7 +743,7 @@ mod tests {
     fn get_bytes_length() {
         let data = make_nsdata(b"ABCDE");
         let buf = alloc_u64_buf(2); // 16 bytes
-        shim_nsdata_get_bytes_length(data, 0, buf as u64, 3);
+        shim_nsdata_get_bytes_length(data, 0, buf, 3);
         let slice = unsafe { std::slice::from_raw_parts(buf as *const u8, 3) };
         assert_eq!(slice, b"ABC");
         free_buf(buf);
@@ -760,7 +754,7 @@ mod tests {
     fn get_bytes_length_clamps() {
         let data = make_nsdata(b"AB");
         let buf = alloc_u64_buf(2);
-        shim_nsdata_get_bytes_length(data, 0, buf as u64, 100);
+        shim_nsdata_get_bytes_length(data, 0, buf, 100);
         let slice = unsafe { std::slice::from_raw_parts(buf as *const u8, 2) };
         assert_eq!(slice, b"AB");
         free_buf(buf);
@@ -778,7 +772,7 @@ mod tests {
     fn get_bytes_range() {
         let data = make_nsdata(b"Hello, World!");
         let buf = alloc_u64_buf(2);
-        shim_nsdata_get_bytes_range(data, 0, buf as u64, 7, 5);
+        shim_nsdata_get_bytes_range(data, 0, buf, 7, 5);
         let slice = unsafe { std::slice::from_raw_parts(buf as *const u8, 5) };
         assert_eq!(slice, b"World");
         free_buf(buf);

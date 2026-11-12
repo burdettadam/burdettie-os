@@ -125,7 +125,7 @@ pub extern "C" fn shim_nsurlcomponents_with_string(_cls: u64, _cmd: u64, url_str
         return obj;
     }
     if let Some(s) = cfstring::extract_cfstring_cstr(url_string) {
-        parse_url(&s, obj);
+        parse_url(s, obj);
     }
     obj
 }
@@ -191,11 +191,11 @@ pub extern "C" fn shim_nsurlcomponents_url(obj: u64, _cmd: u64) -> u64 {
     let mut result = String::new();
 
     if let Some(scheme) = cfstring::extract_cfstring_cstr(get_str_field(obj, SCHEME_OFF)) {
-        result.push_str(&scheme);
+        result.push_str(scheme);
         result.push_str("://");
     }
     if let Some(host) = cfstring::extract_cfstring_cstr(get_str_field(obj, HOST_OFF)) {
-        result.push_str(&host);
+        result.push_str(host);
     }
     let port_ptr = get_str_field(obj, PORT_OFF);
     if port_ptr != 0 {
@@ -203,15 +203,15 @@ pub extern "C" fn shim_nsurlcomponents_url(obj: u64, _cmd: u64) -> u64 {
         result.push_str(&format!(":{port}"));
     }
     if let Some(path) = cfstring::extract_cfstring_cstr(get_str_field(obj, PATH_OFF)) {
-        result.push_str(&path);
+        result.push_str(path);
     }
     if let Some(query) = cfstring::extract_cfstring_cstr(get_str_field(obj, QUERY_OFF)) {
         result.push('?');
-        result.push_str(&query);
+        result.push_str(query);
     }
     if let Some(frag) = cfstring::extract_cfstring_cstr(get_str_field(obj, FRAGMENT_OFF)) {
         result.push('#');
-        result.push_str(&frag);
+        result.push_str(frag);
     }
 
     let ns = make_nsstring(&result);
@@ -252,7 +252,7 @@ pub extern "C" fn shim_nsurlcomponents_query_items(obj: u64, _cmd: u64) -> u64 {
         } else {
             (pair, None)
         };
-        let item = alloc_query_item(make_nsstring(name), value.map_or(0, |v| make_nsstring(v)));
+        let item = alloc_query_item(make_nsstring(name), value.map_or(0, make_nsstring));
         items.push(item);
     }
     crate::nsarray::make_nsarray(&items)

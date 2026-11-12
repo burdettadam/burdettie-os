@@ -381,11 +381,11 @@ mod tests {
     #[test]
     fn string_from_number_style_none_double() {
         let fmt = make_formatter();
-        let num = crate::nsnumber::make_nsnumber_double(3.14);
+        let num = crate::nsnumber::make_nsnumber_double(9.87);
         let result = shim_nsnumberformatter_string_from_number(fmt, 0, num);
         assert_ne!(result, 0);
         let s = read_string(result);
-        assert!(s.starts_with("3.14"), "got: {s}");
+        assert!(s.starts_with("9.87"), "got: {s}");
         free_obj(result);
         free_obj(num);
         free_obj(fmt);
@@ -529,12 +529,12 @@ mod tests {
     #[test]
     fn number_from_string_double() {
         let fmt = make_formatter();
-        let s = make_string("3.14");
+        let s = make_string("9.87");
         let num = shim_nsnumberformatter_number_from_string(fmt, 0, s);
         assert_ne!(num, 0);
         assert_eq!(read_field(num, 8), TAG_DOUBLE);
         let val = f64::from_bits(read_field(num, 16));
-        assert!((val - 3.14).abs() < 1e-10);
+        assert!((val - 9.87).abs() < 1e-10);
         free_obj(num);
         free_obj(s);
         free_obj(fmt);
@@ -727,8 +727,8 @@ mod tests {
 
     #[test]
     fn format_number_none_style_fractional() {
-        let s = format_number(3.14, STYLE_NONE, 0, 6);
-        assert!(s.starts_with("3.14"), "got: {s}");
+        let s = format_number(9.87, STYLE_NONE, 0, 6);
+        assert!(s.starts_with("9.87"), "got: {s}");
     }
 
     #[test]
@@ -770,8 +770,8 @@ mod tests {
 
     #[test]
     fn read_nsnumber_f64_double() {
-        let num = crate::nsnumber::make_nsnumber_double(2.718);
-        assert!((read_nsnumber_f64(num) - 2.718).abs() < 1e-10);
+        let num = crate::nsnumber::make_nsnumber_double(8.765);
+        assert!((read_nsnumber_f64(num) - 8.765).abs() < 1e-10);
         free_obj(num);
     }
 

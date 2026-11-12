@@ -400,11 +400,11 @@ mod tests {
 
     #[test]
     fn scan_double_basic() {
-        let sc = make_scanner("3.14");
+        let sc = make_scanner("9.87");
         let mut val: f64 = 0.0;
         let ok = shim_nsscanner_scan_double(sc, 0, &raw mut val as u64);
         assert_eq!(ok, 1);
-        assert!((val - 3.14).abs() < 1e-9, "expected 3.14, got {val}");
+        assert!((val - 9.87).abs() < 1e-9, "expected 9.87, got {val}");
         free_obj(sc);
     }
 

@@ -164,7 +164,7 @@ pub extern "C" fn shim_iso8601_date_from_string(_obj: u64, _cmd: u64, string: u6
     let Some(s) = cfstring::extract_cfstring_cstr(string) else {
         return 0;
     };
-    parse_iso8601(&s)
+    parse_iso8601(s)
 }
 
 /// `-[NSISO8601DateFormatter setFormatOptions:]`
