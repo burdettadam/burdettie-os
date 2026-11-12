@@ -78,7 +78,7 @@ input requirements visible so a reviewer can reproduce the same scope.
 ## Outstanding validation gates
 
 Source cleanup and a working quick start do not establish a fully passing CI
-baseline. Two broader gates remain open:
+baseline. Three broader gates remain open:
 
 - **Font dependency maintenance.** `cargo deny check advisories` reports
   [RUSTSEC-2026-0192](https://rustsec.org/advisories/RUSTSEC-2026-0192.html) for
@@ -90,6 +90,12 @@ baseline. Two broader gates remain open:
   existing `arm64-translate` Clippy warnings. These checks need to pass before
   claiming a clean strict-lint baseline; a successful image build does not mean
   its later test steps ran.
+- **Linux ARM64 interpreter execution.** The native image and interpreter test
+  binary compile successfully, but the first of 40 discovered tests,
+  `interp_cf_bridging`, aborts on a misaligned pointer dereference in
+  `repair_superclass_addrs`. No completed suite summary is produced, and the
+  remaining 39 cases are not reached. This runtime path needs repair and further
+  validation before claiming a passing interpreter suite.
 
 Use the [CI workflow](../.github/workflows/ci.yml), [dependency policy](../deny.toml),
 and recorded job results to distinguish successful demonstrations from the
