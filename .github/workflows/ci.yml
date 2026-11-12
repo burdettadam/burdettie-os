@@ -52,6 +52,61 @@ jobs:
           path: ${{ runner.temp }}/native-fixtures.tar.gz
           retention-days: 1
 
+  quickstart:
+    name: README quickstart (macOS ARM64)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify native ARM64 host
+        run: test "$(uname -m)" = arm64
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build workspace as documented
+        run: cargo build --workspace --locked
+
+      - name: Compile the quickstart fixture
+        run: cc -o fixtures/simple_cli/app fixtures/simple_cli/main.c
+
+      - name: Inspect the fixture
+        run: cargo run --locked -p macho-inspect -- fixtures/simple_cli/app
+
+      - name: Verify JSON inspection
+        run: |
+          cargo run --locked -p macho-inspect -- --json fixtures/simple_cli/app > "${RUNNER_TEMP}/simple-cli.json"
+          python3 - <<'PYJSON'
+          import json
+          import os
+          from pathlib import Path
+
+          report = json.loads((Path(os.environ["RUNNER_TEMP"]) / "simple-cli.json").read_text())
+          assert report["header"]["cpu_type"] == "Arm64", report["header"]
+          assert report["entry"] is not None, "The fixture must have an entry point"
+          print("Verified ARM64 Mach-O inspection JSON")
+          PYJSON
+
+      - name: Execute the fixture through the runtime
+        run: |
+          set -euo pipefail
+          cargo run --locked -p macho-inspect -- --exec fixtures/simple_cli/app | tee "${RUNNER_TEMP}/simple-cli-exec.txt"
+          python3 - <<'PYEXEC'
+          import os
+          from pathlib import Path
+
+          output = (Path(os.environ["RUNNER_TEMP"]) / "simple-cli-exec.txt").read_text()
+          lines = {line.strip() for line in output.splitlines()}
+          assert "hello" in lines, "Missing output from the guest C program"
+          assert "Entry returned with exit code 0" in lines, "The guest did not return successfully"
+          print("Verified guest output and successful return")
+          PYEXEC
+
   check:
     name: Build & Test
     needs: fixtures

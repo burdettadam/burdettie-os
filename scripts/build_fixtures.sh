@@ -37,6 +37,10 @@ for source in "$FIXTURES"/*/main.c "$FIXTURES"/*/main.m; do
         dispatch_test|process_info)
             output="$dir/$name"
             ;;
+        xcodebuild_simple_cli)
+            # Match the checked-in Xcode project's Debug configuration.
+            flags+=(-DHELLO_VALUE=41)
+            ;;
         objc_minimal)
             output="$dir/objc_minimal"
             flags+=("${OBJC[@]}" -lobjc)
@@ -47,8 +51,11 @@ for source in "$FIXTURES"/*/main.c "$FIXTURES"/*/main.m; do
         block_basics)
             flags+=("${OBJC[@]}")
             ;;
-        appkit_bootstrap|cocoa_controls|cocoa_draw|cocoa_window)
+        appkit_bootstrap|cocoa_window)
             flags+=("${OBJC[@]}" -framework Foundation -framework AppKit)
+            ;;
+        cocoa_controls|cocoa_draw)
+            flags+=("${OBJC[@]}" -framework Foundation -framework AppKit -framework CoreGraphics)
             ;;
         *)
             if [[ "$source" == *.m ]]; then

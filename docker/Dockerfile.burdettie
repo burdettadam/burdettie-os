@@ -97,6 +97,7 @@ ARG TARGETARCH
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libstdc++6 \
+    libatomic1 \
     file \
     libbz2-1.0 \
     zlib1g \
@@ -147,6 +148,7 @@ RUN echo "burdettie-os 1.0" > /etc/burdettie-release
 # Preserve notices for the project and the fonts embedded in Rust binaries.
 COPY LICENSE-MIT LICENSE-APACHE /usr/share/doc/burdettie-os/
 COPY crates/graphics-core/fonts/LICENSE-DejaVu.txt /usr/share/doc/burdettie-os/LICENSE-DejaVu.txt
+COPY licenses/LICENSE-CDLA-Permissive-2.0.txt /usr/share/doc/burdettie-os/LICENSE-CDLA-Permissive-2.0.txt
 
 # Provide SystemVersion.plist so sw_vers and other tools can read macOS version info
 RUN mkdir -p /System/Library/CoreServices && \

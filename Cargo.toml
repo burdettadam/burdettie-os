@@ -150,7 +150,7 @@ lzfse_rust = "0.2"
 tiny_http = "0.12"
 accesskit = "0.17.1"
 accesskit_winit = { version = "0.23.1", default-features = false, features = ["rwh_06"] }
-serde_yaml = "0.9"
+serde-saphyr = { version = "2.1", default-features = false, features = ["deserialize"] }
 open = "5.3.5"
 car = { package = "car-parser", version = "0.0.1", features = ["image"] }
 

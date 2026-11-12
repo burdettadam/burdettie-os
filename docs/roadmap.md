@@ -5,6 +5,33 @@
 
 ---
 
+## Publication Readiness: Font Dependency Maintenance
+
+**Checked 2026-11-12.** Dependency updates and the YAML parser migration have
+removed the reported vulnerability findings from `cargo audit`. The full
+dependency policy gate still fails: `cargo deny check` rejects the unmaintained
+`ttf-parser` dependency under
+[RUSTSEC-2026-0192](https://rustsec.org/advisories/RUSTSEC-2026-0192.html).
+The advisory has no patched version and recommends the maintained `skrifa`
+parser. The advisory is not suppressed; CI should remain blocked on this policy
+until the affected font dependencies are replaced.
+
+The dependency reaches rendering through both `ab_glyph` / `owned_ttf_parser`
+and the `cosmic-text` / `fontdb` stack. Replacing it requires a focused rendering
+migration, beyond dependency version updates. The existing font APIs supply
+glyph metrics, outlines, and rasterization to the CPU renderer and GPU atlas.
+
+- [ ] Select maintained font parsing and rasterization dependencies, evaluating
+  `skrifa` and the Fontations ecosystem.
+- [ ] Migrate both dependency paths without suppressing the advisory or vendoring
+  an unchanged abandoned parser.
+- [ ] Verify glyph metrics, shaping, text layout, and CPU/GPU rendering against
+  the bundled fonts and representative Unicode text.
+- [ ] Pass `cargo audit` and the complete `cargo deny check` policy gate, then
+  update the documented CI status.
+
+---
+
 ## Vision
 
 A full Rust implementation of the macOS userspace runtime — Mach-O loader, ObjC

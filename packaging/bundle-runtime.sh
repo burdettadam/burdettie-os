@@ -17,7 +17,8 @@
 #   ├── licenses/
 #   │   ├── LICENSE-MIT
 #   │   ├── LICENSE-APACHE
-#   │   └── LICENSE-DejaVu.txt
+#   │   ├── LICENSE-DejaVu.txt
+#   │   └── LICENSE-CDLA-Permissive-2.0.txt
 #   └── docs/
 #       ├── README.md
 #       ├── architecture.md
@@ -57,6 +58,7 @@ LICENSE_SOURCES=(
     "$ROOT/LICENSE-MIT"
     "$ROOT/LICENSE-APACHE"
     "$ROOT/crates/graphics-core/fonts/LICENSE-DejaVu.txt"
+    "$ROOT/licenses/LICENSE-CDLA-Permissive-2.0.txt"
 )
 for license_source in "${LICENSE_SOURCES[@]}"; do
     if [ ! -f "$license_source" ]; then
@@ -144,9 +146,9 @@ for doc in "$ROOT/docs"/*.md "$ROOT/README.md"; do
 done
 echo "  ✓ docs/ ($doc_count files)"
 
-# ── Copy project and embedded-font license notices ─────────────────
+# ── Copy project, embedded-font, and CA-data license notices ────────
 cp "${LICENSE_SOURCES[@]}" "$OUTPUT_DIR/licenses/"
-echo "  ✓ licenses/ (project and DejaVu notices)"
+echo "  ✓ licenses/ (project, DejaVu, and CA-data notices)"
 
 # ── Copy demos.json and banner.txt ─────────────────────────────────
 mkdir -p "$OUTPUT_DIR/config"

@@ -17,6 +17,18 @@ observed/
 dist/
 *.dmg
 burdettie-os.tar.gz
+*.o
+*.a
+*.so
+*.so.*
+*.dylib
+*.app/
+*.framework/
+*.xcarchive/
+
+# SDK and shared-cache imports used in local compatibility experiments
+*.sdk/
+dyld_shared_cache_*
 
 # Extracted Mach-O tools for Docker testing
 docker/xcode-tools/*

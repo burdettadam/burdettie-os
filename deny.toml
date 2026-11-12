@@ -24,6 +24,8 @@ allow = [
     "BSD-2-Clause",
     "BSD-3-Clause",
     "ISC",
+    # Mozilla CA data embedded by webpki-roots; full notice is in licenses/.
+    "CDLA-Permissive-2.0",
     "MPL-2.0",
     "Zlib",
     "Unicode-3.0",

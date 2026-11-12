@@ -13,5 +13,5 @@ pub enum MemoryIndexError {
     #[error("sqlite error: {0}")]
     Sql(#[from] rusqlite::Error),
     #[error("yaml error: {0}")]
-    Yaml(#[from] serde_yaml::Error),
+    Yaml(#[from] serde_saphyr::Error),
 }

@@ -14,6 +14,7 @@
 #   include/darwin_runtime.h
 #   bin/{runtime-shell,macho-inspect,hello-darwin,control-gallery,foundation-explorer}
 #   share/doc/darwin-runtime/{LICENSE-MIT,LICENSE-APACHE,LICENSE-DejaVu.txt}
+#   share/doc/darwin-runtime/LICENSE-CDLA-Permissive-2.0.txt
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -53,6 +54,7 @@ LICENSE_SOURCES=(
     "$ROOT/LICENSE-MIT"
     "$ROOT/LICENSE-APACHE"
     "$ROOT/crates/graphics-core/fonts/LICENSE-DejaVu.txt"
+    "$ROOT/licenses/LICENSE-CDLA-Permissive-2.0.txt"
 )
 
 BINARIES=(runtime-shell macho-inspect hello-darwin control-gallery foundation-explorer)
@@ -69,7 +71,8 @@ if $UNINSTALL; then
     removed=0
     for f in "$DYLIB_DST" "$HEADER_DST" "$PC_DST" \
              "$LICENSE_DIR/LICENSE-MIT" "$LICENSE_DIR/LICENSE-APACHE" \
-             "$LICENSE_DIR/LICENSE-DejaVu.txt"; do
+             "$LICENSE_DIR/LICENSE-DejaVu.txt" \
+             "$LICENSE_DIR/LICENSE-CDLA-Permissive-2.0.txt"; do
         if [ -f "$f" ]; then
             if $DRY_RUN; then echo "  would remove: $f"
             else rm -f "$f"; echo "  ✓ removed $f"; fi
@@ -92,9 +95,9 @@ fi
 if [ ! -f "$DYLIB_SRC" ]; then
     echo "▶ Building darwin-runtime-ffi ($BUILD_PROFILE)..."
     if [ "$BUILD_PROFILE" = "release" ]; then
-        (cd "$ROOT" && cargo build -p darwin-runtime-ffi --release)
+        (cd "$ROOT" && cargo build --locked -p darwin-runtime-ffi --release)
     else
-        (cd "$ROOT" && cargo build -p darwin-runtime-ffi)
+        (cd "$ROOT" && cargo build --locked -p darwin-runtime-ffi)
     fi
 fi
 
@@ -141,7 +144,7 @@ for bin_name in "${BINARIES[@]}"; do
     fi
 done
 
-# Project and embedded-font license notices
+# Project, embedded-font, and CA-data license notices
 for license_source in "${LICENSE_SOURCES[@]}"; do
     install_file "$license_source" "$LICENSE_DIR/$(basename "$license_source")"
 done
