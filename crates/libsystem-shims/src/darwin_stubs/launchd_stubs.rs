@@ -767,6 +767,10 @@ pub unsafe extern "C" fn shim_vproc_swap_string(
 /// The caller must satisfy [`launchd::vproc::_vproc_get_last_exit_status`]
 /// for all pointers and ownership transfers. Integer handles represent the
 /// same pointers and must satisfy those validity and aliasing requirements.
+#[allow(
+    non_snake_case,
+    reason = "The shim name preserves the guest symbol leading underscore."
+)]
 pub unsafe extern "C" fn shim__vproc_get_last_exit_status(
     wstatus: *mut i32,
 ) -> *const libc::c_void {
@@ -774,6 +778,10 @@ pub unsafe extern "C" fn shim__vproc_get_last_exit_status(
     unsafe { launchd::vproc::_vproc_get_last_exit_status(wstatus) }
 }
 
+#[allow(
+    non_snake_case,
+    reason = "The shim name preserves the guest symbol leading underscore."
+)]
 pub extern "C" fn shim__vproc_set_global_on_demand(val: bool) -> *const libc::c_void {
     launchd::vproc::_vproc_set_global_on_demand(val)
 }
@@ -784,6 +792,10 @@ pub extern "C" fn shim__vproc_set_global_on_demand(val: bool) -> *const libc::c_
 /// The caller must satisfy [`launchd::vproc::_vproc_send_signal_by_label`]
 /// for all pointers and ownership transfers. Integer handles represent the
 /// same pointers and must satisfy those validity and aliasing requirements.
+#[allow(
+    non_snake_case,
+    reason = "The shim name preserves the guest symbol leading underscore."
+)]
 pub unsafe extern "C" fn shim__vproc_send_signal_by_label(
     label: *const libc::c_char,
     sig: i32,
@@ -792,42 +804,82 @@ pub unsafe extern "C" fn shim__vproc_send_signal_by_label(
     unsafe { launchd::vproc::_vproc_send_signal_by_label(label, sig) }
 }
 
+#[allow(
+    non_snake_case,
+    reason = "The shim name preserves the guest symbol leading underscore."
+)]
 pub extern "C" fn shim__vproc_transaction_begin() {
     launchd::vproc::_vproc_transaction_begin();
 }
 
+#[allow(
+    non_snake_case,
+    reason = "The shim name preserves the guest symbol leading underscore."
+)]
 pub extern "C" fn shim__vproc_transaction_end() {
     launchd::vproc::_vproc_transaction_end();
 }
 
+#[allow(
+    non_snake_case,
+    reason = "The shim name preserves the guest symbol leading underscore."
+)]
 pub extern "C" fn shim__vproc_transaction_count() -> usize {
     launchd::vproc::_vproc_transaction_count()
 }
 
+#[allow(
+    non_snake_case,
+    reason = "The shim name preserves the guest symbol leading underscore."
+)]
 pub extern "C" fn shim__vproc_transactions_enable() {
     launchd::vproc::_vproc_transactions_enable();
 }
 
+#[allow(
+    non_snake_case,
+    reason = "The shim name preserves the guest symbol leading underscore."
+)]
 pub extern "C" fn shim__vproc_standby_begin() {
     launchd::vproc::_vproc_standby_begin();
 }
 
+#[allow(
+    non_snake_case,
+    reason = "The shim name preserves the guest symbol leading underscore."
+)]
 pub extern "C" fn shim__vproc_standby_end() {
     launchd::vproc::_vproc_standby_end();
 }
 
+#[allow(
+    non_snake_case,
+    reason = "The shim name preserves the guest symbol leading underscore."
+)]
 pub extern "C" fn shim__vproc_standby_count() -> usize {
     launchd::vproc::_vproc_standby_count()
 }
 
+#[allow(
+    non_snake_case,
+    reason = "The shim name preserves the guest symbol leading underscore."
+)]
 pub extern "C" fn shim__vproc_standby_timeout() -> usize {
     launchd::vproc::_vproc_standby_timeout()
 }
 
+#[allow(
+    non_snake_case,
+    reason = "The shim name preserves the guest symbol leading underscore."
+)]
 pub extern "C" fn shim__vproc_pid_is_managed(pid: i32) -> bool {
     launchd::vproc::_vproc_pid_is_managed(pid)
 }
 
+#[allow(
+    non_snake_case,
+    reason = "The shim name preserves the guest symbol leading underscore."
+)]
 pub extern "C" fn shim__vproc_transaction_try_exit(status: i32) {
     launchd::vproc::_vproc_transaction_try_exit(status);
 }

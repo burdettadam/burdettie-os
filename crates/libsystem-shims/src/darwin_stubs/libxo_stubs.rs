@@ -38,7 +38,7 @@ extern "C" fn shim_xo_create_to_file(
 ) -> *mut libc::c_void {
     let fp = if fp.is_null() {
         // Default: stdout
-        unsafe { libc::fdopen(1, b"w\0".as_ptr() as *const libc::c_char) }
+        unsafe { libc::fdopen(1, c"w".as_ptr()) }
     } else {
         fp as *mut libc::FILE
     };
@@ -187,7 +187,7 @@ extern "C" fn shim_xo_err(eval: libc::c_int, fmt: *const libc::c_char) {
     if !fmt.is_null() {
         unsafe {
             libc::fprintf(get_stderr(), fmt);
-            libc::fprintf(get_stderr(), b"\n\0".as_ptr() as *const libc::c_char);
+            libc::fprintf(get_stderr(), c"\n".as_ptr());
         }
     }
     unsafe {
@@ -201,7 +201,7 @@ extern "C" fn shim_xo_errx(eval: libc::c_int, fmt: *const libc::c_char) {
     if !fmt.is_null() {
         unsafe {
             libc::fprintf(get_stderr(), fmt);
-            libc::fprintf(get_stderr(), b"\n\0".as_ptr() as *const libc::c_char);
+            libc::fprintf(get_stderr(), c"\n".as_ptr());
         }
     }
     unsafe {
@@ -225,7 +225,7 @@ extern "C" fn shim_xo_warn(fmt: *const libc::c_char) {
     if !fmt.is_null() {
         unsafe {
             libc::fprintf(get_stderr(), fmt);
-            libc::fprintf(get_stderr(), b"\n\0".as_ptr() as *const libc::c_char);
+            libc::fprintf(get_stderr(), c"\n".as_ptr());
         }
     }
 }
@@ -236,7 +236,7 @@ extern "C" fn shim_xo_warnx(fmt: *const libc::c_char) {
     if !fmt.is_null() {
         unsafe {
             libc::fprintf(get_stderr(), fmt);
-            libc::fprintf(get_stderr(), b"\n\0".as_ptr() as *const libc::c_char);
+            libc::fprintf(get_stderr(), c"\n".as_ptr());
         }
     }
 }
@@ -429,6 +429,9 @@ pub struct LibxoStubs;
 
 impl LibxoStubs {
     pub fn install(table: &mut ShimTable) {
+        #[cfg(target_os = "macos")]
+        let _ = table;
+
         #[cfg(not(target_os = "macos"))]
         {
             crate::register_shims!(

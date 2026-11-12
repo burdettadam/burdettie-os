@@ -537,7 +537,7 @@ mod tests {
 
     #[test]
     fn test_getpwnam_root() {
-        let name = b"root\0".as_ptr() as u64;
+        let name = c"root".as_ptr() as u64;
         let result = shim_getpwnam(name);
         assert_ne!(result, 0, "getpwnam(\"root\") should return non-null");
     }
@@ -640,7 +640,7 @@ mod tests {
 
     #[test]
     fn test_getgrouplist_root() {
-        let name = b"root\0".as_ptr() as u64;
+        let name = c"root".as_ptr() as u64;
         let mut groups = [0u32; 64];
         let mut ngroups: i32 = 64;
         let rc = shim_getgrouplist(

@@ -75,9 +75,9 @@ pub fn route_to_handler(name: &str, request: u64) -> u64 {
 pub fn create(name_ptr: u64, flags: u64) -> u64 {
     let pipe = xpc_objects::create_dictionary_empty();
     if name_ptr != 0 {
-        xpc_objects::dict_set_string(pipe, b"_pipe_name\0".as_ptr() as u64, name_ptr);
+        xpc_objects::dict_set_string(pipe, c"_pipe_name".as_ptr() as u64, name_ptr);
     }
-    xpc_objects::dict_set_uint64(pipe, b"_pipe_flags\0".as_ptr() as u64, flags);
+    xpc_objects::dict_set_uint64(pipe, c"_pipe_flags".as_ptr() as u64, flags);
     log::debug!("xpc_pipe: created pipe handle {:#x}", pipe);
     pipe
 }
@@ -89,7 +89,7 @@ pub fn create(name_ptr: u64, flags: u64) -> u64 {
 /// `reply_out`.  Otherwise returns EPIPE.
 pub fn routine(pipe: u64, request: u64, reply_out: u64) -> i32 {
     // Extract the pipe name from the pipe dict
-    let name_ptr = xpc_objects::dict_get_string(pipe, b"_pipe_name\0".as_ptr() as u64);
+    let name_ptr = xpc_objects::dict_get_string(pipe, c"_pipe_name".as_ptr() as u64);
     if name_ptr == 0 {
         log::debug!("xpc_pipe: routine on pipe with no name → EPIPE");
         return EPIPE;
@@ -149,11 +149,11 @@ pub fn routine(pipe: u64, request: u64, reply_out: u64) -> i32 {
 fn launchd_stub_handler(request: u64) -> u64 {
     let _ = request;
     let reply = xpc_objects::create_dictionary_empty();
-    xpc_objects::dict_set_int64(reply, b"error\0".as_ptr() as u64, EPIPE as i64);
+    xpc_objects::dict_set_int64(reply, c"error".as_ptr() as u64, EPIPE as i64);
     xpc_objects::dict_set_string(
         reply,
-        b"error-string\0".as_ptr() as u64,
-        b"launchd not available in emulation\0".as_ptr() as u64,
+        c"error-string".as_ptr() as u64,
+        c"launchd not available in emulation".as_ptr() as u64,
     );
     reply
 }
@@ -168,8 +168,8 @@ fn burdettie_analytics_handler(request: u64) -> u64 {
     let _ = request;
     log::debug!("xpc_pipe: burdettie analytics handler invoked");
     let reply = xpc_objects::create_dictionary_empty();
-    xpc_objects::dict_set_int64(reply, b"error\0".as_ptr() as u64, 0);
-    xpc_objects::dict_set_bool(reply, b"success\0".as_ptr() as u64, true);
+    xpc_objects::dict_set_int64(reply, c"error".as_ptr() as u64, 0);
+    xpc_objects::dict_set_bool(reply, c"success".as_ptr() as u64, true);
     reply
 }
 
@@ -181,8 +181,8 @@ fn burdettie_diagnostics_handler(request: u64) -> u64 {
     let _ = request;
     log::debug!("xpc_pipe: burdettie diagnostics handler invoked");
     let reply = xpc_objects::create_dictionary_empty();
-    xpc_objects::dict_set_int64(reply, b"error\0".as_ptr() as u64, 0);
-    xpc_objects::dict_set_bool(reply, b"success\0".as_ptr() as u64, true);
+    xpc_objects::dict_set_int64(reply, c"error".as_ptr() as u64, 0);
+    xpc_objects::dict_set_bool(reply, c"success".as_ptr() as u64, true);
     reply
 }
 
@@ -194,12 +194,8 @@ fn burdettie_symptom_handler(request: u64) -> u64 {
     let _ = request;
     log::debug!("xpc_pipe: burdettie symptom handler invoked");
     let reply = xpc_objects::create_dictionary_empty();
-    xpc_objects::dict_set_int64(reply, b"error\0".as_ptr() as u64, 0);
-    xpc_objects::dict_set_string(
-        reply,
-        b"status\0".as_ptr() as u64,
-        b"healthy\0".as_ptr() as u64,
-    );
+    xpc_objects::dict_set_int64(reply, c"error".as_ptr() as u64, 0);
+    xpc_objects::dict_set_string(reply, c"status".as_ptr() as u64, c"healthy".as_ptr() as u64);
     reply
 }
 
@@ -212,9 +208,9 @@ fn burdettie_launch_services_handler(request: u64) -> u64 {
     let _ = request;
     log::debug!("xpc_pipe: burdettie launch services handler invoked");
     let reply = xpc_objects::create_dictionary_empty();
-    xpc_objects::dict_set_int64(reply, b"error\0".as_ptr() as u64, 0);
+    xpc_objects::dict_set_int64(reply, c"error".as_ptr() as u64, 0);
     // Return an empty result set — no registered apps
-    xpc_objects::dict_set_int64(reply, b"result-count\0".as_ptr() as u64, 0);
+    xpc_objects::dict_set_int64(reply, c"result-count".as_ptr() as u64, 0);
     reply
 }
 
@@ -226,8 +222,8 @@ fn burdettie_quarantine_handler(request: u64) -> u64 {
     let _ = request;
     log::debug!("xpc_pipe: burdettie quarantine handler invoked");
     let reply = xpc_objects::create_dictionary_empty();
-    xpc_objects::dict_set_int64(reply, b"error\0".as_ptr() as u64, 0);
-    xpc_objects::dict_set_bool(reply, b"quarantined\0".as_ptr() as u64, false);
+    xpc_objects::dict_set_int64(reply, c"error".as_ptr() as u64, 0);
+    xpc_objects::dict_set_bool(reply, c"quarantined".as_ptr() as u64, false);
     reply
 }
 
@@ -239,8 +235,8 @@ fn burdettie_cfprefs_handler(request: u64) -> u64 {
     let _ = request;
     log::debug!("xpc_pipe: burdettie cfprefs handler invoked");
     let reply = xpc_objects::create_dictionary_empty();
-    xpc_objects::dict_set_int64(reply, b"error\0".as_ptr() as u64, 0);
-    xpc_objects::dict_set_bool(reply, b"success\0".as_ptr() as u64, true);
+    xpc_objects::dict_set_int64(reply, c"error".as_ptr() as u64, 0);
+    xpc_objects::dict_set_bool(reply, c"success".as_ptr() as u64, true);
     reply
 }
 
@@ -252,8 +248,8 @@ fn burdettie_pluginkit_handler(request: u64) -> u64 {
     let _ = request;
     log::debug!("xpc_pipe: burdettie pluginkit handler invoked");
     let reply = xpc_objects::create_dictionary_empty();
-    xpc_objects::dict_set_int64(reply, b"error\0".as_ptr() as u64, 0);
-    xpc_objects::dict_set_int64(reply, b"result-count\0".as_ptr() as u64, 0);
+    xpc_objects::dict_set_int64(reply, c"error".as_ptr() as u64, 0);
+    xpc_objects::dict_set_int64(reply, c"result-count".as_ptr() as u64, 0);
     reply
 }
 
@@ -267,8 +263,8 @@ fn burdettie_securityd_handler(request: u64) -> u64 {
     log::debug!("xpc_pipe: burdettie securityd handler invoked");
     let reply = xpc_objects::create_dictionary_empty();
     // errSecItemNotFound = -25300
-    xpc_objects::dict_set_int64(reply, b"error\0".as_ptr() as u64, -25300);
-    xpc_objects::dict_set_int64(reply, b"result\0".as_ptr() as u64, -25300);
+    xpc_objects::dict_set_int64(reply, c"error".as_ptr() as u64, -25300);
+    xpc_objects::dict_set_int64(reply, c"result".as_ptr() as u64, -25300);
     reply
 }
 
@@ -282,9 +278,9 @@ fn burdettie_trustd_handler(request: u64) -> u64 {
     let _ = request;
     log::debug!("xpc_pipe: burdettie trustd handler invoked");
     let reply = xpc_objects::create_dictionary_empty();
-    xpc_objects::dict_set_int64(reply, b"error\0".as_ptr() as u64, 0);
+    xpc_objects::dict_set_int64(reply, c"error".as_ptr() as u64, 0);
     // Trust evaluation result = kSecTrustResultProceed (1)
-    xpc_objects::dict_set_int64(reply, b"trust-result\0".as_ptr() as u64, 1);
+    xpc_objects::dict_set_int64(reply, c"trust-result".as_ptr() as u64, 1);
     reply
 }
 
@@ -297,10 +293,10 @@ fn burdettie_amfi_handler(request: u64) -> u64 {
     let _ = request;
     log::debug!("xpc_pipe: burdettie AMFI handler invoked");
     let reply = xpc_objects::create_dictionary_empty();
-    xpc_objects::dict_set_int64(reply, b"error\0".as_ptr() as u64, 0);
+    xpc_objects::dict_set_int64(reply, c"error".as_ptr() as u64, 0);
     // Valid code signing status
-    xpc_objects::dict_set_bool(reply, b"valid\0".as_ptr() as u64, true);
-    xpc_objects::dict_set_int64(reply, b"status\0".as_ptr() as u64, 0);
+    xpc_objects::dict_set_bool(reply, c"valid".as_ptr() as u64, true);
+    xpc_objects::dict_set_int64(reply, c"status".as_ptr() as u64, 0);
     reply
 }
 
@@ -313,10 +309,10 @@ fn burdettie_launchservicesd_handler(request: u64) -> u64 {
     let _ = request;
     log::debug!("xpc_pipe: burdettie launchservicesd handler invoked");
     let reply = xpc_objects::create_dictionary_empty();
-    xpc_objects::dict_set_int64(reply, b"error\0".as_ptr() as u64, 0);
+    xpc_objects::dict_set_int64(reply, c"error".as_ptr() as u64, 0);
     // kLSApplicationNotFoundErr = -10814
-    xpc_objects::dict_set_int64(reply, b"result\0".as_ptr() as u64, -10814);
-    xpc_objects::dict_set_int64(reply, b"result-count\0".as_ptr() as u64, 0);
+    xpc_objects::dict_set_int64(reply, c"result".as_ptr() as u64, -10814);
+    xpc_objects::dict_set_int64(reply, c"result-count".as_ptr() as u64, 0);
     reply
 }
 
@@ -330,10 +326,10 @@ fn burdettie_notifyd_handler(request: u64) -> u64 {
     let _ = request;
     log::debug!("xpc_pipe: burdettie notifyd handler invoked");
     let reply = xpc_objects::create_dictionary_empty();
-    xpc_objects::dict_set_int64(reply, b"error\0".as_ptr() as u64, 0);
+    xpc_objects::dict_set_int64(reply, c"error".as_ptr() as u64, 0);
     // Token for notification registration
-    xpc_objects::dict_set_int64(reply, b"token\0".as_ptr() as u64, 1);
-    xpc_objects::dict_set_int64(reply, b"status\0".as_ptr() as u64, 0);
+    xpc_objects::dict_set_int64(reply, c"token".as_ptr() as u64, 1);
+    xpc_objects::dict_set_int64(reply, c"status".as_ptr() as u64, 0);
     reply
 }
 
@@ -346,13 +342,13 @@ fn burdettie_directory_service_handler(request: u64) -> u64 {
     let _ = request;
     log::debug!("xpc_pipe: burdettie directory service handler invoked");
     let reply = xpc_objects::create_dictionary_empty();
-    xpc_objects::dict_set_int64(reply, b"error\0".as_ptr() as u64, 0);
+    xpc_objects::dict_set_int64(reply, c"error".as_ptr() as u64, 0);
     // Return basic identity — current uid/gid
     let uid = unsafe { libc::getuid() };
     let gid = unsafe { libc::getgid() };
-    xpc_objects::dict_set_int64(reply, b"uid\0".as_ptr() as u64, uid as i64);
-    xpc_objects::dict_set_int64(reply, b"gid\0".as_ptr() as u64, gid as i64);
-    xpc_objects::dict_set_int64(reply, b"member\0".as_ptr() as u64, 1); // is member
+    xpc_objects::dict_set_int64(reply, c"uid".as_ptr() as u64, uid as i64);
+    xpc_objects::dict_set_int64(reply, c"gid".as_ptr() as u64, gid as i64);
+    xpc_objects::dict_set_int64(reply, c"member".as_ptr() as u64, 1); // is member
     reply
 }
 
@@ -365,8 +361,8 @@ fn burdettie_syslog_handler(request: u64) -> u64 {
     let _ = request;
     log::debug!("xpc_pipe: burdettie syslog handler invoked");
     let reply = xpc_objects::create_dictionary_empty();
-    xpc_objects::dict_set_int64(reply, b"error\0".as_ptr() as u64, 0);
-    xpc_objects::dict_set_bool(reply, b"success\0".as_ptr() as u64, true);
+    xpc_objects::dict_set_int64(reply, c"error".as_ptr() as u64, 0);
+    xpc_objects::dict_set_bool(reply, c"success".as_ptr() as u64, true);
     reply
 }
 
@@ -417,7 +413,7 @@ mod tests {
         // Echo: create a reply with the request's count
         let reply = xpc_objects::create_dictionary_empty();
         let count = xpc_objects::dict_get_count(request);
-        xpc_objects::dict_set_int64(reply, b"count\0".as_ptr() as u64, count as i64);
+        xpc_objects::dict_set_int64(reply, c"count".as_ptr() as u64, count as i64);
         reply
     }
 
@@ -426,10 +422,10 @@ mod tests {
         register_pipe_handler("com.test.echo", echo_handler);
         assert!(has_pipe_handler("com.test.echo"));
 
-        let pipe = create(b"com.test.echo\0".as_ptr() as u64, 0);
+        let pipe = create(c"com.test.echo".as_ptr() as u64, 0);
         let request = xpc_objects::create_dictionary_empty();
-        xpc_objects::dict_set_int64(request, b"a\0".as_ptr() as u64, 1);
-        xpc_objects::dict_set_int64(request, b"b\0".as_ptr() as u64, 2);
+        xpc_objects::dict_set_int64(request, c"a".as_ptr() as u64, 1);
+        xpc_objects::dict_set_int64(request, c"b".as_ptr() as u64, 2);
 
         let mut reply_handle: u64 = 0;
         let result = routine(pipe, request, &mut reply_handle as *mut u64 as u64);
@@ -437,14 +433,14 @@ mod tests {
         assert_ne!(reply_handle, 0);
         // The echo handler returns count of request entries
         assert_eq!(
-            xpc_objects::dict_get_int64(reply_handle, b"count\0".as_ptr() as u64),
+            xpc_objects::dict_get_int64(reply_handle, c"count".as_ptr() as u64),
             2
         );
     }
 
     #[test]
     fn unregistered_pipe_returns_epipe() {
-        let pipe = create(b"com.test.nohandler\0".as_ptr() as u64, 0);
+        let pipe = create(c"com.test.nohandler".as_ptr() as u64, 0);
         let request = xpc_objects::create_dictionary_empty();
         let result = routine(pipe, request, 0);
         assert_eq!(result, EPIPE);
@@ -468,7 +464,7 @@ mod tests {
     #[test]
     fn launchd_stub_returns_error_reply() {
         install_defaults();
-        let pipe = create(b"com.apple.xpc.launchd\0".as_ptr() as u64, 0);
+        let pipe = create(c"com.apple.xpc.launchd".as_ptr() as u64, 0);
         let request = xpc_objects::create_dictionary_empty();
         let mut reply: u64 = 0;
         let result = routine(pipe, request, &mut reply as *mut u64 as u64);
@@ -476,7 +472,7 @@ mod tests {
         assert_ne!(reply, 0);
         // Check error field in reply
         assert_eq!(
-            xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64),
+            xpc_objects::dict_get_int64(reply, c"error".as_ptr() as u64),
             32
         );
     }
@@ -493,19 +489,19 @@ mod tests {
     fn burdettie_analytics_handler_returns_success() {
         install_defaults();
         assert!(has_pipe_handler("com.apple.analyticsd"));
-        let pipe = create(b"com.apple.analyticsd\0".as_ptr() as u64, 0);
+        let pipe = create(c"com.apple.analyticsd".as_ptr() as u64, 0);
         let request = xpc_objects::create_dictionary_empty();
         let mut reply: u64 = 0;
         let result = routine(pipe, request, &mut reply as *mut u64 as u64);
         assert_eq!(result, 0);
         assert_ne!(reply, 0);
         assert_eq!(
-            xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64),
+            xpc_objects::dict_get_int64(reply, c"error".as_ptr() as u64),
             0
         );
         assert!(xpc_objects::dict_get_bool(
             reply,
-            b"success\0".as_ptr() as u64
+            c"success".as_ptr() as u64
         ));
     }
 
@@ -513,14 +509,14 @@ mod tests {
     fn burdettie_diagnostics_handler_returns_success() {
         install_defaults();
         assert!(has_pipe_handler("com.apple.diagnosticd"));
-        let pipe = create(b"com.apple.diagnosticd\0".as_ptr() as u64, 0);
+        let pipe = create(c"com.apple.diagnosticd".as_ptr() as u64, 0);
         let request = xpc_objects::create_dictionary_empty();
         let mut reply: u64 = 0;
         let result = routine(pipe, request, &mut reply as *mut u64 as u64);
         assert_eq!(result, 0);
         assert_ne!(reply, 0);
         assert_eq!(
-            xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64),
+            xpc_objects::dict_get_int64(reply, c"error".as_ptr() as u64),
             0
         );
     }
@@ -528,7 +524,7 @@ mod tests {
     #[test]
     fn burdettie_quarantine_reports_not_quarantined() {
         install_defaults();
-        let pipe = create(b"com.apple.coreservices.quarantine\0".as_ptr() as u64, 0);
+        let pipe = create(c"com.apple.coreservices.quarantine".as_ptr() as u64, 0);
         let request = xpc_objects::create_dictionary_empty();
         let mut reply: u64 = 0;
         let result = routine(pipe, request, &mut reply as *mut u64 as u64);
@@ -536,14 +532,14 @@ mod tests {
         assert_ne!(reply, 0);
         assert!(!xpc_objects::dict_get_bool(
             reply,
-            b"quarantined\0".as_ptr() as u64
+            c"quarantined".as_ptr() as u64
         ));
     }
 
     #[test]
     fn burdettie_securityd_returns_item_not_found() {
         install_defaults();
-        let pipe = create(b"com.apple.securityd\0".as_ptr() as u64, 0);
+        let pipe = create(c"com.apple.securityd".as_ptr() as u64, 0);
         let request = xpc_objects::create_dictionary_empty();
         let mut reply: u64 = 0;
         let result = routine(pipe, request, &mut reply as *mut u64 as u64);
@@ -551,11 +547,11 @@ mod tests {
         assert_ne!(reply, 0);
         // errSecItemNotFound = -25300
         assert_eq!(
-            xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64),
+            xpc_objects::dict_get_int64(reply, c"error".as_ptr() as u64),
             -25300
         );
         assert_eq!(
-            xpc_objects::dict_get_int64(reply, b"result\0".as_ptr() as u64),
+            xpc_objects::dict_get_int64(reply, c"result".as_ptr() as u64),
             -25300
         );
     }
@@ -563,18 +559,18 @@ mod tests {
     #[test]
     fn burdettie_trustd_returns_proceed() {
         install_defaults();
-        let pipe = create(b"com.apple.trustd\0".as_ptr() as u64, 0);
+        let pipe = create(c"com.apple.trustd".as_ptr() as u64, 0);
         let request = xpc_objects::create_dictionary_empty();
         let mut reply: u64 = 0;
         let result = routine(pipe, request, &mut reply as *mut u64 as u64);
         assert_eq!(result, 0);
         assert_ne!(reply, 0);
         assert_eq!(
-            xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64),
+            xpc_objects::dict_get_int64(reply, c"error".as_ptr() as u64),
             0
         );
         assert_eq!(
-            xpc_objects::dict_get_int64(reply, b"trust-result\0".as_ptr() as u64),
+            xpc_objects::dict_get_int64(reply, c"trust-result".as_ptr() as u64),
             1
         );
     }
@@ -582,22 +578,19 @@ mod tests {
     #[test]
     fn burdettie_amfi_returns_valid() {
         install_defaults();
-        let pipe = create(b"com.apple.MobileFileIntegrity\0".as_ptr() as u64, 0);
+        let pipe = create(c"com.apple.MobileFileIntegrity".as_ptr() as u64, 0);
         let request = xpc_objects::create_dictionary_empty();
         let mut reply: u64 = 0;
         let result = routine(pipe, request, &mut reply as *mut u64 as u64);
         assert_eq!(result, 0);
         assert_ne!(reply, 0);
         assert_eq!(
-            xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64),
+            xpc_objects::dict_get_int64(reply, c"error".as_ptr() as u64),
             0
         );
-        assert!(xpc_objects::dict_get_bool(
-            reply,
-            b"valid\0".as_ptr() as u64
-        ));
+        assert!(xpc_objects::dict_get_bool(reply, c"valid".as_ptr() as u64));
         assert_eq!(
-            xpc_objects::dict_get_int64(reply, b"status\0".as_ptr() as u64),
+            xpc_objects::dict_get_int64(reply, c"status".as_ptr() as u64),
             0
         );
     }
@@ -605,26 +598,23 @@ mod tests {
     #[test]
     fn burdettie_launchservicesd_returns_not_found() {
         install_defaults();
-        let pipe = create(
-            b"com.apple.coreservices.launchservicesd\0".as_ptr() as u64,
-            0,
-        );
+        let pipe = create(c"com.apple.coreservices.launchservicesd".as_ptr() as u64, 0);
         let request = xpc_objects::create_dictionary_empty();
         let mut reply: u64 = 0;
         let result = routine(pipe, request, &mut reply as *mut u64 as u64);
         assert_eq!(result, 0);
         assert_ne!(reply, 0);
         assert_eq!(
-            xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64),
+            xpc_objects::dict_get_int64(reply, c"error".as_ptr() as u64),
             0
         );
         // kLSApplicationNotFoundErr = -10814
         assert_eq!(
-            xpc_objects::dict_get_int64(reply, b"result\0".as_ptr() as u64),
+            xpc_objects::dict_get_int64(reply, c"result".as_ptr() as u64),
             -10814
         );
         assert_eq!(
-            xpc_objects::dict_get_int64(reply, b"result-count\0".as_ptr() as u64),
+            xpc_objects::dict_get_int64(reply, c"result-count".as_ptr() as u64),
             0
         );
     }
@@ -632,22 +622,22 @@ mod tests {
     #[test]
     fn burdettie_notifyd_returns_token() {
         install_defaults();
-        let pipe = create(b"com.apple.notifyd\0".as_ptr() as u64, 0);
+        let pipe = create(c"com.apple.notifyd".as_ptr() as u64, 0);
         let request = xpc_objects::create_dictionary_empty();
         let mut reply: u64 = 0;
         let result = routine(pipe, request, &mut reply as *mut u64 as u64);
         assert_eq!(result, 0);
         assert_ne!(reply, 0);
         assert_eq!(
-            xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64),
+            xpc_objects::dict_get_int64(reply, c"error".as_ptr() as u64),
             0
         );
         assert_eq!(
-            xpc_objects::dict_get_int64(reply, b"token\0".as_ptr() as u64),
+            xpc_objects::dict_get_int64(reply, c"token".as_ptr() as u64),
             1
         );
         assert_eq!(
-            xpc_objects::dict_get_int64(reply, b"status\0".as_ptr() as u64),
+            xpc_objects::dict_get_int64(reply, c"status".as_ptr() as u64),
             0
         );
     }
@@ -656,7 +646,7 @@ mod tests {
     fn burdettie_directory_service_returns_identity() {
         install_defaults();
         let pipe = create(
-            b"com.apple.system.DirectoryService.membership_v1\0".as_ptr() as u64,
+            c"com.apple.system.DirectoryService.membership_v1".as_ptr() as u64,
             0,
         );
         let request = xpc_objects::create_dictionary_empty();
@@ -665,21 +655,21 @@ mod tests {
         assert_eq!(result, 0);
         assert_ne!(reply, 0);
         assert_eq!(
-            xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64),
+            xpc_objects::dict_get_int64(reply, c"error".as_ptr() as u64),
             0
         );
         let uid = unsafe { libc::getuid() } as i64;
         let gid = unsafe { libc::getgid() } as i64;
         assert_eq!(
-            xpc_objects::dict_get_int64(reply, b"uid\0".as_ptr() as u64),
+            xpc_objects::dict_get_int64(reply, c"uid".as_ptr() as u64),
             uid
         );
         assert_eq!(
-            xpc_objects::dict_get_int64(reply, b"gid\0".as_ptr() as u64),
+            xpc_objects::dict_get_int64(reply, c"gid".as_ptr() as u64),
             gid
         );
         assert_eq!(
-            xpc_objects::dict_get_int64(reply, b"member\0".as_ptr() as u64),
+            xpc_objects::dict_get_int64(reply, c"member".as_ptr() as u64),
             1
         );
     }
@@ -687,19 +677,19 @@ mod tests {
     #[test]
     fn burdettie_syslog_returns_success() {
         install_defaults();
-        let pipe = create(b"com.apple.syslog\0".as_ptr() as u64, 0);
+        let pipe = create(c"com.apple.syslog".as_ptr() as u64, 0);
         let request = xpc_objects::create_dictionary_empty();
         let mut reply: u64 = 0;
         let result = routine(pipe, request, &mut reply as *mut u64 as u64);
         assert_eq!(result, 0);
         assert_ne!(reply, 0);
         assert_eq!(
-            xpc_objects::dict_get_int64(reply, b"error\0".as_ptr() as u64),
+            xpc_objects::dict_get_int64(reply, c"error".as_ptr() as u64),
             0
         );
         assert!(xpc_objects::dict_get_bool(
             reply,
-            b"success\0".as_ptr() as u64
+            c"success".as_ptr() as u64
         ));
     }
 

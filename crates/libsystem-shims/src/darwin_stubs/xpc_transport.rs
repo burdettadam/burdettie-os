@@ -407,7 +407,7 @@ pub fn register_listener(name: &str, handler: u64) {
 /// Check if a service has a listener.
 pub fn has_listener(name: &str) -> bool {
     let guard = LISTENERS.lock().unwrap_or_else(|e| e.into_inner());
-    guard.as_ref().map_or(false, |m| m.contains_key(name))
+    guard.as_ref().is_some_and(|m| m.contains_key(name))
 }
 
 /// Get the listener handler for a service.
@@ -812,13 +812,10 @@ pub mod socket_transport {
                     }
                     let key_bytes = &data[*pos..*pos + key_len];
                     *pos += key_len;
-                    let key = match std::ffi::CString::new(key_bytes) {
-                        Ok(k) => k,
-                        Err(_) => {
-                            // Skip the value
-                            let _ = deserialize_value(data, pos);
-                            continue;
-                        }
+                    let Ok(key) = std::ffi::CString::new(key_bytes) else {
+                        // Skip the value
+                        let _ = deserialize_value(data, pos);
+                        continue;
                     };
                     let val = deserialize_value(data, pos);
                     xpc_objects::dict_set(dict, &key, val);
@@ -860,18 +857,13 @@ pub mod socket_transport {
     #[cfg(test)]
     mod tests {
         use super::*;
-        use std::ffi::CString;
 
         #[test]
         fn serialize_deserialize_roundtrip() {
             let dict = xpc_objects::create_dictionary_empty();
-            xpc_objects::dict_set_int64(dict, b"count\0".as_ptr() as u64, 42);
-            xpc_objects::dict_set_string(
-                dict,
-                b"name\0".as_ptr() as u64,
-                b"hello\0".as_ptr() as u64,
-            );
-            xpc_objects::dict_set_bool(dict, b"flag\0".as_ptr() as u64, true);
+            xpc_objects::dict_set_int64(dict, c"count".as_ptr() as u64, 42);
+            xpc_objects::dict_set_string(dict, c"name".as_ptr() as u64, c"hello".as_ptr() as u64);
+            xpc_objects::dict_set_bool(dict, c"flag".as_ptr() as u64, true);
 
             let data = serialize_message(dict);
             assert!(!data.is_empty());
@@ -879,12 +871,12 @@ pub mod socket_transport {
             let dict2 = deserialize_message(&data);
             assert_eq!(xpc_objects::dict_get_count(dict2), 3);
             assert_eq!(
-                xpc_objects::dict_get_int64(dict2, b"count\0".as_ptr() as u64),
+                xpc_objects::dict_get_int64(dict2, c"count".as_ptr() as u64),
                 42
             );
-            assert!(xpc_objects::dict_get_bool(dict2, b"flag\0".as_ptr() as u64));
+            assert!(xpc_objects::dict_get_bool(dict2, c"flag".as_ptr() as u64));
 
-            let name_ptr = xpc_objects::dict_get_string(dict2, b"name\0".as_ptr() as u64);
+            let name_ptr = xpc_objects::dict_get_string(dict2, c"name".as_ptr() as u64);
             assert_ne!(name_ptr, 0);
             let name = unsafe { std::ffi::CStr::from_ptr(name_ptr as *const std::ffi::c_char) };
             assert_eq!(name.to_str().unwrap(), "hello");
@@ -902,15 +894,11 @@ pub mod socket_transport {
         fn nested_dictionary_roundtrip() {
             // Create outer dict with an inner dict
             let inner = xpc_objects::create_dictionary_empty();
-            xpc_objects::dict_set_int64(inner, b"x\0".as_ptr() as u64, 99);
-            xpc_objects::dict_set_string(
-                inner,
-                b"y\0".as_ptr() as u64,
-                b"nested\0".as_ptr() as u64,
-            );
+            xpc_objects::dict_set_int64(inner, c"x".as_ptr() as u64, 99);
+            xpc_objects::dict_set_string(inner, c"y".as_ptr() as u64, c"nested".as_ptr() as u64);
 
             let outer = xpc_objects::create_dictionary_empty();
-            xpc_objects::dict_set_int64(outer, b"top\0".as_ptr() as u64, 1);
+            xpc_objects::dict_set_int64(outer, c"top".as_ptr() as u64, 1);
             let key = std::ffi::CString::new("child").unwrap();
             xpc_objects::dict_set(outer, &key, inner);
 
@@ -919,7 +907,7 @@ pub mod socket_transport {
 
             assert_eq!(xpc_objects::dict_get_count(restored), 2);
             assert_eq!(
-                xpc_objects::dict_get_int64(restored, b"top\0".as_ptr() as u64),
+                xpc_objects::dict_get_int64(restored, c"top".as_ptr() as u64),
                 1
             );
 
@@ -929,10 +917,10 @@ pub mod socket_transport {
             assert_ne!(child_handle, 0);
             assert_eq!(xpc_objects::dict_get_count(child_handle), 2);
             assert_eq!(
-                xpc_objects::dict_get_int64(child_handle, b"x\0".as_ptr() as u64),
+                xpc_objects::dict_get_int64(child_handle, c"x".as_ptr() as u64),
                 99
             );
-            let y_ptr = xpc_objects::dict_get_string(child_handle, b"y\0".as_ptr() as u64);
+            let y_ptr = xpc_objects::dict_get_string(child_handle, c"y".as_ptr() as u64);
             assert_ne!(y_ptr, 0);
             let y_str = unsafe { std::ffi::CStr::from_ptr(y_ptr as *const std::ffi::c_char) };
             assert_eq!(y_str.to_str().unwrap(), "nested");
@@ -949,14 +937,14 @@ pub mod socket_transport {
             let dict = xpc_objects::create_dictionary_empty();
             let key = std::ffi::CString::new("items").unwrap();
             xpc_objects::dict_set(dict, &key, arr);
-            xpc_objects::dict_set_int64(dict, b"total\0".as_ptr() as u64, 2);
+            xpc_objects::dict_set_int64(dict, c"total".as_ptr() as u64, 2);
 
             let data = serialize_message(dict);
             let restored = deserialize_message(&data);
 
             assert_eq!(xpc_objects::dict_get_count(restored), 2);
             assert_eq!(
-                xpc_objects::dict_get_int64(restored, b"total\0".as_ptr() as u64),
+                xpc_objects::dict_get_int64(restored, c"total".as_ptr() as u64),
                 2
             );
 
@@ -974,7 +962,7 @@ pub mod socket_transport {
         fn deeply_nested_roundtrip() {
             // dict → dict → array → dict
             let leaf = xpc_objects::create_dictionary_empty();
-            xpc_objects::dict_set_string(leaf, b"msg\0".as_ptr() as u64, b"deep\0".as_ptr() as u64);
+            xpc_objects::dict_set_string(leaf, c"msg".as_ptr() as u64, c"deep".as_ptr() as u64);
 
             let arr = xpc_objects::create_array_empty();
             xpc_objects::array_append(arr, leaf);
@@ -997,7 +985,7 @@ pub mod socket_transport {
             assert_ne!(r_list, 0);
             assert_eq!(xpc_objects::array_get_count(r_list), 1);
             let r_leaf = xpc_objects::array_get_value(r_list, 0);
-            let msg_ptr = xpc_objects::dict_get_string(r_leaf, b"msg\0".as_ptr() as u64);
+            let msg_ptr = xpc_objects::dict_get_string(r_leaf, c"msg".as_ptr() as u64);
             assert_ne!(msg_ptr, 0);
             let msg = unsafe { std::ffi::CStr::from_ptr(msg_ptr as *const std::ffi::c_char) };
             assert_eq!(msg.to_str().unwrap(), "deep");
@@ -1043,11 +1031,7 @@ pub mod socket_transport {
                     let count = xpc_objects::dict_get_count(request);
                     // Build reply
                     let reply = xpc_objects::create_dictionary_empty();
-                    xpc_objects::dict_set_int64(
-                        reply,
-                        b"echo_count\0".as_ptr() as u64,
-                        count as i64,
-                    );
+                    xpc_objects::dict_set_int64(reply, c"echo_count".as_ptr() as u64, count as i64);
                     serialize_message(reply)
                 } else {
                     Vec::new()
@@ -1056,8 +1040,8 @@ pub mod socket_transport {
 
             // Client: send a message
             let msg = xpc_objects::create_dictionary_empty();
-            xpc_objects::dict_set_int64(msg, b"a\0".as_ptr() as u64, 1);
-            xpc_objects::dict_set_int64(msg, b"b\0".as_ptr() as u64, 2);
+            xpc_objects::dict_set_int64(msg, c"a".as_ptr() as u64, 1);
+            xpc_objects::dict_set_int64(msg, c"b".as_ptr() as u64, 2);
 
             assert!(try_send(service, msg));
 

@@ -679,15 +679,15 @@ mod tests {
     #[test]
     fn dictionary_set_get_int64() {
         let dict = create_dictionary_empty();
-        dict_set_int64(dict, b"count\0".as_ptr() as u64, 99);
-        assert_eq!(dict_get_int64(dict, b"count\0".as_ptr() as u64), 99);
+        dict_set_int64(dict, c"count".as_ptr() as u64, 99);
+        assert_eq!(dict_get_int64(dict, c"count".as_ptr() as u64), 99);
     }
 
     #[test]
     fn dictionary_set_get_string() {
         let dict = create_dictionary_empty();
-        dict_set_string(dict, b"key\0".as_ptr() as u64, b"value\0".as_ptr() as u64);
-        let ptr = dict_get_string(dict, b"key\0".as_ptr() as u64);
+        dict_set_string(dict, c"key".as_ptr() as u64, c"value".as_ptr() as u64);
+        let ptr = dict_get_string(dict, c"key".as_ptr() as u64);
         assert_ne!(ptr, 0);
         let read = unsafe { CStr::from_ptr(ptr as *const std::ffi::c_char) };
         assert_eq!(read.to_str().unwrap(), "value");
@@ -696,17 +696,17 @@ mod tests {
     #[test]
     fn dictionary_set_get_bool() {
         let dict = create_dictionary_empty();
-        dict_set_bool(dict, b"flag\0".as_ptr() as u64, true);
-        assert!(dict_get_bool(dict, b"flag\0".as_ptr() as u64));
+        dict_set_bool(dict, c"flag".as_ptr() as u64, true);
+        assert!(dict_get_bool(dict, c"flag".as_ptr() as u64));
     }
 
     #[test]
     fn dictionary_replace_key() {
         let dict = create_dictionary_empty();
-        dict_set_int64(dict, b"x\0".as_ptr() as u64, 1);
-        dict_set_int64(dict, b"x\0".as_ptr() as u64, 2);
+        dict_set_int64(dict, c"x".as_ptr() as u64, 1);
+        dict_set_int64(dict, c"x".as_ptr() as u64, 2);
         assert_eq!(dict_get_count(dict), 1);
-        assert_eq!(dict_get_int64(dict, b"x\0".as_ptr() as u64), 2);
+        assert_eq!(dict_get_int64(dict, c"x".as_ptr() as u64), 2);
     }
 
     #[test]

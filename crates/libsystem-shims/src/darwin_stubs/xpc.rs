@@ -891,7 +891,7 @@ pub extern "C" fn shim_xpc_pipe_routine_with_flags(
 pub extern "C" fn shim_xpc_void2(_a: u64, _b: u64) {}
 pub extern "C" fn shim_xpc_void3(_a: u64, _b: u64, _c: u64) {}
 
-pub extern "C" fn shim_xpc_connection_create_from_endpoint(endpoint: u64, queue: u64) -> u64 {
+pub extern "C" fn shim_xpc_connection_create_from_endpoint(_endpoint: u64, queue: u64) -> u64 {
     // Just create a fresh connection — the endpoint carries a connection id
     // but in our loopback model connections are independent.
     transport::create_connection(0, queue, 0)
@@ -1087,8 +1087,8 @@ pub extern "C" fn shim_xpc_shmem_create(region: u64, length: u64) -> u64 {
     }
     // Store the region address and length in a dictionary for later retrieval
     let shmem = obj::create_dictionary_empty();
-    obj::dict_set_uint64(shmem, b"_shmem_addr\0".as_ptr() as u64, region);
-    obj::dict_set_uint64(shmem, b"_shmem_size\0".as_ptr() as u64, length);
+    obj::dict_set_uint64(shmem, c"_shmem_addr".as_ptr() as u64, region);
+    obj::dict_set_uint64(shmem, c"_shmem_size".as_ptr() as u64, length);
     shmem
 }
 
@@ -1097,8 +1097,8 @@ pub extern "C" fn shim_xpc_shmem_create(region: u64, length: u64) -> u64 {
 /// Maps the shared memory region and writes the address to *region.
 /// Returns the size. In our emulation we just pass through the original pointer.
 pub extern "C" fn shim_xpc_shmem_map(shmem: u64, region_out: u64) -> u64 {
-    let addr = obj::dict_get_uint64(shmem, b"_shmem_addr\0".as_ptr() as u64);
-    let size = obj::dict_get_uint64(shmem, b"_shmem_size\0".as_ptr() as u64);
+    let addr = obj::dict_get_uint64(shmem, c"_shmem_addr".as_ptr() as u64);
+    let size = obj::dict_get_uint64(shmem, c"_shmem_size".as_ptr() as u64);
 
     if region_out != 0 && addr != 0 {
         unsafe { *(region_out as *mut u64) = addr };
@@ -1194,23 +1194,23 @@ mod tests {
         assert_eq!(shim_xpc_dictionary_get_count(dict), 0);
 
         // String round-trip
-        shim_xpc_dictionary_set_string(dict, b"name\0".as_ptr() as u64, b"hello\0".as_ptr() as u64);
-        let ptr = shim_xpc_dictionary_get_string(dict, b"name\0".as_ptr() as u64);
+        shim_xpc_dictionary_set_string(dict, c"name".as_ptr() as u64, c"hello".as_ptr() as u64);
+        let ptr = shim_xpc_dictionary_get_string(dict, c"name".as_ptr() as u64);
         assert_ne!(ptr, 0);
         let s = unsafe { std::ffi::CStr::from_ptr(ptr as *const std::ffi::c_char) };
         assert_eq!(s.to_str().unwrap(), "hello");
 
         // Int64 round-trip
-        shim_xpc_dictionary_set_int64(dict, b"count\0".as_ptr() as u64, 42);
+        shim_xpc_dictionary_set_int64(dict, c"count".as_ptr() as u64, 42);
         assert_eq!(
-            shim_xpc_dictionary_get_int64(dict, b"count\0".as_ptr() as u64),
+            shim_xpc_dictionary_get_int64(dict, c"count".as_ptr() as u64),
             42
         );
 
         // Bool round-trip
-        shim_xpc_dictionary_set_bool(dict, b"flag\0".as_ptr() as u64, 1);
+        shim_xpc_dictionary_set_bool(dict, c"flag".as_ptr() as u64, 1);
         assert_eq!(
-            shim_xpc_dictionary_get_bool(dict, b"flag\0".as_ptr() as u64),
+            shim_xpc_dictionary_get_bool(dict, c"flag".as_ptr() as u64),
             1
         );
 
@@ -1233,7 +1233,7 @@ mod tests {
 
     #[test]
     fn string_round_trip() {
-        let h = shim_xpc_string_create(b"test\0".as_ptr() as u64);
+        let h = shim_xpc_string_create(c"test".as_ptr() as u64);
         assert_ne!(h, 0);
         let ptr = shim_xpc_string_get_string_ptr(h);
         let s = unsafe { std::ffi::CStr::from_ptr(ptr as *const std::ffi::c_char) };
@@ -1258,9 +1258,9 @@ mod tests {
 
     #[test]
     fn double_round_trip() {
-        let h = shim_xpc_double_create(3.14f64.to_bits());
+        let h = shim_xpc_double_create(1.2345f64.to_bits());
         let v = shim_xpc_double_get_value(h);
-        assert!((v - 3.14).abs() < 1e-10);
+        assert!((v - 1.2345).abs() < 1e-10);
     }
 
     #[test]
@@ -1276,7 +1276,7 @@ mod tests {
 
     #[test]
     fn type_tag_check() {
-        let s = shim_xpc_string_create(b"x\0".as_ptr() as u64);
+        let s = shim_xpc_string_create(c"x".as_ptr() as u64);
         assert_eq!(shim_xpc_get_type(s), obj::XPC_TYPE_TAG_STRING);
         let i = shim_xpc_int64_create(0);
         assert_eq!(shim_xpc_get_type(i), obj::XPC_TYPE_TAG_INT64);
@@ -1307,7 +1307,7 @@ mod tests {
     fn pipe_routine_with_handler() {
         // Install defaults and test launchd stub
         pipe::install_defaults();
-        let p = shim_xpc_pipe_create(b"com.apple.xpc.launchd\0".as_ptr() as u64, 0);
+        let p = shim_xpc_pipe_create(c"com.apple.xpc.launchd".as_ptr() as u64, 0);
         let req = obj::create_dictionary_empty();
         let mut reply: u64 = 0;
         let result = shim_xpc_pipe_routine(p, req, &mut reply as *mut u64 as u64);
