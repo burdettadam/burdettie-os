@@ -43,8 +43,8 @@ fn query_display_size() -> (f64, f64) {
                     let display = mid();
                     let w = pw(display) as f64;
                     let h = ph(display) as f64;
-                    libc::dlclose(cg);
                     if w > 0.0 && h > 0.0 {
+                        libc::dlclose(cg);
                         return (w, h);
                     }
                 }
