@@ -129,6 +129,8 @@ jobs:
           components: clippy, rustfmt
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
 
       - name: Check formatting
         run: cargo fmt --all -- --check
@@ -151,14 +153,14 @@ jobs:
       - name: Build (debug)
         run: cargo build --locked --workspace --all-targets
 
-      - name: Build (release)
-        run: cargo build --locked --workspace --release
-
       - name: Test
-        run: cargo test --locked --workspace
+        run: cargo test --locked --workspace --no-fail-fast
 
       - name: Test GPU text layout and glyph cache
         run: cargo test --locked -p graphics-core --lib --features gpu
+
+      - name: Build (release)
+        run: cargo build --locked --workspace --release
 
       - name: Bundle runtime
         run: |
