@@ -4,7 +4,7 @@ Use a Linux build host and the pinned x86_64 Darwin VM as the first Burdettie re
 
 ## Actual blockers
 
-The current execution workspace has Git and a C compiler, but no Nix, QEMU, Rust/Cargo or Clang, no pinned PureDarwin checkout/image, and about 17 GiB of free disk. It cannot perform the selected source-build experiment as equipped. PureDarwin's current build guide recommends 60 GB or more of Nix store for a full image build; the smaller minimal image's peak build footprint is not specified. An equipped Linux host resolves this environment dependency. [Upstream build requirements](https://puredarwin.org/handbook/getting-started.html).
+The original scratch workspace lacked Nix, QEMU, Rust/Cargo and Clang and had about 17 GiB free. Development now also uses the retained AWS Linux instance: QEMU and OVMF are installed, the official older image is verified, and a bounded bootstrap run has started. Its final result still needs retrieval after AWS sign-in. See the [AWS development checkpoint](M1_AWS_DEVELOPMENT.md). The 40-GiB host disk cannot reserve upstream's 60-GB-or-more Nix-store budget for a full image build; the smaller minimal image's peak build footprint is not specified. Selected-source build capacity and tooling remain open. [Upstream build requirements](https://puredarwin.org/handbook/getting-started.html).
 
 The earlier requirement to identify and boot a physical Mac before closing M1 was a sequencing choice. M1 now freezes the virtual hardware and tests it first. Physical driver/firmware qualification is deferred. The exact Stickies bundle is an M4 application input, not a prerequisite for writing the loader, supervisor or security implementation.
 
@@ -30,7 +30,7 @@ An official prebuilt PureDarwin 20.5 minimal image is available for a smaller Li
 | SHA-256 reported by GitHub | `ef65a816395680ef9210f401cebe3783c131badca1a942cb80e56bec97e717ac` |
 | Release source commit | `1bbaeb2ee6aa41e6f792a0b1e2943cc295b3b290` |
 
-Verify the downloaded bytes against that digest, use a writable copy and the release's matching firmware/runner configuration, and save only small diagnostic evidence. This older release uses a different substrate from the selected `0163b2db225b85e3bf96fc25646ea290105ac298` candidate. Its boot result cannot qualify the current candidate, Burdettie's runtime, Apple application compatibility or security enforcement. No bootstrap boot has been executed in this session. [Release runner source](https://github.com/PureDarwin/PureDarwin/blob/1bbaeb2ee6aa41e6f792a0b1e2943cc295b3b290/nix/image-contents.nix).
+Verify the downloaded bytes against that digest, use a writable copy and the release's matching firmware/runner configuration, and save only small diagnostic evidence. This older release uses a different substrate from the selected `0163b2db225b85e3bf96fc25646ea290105ac298` candidate. Its boot result cannot qualify the current candidate, Burdettie's runtime, Apple application compatibility or security enforcement. A bounded AWS bootstrap run has since started; its last observation showed kernel/device output, with the final shell/persistence result still uncollected. See the [AWS checkpoint](M1_AWS_DEVELOPMENT.md). [Release runner source](https://github.com/PureDarwin/PureDarwin/blob/1bbaeb2ee6aa41e6f792a0b1e2943cc295b3b290/nix/image-contents.nix).
 
 Standard public GitHub Ubuntu runners are a possible host for this bounded smoke experiment. Current specifications are four CPUs, 16 GB RAM and 14 GB SSD; their compute is free for public repositories. That documented disk allowance is insufficient as an assumed budget for the full source-build path. Keep any heavyweight experiment manual and separate from ordinary PR checks; do not introduce paid runners or large artifact retention implicitly. [GitHub runner specifications](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
 
@@ -75,4 +75,4 @@ Native macOS comparisons can later use recorded reference observations or a refe
 - **M5:** Real enforcement inside the selected Darwin VM, including operations that bypass compatibility shims.
 - **M7:** Installable and recoverable VM alpha. Physical-machine support is separately qualified when selected and available.
 
-M1 remains in progress until the VM experiment is performed. The next required resource is suitable Linux execution capacity, not Mac hardware.
+M1 remains in progress. AWS now supplies the initial bootstrap execution environment. Retrieve that run's result, establish the remaining source-build capacity/tooling and record the selected candidate's own feasibility evidence.

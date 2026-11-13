@@ -93,11 +93,33 @@
     "enforcement_qualification": "not_run"
   },
   "closure_blockers": [
-    "equipped_linux_build_host_and_pinned_checkout",
+    "selected_source_build_capacity_and_tooling",
     "linux_puredarwin_fixture_build_recipe",
     "recorded_vm_build_boot_runtime_feasibility_results",
     "backend_control_allocation_and_contract_review"
   ],
   "reference_platform": "puredarwin-x86_64-q35-tcg",
-  "mac_hardware_required_for_m1": false
+  "mac_hardware_required_for_m1": false,
+  "development_host": {
+    "provider": "existing_aws_free_plan_instance",
+    "role": "bootstrap_execution",
+    "os": "Ubuntu 24.04",
+    "architecture": "x86_64",
+    "vcpus": 2,
+    "memory_gib": 8,
+    "existing_root_disk_gib": 40,
+    "full_image_build_capacity_qualified": false
+  },
+  "bootstrap_experiment": {
+    "release": "PureDarwin 20.5",
+    "release_revision": "1bbaeb2ee6aa41e6f792a0b1e2943cc295b3b290",
+    "image_sha256": "ef65a816395680ef9210f401cebe3783c131badca1a942cb80e56bec97e717ac",
+    "harness_revision": "5800f5ec505c427bc335215d028e2ec9618ebfee",
+    "result": "pending_readback",
+    "last_observed_state": "running_with_kernel_and_device_output",
+    "shell_evidence": "not_yet_verified",
+    "persistence_evidence": "not_yet_verified",
+    "qualifies_selected_candidate": false,
+    "checkpoint": "M1_AWS_DEVELOPMENT.md"
+  }
 }

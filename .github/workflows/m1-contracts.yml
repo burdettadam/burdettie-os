@@ -7,16 +7,20 @@ on:
       - 'docs/contracts/**'
       - 'scripts/collect_m1_inventory.py'
       - 'scripts/m1_boot_preflight.py'
+      - 'scripts/m1_vm_bootstrap.py'
       - 'scripts/tests/test_collect_m1_inventory.py'
       - 'scripts/tests/test_m1_boot_preflight.py'
+      - 'scripts/tests/test_m1_vm_bootstrap.py'
   pull_request:
     paths:
       - '.github/workflows/m1-contracts.yml'
       - 'docs/contracts/**'
       - 'scripts/collect_m1_inventory.py'
       - 'scripts/m1_boot_preflight.py'
+      - 'scripts/m1_vm_bootstrap.py'
       - 'scripts/tests/test_collect_m1_inventory.py'
       - 'scripts/tests/test_m1_boot_preflight.py'
+      - 'scripts/tests/test_m1_vm_bootstrap.py'
 
 permissions:
   contents: read
@@ -33,7 +37,7 @@ jobs:
         run: |
           python3 -m venv "$RUNNER_TEMP/burdettie-m1-venv"
           "$RUNNER_TEMP/burdettie-m1-venv/bin/python" -m pip install --disable-pip-version-check -r docs/contracts/requirements.txt
-      - name: Check inventory and boot preflight behavior
+      - name: Check inventory, preflight and bootstrap harness behavior
         run: python3 -m unittest discover -s scripts/tests -p 'test_*.py' -v
       - name: Check contract consistency examples
         run: |

@@ -63,7 +63,7 @@ On the x86_64 Linux build host, after obtaining the pinned PureDarwin checkout d
 python3 scripts/m1_boot_preflight.py --source /path/to/puredarwin-m1
 ```
 
-The preflight never builds, downloads or boots an image. Exit 2 means its checked prerequisites are blocked; exit 0 means those prerequisites are present, not that a build or boot has passed. Check disk capacity separately. The current execution environment lacks Nix, QEMU and a pinned source/image and has about 17 GiB free, so the recorded source-build experiment is blocked. The VM and runtime checks remain unexecuted; physical hardware is deferred.
+The preflight never builds, downloads or boots an image. Exit 2 means its checked prerequisites are blocked; exit 0 means those prerequisites are present, not that a build or boot has passed. Check disk capacity separately. The original scratch environment was blocked. The retained AWS host now has QEMU/OVMF and a verified older 20.5 image, and its bounded bootstrap run has started; the final result needs retrieval after sign-in. The selected source-build candidate still needs Nix, its pinned checkout, adequate measured build capacity and its own VM/runtime evidence. Physical hardware is deferred. See the [AWS development checkpoint](M1_AWS_DEVELOPMENT.md).
 
 ## Work allocation and completion evidence
 
@@ -92,4 +92,4 @@ M3 through M7 deliver this integrated alpha. M1 closes when its targets, contrac
 
 ## Remaining work before closing M1
 
-Provide an equipped Linux build host, add the Linux/PureDarwin fixture build recipe, record the pinned VM build/boot/runtime experiment, and complete backend-control allocation and contract review. Mac ownership and Stickies availability are not M1 blockers. M4 still needs an exact real application and its behavior evidence; physical hardware support needs its own later qualification. Production sandbox support and an installable OS are not yet established.
+Retrieve the AWS bootstrap result, establish remaining source-build capacity and tooling, add the Linux/PureDarwin fixture build recipe, record the selected candidate's own VM build/boot/runtime experiment, and complete backend-control allocation and contract review. Mac ownership and Stickies availability are not M1 blockers. M4 still needs an exact real application and its behavior evidence; physical hardware support needs its own later qualification. Production sandbox support and an installable OS are not yet established.
