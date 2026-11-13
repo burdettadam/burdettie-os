@@ -65,8 +65,16 @@ fn pthread_create_with_virtualized_guest_attr_buffer() {
         arg
     }
 
+    // Linux virtualizes the guest handle without touching its opaque storage.
+    // Darwin passes attrs through and needs a complete, properly aligned object.
+    #[cfg(not(target_os = "macos"))]
     let mut guest_attr = [0u8; 8];
+    #[cfg(not(target_os = "macos"))]
     let attr = guest_attr.as_mut_ptr().cast::<libc::pthread_attr_t>();
+    #[cfg(target_os = "macos")]
+    let mut guest_attr = std::mem::MaybeUninit::<libc::pthread_attr_t>::uninit();
+    #[cfg(target_os = "macos")]
+    let attr = guest_attr.as_mut_ptr();
 
     assert_eq!(shim_pthread_attr_init(attr), 0);
     assert_eq!(shim_pthread_attr_setstacksize(attr, 1 << 20), 0);
