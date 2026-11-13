@@ -194,6 +194,7 @@ fn scorecard_per_fixture_results() {
     let mut failed = Vec::new();
 
     for (name, binary) in &entries {
+        eprintln!("[scorecard fixture] {name}");
         let expected = expected_exit(name);
         let config = RuntimeConfig::permissive(binary);
 

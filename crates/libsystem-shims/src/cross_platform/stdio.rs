@@ -351,7 +351,7 @@ impl StdioShims {
                 ("_ferror", libc::ferror as *const () as u64, "native ferror"),
                 ("_fputc", libc::fputc as *const () as u64, "native fputc"),
                 ("_fgetc", libc::fgetc as *const () as u64, "native fgetc"),
-                ("_getc", libc::getc as *const () as u64, "native getc"),
+                ("_getc", libc::fgetc as *const () as u64, "native getc"),
             );
         }
     }

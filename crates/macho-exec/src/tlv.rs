@@ -220,6 +220,78 @@ unsafe extern "C" fn tlv_block_destructor(ptr: *mut libc::c_void) {
 /// Called from guest code via function pointer. `desc` must point to
 /// a valid TLV descriptor in mapped memory with a key value that was
 /// registered via `patch_tlv_thunks`.
+// Darwin TLV calls preserve live registers across lookup, unlike the C ABI.
+// In particular LLVM keeps prior TLV addresses in x8 across the next lookup.
+// See dyld/libdyld/threadLocalHelpers.s. Preserve all vector registers too.
+#[cfg(target_arch = "aarch64")]
+#[unsafe(naked)]
+unsafe extern "C" fn tlv_get_addr_thunk(desc: *mut TlvDescriptor) -> *mut u8 {
+    core::arch::naked_asm!(
+        "sub sp, sp, #688",
+        "stp x1, x2, [sp, #0]",
+        "stp x3, x4, [sp, #16]",
+        "stp x5, x6, [sp, #32]",
+        "stp x7, x8, [sp, #48]",
+        "stp x9, x10, [sp, #64]",
+        "stp x11, x12, [sp, #80]",
+        "stp x13, x14, [sp, #96]",
+        "stp x15, x16, [sp, #112]",
+        "stp x17, x18, [sp, #128]",
+        "stp x29, x30, [sp, #144]",
+        "add x29, sp, #144",
+        "mrs x16, nzcv",
+        "str x16, [sp, #672]",
+        "stp q0, q1, [sp, #160]",
+        "stp q2, q3, [sp, #192]",
+        "stp q4, q5, [sp, #224]",
+        "stp q6, q7, [sp, #256]",
+        "stp q8, q9, [sp, #288]",
+        "stp q10, q11, [sp, #320]",
+        "stp q12, q13, [sp, #352]",
+        "stp q14, q15, [sp, #384]",
+        "stp q16, q17, [sp, #416]",
+        "stp q18, q19, [sp, #448]",
+        "stp q20, q21, [sp, #480]",
+        "stp q22, q23, [sp, #512]",
+        "stp q24, q25, [sp, #544]",
+        "stp q26, q27, [sp, #576]",
+        "stp q28, q29, [sp, #608]",
+        "stp q30, q31, [sp, #640]",
+        "bl {resolve}",
+        "ldp q0, q1, [sp, #160]",
+        "ldp q2, q3, [sp, #192]",
+        "ldp q4, q5, [sp, #224]",
+        "ldp q6, q7, [sp, #256]",
+        "ldp q8, q9, [sp, #288]",
+        "ldp q10, q11, [sp, #320]",
+        "ldp q12, q13, [sp, #352]",
+        "ldp q14, q15, [sp, #384]",
+        "ldp q16, q17, [sp, #416]",
+        "ldp q18, q19, [sp, #448]",
+        "ldp q20, q21, [sp, #480]",
+        "ldp q22, q23, [sp, #512]",
+        "ldp q24, q25, [sp, #544]",
+        "ldp q26, q27, [sp, #576]",
+        "ldp q28, q29, [sp, #608]",
+        "ldp q30, q31, [sp, #640]",
+        "ldr x16, [sp, #672]",
+        "msr nzcv, x16",
+        "ldp x1, x2, [sp, #0]",
+        "ldp x3, x4, [sp, #16]",
+        "ldp x5, x6, [sp, #32]",
+        "ldp x7, x8, [sp, #48]",
+        "ldp x9, x10, [sp, #64]",
+        "ldp x11, x12, [sp, #80]",
+        "ldp x13, x14, [sp, #96]",
+        "ldp x15, x16, [sp, #112]",
+        "ldp x17, x18, [sp, #128]",
+        "ldp x29, x30, [sp, #144]",
+        "add sp, sp, #688",
+        "ret",
+        resolve = sym tlv_get_addr,
+    );
+}
+
 unsafe extern "C" fn tlv_get_addr(desc: *mut TlvDescriptor) -> *mut u8 {
     let d = unsafe { &*desc };
     let offset = d.offset;
@@ -571,7 +643,14 @@ pub fn patch_tlv_thunks(image: &MappedImage, parsed: &ParsedMachO) -> usize {
                 .insert(desc_ptr as usize, Arc::clone(&image_info));
         }
         unsafe {
-            (*desc_ptr).thunk = tlv_get_addr;
+            #[cfg(target_arch = "aarch64")]
+            {
+                (*desc_ptr).thunk = tlv_get_addr_thunk;
+            }
+            #[cfg(not(target_arch = "aarch64"))]
+            {
+                (*desc_ptr).thunk = tlv_get_addr;
+            }
             (*desc_ptr).key = pkey as usize;
             // offset stays as-is (it's the offset within the TLV block).
         }
@@ -604,6 +683,48 @@ mod tests {
         }
         let mut guard = TLV_IMAGE_REGISTRY.lock().unwrap();
         *guard = None;
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    #[test]
+    fn tlv_thunk_preserves_live_integer_and_fp_registers() {
+        let _registry_guard = TLV_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let pkey = tls::create_key(tlv_block_destructor).expect("TLV key");
+        let info = Arc::new(TlvImageInfo {
+            pthread_key: pkey,
+            total_size: 16,
+            allocation_size: 16,
+            template_chunks: Vec::new(),
+        });
+        let mut descriptor = TlvDescriptor {
+            thunk: tlv_get_addr_thunk,
+            key: 0,
+            offset: 0,
+        };
+        {
+            let mut guard = TLV_IMAGE_REGISTRY.lock().unwrap();
+            let registry = guard.insert(TlvImageRegistry::new());
+            registry
+                .descriptors
+                .insert((&mut descriptor as *mut TlvDescriptor) as usize, info);
+        }
+        let pointer: *mut u8;
+        let live_integer: u64;
+        let live_float: f64;
+        unsafe {
+            core::arch::asm!(
+                "blr x16",
+                inlateout("x0") &mut descriptor as *mut TlvDescriptor => pointer,
+                inlateout("x8") 0x1234_5678_9abc_def0_u64 => live_integer,
+                inlateout("d0") 3.25_f64 => live_float,
+                in("x16") tlv_get_addr_thunk as *const (),
+                clobber_abi("C"),
+            );
+        }
+        assert!(!pointer.is_null());
+        assert_eq!(live_integer, 0x1234_5678_9abc_def0);
+        assert_eq!(live_float.to_bits(), 3.25_f64.to_bits());
+        cleanup_test_key(pkey);
     }
 
     #[test]

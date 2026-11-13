@@ -167,8 +167,8 @@ jobs:
               echo "::group::Native backtrace: $stem"
               lldb --batch \
                 -o 'settings set target.disable-aslr false' \
-                -o run -o 'thread backtrace all' \
-                -- "$binary" --nocapture --test-threads=1 || true
+                -o run -k 'thread backtrace all' -k 'register read' \
+                -- "$binary" --nocapture || true
               echo '::endgroup::'
             done
           done

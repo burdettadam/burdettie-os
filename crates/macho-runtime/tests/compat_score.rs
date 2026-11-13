@@ -159,6 +159,7 @@ fn score_fixture_subprocess(name: &str, binary: &Path) -> FixtureScore {
 
 /// Run a fixture in-process and score it (fast path).
 fn score_fixture_inprocess(name: &str, binary: &Path) -> FixtureScore {
+    eprintln!("[compat fixture] {name}");
     let expected = expected_exit(name);
     let mut score = FixtureScore {
         name: name.to_string(),

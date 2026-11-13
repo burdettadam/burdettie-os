@@ -23,6 +23,7 @@ pub static RUNTIME_LOCK: Mutex<()> = Mutex::new(());
     reason = "Each integration-test binary compiles this shared module and uses a different subset of its helpers"
 )]
 pub fn run_fixture(fixture_rel: &str) -> Option<RuntimeResult> {
+    eprintln!("[runtime fixture] {fixture_rel}");
     let _lock = RUNTIME_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let fixture = fixtures_dir().join(fixture_rel);
     if !fixture.exists() {
