@@ -10,11 +10,78 @@ fn access_last_byte(addr: u64, size: usize) -> Option<u64> {
     addr.checked_add(u64::try_from(size.checked_sub(1)?).ok()?)
 }
 
+/// Darwin's mincore reports residency, including successful queries over holes.
+/// Walk Mach VM regions instead, rejecting any gap before the last byte.
+#[cfg(target_os = "macos")]
+fn is_host_range_mapped(addr: u64, size: usize) -> bool {
+    // ABI from XNU osfmk/mach/vm_region.h and mach_vm.defs. The packed basic
+    // information record occupies nine integer_t slots; its fields are unused.
+    const VM_REGION_BASIC_INFO_64: i32 = 9;
+    const VM_REGION_BASIC_INFO_COUNT_64: u32 = 9;
+    unsafe extern "C" {
+        fn mach_vm_region(
+            task: u32,
+            address: *mut u64,
+            size: *mut u64,
+            flavor: i32,
+            info: *mut i32,
+            count: *mut u32,
+            object_name: *mut u32,
+        ) -> i32;
+        fn mach_port_deallocate(task: u32, name: u32) -> i32;
+    }
+
+    let Some(last) = access_last_byte(addr, size) else {
+        return false;
+    };
+    // libc deprecates its Mach bindings in favor of an additional wrapper crate.
+    #[allow(deprecated)]
+    let task = unsafe { libc::mach_task_self() };
+    let mut cursor = addr;
+    loop {
+        let mut region_start = cursor;
+        let mut region_size = 0;
+        let mut info = [0_i32; VM_REGION_BASIC_INFO_COUNT_64 as usize];
+        let mut count = VM_REGION_BASIC_INFO_COUNT_64;
+        let mut object_name = 0;
+        // SAFETY: All output buffers match the fixed Mach ABI. The query does
+        // not dereference guest memory and only inspects this task's mappings.
+        let status = unsafe {
+            mach_vm_region(
+                task,
+                &mut region_start,
+                &mut region_size,
+                VM_REGION_BASIC_INFO_64,
+                info.as_mut_ptr(),
+                &mut count,
+                &mut object_name,
+            )
+        };
+        if object_name != 0 {
+            // SAFETY: Release the send right returned by mach_vm_region.
+            unsafe { mach_port_deallocate(task, object_name) };
+        }
+        if status != libc::KERN_SUCCESS || region_start > cursor {
+            return false;
+        }
+        let Some(region_end) = region_start.checked_add(region_size) else {
+            return false;
+        };
+        if region_end <= cursor {
+            return false;
+        }
+        if last < region_end {
+            return true;
+        }
+        cursor = region_end;
+    }
+}
+
 /// Check that every host page covering an access is mapped.
 ///
 /// This is a mapping check, not a permission or lifetime guarantee. Host
 /// passthrough remains limited to trusted pointers whose access is valid.
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "macos")))]
 fn is_host_range_mapped(addr: u64, size: usize) -> bool {
     static PAGE_SIZE: std::sync::OnceLock<Option<u64>> = std::sync::OnceLock::new();
     let Some(page_size) = *PAGE_SIZE.get_or_init(|| {
@@ -25,9 +92,8 @@ fn is_host_range_mapped(addr: u64, size: usize) -> bool {
     }) else {
         return false;
     };
-    // Darwin can round the query to a user-map page but report residency at a
-    // smaller kernel granule. Reserve 16 bytes below for up to a 64 KiB page
-    // reported in 4 KiB units; reject unsupported granules conservatively.
+    // Reserve enough residency storage for non-Linux Unix granules. Darwin
+    // uses the Mach region query above because mincore does not reject holes.
     #[cfg(not(target_os = "linux"))]
     if !(4096..=65536).contains(&page_size) || !page_size.is_power_of_two() {
         return false;
@@ -44,8 +110,8 @@ fn is_host_range_mapped(addr: u64, size: usize) -> bool {
         #[cfg(not(target_os = "linux"))]
         let mut residency = [0_u8; 16];
         // SAFETY: The address is aligned to the actual host page size. A
-        // one-byte length produces one residency byte on Linux. Darwin's
-        // mixed-granule reporting fits in the larger buffer described above.
+        // one-byte length produces one residency byte on Linux. Other Unix
+        // granules fit in the larger buffer described above.
         // A fixed 16 KiB length with a one-byte buffer overwrites the stack on
         // Linux with 4 KiB pages. mincore does not dereference the queried
         // address; an unmapped page produces an error instead.
@@ -715,6 +781,10 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn host_passthrough_checks_every_page_of_an_access() {
+        // Allocate the interpreter stack before creating a hole so this test's
+        // own allocator cannot immediately reuse the unmapped address range.
+        let mut mem = unsafe { super::Memory::from_segments(&[]) };
+        mem.host_passthrough = true;
         // Leave the second page unmapped so a read crossing the boundary must
         // be rejected before a raw pointer is dereferenced.
         let page_size =
@@ -738,8 +808,6 @@ mod tests {
         );
         // SAFETY: The first page remains mapped and writable.
         unsafe { first_page.add(page_size - 4).cast::<u32>().write(0x1234) };
-        let mut mem = unsafe { super::Memory::from_segments(&[]) };
-        mem.host_passthrough = true;
         let addr = first_page as u64 + (page_size - 4) as u64;
         assert_eq!(mem.read_u32(addr), Some(0x1234));
         assert_eq!(mem.read_u64(addr), None);
