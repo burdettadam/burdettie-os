@@ -62,6 +62,10 @@ pub(super) fn run_interpreted(
         (main_data, arc_parsed)
     };
 
+    // 3. Apply the same admission policy as native execution before any
+    // shim setup, dependency loading, or guest initializer can run.
+    let security_report = crate::security::evaluate_security(&arc_parsed, binary_path, config)?;
+
     // 4. Build shim table
     let shim_config = ShimConfig {
         process_name: config.process_name.clone(),
@@ -94,27 +98,40 @@ pub(super) fn run_interpreted(
     let mut registry = ImageRegistry::new(config.platform.memory(), unwind_registry);
     let binary_dir = binary_path.parent().unwrap_or(Path::new("."));
 
-    // 5.5. Load DYLD_INSERT_LIBRARIES (if any, and not blocked by hardened runtime).
-    {
-        let mut insert_paths = config.insert_libraries.clone();
+    // 5.5. Load DYLD_INSERT_LIBRARIES and apply the same hardened-runtime
+    // transformation used by native execution.
+    let insert_paths: Vec<std::path::PathBuf> = {
+        let mut paths = config.insert_libraries.clone();
         for (key, val) in &config.env_overrides {
             if key == "DYLD_INSERT_LIBRARIES" {
                 for p in val.split(':') {
                     let p = p.trim();
                     if !p.is_empty() {
-                        insert_paths.push(std::path::PathBuf::from(p));
+                        paths.push(std::path::PathBuf::from(p));
                     }
                 }
             }
         }
-        if !insert_paths.is_empty() {
-            let count =
-                loader::load_insert_libraries(&insert_paths, &mut registry, config.platform.fs());
-            log::info!(
-                "DYLD_INSERT_LIBRARIES: loaded {count}/{} libraries",
-                insert_paths.len()
-            );
+        if !paths.is_empty() {
+            if let Some(ref report) = security_report {
+                if report.strip_dyld_env {
+                    log::warn!(
+                        "DYLD_INSERT_LIBRARIES blocked by hardened runtime ({} libraries ignored)",
+                        paths.len(),
+                    );
+                    paths.clear();
+                }
+            }
         }
+        paths
+    };
+    if !insert_paths.is_empty() {
+        let count =
+            loader::load_insert_libraries(&insert_paths, &mut registry, config.platform.fs());
+        log::info!(
+            "DYLD_INSERT_LIBRARIES: loaded {count}/{} libraries",
+            insert_paths.len()
+        );
     }
 
     let _dep_stats =
@@ -251,7 +268,7 @@ pub(super) fn run_interpreted(
 
     Ok(RuntimeResult {
         exit_code: entry_result.exit_code,
-        security_report: None,
+        security_report,
         images_loaded: registry.images().len(),
         shims_installed: ctx.shim_table.len(),
         initializers_run: 0,
