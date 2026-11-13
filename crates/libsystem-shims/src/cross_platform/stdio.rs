@@ -334,7 +334,26 @@ impl StdioShims {
             );
         }
         #[cfg(target_os = "macos")]
-        let _ = table;
+        {
+            // Native FILE layouts match the guest. Register the same stdio API
+            // explicitly instead of depending on the host fallback allowlist.
+            use crate::register_shims;
+            register_shims!(
+                table,
+                ("_fopen", libc::fopen as *const () as u64, "native fopen"),
+                (
+                    "_fopen$DARWIN_EXTSN",
+                    libc::fopen as *const () as u64,
+                    "native fopen variant"
+                ),
+                ("_fclose", libc::fclose as *const () as u64, "native fclose"),
+                ("_feof", libc::feof as *const () as u64, "native feof"),
+                ("_ferror", libc::ferror as *const () as u64, "native ferror"),
+                ("_fputc", libc::fputc as *const () as u64, "native fputc"),
+                ("_fgetc", libc::fgetc as *const () as u64, "native fgetc"),
+                ("_getc", libc::getc as *const () as u64, "native getc"),
+            );
+        }
     }
 }
 

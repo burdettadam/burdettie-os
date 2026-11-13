@@ -158,6 +158,7 @@ jobs:
 
       - name: Diagnose native process failures
         if: failure()
+        timeout-minutes: 5
         run: |
           # Diagnostic reruns never replace the required parallel workspace test.
           for stem in arm64_translate headless_tests libsystem_shims compat_score runtime_exec_tests; do

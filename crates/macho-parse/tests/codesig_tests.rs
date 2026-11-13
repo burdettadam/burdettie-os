@@ -105,15 +105,29 @@ fn simple_cli_cd_hash_matches_codesign() {
         "CDHash should not be all zeros"
     );
 
-    // Verify it matches the codesign output (first 20 bytes = CDHash displayed by codesign)
-    let hash_hex: String = cd.cd_hash.iter().map(|b| format!("{b:02x}")).collect();
-    // codesign reports CDHash=7cad795285f7f4f76e40c3fe1055d1904416f746
-    // (first 20 bytes = 40 hex chars of the full SHA-256)
-    let expected_prefix = "7cad795285f7f4f76e40c3fe1055d1904416f746";
-    assert!(
-        hash_hex.starts_with(expected_prefix),
-        "CDHash should start with {expected_prefix}, got {hash_hex}"
-    );
+    // Fixture signatures change with compiler/linker versions. Compare with
+    // the native codesign oracle for the binary built in this run.
+    #[cfg(target_os = "macos")]
+    {
+        let fixture = macho_fixtures::fixtures_dir().join("simple_cli/app");
+        let output = std::process::Command::new("codesign")
+            .args(["-d", "--verbose=4"])
+            .arg(fixture)
+            .output()
+            .expect("run native codesign oracle");
+        assert!(output.status.success(), "codesign inspection failed");
+        let details = String::from_utf8_lossy(&output.stderr);
+        let expected = details
+            .lines()
+            .find_map(|line| line.strip_prefix("CDHash="))
+            .expect("codesign must report a CDHash");
+        let hash_hex: String = cd.cd_hash.iter().map(|b| format!("{b:02x}")).collect();
+        assert_eq!(expected.len(), 40, "codesign CDHash must contain 20 bytes");
+        assert!(
+            hash_hex.starts_with(expected),
+            "CDHash differs from codesign: {hash_hex} vs {expected}"
+        );
+    }
 }
 
 #[test]

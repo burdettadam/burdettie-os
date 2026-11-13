@@ -870,6 +870,11 @@ pub extern "C" fn shim_mmap(
 ///   RLIMIT_NPROC    = 7      RLIMIT_NPROC    = 6
 ///   RLIMIT_NOFILE   = 8      RLIMIT_NOFILE   = 7
 fn translate_rlimit_resource(darwin_res: c_int) -> c_int {
+    #[cfg(target_os = "macos")]
+    {
+        darwin_res
+    }
+    #[cfg(not(target_os = "macos"))]
     match darwin_res {
         0..=4 => darwin_res, // CPU, FSIZE, DATA, STACK, CORE — same
         5 => 9,              // RLIMIT_AS
@@ -899,6 +904,11 @@ pub extern "C" fn shim_setrlimit(resource: c_int, rlp: *const libc::rlimit) -> c
 /// Translate macOS `_SC_*` constants to Linux equivalents.
 /// Every single value differs between the two platforms.
 fn translate_sysconf_name(darwin_name: c_int) -> c_int {
+    #[cfg(target_os = "macos")]
+    {
+        darwin_name
+    }
+    #[cfg(not(target_os = "macos"))]
     match darwin_name {
         1 => 0,     // _SC_ARG_MAX
         2 => 1,     // _SC_CHILD_MAX
@@ -948,7 +958,7 @@ fn translate_sysconf_name(darwin_name: c_int) -> c_int {
 /// `long sysconf(int name)`
 ///
 /// Translates macOS `_SC_*` constants to Linux equivalents before
-/// delegating to the host sysconf.
+/// delegating to the host sysconf. On macOS, guest constants already match the host.
 pub extern "C" fn shim_sysconf(name: c_int) -> c_long {
     let linux_name = translate_sysconf_name(name);
     log::trace!("sysconf: macOS _SC_={name} → Linux _SC_={linux_name}");
@@ -1443,35 +1453,48 @@ mod tests {
 
     #[test]
     fn test_rlimit_divergent_values() {
-        assert_eq!(translate_rlimit_resource(5), 9); // RLIMIT_AS
-        assert_eq!(translate_rlimit_resource(6), 8); // RLIMIT_MEMLOCK
-        assert_eq!(translate_rlimit_resource(7), 6); // RLIMIT_NPROC
-        assert_eq!(translate_rlimit_resource(8), 7); // RLIMIT_NOFILE
+        #[cfg(target_os = "macos")]
+        let expected = [5, 6, 7, 8];
+        #[cfg(not(target_os = "macos"))]
+        let expected = [9, 8, 6, 7];
+        for (resource, expected) in (5..=8).zip(expected) {
+            assert_eq!(translate_rlimit_resource(resource), expected);
+        }
     }
 
     // ── sysconf translation tests ───────────────────────────────
 
     #[test]
     fn test_sysconf_pagesize() {
-        assert_eq!(translate_sysconf_name(29), 30); // _SC_PAGESIZE
+        assert_eq!(translate_sysconf_name(29), libc::_SC_PAGESIZE); // _SC_PAGESIZE
     }
 
     #[test]
     fn test_sysconf_nprocessors() {
-        assert_eq!(translate_sysconf_name(57), 83); // _SC_NPROCESSORS_CONF
-        assert_eq!(translate_sysconf_name(58), 84); // _SC_NPROCESSORS_ONLN
+        assert_eq!(translate_sysconf_name(57), libc::_SC_NPROCESSORS_CONF); // _SC_NPROCESSORS_CONF
+        assert_eq!(translate_sysconf_name(58), libc::_SC_NPROCESSORS_ONLN); // _SC_NPROCESSORS_ONLN
     }
 
     #[test]
     fn test_sysconf_phys_pages() {
-        assert_eq!(translate_sysconf_name(200), 85); // _SC_PHYS_PAGES
+        assert_eq!(translate_sysconf_name(200), libc::_SC_PHYS_PAGES); // _SC_PHYS_PAGES
     }
 
     #[test]
     fn test_sysconf_common_values() {
-        assert_eq!(translate_sysconf_name(1), 0); // _SC_ARG_MAX
-        assert_eq!(translate_sysconf_name(3), 2); // _SC_CLK_TCK
-        assert_eq!(translate_sysconf_name(5), 4); // _SC_OPEN_MAX
+        assert_eq!(translate_sysconf_name(1), libc::_SC_ARG_MAX); // _SC_ARG_MAX
+        assert_eq!(translate_sysconf_name(3), libc::_SC_CLK_TCK); // _SC_CLK_TCK
+        assert_eq!(translate_sysconf_name(5), libc::_SC_OPEN_MAX); // _SC_OPEN_MAX
+    }
+
+    #[test]
+    fn sysconf_shim_matches_host_page_size_and_processor_count() {
+        for (darwin_name, host_name) in [(29, libc::_SC_PAGESIZE), (58, libc::_SC_NPROCESSORS_ONLN)]
+        {
+            let expected = unsafe { libc::sysconf(host_name) };
+            assert!(expected > 0);
+            assert_eq!(shim_sysconf(darwin_name), expected);
+        }
     }
 
     #[test]
