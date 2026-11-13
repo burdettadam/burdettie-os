@@ -6,7 +6,7 @@ Burdettie-OS explores what it takes to run software built for macOS through an i
 
 This is an experimental systems project. Compatibility depends on the binary, CPU architecture, platform backend, and APIs it uses. The implementation is a user-space runtime; the host operating system still provides the kernel, memory management, files, and display services.
 
-The product goal is a bootable, Darwin-compatible OS that runs a named set of macOS applications with owner-selectable permissive, audit and enforced security. [M1 platform and security contracts](docs/milestones/M1_PLATFORM_SECURITY.md) define the first OS target, the launch contract and the evidence needed to proceed. PureDarwin/XNU on x86_64 is selected for a bounded boot feasibility experiment; the physical Mac, exact Apple application version and enforcement backend still require qualification.
+The product goal is a bootable, Darwin-compatible OS that runs a named set of macOS applications with owner-selectable permissive, audit and enforced security. [M1 platform and security contracts](docs/milestones/M1_PLATFORM_SECURITY.md) define a Linux-built PureDarwin/XNU x86_64 VM as the initial reference platform, with a bounded boot feasibility experiment and shared launch contract. [Development without Mac hardware](docs/milestones/M1_WITHOUT_MAC.md) separates the immediate build/runtime work from later exact-application and physical-device qualification.
 
 [Quick start](#quick-start) · [Architecture](#architecture) · [Engineering highlights](#engineering-highlights) · [Validation](#validation) · [Documentation](#documentation)
 

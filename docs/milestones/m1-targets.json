@@ -34,7 +34,7 @@
     "qualification": "not_run"
   },
   "physical_target": {
-    "status": "inventory_required",
+    "status": "deferred_hardware_support_track",
     "architecture_intent": "x86_64",
     "model_identifier": null,
     "cpu_model": null,
@@ -44,7 +44,8 @@
     "gpu": null,
     "input_controllers": null,
     "network_devices": null,
-    "boot_result": "not_run"
+    "boot_result": "not_run",
+    "required_for_m1": false
   },
   "apple_application": {
     "name": "Stickies",
@@ -59,7 +60,9 @@
     "bundle_manifest_sha256": null,
     "dependency_closure": null,
     "workflow": "create_edit_unicode_select_clipboard_quit_reboot_reopen_notes",
-    "qualification": "not_run"
+    "qualification": "not_run",
+    "required_for_m1": false,
+    "qualification_milestone": "M4"
   },
   "public_fixtures": [
     {
@@ -80,16 +83,21 @@
   ],
   "security": {
     "contract_version": 1,
-    "modes": ["permissive", "audit", "enforced"],
+    "modes": [
+      "permissive",
+      "audit",
+      "enforced"
+    ],
     "mode_independent_of_signer_policy": true,
     "production_enforcement_backend": null,
     "enforcement_qualification": "not_run"
   },
   "closure_blockers": [
-    "actual_mac_inventory",
-    "exact_apple_application_inventory_and_dependency_closure",
-    "equipped_build_host_and_pinned_checkout",
-    "recorded_boot_runtime_and_hardware_feasibility_results",
+    "equipped_linux_build_host_and_pinned_checkout",
+    "linux_puredarwin_fixture_build_recipe",
+    "recorded_vm_build_boot_runtime_feasibility_results",
     "backend_control_allocation_and_contract_review"
-  ]
+  ],
+  "reference_platform": "puredarwin-x86_64-q35-tcg",
+  "mac_hardware_required_for_m1": false
 }

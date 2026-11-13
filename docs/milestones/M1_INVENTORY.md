@@ -1,5 +1,7 @@
 # M1 application and hardware inventory
 
+The initial M1 reference platform is the Linux-hosted x86_64 Darwin VM. This collector supports later application and physical-hardware qualification; a Mac inventory is not required to close M1. An existing `.app` can be inspected on Linux or Windows with `--no-hardware`, without running it or invoking Apple's `codesign` tool.
+
 Run this passive collector on the intended Mac. It does not launch the selected
 application, use a network service, request administrator privileges, copy
 application code, or change system configuration. Python 3.9 or later is needed.

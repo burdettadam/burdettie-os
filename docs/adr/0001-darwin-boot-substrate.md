@@ -1,6 +1,6 @@
 # M1 platform and boot decision
 
-Status: selected for a bounded feasibility spike. The production substrate is conditional on the evidence below. M1 remains in progress until the physical target and application identity are recorded and the spike produces a result.
+Status: selected for a bounded feasibility spike. The production substrate is conditional on the evidence below. The x86_64 QEMU VM is the initial reference platform. M1 remains in progress until its build/boot/runtime experiment and contract decisions are recorded; physical Mac and real-application qualification proceed later.
 
 ## Decision
 
@@ -8,7 +8,7 @@ Use an x86_64 Darwin guest built from the PureDarwin XNU distribution as the fir
 
 This decision establishes where to invest the first platform experiment. It does not establish that the Burdettie runtime already runs on PureDarwin, that an arbitrary Intel Mac boots it, or that the substrate enforces Burdettie policies. Those are separate gates.
 
-Keep native Apple Silicon macOS development and Linux ARM64 interpreter validation as existing runtime development lanes. The first candidate OS lane is explicitly x86_64. Prefer x86_64 slices of the selected macOS application on that lane; ARM64-to-x86_64 translation is outside the initial target unless the actual application inventory makes it unavoidable.
+Use Linux for the complete M1 build/VM path. Existing native macOS tests can remain reference evidence, and Linux ARM64 interpreter validation remains useful; neither is a prerequisite for the x86_64 OS experiment. Prefer x86_64 application slices on that lane; additional architectures require their own qualification.
 
 ## Why this candidate
 
@@ -47,7 +47,7 @@ There is an upstream documentation mismatch. The pinned README still tells build
 
 The q35 machine alias is pinned indirectly by the QEMU derivation; save the expanded command and its resolved machine version with the evidence. KVM with host passthrough may be a developer acceleration lane after the TCG baseline; it is a separate machine/CPU configuration and needs its own result.
 
-An older Mac is not a precise platform. Before M1 closes, collect model identifier, CPU model/architecture/features, RAM, firmware width/version, storage/controller, GPU/display path, keyboard/trackpad/USB controllers, and network device IDs. The selected machine must actually be available for testing. Do not choose a fictional Mac model to fill the table.
+The physical-target column is a deferred hardware-support track, not an M1 closure dependency. When physical support is added, collect model identifier, CPU model/architecture/features, RAM, firmware width/version, storage/controller, GPU/display path, keyboard/trackpad/USB controllers, and network device IDs. VM evidence does not establish support for that machine.
 
 ## Bounded spike and stop conditions
 
@@ -57,7 +57,7 @@ Run the stages in order. A stage may consume at most two focused engineer days b
 2. **Independent boot and persistence.** Boot a writable copy of the minimal image under the selected VM. Capture the loader, XNU, root mount, launchd and shell evidence. Write a fixed test string under `/var/tmp/burdettie-m1`, flush, stop QEMU, restart the same writable image and confirm the exact bytes. Boot the untouched base image separately as recovery. Save serial logs and image hashes. A shell from the old macOS IPSW VM does not satisfy this stage.
 3. **Runtime ABI bridge.** First run a source-built x86_64 Mach-O console probe on the guest that exercises allocation, file I/O, thread creation and process exit. Then build/package the narrow Burdettie CLI runtime against the selected SDK/libSystem and execute a source-built x86_64 guest fixture through it. Record all unresolved symbols, minimum-version commands, framework dependencies and actual native/guest provenance. An Apple macOS-target Rust binary is not assumed to link or run merely because both systems are Darwin.
 4. **Session and enforcement boundary.** Determine the concrete display/input path for Burdettie's software renderer without assuming Apple's host AppKit. Produce the exact process-launch and resource-confinement capability map consumed by the M1 security contract. Unknown mechanisms stay unsupported; do not map XNU presence or a successful sandbox shim to enforcement. PureDarwin's minimal console is a root shell for bringup. The Burdettie supervisor may need privileged mechanisms, but its app workers must run without supervisor authority. Permissive policy does not require running all guest apps as root. M3 completes the session boot integration; M5 proves confinement.
-5. **Physical boot probe.** After selecting the actual Mac, use separate external test media and record the boot selection, console, root mount, input and persistent-write result. Do not modify the machine's internal OS as part of this experiment. M1 needs an explicit hardware feasibility result; broader device and recovery qualification is M3/M7 work.
+5. **Later physical boot probe.** This is outside M1 closure. If physical Mac support is selected later, use separate external test media and record boot selection, console, root mount, input and persistent writes. Device/installer/recovery qualification belongs to that hardware-support target; it does not block the VM preview or virtual-machine alpha.
 
 If stages 2 or 3 cannot pass within the investigation budget, produce a gap list with estimated implementation work and decide whether to continue this candidate, use a known earlier pinned PureDarwin revision, or reassess the Darwin integration. A failed candidate does not silently authorize changing the shipping product to Linux.
 
@@ -113,7 +113,7 @@ Exit QEMU completely, rerun the identical host command against the same image, t
 
 ## Observed feasibility result in this session
 
-The available execution host is Linux x86_64. Read-only checks found Git and a C compiler, but no Nix, QEMU, Rust/Cargo, Clang or Xcode on PATH, and no `/dev/kvm`. No pinned PureDarwin checkout or image was present. The independent boot experiment is blocked at environment preflight. No image was built, no VM was booted, and no physical hardware was accessed. The absence of KVM is not itself a blocker because the selected baseline is TCG. The accompanying preflight utility emits machine-readable `blocked` or `ready_for_spike`; neither status claims a boot or runtime pass.
+The available execution host is Linux x86_64. Read-only checks found Git and a C compiler, but no Nix, QEMU, Rust/Cargo or Clang on PATH, and no `/dev/kvm`. No pinned PureDarwin checkout or image was present. A follow-up capacity check found about 17 GiB free. Upstream recommends budgeting 60 GB or more of Nix store for a full image build; the minimal image's exact peak build footprint has not been measured here. The independent boot experiment is blocked by the execution environment, not by absence of Mac hardware. No image was built or VM booted. KVM is optional because the baseline uses TCG. The preflight reports tool/source readiness only; disk capacity and the actual build remain separate checks. See [Mac-free execution options](../milestones/M1_WITHOUT_MAC.md).
 
 ## Sources
 
