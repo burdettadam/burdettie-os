@@ -781,6 +781,30 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn host_passthrough_checks_every_page_of_an_access() {
+        // An unmapped page can be reused by unrelated allocations in parallel
+        // tests. Exercise the kernel hole in a single-test child process so a
+        // successful mapping probe cannot race another test unmapping its data.
+        const CHILD: &str = "BURDETTIE_CROSS_PAGE_PROBE_CHILD";
+        if std::env::var_os(CHILD).is_none() {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "mem::tests::host_passthrough_checks_every_page_of_an_access",
+                    "--test-threads=1",
+                    "--nocapture",
+                ])
+                .env(CHILD, "1")
+                .output()
+                .expect("run isolated cross-page mapping regression");
+            assert!(
+                output.status.success(),
+                "cross-page regression failed: {:?}\n{}\n{}",
+                output.status,
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            return;
+        }
         // Allocate the interpreter stack before creating a hole so this test's
         // own allocator cannot immediately reuse the unmapped address range.
         let mut mem = unsafe { super::Memory::from_segments(&[]) };
