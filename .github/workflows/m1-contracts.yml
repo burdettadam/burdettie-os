@@ -1,0 +1,41 @@
+name: M1 contracts and inventory
+
+on:
+  push:
+    paths:
+      - '.github/workflows/m1-contracts.yml'
+      - 'docs/contracts/**'
+      - 'scripts/collect_m1_inventory.py'
+      - 'scripts/m1_boot_preflight.py'
+      - 'scripts/tests/test_collect_m1_inventory.py'
+      - 'scripts/tests/test_m1_boot_preflight.py'
+  pull_request:
+    paths:
+      - '.github/workflows/m1-contracts.yml'
+      - 'docs/contracts/**'
+      - 'scripts/collect_m1_inventory.py'
+      - 'scripts/m1_boot_preflight.py'
+      - 'scripts/tests/test_collect_m1_inventory.py'
+      - 'scripts/tests/test_m1_boot_preflight.py'
+
+permissions:
+  contents: read
+
+jobs:
+  contract-and-inventory:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install contract validation dependency
+        run: |
+          python3 -m venv "$RUNNER_TEMP/burdettie-m1-venv"
+          "$RUNNER_TEMP/burdettie-m1-venv/bin/python" -m pip install --disable-pip-version-check -r docs/contracts/requirements.txt
+      - name: Check inventory and boot preflight behavior
+        run: python3 -m unittest discover -s scripts/tests -p 'test_*.py' -v
+      - name: Check contract consistency examples
+        run: |
+          "$RUNNER_TEMP/burdettie-m1-venv/bin/python" docs/contracts/validate_contract.py --self-test
+          "$RUNNER_TEMP/burdettie-m1-venv/bin/python" docs/contracts/validate_contract.py docs/contracts/examples/*.json

@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "milestone": "M1",
+  "status": "in_progress",
+  "source_revision": "7bf375562ca9edf513c353da7ec3309c0337f457",
+  "product": "bootable_darwin_compatible_os",
+  "substrate": {
+    "status": "selected_for_feasibility",
+    "repository": "https://github.com/PureDarwin/PureDarwin",
+    "revision": "0163b2db225b85e3bf96fc25646ea290105ac298",
+    "nixpkgs_revision": "fd1462031fdee08f65fd0b4c6b64e22239a77870",
+    "kernel_family": "XNU",
+    "build_host": "x86_64-linux",
+    "image_target": "image-minimal",
+    "image_sha256": null,
+    "boot_result": "not_run",
+    "preflight_result": "blocked"
+  },
+  "vm": {
+    "id": "puredarwin-x86_64-q35-tcg",
+    "guest_architecture": "x86_64",
+    "application_architecture": "x86_64",
+    "machine": "q35",
+    "accelerator": "tcg",
+    "cpu": "IvyBridge,vendor=GenuineIntel",
+    "vcpus": 4,
+    "memory_mib": 4096,
+    "firmware": "OVMF-X64",
+    "disk": "AHCI-raw",
+    "root_filesystem": "ext4",
+    "input": "QEMU-xHCI-keyboard-mouse",
+    "display": "std-vga-with-serial-console",
+    "network": "none",
+    "qualification": "not_run"
+  },
+  "physical_target": {
+    "status": "inventory_required",
+    "architecture_intent": "x86_64",
+    "model_identifier": null,
+    "cpu_model": null,
+    "firmware": null,
+    "memory_bytes": null,
+    "storage_controller": null,
+    "gpu": null,
+    "input_controllers": null,
+    "network_devices": null,
+    "boot_result": "not_run"
+  },
+  "apple_application": {
+    "name": "Stickies",
+    "status": "candidate_pending_inventory",
+    "bundle_identifier": null,
+    "version": null,
+    "build": null,
+    "source_macos_version": null,
+    "source_macos_build": null,
+    "selected_architecture": null,
+    "executable_sha256": null,
+    "bundle_manifest_sha256": null,
+    "dependency_closure": null,
+    "workflow": "create_edit_unicode_select_clipboard_quit_reboot_reopen_notes",
+    "qualification": "not_run"
+  },
+  "public_fixtures": [
+    {
+      "name": "simple_cli",
+      "status": "source_exists_binary_not_built_for_candidate",
+      "source_path": "fixtures/simple_cli/main.c",
+      "source_revision": "7bf375562ca9edf513c353da7ec3309c0337f457",
+      "target_architecture": "x86_64",
+      "role": "first_runtime_execution_probe"
+    },
+    {
+      "name": "BurdettieDocument",
+      "version": "0.1.0",
+      "status": "specified_for_M4_not_implemented",
+      "target_architecture": "x86_64",
+      "role": "document_persistence_errors_and_policy_grants"
+    }
+  ],
+  "security": {
+    "contract_version": 1,
+    "modes": ["permissive", "audit", "enforced"],
+    "mode_independent_of_signer_policy": true,
+    "production_enforcement_backend": null,
+    "enforcement_qualification": "not_run"
+  },
+  "closure_blockers": [
+    "actual_mac_inventory",
+    "exact_apple_application_inventory_and_dependency_closure",
+    "equipped_build_host_and_pinned_checkout",
+    "recorded_boot_runtime_and_hardware_feasibility_results",
+    "backend_control_allocation_and_contract_review"
+  ]
+}

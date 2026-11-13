@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "message_type": "launch_request",
+  "request_id": "example-request",
+  "app_id": "example-registration",
+  "expected_revision": "0000000000000000000000000000000000000000000000000000000000000000",
+  "security": {
+    "mode": "enforced",
+    "profile": {
+      "id": "local-notes",
+      "revision": "1"
+    }
+  },
+  "execution_preference": "native",
+  "arguments": [],
+  "environment": {},
+  "document_grants": [],
+  "working_directory": {
+    "kind": "app_data",
+    "reference": "example-registration"
+  }
+}
