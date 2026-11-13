@@ -34,6 +34,21 @@ Verify the downloaded bytes against that digest, use a writable copy and the rel
 
 Standard public GitHub Ubuntu runners are a possible host for this bounded smoke experiment. Current specifications are four CPUs, 16 GB RAM and 14 GB SSD; their compute is free for public repositories. That documented disk allowance is insufficient as an assumed budget for the full source-build path. Keep any heavyweight experiment manual and separate from ordinary PR checks; do not introduce paid runners or large artifact retention implicitly. [GitHub runner specifications](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
 
+### Bounded bootstrap harness
+
+[`scripts/m1_vm_bootstrap.py`](../../scripts/m1_vm_bootstrap.py) accepts an already-downloaded official image and a matching OVMF CODE/VARS pair. It verifies the pinned image size and SHA-256, creates private writable copies, runs an offline headless TCG VM, and records `blocked`, `fail` or `pass` with raw serial logs and hashes. A pass requires a nonce-verified Darwin/x86_64 shell response and exact-byte persistence across two separate QEMU processes. Echoed commands and a kernel banner are insufficient. The first process is stopped after guest `sync`; this does not test graceful guest shutdown.
+
+```sh
+python3 scripts/m1_vm_bootstrap.py \
+  --image /path/to/puredarwin-minimal.img \
+  --firmware-code /usr/share/OVMF/OVMF_CODE_4M.fd \
+  --firmware-vars /usr/share/OVMF/OVMF_VARS_4M.fd \
+  --output-dir /path/to/new-run \
+  --memory-mib 2048 --vcpus 2 --timeout 600
+```
+
+Confirm the firmware paths on the host before running. The output directory must be new and its parent must exist. On a shared host, run as an unprivileged account inside a cgroup with a hard memory ceiling and CPU quota. The script additionally bounds CPU affinity, wall time, RSS and logs. Its smaller 2-vCPU/2-GiB default is a bootstrap profile, separate from the M1 reference configuration. It never downloads software, installs packages, changes its input files or opens public listeners. Unit tests validate protocol and failure handling; only an actual run can establish boot evidence.
+
 ## What can be proved without a Mac
 
 | Work | Evidence available on the reference VM |
