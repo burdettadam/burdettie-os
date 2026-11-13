@@ -10,6 +10,8 @@ use macho_parse::{parse, ParsedMachO};
 use platform_core::fs::FilesystemProvider;
 use runtime_diagnostics::DiagEvent;
 
+use crate::config::RuntimeConfig;
+
 use crate::error::RuntimeError;
 use crate::tracer::RuntimeTracer;
 
@@ -86,6 +88,7 @@ pub(crate) fn load_dependencies(
     registry: &mut ImageRegistry,
     binary_dir: &Path,
     fs: &dyn FilesystemProvider,
+    config: &RuntimeConfig,
 ) -> Result<DependencyLoadStats, RuntimeError> {
     let mut queue: VecDeque<(String, Vec<String>, PathBuf)> = VecDeque::new();
     let mut stats = DependencyLoadStats::default();
@@ -165,6 +168,10 @@ pub(crate) fn load_dependencies(
             }
         };
         stats.parse_time += parse_start.elapsed();
+
+        // Every locally loaded image must pass the same admission evaluator as
+        // the main executable before its children are considered or it is mapped.
+        crate::security::evaluate_security(&sub_parsed, &path, config)?;
 
         // Enqueue sub-dependencies
         let sub_rpaths = sub_parsed.rpaths.clone();
@@ -283,7 +290,8 @@ pub(crate) fn load_insert_libraries(
     paths: &[std::path::PathBuf],
     registry: &mut ImageRegistry,
     fs: &dyn FilesystemProvider,
-) -> usize {
+    config: &RuntimeConfig,
+) -> Result<usize, RuntimeError> {
     let mut loaded = 0;
     for path in paths {
         let install_name = path
@@ -312,6 +320,8 @@ pub(crate) fn load_insert_libraries(
                 continue;
             }
         };
+        // Inserted libraries are executable inputs too; reject them before mapping.
+        crate::security::evaluate_security(&parsed, path, config)?;
         match registry.load_preparsed(&install_name, Arc::new(parsed), Arc::from(data)) {
             Ok(_) => {
                 log::info!("DYLD_INSERT_LIBRARIES: loaded {}", path.display());
@@ -322,5 +332,5 @@ pub(crate) fn load_insert_libraries(
             }
         }
     }
-    loaded
+    Ok(loaded)
 }
