@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Preserve live ARM64 TLV registers across storage lookup and isolate the
+  unmapped-page regression from parallel allocator reuse.
+- Preserve native Darwin sysconf/resource-limit constants, register native
+  stdio APIs, and reset process state between independent scorecard guests.
+- Repair native pthread test storage, bounded-worker concurrency checks, and
+  reproducible category/export/code-signature fixtures.
+- Use typed C strings for native framework lookup; close the CoreGraphics handle
+  exactly once when display dimensions are invalid.
+- Reject unmapped Darwin host-range gaps using Mach VM region queries rather
+  than treating a successful mincore residency query as proof of a mapping.
+
 - Align Foundation class storage and restrict Objective-C superclass repair to
   registered mapped class records, avoiding reads through synthetic handles.
 - Distinguish pointer-backed CFStrings from legacy inline ASCII payloads so
@@ -37,6 +48,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   policy.
 
 ### Changed
+
+- Preserve the recovered source inventory and record native macOS ARM64, Linux,
+  Docker and language-binding CI evidence, with the unsuppressed font dependency
+  advisory tracked separately in issue #2.
 
 - Document the public source/artifact boundary, source-built quick start, and
   revision-specific validation results in the portfolio README and publication guide.

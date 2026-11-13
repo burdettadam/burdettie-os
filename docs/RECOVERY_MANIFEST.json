@@ -1,0 +1,1348 @@
+{
+  "base": "2928aa855af9b1c67302d8e754ced75f892e3948",
+  "original_pr_head": "852ce324d8322b06cb26af70ea35cc0df2aff072",
+  "original_pr_tree": "955636ce9ee8968ef5448d57cc52a93c20baa3a4",
+  "commits": [
+    {
+      "commit": "4bdb0b69827e8715b5006045177793eb4436c5d6",
+      "parents": [
+        "2928aa855af9b1c67302d8e754ced75f892e3948"
+      ],
+      "tree": "451dc8a3f3bc3ed5f6aac9e096ba282d3d010352",
+      "summary": "Fix runtime class storage, malformed Mach-O parsing, and text rendering",
+      "changed_paths": [
+        ".github/workflows/ci.yml",
+        "crates/arm64-translate/src/cpu.rs",
+        "crates/arm64-translate/src/decode/branch.rs",
+        "crates/arm64-translate/src/decode/dp_imm.rs",
+        "crates/arm64-translate/src/decode/dp_reg.rs",
+        "crates/arm64-translate/src/decode/fp_dp.rs",
+        "crates/arm64-translate/src/decode/load_store.rs",
+        "crates/arm64-translate/src/decode/util.rs",
+        "crates/arm64-translate/src/ffi.rs",
+        "crates/arm64-translate/src/interp/exec_branch.rs",
+        "crates/arm64-translate/src/interp/exec_dp.rs",
+        "crates/arm64-translate/src/interp/exec_dp_extended.rs",
+        "crates/arm64-translate/src/interp/exec_fp.rs",
+        "crates/arm64-translate/src/interp/exec_fp_dp.rs",
+        "crates/arm64-translate/src/interp/exec_ls_extended.rs",
+        "crates/arm64-translate/src/interp/mod.rs",
+        "crates/arm64-translate/src/jit/emit.rs",
+        "crates/arm64-translate/src/jit/mod.rs",
+        "crates/arm64-translate/src/mem.rs",
+        "crates/arm64-translate/src/test_helpers.rs",
+        "crates/cf-lite/src/nsobj/mod.rs",
+        "crates/graphics-core/src/font_manager.rs",
+        "crates/graphics-core/src/gpu/atlas.rs",
+        "crates/graphics-core/src/gpu/renderer.rs",
+        "crates/graphics-core/src/gpu/renderer_ops.rs",
+        "crates/graphics-core/src/tests/attributed.rs",
+        "crates/graphics-core/src/tests/basics_and_font.rs",
+        "crates/graphics-core/src/tests/gpu_stub.rs",
+        "crates/graphics-core/src/tests/path_and_gradient.rs",
+        "crates/graphics-core/src/tests/renderer_methods.rs",
+        "crates/graphics-core/src/tests/rotate.rs",
+        "crates/graphics-core/src/tests/shadow.rs",
+        "crates/graphics-core/src/tests/transform.rs",
+        "crates/graphics-core/src/text_layout/attributed.rs",
+        "crates/graphics-core/src/text_system.rs",
+        "crates/macho-parse/src/exports.rs",
+        "crates/macho-parse/src/fat.rs",
+        "crates/macho-parse/src/fixups/decode.rs",
+        "crates/macho-parse/src/fixups/mod.rs",
+        "crates/macho-parse/src/func_starts.rs",
+        "crates/macho-parse/src/leb128.rs",
+        "crates/macho-parse/src/lib.rs",
+        "crates/macho-parse/src/parser/mod.rs",
+        "crates/macho-parse/src/parser/reader.rs",
+        "crates/macho-parse/src/relocations.rs",
+        "crates/macho-parse/src/strings.rs",
+        "crates/macho-parse/src/tlv.rs",
+        "crates/macho-parse/tests/malformed_metadata_tests.rs",
+        "crates/macho-resolve/src/bind.rs",
+        "crates/macho-resolve/src/resolve/mod.rs",
+        "crates/macho-runtime/src/objc_setup.rs",
+        "crates/macho-types/src/load_command.rs",
+        "crates/objc-runtime/src/class/mod.rs",
+        "crates/objc-runtime/src/class/registration.rs",
+        "crates/objc-runtime/src/class/tests/mod.rs",
+        "crates/objc-runtime/src/class/tests/superclass_repair_tests.rs",
+        "crates/platform-core/src/clock.rs",
+        "crates/platform-core/src/lib.rs",
+        "crates/test-harness/src/lib.rs",
+        "crates/trust-policy/src/real_amfi.rs",
+        "docker/Dockerfile.dev"
+      ],
+      "included_in_original_pr": true,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "735a5052fadb7ddf0435e44e0cc367ac398899a4",
+      "parents": [
+        "4bdb0b69827e8715b5006045177793eb4436c5d6"
+      ],
+      "tree": "a35e7c4feb9847a31e2b5fc595bc9bb875701283",
+      "summary": "Bound host memory checks, export scans, and glyph atlas placement",
+      "changed_paths": [
+        "crates/arm64-translate/src/mem.rs",
+        "crates/graphics-core/src/gpu/atlas.rs",
+        "crates/macho-parse/src/exports.rs",
+        "crates/macho-parse/tests/malformed_metadata_tests.rs"
+      ],
+      "included_in_original_pr": true,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "b1e1246b8c6a3be94a1b3afab55679356a6fefc0",
+      "parents": [
+        "735a5052fadb7ddf0435e44e0cc367ac398899a4"
+      ],
+      "tree": "b604b33d41a0bb3e2b7d5d140ccb018f9199cb67",
+      "summary": "Correct ARM64 atomic decoding, signed operations, and memory bounds",
+      "changed_paths": [
+        "crates/arm64-translate/src/decode/load_store.rs",
+        "crates/arm64-translate/src/interp/exec_ls_extended.rs",
+        "crates/arm64-translate/src/mem.rs"
+      ],
+      "included_in_original_pr": true,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "934ead2b94b2fe56ead0c5ff8aa9c2c5a0fa88ce",
+      "parents": [
+        "b1e1246b8c6a3be94a1b3afab55679356a6fefc0"
+      ],
+      "tree": "1e3f5c7183b508bcf44c6b64af7a3273af310345",
+      "summary": "Record verified regression results and remaining native validation gates",
+      "changed_paths": [
+        "docs/PUBLICATION.md"
+      ],
+      "included_in_original_pr": true,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "a22a8fba35a4458be3632245190efbb54453a7f9",
+      "parents": [
+        "934ead2b94b2fe56ead0c5ff8aa9c2c5a0fa88ce"
+      ],
+      "tree": "37549fce2533dfcdd95ff597461521efe985622c",
+      "summary": "Resolve strict graphics lints without changing rendering APIs",
+      "changed_paths": [
+        "crates/graphics-core/src/gpu/renderer.rs",
+        "crates/graphics-core/src/gpu/renderer_ops.rs",
+        "crates/graphics-core/src/gpu/vertex.rs",
+        "crates/graphics-core/src/software/renderer.rs",
+        "crates/graphics-core/src/software/renderer_trait.rs",
+        "crates/graphics-core/src/tests/line_styles.rs",
+        "crates/graphics-core/src/tests/rotate.rs",
+        "crates/graphics-core/src/text_layout/layout.rs",
+        "crates/graphics-core/src/text_system.rs"
+      ],
+      "included_in_original_pr": true,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "3766a0df7eb1d78a4f54727c25a08d3bec2da2a3",
+      "parents": [
+        "a22a8fba35a4458be3632245190efbb54453a7f9"
+      ],
+      "tree": "e9a0410b1bd5a6f317d602fa4ddd84f007fdef1d",
+      "summary": "Resolve strict Mach-O execution lints while preserving behavior",
+      "changed_paths": [
+        "crates/macho-exec/src/compact_to_ehframe/constants.rs",
+        "crates/macho-exec/src/compact_to_ehframe/emitter.rs",
+        "crates/macho-exec/src/compact_to_ehframe/parser.rs",
+        "crates/macho-exec/src/fixup/chained/walk.rs",
+        "crates/macho-exec/src/fixup/data_symbols.rs",
+        "crates/macho-exec/src/patch.rs",
+        "crates/macho-exec/src/tlv.rs"
+      ],
+      "included_in_original_pr": true,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "2b3b674f7741d7f56133d76c7b1c58cf40babf3a",
+      "parents": [
+        "3766a0df7eb1d78a4f54727c25a08d3bec2da2a3"
+      ],
+      "tree": "4248b31f710d379125ce47d450964b5e0fb18696",
+      "summary": "Complete portable library and test-target lint fixes",
+      "changed_paths": [
+        "crates/burdettie-memory-core/src/lib.rs",
+        "crates/burdettie-memory-core/src/model.rs",
+        "crates/macho-exec/src/lib.rs",
+        "crates/macho-exec/src/patch.rs",
+        "crates/macho-exec/src/unwind.rs",
+        "crates/macho-exec/tests/entry_tests.rs",
+        "crates/macho-exec/tests/security_tests.rs",
+        "crates/platform-linux/src/clock.rs"
+      ],
+      "included_in_original_pr": true,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "92b77be215f78ea4bfc0fe8cbea4b6268b05253f",
+      "parents": [
+        "2b3b674f7741d7f56133d76c7b1c58cf40babf3a"
+      ],
+      "tree": "e9ee779f1cac130a6ece78d8338eb844744ef79c",
+      "summary": "Resolve utility Clippy diagnostics without changing command output",
+      "changed_paths": [
+        "crates/burdettie-plutil/src/main.rs",
+        "crates/swift-stub-gen/src/codegen.rs"
+      ],
+      "included_in_original_pr": true,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "64ae4a5bbbe384b775330afa398be0f19898ca3d",
+      "parents": [
+        "92b77be215f78ea4bfc0fe8cbea4b6268b05253f"
+      ],
+      "tree": "3ebac09324e2c878325428f9bfd5f34b9abc67af",
+      "summary": "Clean up portable service and window backend lint diagnostics",
+      "changed_paths": [
+        "crates/burdettie-domain-map/src/config.rs",
+        "crates/burdettie-memory-index/src/db/mod.rs",
+        "crates/burdettie-memory-index/src/sync/mod.rs",
+        "crates/burdettie-memory-index/src/vector/mod.rs",
+        "crates/libxo/src/lib.rs",
+        "crates/window-backend/src/keyboard_layout.rs"
+      ],
+      "included_in_original_pr": true,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "92f9b4bcb4f51b776f6c880dd084ece43c9aae32",
+      "parents": [
+        "64ae4a5bbbe384b775330afa398be0f19898ca3d"
+      ],
+      "tree": "514489f87497ad172d477f6fce3c609e1f376ce7",
+      "summary": "Restore UI test compilation and remove remaining GUI lint failures",
+      "changed_paths": [
+        "apps/file-explorer/src/main.rs",
+        "crates/app-kit-lite/src/responder.rs",
+        "crates/ui-controls/src/layout/mod.rs",
+        "crates/ui-controls/src/scene/mod.rs"
+      ],
+      "included_in_original_pr": true,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "4ae0ab7148e42d7ca3d6bb14bc41c275051910ea",
+      "parents": [
+        "92f9b4bcb4f51b776f6c880dd084ece43c9aae32"
+      ],
+      "tree": "97343073c1f218877ce1a6e5bcdf1dbdae4356f5",
+      "summary": "Resolve service lint failures while preserving request handling",
+      "changed_paths": [
+        "crates/burdettie-services/src/config.rs",
+        "crates/burdettie-services/src/handlers/admin.rs",
+        "crates/burdettie-services/src/handlers/icloud.rs",
+        "crates/burdettie-services/src/handlers/notarize.rs",
+        "crates/burdettie-services/src/handlers/replay.rs",
+        "crates/burdettie-services/src/recorder.rs",
+        "crates/burdettie-services/src/server.rs"
+      ],
+      "included_in_original_pr": true,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "31e52c91ae89bf62fbaac4051c4a6fb4abbdbe2c",
+      "parents": [
+        "4ae0ab7148e42d7ca3d6bb14bc41c275051910ea"
+      ],
+      "tree": "58dd9b4c4bf502ca08aeb7e7b021fefa9eae35e4",
+      "summary": "Make launchd pointer contracts sound and terminate C error strings",
+      "changed_paths": [
+        "crates/launchd/src/bootstrap.rs",
+        "crates/launchd/src/job.rs",
+        "crates/launchd/src/launch_data.rs",
+        "crates/launchd/src/launch_msg.rs",
+        "crates/launchd/src/lib.rs",
+        "crates/launchd/src/vproc.rs",
+        "crates/libsystem-shims/src/cross_platform/posix_extras.rs",
+        "crates/libsystem-shims/src/darwin_stubs/launchd_stubs.rs",
+        "crates/libsystem-shims/src/darwin_stubs/mach_extras.rs"
+      ],
+      "included_in_original_pr": true,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "492a3f23c504619a5cec26cd16ff8abd12d2ad72",
+      "parents": [
+        "31e52c91ae89bf62fbaac4051c4a6fb4abbdbe2c"
+      ],
+      "tree": "be12b274c0477b949566db93258265296abd005b",
+      "summary": "Use typed C strings and preserve shim API names in strict lint checks",
+      "changed_paths": [
+        "crates/libsystem-shims/src/darwin_stubs/cf_notification_center.rs",
+        "crates/libsystem-shims/src/darwin_stubs/launchd_stubs.rs",
+        "crates/libsystem-shims/src/darwin_stubs/libedit.rs",
+        "crates/libsystem-shims/src/darwin_stubs/libxo_stubs.rs",
+        "crates/libsystem-shims/src/darwin_stubs/macho_arch.rs",
+        "crates/libsystem-shims/src/darwin_stubs/os_log.rs",
+        "crates/libsystem-shims/src/darwin_stubs/sysinfo.rs",
+        "crates/libsystem-shims/src/darwin_stubs/xpc.rs",
+        "crates/libsystem-shims/src/darwin_stubs/xpc_activity.rs",
+        "crates/libsystem-shims/src/darwin_stubs/xpc_objects.rs",
+        "crates/libsystem-shims/src/darwin_stubs/xpc_pipe.rs",
+        "crates/libsystem-shims/src/darwin_stubs/xpc_transport.rs"
+      ],
+      "included_in_original_pr": true,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "0921a0477f187145d968a72f9ca69d30a658ad0e",
+      "parents": [
+        "492a3f23c504619a5cec26cd16ff8abd12d2ad72"
+      ],
+      "tree": "259c955a812299f2d6f4517f19790625a65ab932",
+      "summary": "Make variadic shim contracts explicit and repair platform test fixtures",
+      "changed_paths": [
+        "crates/libsystem-shims/src/cross_platform/dirent.rs",
+        "crates/libsystem-shims/src/cross_platform/fts.rs",
+        "crates/libsystem-shims/src/cross_platform/kqueue.rs",
+        "crates/libsystem-shims/src/cross_platform/posix_extras.rs",
+        "crates/libsystem-shims/src/cross_platform/stat.rs",
+        "crates/libsystem-shims/src/cross_platform/stdio.rs",
+        "crates/libsystem-shims/src/cross_platform/variadic_shims.rs",
+        "crates/libsystem-shims/src/darwin_compat.rs",
+        "crates/libsystem-shims/src/dispatch.rs",
+        "crates/libsystem-shims/src/lifecycle.rs",
+        "crates/libsystem-shims/src/process.rs",
+        "crates/libsystem-shims/src/pthread/shims.rs",
+        "crates/libsystem-shims/src/socket.rs"
+      ],
+      "included_in_original_pr": true,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "4e1294772edbebeb80400486289de4e9d49fb199",
+      "parents": [
+        "0921a0477f187145d968a72f9ca69d30a658ad0e"
+      ],
+      "tree": "1a41cc22561b66bd95776913290d0916aba3575b",
+      "summary": "Fix DNS service resource ownership and callback reentrancy",
+      "changed_paths": [
+        "crates/libsystem-shims/src/darwin_stubs/cfnetwork.rs",
+        "crates/libsystem-shims/src/darwin_stubs/common_crypto.rs",
+        "crates/libsystem-shims/src/darwin_stubs/copyfile.rs",
+        "crates/libsystem-shims/src/darwin_stubs/core_text.rs",
+        "crates/libsystem-shims/src/darwin_stubs/dispatch_data_source.rs",
+        "crates/libsystem-shims/src/darwin_stubs/dispatch_extras.rs",
+        "crates/libsystem-shims/src/darwin_stubs/dispatch_queue.rs",
+        "crates/libsystem-shims/src/darwin_stubs/dns_sd.rs",
+        "crates/libsystem-shims/src/darwin_stubs/dyld_introspection.rs",
+        "crates/libsystem-shims/src/darwin_stubs/iokit.rs",
+        "crates/libsystem-shims/src/darwin_stubs/keymgr.rs",
+        "crates/libsystem-shims/src/darwin_stubs/linker_support.rs",
+        "crates/libsystem-shims/src/darwin_stubs/notify.rs",
+        "crates/libsystem-shims/src/darwin_stubs/security.rs",
+        "crates/libsystem-shims/src/darwin_stubs/swift_foundation_bridge.rs",
+        "crates/libsystem-shims/src/darwin_stubs/system_configuration.rs"
+      ],
+      "included_in_original_pr": true,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "ba47ca07e9ac5fea2a65954c97959377555c6d85",
+      "parents": [
+        "4e1294772edbebeb80400486289de4e9d49fb199"
+      ],
+      "tree": "8adabb0ba42f5e0f7896098a3ef3d723e5bcfbaf",
+      "summary": "Scope compatibility helpers and isolate TLV registry tests",
+      "changed_paths": [
+        "crates/macho-exec/src/fixup/ctor_thunk.rs",
+        "crates/macho-exec/src/fixup/mod.rs",
+        "crates/macho-exec/src/ptrauth.rs",
+        "crates/macho-exec/src/tlv.rs"
+      ],
+      "included_in_original_pr": true,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "aa7b44d2530bbd0c67304bf4d19f4f7574bd8bf8",
+      "parents": [
+        "ba47ca07e9ac5fea2a65954c97959377555c6d85"
+      ],
+      "tree": "496124921790669d1e21c53bf53847bd1191894c",
+      "summary": "Resolve graphics and internationalization lint diagnostics",
+      "changed_paths": [
+        "crates/cg-shims/src/gradient.rs",
+        "crates/icu-shims/src/calendar.rs",
+        "crates/icu-shims/src/datetime.rs",
+        "crates/icu-shims/src/decimal.rs",
+        "crates/icu-shims/src/segmenter.rs"
+      ],
+      "included_in_original_pr": true,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "87c6fa4f509de5aeac3cbc3851d96e5241197d37",
+      "parents": [
+        "aa7b44d2530bbd0c67304bf4d19f4f7574bd8bf8"
+      ],
+      "tree": "7df9aef688db56862a6c7457308745bae235132b",
+      "summary": "Resolve Objective-C runtime lint diagnostics while preserving ABI",
+      "changed_paths": [
+        "crates/objc-runtime/src/class/mod.rs",
+        "crates/objc-runtime/src/refcount.rs",
+        "crates/objc-runtime/src/shims/dispatch/lookup.rs",
+        "crates/objc-runtime/src/shims/lifecycle/dynamic_class/class_pair_shims.rs",
+        "crates/objc-runtime/src/shims/lifecycle/exception.rs",
+        "crates/objc-runtime/src/shims/lifecycle/introspection.rs",
+        "crates/objc-runtime/src/shims/lifecycle/runtime_query.rs"
+      ],
+      "included_in_original_pr": true,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "32d18ee8299fb09fc181c1547d2e0a59a744096c",
+      "parents": [
+        "87c6fa4f509de5aeac3cbc3851d96e5241197d37"
+      ],
+      "tree": "300c877230d9491379e04916b072af92af579ae8",
+      "summary": "Correct Foundation aggregate ABI and Core Animation transform arguments",
+      "changed_paths": [
+        "crates/cf-lite/src/calayer.rs",
+        "crates/cf-lite/src/cg_types.rs",
+        "crates/cf-lite/src/nsaccessibility.rs",
+        "crates/cf-lite/src/nsclipview.rs",
+        "crates/cf-lite/src/nsdistributednotificationcenter.rs",
+        "crates/cf-lite/src/nsimagerep.rs",
+        "crates/cf-lite/src/nskeyedarchiver.rs",
+        "crates/cf-lite/src/nslayoutmanager.rs",
+        "crates/cf-lite/src/nstextview.rs",
+        "crates/cf-lite/src/nsview.rs",
+        "crates/cf-lite/src/nsworkspace.rs",
+        "crates/cf-lite/src/nsxmlparser.rs",
+        "crates/core-foundation-lite/src/lib.rs",
+        "crates/core-foundation-lite/src/types.rs"
+      ],
+      "included_in_original_pr": true,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "b98edf7ff8689bd816a3f2385edc02bb978d2535",
+      "parents": [
+        "32d18ee8299fb09fc181c1547d2e0a59a744096c"
+      ],
+      "tree": "8130453e48cee0c68faf37eb22bc945f750895cf",
+      "summary": "Compile shared-cache storage variants only on supported hosts",
+      "changed_paths": [
+        "crates/macho-runtime/src/shared_cache.rs"
+      ],
+      "included_in_original_pr": true,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "ad3f398bfe15e01b1cd233f359f9fca0aff27132",
+      "parents": [
+        "b98edf7ff8689bd816a3f2385edc02bb978d2535"
+      ],
+      "tree": "9eb773c4d1b6a7d8876eba36ff7f3d6c4455d4b0",
+      "summary": "Resolve Foundation data and serialization lint failures",
+      "changed_paths": [
+        "crates/cf-lite/src/nsdata.rs",
+        "crates/cf-lite/src/nsdecimalnumber.rs",
+        "crates/cf-lite/src/nsdistributednotificationcenter.rs",
+        "crates/cf-lite/src/nsfilemanager.rs",
+        "crates/cf-lite/src/nsiso8601dateformatter.rs",
+        "crates/cf-lite/src/nskeyedarchiver.rs",
+        "crates/cf-lite/src/nsnumberformatter.rs",
+        "crates/cf-lite/src/nspropertylistserialization.rs",
+        "crates/cf-lite/src/nsscanner.rs",
+        "crates/cf-lite/src/nsstepper.rs",
+        "crates/cf-lite/src/nsstream.rs",
+        "crates/cf-lite/src/nsurl.rs",
+        "crates/cf-lite/src/nsurlcomponents.rs",
+        "crates/cf-lite/src/nsurlsession.rs"
+      ],
+      "included_in_original_pr": true,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "82b04e65188f94a921f6d7944d980553c7a99745",
+      "parents": [
+        "ad3f398bfe15e01b1cd233f359f9fca0aff27132"
+      ],
+      "tree": "34028c398c050b93db77f612fcc7a227553b1a55",
+      "summary": "Simplify private rendering helpers and isolate block callback tests",
+      "changed_paths": [
+        "crates/cf-lite/src/foundation/mod.rs",
+        "crates/cf-lite/src/layer_compositor.rs",
+        "crates/cf-lite/src/nsanimationcontext.rs",
+        "crates/cf-lite/src/nsimage.rs",
+        "crates/cf-lite/src/nsimageview.rs",
+        "crates/cf-lite/src/nsindexset.rs",
+        "crates/cf-lite/src/nsrunloop.rs",
+        "crates/cf-lite/src/nsview.rs",
+        "crates/cf-lite/src/nswindow.rs"
+      ],
+      "included_in_original_pr": true,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "af582402f48fb9633949ce6b96bb196323d8e1a5",
+      "parents": [
+        "82b04e65188f94a921f6d7944d980553c7a99745"
+      ],
+      "tree": "a5c92373ef386f55fa51c0d2ff8dd2bdf707285b",
+      "summary": "Resolve Foundation collection and control lint diagnostics",
+      "changed_paths": [
+        "crates/cf-lite/src/cf_core/collections.rs",
+        "crates/cf-lite/src/cfstring/nsstring/basic.rs",
+        "crates/cf-lite/src/cfstring/nsstring/search.rs",
+        "crates/cf-lite/src/foundation/register/appkit/phase_c7.rs",
+        "crates/cf-lite/src/layout_solver.rs",
+        "crates/cf-lite/src/nsalert.rs",
+        "crates/cf-lite/src/nsarray/mod.rs",
+        "crates/cf-lite/src/nsattributedstring.rs",
+        "crates/cf-lite/src/nsbitmapimagerep.rs",
+        "crates/cf-lite/src/nsbundle.rs",
+        "crates/cf-lite/src/nsbutton.rs",
+        "crates/cf-lite/src/nscontrol.rs",
+        "crates/cf-lite/src/nsfont.rs",
+        "crates/cf-lite/src/nslog.rs",
+        "crates/cf-lite/src/nsmenu_shim.rs",
+        "crates/cf-lite/src/nsmutablestring.rs",
+        "crates/cf-lite/src/nsoutlineview.rs",
+        "crates/cf-lite/src/nssegmentedcontrol.rs",
+        "crates/cf-lite/src/nssortdescriptor.rs",
+        "crates/cf-lite/src/nsstoryboard.rs",
+        "crates/cf-lite/src/nstableview.rs",
+        "crates/cf-lite/src/nstextfield.rs",
+        "crates/cf-lite/src/nstextstorage.rs",
+        "crates/cf-lite/src/nstextview.rs",
+        "crates/cf-lite/src/nstrackingarea.rs"
+      ],
+      "included_in_original_pr": true,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "055876574fb4d4b6abb35de0ade9413ab95faaf8",
+      "parents": [
+        "af582402f48fb9633949ce6b96bb196323d8e1a5"
+      ],
+      "tree": "eb7d137e9b99cd67fe899187fe921484828013e6",
+      "summary": "Resolve runtime loader and configuration test lint diagnostics",
+      "changed_paths": [
+        "crates/macho-runtime/src/config.rs",
+        "crates/macho-runtime/src/error.rs",
+        "crates/macho-runtime/src/shared_cache.rs"
+      ],
+      "included_in_original_pr": true,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "373566c4902d8920d2efee1a008f0fb0f94941a4",
+      "parents": [
+        "055876574fb4d4b6abb35de0ade9413ab95faaf8"
+      ],
+      "tree": "c74098f0bd4e29df877e90ab5ca1ebaad4ea69e7",
+      "summary": "Clear runtime integration and launcher strict lint checks",
+      "changed_paths": [
+        "apps/launchpad/src/main.rs",
+        "crates/macho-inspect/src/exec.rs",
+        "crates/macho-runtime/tests/common/mod.rs"
+      ],
+      "included_in_original_pr": true,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "4c1476fb34a3f4f247db717993e703772574b522",
+      "parents": [
+        "373566c4902d8920d2efee1a008f0fb0f94941a4"
+      ],
+      "tree": "03fc7ef64e4219fab5ed644fe4cbe236ad3eed8a",
+      "summary": "Use valid represented objects in menu comparison tests",
+      "changed_paths": [
+        "crates/cf-lite/src/nsmenu_shim.rs"
+      ],
+      "included_in_original_pr": true,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "627024e345343f83f639fdc95d85cd8e264e4dbe",
+      "parents": [
+        "4c1476fb34a3f4f247db717993e703772574b522"
+      ],
+      "tree": "16421494261db8b02f8b5f88aead91037f1a37c3",
+      "summary": "Distinguish pointer-backed CFStrings from legacy inline payloads",
+      "changed_paths": [
+        "crates/cf-lite/src/cfstring/mod.rs"
+      ],
+      "included_in_original_pr": true,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "e72f02a4c104a1e8b4c4d2dbe51b9f0b6ae5f115",
+      "parents": [
+        "627024e345343f83f639fdc95d85cd8e264e4dbe"
+      ],
+      "tree": "805b224888567f0e846154d298963a90fc468e4b",
+      "summary": "Repair Foundation test objects and isolate shared runtime state",
+      "changed_paths": [
+        "crates/cf-lite/src/nsdocumentcontroller.rs",
+        "crates/cf-lite/src/nsmutablearray/ops.rs",
+        "crates/cf-lite/src/nsrunloop.rs",
+        "crates/cf-lite/src/nsthread.rs",
+        "crates/cf-lite/src/nstimer.rs",
+        "crates/cf-lite/src/shim_test_helpers.rs"
+      ],
+      "included_in_original_pr": true,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "22c95606fb6af492346f340c9d3f21ba1391a4bc",
+      "parents": [
+        "e72f02a4c104a1e8b4c4d2dbe51b9f0b6ae5f115"
+      ],
+      "tree": "47661a423e4032f7ac6742252cfea1e4da71d019",
+      "summary": "Release timer callback locks while preserving queue ordering",
+      "changed_paths": [
+        "crates/cf-lite/src/nsrunloop.rs",
+        "crates/cf-lite/src/nstimer.rs"
+      ],
+      "included_in_original_pr": true,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "bd692271cd529f1193fb05479158f8481e37d153",
+      "parents": [
+        "22c95606fb6af492346f340c9d3f21ba1391a4bc"
+      ],
+      "tree": "6e7bfe87c93cd542eb2ffffdd834e530805752a6",
+      "summary": "Isolate view-priority test resets across parallel assertions",
+      "changed_paths": [
+        "crates/cf-lite/src/nsview.rs"
+      ],
+      "included_in_original_pr": true,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "69c102f1e1a7200cdd2e53ae0160ee92588e23b3",
+      "parents": [
+        "bd692271cd529f1193fb05479158f8481e37d153"
+      ],
+      "tree": "99c581c50f785f92a27256fae2dddf636bae7665",
+      "summary": "Isolate responder fixtures from process-wide window state",
+      "changed_paths": [
+        "crates/cf-lite/src/nsresponder.rs"
+      ],
+      "included_in_original_pr": true,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "a39c6d8a3ea8df4c1c639f56a25358dd298bdfda",
+      "parents": [
+        "69c102f1e1a7200cdd2e53ae0160ee92588e23b3"
+      ],
+      "tree": "d6980e77275ddc9671ebb5a5ae607a9fc53401ac",
+      "summary": "Document runtime repairs and verified publication checks",
+      "changed_paths": [
+        "CHANGELOG.md",
+        "README.md",
+        "docs/PUBLICATION.md"
+      ],
+      "included_in_original_pr": true,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "39aa061b3cf2aa15d22818872cd792eb8320cb03",
+      "parents": [
+        "a39c6d8a3ea8df4c1c639f56a25358dd298bdfda"
+      ],
+      "tree": "f1f2ad03397ae8174346f05adb711f5a9092c79e",
+      "summary": "Remove redundant casts from Darwin clock offsets",
+      "changed_paths": [
+        "crates/platform-darwin-host/src/clock.rs"
+      ],
+      "included_in_original_pr": true,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "dd08ad9248b46406f065c3a885798b90c45dc13d",
+      "parents": [
+        "39aa061b3cf2aa15d22818872cd792eb8320cb03"
+      ],
+      "tree": "585b0ca053ddbd279241517edffd1037f55c7335",
+      "summary": "Preserve group-copy bounds and collect remaining native lints",
+      "changed_paths": [
+        ".github/workflows/ci.yml",
+        "crates/libsystem-shims/src/darwin_stubs/sysinfo.rs"
+      ],
+      "included_in_original_pr": true,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "852ce324d8322b06cb26af70ea35cc0df2aff072",
+      "parents": [
+        "dd08ad9248b46406f065c3a885798b90c45dc13d"
+      ],
+      "tree": "955636ce9ee8968ef5448d57cc52a93c20baa3a4",
+      "summary": "Restore reviewed Darwin clock, native lint, and validation updates",
+      "changed_paths": [
+        "CHANGELOG.md",
+        "README.md",
+        "crates/libsystem-shims/src/cross_platform/stdio.rs",
+        "crates/macho-exec/src/fixup/ctor_thunk.rs",
+        "crates/macho-exec/src/tlv.rs",
+        "crates/macho-exec/tests/common/mod.rs",
+        "crates/objc-runtime/src/shims/lifecycle/exception.rs",
+        "crates/platform-darwin-host/src/clock.rs",
+        "crates/platform-linux/src/clock.rs",
+        "docs/PUBLICATION.md"
+      ],
+      "included_in_original_pr": true,
+      "included_in_current_pr": false,
+      "content_preserved_by": "12cb7d60c10080702a0b354d885f4997c36c6971"
+    },
+    {
+      "commit": "12cb7d60c10080702a0b354d885f4997c36c6971",
+      "parents": [
+        "dd08ad9248b46406f065c3a885798b90c45dc13d"
+      ],
+      "tree": "955636ce9ee8968ef5448d57cc52a93c20baa3a4",
+      "summary": "Restore reviewed Darwin clock, native lint, and validation updates",
+      "changed_paths": [
+        "CHANGELOG.md",
+        "README.md",
+        "crates/libsystem-shims/src/cross_platform/stdio.rs",
+        "crates/macho-exec/src/fixup/ctor_thunk.rs",
+        "crates/macho-exec/src/tlv.rs",
+        "crates/macho-exec/tests/common/mod.rs",
+        "crates/objc-runtime/src/shims/lifecycle/exception.rs",
+        "crates/platform-darwin-host/src/clock.rs",
+        "crates/platform-linux/src/clock.rs",
+        "docs/PUBLICATION.md"
+      ],
+      "included_in_original_pr": false,
+      "included_in_current_pr": true,
+      "replaces": "852ce324d8322b06cb26af70ea35cc0df2aff072"
+    },
+    {
+      "commit": "3d8d691ce510ad7241f54d7aedfae5044e6e45b8",
+      "parents": [
+        "12cb7d60c10080702a0b354d885f4997c36c6971"
+      ],
+      "tree": "cce0746bf45ebe20b3d5880100b9739d5bb0d1a3",
+      "summary": "Use typed C strings for native framework symbol lookup",
+      "changed_paths": [
+        "crates/cf-lite/src/cf_core/collections.rs",
+        "crates/cf-lite/src/nsscreen.rs",
+        "crates/cf-lite/src/nsurl.rs"
+      ],
+      "included_in_original_pr": false,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "df06b5b98a26ac229c797b24a48ca12de24b3def",
+      "parents": [
+        "3d8d691ce510ad7241f54d7aedfae5044e6e45b8"
+      ],
+      "tree": "637a1f4e773759da5aa6ed1fecd2614263d5c442",
+      "summary": "Close CoreGraphics handle once when display dimensions are invalid",
+      "changed_paths": [
+        "crates/cf-lite/src/nsscreen.rs"
+      ],
+      "included_in_original_pr": false,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "c3394866c6de79a44f65035feeef7fd79f22c1a0",
+      "parents": [
+        "df06b5b98a26ac229c797b24a48ca12de24b3def"
+      ],
+      "tree": "cf11ee33e6ebec802dfc719c77458c525d5e7dd8",
+      "summary": "Document per-binary use of shared runtime test helpers",
+      "changed_paths": [
+        "crates/macho-runtime/tests/common/mod.rs"
+      ],
+      "included_in_original_pr": false,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "47fbcc76dc9d929be788e19f87a9c018c3331e93",
+      "parents": [
+        "c3394866c6de79a44f65035feeef7fd79f22c1a0"
+      ],
+      "tree": "08a64b35a44c9e6522dfe32091c8339a613c40dc",
+      "summary": "Use Mach VM regions to reject unmapped Darwin host ranges",
+      "changed_paths": [
+        "crates/arm64-translate/src/mem.rs"
+      ],
+      "included_in_original_pr": false,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "c4c3474f288b3d9bee474c9e4972805b873dfa58",
+      "parents": [
+        "47fbcc76dc9d929be788e19f87a9c018c3331e93"
+      ],
+      "tree": "57dcb7e57e95ca007490a20b3e0636115af54f26",
+      "summary": "Collect native test failures before release builds and retain failure caches",
+      "changed_paths": [
+        ".github/workflows/ci.yml"
+      ],
+      "included_in_original_pr": false,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "b06b4f6526ec52e482054ec631e08967ff68b7d7",
+      "parents": [
+        "c4c3474f288b3d9bee474c9e4972805b873dfa58"
+      ],
+      "tree": "a2637f36027c7c50f22997f74196f7dd3f5051b1",
+      "summary": "Repair reproducible native test expectations and collect process crash backtraces",
+      "changed_paths": [
+        ".github/workflows/ci.yml"
+      ],
+      "included_in_original_pr": false,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "2d4a6f584e4dee9f98fdb0990f1499e2fb6c6c23",
+      "parents": [
+        "b06b4f6526ec52e482054ec631e08967ff68b7d7"
+      ],
+      "tree": "b2564724c011458d9509e1505942c181148db5bf",
+      "summary": "Repair native POSIX and stdio bridging and reproducible fixture checks",
+      "changed_paths": [
+        ".github/workflows/ci.yml",
+        "crates/libsystem-shims/src/cross_platform/posix_extras.rs",
+        "crates/libsystem-shims/src/cross_platform/stdio.rs",
+        "crates/macho-parse/tests/advanced_parse_tests.rs",
+        "crates/macho-parse/tests/codesig_tests.rs",
+        "crates/macho-runtime/tests/runtime_objc_tests.rs",
+        "scripts/build_fixtures.sh"
+      ],
+      "included_in_original_pr": false,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "2f60e0ca1326bf9180bc04dd8c1a099431e70353",
+      "parents": [
+        "2d4a6f584e4dee9f98fdb0990f1499e2fb6c6c23"
+      ],
+      "tree": "0c4084a5d9dbb9dbe39788e8a732a70ffc48d306",
+      "summary": "Preserve native TLV registers and repair bounded-pool regression coverage",
+      "changed_paths": [
+        ".github/workflows/ci.yml",
+        "apps/hello-darwin/tests/headless_tests.rs",
+        "crates/libsystem-shims/src/cross_platform/stdio.rs",
+        "crates/libsystem-shims/src/darwin_stubs/dispatch_queue.rs",
+        "crates/macho-exec/src/tlv.rs",
+        "crates/macho-runtime/tests/common/mod.rs",
+        "crates/macho-runtime/tests/compat_score.rs"
+      ],
+      "included_in_original_pr": false,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "c3cc645b26bbc8569c129d34b62db18e59c6647e",
+      "parents": [
+        "2f60e0ca1326bf9180bc04dd8c1a099431e70353"
+      ],
+      "tree": "d3ee86c9f8329d034da51272f680b73b782e4320",
+      "summary": "Isolate the unmapped-page regression from parallel address reuse",
+      "changed_paths": [
+        "crates/arm64-translate/src/mem.rs"
+      ],
+      "included_in_original_pr": false,
+      "included_in_current_pr": true
+    },
+    {
+      "commit": "1bf44e2e552254c450d3a7a86cc55487e7f49b51",
+      "parents": [
+        "c3cc645b26bbc8569c129d34b62db18e59c6647e"
+      ],
+      "tree": "5d9c795f0dfc558ff56225181db6da2919db1fa6",
+      "summary": "Reset independent scorecard guests and use valid native pthread attribute storage",
+      "changed_paths": [
+        "apps/hello-darwin/src/lib.rs",
+        "apps/hello-darwin/tests/headless_tests.rs",
+        "crates/libsystem-shims/src/pthread/tests.rs",
+        "crates/macho-runtime/tests/compat_score.rs"
+      ],
+      "included_in_original_pr": false,
+      "included_in_current_pr": true
+    }
+  ],
+  "review_snapshots": [
+    {
+      "snapshot_commit": "03b9948a61f67c1bf897de8355c24124980b7d2c",
+      "expected_commit": "4bdb0b69827e8715b5006045177793eb4436c5d6",
+      "tree": "451dc8a3f3bc3ed5f6aac9e096ba282d3d010352",
+      "parents": [
+        "2928aa855af9b1c67302d8e754ced75f892e3948"
+      ],
+      "verified": true
+    },
+    {
+      "snapshot_commit": "03b9948a61f67c1bf897de8355c24124980b7d2c",
+      "expected_commit": "735a5052fadb7ddf0435e44e0cc367ac398899a4",
+      "tree": "a35e7c4feb9847a31e2b5fc595bc9bb875701283",
+      "parents": [
+        "4bdb0b69827e8715b5006045177793eb4436c5d6"
+      ],
+      "verified": true
+    },
+    {
+      "snapshot_commit": "03b9948a61f67c1bf897de8355c24124980b7d2c",
+      "expected_commit": "b1e1246b8c6a3be94a1b3afab55679356a6fefc0",
+      "tree": "b604b33d41a0bb3e2b7d5d140ccb018f9199cb67",
+      "parents": [
+        "735a5052fadb7ddf0435e44e0cc367ac398899a4"
+      ],
+      "verified": true
+    },
+    {
+      "snapshot_commit": "03b9948a61f67c1bf897de8355c24124980b7d2c",
+      "expected_commit": "934ead2b94b2fe56ead0c5ff8aa9c2c5a0fa88ce",
+      "tree": "1e3f5c7183b508bcf44c6b64af7a3273af310345",
+      "parents": [
+        "b1e1246b8c6a3be94a1b3afab55679356a6fefc0"
+      ],
+      "verified": true
+    },
+    {
+      "snapshot_commit": "b7a981ec9cc9ce0f8075294b30a7d50153fd2eb8",
+      "expected_commit": "a22a8fba35a4458be3632245190efbb54453a7f9",
+      "tree": "37549fce2533dfcdd95ff597461521efe985622c",
+      "parents": [
+        "934ead2b94b2fe56ead0c5ff8aa9c2c5a0fa88ce"
+      ],
+      "verified": true
+    },
+    {
+      "snapshot_commit": "b7a981ec9cc9ce0f8075294b30a7d50153fd2eb8",
+      "expected_commit": "3766a0df7eb1d78a4f54727c25a08d3bec2da2a3",
+      "tree": "e9a0410b1bd5a6f317d602fa4ddd84f007fdef1d",
+      "parents": [
+        "a22a8fba35a4458be3632245190efbb54453a7f9"
+      ],
+      "verified": true
+    },
+    {
+      "snapshot_commit": "b7a981ec9cc9ce0f8075294b30a7d50153fd2eb8",
+      "expected_commit": "2b3b674f7741d7f56133d76c7b1c58cf40babf3a",
+      "tree": "4248b31f710d379125ce47d450964b5e0fb18696",
+      "parents": [
+        "3766a0df7eb1d78a4f54727c25a08d3bec2da2a3"
+      ],
+      "verified": true
+    },
+    {
+      "snapshot_commit": "b7a981ec9cc9ce0f8075294b30a7d50153fd2eb8",
+      "expected_commit": "92b77be215f78ea4bfc0fe8cbea4b6268b05253f",
+      "tree": "e9ee779f1cac130a6ece78d8338eb844744ef79c",
+      "parents": [
+        "2b3b674f7741d7f56133d76c7b1c58cf40babf3a"
+      ],
+      "verified": true
+    },
+    {
+      "snapshot_commit": "b7a981ec9cc9ce0f8075294b30a7d50153fd2eb8",
+      "expected_commit": "64ae4a5bbbe384b775330afa398be0f19898ca3d",
+      "tree": "3ebac09324e2c878325428f9bfd5f34b9abc67af",
+      "parents": [
+        "92b77be215f78ea4bfc0fe8cbea4b6268b05253f"
+      ],
+      "verified": true
+    },
+    {
+      "snapshot_commit": "b7a981ec9cc9ce0f8075294b30a7d50153fd2eb8",
+      "expected_commit": "92f9b4bcb4f51b776f6c880dd084ece43c9aae32",
+      "tree": "514489f87497ad172d477f6fce3c609e1f376ce7",
+      "parents": [
+        "64ae4a5bbbe384b775330afa398be0f19898ca3d"
+      ],
+      "verified": true
+    },
+    {
+      "snapshot_commit": "b7a981ec9cc9ce0f8075294b30a7d50153fd2eb8",
+      "expected_commit": "4ae0ab7148e42d7ca3d6bb14bc41c275051910ea",
+      "tree": "97343073c1f218877ce1a6e5bcdf1dbdae4356f5",
+      "parents": [
+        "92f9b4bcb4f51b776f6c880dd084ece43c9aae32"
+      ],
+      "verified": true
+    },
+    {
+      "snapshot_commit": "b7a981ec9cc9ce0f8075294b30a7d50153fd2eb8",
+      "expected_commit": "31e52c91ae89bf62fbaac4051c4a6fb4abbdbe2c",
+      "tree": "58dd9b4c4bf502ca08aeb7e7b021fefa9eae35e4",
+      "parents": [
+        "4ae0ab7148e42d7ca3d6bb14bc41c275051910ea"
+      ],
+      "verified": true
+    },
+    {
+      "snapshot_commit": "ae2594bc980247fdec901af01294476de8575b15",
+      "expected_commit": "492a3f23c504619a5cec26cd16ff8abd12d2ad72",
+      "tree": "be12b274c0477b949566db93258265296abd005b",
+      "parents": [
+        "31e52c91ae89bf62fbaac4051c4a6fb4abbdbe2c"
+      ],
+      "verified": true
+    },
+    {
+      "snapshot_commit": "ae2594bc980247fdec901af01294476de8575b15",
+      "expected_commit": "0921a0477f187145d968a72f9ca69d30a658ad0e",
+      "tree": "259c955a812299f2d6f4517f19790625a65ab932",
+      "parents": [
+        "492a3f23c504619a5cec26cd16ff8abd12d2ad72"
+      ],
+      "verified": true
+    },
+    {
+      "snapshot_commit": "ae2594bc980247fdec901af01294476de8575b15",
+      "expected_commit": "4e1294772edbebeb80400486289de4e9d49fb199",
+      "tree": "1a41cc22561b66bd95776913290d0916aba3575b",
+      "parents": [
+        "0921a0477f187145d968a72f9ca69d30a658ad0e"
+      ],
+      "verified": true
+    },
+    {
+      "snapshot_commit": "ae2594bc980247fdec901af01294476de8575b15",
+      "expected_commit": "ba47ca07e9ac5fea2a65954c97959377555c6d85",
+      "tree": "8adabb0ba42f5e0f7896098a3ef3d723e5bcfbaf",
+      "parents": [
+        "4e1294772edbebeb80400486289de4e9d49fb199"
+      ],
+      "verified": true
+    },
+    {
+      "snapshot_commit": "ae2594bc980247fdec901af01294476de8575b15",
+      "expected_commit": "aa7b44d2530bbd0c67304bf4d19f4f7574bd8bf8",
+      "tree": "496124921790669d1e21c53bf53847bd1191894c",
+      "parents": [
+        "ba47ca07e9ac5fea2a65954c97959377555c6d85"
+      ],
+      "verified": true
+    },
+    {
+      "snapshot_commit": "ae2594bc980247fdec901af01294476de8575b15",
+      "expected_commit": "87c6fa4f509de5aeac3cbc3851d96e5241197d37",
+      "tree": "7df9aef688db56862a6c7457308745bae235132b",
+      "parents": [
+        "aa7b44d2530bbd0c67304bf4d19f4f7574bd8bf8"
+      ],
+      "verified": true
+    },
+    {
+      "snapshot_commit": "ae2594bc980247fdec901af01294476de8575b15",
+      "expected_commit": "32d18ee8299fb09fc181c1547d2e0a59a744096c",
+      "tree": "300c877230d9491379e04916b072af92af579ae8",
+      "parents": [
+        "87c6fa4f509de5aeac3cbc3851d96e5241197d37"
+      ],
+      "verified": true
+    },
+    {
+      "snapshot_commit": "ae2594bc980247fdec901af01294476de8575b15",
+      "expected_commit": "b98edf7ff8689bd816a3f2385edc02bb978d2535",
+      "tree": "8130453e48cee0c68faf37eb22bc945f750895cf",
+      "parents": [
+        "32d18ee8299fb09fc181c1547d2e0a59a744096c"
+      ],
+      "verified": true
+    },
+    {
+      "snapshot_commit": "ae2594bc980247fdec901af01294476de8575b15",
+      "expected_commit": "ad3f398bfe15e01b1cd233f359f9fca0aff27132",
+      "tree": "9eb773c4d1b6a7d8876eba36ff7f3d6c4455d4b0",
+      "parents": [
+        "b98edf7ff8689bd816a3f2385edc02bb978d2535"
+      ],
+      "verified": true
+    },
+    {
+      "snapshot_commit": "ae2594bc980247fdec901af01294476de8575b15",
+      "expected_commit": "82b04e65188f94a921f6d7944d980553c7a99745",
+      "tree": "34028c398c050b93db77f612fcc7a227553b1a55",
+      "parents": [
+        "ad3f398bfe15e01b1cd233f359f9fca0aff27132"
+      ],
+      "verified": true
+    },
+    {
+      "snapshot_commit": "ae2594bc980247fdec901af01294476de8575b15",
+      "expected_commit": "af582402f48fb9633949ce6b96bb196323d8e1a5",
+      "tree": "a5c92373ef386f55fa51c0d2ff8dd2bdf707285b",
+      "parents": [
+        "82b04e65188f94a921f6d7944d980553c7a99745"
+      ],
+      "verified": true
+    },
+    {
+      "snapshot_commit": "ae2594bc980247fdec901af01294476de8575b15",
+      "expected_commit": "055876574fb4d4b6abb35de0ade9413ab95faaf8",
+      "tree": "eb7d137e9b99cd67fe899187fe921484828013e6",
+      "parents": [
+        "af582402f48fb9633949ce6b96bb196323d8e1a5"
+      ],
+      "verified": true
+    },
+    {
+      "snapshot_commit": "ae2594bc980247fdec901af01294476de8575b15",
+      "expected_commit": "373566c4902d8920d2efee1a008f0fb0f94941a4",
+      "tree": "c74098f0bd4e29df877e90ab5ca1ebaad4ea69e7",
+      "parents": [
+        "055876574fb4d4b6abb35de0ade9413ab95faaf8"
+      ],
+      "verified": true
+    },
+    {
+      "snapshot_commit": "ae2594bc980247fdec901af01294476de8575b15",
+      "expected_commit": "4c1476fb34a3f4f247db717993e703772574b522",
+      "tree": "03fc7ef64e4219fab5ed644fe4cbe236ad3eed8a",
+      "parents": [
+        "373566c4902d8920d2efee1a008f0fb0f94941a4"
+      ],
+      "verified": true
+    },
+    {
+      "snapshot_commit": "ae2594bc980247fdec901af01294476de8575b15",
+      "expected_commit": "627024e345343f83f639fdc95d85cd8e264e4dbe",
+      "tree": "16421494261db8b02f8b5f88aead91037f1a37c3",
+      "parents": [
+        "4c1476fb34a3f4f247db717993e703772574b522"
+      ],
+      "verified": true
+    },
+    {
+      "snapshot_commit": "ae2594bc980247fdec901af01294476de8575b15",
+      "expected_commit": "e72f02a4c104a1e8b4c4d2dbe51b9f0b6ae5f115",
+      "tree": "805b224888567f0e846154d298963a90fc468e4b",
+      "parents": [
+        "627024e345343f83f639fdc95d85cd8e264e4dbe"
+      ],
+      "verified": true
+    },
+    {
+      "snapshot_commit": "ae2594bc980247fdec901af01294476de8575b15",
+      "expected_commit": "22c95606fb6af492346f340c9d3f21ba1391a4bc",
+      "tree": "47661a423e4032f7ac6742252cfea1e4da71d019",
+      "parents": [
+        "e72f02a4c104a1e8b4c4d2dbe51b9f0b6ae5f115"
+      ],
+      "verified": true
+    },
+    {
+      "snapshot_commit": "ae2594bc980247fdec901af01294476de8575b15",
+      "expected_commit": "bd692271cd529f1193fb05479158f8481e37d153",
+      "tree": "6e7bfe87c93cd542eb2ffffdd834e530805752a6",
+      "parents": [
+        "22c95606fb6af492346f340c9d3f21ba1391a4bc"
+      ],
+      "verified": true
+    },
+    {
+      "snapshot_commit": "ae2594bc980247fdec901af01294476de8575b15",
+      "expected_commit": "69c102f1e1a7200cdd2e53ae0160ee92588e23b3",
+      "tree": "99c581c50f785f92a27256fae2dddf636bae7665",
+      "parents": [
+        "bd692271cd529f1193fb05479158f8481e37d153"
+      ],
+      "verified": true
+    },
+    {
+      "snapshot_commit": "ae2594bc980247fdec901af01294476de8575b15",
+      "expected_commit": "a39c6d8a3ea8df4c1c639f56a25358dd298bdfda",
+      "tree": "d6980e77275ddc9671ebb5a5ae607a9fc53401ac",
+      "parents": [
+        "69c102f1e1a7200cdd2e53ae0160ee92588e23b3"
+      ],
+      "verified": true
+    },
+    {
+      "snapshot_commit": "1a55070362aa4ef1539ed7c9d5f2e3c005995a9a",
+      "expected_commit": "39aa061b3cf2aa15d22818872cd792eb8320cb03",
+      "tree": "f1f2ad03397ae8174346f05adb711f5a9092c79e",
+      "parents": [
+        "a39c6d8a3ea8df4c1c639f56a25358dd298bdfda"
+      ],
+      "verified": true
+    },
+    {
+      "snapshot_commit": "1ca8b6da822a958647218a0546e3da7a846cdd80",
+      "expected_commit": "dd08ad9248b46406f065c3a885798b90c45dc13d",
+      "tree": "585b0ca053ddbd279241517edffd1037f55c7335",
+      "parents": [
+        "39aa061b3cf2aa15d22818872cd792eb8320cb03"
+      ],
+      "verified": true
+    }
+  ],
+  "unconfirmed_abbreviations": {
+    "ab7abbd": false,
+    "15b33db": false
+  },
+  "source_of_truth": "Fetched public commit objects and maintenance workflow payloads; original local snapshots unavailable. Both unconfirmed abbreviations also returned GitHub HTTP 422. The original local checkout also cannot resolve ab7abbd, 15b33db or the recovered 852ce324 object; it was not modified.",
+  "attribution_replacement": {
+    "original": "852ce324d8322b06cb26af70ea35cc0df2aff072",
+    "replacement": "12cb7d60c10080702a0b354d885f4997c36c6971",
+    "same_tree": true,
+    "same_parent": true,
+    "author_and_committer_email": "7076785+burdettadam@users.noreply.github.com"
+  },
+  "validated_source_head": "1bf44e2e552254c450d3a7a86cc55487e7f49b51",
+  "post_recovery_source_changes": {
+    "changed_paths": [
+      ".github/workflows/ci.yml",
+      "apps/hello-darwin/src/lib.rs",
+      "apps/hello-darwin/tests/headless_tests.rs",
+      "crates/arm64-translate/src/mem.rs",
+      "crates/cf-lite/src/cf_core/collections.rs",
+      "crates/cf-lite/src/nsscreen.rs",
+      "crates/cf-lite/src/nsurl.rs",
+      "crates/libsystem-shims/src/cross_platform/posix_extras.rs",
+      "crates/libsystem-shims/src/cross_platform/stdio.rs",
+      "crates/libsystem-shims/src/darwin_stubs/dispatch_queue.rs",
+      "crates/libsystem-shims/src/pthread/tests.rs",
+      "crates/macho-exec/src/tlv.rs",
+      "crates/macho-parse/tests/advanced_parse_tests.rs",
+      "crates/macho-parse/tests/codesig_tests.rs",
+      "crates/macho-runtime/tests/common/mod.rs",
+      "crates/macho-runtime/tests/compat_score.rs",
+      "crates/macho-runtime/tests/runtime_objc_tests.rs",
+      "scripts/build_fixtures.sh"
+    ],
+    "summary": "Native C-string/stdio/POSIX fixes; Darwin Mach VM mapping checks; isolated cross-page probe; ARM64 TLV register-preserving trampoline and ABI regression; independent scorecard lifecycle reset; native pthread test storage; CPU-bounded queue concurrency regression; reproducible category/export/code-signature fixtures; current Foundation count assertion; scoped helper annotations; native failure collection and caching. All other recovered source blobs are identical."
+  },
+  "dependency_followup": "https://github.com/burdettadam/burdettie-os/issues/2",
+  "regression_test_inventory": {
+    "removed_without_replacement": [],
+    "renamed_and_repaired": [
+      {
+        "before": "crates/cf-lite/src/nsmutablearray/ops.rs::sort_using_descriptors_is_noop_stub",
+        "after": "crates/cf-lite/src/nsmutablearray/ops.rs::sort_using_empty_descriptors_preserves_order",
+        "reason": "Replace fake object addresses and invalid descriptor pointer with real NSObject fixtures and a valid empty descriptor array; retain stable-order assertions."
+      }
+    ],
+    "added": [
+      "crates/arm64-translate/src/decode/load_store.rs::atomic_regression_cas_ordering_flags",
+      "crates/arm64-translate/src/decode/load_store.rs::atomic_regression_exclusive_word_and_doubleword_widths",
+      "crates/arm64-translate/src/decode/load_store.rs::atomic_regression_lse_sizes_are_byte_widths",
+      "crates/arm64-translate/src/decode/load_store.rs::atomic_regression_unsupported_exclusive_widths_are_not_widened",
+      "crates/arm64-translate/src/interp/exec_ls_extended.rs::atomic_regression_acquire_release_exclusives_honor_monitor",
+      "crates/arm64-translate/src/interp/exec_ls_extended.rs::atomic_regression_acquire_release_word_preserves_neighbor",
+      "crates/arm64-translate/src/interp/exec_ls_extended.rs::atomic_regression_cas_word_preserves_neighbor",
+      "crates/arm64-translate/src/interp/exec_ls_extended.rs::atomic_regression_lse_32_minmax_rejects_read_only_memory",
+      "crates/arm64-translate/src/interp/exec_ls_extended.rs::atomic_regression_lse_32_minmax_results",
+      "crates/arm64-translate/src/interp/exec_ls_extended.rs::atomic_regression_lse_signed_64_minmax",
+      "crates/arm64-translate/src/interp/exec_ls_extended.rs::atomic_regression_lse_signed_byte_minmax",
+      "crates/arm64-translate/src/interp/exec_ls_extended.rs::atomic_regression_lse_signed_halfword_minmax",
+      "crates/arm64-translate/src/interp/exec_ls_extended.rs::atomic_regression_lse_transfer_widths",
+      "crates/arm64-translate/src/interp/exec_ls_extended.rs::atomic_regression_lse_unsigned_64_minmax",
+      "crates/arm64-translate/src/interp/exec_ls_extended.rs::atomic_regression_lse_unsigned_narrow_truncates_source",
+      "crates/arm64-translate/src/interp/exec_ls_extended.rs::atomic_regression_swp_byte_preserves_neighboring_bytes",
+      "crates/arm64-translate/src/interp/exec_ls_extended.rs::atomic_regression_swp_transfer_widths",
+      "crates/arm64-translate/src/interp/exec_ls_extended.rs::atomic_regression_unaligned_accesses_report_memory_faults",
+      "crates/arm64-translate/src/interp/exec_ls_extended.rs::atomic_regression_word_minmax_faults_on_read_only_memory",
+      "crates/arm64-translate/src/mem.rs::atomic_regression_aligned_nonidentity_mapping_works",
+      "crates/arm64-translate/src/mem.rs::atomic_regression_rejects_misaligned_guest_or_host_storage",
+      "crates/arm64-translate/src/mem.rs::atomic_regression_signed_minmax_u64",
+      "crates/arm64-translate/src/mem.rs::host_page_probe_rejects_overflowing_or_empty_ranges",
+      "crates/arm64-translate/src/mem.rs::host_passthrough_checks_every_page_of_an_access",
+      "crates/arm64-translate/src/mem.rs::host_passthrough_preserves_registered_region_bounds_and_protection",
+      "crates/arm64-translate/src/mem.rs::host_passthrough_reads_and_writes_live_storage",
+      "crates/arm64-translate/src/mem.rs::read_cstring_at_guest_address_limit_does_not_wrap",
+      "crates/arm64-translate/src/mem.rs::registered_region_rejects_guest_address_wraparound",
+      "crates/cf-lite/src/calayer.rs::layer_transform_aggregate_roundtrip",
+      "crates/cf-lite/src/calayer.rs::nil_transform_aggregates_preserve_identity",
+      "crates/cf-lite/src/cfstring/mod.rs::pointer_layouts_do_not_decode_address_bytes_as_inline_ascii",
+      "crates/cf-lite/src/cg_types.rs::darwin_aggregate_layouts",
+      "crates/cf-lite/src/nsaccessibility.rs::accessibility_frame_returns_rect_aggregate",
+      "crates/cf-lite/src/nsclipview.rs::constrain_bounds_returns_rect_aggregate",
+      "crates/cf-lite/src/nsmutablearray/ops.rs::sort_using_empty_descriptors_preserves_order",
+      "crates/cf-lite/src/nsobj/mod.rs::child_class_pointers_preserve_the_hierarchy",
+      "crates/cf-lite/src/nsobj/mod.rs::class_storage_has_pointer_alignment",
+      "crates/cf-lite/src/nsrunloop.rs::timer_callback_can_enqueue_without_deadlock",
+      "crates/cf-lite/src/nsrunloop.rs::timer_callback_invalidation_preserves_repeat_policy",
+      "crates/cf-lite/src/nsrunloop.rs::timer_callback_reset_does_not_resurrect_old_entries",
+      "crates/cf-lite/src/nstextview.rs::selected_range_returns_range_aggregate",
+      "crates/cf-lite/src/nstimer.rs::target_callback_can_mutate_runtime",
+      "crates/cf-lite/src/nsxmlparser.rs::tokenizer_preserves_xml10_attribute_normalization",
+      "crates/graphics-core/src/gpu/atlas.rs::attributed_glyph_uses_the_layouts_font_table",
+      "crates/graphics-core/src/gpu/atlas.rs::glyph_cache_distinguishes_font_faces",
+      "crates/graphics-core/src/gpu/atlas.rs::glyph_cache_preserves_fractional_sizes",
+      "crates/graphics-core/src/gpu/atlas.rs::rejected_glyphs_do_not_poison_the_atlas",
+      "crates/graphics-core/src/gpu/atlas.rs::rejected_row_wrap_preserves_space_for_smaller_glyphs",
+      "crates/graphics-core/src/tests/attributed.rs::attributed_combining_mark_keeps_its_own_style",
+      "crates/graphics-core/src/tests/attributed.rs::attributed_metrics_include_unstyled_text",
+      "crates/graphics-core/src/tests/attributed.rs::attributed_styles_use_original_byte_offsets_after_normalization",
+      "crates/libsystem-shims/src/cross_platform/posix_extras.rs::sysconf_shim_matches_host_page_size_and_processor_count",
+      "crates/libsystem-shims/src/darwin_stubs/dns_sd.rs::callback_can_query_and_deallocate_its_service",
+      "crates/libsystem-shims/src/darwin_stubs/launchd_stubs.rs::bootstrap_error_strings_are_terminated_and_preserve_messages",
+      "crates/libsystem-shims/src/darwin_stubs/launchd_stubs.rs::vproc_error_strings_are_terminated_and_preserve_messages",
+      "crates/macho-exec/src/tlv.rs::tlv_thunk_preserves_live_integer_and_fp_registers",
+      "crates/macho-parse/src/exports.rs::cstring_scan_charges_only_bytes_examined",
+      "crates/macho-parse/src/exports.rs::cstring_scan_stops_before_a_nul_beyond_its_budget",
+      "crates/macho-parse/tests/malformed_metadata_tests.rs::arm64_unixthread_reads_pc_instead_of_x16",
+      "crates/macho-parse/tests/malformed_metadata_tests.rs::arm_unixthread_reads_pc_instead_of_r10",
+      "crates/macho-parse/tests/malformed_metadata_tests.rs::cstrings_reject_overflowing_section_range",
+      "crates/macho-parse/tests/malformed_metadata_tests.rs::export_trie_bounds_acyclic_alias_expansion",
+      "crates/macho-parse/tests/malformed_metadata_tests.rs::export_trie_bounds_shared_unterminated_reexport_names",
+      "crates/macho-parse/tests/malformed_metadata_tests.rs::export_trie_does_not_read_address_past_terminal",
+      "crates/macho-parse/tests/malformed_metadata_tests.rs::export_trie_preserves_shared_node_aliases",
+      "crates/macho-parse/tests/malformed_metadata_tests.rs::export_trie_rejects_ancestor_cycle",
+      "crates/macho-parse/tests/malformed_metadata_tests.rs::export_trie_rejects_self_cycle",
+      "crates/macho-parse/tests/malformed_metadata_tests.rs::export_trie_rejects_terminal_length_overflow",
+      "crates/macho-parse/tests/malformed_metadata_tests.rs::export_trie_rejects_truncated_and_overflowing_uleb128",
+      "crates/macho-parse/tests/malformed_metadata_tests.rs::function_starts_reject_truncated_and_overflowing_deltas",
+      "crates/macho-parse/tests/malformed_metadata_tests.rs::function_starts_stop_at_address_overflow",
+      "crates/macho-parse/tests/malformed_metadata_tests.rs::i386_unixthread_reads_eip",
+      "crates/macho-parse/tests/malformed_metadata_tests.rs::tlv_rejects_overflowing_section_range",
+      "crates/macho-parse/tests/malformed_metadata_tests.rs::tlv_stops_before_virtual_address_overflow",
+      "crates/macho-parse/tests/malformed_metadata_tests.rs::unixthread_rejects_wrong_flavor_and_truncated_state",
+      "crates/macho-parse/tests/malformed_metadata_tests.rs::vmaddr_mapping_handles_segment_extent_overflow",
+      "crates/macho-parse/tests/malformed_metadata_tests.rs::vmaddr_mapping_rejects_file_offset_overflow",
+      "crates/macho-parse/tests/malformed_metadata_tests.rs::x86_64_unixthread_reads_rip",
+      "crates/objc-runtime/src/class/tests/superclass_repair_tests.rs::removing_a_mapped_class_drops_its_repair_record",
+      "crates/objc-runtime/src/class/tests/superclass_repair_tests.rs::repair_preserves_synthetic_hierarchies_and_opaque_handles",
+      "crates/objc-runtime/src/class/tests/superclass_repair_tests.rs::repair_reads_unaligned_export_backed_records",
+      "crates/objc-runtime/src/class/tests/superclass_repair_tests.rs::repairs_image_superclasses_after_fixups_including_null",
+      "crates/objc-runtime/src/class/tests/superclass_repair_tests.rs::replacement_and_overlay_preserve_the_winning_storage_kind",
+      "crates/platform-darwin-host/src/clock.rs::monotonic_ns_uses_host_timebase",
+      "crates/platform-darwin-host/src/clock.rs::ticks_to_nanoseconds_avoids_intermediate_overflow",
+      "crates/platform-darwin-host/src/clock.rs::ticks_to_nanoseconds_identity",
+      "crates/platform-darwin-host/src/clock.rs::ticks_to_nanoseconds_saturates",
+      "crates/platform-darwin-host/src/clock.rs::ticks_to_nanoseconds_scales_and_truncates"
+    ],
+    "scope": "Named Rust test functions in paths changed from public main; suites can overlap and this is not a passed-test total."
+  },
+  "security_policy_files_unchanged": [
+    "deny.toml",
+    ".gitleaks.toml",
+    "scripts/check_repository_hygiene.py",
+    ".github/workflows/repository-hygiene.yml",
+    "licenses"
+  ],
+  "security_test_review": "security_tests.rs only removes unused imports; assertions and runtime security gates are unchanged.",
+  "validation": {
+    "source_commit": "1bf44e2e552254c450d3a7a86cc55487e7f49b51",
+    "workflow_url": "https://github.com/burdettadam/burdettie-os/actions/runs/43343829535",
+    "rust": "1.93.0",
+    "native_host": "macOS 26.7.2 ARM64",
+    "jobs": {
+      "Security Scanning": "failure",
+      "README quickstart (macOS ARM64)": "success",
+      "Build native Mach-O fixtures": "success",
+      "Docker Dev Build": "success",
+      "FFI Interop (C + Swift)": "success",
+      "Linux ARM64 E2E (Interpreter)": "success",
+      "Build & Test": "success"
+    },
+    "security_exception": "Unsuppressed RUSTSEC-2026-0192; separate migration tracked in issue #2",
+    "native_ignored_test_entries": 2,
+    "ignored_cases": [
+      "objc-runtime unknown-ISA abort path (pre-existing ignored test)",
+      "libsystem-shims register_shims documentation example"
+    ]
+  }
+}

@@ -95,9 +95,9 @@ The [feature reference](docs/FEATURES.md) provides the detailed subsystem invent
 
 ## Validation
 
-The [CI workflow](.github/workflows/ci.yml) builds the project's own Mach-O fixtures and checks the documented quick start, language bindings, portable libraries, and interpreted execution. In the [recorded run for `dd08ad9`](https://github.com/burdettadam/burdettie-os/actions/runs/43311827892), the macOS ARM64 quick start, C/Swift interop, Docker checks, and all 40 Linux ARM64 interpreter fixtures passed.
+The [CI workflow](.github/workflows/ci.yml) builds the project's own Mach-O fixtures. In [run 43343829535](https://github.com/burdettadam/burdettie-os/actions/runs/43343829535) for source commit `1bf44e2e552254c450d3a7a86cc55487e7f49b51`, native macOS ARM64 formatting, strict Clippy, debug/release builds, full workspace tests, GPU-feature tests, runtime packaging, README quick start, and C/Swift interop passed. Docker's 344 portable library tests and all 40 Linux ARM64 interpreter fixtures passed in their separate Linux environments.
 
-That run also exposed strict-lint failures in the broader macOS build-and-test job. The `ttf-parser` maintenance advisory remains visible in the dependency checks. Follow-up source fixes and their local regression results are recorded in the [validation status](docs/PUBLICATION.md#validation-status), with native CI distinguished from local checks. These results describe the tested fixtures and revision; framework and application coverage remains incremental.
+The security workflow remains failed for the unsuppressed `ttf-parser` maintenance advisory; [issue #2](https://github.com/burdettadam/burdettie-os/issues/2) tracks replacement of both font dependency paths. `cargo audit`, license/source policy, repository hygiene and reachable-history secret scanning passed. See the [revision-specific validation record](docs/PUBLICATION.md#validation-status) and [recovery manifest](docs/RECOVERY_MANIFEST.json) for environments, ignored tests, source preservation and runtime limits. These results describe the tested revision and inputs; framework and application coverage remains incremental.
 
 ## Scope and limitations
 
