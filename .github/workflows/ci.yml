@@ -156,6 +156,25 @@ jobs:
       - name: Test
         run: cargo test --locked --workspace --no-fail-fast
 
+      - name: Diagnose native process failures
+        if: failure()
+        run: |
+          # Diagnostic reruns never replace the required parallel workspace test.
+          for stem in arm64_translate headless_tests libsystem_shims compat_score runtime_exec_tests; do
+            for binary in target/debug/deps/"$stem"-*; do
+              [[ -f "$binary" && -x "$binary" ]] || continue
+              echo "::group::Native backtrace: $stem"
+              lldb --batch \
+                -o 'settings set target.disable-aslr false' \
+                -o run -o 'thread backtrace all' \
+                -- "$binary" --nocapture --test-threads=1 || true
+              echo '::endgroup::'
+            done
+          done
+          echo '::group::Objective-C category sections'
+          otool -l fixtures/objc_category/objc_category || true
+          echo '::endgroup::'
+
       - name: Test GPU text layout and glyph cache
         run: cargo test --locked -p graphics-core --lib --features gpu
 
