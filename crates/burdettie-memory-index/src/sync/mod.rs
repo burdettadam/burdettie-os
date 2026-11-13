@@ -363,9 +363,8 @@ impl SemanticMemoryIndex {
             return Ok(None);
         }
 
-        let body = match String::from_utf8(bytes) {
-            Ok(body) => body,
-            Err(_) => return Ok(None),
+        let Ok(body) = String::from_utf8(bytes) else {
+            return Ok(None);
         };
 
         let relative_path =

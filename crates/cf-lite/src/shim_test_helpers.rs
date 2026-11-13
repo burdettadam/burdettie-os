@@ -22,15 +22,42 @@
 //!
 //! # Compromises (for future maintainers)
 //!
-//! - Objects are allocated with fake ISA pointers. Tests validate shim logic
-//!   in isolation, NOT full ObjC message dispatch through the runtime.
+//! - Fake ISA pointers are suitable only when a test never dispatches ObjC
+//!   methods. Dispatch tests need allocated objects with valid class addresses.
 //! - No retain/release tracking — tests do manual `free_obj` calls, not
 //!   autorelease semantics.
 //! - String equality is byte-level via `extract_cfstring_cstr`, not locale-aware.
-//! - These tests run without `set_platform()` — the `pal_alloc()` fallback
-//!   (libc malloc) is used. Platform-dependent shims (clock, rng, fs) should
-//!   set up their own platform provider or be tested through corpus instead.
-//! - Thread safety is not tested — all tests are single-threaded.
+//! - Allocation-only tests can use the `pal_alloc()` fallback. Tests that use
+//!   platform services such as clocks must explicitly install a provider.
+//! - The test harness runs tests in parallel. Tests sharing mutable global
+//!   state must coordinate access; tests requiring fresh process-wide identity
+//!   use `with_isolated_test_process` instead of resetting production state.
+
+/// Run an exact test in a fresh process, so its process-wide `OnceLock` state
+/// does not depend on which other test worker initialized the runtime first.
+/// The per-test environment guard lets the child execute the body once.
+pub fn with_isolated_test_process(test_name: &str, body: impl FnOnce()) {
+    const GUARD: &str = "BURDETTIE_CF_ISOLATED_TEST";
+    let completion = format!("isolated test completed: {test_name}");
+    if std::env::var(GUARD).ok().as_deref() == Some(test_name) {
+        body();
+        eprintln!("{completion}");
+        return;
+    }
+
+    let output = std::process::Command::new(std::env::current_exe().expect("current test binary"))
+        .args(["--exact", test_name, "--nocapture"])
+        .env(GUARD, test_name)
+        .output()
+        .expect("run isolated test process");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        output.status.success() && stderr.contains(&completion),
+        "isolated test {test_name} did not complete successfully: {}\nstdout:\n{stdout}\nstderr:\n{stderr}",
+        output.status
+    );
+}
 
 /// Allocate a zeroed object of `size` bytes with the given ISA pointer.
 ///

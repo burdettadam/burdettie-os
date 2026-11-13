@@ -41,13 +41,10 @@ pub fn extract_cstrings(parsed: &ParsedMachO, data: &[u8]) -> Vec<SectionStrings
             continue;
         }
 
-        let start = section.offset as usize;
-        let end = start + section.size as usize;
-        if end > data.len() {
+        let Some(section_data) = crate::bytes_at(data, u64::from(section.offset), section.size)
+        else {
             continue;
-        }
-
-        let section_data = &data[start..end];
+        };
         let strings = extract_null_terminated(section_data);
 
         if !strings.is_empty() {

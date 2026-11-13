@@ -104,10 +104,6 @@ static SOURCE_TYPE_MEMORYPRESSURE: u8 = 11;
 static SOURCE_TYPE_DATA_REPLACE: u8 = 12;
 
 // ---------------------------------------------------------------------------
-// Block invocation helper
-// ---------------------------------------------------------------------------
-
-/// Invoke a GCD block.  Block layout: `isa(8) + flags(4) + reserved(4) + invoke(8)`.
 // dispatch_data shims
 // ---------------------------------------------------------------------------
 
@@ -348,7 +344,7 @@ extern "C" fn shim_dispatch_resume(object: u64) {
             std::thread::Builder::new()
                 .name(format!("dispatch-source-read-{fd}"))
                 .spawn(move || {
-                    source_poll_fd(src_arc, fd, libc::POLLIN as i16);
+                    source_poll_fd(&src_arc, fd, libc::POLLIN);
                 })
                 .ok();
         }
@@ -360,7 +356,7 @@ extern "C" fn shim_dispatch_resume(object: u64) {
             std::thread::Builder::new()
                 .name(format!("dispatch-source-write-{fd}"))
                 .spawn(move || {
-                    source_poll_fd(src_arc, fd, libc::POLLOUT as i16);
+                    source_poll_fd(&src_arc, fd, libc::POLLOUT);
                 })
                 .ok();
         }
@@ -372,7 +368,7 @@ extern "C" fn shim_dispatch_resume(object: u64) {
             std::thread::Builder::new()
                 .name(format!("dispatch-source-signal-{signum}"))
                 .spawn(move || {
-                    source_wait_signal(src_arc, signum);
+                    source_wait_signal(&src_arc, signum);
                 })
                 .ok();
         }
@@ -381,7 +377,7 @@ extern "C" fn shim_dispatch_resume(object: u64) {
 
 /// Poll a file descriptor for the specified events (POLLIN or POLLOUT).
 /// Fires the event handler each time the fd becomes ready.
-fn source_poll_fd(src: Arc<Source>, fd: i32, events: i16) {
+fn source_poll_fd(src: &Source, fd: i32, events: i16) {
     loop {
         if src.cancelled.load(Ordering::Acquire) || src.suspended.load(Ordering::Acquire) {
             break;
@@ -408,13 +404,13 @@ fn source_poll_fd(src: Arc<Source>, fd: i32, events: i16) {
             continue; // timeout, check cancel again
         }
 
-        if pfd.revents & (libc::POLLERR | libc::POLLHUP | libc::POLLNVAL) as i16 != 0 {
+        if pfd.revents & (libc::POLLERR | libc::POLLHUP | libc::POLLNVAL) != 0 {
             break;
         }
 
         if pfd.revents & events != 0 {
             // Store estimated readable/writable bytes.
-            if events == libc::POLLIN as i16 {
+            if events == libc::POLLIN {
                 let mut available: i32 = 0;
                 unsafe { libc::ioctl(fd, libc::FIONREAD, &mut available) };
                 src.pending_data
@@ -429,7 +425,7 @@ fn source_poll_fd(src: Arc<Source>, fd: i32, events: i16) {
 }
 
 /// Wait for a signal using sigtimedwait (avoids global signal handler conflicts).
-fn source_wait_signal(src: Arc<Source>, signum: i32) {
+fn source_wait_signal(src: &Source, signum: i32) {
     // Block the signal on this thread so sigtimedwait can catch it.
     #[cfg(target_os = "linux")]
     {

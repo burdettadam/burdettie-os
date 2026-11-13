@@ -473,13 +473,11 @@ pub extern "C" fn shim_cfhost_start_info_resolution(
     _error: *mut u64,
 ) -> i32 {
     let mut guard = cfhost_store();
-    let store = match guard.as_mut() {
-        Some(s) => s,
-        None => return 0,
+    let Some(store) = guard.as_mut() else {
+        return 0;
     };
-    let entry = match store.get_mut(&host) {
-        Some(e) => e,
-        None => return 0,
+    let Some(entry) = store.get_mut(&host) else {
+        return 0;
     };
 
     // BurdettieOS DNS rewrite — redirect Apple domains to local service
@@ -489,9 +487,8 @@ pub extern "C" fn shim_cfhost_start_info_resolution(
     };
 
     // Use libc getaddrinfo for portable DNS resolution (works on both macOS and Linux)
-    let hostname_cstr = match std::ffi::CString::new(resolve_hostname.as_str()) {
-        Ok(c) => c,
-        Err(_) => return 0,
+    let Ok(hostname_cstr) = std::ffi::CString::new(resolve_hostname.as_str()) else {
+        return 0;
     };
 
     let mut hints: libc::addrinfo = unsafe { std::mem::zeroed() };
@@ -548,27 +545,21 @@ pub extern "C" fn shim_cfhost_start_info_resolution(
 /// Returns a CFArray of sockaddr data objects from the resolved addresses.
 pub extern "C" fn shim_cfhost_get_addressing(host: u64, resolved: *mut i32) -> u64 {
     let mut guard = cfhost_store();
-    let store = match guard.as_mut() {
-        Some(s) => s,
-        None => {
-            if !resolved.is_null() {
-                unsafe {
-                    *resolved = 0;
-                }
+    let Some(store) = guard.as_mut() else {
+        if !resolved.is_null() {
+            unsafe {
+                *resolved = 0;
             }
-            return 0;
         }
+        return 0;
     };
-    let entry = match store.get_mut(&host) {
-        Some(e) => e,
-        None => {
-            if !resolved.is_null() {
-                unsafe {
-                    *resolved = 0;
-                }
+    let Some(entry) = store.get_mut(&host) else {
+        if !resolved.is_null() {
+            unsafe {
+                *resolved = 0;
             }
-            return 0;
         }
+        return 0;
     };
 
     match &entry.resolved_addrs {
@@ -715,16 +706,15 @@ pub extern "C" fn shim_getaddrinfo(
     let hostname = read_cstr(node);
     let resolve_hostname = hostname
         .as_deref()
-        .and_then(|h| burdettie_domain_map::rewrite_hostname(h));
+        .and_then(burdettie_domain_map::rewrite_hostname);
 
     if let Some(ref rewritten) = resolve_hostname {
         log::info!(
             "getaddrinfo: domain rewrite {} → {rewritten}",
             hostname.as_deref().unwrap_or("?")
         );
-        let cstr = match std::ffi::CString::new(rewritten.as_str()) {
-            Ok(c) => c,
-            Err(_) => return libc::EAI_FAIL,
+        let Ok(cstr) = std::ffi::CString::new(rewritten.as_str()) else {
+            return libc::EAI_FAIL;
         };
         return unsafe { libc::getaddrinfo(cstr.as_ptr(), service, hints, res) };
     }

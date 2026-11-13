@@ -204,9 +204,8 @@ pub(crate) fn tracking_areas_containing_point(view: u64, px: f64, py: f64) -> Ve
         return Vec::new();
     }
     let guard = VIEW_TRACKING_AREAS.lock().unwrap();
-    let areas = match guard.as_ref().and_then(|m| m.get(&view)) {
-        Some(a) => a,
-        None => return Vec::new(),
+    let Some(areas) = guard.as_ref().and_then(|m| m.get(&view)) else {
+        return Vec::new();
     };
     let mut result = Vec::new();
     for &area in areas {

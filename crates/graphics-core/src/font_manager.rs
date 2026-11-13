@@ -5,6 +5,12 @@
 
 use ab_glyph::{Font as AbFont, FontVec, ScaleFont};
 
+#[cfg(feature = "gpu")]
+use std::sync::atomic::{AtomicU64, Ordering};
+
+#[cfg(feature = "gpu")]
+static NEXT_FONT_CACHE_ID: AtomicU64 = AtomicU64::new(1);
+
 use super::unicode::{is_combining_mark, is_zero_width, normalize_nfc};
 
 /// Embedded DejaVu Sans Regular — the default system font.
@@ -23,6 +29,10 @@ pub(crate) const DEJAVU_SANS_BOLD_OBLIQUE: &[u8] =
 pub struct FontFace {
     inner: FontVec,
     name: String,
+    // Stable across moves and unique across managers, including custom fonts
+    // that reuse the same name. An atlas can outlive an individual layout.
+    #[cfg(feature = "gpu")]
+    cache_id: u64,
 }
 
 impl FontFace {
@@ -32,6 +42,8 @@ impl FontFace {
         Some(Self {
             inner,
             name: name.into(),
+            #[cfg(feature = "gpu")]
+            cache_id: NEXT_FONT_CACHE_ID.fetch_add(1, Ordering::Relaxed),
         })
     }
 
@@ -99,6 +111,11 @@ impl FontFace {
     /// Access the underlying ab_glyph font for rasterization.
     pub(crate) fn inner(&self) -> &FontVec {
         &self.inner
+    }
+
+    #[cfg(feature = "gpu")]
+    pub(crate) fn cache_id(&self) -> u64 {
+        self.cache_id
     }
 }
 

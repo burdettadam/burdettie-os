@@ -123,9 +123,8 @@ pub extern "C" fn shim_nsbitmapimagerep_init_with_data(obj: u64, _cmd: u64, data
     }
 
     let slice = unsafe { std::slice::from_raw_parts(bytes as *const u8, length) };
-    let img = match graphics_core::ImageBuffer::from_encoded(slice) {
-        Some(i) => i,
-        None => return 0,
+    let Some(img) = graphics_core::ImageBuffer::from_encoded(slice) else {
+        return 0;
     };
     let w = img.width();
     let h = img.height();
@@ -207,7 +206,7 @@ pub extern "C" fn shim_nsbitmapimagerep_bits_per_pixel(obj: u64, _cmd: u64) -> u
 
 /// `-[NSBitmapImageRep colorSpaceName]` → `NSCalibratedRGBColorSpace`
 pub extern "C" fn shim_nsbitmapimagerep_color_space_name(_obj: u64, _cmd: u64) -> u64 {
-    crate::cfstring::alloc_nsstring_from_cstr(b"NSCalibratedRGBColorSpace\0".as_ptr() as *const _)
+    crate::cfstring::alloc_nsstring_from_cstr(c"NSCalibratedRGBColorSpace".as_ptr())
 }
 
 /// `-[NSBitmapImageRep representationUsingType:properties:]` → stub returning nil.

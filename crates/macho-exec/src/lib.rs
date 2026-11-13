@@ -105,7 +105,7 @@ mod tests {
     fn exec_error_display_mprotect() {
         let err = ExecError::MprotectFailed {
             segment: "__DATA".into(),
-            source: std::io::Error::new(std::io::ErrorKind::Other, "bad perm"),
+            source: std::io::Error::other("bad perm"),
         };
         assert!(err.to_string().contains("__DATA"));
     }

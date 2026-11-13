@@ -6,6 +6,7 @@ pub mod fat;
 pub mod fixups;
 pub mod func_starts;
 pub mod indirect;
+mod leb128;
 mod parser;
 pub mod relocations;
 pub mod strings;
@@ -40,7 +41,7 @@ pub fn set_platform_hasher(hasher: Arc<dyn platform_core::hash::Hasher>) {
 
 /// Get the global platform hasher (if set).
 pub(crate) fn platform_hasher() -> Option<&'static dyn platform_core::hash::Hasher> {
-    PLATFORM_HASHER.get().map(|arc| arc.as_ref())
+    PLATFORM_HASHER.get().map(std::convert::AsRef::as_ref)
 }
 
 /// Convert a virtual memory address to a file offset using segment mappings.
@@ -49,12 +50,19 @@ pub(crate) fn platform_hasher() -> Option<&'static dyn platform_core::hash::Hash
 /// computes the file offset as `vmaddr - seg.vmaddr + seg.fileoff`.
 pub fn vmaddr_to_file_offset(parsed: &ParsedMachO, vmaddr: u64) -> Option<usize> {
     for seg in &parsed.segments {
-        if vmaddr >= seg.vmaddr && vmaddr < seg.vmaddr + seg.vmsize {
-            let offset_in_seg = vmaddr - seg.vmaddr;
-            if offset_in_seg < seg.filesize {
-                return Some((seg.fileoff + offset_in_seg) as usize);
-            }
+        let Some(offset_in_seg) = vmaddr.checked_sub(seg.vmaddr) else {
+            continue;
+        };
+        if offset_in_seg < seg.vmsize && offset_in_seg < seg.filesize {
+            return usize::try_from(seg.fileoff.checked_add(offset_in_seg)?).ok();
         }
     }
     None
+}
+
+/// Read a file range only when both its arithmetic and host-size conversion fit.
+pub(crate) fn bytes_at(data: &[u8], offset: u64, size: u64) -> Option<&[u8]> {
+    let start = usize::try_from(offset).ok()?;
+    let size = usize::try_from(size).ok()?;
+    data.get(start..start.checked_add(size)?)
 }

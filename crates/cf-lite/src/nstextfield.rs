@@ -105,7 +105,7 @@ pub extern "C" fn shim_nstextfield_string_value(obj: u64, _cmd: u64) -> u64 {
     if ptr != 0 {
         return ptr;
     }
-    crate::cfstring::shim_cf_string_create_with_cstring(0, b"\0".as_ptr().cast(), 0)
+    crate::cfstring::shim_cf_string_create_with_cstring(0, c"".as_ptr(), 0)
 }
 
 /// `-[NSTextField setStringValue:]`

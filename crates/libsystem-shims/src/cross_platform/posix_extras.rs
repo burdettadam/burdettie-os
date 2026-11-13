@@ -530,12 +530,20 @@ pub extern "C" fn shim_atexit_b(block: u64) -> c_int {
 /// Resolves a service name to a synthetic Mach port via the launchd
 /// bootstrap service registry. Returns `KERN_SUCCESS` (0) on success,
 /// or `BOOTSTRAP_UNKNOWN_SERVICE` (1102) if the name is NULL.
-pub extern "C" fn shim_bootstrap_look_up(
+///
+/// # Safety
+/// `service_name` must be null or a readable, NUL-terminated string that
+/// remains unchanged for the call. `sp` must be null or an aligned,
+/// exclusively writable `u32`, as required by
+/// [`launchd::bootstrap::bootstrap_look_up`].
+pub unsafe extern "C" fn shim_bootstrap_look_up(
     bp: u32,
     service_name: *const c_char,
     sp: *mut u32,
 ) -> c_int {
-    launchd::bootstrap::bootstrap_look_up(bp, service_name, sp) as c_int
+    // SAFETY: The caller supplies the readable C string and writable output
+    // required by bootstrap_look_up; the wrapper forwards them unchanged.
+    unsafe { launchd::bootstrap::bootstrap_look_up(bp, service_name, sp) as c_int }
 }
 
 // ── posix_spawn core ────────────────────────────────────────────────
@@ -552,16 +560,7 @@ pub extern "C" fn shim_posix_spawn(
     if path.is_null() || argv.is_null() {
         return libc::EINVAL;
     }
-    unsafe {
-        libc::posix_spawn(
-            pid,
-            path,
-            file_actions,
-            attrp,
-            argv as *const *mut _,
-            envp as *const *mut _,
-        )
-    }
+    unsafe { libc::posix_spawn(pid, path, file_actions, attrp, argv, envp) }
 }
 
 /// `posix_spawnp(pid, file, file_actions, attrp, argv, envp)` → libc (PATH search).
@@ -576,16 +575,7 @@ pub extern "C" fn shim_posix_spawnp(
     if file.is_null() || argv.is_null() {
         return libc::EINVAL;
     }
-    unsafe {
-        libc::posix_spawnp(
-            pid,
-            file,
-            file_actions,
-            attrp,
-            argv as *const *mut _,
-            envp as *const *mut _,
-        )
-    }
+    unsafe { libc::posix_spawnp(pid, file, file_actions, attrp, argv, envp) }
 }
 
 // ── posix_spawn_file_actions ─────────────────────────────────────────
@@ -880,6 +870,11 @@ pub extern "C" fn shim_mmap(
 ///   RLIMIT_NPROC    = 7      RLIMIT_NPROC    = 6
 ///   RLIMIT_NOFILE   = 8      RLIMIT_NOFILE   = 7
 fn translate_rlimit_resource(darwin_res: c_int) -> c_int {
+    #[cfg(target_os = "macos")]
+    {
+        darwin_res
+    }
+    #[cfg(not(target_os = "macos"))]
     match darwin_res {
         0..=4 => darwin_res, // CPU, FSIZE, DATA, STACK, CORE — same
         5 => 9,              // RLIMIT_AS
@@ -909,6 +904,11 @@ pub extern "C" fn shim_setrlimit(resource: c_int, rlp: *const libc::rlimit) -> c
 /// Translate macOS `_SC_*` constants to Linux equivalents.
 /// Every single value differs between the two platforms.
 fn translate_sysconf_name(darwin_name: c_int) -> c_int {
+    #[cfg(target_os = "macos")]
+    {
+        darwin_name
+    }
+    #[cfg(not(target_os = "macos"))]
     match darwin_name {
         1 => 0,     // _SC_ARG_MAX
         2 => 1,     // _SC_CHILD_MAX
@@ -958,7 +958,7 @@ fn translate_sysconf_name(darwin_name: c_int) -> c_int {
 /// `long sysconf(int name)`
 ///
 /// Translates macOS `_SC_*` constants to Linux equivalents before
-/// delegating to the host sysconf.
+/// delegating to the host sysconf. On macOS, guest constants already match the host.
 pub extern "C" fn shim_sysconf(name: c_int) -> c_long {
     let linux_name = translate_sysconf_name(name);
     log::trace!("sysconf: macOS _SC_={name} → Linux _SC_={linux_name}");
@@ -1117,7 +1117,6 @@ fn translate_regcomp_flags(darwin_cflags: c_int) -> c_int {
 /// corrupts adjacent memory. We allocate glibc-size regex_t on the heap
 /// and store its pointer in the macOS struct's `re_g` field (offset 24).
 /// On Darwin, `re_nsub` at offset 8 receives the sub-expression count.
-
 #[cfg(target_os = "linux")]
 mod regex_shims {
     use super::*;
@@ -1252,10 +1251,10 @@ mod regex_shims {
 
             // Convert output pmatch from Linux to macOS layout
             if darwin_pmatch != 0 && ret == 0 {
-                for i in 0..nm {
+                for (i, linux_match) in linux_pmatch.iter().take(nm).enumerate() {
                     let darwin = unsafe { &mut *((darwin_pmatch as *mut DarwinRegmatch).add(i)) };
-                    darwin.rm_so = linux_pmatch[i].rm_so as i64;
-                    darwin.rm_eo = linux_pmatch[i].rm_eo as i64;
+                    darwin.rm_so = i64::from(linux_match.rm_so);
+                    darwin.rm_eo = i64::from(linux_match.rm_eo);
                 }
             }
 
@@ -1332,14 +1331,17 @@ mod tests {
     fn test_bootstrap_look_up() {
         // NULL service name + NULL sp → BOOTSTRAP_BAD_COUNT (1104)
         // (sp is checked first in launchd::bootstrap::bootstrap_look_up)
+        // SAFETY: Null inputs are explicitly accepted as an error case.
         assert_eq!(
-            shim_bootstrap_look_up(0, std::ptr::null(), std::ptr::null_mut()),
+            unsafe { shim_bootstrap_look_up(0, std::ptr::null(), std::ptr::null_mut()) },
             1104
         );
         // Valid service name → KERN_SUCCESS (0) + non-zero port
         let name = b"com.apple.test.service\0";
         let mut port: u32 = 0;
-        let result = shim_bootstrap_look_up(0, name.as_ptr() as *const c_char, &mut port);
+        // SAFETY: name is NUL-terminated and alive; port is an exclusive local output.
+        let result =
+            unsafe { shim_bootstrap_look_up(0, name.as_ptr() as *const c_char, &mut port) };
         assert_eq!(result, 0);
         assert!(port >= 0x1000);
     }
@@ -1451,35 +1453,48 @@ mod tests {
 
     #[test]
     fn test_rlimit_divergent_values() {
-        assert_eq!(translate_rlimit_resource(5), 9); // RLIMIT_AS
-        assert_eq!(translate_rlimit_resource(6), 8); // RLIMIT_MEMLOCK
-        assert_eq!(translate_rlimit_resource(7), 6); // RLIMIT_NPROC
-        assert_eq!(translate_rlimit_resource(8), 7); // RLIMIT_NOFILE
+        #[cfg(target_os = "macos")]
+        let expected = [5, 6, 7, 8];
+        #[cfg(not(target_os = "macos"))]
+        let expected = [9, 8, 6, 7];
+        for (resource, expected) in (5..=8).zip(expected) {
+            assert_eq!(translate_rlimit_resource(resource), expected);
+        }
     }
 
     // ── sysconf translation tests ───────────────────────────────
 
     #[test]
     fn test_sysconf_pagesize() {
-        assert_eq!(translate_sysconf_name(29), 30); // _SC_PAGESIZE
+        assert_eq!(translate_sysconf_name(29), libc::_SC_PAGESIZE); // _SC_PAGESIZE
     }
 
     #[test]
     fn test_sysconf_nprocessors() {
-        assert_eq!(translate_sysconf_name(57), 83); // _SC_NPROCESSORS_CONF
-        assert_eq!(translate_sysconf_name(58), 84); // _SC_NPROCESSORS_ONLN
+        assert_eq!(translate_sysconf_name(57), libc::_SC_NPROCESSORS_CONF); // _SC_NPROCESSORS_CONF
+        assert_eq!(translate_sysconf_name(58), libc::_SC_NPROCESSORS_ONLN); // _SC_NPROCESSORS_ONLN
     }
 
     #[test]
     fn test_sysconf_phys_pages() {
-        assert_eq!(translate_sysconf_name(200), 85); // _SC_PHYS_PAGES
+        assert_eq!(translate_sysconf_name(200), libc::_SC_PHYS_PAGES); // _SC_PHYS_PAGES
     }
 
     #[test]
     fn test_sysconf_common_values() {
-        assert_eq!(translate_sysconf_name(1), 0); // _SC_ARG_MAX
-        assert_eq!(translate_sysconf_name(3), 2); // _SC_CLK_TCK
-        assert_eq!(translate_sysconf_name(5), 4); // _SC_OPEN_MAX
+        assert_eq!(translate_sysconf_name(1), libc::_SC_ARG_MAX); // _SC_ARG_MAX
+        assert_eq!(translate_sysconf_name(3), libc::_SC_CLK_TCK); // _SC_CLK_TCK
+        assert_eq!(translate_sysconf_name(5), libc::_SC_OPEN_MAX); // _SC_OPEN_MAX
+    }
+
+    #[test]
+    fn sysconf_shim_matches_host_page_size_and_processor_count() {
+        for (darwin_name, host_name) in [(29, libc::_SC_PAGESIZE), (58, libc::_SC_NPROCESSORS_ONLN)]
+        {
+            let expected = unsafe { libc::sysconf(host_name) };
+            assert!(expected > 0);
+            assert_eq!(shim_sysconf(darwin_name), expected);
+        }
     }
 
     #[test]
@@ -1529,7 +1544,7 @@ mod tests {
 
     #[test]
     fn test_posix_optstring_prepends_plus() {
-        let result = posix_optstring(b"abc:\0".as_ptr() as *const c_char);
+        let result = posix_optstring(c"abc:".as_ptr());
         assert!(result.is_some());
         let cstr = result.unwrap();
         assert_eq!(cstr.to_bytes(), b"+abc:");
@@ -1537,7 +1552,7 @@ mod tests {
 
     #[test]
     fn test_posix_optstring_already_posix() {
-        let result = posix_optstring(b"+abc:\0".as_ptr() as *const c_char);
+        let result = posix_optstring(c"+abc:".as_ptr());
         assert!(result.is_none()); // already has +, no change needed
     }
 
@@ -1549,7 +1564,7 @@ mod tests {
 
     #[test]
     fn test_posix_optstring_empty() {
-        let result = posix_optstring(b"\0".as_ptr() as *const c_char);
+        let result = posix_optstring(c"".as_ptr());
         assert!(result.is_some());
         let cstr = result.unwrap();
         assert_eq!(cstr.to_bytes(), b"+");

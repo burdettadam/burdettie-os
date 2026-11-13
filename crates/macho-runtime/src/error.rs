@@ -87,7 +87,7 @@ mod tests {
         let variants: Vec<Box<dyn std::fmt::Debug>> = vec![
             Box::new(RuntimeError::Io {
                 path: PathBuf::from("/x"),
-                source: std::io::Error::new(std::io::ErrorKind::Other, "oops"),
+                source: std::io::Error::other("oops"),
             }),
             Box::new(RuntimeError::SecurityDenied {
                 reasons: vec!["r".into()],

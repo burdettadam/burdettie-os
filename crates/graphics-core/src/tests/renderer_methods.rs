@@ -10,7 +10,6 @@ fn px(surface: &Surface, x: u32, y: u32) -> u32 {
 
 const BLACK: u32 = 0xFF000000;
 const RED: u32 = 0xFFFF0000;
-const WHITE: u32 = 0xFFFFFFFF;
 
 // ── fill_path ──────────────────────────────────────────────────────
 

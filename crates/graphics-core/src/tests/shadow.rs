@@ -1,5 +1,3 @@
-use super::*;
-
 use crate::color::Color;
 use crate::geometry::Rect;
 use crate::renderer::Renderer;

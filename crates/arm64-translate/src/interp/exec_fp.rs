@@ -461,7 +461,6 @@ impl Interpreter {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::test_helpers::*;
 
     // ── FP Load/Store ───────────────────────────────────────────
@@ -472,10 +471,10 @@ mod tests {
             enc_fp_str_imm64(0, 2, 0), // STR D0, [X2, #0]
             enc_fp_ldr_imm64(1, 2, 0), // LDR D1, [X2, #0]
         ]);
-        t.interp.cpu.write_d(0, f64::to_bits(3.14));
+        t.interp.cpu.write_d(0, f64::to_bits(std::f64::consts::PI));
         t.interp.cpu.x[2] = t.data_base;
         let cpu = t.run_ok();
-        assert_eq!(f64::from_bits(cpu.read_d(1)), 3.14);
+        assert_eq!(f64::from_bits(cpu.read_d(1)), std::f64::consts::PI);
     }
 
     #[test]

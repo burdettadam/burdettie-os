@@ -5,7 +5,6 @@ use crate::{nsappearance, nsmenu_shim, nsnib, nsobj, nsusernotificationcenter};
 use objc_runtime::ClassInfo;
 use std::collections::HashMap;
 
-/// Register `NSResponder` — base class for responder chain.
 // ── Phase C7 AppKit classes ────────────────────────────────────
 
 /// Register `NSAppearance` — dark mode appearance queries.

@@ -12,12 +12,8 @@ use crate::class::OBJC_RUNTIME;
 fn host_class_name(cls: u64) -> Option<String> {
     // Determine shared cache bounds to validate the address.
     type GetCacheRangeFn = unsafe extern "C" fn(*mut usize) -> *const u8;
-    let cache_fn_sym = unsafe {
-        libc::dlsym(
-            libc::RTLD_DEFAULT,
-            b"_dyld_get_shared_cache_range\0".as_ptr() as *const c_char,
-        )
-    };
+    let cache_fn_sym =
+        unsafe { libc::dlsym(libc::RTLD_DEFAULT, c"_dyld_get_shared_cache_range".as_ptr()) };
     if !cache_fn_sym.is_null() {
         let get_range: GetCacheRangeFn = unsafe { std::mem::transmute(cache_fn_sym) };
         let mut size: usize = 0;
@@ -31,12 +27,7 @@ fn host_class_name(cls: u64) -> Option<String> {
     }
 
     type ClassGetNameFn = unsafe extern "C" fn(*const u8) -> *const c_char;
-    let sym = unsafe {
-        libc::dlsym(
-            libc::RTLD_DEFAULT,
-            b"class_getName\0".as_ptr() as *const c_char,
-        )
-    };
+    let sym = unsafe { libc::dlsym(libc::RTLD_DEFAULT, c"class_getName".as_ptr()) };
     if sym.is_null() {
         return None;
     }

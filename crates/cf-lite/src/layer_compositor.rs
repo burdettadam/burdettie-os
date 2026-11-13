@@ -40,7 +40,7 @@ fn argb32_to_premul_rgba(src: &[u32], dst: &mut [u8]) {
 /// Convert premultiplied RGBA bytes back to ARGB32 u32 pixels.
 fn premul_rgba_to_argb32(src: &[u8], dst: &mut [u32]) {
     debug_assert_eq!(src.len(), dst.len() * 4);
-    for i in 0..dst.len() {
+    for (i, pixel) in dst.iter_mut().enumerate() {
         let base = i * 4;
         let r = src[base];
         let g = src[base + 1];
@@ -48,15 +48,15 @@ fn premul_rgba_to_argb32(src: &[u8], dst: &mut [u32]) {
         let a = src[base + 3];
         // Un-premultiply back to straight alpha for Surface consumption.
         if a == 0 {
-            dst[i] = 0;
+            *pixel = 0;
         } else if a == 255 {
-            dst[i] = 0xFF00_0000 | ((r as u32) << 16) | ((g as u32) << 8) | (b as u32);
+            *pixel = 0xFF00_0000 | ((r as u32) << 16) | ((g as u32) << 8) | (b as u32);
         } else {
             let af = 255.0 / a as f32;
             let ur = (r as f32 * af + 0.5).min(255.0) as u32;
             let ug = (g as f32 * af + 0.5).min(255.0) as u32;
             let ub = (b as f32 * af + 0.5).min(255.0) as u32;
-            dst[i] = ((a as u32) << 24) | (ur << 16) | (ug << 8) | ub;
+            *pixel = ((a as u32) << 24) | (ur << 16) | (ug << 8) | ub;
         }
     }
 }
@@ -85,18 +85,16 @@ pub(crate) fn layer_needs_compositing(layer: u64) -> bool {
 /// its CALayer's visual effects (opacity, cornerRadius clipping, border).
 ///
 /// `src_pixels` - the ARGB32 pixels of the per-view offscreen buffer (view's drawRect: output)
-/// `src_w`, `src_h` - dimensions of the source buffer
+/// `(src_w, src_h)` - dimensions of the source buffer
 /// `dst_pixels` - the ARGB32 pixels of the window's CGContext surface (destination)
-/// `dst_w`, `dst_h` - dimensions of the destination buffer
+/// `(dst_w, dst_h)` - dimensions of the destination buffer
 /// `view_x`, `view_y` - the view's frame origin in the destination coordinate space
 /// `props` - the CALayer visual properties to apply
 pub(crate) fn composite_layer(
     src_pixels: &[u32],
-    src_w: u32,
-    src_h: u32,
+    (src_w, src_h): (u32, u32),
     dst_pixels: &mut [u32],
-    dst_w: u32,
-    dst_h: u32,
+    (dst_w, dst_h): (u32, u32),
     view_x: i32,
     view_y: i32,
     props: &LayerProps,
@@ -152,12 +150,10 @@ pub(crate) fn composite_layer(
 /// scaling to fill the given view dimensions.
 pub(crate) fn render_layer_contents(
     dst_pixels: &mut [u32],
-    dst_w: u32,
-    dst_h: u32,
+    (dst_w, dst_h): (u32, u32),
     view_x: i32,
     view_y: i32,
-    view_w: u32,
-    view_h: u32,
+    (view_w, view_h): (u32, u32),
     contents: u64,
 ) {
     if contents == 0 || view_w == 0 || view_h == 0 {
@@ -499,12 +495,10 @@ fn blit_pixmap_transformed(
 /// background appears even without per-view offscreen buffers.
 pub(crate) fn draw_layer_background(
     dst_pixels: &mut [u32],
-    dst_w: u32,
-    dst_h: u32,
+    (dst_w, dst_h): (u32, u32),
     view_x: i32,
     view_y: i32,
-    view_w: u32,
-    view_h: u32,
+    (view_w, view_h): (u32, u32),
     bg_color: u64,
     props: &LayerProps,
 ) {
@@ -695,7 +689,7 @@ mod tests {
             hidden: true,
             ..Default::default()
         };
-        composite_layer(&src, 2, 2, &mut dst, 2, 2, 0, 0, &props);
+        composite_layer(&src, (2, 2), &mut dst, (2, 2), 0, 0, &props);
         // Destination should be unchanged.
         assert!(dst.iter().all(|&p| p == 0xFFFF_FFFF));
     }
@@ -705,7 +699,7 @@ mod tests {
         let mut dst = vec![0xFFFF_FFFFu32; 4]; // 2x2 white
         let src = vec![0xFF_FF_00_00u32; 4]; // 2x2 opaque red
         let props = LayerProps::default(); // opacity=1.0
-        composite_layer(&src, 2, 2, &mut dst, 2, 2, 0, 0, &props);
+        composite_layer(&src, (2, 2), &mut dst, (2, 2), 0, 0, &props);
         // Red should overwrite white.
         for &p in &dst {
             assert_eq!((p >> 24) & 0xFF, 0xFF); // fully opaque
@@ -721,7 +715,7 @@ mod tests {
             opacity: 0.5,
             ..Default::default()
         };
-        composite_layer(&src, 2, 2, &mut dst, 2, 2, 0, 0, &props);
+        composite_layer(&src, (2, 2), &mut dst, (2, 2), 0, 0, &props);
         // Should be roughly gray (blended black at 50% over white).
         for &p in &dst {
             let r = (p >> 16) & 0xFF;
@@ -735,7 +729,7 @@ mod tests {
         let mut dst = vec![0xFF_FF_FF_FFu32; 16]; // 4x4 white
         let src = vec![0xFF_00_FF_00u32; 4]; // 2x2 opaque green
         let props = LayerProps::default();
-        composite_layer(&src, 2, 2, &mut dst, 4, 4, 1, 1, &props);
+        composite_layer(&src, (2, 2), &mut dst, (4, 4), 1, 1, &props);
         // Pixel (0,0) should still be white.
         assert_eq!(dst[0], 0xFF_FF_FF_FF);
         // Pixel (1,1) should be green.
@@ -749,7 +743,7 @@ mod tests {
         let color_handle = cg_shims::bridge::color_create_rgb(0.0, 0.0, 1.0, 1.0);
         let mut dst = vec![0xFF_FF_FF_FFu32; 16]; // 4x4 white
         let props = LayerProps::default();
-        draw_layer_background(&mut dst, 4, 4, 1, 1, 2, 2, color_handle, &props);
+        draw_layer_background(&mut dst, (4, 4), 1, 1, (2, 2), color_handle, &props);
         // Pixel (0,0) = white, pixel (1,1) = blue.
         assert_eq!(dst[0], 0xFF_FF_FF_FF);
         let p11 = dst[4 + 1];
@@ -766,7 +760,7 @@ mod tests {
             corner_radius: 5.0,
             ..Default::default()
         };
-        draw_layer_background(&mut dst, 20, 20, 0, 0, 20, 20, color_handle, &props);
+        draw_layer_background(&mut dst, (20, 20), 0, 0, (20, 20), color_handle, &props);
         // Corner pixel (0,0) should be clipped (still white-ish) because of the radius.
         let corner = dst[0];
         let center = dst[10 * 20 + 10]; // center pixel should be red.

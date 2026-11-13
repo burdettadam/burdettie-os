@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserve live ARM64 TLV registers across storage lookup and isolate the
+  unmapped-page regression from parallel allocator reuse.
+- Preserve native Darwin sysconf/resource-limit constants, register native
+  stdio APIs, and reset process state between independent scorecard guests.
+- Repair native pthread test storage, bounded-worker concurrency checks, and
+  reproducible category/export/code-signature fixtures.
+- Use typed C strings for native framework lookup; close the CoreGraphics handle
+  exactly once when display dimensions are invalid.
+- Reject unmapped Darwin host-range gaps using Mach VM region queries rather
+  than treating a successful mincore residency query as proof of a mapping.
+
+- Align Foundation class storage and restrict Objective-C superclass repair to
+  registered mapped class records, avoiding reads through synthetic handles.
+- Distinguish pointer-backed CFStrings from legacy inline ASCII payloads so
+  printable bytes in a heap address cannot be returned as string contents.
+- Use the host page size and correctly sized residency buffers for memory checks;
+  reject overflowing ranges and C-string address arithmetic.
+- Convert Darwin monotonic clock ticks to nanoseconds with the host timebase,
+  using wide intermediate arithmetic to avoid conversion overflow.
+- Correct ARM64 atomic decoding, widths, signed comparisons, alignment checks,
+  acquire/release flags, and exclusive-monitor handling.
+- Bound malformed Mach-O export-trie traversal and integer/range parsing, while
+  retaining valid shared trie paths and architecture-specific thread entry points.
+- Preserve attributed-text styles through normalization and distinguish font
+  faces and fractional sizes in glyph caches; make atlas placement transactional.
+- Close both DNS service pipe descriptors when a service is released and invoke
+  callbacks outside the registry lock so callbacks can query or release services.
+- Release timer-queue and Objective-C runtime locks before invoking timer
+  callbacks, allowing callbacks to enqueue timers or register runtime metadata;
+  preserve timer order and reset/re-enqueue behavior.
+- Return NUL-terminated launchd error strings and make raw-pointer and variadic
+  Rust API contracts explicit.
+- Use C-compatible geometry, range, and transform return types for the affected
+  Objective-C methods, including aggregate Core Animation transform arguments.
+- Repair invalid Foundation test objects, UI test imports, and process/global
+  state isolation; resolve compiler and Clippy diagnostics without weakening CI
+  policy.
+
+### Changed
+
+- Preserve the recovered source inventory and record native macOS ARM64, Linux,
+  Docker and language-binding CI evidence, with the unsuppressed font dependency
+  advisory tracked separately in issue #2.
+
+- Document the public source/artifact boundary, source-built quick start, and
+  revision-specific validation results in the portfolio README and publication guide.
+
 ## [0.1.0] - 2026-03-31
 
 ### Added

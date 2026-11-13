@@ -237,10 +237,7 @@ impl Renderer for SoftwareRenderer<'_> {
                         bounds.min.x as i32 + rx as i32,
                         bounds.min.y as i32 + ry as i32,
                         coverage,
-                        cr,
-                        cg,
-                        cb,
-                        ca,
+                        [cr, cg, cb, ca],
                         sw,
                         sh,
                     );
@@ -425,7 +422,7 @@ impl Renderer for SoftwareRenderer<'_> {
         // Composite tiny-skia result onto our ARGB32 surface (source-over).
         let ts_data = pixmap.data();
         let pixels = self.surface.pixels_mut();
-        for i in 0..pixels.len() {
+        for (i, pixel) in pixels.iter_mut().enumerate() {
             let base = i * 4;
             let sa = ts_data[base + 3] as u32;
             if sa == 0 {
@@ -436,10 +433,10 @@ impl Renderer for SoftwareRenderer<'_> {
             let sb = ts_data[base + 2] as u32;
             if sa == 255 {
                 // Un-premultiply and write ARGB32.
-                pixels[i] = 0xFF00_0000 | (sr << 16) | (sg << 8) | sb;
+                *pixel = 0xFF00_0000 | (sr << 16) | (sg << 8) | sb;
             } else {
                 // Source-over blend (premultiplied src onto straight-alpha dst).
-                let dst_pixel = pixels[i];
+                let dst_pixel = *pixel;
                 let da = (dst_pixel >> 24) & 0xFF;
                 let dr = (dst_pixel >> 16) & 0xFF;
                 let dg = (dst_pixel >> 8) & 0xFF;
@@ -449,7 +446,7 @@ impl Renderer for SoftwareRenderer<'_> {
                 let or_ch = sr + ((dr * inv_sa + 128) / 255);
                 let og = sg + ((dg * inv_sa + 128) / 255);
                 let ob = sb + ((db * inv_sa + 128) / 255);
-                pixels[i] =
+                *pixel =
                     (oa.min(255) << 24) | (or_ch.min(255) << 16) | (og.min(255) << 8) | ob.min(255);
             }
         }
@@ -556,7 +553,7 @@ impl Renderer for SoftwareRenderer<'_> {
         // Composite onto ARGB32 surface.
         let ts_data = pixmap.data();
         let pixels = self.surface.pixels_mut();
-        for i in 0..pixels.len() {
+        for (i, pixel) in pixels.iter_mut().enumerate() {
             let base = i * 4;
             let sa = ts_data[base + 3] as u32;
             if sa == 0 {
@@ -566,9 +563,9 @@ impl Renderer for SoftwareRenderer<'_> {
             let sg = ts_data[base + 1] as u32;
             let sb = ts_data[base + 2] as u32;
             if sa == 255 {
-                pixels[i] = 0xFF00_0000 | (sr << 16) | (sg << 8) | sb;
+                *pixel = 0xFF00_0000 | (sr << 16) | (sg << 8) | sb;
             } else {
-                let dst_pixel = pixels[i];
+                let dst_pixel = *pixel;
                 let da = (dst_pixel >> 24) & 0xFF;
                 let dr = (dst_pixel >> 16) & 0xFF;
                 let dg = (dst_pixel >> 8) & 0xFF;
@@ -578,7 +575,7 @@ impl Renderer for SoftwareRenderer<'_> {
                 let or_ch = sr + ((dr * inv_sa + 128) / 255);
                 let og = sg + ((dg * inv_sa + 128) / 255);
                 let ob = sb + ((db * inv_sa + 128) / 255);
-                pixels[i] =
+                *pixel =
                     (oa.min(255) << 24) | (or_ch.min(255) << 16) | (og.min(255) << 8) | ob.min(255);
             }
         }

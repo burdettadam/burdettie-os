@@ -317,7 +317,7 @@ mod tests {
         assert_eq!(shim_nsstepper_integer_value(0, 0), 0);
         shim_nsstepper_set_integer_value(0, 0, 10);
         assert_eq!(shim_nsstepper_double_value(0, 0), 0.0);
-        shim_nsstepper_set_double_value(0, 0, 3.14);
+        shim_nsstepper_set_double_value(0, 0, 9.87);
         shim_nsstepper_draw_rect(0, 0, 0.0, 0.0, 19.0, 27.0);
         shim_nsstepper_mouse_down(0, 0, 0);
     }

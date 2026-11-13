@@ -221,7 +221,7 @@ fn extract_attrs(e: &quick_xml::events::BytesStart<'_>) -> Vec<(String, String)>
         .map(|a| {
             let key = String::from_utf8_lossy(a.key.as_ref()).to_string();
             let val = a
-                .unescape_value()
+                .normalized_value(quick_xml::XmlVersion::Implicit1_0)
                 .map(|v| v.to_string())
                 .unwrap_or_default();
             (key, val)
@@ -468,6 +468,21 @@ mod tests {
             .map(|token| token.text.as_str())
             .collect();
         assert_eq!(text, "Alice & Bob A 😀 &lt;");
+    }
+
+    #[test]
+    fn tokenizer_preserves_xml10_attribute_normalization() {
+        let tokens = tokenize_xml(
+            "<root literal=\"a\tb\r\nc\" escaped=\"&#x9;&#xA;&#xD;\" nested=\"&amp;lt;\"/>",
+        );
+        assert_eq!(
+            tokens[0].attrs,
+            vec![
+                ("literal".into(), "a b c".into()),
+                ("escaped".into(), "\t\n\r".into()),
+                ("nested".into(), "&lt;".into()),
+            ]
+        );
     }
 
     #[test]

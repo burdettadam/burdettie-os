@@ -78,12 +78,7 @@ fn ehtype_vtable_plus_2() -> *const c_void {
     use std::sync::OnceLock;
     static VTABLE: OnceLock<usize> = OnceLock::new();
     let addr = *VTABLE.get_or_init(|| {
-        let sym = unsafe {
-            libc::dlsym(
-                libc::RTLD_DEFAULT as *mut c_void,
-                c"objc_ehtype_vtable".as_ptr(),
-            )
-        };
+        let sym = unsafe { libc::dlsym(libc::RTLD_DEFAULT, c"objc_ehtype_vtable".as_ptr()) };
         if sym.is_null() {
             log::warn!("objc_ehtype_vtable not found — @catch type matching may fail");
             0
@@ -110,7 +105,7 @@ fn ensure_foundation_loaded() {
 #[cfg(target_os = "macos")]
 fn resolve_host_symbol(name: *const libc::c_char) -> *mut c_void {
     ensure_foundation_loaded();
-    unsafe { libc::dlsym(libc::RTLD_DEFAULT as *mut c_void, name.cast()) }
+    unsafe { libc::dlsym(libc::RTLD_DEFAULT, name.cast()) }
 }
 
 #[cfg(target_os = "macos")]
@@ -397,9 +392,8 @@ pub extern "C" fn shim_objc_exception_match(catch_cls: u64, exception: u64) -> i
         Ok(g) => g,
         Err(e) => e.into_inner(),
     };
-    let rt = match guard.as_ref() {
-        Some(rt) => rt,
-        None => return 0,
+    let Some(rt) = guard.as_ref() else {
+        return 0;
     };
 
     let raw_isa = unsafe { *(exception as *const u64) };
@@ -749,18 +743,18 @@ pub extern "C" fn shim_objc_personality_v0(
                 return URC_HANDLER_FOUND;
             }
 
-            if actions & UA_CLEANUP_PHASE != 0 {
-                if actions & UA_HANDLER_FRAME != 0 || lp.action_index == 0 {
-                    // Phase 2: install the landing pad.
-                    // x0 (DWARF reg 0) = _Unwind_Exception pointer.
-                    // x1 (DWARF reg 1) = type selector (0 = cleanup).
-                    unsafe {
-                        _Unwind_SetGR(context, 0, exception_object as u64);
-                        _Unwind_SetGR(context, 1, lp.action_index as u64);
-                        _Unwind_SetIP(context, lp.lp_addr);
-                    }
-                    return URC_INSTALL_CONTEXT;
+            if actions & UA_CLEANUP_PHASE != 0
+                && (actions & UA_HANDLER_FRAME != 0 || lp.action_index == 0)
+            {
+                // Phase 2: install the landing pad.
+                // x0 (DWARF reg 0) = _Unwind_Exception pointer.
+                // x1 (DWARF reg 1) = type selector (0 = cleanup).
+                unsafe {
+                    _Unwind_SetGR(context, 0, exception_object as u64);
+                    _Unwind_SetGR(context, 1, lp.action_index as u64);
+                    _Unwind_SetIP(context, lp.lp_addr);
                 }
+                return URC_INSTALL_CONTEXT;
             }
 
             URC_CONTINUE_UNWIND

@@ -38,7 +38,7 @@ fn make_nsstring_from_str(value: &str) -> u64 {
     crate::cfstring::alloc_nsstring_from_cstr(cstr.as_ptr())
 }
 
-fn release_image_info(info: ImageInfo) {
+fn release_image_info(info: &ImageInfo) {
     if info.cg_handle != 0 {
         cg_shims::bridge::image_release(info.cg_handle);
     }
@@ -48,7 +48,7 @@ fn insert_image_info(obj: u64, info: ImageInfo) {
     let mut guard = store();
     let map = ensure_store(&mut guard);
     if let Some(old) = map.insert(obj, info) {
-        release_image_info(old);
+        release_image_info(&old);
     }
 }
 
@@ -637,12 +637,10 @@ fn system_image_spec(name: &str, allow_symbol_name: bool) -> Option<SystemImageS
     } else if lower.starts_with("nsimagename")
         || lower.starts_with("nstouchbar")
         || lower.ends_with("template")
-    {
-        SystemImageGlyph::Generic
-    } else if allow_symbol_name
-        && lower
-            .chars()
-            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '-' | '_'))
+        || (allow_symbol_name
+            && lower
+                .chars()
+                .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '-' | '_')))
     {
         SystemImageGlyph::Generic
     } else {
@@ -662,8 +660,7 @@ fn put_pixel(data: &mut [u8], width: u32, height: u32, x: i32, y: i32, color: [u
 
 fn fill_rect(
     data: &mut [u8],
-    width: u32,
-    height: u32,
+    (width, height): (u32, u32),
     x: i32,
     y: i32,
     w: i32,
@@ -679,8 +676,7 @@ fn fill_rect(
 
 fn draw_line(
     data: &mut [u8],
-    width: u32,
-    height: u32,
+    (width, height): (u32, u32),
     mut x0: i32,
     mut y0: i32,
     x1: i32,
@@ -761,21 +757,20 @@ fn synthetic_system_image_buffer(
 
     match spec.glyph {
         SystemImageGlyph::Plus => {
-            fill_rect(&mut data, width, height, 8, 4, 3, 10, ink);
-            fill_rect(&mut data, width, height, 4, 8, 10, 3, ink);
+            fill_rect(&mut data, (width, height), 8, 4, 3, 10, ink);
+            fill_rect(&mut data, (width, height), 4, 8, 10, 3, ink);
         }
-        SystemImageGlyph::Minus => fill_rect(&mut data, width, height, 4, 8, 10, 3, ink),
+        SystemImageGlyph::Minus => fill_rect(&mut data, (width, height), 4, 8, 10, 3, ink),
         SystemImageGlyph::Check => {
-            draw_line(&mut data, width, height, 4, 9, 8, 13, ink);
-            draw_line(&mut data, width, height, 8, 13, 14, 5, ink);
+            draw_line(&mut data, (width, height), 4, 9, 8, 13, ink);
+            draw_line(&mut data, (width, height), 8, 13, 14, 5, ink);
         }
         SystemImageGlyph::Caution => {
             for y in 3..15 {
                 let inset = (y - 3) / 2;
                 fill_rect(
                     &mut data,
-                    width,
-                    height,
+                    (width, height),
                     8 - inset,
                     y,
                     inset * 2 + 2,
@@ -783,26 +778,26 @@ fn synthetic_system_image_buffer(
                     accent,
                 );
             }
-            fill_rect(&mut data, width, height, 8, 7, 2, 5, danger);
-            fill_rect(&mut data, width, height, 8, 13, 2, 2, danger);
+            fill_rect(&mut data, (width, height), 8, 7, 2, 5, danger);
+            fill_rect(&mut data, (width, height), 8, 13, 2, 2, danger);
         }
         SystemImageGlyph::Folder => {
-            fill_rect(&mut data, width, height, 2, 6, 14, 9, [232, 178, 64, 245]);
-            fill_rect(&mut data, width, height, 3, 4, 6, 3, [245, 204, 92, 245]);
-            draw_line(&mut data, width, height, 2, 6, 15, 6, [170, 120, 44, 245]);
+            fill_rect(&mut data, (width, height), 2, 6, 14, 9, [232, 178, 64, 245]);
+            fill_rect(&mut data, (width, height), 3, 4, 6, 3, [245, 204, 92, 245]);
+            draw_line(&mut data, (width, height), 2, 6, 15, 6, [170, 120, 44, 245]);
         }
         SystemImageGlyph::Gear => {
             draw_circle_outline(&mut data, width, height, 9, 9, 5, ink);
             fill_circle(&mut data, width, height, 9, 9, 2, ink);
-            fill_rect(&mut data, width, height, 8, 2, 2, 4, ink);
-            fill_rect(&mut data, width, height, 8, 12, 2, 4, ink);
-            fill_rect(&mut data, width, height, 2, 8, 4, 2, ink);
-            fill_rect(&mut data, width, height, 12, 8, 4, 2, ink);
+            fill_rect(&mut data, (width, height), 8, 2, 2, 4, ink);
+            fill_rect(&mut data, (width, height), 8, 12, 2, 4, ink);
+            fill_rect(&mut data, (width, height), 2, 8, 4, 2, ink);
+            fill_rect(&mut data, (width, height), 12, 8, 4, 2, ink);
         }
         SystemImageGlyph::Trash => {
-            fill_rect(&mut data, width, height, 5, 7, 9, 8, ink);
-            fill_rect(&mut data, width, height, 4, 5, 11, 2, ink);
-            fill_rect(&mut data, width, height, 7, 3, 5, 2, ink);
+            fill_rect(&mut data, (width, height), 5, 7, 9, 8, ink);
+            fill_rect(&mut data, (width, height), 4, 5, 11, 2, ink);
+            fill_rect(&mut data, (width, height), 7, 3, 5, 2, ink);
         }
         SystemImageGlyph::Lock | SystemImageGlyph::Unlock => {
             if matches!(spec.glyph, SystemImageGlyph::Lock) {
@@ -810,55 +805,55 @@ fn synthetic_system_image_buffer(
             } else {
                 draw_circle_outline(&mut data, width, height, 12, 8, 4, ink);
             }
-            fill_rect(&mut data, width, height, 5, 8, 9, 7, ink);
+            fill_rect(&mut data, (width, height), 5, 8, 9, 7, ink);
         }
         SystemImageGlyph::ArrowLeft => {
-            draw_line(&mut data, width, height, 4, 9, 14, 9, ink);
-            draw_line(&mut data, width, height, 4, 9, 9, 4, ink);
-            draw_line(&mut data, width, height, 4, 9, 9, 14, ink);
+            draw_line(&mut data, (width, height), 4, 9, 14, 9, ink);
+            draw_line(&mut data, (width, height), 4, 9, 9, 4, ink);
+            draw_line(&mut data, (width, height), 4, 9, 9, 14, ink);
         }
         SystemImageGlyph::ArrowRight => {
-            draw_line(&mut data, width, height, 4, 9, 14, 9, ink);
-            draw_line(&mut data, width, height, 14, 9, 9, 4, ink);
-            draw_line(&mut data, width, height, 14, 9, 9, 14, ink);
+            draw_line(&mut data, (width, height), 4, 9, 14, 9, ink);
+            draw_line(&mut data, (width, height), 14, 9, 9, 4, ink);
+            draw_line(&mut data, (width, height), 14, 9, 9, 14, ink);
         }
         SystemImageGlyph::Refresh => {
             draw_circle_outline(&mut data, width, height, 9, 9, 5, ink);
-            draw_line(&mut data, width, height, 13, 4, 15, 4, ink);
-            draw_line(&mut data, width, height, 13, 4, 13, 7, ink);
+            draw_line(&mut data, (width, height), 13, 4, 15, 4, ink);
+            draw_line(&mut data, (width, height), 13, 4, 13, 7, ink);
         }
         SystemImageGlyph::Share => {
-            draw_line(&mut data, width, height, 9, 3, 9, 12, ink);
-            draw_line(&mut data, width, height, 9, 3, 5, 7, ink);
-            draw_line(&mut data, width, height, 9, 3, 13, 7, ink);
-            fill_rect(&mut data, width, height, 4, 11, 10, 4, ink);
+            draw_line(&mut data, (width, height), 9, 3, 9, 12, ink);
+            draw_line(&mut data, (width, height), 9, 3, 5, 7, ink);
+            draw_line(&mut data, (width, height), 9, 3, 13, 7, ink);
+            fill_rect(&mut data, (width, height), 4, 11, 10, 4, ink);
         }
         SystemImageGlyph::Info => {
             draw_circle_outline(&mut data, width, height, 9, 9, 6, ink);
-            fill_rect(&mut data, width, height, 8, 8, 2, 6, ink);
-            fill_rect(&mut data, width, height, 8, 5, 2, 2, ink);
+            fill_rect(&mut data, (width, height), 8, 8, 2, 6, ink);
+            fill_rect(&mut data, (width, height), 8, 5, 2, 2, ink);
         }
         SystemImageGlyph::Stop => {
-            draw_line(&mut data, width, height, 5, 5, 13, 13, danger);
-            draw_line(&mut data, width, height, 13, 5, 5, 13, danger);
+            draw_line(&mut data, (width, height), 5, 5, 13, 13, danger);
+            draw_line(&mut data, (width, height), 13, 5, 5, 13, danger);
         }
         SystemImageGlyph::User => {
             fill_circle(&mut data, width, height, 9, 6, 3, ink);
             fill_circle(&mut data, width, height, 9, 14, 6, ink);
         }
         SystemImageGlyph::View => {
-            draw_line(&mut data, width, height, 3, 9, 7, 5, ink);
-            draw_line(&mut data, width, height, 7, 5, 11, 5, ink);
-            draw_line(&mut data, width, height, 11, 5, 15, 9, ink);
-            draw_line(&mut data, width, height, 15, 9, 11, 13, ink);
-            draw_line(&mut data, width, height, 11, 13, 7, 13, ink);
-            draw_line(&mut data, width, height, 7, 13, 3, 9, ink);
+            draw_line(&mut data, (width, height), 3, 9, 7, 5, ink);
+            draw_line(&mut data, (width, height), 7, 5, 11, 5, ink);
+            draw_line(&mut data, (width, height), 11, 5, 15, 9, ink);
+            draw_line(&mut data, (width, height), 15, 9, 11, 13, ink);
+            draw_line(&mut data, (width, height), 11, 13, 7, 13, ink);
+            draw_line(&mut data, (width, height), 7, 13, 3, 9, ink);
             fill_circle(&mut data, width, height, 9, 9, 2, ink);
         }
         SystemImageGlyph::Generic => {
             draw_circle_outline(&mut data, width, height, 9, 9, 6, ink);
-            fill_rect(&mut data, width, height, 8, 4, 2, 10, ink);
-            fill_rect(&mut data, width, height, 4, 8, 10, 2, ink);
+            fill_rect(&mut data, (width, height), 8, 4, 2, 10, ink);
+            fill_rect(&mut data, (width, height), 4, 8, 10, 2, ink);
         }
     }
 
@@ -1081,7 +1076,7 @@ pub extern "C" fn shim_nsimage_init_with_contents_of_file(
 pub extern "C" fn shim_nsimage_init_with_data(obj: u64, _cmd: u64, data_ptr: u64) -> u64 {
     log::debug!("NSImage initWithData:");
 
-    let (w, h, cg_handle) = if data_ptr != 0 && data_ptr % 8 == 0 {
+    let (w, h, cg_handle) = if data_ptr != 0 && data_ptr.is_multiple_of(8) {
         // Try to read NSData bytes (only if pointer is aligned, i.e. plausibly valid).
         let bytes = crate::nsdata::nsdata_bytes_slice(data_ptr);
         if !bytes.is_empty() {
@@ -1236,7 +1231,7 @@ pub fn nsimage_remove(obj: u64) {
     let mut guard = store();
     if let Some(map) = guard.as_mut() {
         if let Some(info) = map.remove(&obj) {
-            release_image_info(info);
+            release_image_info(&info);
         }
     }
 }

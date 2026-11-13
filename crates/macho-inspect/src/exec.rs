@@ -406,7 +406,7 @@ unsafe fn install_guest_crash_handler() {
             let fault_addr = info.si_addr() as u64;
             let uctx = &*(ctx as *const libc::ucontext_t);
             #[cfg(target_arch = "aarch64")]
-            let (pc, pc_stripped, fp, sp) = {
+            let (_pc, pc_stripped, fp, sp) = {
                 let pc = uctx.uc_mcontext.pc;
                 let regs = &uctx.uc_mcontext.regs;
                 let pc_stripped = pc & 0x0000_FFFF_FFFF_FFFF;
@@ -421,7 +421,7 @@ unsafe fn install_guest_crash_handler() {
                 (pc, pc_stripped, fp, sp)
             };
             #[cfg(target_arch = "x86_64")]
-            let (pc, pc_stripped, fp, sp) = {
+            let (_pc, pc_stripped, fp, sp) = {
                 let gregs = &uctx.uc_mcontext.gregs;
                 let pc = gregs[libc::REG_RIP as usize] as u64;
                 let fp = gregs[libc::REG_RBP as usize] as u64;
@@ -442,7 +442,7 @@ unsafe fn install_guest_crash_handler() {
                 (pc, pc, fp, sp)
             };
             #[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
-            let (pc, pc_stripped, fp, sp) = {
+            let (_pc, pc_stripped, fp, sp) = {
                 eprintln!(
                     "\n  *** SIGSEGV at fault_addr={fault_addr:#x}, signal={sig} (register dump unavailable on {}) ***",
                     std::env::consts::ARCH
@@ -635,7 +635,7 @@ unsafe fn install_guest_crash_handler() {
     }
 
     let mut sa: libc::sigaction = std::mem::zeroed();
-    sa.sa_sigaction = crash_handler as usize;
+    sa.sa_sigaction = crash_handler as *const () as usize;
     sa.sa_flags = libc::SA_SIGINFO | libc::SA_RESETHAND;
     libc::sigaction(libc::SIGSEGV, &sa, std::ptr::null_mut());
     libc::sigaction(libc::SIGBUS, &sa, std::ptr::null_mut());

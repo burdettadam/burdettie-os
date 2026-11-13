@@ -8,14 +8,15 @@
 //! - `NSRange` = `{ location: u64, length: u64 }` — 16 bytes
 //! - `NSEdgeInsets` = `{ top, left, bottom, right: CGFloat }` — 32 bytes
 //!
-//! On ARM64, structs ≤16 bytes are returned in x0/x1. Structs >16 bytes
-//! (CGRect, NSEdgeInsets) use x8 as the indirect result pointer, which
-//! is handled by the objc_msgSend trampoline.
+//! On ARM64, the geometry types are homogeneous floating-point aggregates:
+//! `CGPoint`/`CGSize` return in d0/d1 and `CGRect`/`NSEdgeInsets` in d0–d3.
+//! The two-integer `NSRange` returns in x0/x1. Aggregate return conventions
+//! depend on field types as well as size.
 
 /// `CGFloat` — `f64` on 64-bit platforms.
 pub type CGFloat = f64;
 
-/// `CGPoint` — 16 bytes, returned in x0/x1 on ARM64.
+/// `CGPoint` — 16-byte floating-point aggregate, returned in d0/d1 on ARM64.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct CGPoint {
@@ -27,7 +28,7 @@ impl CGPoint {
     pub const ZERO: Self = Self { x: 0.0, y: 0.0 };
 }
 
-/// `CGSize` — 16 bytes, returned in x0/x1 on ARM64.
+/// `CGSize` — 16-byte floating-point aggregate, returned in d0/d1 on ARM64.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct CGSize {
@@ -42,7 +43,7 @@ impl CGSize {
     };
 }
 
-/// `CGRect` — 32 bytes, uses x8 indirect return on ARM64.
+/// `CGRect` — 32-byte floating-point aggregate, returned in d0–d3 on ARM64.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct CGRect {
@@ -76,7 +77,7 @@ impl NSRange {
     pub const NOT_FOUND: u64 = u64::MAX; // NSNotFound
 }
 
-/// `NSEdgeInsets` — 32 bytes, uses x8 indirect return on ARM64.
+/// `NSEdgeInsets` — 32-byte floating-point aggregate, returned in d0–d3 on ARM64.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct NSEdgeInsets {

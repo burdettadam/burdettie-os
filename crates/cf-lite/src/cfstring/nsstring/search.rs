@@ -221,20 +221,18 @@ pub extern "C" fn shim_nsstring_range_of_string_options_range(
                     };
                 }
             }
-        } else {
-            if haystack_bytes.len() >= needle_bytes.len() {
-                let candidate = &haystack_bytes[..needle_bytes.len()];
-                let matched = if case_insensitive {
-                    candidate.eq_ignore_ascii_case(needle_bytes)
-                } else {
-                    candidate == needle_bytes
+        } else if haystack_bytes.len() >= needle_bytes.len() {
+            let candidate = &haystack_bytes[..needle_bytes.len()];
+            let matched = if case_insensitive {
+                candidate.eq_ignore_ascii_case(needle_bytes)
+            } else {
+                candidate == needle_bytes
+            };
+            if matched {
+                return NSRange {
+                    location: loc as u64,
+                    length: needle_bytes.len() as u64,
                 };
-                if matched {
-                    return NSRange {
-                        location: loc as u64,
-                        length: needle_bytes.len() as u64,
-                    };
-                }
             }
         }
         return not_found;
@@ -256,16 +254,14 @@ pub extern "C" fn shim_nsstring_range_of_string_options_range(
                     length: needle_lower.len() as u64,
                 };
             }
-        } else {
-            if let Some(pos) = hay_lower
-                .windows(needle_lower.len())
-                .position(|w| w == needle_lower.as_slice())
-            {
-                return NSRange {
-                    location: (loc + pos) as u64,
-                    length: needle_lower.len() as u64,
-                };
-            }
+        } else if let Some(pos) = hay_lower
+            .windows(needle_lower.len())
+            .position(|w| w == needle_lower.as_slice())
+        {
+            return NSRange {
+                location: (loc + pos) as u64,
+                length: needle_lower.len() as u64,
+            };
         }
         return not_found;
     }
@@ -278,13 +274,11 @@ pub extern "C" fn shim_nsstring_range_of_string_options_range(
                 length: needle_bytes.len() as u64,
             };
         }
-    } else {
-        if let Some(pos) = haystack.find(needle) {
-            return NSRange {
-                location: (loc + pos) as u64,
-                length: needle_bytes.len() as u64,
-            };
-        }
+    } else if let Some(pos) = haystack.find(needle) {
+        return NSRange {
+            location: (loc + pos) as u64,
+            length: needle_bytes.len() as u64,
+        };
     }
 
     not_found
@@ -559,9 +553,9 @@ mod tests {
 
     #[test]
     fn double_value_basic() {
-        let s = make_string("3.14");
+        let s = make_string("3.25");
         let v = shim_nsstring_double_value(s, 0);
-        assert!((v - 3.14).abs() < 1e-6, "expected 3.14 got {v}");
+        assert!((v - 3.25).abs() < 1e-6, "expected 3.25 got {v}");
         free_obj(s);
     }
 

@@ -95,7 +95,7 @@ impl ServiceServer {
         let thread = std::thread::Builder::new()
             .name("burdettie-services".into())
             .spawn(move || {
-                serve_loop(server, router, stop_clone);
+                serve_loop(&server, &router, &stop_clone);
             })
             .map_err(|e| format!("failed to spawn server thread: {e}"))?;
 
@@ -109,7 +109,7 @@ impl ServiceServer {
 }
 
 /// Main server loop — processes requests until stopped.
-fn serve_loop(server: tiny_http::Server, router: Arc<Router>, stop: Arc<AtomicBool>) {
+fn serve_loop(server: &tiny_http::Server, router: &Router, stop: &AtomicBool) {
     loop {
         if stop.load(Ordering::Acquire) {
             log::debug!("burdettie-services: stop signal received");

@@ -195,7 +195,7 @@ fn main() {
     // ── Path bar (label 0) ─────────────────────────────
     let mut path_label = Label::new(
         Rect::new(FILE_LIST_X, MENU_H + 4.0, FILE_LIST_W, PATH_BAR_H - 4.0),
-        &format!("  {}", current_dir.display()),
+        format!("  {}", current_dir.display()),
     );
     path_label.set_text_color(Color::new(0.2, 0.2, 0.3, 1.0));
     app.add_label(path_label);
@@ -327,7 +327,7 @@ fn main() {
     let status_label_idx = 5 + VISIBLE_ROWS * 3;
     app.add_label(Label::new(
         Rect::new(FILE_LIST_X + 240.0, nav_y + 4.0, 300.0, 20.0),
-        &format!("{} items", entries.len()),
+        format!("{} items", entries.len()),
     ));
 
     // ── Click handlers ─────────────────────────────────

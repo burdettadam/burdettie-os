@@ -7,6 +7,7 @@
 
 use crate::accessibility_bridge;
 use crate::cfstring;
+use crate::cg_types::CGRect;
 use crate::nsobj;
 
 // ── Helper: ISA reader ─────────────────────────────────────────────
@@ -154,18 +155,12 @@ pub extern "C" fn shim_accessibility_parent(obj: u64, _cmd: u64) -> u64 {
 // ── accessibilityFrame ─────────────────────────────────────────────
 
 /// `-[NSView accessibilityFrame]` — returns frame as CGRect (4 doubles).
-/// Note: ObjC returns NSRect by value (4 × f64). We return via stret convention.
-pub extern "C" fn shim_accessibility_frame(obj: u64, _cmd: u64) -> (f64, f64, f64, f64) {
+/// The C-compatible aggregate uses the target's CGRect return convention.
+pub extern "C" fn shim_accessibility_frame(obj: u64, _cmd: u64) -> CGRect {
     if obj == 0 {
-        return (0.0, 0.0, 0.0, 0.0);
+        return CGRect::ZERO;
     }
-    let frame = crate::nsview::view_frame(obj);
-    (
-        frame.origin.x,
-        frame.origin.y,
-        frame.size.width,
-        frame.size.height,
-    )
+    crate::nsview::view_frame(obj)
 }
 
 // ── Tests ──────────────────────────────────────────────────────────
@@ -182,6 +177,15 @@ mod tests {
         assert_eq!(shim_accessibility_label(0, 0), 0);
         assert_eq!(shim_accessibility_value(0, 0), 0);
         assert_eq!(shim_accessibility_parent(0, 0), 0);
+    }
+
+    #[test]
+    fn accessibility_frame_returns_rect_aggregate() {
+        let view = crate::nsview::shim_nsview_init_with_frame(0, 0, -10.5, 20.25, 300.0, 400.0);
+        let frame: extern "C" fn(u64, u64) -> CGRect = shim_accessibility_frame;
+        assert_eq!(frame(view, 0), CGRect::new(-10.5, 20.25, 300.0, 400.0));
+        assert_eq!(frame(0, 0), CGRect::ZERO);
+        free_obj(view);
     }
 
     #[test]

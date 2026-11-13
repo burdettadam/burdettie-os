@@ -151,7 +151,7 @@ pub(crate) fn read_uleb128(data: &[u8], pos: &mut usize) -> u64 {
         }
         let byte = data[*pos];
         *pos += 1;
-        result |= ((byte & 0x7F) as u64) << shift;
+        result |= u64::from(byte & 0x7F) << shift;
         if byte & 0x80 == 0 {
             break;
         }
@@ -173,7 +173,7 @@ pub(crate) fn read_sleb128(data: &[u8], pos: &mut usize) -> i64 {
         }
         byte = data[*pos];
         *pos += 1;
-        result |= ((byte & 0x7F) as i64) << shift;
+        result |= i64::from(byte & 0x7F) << shift;
         shift += 7;
         if byte & 0x80 == 0 {
             break;

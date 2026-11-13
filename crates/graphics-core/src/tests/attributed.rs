@@ -187,3 +187,66 @@ fn supports_attributed_text_without_fonts() {
     let r = SoftwareRenderer::new(&mut s);
     assert!(!r.supports_attributed_text());
 }
+
+#[test]
+fn attributed_styles_use_original_byte_offsets_after_normalization() {
+    let fm = FontManager::new();
+    let text = "e\u{301}X";
+    let runs = [TextRun {
+        range: 3..4,
+        font_name: None,
+        size: Some(24.0),
+        color: Some(Color::RED),
+        bold: true,
+        italic: false,
+    }];
+
+    let layout = layout_attributed(text, &runs, &fm, fm.system(), 14.0);
+    let composed = layout_single_line("é", fm.system(), 14.0);
+    assert_eq!(layout.glyphs.len(), 2);
+    assert_eq!(layout.glyphs[0].glyph_id, composed.glyphs[0].glyph_id);
+    assert_eq!(layout.glyphs[0].color, None);
+    assert_eq!(layout.glyphs[1].color, Some(Color::RED));
+    assert_eq!(layout.glyphs[1].size, 24.0);
+    assert_eq!(
+        layout.fonts[layout.glyphs[1].font_index].name(),
+        "System-Bold"
+    );
+}
+
+#[test]
+fn attributed_combining_mark_keeps_its_own_style() {
+    let fm = FontManager::new();
+    let runs = [TextRun {
+        range: 1..3,
+        font_name: None,
+        size: None,
+        color: Some(Color::RED),
+        bold: false,
+        italic: false,
+    }];
+
+    let layout = layout_attributed("e\u{301}", &runs, &fm, fm.system(), 14.0);
+    assert_eq!(layout.glyphs.len(), 2);
+    assert_eq!(layout.glyphs[0].color, None);
+    assert_eq!(layout.glyphs[1].color, Some(Color::RED));
+    assert_eq!(layout.glyphs[1].x, layout.glyphs[0].x);
+}
+
+#[test]
+fn attributed_metrics_include_unstyled_text() {
+    let fm = FontManager::new();
+    let runs = [TextRun {
+        range: 0..1,
+        font_name: None,
+        size: Some(6.0),
+        color: None,
+        bold: false,
+        italic: false,
+    }];
+
+    let layout = layout_attributed("AB", &runs, &fm, fm.system(), 24.0);
+    let expected = fm.system().metrics(24.0);
+    assert_eq!(layout.height, expected.line_height());
+    assert!(layout.glyphs.iter().all(|glyph| glyph.y == expected.ascent));
+}

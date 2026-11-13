@@ -55,7 +55,7 @@ pub fn parse_rebases(data: &[u8], rebase_off: u32, rebase_size: u32) -> Vec<Reba
                 seg_offset = seg_offset.wrapping_add(read_uleb128(stream, &mut pos));
             }
             REBASE_OPCODE_ADD_ADDR_IMM_SCALED => {
-                seg_offset = seg_offset.wrapping_add(immediate as u64 * pointer_size);
+                seg_offset = seg_offset.wrapping_add(u64::from(immediate) * pointer_size);
             }
             REBASE_OPCODE_DO_REBASE_IMM_TIMES => {
                 for _ in 0..immediate {
@@ -146,7 +146,7 @@ pub fn parse_binds(data: &[u8], bind_off: u32, bind_size: u32, is_lazy: bool) ->
                 }
             }
             BIND_OPCODE_SET_DYLIB_ORDINAL_IMM => {
-                dylib_ordinal = immediate as i64;
+                dylib_ordinal = i64::from(immediate);
             }
             BIND_OPCODE_SET_DYLIB_ORDINAL_ULEB => {
                 dylib_ordinal = read_uleb128(stream, &mut pos) as i64;
@@ -155,7 +155,7 @@ pub fn parse_binds(data: &[u8], bind_off: u32, bind_size: u32, is_lazy: bool) ->
                 if immediate == 0 {
                     dylib_ordinal = 0;
                 } else {
-                    dylib_ordinal = (0xF0 | immediate) as i8 as i64;
+                    dylib_ordinal = i64::from((0xF0 | immediate) as i8);
                 }
             }
             BIND_OPCODE_SET_SYMBOL_TRAILING_FLAGS_IMM => {
@@ -213,7 +213,7 @@ pub fn parse_binds(data: &[u8], bind_off: u32, bind_size: u32, is_lazy: bool) ->
                     is_weak,
                     is_lazy,
                 });
-                seg_offset = seg_offset.wrapping_add((immediate as u64 + 1) * pointer_size);
+                seg_offset = seg_offset.wrapping_add((u64::from(immediate) + 1) * pointer_size);
             }
             BIND_OPCODE_DO_BIND_ULEB_TIMES_SKIPPING_ULEB => {
                 let count = read_uleb128(stream, &mut pos);
@@ -335,7 +335,7 @@ pub fn parse_chained_fixups(
 
             fixups.push(ChainedFixup::Rebase {
                 segment_index: seg_i,
-                page_offset: page_start as u32 + (page_i as u32 * page_size as u32),
+                page_offset: u32::from(page_start) + (page_i as u32 * u32::from(page_size)),
                 target: 0,
             });
         }

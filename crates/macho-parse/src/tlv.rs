@@ -20,37 +20,34 @@ pub fn parse_tlv_descriptors(parsed: &ParsedMachO, data: &[u8]) -> Vec<TlvDescri
             continue;
         }
 
-        let file_offset = section.offset as usize;
-        let section_size = section.size as usize;
-
-        if file_offset + section_size > data.len() {
+        let Some(section_data) = crate::bytes_at(data, u64::from(section.offset), section.size)
+        else {
             continue;
-        }
+        };
 
-        let count = section_size / desc_size;
-        for i in 0..count {
-            let base = file_offset + i * desc_size;
-            let addr = section.addr + (i * desc_size) as u64;
-
-            let (thunk, key, offset) = if is_64 {
-                if base + 24 > data.len() {
-                    break;
-                }
-                (
-                    u64::from_le_bytes(data[base..base + 8].try_into().unwrap()),
-                    u64::from_le_bytes(data[base + 8..base + 16].try_into().unwrap()),
-                    u64::from_le_bytes(data[base + 16..base + 24].try_into().unwrap()),
-                )
-            } else {
-                if base + 12 > data.len() {
-                    break;
-                }
-                (
-                    u32::from_le_bytes(data[base..base + 4].try_into().unwrap()) as u64,
-                    u32::from_le_bytes(data[base + 4..base + 8].try_into().unwrap()) as u64,
-                    u32::from_le_bytes(data[base + 8..base + 12].try_into().unwrap()) as u64,
-                )
+        for (i, descriptor) in section_data.chunks_exact(desc_size).enumerate() {
+            let Ok(byte_offset) = u64::try_from(i * desc_size) else {
+                break;
             };
+            let Some(addr) = section.addr.checked_add(byte_offset) else {
+                break;
+            };
+            let read_pointer = |offset: usize| {
+                let bytes = &descriptor[offset..offset + ptr_size];
+                if is_64 {
+                    u64::from_le_bytes([
+                        bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6],
+                        bytes[7],
+                    ])
+                } else {
+                    u64::from(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+                }
+            };
+            let (thunk, key, offset) = (
+                read_pointer(0),
+                read_pointer(ptr_size),
+                read_pointer(ptr_size * 2),
+            );
 
             descriptors.push(TlvDescriptor {
                 address: addr,

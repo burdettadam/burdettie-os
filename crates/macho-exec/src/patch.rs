@@ -58,9 +58,8 @@ const STUB_PREFIXES: &[&str] = &[
 /// Must be called BEFORE `protect_executable()` while __TEXT is still
 /// writable.  Returns the number of instructions patched.
 pub fn patch_known_crashes(image: &MappedImage, parsed: &ParsedMachO) -> usize {
-    let text_seg = match image.segment("__TEXT") {
-        Some(seg) => seg,
-        None => return 0,
+    let Some(text_seg) = image.segment("__TEXT") else {
+        return 0;
     };
 
     let symbols = match &parsed.symbols {
@@ -269,8 +268,6 @@ fn stub_function_entry(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     #[cfg(target_arch = "aarch64")]
     fn bl_decode_roundtrip() {

@@ -24,6 +24,12 @@ pub struct DataSymbolStore {
     symbols: HashMap<&'static str, u64>,
 }
 
+impl Default for DataSymbolStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DataSymbolStore {
     /// Return the process-wide singleton, initializing on first call.
     ///

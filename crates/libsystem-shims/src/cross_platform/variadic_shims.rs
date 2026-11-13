@@ -39,6 +39,18 @@ use crate::table::ShimTable;
 /// These override the StubResolver safe-list entries for printf-family
 /// and err-family functions, ensuring the Apple-ABI variadic args are
 /// correctly forwarded to Linux's v-variant implementations.
+///
+/// # Assembly entry requirements
+///
+/// The naked `shim_*` entry points require each documented Darwin ARM64 C
+/// prototype: named integer/pointer arguments occupy their specified `x0`–`x7`
+/// registers, `sp` is 16-byte aligned, and variadic arguments follow the Darwin
+/// stack layout. The `v*` forms instead receive a live Darwin `va_list` pointer
+/// in the documented argument register. All formats, streams, input pointers,
+/// and writable destinations must stay valid for the operation; argument types
+/// and buffer sizes must satisfy every format conversion. Their zero-argument
+/// Rust signatures exist only to expose assembly symbols and are not callable
+/// Rust API prototypes.
 pub struct VariadicShims;
 
 impl VariadicShims {
@@ -283,6 +295,8 @@ impl VariadicShims {
 
             log::info!("VariadicShims: registered 45 Apple→Linux ABI shims");
         }
+        #[cfg(not(all(target_os = "linux", target_arch = "aarch64")))]
+        let _ = table;
     }
 }
 
@@ -410,8 +424,14 @@ mod inner {
         /// `int fprintf(FILE *stream, const char *fmt, ...)`
         ///   → `vfprintf_shadow(stream, fmt, &va_list)`
         /// Named args: x0=stream, x1=fmt  ⇒ va_list in x2
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_fprintf() -> libc::c_int {
+        pub unsafe extern "C" fn shim_fprintf() -> libc::c_int {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -430,8 +450,14 @@ mod inner {
         /// `int printf(const char *fmt, ...)`
         ///   → `vprintf(fmt, &va_list)`
         /// Named args: x0=fmt  ⇒ va_list in x1
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_printf() -> libc::c_int {
+        pub unsafe extern "C" fn shim_printf() -> libc::c_int {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -450,8 +476,14 @@ mod inner {
         /// `int snprintf(char *buf, size_t size, const char *fmt, ...)`
         ///   → `vsnprintf(buf, size, fmt, &va_list)`
         /// Named args: x0=buf, x1=size, x2=fmt  ⇒ va_list in x3
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_snprintf() -> libc::c_int {
+        pub unsafe extern "C" fn shim_snprintf() -> libc::c_int {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -470,8 +502,14 @@ mod inner {
         /// `int sprintf(char *buf, const char *fmt, ...)`
         ///   → `vsprintf(buf, fmt, &va_list)`
         /// Named args: x0=buf, x1=fmt  ⇒ va_list in x2
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_sprintf() -> libc::c_int {
+        pub unsafe extern "C" fn shim_sprintf() -> libc::c_int {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -490,8 +528,14 @@ mod inner {
         /// `int dprintf(int fd, const char *fmt, ...)`
         ///   → `vdprintf(fd, fmt, &va_list)`
         /// Named args: x0=fd, x1=fmt  ⇒ va_list in x2
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_dprintf() -> libc::c_int {
+        pub unsafe extern "C" fn shim_dprintf() -> libc::c_int {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -510,8 +554,14 @@ mod inner {
         /// `int asprintf(char **ret, const char *fmt, ...)`
         ///   → `vasprintf(ret, fmt, &va_list)`
         /// Named args: x0=ret, x1=fmt  ⇒ va_list in x2
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_asprintf() -> libc::c_int {
+        pub unsafe extern "C" fn shim_asprintf() -> libc::c_int {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -532,8 +582,14 @@ mod inner {
         /// `int sscanf(const char *s, const char *fmt, ...)`
         ///   → `vsscanf(s, fmt, &va_list)`
         /// Named args: x0=s, x1=fmt  ⇒ va_list in x2
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_sscanf() -> libc::c_int {
+        pub unsafe extern "C" fn shim_sscanf() -> libc::c_int {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -552,8 +608,14 @@ mod inner {
         /// `int fscanf(FILE *stream, const char *fmt, ...)`
         ///   → `vfscanf_shadow(stream, fmt, &va_list)`
         /// Named args: x0=stream, x1=fmt  ⇒ va_list in x2
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_fscanf() -> libc::c_int {
+        pub unsafe extern "C" fn shim_fscanf() -> libc::c_int {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -572,8 +634,14 @@ mod inner {
         /// `int scanf(const char *fmt, ...)`
         ///   → `vscanf(fmt, &va_list)`
         /// Named args: x0=fmt  ⇒ va_list in x1
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_scanf() -> libc::c_int {
+        pub unsafe extern "C" fn shim_scanf() -> libc::c_int {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -594,8 +662,14 @@ mod inner {
         /// `void syslog(int priority, const char *fmt, ...)`
         ///   → `vsyslog(priority, fmt, &va_list)`
         /// Named args: x0=priority, x1=fmt  ⇒ va_list in x2
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_syslog() {
+        pub unsafe extern "C" fn shim_syslog() {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -622,8 +696,14 @@ mod inner {
         /// `int vfprintf(FILE *stream, const char *fmt, va_list ap)`
         /// Apple: x2 = char* (Apple va_list)
         /// Linux: x2 = __va_list* (pointer to 32-byte struct)
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_vfprintf() -> libc::c_int {
+        pub unsafe extern "C" fn shim_vfprintf() -> libc::c_int {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -640,8 +720,14 @@ mod inner {
 
         /// `int vprintf(const char *fmt, va_list ap)`
         /// Apple: x1 = Apple va_list
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_vprintf() -> libc::c_int {
+        pub unsafe extern "C" fn shim_vprintf() -> libc::c_int {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -658,8 +744,14 @@ mod inner {
 
         /// `int vsnprintf(char *buf, size_t size, const char *fmt, va_list ap)`
         /// Apple: x3 = Apple va_list
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_vsnprintf() -> libc::c_int {
+        pub unsafe extern "C" fn shim_vsnprintf() -> libc::c_int {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -676,8 +768,14 @@ mod inner {
 
         /// `int vsprintf(char *buf, const char *fmt, va_list ap)`
         /// Apple: x2 = Apple va_list
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_vsprintf() -> libc::c_int {
+        pub unsafe extern "C" fn shim_vsprintf() -> libc::c_int {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -694,8 +792,14 @@ mod inner {
 
         /// `int vdprintf(int fd, const char *fmt, va_list ap)`
         /// Apple: x2 = Apple va_list
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_vdprintf() -> libc::c_int {
+        pub unsafe extern "C" fn shim_vdprintf() -> libc::c_int {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -712,8 +816,14 @@ mod inner {
 
         /// `int vasprintf(char **ret, const char *fmt, va_list ap)`
         /// Apple: x2 = Apple va_list
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_vasprintf() -> libc::c_int {
+        pub unsafe extern "C" fn shim_vasprintf() -> libc::c_int {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -730,8 +840,14 @@ mod inner {
 
         /// `int vsscanf(const char *s, const char *fmt, va_list ap)`
         /// Apple: x2 = Apple va_list
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_vsscanf() -> libc::c_int {
+        pub unsafe extern "C" fn shim_vsscanf() -> libc::c_int {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -748,8 +864,14 @@ mod inner {
 
         /// `int vfscanf(FILE *stream, const char *fmt, va_list ap)`
         /// Apple: x2 = Apple va_list
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_vfscanf() -> libc::c_int {
+        pub unsafe extern "C" fn shim_vfscanf() -> libc::c_int {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -766,8 +888,14 @@ mod inner {
 
         /// `int vscanf(const char *fmt, va_list ap)`
         /// Apple: x1 = Apple va_list
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_vscanf() -> libc::c_int {
+        pub unsafe extern "C" fn shim_vscanf() -> libc::c_int {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -784,8 +912,14 @@ mod inner {
 
         /// `void vsyslog(int priority, const char *fmt, va_list ap)`
         /// Apple: x2 = Apple va_list
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_vsyslog() {
+        pub unsafe extern "C" fn shim_vsyslog() {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -810,8 +944,14 @@ mod inner {
         /// `int __snprintf_chk(buf, maxlen, flag, slen, fmt, ...)`
         /// Named args: x0=buf, x1=maxlen, x2=flag, x3=slen, x4=fmt ⇒ va in x5
         /// → `__vsnprintf_chk(buf, maxlen, flag, slen, fmt, &va_list)`
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_snprintf_chk() -> libc::c_int {
+        pub unsafe extern "C" fn shim_snprintf_chk() -> libc::c_int {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -830,8 +970,14 @@ mod inner {
         /// `int __sprintf_chk(buf, flag, slen, fmt, ...)`
         /// Named args: x0=buf, x1=flag, x2=slen, x3=fmt ⇒ va in x4
         /// → `__vsprintf_chk(buf, flag, slen, fmt, &va_list)`
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_sprintf_chk() -> libc::c_int {
+        pub unsafe extern "C" fn shim_sprintf_chk() -> libc::c_int {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -850,8 +996,14 @@ mod inner {
         /// `int __fprintf_chk(stream, flag, fmt, ...)`
         /// Named args: x0=stream, x1=flag, x2=fmt ⇒ va in x3
         /// → `vfprintf_chk_shadow(stream, flag, fmt, &va_list)`
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_fprintf_chk() -> libc::c_int {
+        pub unsafe extern "C" fn shim_fprintf_chk() -> libc::c_int {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -870,8 +1022,14 @@ mod inner {
         /// `int __printf_chk(flag, fmt, ...)`
         /// Named args: x0=flag, x1=fmt ⇒ va in x2
         /// → `__vprintf_chk(flag, fmt, &va_list)`
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_printf_chk() -> libc::c_int {
+        pub unsafe extern "C" fn shim_printf_chk() -> libc::c_int {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -891,8 +1049,14 @@ mod inner {
 
         /// `int __vsnprintf_chk(buf, maxlen, flag, slen, fmt, va_list ap)`
         /// Apple: x5 = Apple va_list
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_vsnprintf_chk() -> libc::c_int {
+        pub unsafe extern "C" fn shim_vsnprintf_chk() -> libc::c_int {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -909,8 +1073,14 @@ mod inner {
 
         /// `int __vsprintf_chk(buf, flag, slen, fmt, va_list ap)`
         /// Apple: x4 = Apple va_list
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_vsprintf_chk() -> libc::c_int {
+        pub unsafe extern "C" fn shim_vsprintf_chk() -> libc::c_int {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -927,8 +1097,14 @@ mod inner {
 
         /// `int __vfprintf_chk(stream, flag, fmt, va_list ap)`
         /// Apple: x3 = Apple va_list
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_vfprintf_chk() -> libc::c_int {
+        pub unsafe extern "C" fn shim_vfprintf_chk() -> libc::c_int {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -945,8 +1121,14 @@ mod inner {
 
         /// `int __vprintf_chk(flag, fmt, va_list ap)`
         /// Apple: x2 = Apple va_list
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_vprintf_chk() -> libc::c_int {
+        pub unsafe extern "C" fn shim_vprintf_chk() -> libc::c_int {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -972,8 +1154,14 @@ mod inner {
         /// `int BIO_printf(BIO *bio, const char *format, ...)`
         ///   → `bio_vprintf_bridge(bio, format, &va_list)`
         /// Named args: x0=bio, x1=format  ⇒ va_list in x2
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_bio_printf() -> libc::c_int {
+        pub unsafe extern "C" fn shim_bio_printf() -> libc::c_int {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -992,8 +1180,14 @@ mod inner {
         /// `int BIO_vprintf(BIO *bio, const char *format, va_list args)`
         /// Apple: x2 = char* (Apple va_list)
         /// Linux: x2 = __va_list* (pointer to 32-byte struct)
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_bio_vprintf() -> libc::c_int {
+        pub unsafe extern "C" fn shim_bio_vprintf() -> libc::c_int {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -1011,8 +1205,14 @@ mod inner {
         /// `int BIO_snprintf(char *buf, size_t n, const char *format, ...)`
         ///   → `bio_vsnprintf_bridge(buf, n, format, &va_list)`
         /// Named args: x0=buf, x1=n, x2=format  ⇒ va_list in x3
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_bio_snprintf() -> libc::c_int {
+        pub unsafe extern "C" fn shim_bio_snprintf() -> libc::c_int {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -1030,8 +1230,14 @@ mod inner {
 
         /// `int BIO_vsnprintf(char *buf, size_t n, const char *fmt, va_list args)`
         /// Apple: x3 = Apple va_list
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_bio_vsnprintf() -> libc::c_int {
+        pub unsafe extern "C" fn shim_bio_vsnprintf() -> libc::c_int {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -1055,8 +1261,14 @@ mod inner {
         /// Named args: x0=eval, x1=fmt  ⇒ va_list in x2
         ///
         /// Constructs va_list, then calls `err_inner(eval, fmt, &va_list)`.
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_err() -> ! {
+        pub unsafe extern "C" fn shim_err() -> ! {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -1074,8 +1286,14 @@ mod inner {
 
         /// `void errx(int eval, const char *fmt, ...)`
         /// Named args: x0=eval, x1=fmt  ⇒ va_list in x2
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_errx() -> ! {
+        pub unsafe extern "C" fn shim_errx() -> ! {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -1092,8 +1310,14 @@ mod inner {
 
         /// `void errc(int eval, int code, const char *fmt, ...)`
         /// Named args: x0=eval, x1=code, x2=fmt  ⇒ va_list in x3
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_errc() -> ! {
+        pub unsafe extern "C" fn shim_errc() -> ! {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -1110,8 +1334,14 @@ mod inner {
 
         /// `void warn(const char *fmt, ...)`
         /// Named args: x0=fmt  ⇒ va_list in x1
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_warn() {
+        pub unsafe extern "C" fn shim_warn() {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -1129,8 +1359,14 @@ mod inner {
 
         /// `void warnx(const char *fmt, ...)`
         /// Named args: x0=fmt  ⇒ va_list in x1
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_warnx() {
+        pub unsafe extern "C" fn shim_warnx() {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -1148,8 +1384,14 @@ mod inner {
 
         /// `void warnc(int code, const char *fmt, ...)`
         /// Named args: x0=code, x1=fmt  ⇒ va_list in x2
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_warnc() {
+        pub unsafe extern "C" fn shim_warnc() {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -1173,8 +1415,14 @@ mod inner {
 
         /// `void vwarn(const char *fmt, va_list ap)`
         /// Apple: x1 = Apple va_list
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_vwarn() {
+        pub unsafe extern "C" fn shim_vwarn() {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -1191,8 +1439,14 @@ mod inner {
 
         /// `void vwarnx(const char *fmt, va_list ap)`
         /// Apple: x1 = Apple va_list
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_vwarnx() {
+        pub unsafe extern "C" fn shim_vwarnx() {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -1209,8 +1463,14 @@ mod inner {
 
         /// `void vwarnc(int code, const char *fmt, va_list ap)`
         /// Apple: x2 = Apple va_list
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_vwarnc() {
+        pub unsafe extern "C" fn shim_vwarnc() {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -1227,8 +1487,14 @@ mod inner {
 
         /// `void verr(int eval, const char *fmt, va_list ap)`
         /// Apple: x2 = Apple va_list
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_verr() -> ! {
+        pub unsafe extern "C" fn shim_verr() -> ! {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -1244,8 +1510,14 @@ mod inner {
 
         /// `void verrx(int eval, const char *fmt, va_list ap)`
         /// Apple: x2 = Apple va_list
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_verrx() -> ! {
+        pub unsafe extern "C" fn shim_verrx() -> ! {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -1261,8 +1533,14 @@ mod inner {
 
         /// `void verrc(int eval, int code, const char *fmt, va_list ap)`
         /// Apple: x3 = Apple va_list
+        ///
+        /// # Safety
+        /// Enter with the documented Darwin ARM64 prototype and the register,
+        /// stack, and argument-validity requirements in
+        /// [`VariadicShims`][crate::cross_platform::variadic_shims::VariadicShims].
+        /// Do not invoke through this function's zero-argument Rust signature.
         #[unsafe(naked)]
-        pub extern "C" fn shim_verrc() -> ! {
+        pub unsafe extern "C" fn shim_verrc() -> ! {
             core::arch::naked_asm!(
                 "stp  x29, x30, [sp, #-64]!",
                 "mov  x29, sp",
@@ -1286,10 +1564,10 @@ mod inner {
             static STDERR: OnceLock<usize> = OnceLock::new();
             let addr = *STDERR.get_or_init(|| unsafe {
                 // dlsym for the Linux "stderr" global
-                let ptr = libc::dlsym(libc::RTLD_DEFAULT, b"stderr\0".as_ptr().cast());
+                let ptr = libc::dlsym(libc::RTLD_DEFAULT, c"stderr".as_ptr());
                 if ptr.is_null() {
                     // Fallback: fdopen(2)
-                    libc::fdopen(2, b"w\0".as_ptr().cast()) as usize
+                    libc::fdopen(2, c"w".as_ptr()) as usize
                 } else {
                     // stderr is a FILE*, and dlsym returns &stderr, so deref
                     *(ptr as *const *mut libc::FILE) as usize
@@ -1321,13 +1599,13 @@ mod inner {
             unsafe {
                 let se = host_stderr();
                 let pn = progname_cstr();
-                fprintf(se, b"%s: \0".as_ptr().cast(), pn);
+                fprintf(se, c"%s: ".as_ptr(), pn);
                 if !fmt.is_null() {
                     vfprintf(se, fmt, ap);
-                    fprintf(se, b": \0".as_ptr().cast());
+                    fprintf(se, c": ".as_ptr());
                 }
                 let errno_str = libc::strerror(*libc::__errno_location());
-                fprintf(se, b"%s\n\0".as_ptr().cast(), errno_str);
+                fprintf(se, c"%s\n".as_ptr(), errno_str);
             }
             std::process::exit(eval);
         }
@@ -1337,11 +1615,11 @@ mod inner {
             unsafe {
                 let se = host_stderr();
                 let pn = progname_cstr();
-                fprintf(se, b"%s: \0".as_ptr().cast(), pn);
+                fprintf(se, c"%s: ".as_ptr(), pn);
                 if !fmt.is_null() {
                     vfprintf(se, fmt, ap);
                 }
-                fprintf(se, b"\n\0".as_ptr().cast());
+                fprintf(se, c"\n".as_ptr());
             }
             std::process::exit(eval);
         }
@@ -1356,13 +1634,13 @@ mod inner {
             unsafe {
                 let se = host_stderr();
                 let pn = progname_cstr();
-                fprintf(se, b"%s: \0".as_ptr().cast(), pn);
+                fprintf(se, c"%s: ".as_ptr(), pn);
                 if !fmt.is_null() {
                     vfprintf(se, fmt, ap);
-                    fprintf(se, b": \0".as_ptr().cast());
+                    fprintf(se, c": ".as_ptr());
                 }
                 let errno_str = libc::strerror(code);
-                fprintf(se, b"%s\n\0".as_ptr().cast(), errno_str);
+                fprintf(se, c"%s\n".as_ptr(), errno_str);
             }
             std::process::exit(eval);
         }
@@ -1372,13 +1650,13 @@ mod inner {
             unsafe {
                 let se = host_stderr();
                 let pn = progname_cstr();
-                fprintf(se, b"%s: \0".as_ptr().cast(), pn);
+                fprintf(se, c"%s: ".as_ptr(), pn);
                 if !fmt.is_null() {
                     vfprintf(se, fmt, ap);
-                    fprintf(se, b": \0".as_ptr().cast());
+                    fprintf(se, c": ".as_ptr());
                 }
                 let errno_str = libc::strerror(*libc::__errno_location());
-                fprintf(se, b"%s\n\0".as_ptr().cast(), errno_str);
+                fprintf(se, c"%s\n".as_ptr(), errno_str);
             }
         }
 
@@ -1387,11 +1665,11 @@ mod inner {
             unsafe {
                 let se = host_stderr();
                 let pn = progname_cstr();
-                fprintf(se, b"%s: \0".as_ptr().cast(), pn);
+                fprintf(se, c"%s: ".as_ptr(), pn);
                 if !fmt.is_null() {
                     vfprintf(se, fmt, ap);
                 }
-                fprintf(se, b"\n\0".as_ptr().cast());
+                fprintf(se, c"\n".as_ptr());
             }
         }
 
@@ -1400,13 +1678,13 @@ mod inner {
             unsafe {
                 let se = host_stderr();
                 let pn = progname_cstr();
-                fprintf(se, b"%s: \0".as_ptr().cast(), pn);
+                fprintf(se, c"%s: ".as_ptr(), pn);
                 if !fmt.is_null() {
                     vfprintf(se, fmt, ap);
-                    fprintf(se, b": \0".as_ptr().cast());
+                    fprintf(se, c": ".as_ptr());
                 }
                 let errno_str = libc::strerror(code);
-                fprintf(se, b"%s\n\0".as_ptr().cast(), errno_str);
+                fprintf(se, c"%s\n".as_ptr(), errno_str);
             }
         }
 
@@ -1424,7 +1702,7 @@ mod inner {
             use std::sync::OnceLock;
             static FN_PTR: OnceLock<usize> = OnceLock::new();
             let addr = *FN_PTR.get_or_init(|| unsafe {
-                libc::dlsym(libc::RTLD_DEFAULT, b"BIO_vprintf\0".as_ptr().cast()) as usize
+                libc::dlsym(libc::RTLD_DEFAULT, c"BIO_vprintf".as_ptr()) as usize
             });
             if addr == 0 {
                 return -1;
@@ -1447,7 +1725,7 @@ mod inner {
             use std::sync::OnceLock;
             static FN_PTR: OnceLock<usize> = OnceLock::new();
             let addr = *FN_PTR.get_or_init(|| unsafe {
-                libc::dlsym(libc::RTLD_DEFAULT, b"BIO_vsnprintf\0".as_ptr().cast()) as usize
+                libc::dlsym(libc::RTLD_DEFAULT, c"BIO_vsnprintf".as_ptr()) as usize
             });
             if addr == 0 {
                 return -1;

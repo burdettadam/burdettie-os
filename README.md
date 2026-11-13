@@ -6,7 +6,7 @@ Burdettie-OS explores what it takes to run software built for macOS through an i
 
 This is an experimental systems project. Compatibility depends on the binary, CPU architecture, platform backend, and APIs it uses. The implementation is a user-space runtime; the host operating system still provides the kernel, memory management, files, and display services.
 
-[Quick start](#quick-start) · [Architecture](#architecture) · [Engineering highlights](#engineering-highlights) · [Documentation](#documentation)
+[Quick start](#quick-start) · [Architecture](#architecture) · [Engineering highlights](#engineering-highlights) · [Validation](#validation) · [Documentation](#documentation)
 
 ## Start here
 
@@ -92,6 +92,12 @@ Treat locally imported guest software as a separate development input. Imported 
 | Semantic memory and services | `burdettie-domain-map`, `burdettie-memory-core`, `burdettie-memory-index`, `burdettie-services`, `burdettie-log-pipeline` | Explore domain modeling, memory indexing, service integration, and logging. |
 
 The [feature reference](docs/FEATURES.md) provides the detailed subsystem inventory. The [roadmap](docs/roadmap.md) records the intended direction and target matrix.
+
+## Validation
+
+The [CI workflow](.github/workflows/ci.yml) builds the project's own Mach-O fixtures. In [run 43343829535](https://github.com/burdettadam/burdettie-os/actions/runs/43343829535) for source commit `1bf44e2e552254c450d3a7a86cc55487e7f49b51`, native macOS ARM64 formatting, strict Clippy, debug/release builds, full workspace tests, GPU-feature tests, runtime packaging, README quick start, and C/Swift interop passed. Docker's 344 portable library tests and all 40 Linux ARM64 interpreter fixtures passed in their separate Linux environments.
+
+The security workflow remains failed for the unsuppressed `ttf-parser` maintenance advisory; [issue #2](https://github.com/burdettadam/burdettie-os/issues/2) tracks replacement of both font dependency paths. `cargo audit`, license/source policy, repository hygiene and reachable-history secret scanning passed. See the [revision-specific validation record](docs/PUBLICATION.md#validation-status) and [recovery manifest](docs/RECOVERY_MANIFEST.json) for environments, ignored tests, source preservation and runtime limits. These results describe the tested revision and inputs; framework and application coverage remains incremental.
 
 ## Scope and limitations
 

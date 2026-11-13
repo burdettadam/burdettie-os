@@ -1,10 +1,5 @@
 use super::*;
 
-#[allow(unused_imports)]
-use super::*;
-
-use super::*;
-
 #[test]
 fn point_basic() {
     let p = Point::new(10.0, 20.0);

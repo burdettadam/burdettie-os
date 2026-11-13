@@ -70,7 +70,7 @@ fn set_opacity_changes_alpha() {
     let p = px(&surface, 5, 5);
     let alpha = (p >> 24) & 0xFF;
     // Full-alpha RED (0xFF) * 0.5 → ~0x7F
-    assert!(alpha >= 0x7D && alpha <= 0x80, "expected ~127, got {alpha}");
+    assert!((0x7D..=0x80).contains(&alpha), "expected ~127, got {alpha}");
 }
 
 #[test]

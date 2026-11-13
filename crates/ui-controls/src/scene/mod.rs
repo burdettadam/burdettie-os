@@ -73,7 +73,9 @@ impl Default for AppScene {
 mod tests {
     use super::*;
     use app_kit_lite::{NSPasteboard, NS_PASTEBOARD_TYPE_STRING};
+    use graphics_core::{Point, Rect};
     use std::sync::{Mutex, Once};
+    use window_backend::KeyCode;
 
     /// Serialize tests that read/write the shared in-memory pasteboard.
     static CLIPBOARD_TEST_LOCK: Mutex<()> = Mutex::new(());

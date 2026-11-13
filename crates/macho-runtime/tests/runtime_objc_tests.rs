@@ -215,7 +215,7 @@ fn run_registration_pipeline_reports_foundation_and_selector_stats() {
         "empty registry should contain no ObjC guest images"
     );
     assert_eq!(
-        stats.foundation_classes_registered, 93,
+        stats.foundation_classes_registered, 98,
         "foundation registration count should remain stable"
     );
     assert!(
@@ -226,7 +226,7 @@ fn run_registration_pipeline_reports_foundation_and_selector_stats() {
     let events = tracer.events();
     assert!(
         events.iter().any(|event| {
-            event.message == "perf|objc_reg|counter|foundation_classes_registered|93"
+            event.message == "perf|objc_reg|counter|foundation_classes_registered|98"
         }),
         "tracer should emit foundation class count perf event"
     );

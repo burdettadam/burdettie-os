@@ -271,7 +271,7 @@ fn register_export_backed_compat_class(
         return;
     };
 
-    objc_rt.register_synthetic_class(objc_runtime::ClassInfo {
+    objc_rt.register_mapped_class(objc_runtime::ClassInfo {
         name: class_name.to_string(),
         mapped_addr: class_addr,
         methods: vec![],

@@ -404,11 +404,7 @@ fn read_scalar(data: &[u8], signed: bool) -> i64 {
         }
         8 => {
             let v = u64::from_le_bytes(data[..8].try_into().unwrap_or([0; 8]));
-            if signed {
-                v as i64
-            } else {
-                v as i64
-            }
+            v as i64
         }
         _ => 0,
     }
@@ -699,12 +695,12 @@ mod tests {
     #[test]
     fn os_log_create_returns_unique_handles() {
         let h1 = shim_os_log_create(
-            b"com.apple.test1\0".as_ptr() as u64,
-            b"default\0".as_ptr() as u64,
+            c"com.apple.test1".as_ptr() as u64,
+            c"default".as_ptr() as u64,
         );
         let h2 = shim_os_log_create(
-            b"com.apple.test2\0".as_ptr() as u64,
-            b"network\0".as_ptr() as u64,
+            c"com.apple.test2".as_ptr() as u64,
+            c"network".as_ptr() as u64,
         );
         assert_ne!(h1, h2);
 
@@ -721,14 +717,14 @@ mod tests {
 
         let before = burdettie_log_pipeline::event_count();
         let handle = shim_os_log_create(
-            b"com.apple.pipeline.test\0".as_ptr() as u64,
-            b"unit\0".as_ptr() as u64,
+            c"com.apple.pipeline.test".as_ptr() as u64,
+            c"unit".as_ptr() as u64,
         );
         shim_os_log_impl(
             0,
             handle,
             0x01, // OS_LOG_TYPE_INFO
-            b"pipeline test message\0".as_ptr() as u64,
+            c"pipeline test message".as_ptr() as u64,
             0,
             0,
         );

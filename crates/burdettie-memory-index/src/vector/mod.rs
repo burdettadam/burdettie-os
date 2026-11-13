@@ -148,7 +148,7 @@ mod tests {
             "linux kernel memory management is complex",
             "docker build caching speeds up docker image creation",
         ];
-        let texts: Vec<&str> = docs.iter().map(|d| *d).collect();
+        let texts: Vec<&str> = docs.to_vec();
         let (_vocab, vectors) = fit_transform(&texts, 64);
 
         assert_eq!(vectors.len(), 3);

@@ -142,9 +142,11 @@ mod tests {
     use platform_core::unwind::NoopUnwindRegistry;
     use std::sync::Mutex;
 
+    type UnwindRegistration = (usize, usize, Option<(usize, usize)>, Option<(usize, usize)>);
+
     /// Test registry that records register/unregister calls.
     struct RecordingRegistry {
-        registered: Mutex<Vec<(usize, usize, Option<(usize, usize)>, Option<(usize, usize)>)>>,
+        registered: Mutex<Vec<UnwindRegistration>>,
         unregistered: Mutex<Vec<usize>>,
     }
 

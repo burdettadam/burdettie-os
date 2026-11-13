@@ -8,7 +8,6 @@
 //! matching observers are invoked synchronously. Name matching uses CFString
 //! extraction (ISA-tagged objects or C string fallback). A nil name matches all.
 
-use std::ffi::CStr;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
 
@@ -349,7 +348,7 @@ mod tests {
         let _g = reset();
         let center = shim_cf_notification_center_get_local();
         // Use a C-string-like name for simplicity in tests
-        let name = b"TestNotification\0".as_ptr() as u64;
+        let name = c"TestNotification".as_ptr() as u64;
 
         shim_cf_notification_center_add_observer(
             center,
@@ -372,7 +371,7 @@ mod tests {
     fn remove_observer_stops_delivery() {
         let _g = reset();
         let center = shim_cf_notification_center_get_local();
-        let name = b"RemoveTest\0".as_ptr() as u64;
+        let name = c"RemoveTest".as_ptr() as u64;
 
         shim_cf_notification_center_add_observer(
             center,
@@ -397,8 +396,8 @@ mod tests {
     fn remove_every_observer_clears_all_for_observer() {
         let _g = reset();
         let center = shim_cf_notification_center_get_local();
-        let name_a = b"EveryA\0".as_ptr() as u64;
-        let name_b = b"EveryB\0".as_ptr() as u64;
+        let name_a = c"EveryA".as_ptr() as u64;
+        let name_b = c"EveryB".as_ptr() as u64;
 
         shim_cf_notification_center_add_observer(
             center,
@@ -439,11 +438,11 @@ mod tests {
             0,
         );
 
-        let name_x = b"AnyName\0".as_ptr() as u64;
+        let name_x = c"AnyName".as_ptr() as u64;
         shim_cf_notification_center_post_notification(center, name_x, 0, 0, 0);
         assert_eq!(TEST_COUNTER.load(Ordering::SeqCst), 1);
 
-        let name_y = b"Other\0".as_ptr() as u64;
+        let name_y = c"Other".as_ptr() as u64;
         shim_cf_notification_center_post_notification(center, name_y, 0, 0, 0);
         assert_eq!(TEST_COUNTER.load(Ordering::SeqCst), 2);
 
@@ -456,7 +455,7 @@ mod tests {
         let _g = reset();
         let local = shim_cf_notification_center_get_local();
         let dist = shim_cf_notification_center_get_distributed();
-        let name = b"CrossCenter\0".as_ptr() as u64;
+        let name = c"CrossCenter".as_ptr() as u64;
 
         // Add observer on local center
         shim_cf_notification_center_add_observer(
@@ -484,7 +483,7 @@ mod tests {
     fn null_callback_ignored() {
         let _g = reset();
         let center = shim_cf_notification_center_get_local();
-        let name = b"NullCb\0".as_ptr() as u64;
+        let name = c"NullCb".as_ptr() as u64;
 
         // Adding with callback=0 should be silently ignored
         shim_cf_notification_center_add_observer(center, 0x47, 0, name, 0, 0);

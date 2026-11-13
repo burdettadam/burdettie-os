@@ -52,7 +52,7 @@ fn decode_add_sub_imm(raw: u32) -> Instruction {
     let op = (raw >> 30) & 1; // 0=ADD, 1=SUB
     let s = (raw >> 29) & 1; // set flags
     let shift = ((raw >> 22) & 0x3) as u8; // 0=none, 1=LSL#12
-    let imm12 = ((raw >> 10) & 0xFFF) as u32;
+    let imm12 = (raw >> 10) & 0xFFF;
     let rn = ((raw >> 5) & 0x1F) as u8;
     let rd = (raw & 0x1F) as u8;
 
@@ -93,8 +93,8 @@ fn decode_logical_imm(raw: u32) -> Instruction {
     let sf = (raw >> 31) & 1 == 1;
     let opc = ((raw >> 29) & 0x3) as u8;
     let n = (raw >> 22) & 1;
-    let immr = ((raw >> 16) & 0x3F) as u32;
-    let imms = ((raw >> 10) & 0x3F) as u32;
+    let immr = (raw >> 16) & 0x3F;
+    let imms = (raw >> 10) & 0x3F;
     let rn = ((raw >> 5) & 0x1F) as u8;
     let rd = (raw & 0x1F) as u8;
 
@@ -179,7 +179,6 @@ fn decode_bitfield(raw: u32) -> Instruction {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::decode::{decode, Instruction};
     use crate::test_helpers::*;
 
@@ -188,7 +187,7 @@ mod tests {
         let imm = imm21 as u32 & 0x1F_FFFF; // 21-bit mask
         let immlo = imm & 0x3;
         let immhi = (imm >> 2) & 0x7FFFF;
-        (0b0 << 31) | (immlo << 29) | (0b10000 << 24) | (immhi << 5) | (rd as u32 & 0x1F)
+        (immlo << 29) | (0b10000 << 24) | (immhi << 5) | (rd as u32 & 0x1F)
     }
 
     // ── Helper: encode ADRP (sf=1) ─────────────────────────────────
@@ -1104,14 +1103,12 @@ mod tests {
     #[test]
     fn test_decode_bitfield_opc3_unknown() {
         // opc=11 is reserved → Unknown
-        let raw = (1u32 << 31)   // sf=1
+        let raw = ((1u32 << 31)   // sf=1
             | (0b11 << 29)       // opc=11
             | (0b100110 << 23)   // bitfield fixed bits
-            | (1 << 22)          // N=1
-            | (0 << 16)          // immr=0
+            | (1 << 22))          // immr=0
             | (7 << 10)          // imms=7
-            | (1 << 5)           // rn=1
-            | 0; // rd=0
+            | (1 << 5); // rd=0
         let insn = decode(raw, 0);
         assert!(matches!(insn, Instruction::Unknown { .. }));
     }

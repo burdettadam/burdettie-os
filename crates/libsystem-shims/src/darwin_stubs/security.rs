@@ -823,7 +823,6 @@ fn key_store() -> std::sync::MutexGuard<'static, Option<HashMap<u64, StoredKey>>
 /// The keychain is backed by a SQLite database at `$TMPDIR/burdettieOS-keychain.db`.
 /// If the file cannot be created, falls back to an in-memory database.
 /// Items are stored as (service TEXT, account TEXT, class INTEGER, data BLOB).
-
 static KEYCHAIN_DB: Mutex<Option<rusqlite::Connection>> = Mutex::new(None);
 
 fn keychain_db() -> std::sync::MutexGuard<'static, Option<rusqlite::Connection>> {
@@ -1239,21 +1238,18 @@ pub extern "C" fn shim_sec_keychain_item_copy_content(
     data_out: *mut *mut u8,
 ) -> i32 {
     let guard = keychain_item_store();
-    let iref = match guard.as_ref().and_then(|s| s.get(&item)) {
-        Some(r) => r,
-        None => {
-            if !length_out.is_null() {
-                unsafe {
-                    *length_out = 0;
-                }
+    let Some(iref) = guard.as_ref().and_then(|s| s.get(&item)) else {
+        if !length_out.is_null() {
+            unsafe {
+                *length_out = 0;
             }
-            if !data_out.is_null() {
-                unsafe {
-                    *data_out = std::ptr::null_mut();
-                }
-            }
-            return ERR_SEC_ITEM_NOT_FOUND;
         }
+        if !data_out.is_null() {
+            unsafe {
+                *data_out = std::ptr::null_mut();
+            }
+        }
+        return ERR_SEC_ITEM_NOT_FOUND;
     };
     let service = iref.service.clone();
     let account = iref.account.clone();
@@ -1326,9 +1322,8 @@ pub extern "C" fn shim_sec_keychain_item_modify_content(
     data: *const u8,
 ) -> i32 {
     let guard = keychain_item_store();
-    let iref = match guard.as_ref().and_then(|s| s.get(&item)) {
-        Some(r) => r,
-        None => return ERR_SEC_ITEM_NOT_FOUND,
+    let Some(iref) = guard.as_ref().and_then(|s| s.get(&item)) else {
+        return ERR_SEC_ITEM_NOT_FOUND;
     };
     let service = iref.service.clone();
     let account = iref.account.clone();
@@ -1781,30 +1776,27 @@ pub extern "C" fn shim_sec_key_copy_public(key: u64) -> u64 {
                 return key; // Already a public key handle
             }
             // Extract public key from private PKCS8
-            match stored.algorithm {
-                KeyAlgorithm::EcdsaP256 => {
-                    use ring::signature::{EcdsaKeyPair, KeyPair, ECDSA_P256_SHA256_ASN1_SIGNING};
-                    if let Ok(kp) = EcdsaKeyPair::from_pkcs8(
-                        &ECDSA_P256_SHA256_ASN1_SIGNING,
-                        &stored.key_pair_der,
-                        &ring::rand::SystemRandom::new(),
-                    ) {
-                        let pub_bytes = kp.public_key().as_ref().to_vec();
-                        drop(guard);
-                        let pub_handle = next_sec_handle();
-                        let pub_key = StoredKey {
-                            key_pair_der: pub_bytes,
-                            algorithm: KeyAlgorithm::EcdsaP256,
-                            is_public: true,
-                        };
-                        let mut wguard = key_store();
-                        wguard
-                            .get_or_insert_with(HashMap::new)
-                            .insert(pub_handle, pub_key);
-                        return pub_handle;
-                    }
+            if let KeyAlgorithm::EcdsaP256 = stored.algorithm {
+                use ring::signature::{EcdsaKeyPair, KeyPair, ECDSA_P256_SHA256_ASN1_SIGNING};
+                if let Ok(kp) = EcdsaKeyPair::from_pkcs8(
+                    &ECDSA_P256_SHA256_ASN1_SIGNING,
+                    &stored.key_pair_der,
+                    &ring::rand::SystemRandom::new(),
+                ) {
+                    let pub_bytes = kp.public_key().as_ref().to_vec();
+                    drop(guard);
+                    let pub_handle = next_sec_handle();
+                    let pub_key = StoredKey {
+                        key_pair_der: pub_bytes,
+                        algorithm: KeyAlgorithm::EcdsaP256,
+                        is_public: true,
+                    };
+                    let mut wguard = key_store();
+                    wguard
+                        .get_or_insert_with(HashMap::new)
+                        .insert(pub_handle, pub_key);
+                    return pub_handle;
                 }
-                _ => {}
             }
         }
     }
@@ -1818,16 +1810,13 @@ pub extern "C" fn shim_sec_key_create_signature(
     data_obj: u64,
     error: *mut u64,
 ) -> u64 {
-    let data = match extract_data(data_obj) {
-        Some(d) => d,
-        None => {
-            if !error.is_null() {
-                unsafe {
-                    *error = 0;
-                }
+    let Some(data) = extract_data(data_obj) else {
+        if !error.is_null() {
+            unsafe {
+                *error = 0;
             }
-            return 0;
         }
+        return 0;
     };
 
     let guard = key_store();
@@ -1954,12 +1943,9 @@ pub extern "C" fn shim_sec_trust_create(certs: u64, _policies: u64, trust_out: *
 /// validation using webpki + Mozilla root certificate store.
 pub extern "C" fn shim_sec_trust_evaluate_with_error(trust: u64, error: *mut u64) -> i32 {
     let tguard = trust_store();
-    let trust_obj = match tguard.as_ref().and_then(|s| s.get(&trust)) {
-        Some(t) => t,
-        None => {
-            log::debug!("SecTrustEvaluateWithError: unknown trust handle {trust:#x}");
-            return 0;
-        }
+    let Some(trust_obj) = tguard.as_ref().and_then(|s| s.get(&trust)) else {
+        log::debug!("SecTrustEvaluateWithError: unknown trust handle {trust:#x}");
+        return 0;
     };
 
     // Collect DER bytes from cert store

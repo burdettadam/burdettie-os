@@ -322,14 +322,14 @@ mod tests {
     #[test]
     fn source_version_large_a() {
         // a occupies 24 bits, so test a large a value
-        let packed = (1000u64 << 40) | (0u64 << 30) | (0u64 << 20) | (0u64 << 10) | 0;
+        let packed = 1000u64 << 40;
         assert_eq!(decode_source_version(packed), "1000.0.0.0.0");
     }
 
     #[test]
     fn source_version_max_components() {
         // b,c,d,e are 10-bit → max 1023
-        let packed = (0u64 << 40) | (1023u64 << 30) | (1023u64 << 20) | (1023u64 << 10) | 1023;
+        let packed = (1023u64 << 30) | (1023u64 << 20) | (1023u64 << 10) | 1023;
         assert_eq!(decode_source_version(packed), "0.1023.1023.1023.1023");
     }
 

@@ -832,13 +832,13 @@ mod tests {
         assert_eq!(priority_to_strength(1000.0), REQUIRED);
         // STRONG range
         let s750 = priority_to_strength(750.0);
-        assert!(s750 >= STRONG && s750 <= REQUIRED);
+        assert!((STRONG..=REQUIRED).contains(&s750));
         // MEDIUM range
         let s500 = priority_to_strength(500.0);
-        assert!(s500 >= MEDIUM && s500 <= STRONG);
+        assert!((MEDIUM..=STRONG).contains(&s500));
         // WEAK range
         let s250 = priority_to_strength(250.0);
-        assert!(s250 >= WEAK && s250 <= MEDIUM);
+        assert!((WEAK..=MEDIUM).contains(&s250));
         // Low
         let s1 = priority_to_strength(1.0);
         assert!(s1 > 0.0 && s1 < WEAK);

@@ -642,32 +642,26 @@ impl Interpreter {
                 let addr = self.cpu.read_reg(rn);
                 let src = self.cpu.read_reg_zr(rs);
                 let orig = match size {
-                    8 => {
-                        let orig = match Self::lse_atomic_op64(&self.mem, op, addr, src) {
-                            Some(v) => v,
-                            None => {
-                                return StepResult::Exit(ExitReason::MemoryFault {
-                                    pc,
-                                    addr,
-                                    is_write: true,
-                                })
-                            }
-                        };
-                        orig
-                    }
-                    4 => {
-                        let orig = match Self::lse_atomic_op32(&self.mem, op, addr, src as u32) {
-                            Some(v) => v as u64,
-                            None => {
-                                return StepResult::Exit(ExitReason::MemoryFault {
-                                    pc,
-                                    addr,
-                                    is_write: true,
-                                })
-                            }
-                        };
-                        orig
-                    }
+                    8 => match Self::lse_atomic_op64(&self.mem, op, addr, src) {
+                        Some(v) => v,
+                        None => {
+                            return StepResult::Exit(ExitReason::MemoryFault {
+                                pc,
+                                addr,
+                                is_write: true,
+                            })
+                        }
+                    },
+                    4 => match Self::lse_atomic_op32(&self.mem, op, addr, src as u32) {
+                        Some(v) => v as u64,
+                        None => {
+                            return StepResult::Exit(ExitReason::MemoryFault {
+                                pc,
+                                addr,
+                                is_write: true,
+                            })
+                        }
+                    },
                     2 => {
                         let orig = match self.mem.read_u16(addr) {
                             Some(v) => v as u64,
@@ -679,7 +673,7 @@ impl Interpreter {
                                 })
                             }
                         };
-                        let new_val = Self::lse_op32(op, orig as u32, src as u32) as u64;
+                        let new_val = Self::lse_op_narrow(op, orig as u32, src as u32, 16);
                         if !self.mem.write_u16(addr, new_val as u16) {
                             return StepResult::Exit(ExitReason::MemoryFault {
                                 pc,
@@ -701,7 +695,7 @@ impl Interpreter {
                                 })
                             }
                         };
-                        let new_val = Self::lse_op32(op, orig as u32, src as u32) as u64;
+                        let new_val = Self::lse_op_narrow(op, orig as u32, src as u32, 8);
                         if !self.mem.write_u8(addr, new_val as u8) {
                             return StepResult::Exit(ExitReason::MemoryFault {
                                 pc,
@@ -746,17 +740,24 @@ impl Interpreter {
                     },
                     _ => {
                         // Byte/halfword: non-atomic fallback
-                        let v = match self.mem.read_u16(addr) {
-                            Some(v) => v as u64,
-                            None => {
-                                return StepResult::Exit(ExitReason::MemoryFault {
-                                    pc,
-                                    addr,
-                                    is_write: false,
-                                })
-                            }
+                        let loaded = if size == 2 {
+                            self.mem.read_u16(addr).map(u64::from)
+                        } else {
+                            self.mem.read_u8(addr).map(u64::from)
                         };
-                        if !self.mem.write_u16(addr, src as u16) {
+                        let Some(v) = loaded else {
+                            return StepResult::Exit(ExitReason::MemoryFault {
+                                pc,
+                                addr,
+                                is_write: false,
+                            });
+                        };
+                        let stored = if size == 2 {
+                            self.mem.write_u16(addr, src as u16)
+                        } else {
+                            self.mem.write_u8(addr, src as u8)
+                        };
+                        if !stored {
                             return StepResult::Exit(ExitReason::MemoryFault {
                                 pc,
                                 addr,
@@ -867,6 +868,23 @@ impl Interpreter {
         }
     }
 
+    /// Byte/halfword operands must be truncated before unsigned comparisons,
+    /// and sign-extended before signed comparisons. Results are truncated by
+    /// the caller's width-specific write. This fallback is still non-atomic.
+    fn lse_op_narrow(op: u8, orig: u32, src: u32, bits: u32) -> u32 {
+        let shift = 32 - bits;
+        let mask = u32::MAX >> shift;
+        let orig = orig & mask;
+        let src = src & mask;
+        if matches!(op, 4 | 5) {
+            let orig = ((orig << shift) as i32 >> shift) as u32;
+            let src = ((src << shift) as i32 >> shift) as u32;
+            Self::lse_op32(op, orig, src)
+        } else {
+            Self::lse_op32(op, orig, src)
+        }
+    }
+
     /// Perform a 64-bit LSE atomic operation using real atomic RMW.
     /// Returns the original value before the operation.
     fn lse_atomic_op64(mem: &crate::mem::Memory, op: u8, addr: u64, src: u64) -> Option<u64> {
@@ -877,8 +895,8 @@ impl Interpreter {
             3 => mem.atomic_fetch_or_u64(addr, src),   // LDSET
             4 => mem.atomic_fetch_smax_u64(addr, src), // LDSMAX
             5 => mem.atomic_fetch_smin_u64(addr, src), // LDSMIN
-            6 => mem.atomic_fetch_smax_u64(addr, src), // LDUMAX (use max)
-            7 => mem.atomic_fetch_smin_u64(addr, src), // LDUMIN (use min)
+            6 => mem.atomic_fetch_umax_u64(addr, src), // LDUMAX
+            7 => mem.atomic_fetch_umin_u64(addr, src), // LDUMIN
             _ => mem.atomic_read_u64(addr),
         }
     }
@@ -890,13 +908,11 @@ impl Interpreter {
             1 => mem.atomic_fetch_and_u32(addr, !src), // LDCLR
             2 => mem.atomic_fetch_xor_u32(addr, src),  // LDEOR
             3 => mem.atomic_fetch_or_u32(addr, src),   // LDSET
-            _ => {
-                // SMAX/SMIN/UMAX/UMIN: use CAS loop for 32-bit
-                let orig = mem.atomic_read_u32(addr)?;
-                let new_val = Self::lse_op32(op, orig, src);
-                let _ = mem.atomic_cas_u32(addr, orig, new_val);
-                Some(orig)
-            }
+            4 => mem.atomic_fetch_smax_u32(addr, src), // LDSMAX
+            5 => mem.atomic_fetch_smin_u32(addr, src), // LDSMIN
+            6 => mem.atomic_fetch_umax_u32(addr, src), // LDUMAX
+            7 => mem.atomic_fetch_umin_u32(addr, src), // LDUMIN
+            _ => mem.atomic_read_u32(addr),
         }
     }
     pub(super) fn reg_index_addr(&self, rn: u8, rm: u8, extend: u8, s: bool, log2_size: u8) -> u64 {
@@ -915,7 +931,6 @@ impl Interpreter {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::test_helpers::*;
 
     // ── Helper encoders for instructions without test_helpers ──────
@@ -1048,7 +1063,6 @@ mod tests {
         let expected_base = t.data_base + 16;
         let cpu = t.run_ok();
         assert_eq!(cpu.x[2], expected_base, "base register must be updated");
-        drop(cpu);
         assert_eq!(t.read_data_u64(16), 0xAAAA);
         assert_eq!(t.read_data_u64(24), 0xBBBB);
     }
@@ -1077,7 +1091,6 @@ mod tests {
         let expected_base = t.data_base + 16;
         let cpu = t.run_ok();
         assert_eq!(cpu.x[2], expected_base, "base updated AFTER store");
-        drop(cpu);
         assert_eq!(t.read_data_u64(0), 0x5555);
         assert_eq!(t.read_data_u64(8), 0x6666);
     }
@@ -1199,5 +1212,248 @@ mod tests {
         let cpu = t.run_ok();
         // STXR should fail because CLREX cleared the monitor
         assert_eq!(cpu.x[3], 1, "STXR should report failure (W3=1) after CLREX");
+    }
+
+    /// LSE operation with source W1/X1, result W0/X0, and base X2.
+    fn enc_lse(size_bits: u32, op: u32) -> u32 {
+        0x3821_0040 | (size_bits << 30) | (op << 12)
+    }
+
+    #[test]
+    fn atomic_regression_lse_transfer_widths() {
+        let initial = 0x1122_3344_5566_77FF_u64;
+        for size_bits in 0..4 {
+            let width = 1 << size_bits;
+            let mask = u64::MAX >> (64 - width * 8);
+            let mut t = test_interp(&[enc_lse(size_bits, 0)]); // LDADD
+            t.interp.cpu.x[1] = 1;
+            t.interp.cpu.x[2] = t.data_base;
+            t.write_data_u64(0, initial);
+            assert_eq!(t.run_ok().x[0], initial & mask, "width {width}");
+            let expected = (initial & !mask) | ((initial & mask).wrapping_add(1) & mask);
+            assert_eq!(t.read_data_u64(0), expected, "width {width}");
+        }
+    }
+
+    #[test]
+    fn atomic_regression_lse_unsigned_64_minmax() {
+        for (op, original, source, expected) in [
+            (6, 5, u64::MAX - 2, u64::MAX - 2),
+            (7, u64::MAX - 4, 3, 3),
+            (6, 1 << 63, 0, 1 << 63),
+            (7, 0, 1 << 63, 0),
+        ] {
+            let mut t = test_interp(&[enc_lse(3, op)]);
+            t.interp.cpu.x[1] = source;
+            t.interp.cpu.x[2] = t.data_base;
+            t.write_data_u64(0, original);
+            assert_eq!(t.run_ok().x[0], original);
+            assert_eq!(t.read_data_u64(0), expected, "operation {op}");
+        }
+    }
+
+    #[test]
+    fn atomic_regression_lse_32_minmax_rejects_read_only_memory() {
+        for op in 4..=7 {
+            let mut storage = 9_u32;
+            let ptr = std::ptr::from_mut(&mut storage).cast::<u8>();
+            let addr = ptr as u64;
+            // SAFETY: storage outlives mem and remains readable throughout.
+            let mem = unsafe { crate::mem::Memory::from_segments(&[(addr, ptr, 4, false)]) };
+            assert_eq!(
+                super::Interpreter::lse_atomic_op32(&mem, op, addr, 3),
+                None,
+                "operation {op} must propagate the failed write"
+            );
+            assert_eq!(storage, 9);
+        }
+    }
+
+    #[test]
+    fn atomic_regression_lse_32_minmax_results() {
+        for (op, original, source, expected) in [
+            (4, (-5_i32) as u32, 3, 3),
+            (5, 5, (-3_i32) as u32, (-3_i32) as u32),
+            (6, 5, u32::MAX - 2, u32::MAX - 2),
+            (7, u32::MAX - 4, 3, 3),
+        ] {
+            let mut t = test_interp(&[enc_lse(2, op)]);
+            t.interp.cpu.x[1] = u64::from(source);
+            t.interp.cpu.x[2] = t.data_base;
+            t.write_data_u32(0, original);
+            assert_eq!(t.run_ok().x[0], u64::from(original));
+            assert_eq!(t.read_data_u32(0), expected, "operation {op}");
+        }
+    }
+
+    #[test]
+    fn atomic_regression_lse_signed_byte_minmax() {
+        for (op, expected) in [(4, 0x7F), (5, 0x80)] {
+            let mut t = test_interp(&[enc_lse(0, op)]);
+            t.interp.cpu.x[1] = 0xABCD_007F; // only the low byte is an operand
+            t.interp.cpu.x[2] = t.data_base;
+            t.write_data_u32(0, 0x1122_3380);
+            assert_eq!(t.run_ok().x[0], 0x80);
+            assert_eq!(t.read_data_u32(0), 0x1122_3300 | expected);
+        }
+    }
+
+    #[test]
+    fn atomic_regression_lse_signed_halfword_minmax() {
+        for (op, expected) in [(4, 0x7FFF), (5, 0x8000)] {
+            let mut t = test_interp(&[enc_lse(1, op)]);
+            t.interp.cpu.x[1] = 0xABCD_7FFF;
+            t.interp.cpu.x[2] = t.data_base;
+            t.write_data_u32(0, 0x1122_8000);
+            assert_eq!(t.run_ok().x[0], 0x8000);
+            assert_eq!(t.read_data_u32(0), 0x1122_0000 | expected);
+        }
+    }
+
+    #[test]
+    fn atomic_regression_swp_byte_preserves_neighboring_bytes() {
+        let mut t = test_interp(&[enc_lse(0, 8)]); // SWPB
+        t.interp.cpu.x[1] = 0xABCD;
+        t.interp.cpu.x[2] = t.data_base + 1;
+        t.write_data_u32(0, 0x4433_2211);
+        assert_eq!(t.run_ok().x[0], 0x22);
+        assert_eq!(t.read_data_u32(0), 0x4433_CD11);
+    }
+
+    #[test]
+    fn atomic_regression_acquire_release_word_preserves_neighbor() {
+        // LDAR W0, [X2]; STLR W1, [X2].
+        let mut t = test_interp(&[0x88DF_FC40, 0x889F_FC41]);
+        t.interp.cpu.x[1] = 0xAABB_CCDD_0000_5678;
+        t.interp.cpu.x[2] = t.data_base;
+        t.write_data_u64(0, 0x1122_3344_5566_7788);
+        assert_eq!(t.run_ok().x[0], 0x5566_7788);
+        assert_eq!(t.read_data_u64(0), 0x1122_3344_0000_5678);
+    }
+
+    #[test]
+    fn atomic_regression_cas_word_preserves_neighbor() {
+        // CAS W0, W1, [X2].
+        let mut t = test_interp(&[0x88A0_7C41]);
+        t.interp.cpu.x[0] = 0x5566_7788;
+        t.interp.cpu.x[1] = 0xAABB_CCDD_0000_5678;
+        t.interp.cpu.x[2] = t.data_base;
+        t.write_data_u64(0, 0x1122_3344_5566_7788);
+        assert_eq!(t.run_ok().x[0], 0x5566_7788);
+        assert_eq!(t.read_data_u64(0), 0x1122_3344_0000_5678);
+    }
+
+    #[test]
+    fn atomic_regression_lse_signed_64_minmax() {
+        for (op, original, source, expected) in [
+            (4, -5_i64, 3_i64, 3_i64),
+            (5, 5, -3, -3),
+            (4, i64::MIN, i64::MAX, i64::MAX),
+            (5, i64::MAX, i64::MIN, i64::MIN),
+        ] {
+            let mut t = test_interp(&[enc_lse(3, op)]);
+            t.interp.cpu.x[1] = source as u64;
+            t.interp.cpu.x[2] = t.data_base;
+            t.write_data_u64(0, original as u64);
+            assert_eq!(t.run_ok().x[0], original as u64);
+            assert_eq!(t.read_data_u64(0), expected as u64);
+        }
+    }
+
+    #[test]
+    fn atomic_regression_lse_unsigned_narrow_truncates_source() {
+        for size_bits in 0..2 {
+            for op in [6, 7] {
+                let mut t = test_interp(&[enc_lse(size_bits, op)]);
+                t.interp.cpu.x[1] = 0xFFFF_0001;
+                t.interp.cpu.x[2] = t.data_base;
+                t.write_data_u32(0, 2);
+                assert_eq!(t.run_ok().x[0], 2);
+                assert_eq!(t.read_data_u32(0), if op == 6 { 2 } else { 1 });
+            }
+        }
+    }
+
+    #[test]
+    fn atomic_regression_swp_transfer_widths() {
+        let initial = 0x1122_3344_5566_7788;
+        let source = 0x8877_6655_4433_2211;
+        for size_bits in 0..4 {
+            let width = 1 << size_bits;
+            let mask = u64::MAX >> (64 - width * 8);
+            let mut t = test_interp(&[enc_lse(size_bits, 8)]);
+            t.interp.cpu.x[1] = source;
+            t.interp.cpu.x[2] = t.data_base;
+            t.write_data_u64(0, initial);
+            assert_eq!(t.run_ok().x[0], initial & mask, "width {width}");
+            assert_eq!(t.read_data_u64(0), (initial & !mask) | (source & mask));
+        }
+    }
+
+    #[test]
+    fn atomic_regression_word_minmax_faults_on_read_only_memory() {
+        for op in 4..=7 {
+            let mut t = test_interp(&[enc_lse(2, op)]);
+            t.interp.cpu.x[1] = 3;
+            t.interp.cpu.x[2] = t.data_base;
+            t.write_data_u32(0, 9);
+            // SAFETY: test_interp keeps these allocations alive. This view
+            // intentionally revokes writes to the data region.
+            t.interp.mem = unsafe {
+                crate::mem::Memory::from_segments(&[
+                    (t.code_base, t.code_base as *mut u8, 4096, false),
+                    (t.data_base, t.data_base as *mut u8, 4096, false),
+                ])
+            };
+            assert!(matches!(t.run(), crate::interp::ExitReason::MemoryFault {
+                pc, addr, is_write: true
+            } if pc == t.code_base && addr == t.data_base));
+            assert_eq!(t.read_data_u32(0), 9);
+        }
+    }
+
+    #[test]
+    fn atomic_regression_unaligned_accesses_report_memory_faults() {
+        // LDAR W0, STLR W1, CAS W0/W1, LDADD W1/W0, and SWP W1/W0.
+        for (word, is_write) in [
+            (0x88DF_FC40, false),
+            (0x889F_FC41, true),
+            (0x88A0_7C41, true),
+            (enc_lse(2, 0), true),
+            (enc_lse(2, 8), true),
+        ] {
+            for sf in [false, true] {
+                let raw = word | (u32::from(sf) << 30);
+                let mut t = test_interp(&[raw]);
+                t.interp.cpu.x[2] = t.data_base + 1;
+                t.write_data_u64(0, 0x1122_3344_5566_7788);
+                assert!(matches!(t.run(), crate::interp::ExitReason::MemoryFault {
+                    pc, addr, is_write: actual_write
+                } if pc == t.code_base && addr == t.data_base + 1 && actual_write == is_write));
+                assert_eq!(t.read_data_u64(0), 0x1122_3344_5566_7788);
+            }
+        }
+    }
+
+    #[test]
+    fn atomic_regression_acquire_release_exclusives_honor_monitor() {
+        for size_bits in 0..4 {
+            for clear_monitor in [false, true] {
+                let mut instructions = vec![0x085F_FC40 | (size_bits << 30)];
+                if clear_monitor {
+                    instructions.push(0xD503_305F); // CLREX
+                }
+                instructions.push(0x0803_FC41 | (size_bits << 30));
+                let mut t = test_interp(&instructions); // LDAXR; STLXR W3, W1/X1
+                t.interp.cpu.x[1] = 0x99;
+                t.interp.cpu.x[2] = t.data_base;
+                t.interp.cpu.x[3] = 7;
+                t.write_data_u64(0, 0x55);
+                let cpu = t.run_ok();
+                assert_eq!(cpu.x[0], 0x55);
+                assert_eq!(cpu.x[3], u64::from(clear_monitor));
+                assert_eq!(t.read_data_u64(0), if clear_monitor { 0x55 } else { 0x99 });
+            }
+        }
     }
 }

@@ -87,8 +87,9 @@ dir="$FIXTURES/dylib_chain"
 
 echo "Building objc_category"
 dir="$FIXTURES/objc_category"
+# Keep category records separate: modern linkers otherwise merge them into Greeter.
 "$CC" "${COMMON[@]}" "${OBJC[@]}" "$dir/main.m" "$dir/greeter.m" "$dir/extras.m" \
-    -lobjc -o "$dir/objc_category"
+    -Wl,-no_objc_category_merging -lobjc -o "$dir/objc_category"
 ln -sfn objc_category "$dir/app"
 
 echo "Building objc_dylib_chain"

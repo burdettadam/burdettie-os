@@ -42,7 +42,6 @@ struct BootstrapRegistryInner {
 struct ServiceEntry {
     port: u32,
     checked_in: bool,
-    server_port: u32, // 0 = no associated server
 }
 
 static REGISTRY: OnceLock<Mutex<BootstrapRegistryInner>> = OnceLock::new();
@@ -70,7 +69,12 @@ fn alloc_port(inner: &mut BootstrapRegistryInner) -> u32 {
 // ═══════════════════════════════════════════════════════════════════
 
 /// `bootstrap_create_server(bp, server_cmd, server_uid, on_demand, &server_port)` → kern_return_t.
-pub fn bootstrap_create_server(
+///
+/// # Safety
+/// `server_port` must be null or point to an aligned, writable `u32` that is
+/// exclusively accessible for the duration of the call.
+/// `_server_cmd` is ignored and is never dereferenced.
+pub unsafe fn bootstrap_create_server(
     _bp: u32,
     _server_cmd: *const libc::c_char,
     _server_uid: u32,
@@ -89,7 +93,11 @@ pub fn bootstrap_create_server(
 }
 
 /// `bootstrap_subset(bp, requestor_port, &subset_port)` → kern_return_t.
-pub fn bootstrap_subset(bp: u32, _requestor_port: u32, subset_port: *mut u32) -> u32 {
+///
+/// # Safety
+/// `subset_port` must be null or point to an aligned, writable `u32` that is
+/// exclusively accessible for the duration of the call.
+pub unsafe fn bootstrap_subset(bp: u32, _requestor_port: u32, subset_port: *mut u32) -> u32 {
     if subset_port.is_null() {
         return BOOTSTRAP_BAD_COUNT;
     }
@@ -108,7 +116,11 @@ pub fn bootstrap_subset(bp: u32, _requestor_port: u32, subset_port: *mut u32) ->
 /// `bootstrap_unprivileged(bp, &unpriv_port)` → kern_return_t.
 ///
 /// In our emulation, all ports are unprivileged, so we return the same port.
-pub fn bootstrap_unprivileged(bp: u32, unpriv_port: *mut u32) -> u32 {
+///
+/// # Safety
+/// `unpriv_port` must be null or point to an aligned, writable `u32` that is
+/// exclusively accessible for the duration of the call.
+pub unsafe fn bootstrap_unprivileged(bp: u32, unpriv_port: *mut u32) -> u32 {
     if unpriv_port.is_null() {
         return BOOTSTRAP_BAD_COUNT;
     }
@@ -119,7 +131,11 @@ pub fn bootstrap_unprivileged(bp: u32, unpriv_port: *mut u32) -> u32 {
 }
 
 /// `bootstrap_parent(bp, &parent_port)` → kern_return_t.
-pub fn bootstrap_parent(bp: u32, parent_port: *mut u32) -> u32 {
+///
+/// # Safety
+/// `parent_port` must be null or point to an aligned, writable `u32` that is
+/// exclusively accessible for the duration of the call.
+pub unsafe fn bootstrap_parent(bp: u32, parent_port: *mut u32) -> u32 {
     if parent_port.is_null() {
         return BOOTSTRAP_BAD_COUNT;
     }
@@ -133,10 +149,13 @@ pub fn bootstrap_parent(bp: u32, parent_port: *mut u32) -> u32 {
 /// `bootstrap_register(bp, service_name, sp)` → kern_return_t.
 ///
 /// Deprecated but still used by legacy code.
-pub fn bootstrap_register(_bp: u32, service_name: *const libc::c_char, sp: u32) -> u32 {
-    let name = match safe_cstr(service_name) {
-        Some(n) => n,
-        None => return BOOTSTRAP_BAD_COUNT,
+///
+/// # Safety
+/// `service_name` must be null or point to a readable, NUL-terminated
+/// C string that remains unchanged for the duration of the call.
+pub unsafe fn bootstrap_register(_bp: u32, service_name: *const libc::c_char, sp: u32) -> u32 {
+    let Some(name) = (unsafe { read_cstr(service_name) }) else {
+        return BOOTSTRAP_BAD_COUNT;
     };
     with_registry(|inner| {
         if let Some(entry) = inner.services.get(&name) {
@@ -149,7 +168,6 @@ pub fn bootstrap_register(_bp: u32, service_name: *const libc::c_char, sp: u32) 
             ServiceEntry {
                 port: sp,
                 checked_in: true,
-                server_port: 0,
             },
         );
         log::debug!("bootstrap_register(\"{}\") → port {:#x}", name, sp);
@@ -160,13 +178,22 @@ pub fn bootstrap_register(_bp: u32, service_name: *const libc::c_char, sp: u32) 
 /// `bootstrap_create_service(bp, service_name, &sp)` → kern_return_t.
 ///
 /// Deprecated.  Creates a port for the named service.
-pub fn bootstrap_create_service(_bp: u32, service_name: *const libc::c_char, sp: *mut u32) -> u32 {
+///
+/// # Safety
+/// `service_name` must be null or point to a readable, NUL-terminated
+/// C string that remains unchanged for the duration of the call.
+/// `sp` must be null or point to an aligned, writable `u32` that is
+/// exclusively accessible for the duration of the call.
+pub unsafe fn bootstrap_create_service(
+    _bp: u32,
+    service_name: *const libc::c_char,
+    sp: *mut u32,
+) -> u32 {
     if sp.is_null() {
         return BOOTSTRAP_BAD_COUNT;
     }
-    let name = match safe_cstr(service_name) {
-        Some(n) => n,
-        None => return BOOTSTRAP_BAD_COUNT,
+    let Some(name) = (unsafe { read_cstr(service_name) }) else {
+        return BOOTSTRAP_BAD_COUNT;
     };
     with_registry(|inner| {
         if inner.services.contains_key(&name) {
@@ -178,7 +205,6 @@ pub fn bootstrap_create_service(_bp: u32, service_name: *const libc::c_char, sp:
             ServiceEntry {
                 port,
                 checked_in: false,
-                server_port: 0,
             },
         );
         unsafe {
@@ -192,13 +218,18 @@ pub fn bootstrap_create_service(_bp: u32, service_name: *const libc::c_char, sp:
 /// `bootstrap_check_in(bp, service_name, &sp)` → kern_return_t.
 ///
 /// Returns the receive right for a declared service.
-pub fn bootstrap_check_in(_bp: u32, service_name: *const libc::c_char, sp: *mut u32) -> u32 {
+///
+/// # Safety
+/// `service_name` must be null or point to a readable, NUL-terminated
+/// C string that remains unchanged for the duration of the call.
+/// `sp` must be null or point to an aligned, writable `u32` that is
+/// exclusively accessible for the duration of the call.
+pub unsafe fn bootstrap_check_in(_bp: u32, service_name: *const libc::c_char, sp: *mut u32) -> u32 {
     if sp.is_null() {
         return BOOTSTRAP_BAD_COUNT;
     }
-    let name = match safe_cstr(service_name) {
-        Some(n) => n,
-        None => return BOOTSTRAP_UNKNOWN_SERVICE,
+    let Some(name) = (unsafe { read_cstr(service_name) }) else {
+        return BOOTSTRAP_UNKNOWN_SERVICE;
     };
     with_registry(|inner| {
         // If service already exists, check if it's checked in
@@ -222,7 +253,6 @@ pub fn bootstrap_check_in(_bp: u32, service_name: *const libc::c_char, sp: *mut 
             ServiceEntry {
                 port,
                 checked_in: true,
-                server_port: 0,
             },
         );
         unsafe {
@@ -236,13 +266,18 @@ pub fn bootstrap_check_in(_bp: u32, service_name: *const libc::c_char, sp: *mut 
 /// `bootstrap_look_up(bp, service_name, &sp)` → kern_return_t.
 ///
 /// Returns a send right for the named service.
-pub fn bootstrap_look_up(_bp: u32, service_name: *const libc::c_char, sp: *mut u32) -> u32 {
+///
+/// # Safety
+/// `service_name` must be null or point to a readable, NUL-terminated
+/// C string that remains unchanged for the duration of the call.
+/// `sp` must be null or point to an aligned, writable `u32` that is
+/// exclusively accessible for the duration of the call.
+pub unsafe fn bootstrap_look_up(_bp: u32, service_name: *const libc::c_char, sp: *mut u32) -> u32 {
     if sp.is_null() {
         return BOOTSTRAP_BAD_COUNT;
     }
-    let name = match safe_cstr(service_name) {
-        Some(n) => n,
-        None => return BOOTSTRAP_UNKNOWN_SERVICE,
+    let Some(name) = (unsafe { read_cstr(service_name) }) else {
+        return BOOTSTRAP_UNKNOWN_SERVICE;
     };
     with_registry(|inner| {
         if let Some(entry) = inner.services.get(&name) {
@@ -260,7 +295,6 @@ pub fn bootstrap_look_up(_bp: u32, service_name: *const libc::c_char, sp: *mut u
                 ServiceEntry {
                     port,
                     checked_in: false,
-                    server_port: 0,
                 },
             );
             unsafe {
@@ -277,7 +311,13 @@ pub fn bootstrap_look_up(_bp: u32, service_name: *const libc::c_char, sp: *mut u
 }
 
 /// `bootstrap_status(bp, service_name, &status)` → kern_return_t.
-pub fn bootstrap_status(
+///
+/// # Safety
+/// `service_name` must be null or point to a readable, NUL-terminated
+/// C string that remains unchanged for the duration of the call.
+/// `service_active` must be null or point to an aligned, writable `u32` that is
+/// exclusively accessible for the duration of the call.
+pub unsafe fn bootstrap_status(
     _bp: u32,
     service_name: *const libc::c_char,
     service_active: *mut u32,
@@ -285,9 +325,8 @@ pub fn bootstrap_status(
     if service_active.is_null() {
         return BOOTSTRAP_BAD_COUNT;
     }
-    let name = match safe_cstr(service_name) {
-        Some(n) => n,
-        None => return BOOTSTRAP_UNKNOWN_SERVICE,
+    let Some(name) = (unsafe { read_cstr(service_name) }) else {
+        return BOOTSTRAP_UNKNOWN_SERVICE;
     };
     with_registry(|inner| match inner.services.get(&name) {
         Some(entry) => {
@@ -323,39 +362,62 @@ pub fn bootstrap_strerror(r: u32) -> &'static str {
 // ── Private API (bootstrap_priv.h) ──────────────────────────────────
 
 /// `bootstrap_register2(bp, service_name, sp, flags)` → kern_return_t.
-pub fn bootstrap_register2(
+///
+/// # Safety
+/// `service_name` must be null or point to a readable, NUL-terminated
+/// C string that remains unchanged for the duration of the call.
+pub unsafe fn bootstrap_register2(
     bp: u32,
     service_name: *const libc::c_char,
     sp: u32,
     _flags: u64,
 ) -> u32 {
     // Flags are ignored in our implementation
-    bootstrap_register(bp, service_name, sp)
+    unsafe { bootstrap_register(bp, service_name, sp) }
 }
 
 /// `bootstrap_look_up2(bp, service_name, &sp, target_pid, flags)` → kern_return_t.
-pub fn bootstrap_look_up2(
+///
+/// # Safety
+/// `service_name` must be null or point to a readable, NUL-terminated
+/// C string that remains unchanged for the duration of the call.
+/// `sp` must be null or point to an aligned, writable `u32` that is
+/// exclusively accessible for the duration of the call.
+pub unsafe fn bootstrap_look_up2(
     bp: u32,
     service_name: *const libc::c_char,
     sp: *mut u32,
     _target_pid: i32,
     _flags: u64,
 ) -> u32 {
-    bootstrap_look_up(bp, service_name, sp)
+    unsafe { bootstrap_look_up(bp, service_name, sp) }
 }
 
 /// `bootstrap_check_in2(bp, service_name, &sp, flags)` → kern_return_t.
-pub fn bootstrap_check_in2(
+///
+/// # Safety
+/// `service_name` must be null or point to a readable, NUL-terminated
+/// C string that remains unchanged for the duration of the call.
+/// `sp` must be null or point to an aligned, writable `u32` that is
+/// exclusively accessible for the duration of the call.
+pub unsafe fn bootstrap_check_in2(
     bp: u32,
     service_name: *const libc::c_char,
     sp: *mut u32,
     _flags: u64,
 ) -> u32 {
-    bootstrap_check_in(bp, service_name, sp)
+    unsafe { bootstrap_check_in(bp, service_name, sp) }
 }
 
 /// `bootstrap_look_up3(bp, service_name, &sp, target_pid, instance_id, flags)` → kern_return_t.
-pub fn bootstrap_look_up3(
+///
+/// # Safety
+/// `service_name` must be null or point to a readable, NUL-terminated
+/// C string that remains unchanged for the duration of the call.
+/// `sp` must be null or point to an aligned, writable `u32` that is
+/// exclusively accessible for the duration of the call.
+/// `_instance_id` is ignored and is never dereferenced.
+pub unsafe fn bootstrap_look_up3(
     bp: u32,
     service_name: *const libc::c_char,
     sp: *mut u32,
@@ -363,22 +425,33 @@ pub fn bootstrap_look_up3(
     _instance_id: *const u8,
     _flags: u64,
 ) -> u32 {
-    bootstrap_look_up(bp, service_name, sp)
+    unsafe { bootstrap_look_up(bp, service_name, sp) }
 }
 
 /// `bootstrap_check_in3(bp, service_name, &sp, instance_id, flags)` → kern_return_t.
-pub fn bootstrap_check_in3(
+///
+/// # Safety
+/// `service_name` must be null or point to a readable, NUL-terminated
+/// C string that remains unchanged for the duration of the call.
+/// `sp` must be null or point to an aligned, writable `u32` that is
+/// exclusively accessible for the duration of the call.
+/// `_instance_id` is ignored and is never dereferenced.
+pub unsafe fn bootstrap_check_in3(
     bp: u32,
     service_name: *const libc::c_char,
     sp: *mut u32,
     _instance_id: *mut u8,
     _flags: u64,
 ) -> u32 {
-    bootstrap_check_in(bp, service_name, sp)
+    unsafe { bootstrap_check_in(bp, service_name, sp) }
 }
 
 /// `bootstrap_get_root(bp, &root)` → kern_return_t.
-pub fn bootstrap_get_root(_bp: u32, root: *mut u32) -> u32 {
+///
+/// # Safety
+/// `root` must be null or point to an aligned, writable `u32` that is
+/// exclusively accessible for the duration of the call.
+pub unsafe fn bootstrap_get_root(_bp: u32, root: *mut u32) -> u32 {
     if root.is_null() {
         return BOOTSTRAP_BAD_COUNT;
     }
@@ -412,7 +485,6 @@ pub fn register_service(name: &str, port: u32) {
             ServiceEntry {
                 port,
                 checked_in: true,
-                server_port: 0,
             },
         );
     });
@@ -420,7 +492,12 @@ pub fn register_service(name: &str, port: u32) {
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
-fn safe_cstr(ptr: *const libc::c_char) -> Option<String> {
+/// Read an optional C string into owned storage.
+///
+/// # Safety
+/// A non-null `ptr` must point to a readable, NUL-terminated C string that
+/// remains unchanged while it is read. Null checking alone does not validate it.
+unsafe fn read_cstr(ptr: *const libc::c_char) -> Option<String> {
     if ptr.is_null() {
         return None;
     }
@@ -434,6 +511,9 @@ fn safe_cstr(ptr: *const libc::c_char) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+    // SAFETY: Test names are live C strings and output pointers refer to
+    // exclusive local values; null pointers exercise documented error paths.
+
     use super::*;
     use std::sync::atomic::{AtomicU32, Ordering};
 
@@ -452,83 +532,89 @@ mod tests {
 
     #[test]
     fn check_in_and_look_up() {
+        let _state_guard = crate::lock_test_state();
         let name = unique_name("checkin");
         let mut port: u32 = 0;
-        let r = bootstrap_check_in(0, name.as_ptr(), &mut port);
+        let r = unsafe { bootstrap_check_in(0, name.as_ptr(), &mut port) };
         assert_eq!(r, BOOTSTRAP_SUCCESS);
         assert_ne!(port, 0);
 
         let mut port2: u32 = 0;
-        let r = bootstrap_look_up(0, name.as_ptr(), &mut port2);
+        let r = unsafe { bootstrap_look_up(0, name.as_ptr(), &mut port2) };
         assert_eq!(r, BOOTSTRAP_SUCCESS);
         assert_eq!(port, port2);
     }
 
     #[test]
     fn double_check_in_returns_active() {
+        let _state_guard = crate::lock_test_state();
         let name = unique_name("dup");
         let mut port: u32 = 0;
-        bootstrap_check_in(0, name.as_ptr(), &mut port);
-        let r = bootstrap_check_in(0, name.as_ptr(), &mut port);
+        unsafe { bootstrap_check_in(0, name.as_ptr(), &mut port) };
+        let r = unsafe { bootstrap_check_in(0, name.as_ptr(), &mut port) };
         assert_eq!(r, BOOTSTRAP_SERVICE_ACTIVE);
     }
 
     #[test]
     fn create_service_and_check_in() {
+        let _state_guard = crate::lock_test_state();
         let name = unique_name("create");
         let mut port: u32 = 0;
-        let r = bootstrap_create_service(0, name.as_ptr(), &mut port);
+        let r = unsafe { bootstrap_create_service(0, name.as_ptr(), &mut port) };
         assert_eq!(r, BOOTSTRAP_SUCCESS);
         assert_ne!(port, 0);
 
         // Check in with the created service
         let mut port2: u32 = 0;
-        let r = bootstrap_check_in(0, name.as_ptr(), &mut port2);
+        let r = unsafe { bootstrap_check_in(0, name.as_ptr(), &mut port2) };
         assert_eq!(r, BOOTSTRAP_SUCCESS);
         assert_eq!(port, port2);
     }
 
     #[test]
     fn duplicate_create_service_returns_active() {
+        let _state_guard = crate::lock_test_state();
         let name = unique_name("dupcs");
         let mut port: u32 = 0;
-        bootstrap_create_service(0, name.as_ptr(), &mut port);
-        let r = bootstrap_create_service(0, name.as_ptr(), &mut port);
+        unsafe { bootstrap_create_service(0, name.as_ptr(), &mut port) };
+        let r = unsafe { bootstrap_create_service(0, name.as_ptr(), &mut port) };
         assert_eq!(r, BOOTSTRAP_SERVICE_ACTIVE);
     }
 
     #[test]
     fn register_and_look_up() {
+        let _state_guard = crate::lock_test_state();
         let name = unique_name("reg");
-        let r = bootstrap_register(0, name.as_ptr(), 0x5000);
+        let r = unsafe { bootstrap_register(0, name.as_ptr(), 0x5000) };
         assert_eq!(r, BOOTSTRAP_SUCCESS);
 
         let mut port: u32 = 0;
-        let r = bootstrap_look_up(0, name.as_ptr(), &mut port);
+        let r = unsafe { bootstrap_look_up(0, name.as_ptr(), &mut port) };
         assert_eq!(r, BOOTSTRAP_SUCCESS);
         assert_eq!(port, 0x5000);
     }
 
     #[test]
     fn status_query() {
+        let _state_guard = crate::lock_test_state();
         let name_unknown = unique_name("statusU");
         let name_svc = unique_name("statusS");
 
         // Unknown service
         let mut status: u32 = 0;
-        let r = bootstrap_status(0, name_unknown.as_ptr(), &mut status);
+        let r = unsafe { bootstrap_status(0, name_unknown.as_ptr(), &mut status) };
         assert_eq!(r, BOOTSTRAP_UNKNOWN_SERVICE);
 
         // Create but don't check in → ON_DEMAND
         let mut port: u32 = 0;
-        bootstrap_create_service(0, name_svc.as_ptr(), &mut port);
-        let r = bootstrap_status(0, name_svc.as_ptr(), &mut status);
+        unsafe { bootstrap_create_service(0, name_svc.as_ptr(), &mut port) };
+        let r = unsafe { bootstrap_status(0, name_svc.as_ptr(), &mut status) };
         assert_eq!(r, BOOTSTRAP_SUCCESS);
         assert_eq!(status, BOOTSTRAP_STATUS_ON_DEMAND);
 
         // Check in → ACTIVE
-        bootstrap_check_in(0, name_svc.as_ptr(), &mut port);
-        let r = bootstrap_status(0, name_svc.as_ptr(), &mut status);
+        unsafe { bootstrap_check_in(0, name_svc.as_ptr(), &mut port) };
+        let r = unsafe { bootstrap_status(0, name_svc.as_ptr(), &mut status) };
         assert_eq!(r, BOOTSTRAP_SUCCESS);
         assert_eq!(status, BOOTSTRAP_STATUS_ACTIVE);
     }
@@ -545,54 +631,58 @@ mod tests {
 
     #[test]
     fn subset_and_parent() {
+        let _state_guard = crate::lock_test_state();
         let root = get_bootstrap_port();
         let mut child: u32 = 0;
-        bootstrap_subset(root, 0, &mut child);
+        unsafe { bootstrap_subset(root, 0, &mut child) };
         assert_ne!(child, 0);
 
         let mut parent: u32 = 0;
-        bootstrap_parent(child, &mut parent);
+        unsafe { bootstrap_parent(child, &mut parent) };
         assert_eq!(parent, root);
 
         // Root's parent is itself
-        bootstrap_parent(root, &mut parent);
+        unsafe { bootstrap_parent(root, &mut parent) };
         assert_eq!(parent, root);
     }
 
     #[test]
     fn unprivileged_returns_same_port() {
         let mut port: u32 = 0;
-        let r = bootstrap_unprivileged(0x105, &mut port);
+        let r = unsafe { bootstrap_unprivileged(0x105, &mut port) };
         assert_eq!(r, BOOTSTRAP_SUCCESS);
         assert_eq!(port, 0x105);
     }
 
     #[test]
     fn create_server() {
+        let _state_guard = crate::lock_test_state();
         let mut port: u32 = 0;
-        let r = bootstrap_create_server(0, c"/usr/sbin/httpd".as_ptr(), 0, true, &mut port);
+        let r =
+            unsafe { bootstrap_create_server(0, c"/usr/sbin/httpd".as_ptr(), 0, true, &mut port) };
         assert_eq!(r, BOOTSTRAP_SUCCESS);
         assert_ne!(port, 0);
     }
 
     #[test]
     fn auto_create_on_look_up() {
+        let _state_guard = crate::lock_test_state();
         let name = unique_name("autocreate");
         let mut port: u32 = 0;
-        let r = bootstrap_look_up(0, name.as_ptr(), &mut port);
+        let r = unsafe { bootstrap_look_up(0, name.as_ptr(), &mut port) };
         assert_eq!(r, BOOTSTRAP_SUCCESS);
         assert_ne!(port, 0);
 
         // Second lookup returns same port
         let mut port2: u32 = 0;
-        bootstrap_look_up(0, name.as_ptr(), &mut port2);
+        unsafe { bootstrap_look_up(0, name.as_ptr(), &mut port2) };
         assert_eq!(port, port2);
     }
 
     #[test]
     fn get_root() {
         let mut root: u32 = 0;
-        let r = bootstrap_get_root(0, &mut root);
+        let r = unsafe { bootstrap_get_root(0, &mut root) };
         assert_eq!(r, BOOTSTRAP_SUCCESS);
         assert_eq!(root, get_bootstrap_port());
     }
@@ -601,68 +691,72 @@ mod tests {
 
     #[test]
     fn null_service_name_returns_error() {
+        let _state_guard = crate::lock_test_state();
         let mut port: u32 = 0;
         assert_eq!(
-            bootstrap_look_up(0, std::ptr::null(), &mut port),
+            unsafe { bootstrap_look_up(0, std::ptr::null(), &mut port) },
             BOOTSTRAP_UNKNOWN_SERVICE
         );
         assert_eq!(
-            bootstrap_check_in(0, std::ptr::null(), &mut port),
+            unsafe { bootstrap_check_in(0, std::ptr::null(), &mut port) },
             BOOTSTRAP_UNKNOWN_SERVICE
         );
         assert_eq!(
-            bootstrap_register(0, std::ptr::null(), 0x100),
+            unsafe { bootstrap_register(0, std::ptr::null(), 0x100) },
             BOOTSTRAP_BAD_COUNT
         );
         assert_eq!(
-            bootstrap_create_service(0, std::ptr::null(), &mut port),
+            unsafe { bootstrap_create_service(0, std::ptr::null(), &mut port) },
             BOOTSTRAP_BAD_COUNT
         );
 
         let mut status: u32 = 0;
         assert_eq!(
-            bootstrap_status(0, std::ptr::null(), &mut status),
+            unsafe { bootstrap_status(0, std::ptr::null(), &mut status) },
             BOOTSTRAP_UNKNOWN_SERVICE
         );
     }
 
     #[test]
     fn null_output_pointer_returns_bad_count() {
+        let _state_guard = crate::lock_test_state();
         let name = unique_name("nullout");
         assert_eq!(
-            bootstrap_look_up(0, name.as_ptr(), std::ptr::null_mut()),
+            unsafe { bootstrap_look_up(0, name.as_ptr(), std::ptr::null_mut()) },
             BOOTSTRAP_BAD_COUNT
         );
         assert_eq!(
-            bootstrap_check_in(0, name.as_ptr(), std::ptr::null_mut()),
+            unsafe { bootstrap_check_in(0, name.as_ptr(), std::ptr::null_mut()) },
             BOOTSTRAP_BAD_COUNT
         );
         assert_eq!(
-            bootstrap_create_service(0, name.as_ptr(), std::ptr::null_mut()),
+            unsafe { bootstrap_create_service(0, name.as_ptr(), std::ptr::null_mut()) },
             BOOTSTRAP_BAD_COUNT
         );
         assert_eq!(
-            bootstrap_status(0, name.as_ptr(), std::ptr::null_mut()),
+            unsafe { bootstrap_status(0, name.as_ptr(), std::ptr::null_mut()) },
             BOOTSTRAP_BAD_COUNT
         );
         assert_eq!(
-            bootstrap_subset(0, 0, std::ptr::null_mut()),
+            unsafe { bootstrap_subset(0, 0, std::ptr::null_mut()) },
             BOOTSTRAP_BAD_COUNT
         );
         assert_eq!(
-            bootstrap_unprivileged(0, std::ptr::null_mut()),
+            unsafe { bootstrap_unprivileged(0, std::ptr::null_mut()) },
             BOOTSTRAP_BAD_COUNT
         );
         assert_eq!(
-            bootstrap_parent(0, std::ptr::null_mut()),
+            unsafe { bootstrap_parent(0, std::ptr::null_mut()) },
             BOOTSTRAP_BAD_COUNT
         );
         assert_eq!(
-            bootstrap_create_server(0, c"/bin/sh".as_ptr(), 0, false, std::ptr::null_mut()),
+            unsafe {
+                bootstrap_create_server(0, c"/bin/sh".as_ptr(), 0, false, std::ptr::null_mut())
+            },
             BOOTSTRAP_BAD_COUNT
         );
         assert_eq!(
-            bootstrap_get_root(0, std::ptr::null_mut()),
+            unsafe { bootstrap_get_root(0, std::ptr::null_mut()) },
             BOOTSTRAP_BAD_COUNT
         );
     }
@@ -691,27 +785,29 @@ mod tests {
 
     #[test]
     fn register_checked_in_service_returns_name_in_use() {
+        let _state_guard = crate::lock_test_state();
         let name = unique_name("regactive");
         let mut port: u32 = 0;
         // Check in creates and marks as checked_in
-        bootstrap_check_in(0, name.as_ptr(), &mut port);
+        unsafe { bootstrap_check_in(0, name.as_ptr(), &mut port) };
         // Trying to register should fail
-        let r = bootstrap_register(0, name.as_ptr(), 0x5000);
+        let r = unsafe { bootstrap_register(0, name.as_ptr(), 0x5000) };
         assert_eq!(r, BOOTSTRAP_NAME_IN_USE);
     }
 
     #[test]
     fn register_unchecked_service_overwrites() {
+        let _state_guard = crate::lock_test_state();
         let name = unique_name("regover");
         let mut port: u32 = 0;
         // Create (not checked in)
-        bootstrap_create_service(0, name.as_ptr(), &mut port);
+        unsafe { bootstrap_create_service(0, name.as_ptr(), &mut port) };
         // Register should succeed (not checked in yet)
-        let r = bootstrap_register(0, name.as_ptr(), 0x6000);
+        let r = unsafe { bootstrap_register(0, name.as_ptr(), 0x6000) };
         assert_eq!(r, BOOTSTRAP_SUCCESS);
         // Lookup should show the new port
         let mut port2: u32 = 0;
-        bootstrap_look_up(0, name.as_ptr(), &mut port2);
+        unsafe { bootstrap_look_up(0, name.as_ptr(), &mut port2) };
         assert_eq!(port2, 0x6000);
     }
 
@@ -725,75 +821,83 @@ mod tests {
 
     #[test]
     fn look_up2_delegates_to_look_up() {
+        let _state_guard = crate::lock_test_state();
         let name = unique_name("lu2");
         let mut port: u32 = 0;
-        bootstrap_register(0, name.as_ptr(), 0x7000);
-        let r = bootstrap_look_up2(0, name.as_ptr(), &mut port, -1, 0);
+        unsafe { bootstrap_register(0, name.as_ptr(), 0x7000) };
+        let r = unsafe { bootstrap_look_up2(0, name.as_ptr(), &mut port, -1, 0) };
         assert_eq!(r, BOOTSTRAP_SUCCESS);
         assert_eq!(port, 0x7000);
     }
 
     #[test]
     fn check_in2_delegates_to_check_in() {
+        let _state_guard = crate::lock_test_state();
         let name = unique_name("ci2");
         let mut port: u32 = 0;
-        let r = bootstrap_check_in2(0, name.as_ptr(), &mut port, 0);
+        let r = unsafe { bootstrap_check_in2(0, name.as_ptr(), &mut port, 0) };
         assert_eq!(r, BOOTSTRAP_SUCCESS);
         assert_ne!(port, 0);
     }
 
     #[test]
     fn look_up3_delegates_to_look_up() {
+        let _state_guard = crate::lock_test_state();
         let name = unique_name("lu3");
         let mut port: u32 = 0;
-        bootstrap_register(0, name.as_ptr(), 0x8000);
-        let r = bootstrap_look_up3(0, name.as_ptr(), &mut port, -1, std::ptr::null(), 0);
+        unsafe { bootstrap_register(0, name.as_ptr(), 0x8000) };
+        let r = unsafe { bootstrap_look_up3(0, name.as_ptr(), &mut port, -1, std::ptr::null(), 0) };
         assert_eq!(r, BOOTSTRAP_SUCCESS);
         assert_eq!(port, 0x8000);
     }
 
     #[test]
     fn check_in3_delegates_to_check_in() {
+        let _state_guard = crate::lock_test_state();
         let name = unique_name("ci3");
         let mut port: u32 = 0;
-        let r = bootstrap_check_in3(0, name.as_ptr(), &mut port, std::ptr::null_mut(), 0);
+        let r =
+            unsafe { bootstrap_check_in3(0, name.as_ptr(), &mut port, std::ptr::null_mut(), 0) };
         assert_eq!(r, BOOTSTRAP_SUCCESS);
         assert_ne!(port, 0);
     }
 
     #[test]
     fn register2_delegates_to_register() {
+        let _state_guard = crate::lock_test_state();
         let name = unique_name("reg2");
-        let r = bootstrap_register2(0, name.as_ptr(), 0x9000, 0);
+        let r = unsafe { bootstrap_register2(0, name.as_ptr(), 0x9000, 0) };
         assert_eq!(r, BOOTSTRAP_SUCCESS);
         let mut port: u32 = 0;
-        bootstrap_look_up(0, name.as_ptr(), &mut port);
+        unsafe { bootstrap_look_up(0, name.as_ptr(), &mut port) };
         assert_eq!(port, 0x9000);
     }
 
     #[test]
     fn subset_hierarchy_deep_nesting() {
+        let _state_guard = crate::lock_test_state();
         let root = get_bootstrap_port();
         let mut child: u32 = 0;
-        bootstrap_subset(root, 0, &mut child);
+        unsafe { bootstrap_subset(root, 0, &mut child) };
 
         let mut grandchild: u32 = 0;
-        bootstrap_subset(child, 0, &mut grandchild);
+        unsafe { bootstrap_subset(child, 0, &mut grandchild) };
 
         // grandchild → child → root
         let mut parent: u32 = 0;
-        bootstrap_parent(grandchild, &mut parent);
+        unsafe { bootstrap_parent(grandchild, &mut parent) };
         assert_eq!(parent, child);
 
-        bootstrap_parent(child, &mut parent);
+        unsafe { bootstrap_parent(child, &mut parent) };
         assert_eq!(parent, root);
 
-        bootstrap_parent(root, &mut parent);
+        unsafe { bootstrap_parent(root, &mut parent) };
         assert_eq!(parent, root); // root's parent is itself
     }
 
     #[test]
     fn rust_helper_look_up_and_register() {
+        let _state_guard = crate::lock_test_state();
         let svc = format!(
             "com.test.rust_api.{}",
             unique_name("rapi").to_str().unwrap()
@@ -805,15 +909,17 @@ mod tests {
 
     #[test]
     fn empty_string_service_name() {
+        let _state_guard = crate::lock_test_state();
         let name = std::ffi::CString::new("").unwrap();
         let mut port: u32 = 0;
-        // Empty string is valid UTF-8 so safe_cstr succeeds — should work
-        let r = bootstrap_look_up(0, name.as_ptr(), &mut port);
+        // Empty string is valid UTF-8 so read_cstr succeeds — should work
+        let r = unsafe { bootstrap_look_up(0, name.as_ptr(), &mut port) };
         assert_eq!(r, BOOTSTRAP_SUCCESS);
     }
 
     #[test]
     fn concurrent_registrations() {
+        let _state_guard = crate::lock_test_state();
         use std::sync::Arc;
         let barrier = Arc::new(std::sync::Barrier::new(4));
         let handles: Vec<_> = (0..4)
@@ -825,7 +931,7 @@ mod tests {
                         let name =
                             std::ffi::CString::new(format!("com.conc.t{}.s{}", t, i)).unwrap();
                         let mut port: u32 = 0;
-                        let r = bootstrap_look_up(0, name.as_ptr(), &mut port);
+                        let r = unsafe { bootstrap_look_up(0, name.as_ptr(), &mut port) };
                         assert_eq!(r, BOOTSTRAP_SUCCESS);
                         assert_ne!(port, 0);
                     }

@@ -175,14 +175,11 @@ impl BlockCache {
         let mut insns = Vec::with_capacity(16);
         let mut pc = start_pc;
         loop {
-            let raw = match mem.read_u32_mapped(pc) {
-                Some(v) => v,
-                None => {
-                    // Unreadable instruction address — insert a sentinel that
-                    // will cause a MemoryFault when the execute loop hits it.
-                    insns.push(Instruction::Unknown { raw: 0 });
-                    break;
-                }
+            let Some(raw) = mem.read_u32_mapped(pc) else {
+                // Unreadable instruction address — insert a sentinel that
+                // will cause a MemoryFault when the execute loop hits it.
+                insns.push(Instruction::Unknown { raw: 0 });
+                break;
             };
             let insn = decode::decode(raw, pc);
             let is_term = is_block_terminator(insn);
@@ -572,7 +569,7 @@ pub fn setup_for_main(
 
 #[cfg(test)]
 mod block_cache_tests {
-    use super::*;
+
     use crate::test_helpers::{enc_bcond, enc_movz, enc_subs_imm, test_interp};
 
     /// Verify the block cache accumulates hits on a tight countdown loop.

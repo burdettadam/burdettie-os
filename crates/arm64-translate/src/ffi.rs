@@ -147,6 +147,13 @@ impl FfiBridge {
 /// `fp_args`: the guest's d0-d7 FP register values. These are loaded into
 /// the host d0-d7 before the call. Required for ObjC methods and C functions
 /// that receive floating-point arguments (e.g., `[NSNumber numberWithDouble:]`).
+///
+/// # Safety
+///
+/// `addr` must identify an executable function using the host C ABI. Every
+/// pointer argument and `guest_x8` must satisfy that function's requirements.
+/// If nonzero, `guest_sp` must point to at least 128 readable bytes, and the
+/// caller must uphold any lifetime and aliasing requirements of the callee.
 #[cfg(target_arch = "aarch64")]
 pub unsafe fn call_host_capturing(
     addr: u64,
@@ -226,6 +233,12 @@ pub unsafe fn call_host_capturing(
 }
 
 /// Fallback for non-aarch64 hosts: only captures x0 (integer return).
+///
+/// # Safety
+///
+/// `addr` must identify a function compatible with the host C ABI and the eight
+/// integer arguments and integer return used here. Pointer arguments must be
+/// valid for the callee, including its lifetime and aliasing requirements.
 #[cfg(not(target_arch = "aarch64"))]
 pub unsafe fn call_host_capturing(
     addr: u64,

@@ -6,7 +6,7 @@
 
 use crate::table::ShimTable;
 use std::collections::HashMap;
-use std::os::unix::io::RawFd;
+use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
 
@@ -14,7 +14,9 @@ use std::sync::{Mutex, OnceLock};
 
 struct ServiceRef {
     handle: u64,
-    fd: RawFd,
+    fd: OwnedFd,
+    // Keep the writer alive so a live service's read end does not report EOF.
+    _write_fd: OwnedFd,
     kind: ServiceKind,
     callback: u64,
     context: u64,
@@ -41,12 +43,13 @@ fn alloc_service_ref(kind: ServiceKind, callback: u64, context: u64) -> u64 {
         if libc::pipe(fds.as_mut_ptr()) != 0 {
             return 0;
         }
-        (fds[0], fds[1])
+        (OwnedFd::from_raw_fd(fds[0]), OwnedFd::from_raw_fd(fds[1]))
     };
     let handle = NEXT_HANDLE.fetch_add(1, Ordering::Relaxed);
     let ref_ = ServiceRef {
         handle,
         fd: fd_read,
+        _write_fd: fd_write,
         kind,
         callback,
         context,
@@ -70,11 +73,11 @@ pub extern "C" fn TXTRecordDeallocate(_txt: *mut u8) {
 
 #[no_mangle]
 pub extern "C" fn TXTRecordSetValue(
-    txt: *mut u8,
-    key: *const u8,
-    key_len: u8,
-    value_len: u8,
-    value: *const u8,
+    _txt: *mut u8,
+    _key: *const u8,
+    _key_len: u8,
+    _value_len: u8,
+    _value: *const u8,
 ) -> i32 {
     // No-op: just pretend success
     0
@@ -109,7 +112,11 @@ pub extern "C" fn DNSServiceBrowse(
     unsafe {
         *sd_ref = handle;
     }
-    0
+    if handle == 0 {
+        -1
+    } else {
+        0
+    }
 }
 
 #[no_mangle]
@@ -134,7 +141,11 @@ pub extern "C" fn DNSServiceRegister(
     unsafe {
         *sd_ref = handle;
     }
-    0
+    if handle == 0 {
+        -1
+    } else {
+        0
+    }
 }
 
 #[no_mangle]
@@ -155,22 +166,30 @@ pub extern "C" fn DNSServiceResolve(
     unsafe {
         *sd_ref = handle;
     }
-    0
+    if handle == 0 {
+        -1
+    } else {
+        0
+    }
 }
 
 #[no_mangle]
 pub extern "C" fn DNSServiceRefSockFD(sd_ref: u64) -> i32 {
     let refs = service_refs().lock().unwrap();
-    refs.get(&sd_ref).map(|r| r.fd).unwrap_or(-1)
+    refs.get(&sd_ref).map(|r| r.fd.as_raw_fd()).unwrap_or(-1)
 }
 
 #[no_mangle]
 pub extern "C" fn DNSServiceProcessResult(sd_ref: u64) -> i32 {
     // Synchronously invoke callback with synthetic data
-    let mut refs = service_refs().lock().unwrap();
-    if let Some(r) = refs.get(&sd_ref) {
+    let callback_context = {
+        let refs = service_refs().lock().unwrap();
+        refs.get(&sd_ref).map(|r| (r.callback, r.context))
+    };
+    // A callback may query or deallocate its own service reference.
+    if let Some((callback, context)) = callback_context {
         // For now, just call the callback with nulls
-        if r.callback != 0 {
+        if callback != 0 {
             let cb: extern "C" fn(
                 u64,
                 u32,
@@ -183,7 +202,7 @@ pub extern "C" fn DNSServiceProcessResult(sd_ref: u64) -> i32 {
                 u16,
                 *const u8,
                 u64,
-            ) = unsafe { std::mem::transmute(r.callback as usize) };
+            ) = unsafe { std::mem::transmute(callback as usize) };
             cb(
                 sd_ref,
                 0,
@@ -195,7 +214,7 @@ pub extern "C" fn DNSServiceProcessResult(sd_ref: u64) -> i32 {
                 std::ptr::null(),
                 0,
                 std::ptr::null(),
-                r.context,
+                context,
             );
         }
     }
@@ -205,11 +224,8 @@ pub extern "C" fn DNSServiceProcessResult(sd_ref: u64) -> i32 {
 #[no_mangle]
 pub extern "C" fn DNSServiceRefDeallocate(sd_ref: u64) {
     let mut refs = service_refs().lock().unwrap();
-    if let Some(r) = refs.remove(&sd_ref) {
-        unsafe {
-            libc::close(r.fd);
-        }
-    }
+    // Dropping the service closes both owned pipe descriptors.
+    refs.remove(&sd_ref);
 }
 
 // ── Install ───────────────────────────────────────────────────
@@ -299,8 +315,30 @@ mod tests {
         );
         assert!(sd_ref != 0);
         let fd = DNSServiceRefSockFD(sd_ref);
-        assert!(fd > 0);
+        assert!(fd >= 0);
+        assert_eq!(DNSServiceProcessResult(sd_ref), 0); // No callback registered.
+        let monitor = service_refs()
+            .lock()
+            .unwrap()
+            .get(&sd_ref)
+            .unwrap()
+            .fd
+            .try_clone()
+            .unwrap();
+        let mut poll_fd = libc::pollfd {
+            fd: monitor.as_raw_fd(),
+            events: libc::POLLIN,
+            revents: 0,
+        };
+        // A live service must retain its writer instead of reporting EOF.
+        assert_eq!(unsafe { libc::poll(&mut poll_fd, 1, 0) }, 0);
         DNSServiceRefDeallocate(sd_ref);
+        assert_eq!(DNSServiceRefSockFD(sd_ref), -1);
+        assert_eq!(DNSServiceProcessResult(sd_ref), 0); // Unknown handle remains a no-op.
+                                                        // The duplicate read end observes closure without depending on raw fd
+                                                        // numbers staying unused while other tests allocate descriptors.
+        assert_eq!(unsafe { libc::poll(&mut poll_fd, 1, 0) }, 1);
+        assert_ne!(poll_fd.revents & libc::POLLHUP, 0);
     }
 
     #[test]
@@ -332,7 +370,7 @@ mod tests {
                 0,
                 std::ptr::null(),
                 std::ptr::null(),
-                cb as u64,
+                cb as *const () as u64,
                 0
             ),
             0
@@ -342,5 +380,78 @@ mod tests {
             assert!(CALLED);
         }
         DNSServiceRefDeallocate(sd_ref);
+    }
+
+    #[test]
+    fn callback_can_query_and_deallocate_its_service() {
+        let _g = TEST_LOCK.lock().unwrap();
+        static CALLBACK_OK: std::sync::atomic::AtomicBool =
+            std::sync::atomic::AtomicBool::new(false);
+        CALLBACK_OK.store(false, Ordering::SeqCst);
+
+        extern "C" fn callback(
+            sd_ref: u64,
+            _flags: u32,
+            _iface: u32,
+            _err: u32,
+            _fullname: *const u8,
+            _host: *const u8,
+            _regtype: *const u8,
+            _domain: *const u8,
+            _port: u16,
+            _txt: *const u8,
+            _context: u64,
+        ) {
+            // Fail outside the C callback instead of hanging or unwinding
+            // through the ABI if ProcessResult still holds the registry lock.
+            let Ok(guard) = service_refs().try_lock() else {
+                return;
+            };
+            drop(guard);
+
+            let was_live = DNSServiceRefSockFD(sd_ref) >= 0;
+            DNSServiceRefDeallocate(sd_ref);
+            CALLBACK_OK.store(
+                was_live && DNSServiceRefSockFD(sd_ref) == -1,
+                Ordering::SeqCst,
+            );
+        }
+
+        let mut sd_ref = 0;
+        assert_eq!(
+            DNSServiceBrowse(
+                &mut sd_ref,
+                0,
+                0,
+                std::ptr::null(),
+                std::ptr::null(),
+                callback as *const () as u64,
+                0,
+            ),
+            0,
+        );
+        let monitor = service_refs()
+            .lock()
+            .unwrap()
+            .get(&sd_ref)
+            .unwrap()
+            .fd
+            .try_clone()
+            .unwrap();
+
+        let status = DNSServiceProcessResult(sd_ref);
+        // Also clean up when the callback could not acquire the lock.
+        DNSServiceRefDeallocate(sd_ref);
+        assert_eq!(status, 0);
+        assert!(CALLBACK_OK.load(Ordering::SeqCst));
+        assert_eq!(DNSServiceRefSockFD(sd_ref), -1);
+
+        let mut poll_fd = libc::pollfd {
+            fd: monitor.as_raw_fd(),
+            events: libc::POLLIN,
+            revents: 0,
+        };
+        assert_eq!(unsafe { libc::poll(&mut poll_fd, 1, 0) }, 1);
+        assert_ne!(poll_fd.revents & libc::POLLHUP, 0);
     }
 }

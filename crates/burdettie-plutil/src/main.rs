@@ -23,17 +23,17 @@ fn run(args: &[String]) -> bool {
     match cmd.as_str() {
         "-help" => {
             print_usage();
-            return true;
+            true
         }
         "-lint" => {
             i += 1;
             let (opts, rest) = parse_options(&args[i..]);
-            return cmd_lint(&rest, &opts);
+            cmd_lint(&rest, &opts)
         }
         "-p" => {
             i += 1;
             let (opts, rest) = parse_options(&args[i..]);
-            return cmd_print(&rest, &opts);
+            cmd_print(&rest, &opts)
         }
         "-convert" => {
             i += 1;
@@ -44,7 +44,7 @@ fn run(args: &[String]) -> bool {
             let fmt = args[i].clone();
             i += 1;
             let (opts, rest) = parse_options(&args[i..]);
-            return cmd_convert(&fmt, &rest, &opts);
+            cmd_convert(&fmt, &rest, &opts)
         }
         "-insert" => {
             i += 1;
@@ -56,13 +56,13 @@ fn run(args: &[String]) -> bool {
             i += 1;
             let (type_flag, type_value, remaining) = parse_type_and_value(&args[i..]);
             let (opts, rest) = parse_options(&remaining);
-            return cmd_insert(
+            cmd_insert(
                 &keypath,
                 type_flag.as_deref(),
                 type_value.as_deref(),
                 &rest,
                 &opts,
-            );
+            )
         }
         "-replace" => {
             i += 1;
@@ -74,13 +74,13 @@ fn run(args: &[String]) -> bool {
             i += 1;
             let (type_flag, type_value, remaining) = parse_type_and_value(&args[i..]);
             let (opts, rest) = parse_options(&remaining);
-            return cmd_replace(
+            cmd_replace(
                 &keypath,
                 type_flag.as_deref(),
                 type_value.as_deref(),
                 &rest,
                 &opts,
-            );
+            )
         }
         "-remove" => {
             i += 1;
@@ -91,7 +91,7 @@ fn run(args: &[String]) -> bool {
             let keypath = args[i].clone();
             i += 1;
             let (opts, rest) = parse_options(&args[i..]);
-            return cmd_remove(&keypath, &rest, &opts);
+            cmd_remove(&keypath, &rest, &opts)
         }
         "-extract" => {
             i += 1;
@@ -108,7 +108,7 @@ fn run(args: &[String]) -> bool {
             let fmt = args[i].clone();
             i += 1;
             let (opts, rest) = parse_options(&args[i..]);
-            return cmd_extract(&keypath, &fmt, &rest, &opts);
+            cmd_extract(&keypath, &fmt, &rest, &opts)
         }
         "-type" => {
             i += 1;
@@ -119,21 +119,17 @@ fn run(args: &[String]) -> bool {
             let keypath = args[i].clone();
             i += 1;
             let (opts, rest) = parse_options(&args[i..]);
-            return cmd_type(&keypath, &rest, &opts);
+            cmd_type(&keypath, &rest, &opts)
         }
         "-create" => {
             i += 1;
             let (fmt, rest_start) = if i < args.len() && !args[i].starts_with('-') {
                 (args[i].clone(), i + 1)
-            } else if i < args.len()
-                && (args[i] == "xml1" || args[i] == "binary1" || args[i] == "json")
-            {
-                (args[i].clone(), i + 1)
             } else {
                 ("xml1".to_string(), i)
             };
             let (opts, rest) = parse_options(&args[rest_start..]);
-            return cmd_create(&fmt, &rest, &opts);
+            cmd_create(&fmt, &rest, &opts)
         }
         _ => {
             // Default: no command means -lint
@@ -144,7 +140,7 @@ fn run(args: &[String]) -> bool {
             }
             eprintln!("Unknown option: {cmd}");
             print_usage();
-            return false;
+            false
         }
     }
 }
@@ -385,7 +381,7 @@ fn navigate_keypath<'a>(root: &'a Value, keypath: &str) -> Option<&'a Value> {
     let mut current = root;
     for part in &parts {
         if let Some(dict) = current.as_dictionary() {
-            if let Some(v) = dict.get(*part) {
+            if let Some(v) = dict.get(part) {
                 current = v;
             } else {
                 return None;
@@ -415,7 +411,7 @@ fn navigate_keypath_mut<'a>(root: &'a mut Value, keypath: &str) -> Option<&'a mu
     let parts: Vec<&str> = keypath.split('.').collect();
     let mut current = root;
     for part in &parts {
-        if let Some(idx) = part.parse::<usize>().ok() {
+        if let Ok(idx) = part.parse::<usize>() {
             let arr = current.as_array_mut()?;
             if idx >= arr.len() {
                 return None;
@@ -423,7 +419,7 @@ fn navigate_keypath_mut<'a>(root: &'a mut Value, keypath: &str) -> Option<&'a mu
             current = &mut arr[idx];
         } else {
             let dict = current.as_dictionary_mut()?;
-            current = dict.get_mut(*part)?;
+            current = dict.get_mut(part)?;
         }
     }
     Some(current)
@@ -968,7 +964,7 @@ fn cmd_create(format: &str, files: &[String], opts: &Options) -> bool {
                 }
             }
             "json" => {
-                let content = if opts.readable_json { "{}\n" } else { "{}\n" };
+                let content = "{}\n";
                 if output_path == "-" {
                     print!("{content}");
                     Ok(())
@@ -1011,7 +1007,7 @@ fn detect_format(bytes: &[u8]) -> &'static str {
         "binary1"
     } else if bytes.starts_with(b"<?xml") || bytes.starts_with(b"<!DOCTYPE") {
         "xml1"
-    } else if bytes.first().map_or(false, |b| *b == b'{' || *b == b'[') {
+    } else if bytes.first().is_some_and(|b| *b == b'{' || *b == b'[') {
         "json"
     } else {
         "xml1"
@@ -1353,7 +1349,7 @@ mod tests {
         dict.insert("str".to_string(), Value::String("hello".to_string()));
         dict.insert("num".to_string(), Value::Integer(42.into()));
         dict.insert("bool".to_string(), Value::Boolean(true));
-        dict.insert("real".to_string(), Value::Real(3.14));
+        dict.insert("real".to_string(), Value::Real(1.2345));
         dict.insert(
             "arr".to_string(),
             Value::Array(vec![Value::Integer(1.into()), Value::Integer(2.into())]),
@@ -1839,8 +1835,10 @@ mod tests {
     #[test]
     fn test_make_value_float_negative() {
         assert_eq!(
-            make_value(Some("-float"), Some("-3.14")).unwrap().as_real(),
-            Some(-3.14)
+            make_value(Some("-float"), Some("-1.2345"))
+                .unwrap()
+                .as_real(),
+            Some(-1.2345)
         );
     }
 
@@ -2067,9 +2065,9 @@ mod tests {
 
     #[test]
     fn test_json_to_plist_float() {
-        let j = serde_json::json!(3.14);
+        let j = serde_json::json!(1.2345);
         let v = json_to_plist(&j);
-        assert!((v.as_real().unwrap() - 3.14).abs() < 1e-10);
+        assert!((v.as_real().unwrap() - 1.2345).abs() < 1e-10);
     }
 
     #[test]
@@ -2912,20 +2910,20 @@ mod tests {
         );
         assert!(run(&[
             "-insert".into(),
-            "pi".into(),
+            "fraction".into(),
             "-float".into(),
-            "3.14159".into(),
+            "1.2345".into(),
             path.to_string_lossy().into(),
         ]));
         let v = Value::from_file(&path).unwrap();
         let f = v
             .as_dictionary()
             .unwrap()
-            .get("pi")
+            .get("fraction")
             .unwrap()
             .as_real()
             .unwrap();
-        assert!((f - 3.14159).abs() < 1e-10);
+        assert!((f - 1.2345).abs() < 1e-10);
         fs::remove_dir_all(&dir).ok();
     }
 
@@ -3178,7 +3176,7 @@ mod tests {
         let p2 = dir.join("bad.plist");
         fs::write(
             &p2,
-            &[0x62, 0x70, 0x6c, 0x69, 0x73, 0x74, 0x30, 0x30, 0xff, 0xff],
+            [0x62, 0x70, 0x6c, 0x69, 0x73, 0x74, 0x30, 0x30, 0xff, 0xff],
         )
         .unwrap(); // corrupt bplist header
         let result = run(&[

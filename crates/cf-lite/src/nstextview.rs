@@ -7,6 +7,7 @@
 //!   offset 96: flags             (u64 — is_editable, is_selectable, is_rich_text, etc.)
 //!   offset 104: selection_start  (i32) + selection_length (i32) packed in u64
 
+use crate::cg_types::NSRange;
 use crate::nsobj;
 
 const TEXT_PADDING_X: f64 = 4.0;
@@ -89,7 +90,7 @@ pub extern "C" fn shim_nstextview_init_with_frame(
     );
 
     // Empty string (kept as mirror for callers of -[NSTextView string]).
-    let empty = crate::cfstring::alloc_nsstring_from_cstr(b"\0".as_ptr() as *const _);
+    let empty = crate::cfstring::alloc_nsstring_from_cstr(c"".as_ptr());
     write_u64(ptr, STRING_OFF, empty);
 
     // Create a cosmic-text Editor for this view.
@@ -275,14 +276,17 @@ pub extern "C" fn shim_nstextview_set_allows_undo(obj: u64, _cmd: u64, flag: u8)
     write_u64(obj, FLAGS_OFF, flags);
 }
 
-/// `-[NSTextView selectedRange]` — returns NSRange as (location, length) via x0/x1.
-pub extern "C" fn shim_nstextview_selected_range(obj: u64, _cmd: u64) -> (u64, u64) {
+/// `-[NSTextView selectedRange]` — returns NSRange via x0/x1 on ARM64.
+pub extern "C" fn shim_nstextview_selected_range(obj: u64, _cmd: u64) -> NSRange {
     if obj == 0 {
-        return (0, 0);
+        return NSRange::default();
     }
     let packed = read_u64(obj, SELECTION_OFF);
     let (start, length) = unpack_selection(packed);
-    (start as u64, length as u64)
+    NSRange {
+        location: start as u64,
+        length: length as u64,
+    }
 }
 
 /// `-[NSTextView setSelectedRange:]`
@@ -311,9 +315,8 @@ pub extern "C" fn shim_nstextview_insert_text(obj: u64, _cmd: u64, text: u64) {
     if utf8.is_null() {
         return;
     }
-    let typed = match unsafe { std::ffi::CStr::from_ptr(utf8) }.to_str() {
-        Ok(s) => s,
-        Err(_) => return,
+    let Ok(typed) = unsafe { std::ffi::CStr::from_ptr(utf8) }.to_str() else {
+        return;
     };
     if typed.is_empty() {
         return;
@@ -562,6 +565,22 @@ mod tests {
         let (s, l) = unpack_selection(packed);
         assert_eq!(s, 10);
         assert_eq!(l, 5);
+    }
+
+    #[test]
+    fn selected_range_returns_range_aggregate() {
+        let tv = alloc_obj(TEXT_VIEW_SIZE, nsobj::nstextview_class_addr());
+        let selected_range: extern "C" fn(u64, u64) -> NSRange = shim_nstextview_selected_range;
+        shim_nstextview_set_selected_range(tv, 0, 10, 5);
+        assert_eq!(
+            selected_range(tv, 0),
+            NSRange {
+                location: 10,
+                length: 5,
+            }
+        );
+        assert_eq!(selected_range(0, 0), NSRange::default());
+        free_obj(tv);
     }
 
     #[test]

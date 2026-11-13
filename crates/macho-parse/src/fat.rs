@@ -51,8 +51,8 @@ pub fn parse_fat(data: &[u8]) -> Result<FatBinary, ParseError> {
         let base = 8 + i * arch_size;
         let cpu_type = CpuType::from(read_u32_fat(data, base, swapped));
         let cpu_subtype = read_u32_fat(data, base + 4, swapped);
-        let offset = read_u32_fat(data, base + 8, swapped) as u64;
-        let size = read_u32_fat(data, base + 12, swapped) as u64;
+        let offset = u64::from(read_u32_fat(data, base + 8, swapped));
+        let size = u64::from(read_u32_fat(data, base + 12, swapped));
         let align = read_u32_fat(data, base + 16, swapped);
 
         // Validate bounds

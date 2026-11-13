@@ -31,7 +31,7 @@ pub fn string_with_format_trampoline_addr() -> u64 {
     }
     #[cfg(not(all(target_arch = "aarch64", target_os = "macos")))]
     {
-        shim_nsmutablestring_string_with_format_inner as u64
+        shim_nsmutablestring_string_with_format_inner as *const () as u64
     }
 }
 const FLAGS_OFF: usize = 8;

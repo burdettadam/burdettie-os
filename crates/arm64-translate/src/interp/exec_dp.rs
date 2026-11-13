@@ -372,7 +372,6 @@ impl Interpreter {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::test_helpers::*;
 
     // ── Local encoding helpers (not in test_helpers) ─────────────

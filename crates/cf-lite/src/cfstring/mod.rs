@@ -64,6 +64,19 @@ fn inline_ascii_cstr(_value: u64) -> Option<&'static CStr> {
     None
 }
 
+/// Recognize only the legacy zero-flags, zero-length inline payload layout.
+///
+/// Shim-created and imported constant strings store a backing pointer alongside
+/// layout flags and a length. Its address bytes can happen to look like ASCII;
+/// they must not override either an explicit layout or a stored string length.
+fn inline_ascii_payload_cstr(flags: u32, length: u64, payload: u64) -> Option<&'static CStr> {
+    if flags == 0 && length == 0 {
+        inline_ascii_cstr(payload)
+    } else {
+        None
+    }
+}
+
 #[cfg(target_arch = "x86_64")]
 fn inline_tagged_nsstring_cstr(obj: u64) -> Option<&'static CStr> {
     if obj & 0x7 == 0 {
@@ -176,11 +189,13 @@ pub extern "C" fn shim_cf_string_get_length(string: u64) -> i64 {
     }
     unsafe {
         let p = string as *const u8;
+        let flags = std::ptr::read_unaligned((p.add(8)) as *const u32);
         let c_str_ptr = std::ptr::read_unaligned((p.add(16)) as *const u64);
-        if let Some(c_str) = inline_ascii_cstr(c_str_ptr) {
+        let length = std::ptr::read_unaligned((p.add(24)) as *const u64);
+        if let Some(c_str) = inline_ascii_payload_cstr(flags, length, c_str_ptr) {
             return c_str.to_bytes().len() as i64;
         }
-        *((p.add(24)) as *const u64) as i64
+        length as i64
     }
 }
 
@@ -200,8 +215,10 @@ pub extern "C" fn shim_cf_string_get_cstring_ptr(string: u64, _encoding: u32) ->
     }
     unsafe {
         let p = string as *const u8;
-        let c_str_ptr = *((p.add(16)) as *const u64);
-        if let Some(c_str) = inline_ascii_cstr(c_str_ptr) {
+        let flags = std::ptr::read_unaligned((p.add(8)) as *const u32);
+        let c_str_ptr = std::ptr::read_unaligned((p.add(16)) as *const u64);
+        let length = std::ptr::read_unaligned((p.add(24)) as *const u64);
+        if let Some(c_str) = inline_ascii_payload_cstr(flags, length, c_str_ptr) {
             return c_str.as_ptr();
         }
         c_str_ptr as *const c_char
@@ -259,12 +276,13 @@ pub fn extract_cfstring_cstr(obj: u64) -> Option<&'static str> {
     }
     // Use read_unaligned: __CFConstantString objects from loaded binaries
     // may reside at addresses that are not 8-byte aligned.
+    let flags = unsafe { std::ptr::read_unaligned((ptr.add(8)) as *const u32) };
     let c_str_ptr = unsafe { std::ptr::read_unaligned((ptr.add(16)) as *const u64) };
-    let len = unsafe { std::ptr::read_unaligned((ptr.add(24)) as *const u64) as usize };
+    let length = unsafe { std::ptr::read_unaligned((ptr.add(24)) as *const u64) };
     if c_str_ptr == 0 {
         return None;
     }
-    if let Some(c_str) = inline_ascii_cstr(c_str_ptr) {
+    if let Some(c_str) = inline_ascii_payload_cstr(flags, length, c_str_ptr) {
         return c_str.to_str().ok();
     }
     // Reject garbage c_str_ptr values by the same bounds check.
@@ -272,13 +290,13 @@ pub fn extract_cfstring_cstr(obj: u64) -> Option<&'static str> {
         return None;
     }
 
-    if len == 0 {
+    if length == 0 {
         return Some("");
     }
 
     // Prefer the stored CFString length over strlen. Imported guest strings
     // can be valid UTF-8 byte buffers without an accessible trailing NUL.
-    let bytes = unsafe { std::slice::from_raw_parts(c_str_ptr as *const u8, len) };
+    let bytes = unsafe { std::slice::from_raw_parts(c_str_ptr as *const u8, length as usize) };
     std::str::from_utf8(bytes).ok()
 }
 
@@ -303,15 +321,17 @@ pub(crate) fn cfstring_parts(obj: u64) -> Option<(&'static [u8], usize)> {
         return None;
     }
     unsafe {
+        let flags = std::ptr::read_unaligned((obj as usize + 8) as *const u32);
         let ptr = std::ptr::read_unaligned((obj as usize + 16) as *const u64);
-        let len = std::ptr::read_unaligned((obj as usize + 24) as *const u64) as usize;
+        let length = std::ptr::read_unaligned((obj as usize + 24) as *const u64);
         if ptr == 0 {
             return None;
         }
-        if let Some(c_str) = inline_ascii_cstr(ptr) {
+        if let Some(c_str) = inline_ascii_payload_cstr(flags, length, ptr) {
             let bytes = c_str.to_bytes();
             return Some((bytes, bytes.len()));
         }
+        let len = length as usize;
         Some((std::slice::from_raw_parts(ptr as *const u8, len), len))
     }
 }
@@ -342,9 +362,12 @@ mod tests {
         );
         assert_ne!(obj, 0);
         assert_eq!(shim_cf_string_get_length(obj), 11);
+        assert_eq!(extract_cfstring_cstr(obj), Some("hello world"));
+        assert_eq!(cfstring_parts(obj), Some((b"hello world".as_slice(), 11)));
 
         let ptr = shim_cf_string_get_cstring_ptr(obj, K_CF_STRING_ENCODING_UTF8);
         assert!(!ptr.is_null());
+        assert_eq!(ptr as u64, unsafe { *((obj as usize + 16) as *const u64) });
         let result = unsafe { CStr::from_ptr(ptr) };
         assert_eq!(result.to_str().unwrap(), "hello world");
 
@@ -355,6 +378,8 @@ mod tests {
     fn null_cfstring_returns_zero() {
         assert_eq!(shim_cf_string_get_length(0), 0);
         assert!(shim_cf_string_get_cstring_ptr(0, 0).is_null());
+        assert!(extract_cfstring_cstr(0).is_none());
+        assert!(cfstring_parts(0).is_none());
     }
 
     #[test]
@@ -367,7 +392,32 @@ mod tests {
         );
         assert_ne!(obj, 0);
         assert_eq!(shim_cf_string_get_length(obj), 0);
+        assert_eq!(extract_cfstring_cstr(obj), Some(""));
+        assert_eq!(cfstring_parts(obj), Some((b"".as_slice(), 0)));
+        let ptr = shim_cf_string_get_cstring_ptr(obj, K_CF_STRING_ENCODING_UTF8);
+        assert!(!ptr.is_null());
+        assert_eq!(ptr as u64, unsafe { *((obj as usize + 16) as *const u64) });
+        assert_eq!(unsafe { CStr::from_ptr(ptr) }.to_bytes(), b"");
         crate::pal_alloc().free(obj as *mut u8);
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    #[test]
+    fn pointer_layouts_do_not_decode_address_bytes_as_inline_ascii() {
+        // Printable address bits exercise the discriminator without dereferencing
+        // invented backing storage or depending on the allocator's chosen address.
+        let printable_bits = u64::from_le_bytes(*b"p>T]VU\0\0");
+        assert!(inline_ascii_cstr(printable_bits).is_some());
+        for flags in [CF_STRING_FLAGS_UTF8, 0x07D0, 1] {
+            assert!(inline_ascii_payload_cstr(flags, 0, printable_bits).is_none());
+        }
+        assert!(inline_ascii_payload_cstr(0, 6, printable_bits).is_none());
+        assert_eq!(
+            inline_ascii_payload_cstr(0, 0, printable_bits)
+                .unwrap()
+                .to_bytes(),
+            b"p>T]VU"
+        );
     }
 
     #[cfg(target_arch = "x86_64")]
@@ -419,6 +469,7 @@ mod tests {
 
         assert_eq!(extract_cfstring_cstr(obj), Some("Modifier"));
         assert_eq!(shim_cf_string_get_length(obj), 8);
+        assert_eq!(cfstring_parts(obj), Some((b"Modifier".as_slice(), 8)));
 
         let ptr = shim_cf_string_get_cstring_ptr(obj, K_CF_STRING_ENCODING_UTF8);
         assert!(!ptr.is_null());
@@ -437,6 +488,12 @@ mod tests {
         write_field(obj, 24, bytes.len() as u64);
 
         assert_eq!(extract_cfstring_cstr(obj), Some("Window"));
+        assert_eq!(shim_cf_string_get_length(obj), 6);
+        assert_eq!(cfstring_parts(obj), Some((bytes.as_slice(), 6)));
+        assert_eq!(
+            shim_cf_string_get_cstring_ptr(obj, K_CF_STRING_ENCODING_UTF8),
+            bytes.as_ptr().cast()
+        );
 
         free_obj(obj);
     }

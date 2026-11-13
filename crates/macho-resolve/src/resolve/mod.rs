@@ -91,154 +91,6 @@ impl SearchEnv {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::path::PathBuf;
-
-    // ── SearchEnv tests ─────────────────────────────────────────────
-
-    #[test]
-    fn search_env_default() {
-        let env = SearchEnv::default();
-        assert!(env.library_path.is_empty());
-        assert!(env.framework_path.is_empty());
-        assert!(env.fallback_library_path.is_empty());
-        assert!(env.fallback_framework_path.is_empty());
-    }
-
-    #[test]
-    fn merge_empty_entries() {
-        let mut env = SearchEnv::default();
-        env.merge_dyld_env_entries(&[]);
-        assert!(env.library_path.is_empty());
-        assert!(env.framework_path.is_empty());
-    }
-
-    #[test]
-    fn merge_single_path() {
-        let mut env = SearchEnv::default();
-        env.merge_dyld_env_entries(&["DYLD_LIBRARY_PATH=/usr/lib".to_string()]);
-        assert_eq!(env.library_path, vec![PathBuf::from("/usr/lib")]);
-    }
-
-    #[test]
-    fn merge_colon_separated() {
-        let mut env = SearchEnv::default();
-        env.merge_dyld_env_entries(&["DYLD_LIBRARY_PATH=/a:/b".to_string()]);
-        assert_eq!(
-            env.library_path,
-            vec![PathBuf::from("/a"), PathBuf::from("/b")]
-        );
-    }
-
-    #[test]
-    fn merge_multiple_entries() {
-        let mut env = SearchEnv::default();
-        env.merge_dyld_env_entries(&[
-            "DYLD_LIBRARY_PATH=/lib1".to_string(),
-            "DYLD_FRAMEWORK_PATH=/fw1:/fw2".to_string(),
-            "DYLD_FALLBACK_LIBRARY_PATH=/fallback".to_string(),
-        ]);
-        assert_eq!(env.library_path, vec![PathBuf::from("/lib1")]);
-        assert_eq!(
-            env.framework_path,
-            vec![PathBuf::from("/fw1"), PathBuf::from("/fw2")]
-        );
-        assert_eq!(env.fallback_library_path, vec![PathBuf::from("/fallback")]);
-        assert!(env.fallback_framework_path.is_empty());
-    }
-
-    #[test]
-    fn merge_ignores_unknown_keys() {
-        let mut env = SearchEnv::default();
-        env.merge_dyld_env_entries(&["SOME_OTHER_VAR=/x".to_string()]);
-        assert!(env.library_path.is_empty());
-        assert!(env.framework_path.is_empty());
-    }
-
-    #[test]
-    fn merge_skips_empty_segments() {
-        let mut env = SearchEnv::default();
-        env.merge_dyld_env_entries(&["DYLD_LIBRARY_PATH=/a::/b:".to_string()]);
-        assert_eq!(
-            env.library_path,
-            vec![PathBuf::from("/a"), PathBuf::from("/b")]
-        );
-    }
-
-    // ── DependencyGraph / init_order tests ──────────────────────────
-
-    fn make_plan(nodes: Vec<ImageNode>, edges: Vec<DependencyEdge>) -> ResolutionPlan {
-        ResolutionPlan {
-            graph: DependencyGraph { nodes, edges },
-            rpaths: vec![],
-            unresolved: vec![],
-            transitive: false,
-        }
-    }
-
-    #[test]
-    fn init_order_empty() {
-        let plan = make_plan(vec![], vec![]);
-        assert!(plan.init_order().is_empty());
-    }
-
-    #[test]
-    fn init_order_single_node() {
-        let plan = make_plan(
-            vec![ImageNode {
-                index: 0,
-                path: PathBuf::from("/bin/a"),
-                install_name: None,
-                depth: 0,
-            }],
-            vec![],
-        );
-        assert_eq!(plan.init_order(), vec![0]);
-    }
-
-    #[test]
-    fn init_order_linear_chain() {
-        // 0 → 1 → 2   ⟹  leaves first: [2, 1, 0]
-        let plan = make_plan(
-            vec![
-                ImageNode {
-                    index: 0,
-                    path: PathBuf::from("/a"),
-                    install_name: None,
-                    depth: 0,
-                },
-                ImageNode {
-                    index: 1,
-                    path: PathBuf::from("/b"),
-                    install_name: None,
-                    depth: 1,
-                },
-                ImageNode {
-                    index: 2,
-                    path: PathBuf::from("/c"),
-                    install_name: None,
-                    depth: 2,
-                },
-            ],
-            vec![
-                DependencyEdge {
-                    from: 0,
-                    to: 1,
-                    raw_name: "b".into(),
-                },
-                DependencyEdge {
-                    from: 1,
-                    to: 2,
-                    raw_name: "c".into(),
-                },
-            ],
-        );
-        assert_eq!(plan.init_order(), vec![2, 1, 0]);
-    }
-}
-
 const STANDARD_DYLIB_PATHS: &[&str] = &["/usr/lib", "/usr/local/lib"];
 const STANDARD_FRAMEWORK_PATHS: &[&str] = &["/Library/Frameworks", "/System/Library/Frameworks"];
 
@@ -435,5 +287,153 @@ impl ResolutionPlan {
 
         dfs(0, &children, &mut visited, &mut order);
         order
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    // ── SearchEnv tests ─────────────────────────────────────────────
+
+    #[test]
+    fn search_env_default() {
+        let env = SearchEnv::default();
+        assert!(env.library_path.is_empty());
+        assert!(env.framework_path.is_empty());
+        assert!(env.fallback_library_path.is_empty());
+        assert!(env.fallback_framework_path.is_empty());
+    }
+
+    #[test]
+    fn merge_empty_entries() {
+        let mut env = SearchEnv::default();
+        env.merge_dyld_env_entries(&[]);
+        assert!(env.library_path.is_empty());
+        assert!(env.framework_path.is_empty());
+    }
+
+    #[test]
+    fn merge_single_path() {
+        let mut env = SearchEnv::default();
+        env.merge_dyld_env_entries(&["DYLD_LIBRARY_PATH=/usr/lib".to_string()]);
+        assert_eq!(env.library_path, vec![PathBuf::from("/usr/lib")]);
+    }
+
+    #[test]
+    fn merge_colon_separated() {
+        let mut env = SearchEnv::default();
+        env.merge_dyld_env_entries(&["DYLD_LIBRARY_PATH=/a:/b".to_string()]);
+        assert_eq!(
+            env.library_path,
+            vec![PathBuf::from("/a"), PathBuf::from("/b")]
+        );
+    }
+
+    #[test]
+    fn merge_multiple_entries() {
+        let mut env = SearchEnv::default();
+        env.merge_dyld_env_entries(&[
+            "DYLD_LIBRARY_PATH=/lib1".to_string(),
+            "DYLD_FRAMEWORK_PATH=/fw1:/fw2".to_string(),
+            "DYLD_FALLBACK_LIBRARY_PATH=/fallback".to_string(),
+        ]);
+        assert_eq!(env.library_path, vec![PathBuf::from("/lib1")]);
+        assert_eq!(
+            env.framework_path,
+            vec![PathBuf::from("/fw1"), PathBuf::from("/fw2")]
+        );
+        assert_eq!(env.fallback_library_path, vec![PathBuf::from("/fallback")]);
+        assert!(env.fallback_framework_path.is_empty());
+    }
+
+    #[test]
+    fn merge_ignores_unknown_keys() {
+        let mut env = SearchEnv::default();
+        env.merge_dyld_env_entries(&["SOME_OTHER_VAR=/x".to_string()]);
+        assert!(env.library_path.is_empty());
+        assert!(env.framework_path.is_empty());
+    }
+
+    #[test]
+    fn merge_skips_empty_segments() {
+        let mut env = SearchEnv::default();
+        env.merge_dyld_env_entries(&["DYLD_LIBRARY_PATH=/a::/b:".to_string()]);
+        assert_eq!(
+            env.library_path,
+            vec![PathBuf::from("/a"), PathBuf::from("/b")]
+        );
+    }
+
+    // ── DependencyGraph / init_order tests ──────────────────────────
+
+    fn make_plan(nodes: Vec<ImageNode>, edges: Vec<DependencyEdge>) -> ResolutionPlan {
+        ResolutionPlan {
+            graph: DependencyGraph { nodes, edges },
+            rpaths: vec![],
+            unresolved: vec![],
+            transitive: false,
+        }
+    }
+
+    #[test]
+    fn init_order_empty() {
+        let plan = make_plan(vec![], vec![]);
+        assert!(plan.init_order().is_empty());
+    }
+
+    #[test]
+    fn init_order_single_node() {
+        let plan = make_plan(
+            vec![ImageNode {
+                index: 0,
+                path: PathBuf::from("/bin/a"),
+                install_name: None,
+                depth: 0,
+            }],
+            vec![],
+        );
+        assert_eq!(plan.init_order(), vec![0]);
+    }
+
+    #[test]
+    fn init_order_linear_chain() {
+        // 0 → 1 → 2   ⟹  leaves first: [2, 1, 0]
+        let plan = make_plan(
+            vec![
+                ImageNode {
+                    index: 0,
+                    path: PathBuf::from("/a"),
+                    install_name: None,
+                    depth: 0,
+                },
+                ImageNode {
+                    index: 1,
+                    path: PathBuf::from("/b"),
+                    install_name: None,
+                    depth: 1,
+                },
+                ImageNode {
+                    index: 2,
+                    path: PathBuf::from("/c"),
+                    install_name: None,
+                    depth: 2,
+                },
+            ],
+            vec![
+                DependencyEdge {
+                    from: 0,
+                    to: 1,
+                    raw_name: "b".into(),
+                },
+                DependencyEdge {
+                    from: 1,
+                    to: 2,
+                    raw_name: "c".into(),
+                },
+            ],
+        );
+        assert_eq!(plan.init_order(), vec![2, 1, 0]);
     }
 }

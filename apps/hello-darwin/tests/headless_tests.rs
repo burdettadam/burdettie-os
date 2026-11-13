@@ -194,10 +194,12 @@ fn scorecard_per_fixture_results() {
     let mut failed = Vec::new();
 
     for (name, binary) in &entries {
+        eprintln!("[scorecard fixture] {name}");
         let expected = expected_exit(name);
         let config = RuntimeConfig::permissive(binary);
 
         let _lock = RUNTIME_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        macho_runtime::reset_runtime_state_for_reuse();
         match Runtime::load_and_run(binary, &config) {
             Ok(result) if result.exit_code == expected => {
                 passed.push(name.clone());

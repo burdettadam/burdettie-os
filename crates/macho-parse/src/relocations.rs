@@ -54,16 +54,20 @@ pub struct SectionRelocations {
 /// Parse `count` relocation entries starting at `offset` in the binary data.
 fn parse_relocation_entries(data: &[u8], offset: usize, count: usize) -> Vec<Relocation> {
     let entry_size = 8;
-    let end = offset + count * entry_size;
-    if end > data.len() {
+    let Some(end) = count
+        .checked_mul(entry_size)
+        .and_then(|size| offset.checked_add(size))
+    else {
         return Vec::new();
-    }
+    };
+    let Some(data) = data.get(offset..end) else {
+        return Vec::new();
+    };
 
     let mut entries = Vec::with_capacity(count);
-    for i in 0..count {
-        let base = offset + i * entry_size;
-        let address = u32::from_le_bytes(data[base..base + 4].try_into().unwrap());
-        let packed = u32::from_le_bytes(data[base + 4..base + 8].try_into().unwrap());
+    for bytes in data.chunks_exact(entry_size) {
+        let address = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+        let packed = u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]);
 
         let symbol_index = packed & 0x00FF_FFFF; // bits 0-23
         let pc_relative = (packed >> 24) & 1 != 0; // bit 24

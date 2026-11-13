@@ -330,11 +330,11 @@ pub extern "C" fn shim_rl_completion_matches(_text: *const u8, _gen: u64) -> u64
 // ── Helpers ─────────────────────────────────────────────────────
 
 fn libc_stdin() -> *mut libc::FILE {
-    unsafe { libc::fdopen(0, b"r\0".as_ptr() as *const libc::c_char) }
+    unsafe { libc::fdopen(0, c"r".as_ptr()) }
 }
 
 fn libc_stdout() -> *mut libc::FILE {
-    unsafe { libc::fdopen(1, b"w\0".as_ptr() as *const libc::c_char) }
+    unsafe { libc::fdopen(1, c"w".as_ptr()) }
 }
 
 #[cfg(test)]

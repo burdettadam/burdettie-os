@@ -59,7 +59,7 @@ fn normalized_file_encoding(encoding: u64) -> u64 {
 }
 
 fn decode_utf16_contents(bytes: &[u8], encoding: u64) -> Option<String> {
-    if bytes.len() % 2 != 0 {
+    if !bytes.len().is_multiple_of(2) {
         return None;
     }
 
@@ -169,7 +169,7 @@ pub extern "C" fn shim_nsstring_init_with_data_encoding(
     let length = unsafe { *((data as *const u8).add(8) as *const u64) } as usize;
     let bytes_ptr = unsafe { *((data as *const u8).add(16) as *const u64) } as *const u8;
     if bytes_ptr.is_null() || length == 0 {
-        return shim_cf_string_create_with_cstring(0, b"\0".as_ptr() as *const c_char, 0);
+        return shim_cf_string_create_with_cstring(0, c"".as_ptr(), 0);
     }
     let slice = unsafe { std::slice::from_raw_parts(bytes_ptr, length) };
     let s = String::from_utf8_lossy(slice);
@@ -400,7 +400,7 @@ pub fn string_with_format_trampoline_addr() -> u64 {
         all(target_arch = "x86_64", target_os = "macos"),
     )))]
     {
-        shim_nsstring_string_with_format_inner as u64
+        shim_nsstring_string_with_format_inner as *const () as u64
     }
 }
 
@@ -618,9 +618,8 @@ pub extern "C" fn shim_nsstring_write_to_file(
     let Some((bytes, _)) = cfstring_parts(obj) else {
         return 0;
     };
-    let text = match std::str::from_utf8(bytes) {
-        Ok(s) => s,
-        Err(_) => return 0,
+    let Ok(text) = std::str::from_utf8(bytes) else {
+        return 0;
     };
 
     let data: Vec<u8> = match encoding {

@@ -1,8 +1,31 @@
 //! macOS clock/time via gettimeofday, localtime_r, mach_absolute_time.
 
 use platform_core::clock::{CalendarComponents, Clock};
+use std::sync::OnceLock;
 
 pub struct DarwinClock;
+
+#[allow(deprecated)]
+fn monotonic_timebase() -> (u32, u32) {
+    static TIMEBASE: OnceLock<(u32, u32)> = OnceLock::new();
+    *TIMEBASE.get_or_init(|| {
+        let mut info = libc::mach_timebase_info { numer: 0, denom: 0 };
+        let status = unsafe { libc::mach_timebase_info(&mut info) };
+        assert_eq!(status, libc::KERN_SUCCESS, "mach_timebase_info failed");
+        assert!(
+            info.numer > 0 && info.denom > 0,
+            "mach_timebase_info returned an invalid ratio"
+        );
+        (info.numer, info.denom)
+    })
+}
+
+// The caller supplies the positive ratio validated by monotonic_timebase.
+fn ticks_to_nanoseconds(ticks: u64, numer: u32, denom: u32) -> u64 {
+    // u128 keeps the u64-by-u32 product exact before division.
+    let nanos = u128::from(ticks) * u128::from(numer) / u128::from(denom);
+    u64::try_from(nanos).unwrap_or(u64::MAX)
+}
 
 impl Clock for DarwinClock {
     fn wall_time_usec(&self) -> (i64, i32) {
@@ -15,10 +38,10 @@ impl Clock for DarwinClock {
     }
 
     fn monotonic_ns(&self) -> u64 {
+        let (numer, denom) = monotonic_timebase();
         #[allow(deprecated)]
-        unsafe {
-            libc::mach_absolute_time()
-        }
+        let ticks = unsafe { libc::mach_absolute_time() };
+        ticks_to_nanoseconds(ticks, numer, denom)
     }
 
     fn utc_offset_sec(&self) -> i64 {
@@ -29,7 +52,7 @@ impl Clock for DarwinClock {
         unsafe { libc::gettimeofday(&mut tv, std::ptr::null_mut()) };
         let mut tm: libc::tm = unsafe { std::mem::zeroed() };
         unsafe { libc::localtime_r(&tv.tv_sec, &mut tm) };
-        tm.tm_gmtoff as i64
+        tm.tm_gmtoff
     }
 
     fn timezone_name(&self) -> String {
@@ -77,7 +100,7 @@ impl Clock for DarwinClock {
             wday: tm.tm_wday,
             yday: tm.tm_yday,
             isdst: tm.tm_isdst,
-            gmtoff: tm.tm_gmtoff as i64,
+            gmtoff: tm.tm_gmtoff,
         }
     }
 
@@ -148,6 +171,54 @@ mod tests {
     }
 
     #[test]
+    fn ticks_to_nanoseconds_identity() {
+        for ticks in [0, 1, 1_234_567, u64::MAX] {
+            assert_eq!(ticks_to_nanoseconds(ticks, 1, 1), ticks);
+        }
+    }
+
+    #[test]
+    fn ticks_to_nanoseconds_scales_and_truncates() {
+        assert_eq!(ticks_to_nanoseconds(3, 125, 3), 125);
+        assert_eq!(ticks_to_nanoseconds(1, 125, 3), 41);
+        assert_eq!(ticks_to_nanoseconds(2, 125, 3), 83);
+        assert_eq!(ticks_to_nanoseconds(1, 1, 2), 0);
+        assert_eq!(ticks_to_nanoseconds(3, 1, 2), 1);
+    }
+
+    #[test]
+    fn ticks_to_nanoseconds_avoids_intermediate_overflow() {
+        assert_eq!(ticks_to_nanoseconds(u64::MAX, 2, 2), u64::MAX);
+    }
+
+    #[test]
+    fn ticks_to_nanoseconds_saturates() {
+        assert_eq!(ticks_to_nanoseconds(u64::MAX, 2, 1), u64::MAX);
+        assert_eq!(ticks_to_nanoseconds(u64::MAX, u32::MAX, 1), u64::MAX);
+    }
+
+    #[test]
+    fn monotonic_ns_uses_host_timebase() {
+        let (numer, denom) = monotonic_timebase();
+        #[allow(deprecated)]
+        let before = unsafe { libc::mach_absolute_time() };
+        let sample = DarwinClock.monotonic_ns();
+        #[allow(deprecated)]
+        let after = unsafe { libc::mach_absolute_time() };
+
+        // Compute the bounds independently of ticks_to_nanoseconds so this
+        // catches returning raw ticks or applying the conversion twice.
+        let lower =
+            (u128::from(before) * u128::from(numer) / u128::from(denom)).min(u128::from(u64::MAX));
+        let upper =
+            (u128::from(after) * u128::from(numer) / u128::from(denom)).min(u128::from(u64::MAX));
+        assert!(
+            (lower..=upper).contains(&u128::from(sample)),
+            "monotonic sample {sample} is outside converted tick bounds {lower}..={upper}"
+        );
+    }
+
+    #[test]
     fn timezone_name_nonempty() {
         let c = DarwinClock;
         let name = c.timezone_name();
@@ -177,7 +248,7 @@ mod tests {
         let c = DarwinClock;
         let off = c.utc_offset_sec();
         // ±14 hours = ±50400 seconds
-        assert!(off >= -50400 && off <= 50400, "offset {off} out of range");
+        assert!((-50400..=50400).contains(&off), "offset {off} out of range");
     }
 
     #[test]

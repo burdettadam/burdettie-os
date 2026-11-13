@@ -7,6 +7,8 @@
 //!   [24..32): width        (f64 — points)
 //!   [32..40): height       (f64 — points)
 
+use crate::cg_types::CGSize;
+
 const SIZE: usize = 40;
 const PIXELS_WIDE_OFF: usize = 8;
 const PIXELS_HIGH_OFF: usize = 16;
@@ -87,12 +89,15 @@ pub extern "C" fn shim_nsimagerep_set_pixels_high(obj: u64, _cmd: u64, h: u64) {
     write_u64(obj, PIXELS_HIGH_OFF, h);
 }
 
-/// `-[NSImageRep size]` → returns (width, height) as two f64 values.
-pub extern "C" fn shim_nsimagerep_size(obj: u64, _cmd: u64) -> (f64, f64) {
+/// `-[NSImageRep size]` — returns the point dimensions as a C-compatible CGSize.
+pub extern "C" fn shim_nsimagerep_size(obj: u64, _cmd: u64) -> CGSize {
     if obj == 0 {
-        return (0.0, 0.0);
+        return CGSize::ZERO;
     }
-    (read_f64(obj, WIDTH_OFF), read_f64(obj, HEIGHT_OFF))
+    CGSize {
+        width: read_f64(obj, WIDTH_OFF),
+        height: read_f64(obj, HEIGHT_OFF),
+    }
 }
 
 /// `-[NSImageRep setSize:]`
@@ -132,9 +137,14 @@ mod tests {
         set_pixel_dims(rep, 100, 200);
         assert_eq!(shim_nsimagerep_pixels_wide(rep, 0), 100);
         assert_eq!(shim_nsimagerep_pixels_high(rep, 0), 200);
-        let (w, h) = shim_nsimagerep_size(rep, 0);
-        assert_eq!(w, 100.0);
-        assert_eq!(h, 200.0);
+        let size: extern "C" fn(u64, u64) -> CGSize = shim_nsimagerep_size;
+        assert_eq!(
+            size(rep, 0),
+            CGSize {
+                width: 100.0,
+                height: 200.0
+            }
+        );
         free_obj(rep);
     }
 
@@ -143,8 +153,6 @@ mod tests {
         assert_eq!(shim_nsimagerep_init(0, 0), 0);
         assert_eq!(shim_nsimagerep_pixels_wide(0, 0), 0);
         assert_eq!(shim_nsimagerep_pixels_high(0, 0), 0);
-        let (w, h) = shim_nsimagerep_size(0, 0);
-        assert_eq!(w, 0.0);
-        assert_eq!(h, 0.0);
+        assert_eq!(shim_nsimagerep_size(0, 0), CGSize::ZERO);
     }
 }

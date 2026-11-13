@@ -144,10 +144,10 @@ pub fn register(name_ptr: u64, criteria: u64, handler: u64) {
         let activity_obj = super::xpc_objects::create_dictionary_empty();
         super::xpc_objects::dict_set_int64(
             activity_obj,
-            b"_state\0".as_ptr() as u64,
+            c"_state".as_ptr() as u64,
             ActivityState::CheckIn as i64,
         );
-        super::xpc_objects::dict_set_string(activity_obj, b"_name\0".as_ptr() as u64, name_ptr);
+        super::xpc_objects::dict_set_string(activity_obj, c"_name".as_ptr() as u64, name_ptr);
 
         invoke_block_1(handler, activity_obj);
 
@@ -185,7 +185,7 @@ pub fn register(name_ptr: u64, criteria: u64, handler: u64) {
                 let activity_obj = super::xpc_objects::create_dictionary_empty();
                 super::xpc_objects::dict_set_int64(
                     activity_obj,
-                    b"_state\0".as_ptr() as u64,
+                    c"_state".as_ptr() as u64,
                     ActivityState::Run as i64,
                 );
 
@@ -230,7 +230,7 @@ pub fn unregister(name_ptr: u64) {
 /// a dictionary handle.  We look up the activity by the embedded `_name` key.
 pub fn set_criteria(activity: u64, criteria: u64) {
     // Try to read the name from the activity object
-    let name_ptr = super::xpc_objects::dict_get_string(activity, b"_name\0".as_ptr() as u64);
+    let name_ptr = super::xpc_objects::dict_get_string(activity, c"_name".as_ptr() as u64);
     if name_ptr != 0 {
         let cstr = unsafe { std::ffi::CStr::from_ptr(name_ptr as *const std::ffi::c_char) };
         let name = cstr.to_str().unwrap_or("unknown");
@@ -246,7 +246,7 @@ pub fn set_criteria(activity: u64, criteria: u64) {
 /// `xpc_activity_get_state(activity)` → XPC_ACTIVITY_STATE_*
 pub fn get_state(activity: u64) -> u64 {
     // Read state from the activity dictionary
-    let state_val = super::xpc_objects::dict_get_int64(activity, b"_state\0".as_ptr() as u64);
+    let state_val = super::xpc_objects::dict_get_int64(activity, c"_state".as_ptr() as u64);
     if state_val != 0 || super::xpc_objects::dict_get_count(activity) > 0 {
         return state_val as u64;
     }

@@ -273,12 +273,7 @@ fn decode_plist_object(unarchiver: u64, uid: usize, value: &plist::Value) -> u64
         plist::Value::Data(bytes) => crate::nsdata::make_nsdata(bytes),
 
         // Leaf date
-        plist::Value::Date(d) => {
-            // plist::Date is seconds since 2001-01-01 (same as NSDate reference date)
-            let ti = d.to_xml_format().parse::<f64>().unwrap_or(0.0);
-            // plist Date can provide seconds via conversion
-            crate::nsdate::alloc_nsdate(date_to_ti(d))
-        }
+        plist::Value::Date(d) => crate::nsdate::alloc_nsdate(date_to_ti(d)),
 
         // UID reference (shouldn't appear at top level, but handle gracefully)
         plist::Value::Uid(u) => decode_uid(unarchiver, u.get() as usize),
@@ -331,7 +326,6 @@ fn decode_plist_object(unarchiver: u64, uid: usize, value: &plist::Value) -> u64
 fn date_to_ti(d: &plist::Date) -> f64 {
     // plist dates are XML date strings; convert to NSTimeInterval.
     // Apple reference date: 2001-01-01T00:00:00Z = Unix 978307200
-    use std::time::SystemTime;
     let xml = d.to_xml_format();
     // Try parsing ISO 8601
     if let Ok(secs_unix) = parse_iso8601_to_unix(&xml) {
@@ -384,8 +378,8 @@ fn parse_iso8601_to_unix(s: &str) -> Result<f64, ()> {
         30,
         31,
     ];
-    for m in 0..(month - 1) as usize {
-        days += month_days[m];
+    for &month_length in &month_days[..(month - 1) as usize] {
+        days += month_length;
     }
     days += day - 1;
 
@@ -570,9 +564,10 @@ fn decode_foundation_dictionary(unarchiver: u64, dict: &plist::Dictionary) -> u6
     let keys_val = dict.get("NS.keys");
     let vals_val = dict.get("NS.objects");
 
-    let (keys_raw, vals_raw) = match (keys_val, vals_val) {
-        (Some(plist::Value::Array(k)), Some(plist::Value::Array(v))) => (k, v),
-        _ => return crate::nsdictionary::make_nsdictionary(&[], &[]),
+    let (Some(plist::Value::Array(keys_raw)), Some(plist::Value::Array(vals_raw))) =
+        (keys_val, vals_val)
+    else {
+        return crate::nsdictionary::make_nsdictionary(&[], &[]);
     };
 
     let keys: Vec<u64> = keys_raw
@@ -1022,10 +1017,8 @@ fn apple_decode_key(unarchiver: u64, key: &str) -> Option<u64> {
 
     if let Some(uid_val) = uid_ref {
         Some(decode_uid(unarchiver, uid_val))
-    } else if let Some(v) = inline_val {
-        Some(decode_plist_object(unarchiver, uid, &v))
     } else {
-        None
+        inline_val.map(|v| decode_plist_object(unarchiver, uid, &v))
     }
 }
 
@@ -1960,7 +1953,7 @@ pub extern "C" fn shim_nskeyedunarchiver_contains_value_for_key(
     let found = guard
         .as_ref()
         .and_then(|m| m.get(&obj))
-        .map_or(false, |kv| kv.contains_key(&k));
+        .is_some_and(|kv| kv.contains_key(&k));
     u8::from(found)
 }
 
@@ -2238,17 +2231,17 @@ mod tests {
 
     #[test]
     fn encode_double_for_key_nil() {
-        shim_nskeyedarchiver_encode_double_for_key(0, 0, 3.14, 0);
+        shim_nskeyedarchiver_encode_double_for_key(0, 0, 9.87, 0);
     }
 
     #[test]
     fn encode_decode_double_roundtrip() {
         let archiver = alloc_obj(ARCHIVER_SIZE, archiver_isa());
-        let key = make_string("pi");
+        let key = make_string("decimal");
 
-        shim_nskeyedarchiver_encode_double_for_key(archiver, 0, 3.14, key);
+        shim_nskeyedarchiver_encode_double_for_key(archiver, 0, 9.87, key);
         let decoded = shim_nskeyedunarchiver_decode_double_for_key(archiver, 0, key);
-        assert!((decoded - 3.14).abs() < 1e-10);
+        assert!((decoded - 9.87).abs() < 1e-10);
 
         clear_store(archiver);
         free_obj(archiver);
@@ -2731,13 +2724,13 @@ mod tests {
     fn apple_archive_real_leaf() {
         let objects = vec![
             plist::Value::String("$null".to_string()),
-            plist::Value::Real(3.14),
+            plist::Value::Real(9.87),
         ];
         let bytes = build_apple_archive(objects, 1);
         let result = unarchive_bytes(&bytes);
         assert_ne!(result, 0);
         let val = crate::nsnumber::shim_nsnumber_double_value(result, 0);
-        assert!((val - 3.14).abs() < 0.001);
+        assert!((val - 9.87).abs() < 0.001);
     }
 
     #[test]
@@ -2950,7 +2943,7 @@ mod tests {
     fn apple_archive_nsnumber_double_coded() {
         let mut obj_dict = plist::Dictionary::new();
         obj_dict.insert("$class".to_string(), plist::Value::Uid(plist::Uid::new(2)));
-        obj_dict.insert("NS.dblval".to_string(), plist::Value::Real(2.718));
+        obj_dict.insert("NS.dblval".to_string(), plist::Value::Real(8.765));
 
         let mut class_desc = plist::Dictionary::new();
         class_desc.insert(
@@ -2971,7 +2964,7 @@ mod tests {
         let result = unarchive_bytes(&bytes);
         assert_ne!(result, 0);
         let val = crate::nsnumber::shim_nsnumber_double_value(result, 0);
-        assert!((val - 2.718).abs() < 0.001);
+        assert!((val - 8.765).abs() < 0.001);
     }
 
     #[test]

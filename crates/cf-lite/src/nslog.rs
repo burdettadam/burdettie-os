@@ -46,7 +46,7 @@ pub fn nslog_trampoline_addr() -> u64 {
         all(target_arch = "x86_64", target_os = "macos"),
     )))]
     {
-        shim_nslog_inner as u64
+        shim_nslog_inner as *const () as u64
     }
 }
 

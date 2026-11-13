@@ -194,8 +194,7 @@ impl Interpreter {
                             (src >> r) & ((1u64 << width) - 1)
                         } else {
                             // wrap case: rotate right by r, then mask bottom (s+1) bits
-                            let rot = src.rotate_right(r) & ((1u64 << (s + 1)) - 1);
-                            rot
+                            src.rotate_right(r) & ((1u64 << (s + 1)) - 1)
                         };
                         // Sign extend from bit position s (the MSB of the extracted field)
                         let sign_bit = if s >= r { s - r } else { s };
@@ -415,7 +414,6 @@ fn crc32_castagnoli(mut crc: u32, val: u64, nbytes: u32) -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::cpu::Nzcv;
     use crate::test_helpers::*;
 
@@ -423,12 +421,11 @@ mod tests {
 
     /// CSINV: sf 1 0 11010100 Rm cond 00 Rn Rd
     fn enc_csinv(sf: bool, rd: u8, rn: u8, rm: u8, cond: u8) -> u32 {
-        (u32::from(sf) << 31)
+        ((u32::from(sf) << 31)
             | (1 << 30)
             | (0b0011010100 << 21)
             | ((rm as u32 & 0x1F) << 16)
-            | ((cond as u32 & 0xF) << 12)
-            | (0b00 << 10)
+            | ((cond as u32 & 0xF) << 12))
             | ((rn as u32 & 0x1F) << 5)
             | (rd as u32 & 0x1F)
     }
@@ -459,26 +456,23 @@ mod tests {
 
     /// CCMP immediate: sf 1 1 11010010 imm5 cond 1 0 0 Rn 0 nzcv
     fn enc_ccmp_imm(sf: bool, imm5: u8, cond: u8, rn: u8, nzcv: u8) -> u32 {
-        (u32::from(sf) << 31)
+        ((u32::from(sf) << 31)
             | (1 << 30) // op=1 → CCMP
             | (0b111010010 << 21)
             | ((imm5 as u32 & 0x1F) << 16)
             | ((cond as u32 & 0xF) << 12)
-            | (1 << 11) // immediate form
-            | (0b0 << 10)
+            | (1 << 11))
             | ((rn as u32 & 0x1F) << 5)
             | (nzcv as u32 & 0xF)
     }
 
     /// CCMN immediate: sf 0 1 11010010 imm5 cond 1 0 0 Rn 0 nzcv
     fn enc_ccmn_imm(sf: bool, imm5: u8, cond: u8, rn: u8, nzcv: u8) -> u32 {
-        (u32::from(sf) << 31)
-            | (0 << 30) // op=0 → CCMN
+        ((u32::from(sf) << 31) // op=0 → CCMN
             | (0b111010010 << 21)
             | ((imm5 as u32 & 0x1F) << 16)
             | ((cond as u32 & 0xF) << 12)
-            | (1 << 11)
-            | (0b0 << 10)
+            | (1 << 11))
             | ((rn as u32 & 0x1F) << 5)
             | (nzcv as u32 & 0xF)
     }

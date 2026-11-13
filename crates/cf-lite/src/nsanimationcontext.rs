@@ -72,7 +72,7 @@ fn alloc_context() -> u64 {
 // ── Thread-local grouping stack ─────────────────────────────────
 
 thread_local! {
-    static CONTEXT_STACK: RefCell<Vec<u64>> = RefCell::new(Vec::new());
+    static CONTEXT_STACK: RefCell<Vec<u64>> = const { RefCell::new(Vec::new()) };
 }
 
 fn push_context(ctx: u64) {

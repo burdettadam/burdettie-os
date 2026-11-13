@@ -14,7 +14,6 @@
 use crate::cfstring;
 use crate::nsnotificationcenter::make_nsnotification;
 use crate::nsobj;
-use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 
 // ── Suspension behavior constants ──────────────────────────────────
@@ -330,9 +329,7 @@ pub fn cf_local_center_handle() -> u64 {
 /// Post a distributed notification by name (C string).
 pub fn post_distributed_by_cstr(name: &str, object: Option<&str>, user_info: u64) {
     let name_cf = crate::cfstring::make_cfstring(name);
-    let object_cf = object
-        .map(|o| crate::cfstring::make_cfstring(o))
-        .unwrap_or(0);
+    let object_cf = object.map(crate::cfstring::make_cfstring).unwrap_or(0);
     let notif = make_nsnotification(name_cf, object_cf, user_info);
     deliver_to_distributed_observers(name, notif);
 }

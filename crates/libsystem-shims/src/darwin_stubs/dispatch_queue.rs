@@ -123,9 +123,10 @@ fn serial_worker_loop(q: &QueueInner) {
 // ── Global queue registry ──────────────────────────────────────────
 
 static NEXT_HANDLE: AtomicU64 = AtomicU64::new(0x00D1_0000_0001);
-static QUEUE_REGISTRY: OnceLock<Mutex<Vec<(u64, Arc<QueueInner>)>>> = OnceLock::new();
+type QueueEntries = Vec<(u64, Arc<QueueInner>)>;
+static QUEUE_REGISTRY: OnceLock<Mutex<QueueEntries>> = OnceLock::new();
 
-fn registry() -> &'static Mutex<Vec<(u64, Arc<QueueInner>)>> {
+fn registry() -> &'static Mutex<QueueEntries> {
     QUEUE_REGISTRY.get_or_init(|| Mutex::new(Vec::new()))
 }
 
@@ -509,9 +510,11 @@ mod tests {
         let q = queue_create("test.concurrent", true);
         let started = Arc::new(AtomicUsize::new(0));
         let max_concurrent = Arc::new(AtomicUsize::new(0));
-        let barrier = Arc::new(std::sync::Barrier::new(4));
+        // A barrier cannot require more participants than the bounded pool.
+        let participants = available_parallelism().min(8);
+        let barrier = Arc::new(std::sync::Barrier::new(participants));
 
-        for _ in 0..4 {
+        for _ in 0..participants {
             let s = Arc::clone(&started);
             let m = Arc::clone(&max_concurrent);
             let b = Arc::clone(&barrier);
@@ -520,7 +523,7 @@ mod tests {
                 Box::new(move || {
                     let cur = s.fetch_add(1, Ordering::SeqCst) + 1;
                     m.fetch_max(cur, Ordering::SeqCst);
-                    b.wait(); // all 4 must reach here
+                    b.wait(); // every pool worker must reach here
                     s.fetch_sub(1, Ordering::SeqCst);
                 }),
             );
@@ -531,10 +534,10 @@ mod tests {
         // Give pool workers time to finish
         std::thread::sleep(std::time::Duration::from_millis(50));
 
-        assert!(
-            max_concurrent.load(Ordering::SeqCst) >= 2,
-            "concurrent queue should run tasks in parallel (got max {})",
-            max_concurrent.load(Ordering::SeqCst)
+        assert_eq!(
+            max_concurrent.load(Ordering::SeqCst),
+            participants,
+            "all available pool workers must run concurrently"
         );
     }
 

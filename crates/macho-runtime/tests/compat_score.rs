@@ -159,6 +159,7 @@ fn score_fixture_subprocess(name: &str, binary: &Path) -> FixtureScore {
 
 /// Run a fixture in-process and score it (fast path).
 fn score_fixture_inprocess(name: &str, binary: &Path) -> FixtureScore {
+    eprintln!("[compat fixture] {name}");
     let expected = expected_exit(name);
     let mut score = FixtureScore {
         name: name.to_string(),
@@ -175,6 +176,7 @@ fn score_fixture_inprocess(name: &str, binary: &Path) -> FixtureScore {
 
     let config = RuntimeConfig::permissive(binary);
     let _lock = RUNTIME_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    macho_runtime::reset_runtime_state_for_reuse();
 
     match Runtime::load_and_run(binary, &config) {
         Ok(result) => {

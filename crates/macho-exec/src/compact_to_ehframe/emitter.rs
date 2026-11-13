@@ -45,7 +45,7 @@ pub(crate) fn emit_cie_arm64(buf: &mut Vec<u8>, personality: Option<usize>, uses
     write_uleb128(buf, 0);
 
     // Pad to pointer-size alignment.
-    while (buf.len() - cie_start - 4) % std::mem::size_of::<usize>() != 0 {
+    while !(buf.len() - cie_start - 4).is_multiple_of(std::mem::size_of::<usize>()) {
         buf.push(DW_CFA_NOP);
     }
 
@@ -92,7 +92,7 @@ pub(crate) fn emit_fde_arm64(
     }
 
     // Pad to pointer-size alignment.
-    while (buf.len() - fde_start - 4) % std::mem::size_of::<usize>() != 0 {
+    while !(buf.len() - fde_start - 4).is_multiple_of(std::mem::size_of::<usize>()) {
         buf.push(DW_CFA_NOP);
     }
 

@@ -2,12 +2,9 @@
 
 use crate::color::Color;
 use crate::font_manager::FontManager;
-use crate::surface::Surface;
 
 use super::atlas::{GlyphAtlas, ATLAS_SIZE};
 use super::vertex::Vertex;
-
-use wgpu::util::DeviceExt;
 
 /// GPU-accelerated renderer using wgpu.
 ///
@@ -245,19 +242,11 @@ impl GpuRenderer {
     }
 
     /// Push a textured quad for a glyph.
-    pub(super) fn push_textured_quad(
-        &mut self,
-        x0: f32,
-        y0: f32,
-        x1: f32,
-        y1: f32,
-        u0: f32,
-        v0: f32,
-        u1: f32,
-        v1: f32,
-        color: Color,
-    ) {
-        let [r, g, b, a] = [
+    /// Bounds and UV coordinates are ordered left, top, right, bottom.
+    pub(super) fn push_textured_quad(&mut self, bounds: [f32; 4], uv: [f32; 4], color: Color) {
+        let [x0, y0, x1, y1] = bounds;
+        let [u0, v0, u1, v1] = uv;
+        let rgba = [
             color.r as f32,
             color.g as f32,
             color.b as f32,
@@ -268,18 +257,12 @@ impl GpuRenderer {
         let bl = self.to_ndc(x0, y1);
         let br = self.to_ndc(x1, y1);
 
-        self.vertices
-            .push(Vertex::textured(tl[0], tl[1], u0, v0, r, g, b, a));
-        self.vertices
-            .push(Vertex::textured(tr[0], tr[1], u1, v0, r, g, b, a));
-        self.vertices
-            .push(Vertex::textured(bl[0], bl[1], u0, v1, r, g, b, a));
-        self.vertices
-            .push(Vertex::textured(tr[0], tr[1], u1, v0, r, g, b, a));
-        self.vertices
-            .push(Vertex::textured(br[0], br[1], u1, v1, r, g, b, a));
-        self.vertices
-            .push(Vertex::textured(bl[0], bl[1], u0, v1, r, g, b, a));
+        self.vertices.push(Vertex::textured(tl, [u0, v0], rgba));
+        self.vertices.push(Vertex::textured(tr, [u1, v0], rgba));
+        self.vertices.push(Vertex::textured(bl, [u0, v1], rgba));
+        self.vertices.push(Vertex::textured(tr, [u1, v0], rgba));
+        self.vertices.push(Vertex::textured(br, [u1, v1], rgba));
+        self.vertices.push(Vertex::textured(bl, [u0, v1], rgba));
     }
 
     /// Flush all batched vertices to the GPU and render to a CPU Surface.

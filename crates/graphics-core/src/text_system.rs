@@ -169,6 +169,7 @@ pub fn measure_shaped_text(
 ///
 /// Returns the advance width of the last/only line (useful for cursor
 /// positioning).
+#[allow(clippy::too_many_arguments)] // Preserve the public pixel-buffer rendering API.
 pub fn draw_shaped_text(
     pixels: &mut [u32],
     surface_width: u32,
@@ -260,7 +261,6 @@ static EDITORS: Mutex<Option<HashMap<u64, EditorState>>> = Mutex::new(None);
 
 struct EditorState {
     editor: Editor<'static>,
-    font_size: f32,
     line_height: f32,
 }
 
@@ -291,7 +291,6 @@ pub fn editor_create(view_id: u64, text: &str, font_size: f64, max_width: f64) {
         });
         let state = EditorState {
             editor,
-            font_size: fs_val,
             line_height: lh,
         };
         ensure_editors();
@@ -401,6 +400,7 @@ pub fn editor_copy_selection(view_id: u64) -> Option<String> {
 /// Draw the editor contents with selection highlights and cursor bar.
 ///
 /// `show_cursor` should be true only when the text view is first responder.
+#[allow(clippy::too_many_arguments)] // Preserve the public editor rendering API.
 pub fn editor_draw(
     view_id: u64,
     pixels: &mut [u32],
@@ -420,9 +420,8 @@ pub fn editor_draw(
 
     with_text_system(|fs, sc| {
         let mut guard = editors_map();
-        let state = match guard.as_mut().and_then(|m| m.get_mut(&view_id)) {
-            Some(s) => s,
-            None => return,
+        let Some(state) = guard.as_mut().and_then(|m| m.get_mut(&view_id)) else {
+            return;
         };
         let line_height = state.line_height;
         let cursor_pos = state.editor.cursor_position();
@@ -445,11 +444,8 @@ pub fn editor_draw(
                     let run_y = oy + run.line_top as i32;
                     let run_h = line_height as i32;
 
-                    // Determine if this run is within the selection.
-                    let line_in_sel = (run_line > start.line && run_line < end.line)
-                        || (run_line == start.line && run_line == end.line)
-                        || run_line == start.line
-                        || run_line == end.line;
+                    // selection_bounds returns the endpoints in order.
+                    let line_in_sel = (start.line..=end.line).contains(&run_line);
                     if !line_in_sel {
                         continue;
                     }
@@ -460,10 +456,12 @@ pub fn editor_draw(
                             pixels,
                             sw,
                             sh,
-                            ox,
-                            run_y,
-                            run.line_w as i32,
-                            run_h,
+                            PixelRect {
+                                x: ox,
+                                y: run_y,
+                                width: run.line_w as i32,
+                                height: run_h,
+                            },
                             sel_argb,
                         );
                         continue;
@@ -494,10 +492,12 @@ pub fn editor_draw(
                             pixels,
                             sw,
                             sh,
-                            sel_x_min,
-                            run_y,
-                            sel_x_max - sel_x_min,
-                            run_h,
+                            PixelRect {
+                                x: sel_x_min,
+                                y: run_y,
+                                width: sel_x_max - sel_x_min,
+                                height: run_h,
+                            },
                             sel_argb,
                         );
                     }
@@ -546,23 +546,31 @@ pub fn editor_draw(
                 let cursor_y = oy + cy;
                 let cursor_h = line_height as i32;
                 // 2px wide cursor bar, black.
-                fill_rect_alpha(pixels, sw, sh, cursor_x, cursor_y, 2, cursor_h, 0xFF000000);
+                fill_rect_alpha(
+                    pixels,
+                    sw,
+                    sh,
+                    PixelRect {
+                        x: cursor_x,
+                        y: cursor_y,
+                        width: 2,
+                        height: cursor_h,
+                    },
+                    0xFF000000,
+                );
             }
         }
     });
 }
 
 /// Fill a rectangle with alpha blending onto ARGB32 pixels.
-fn fill_rect_alpha(
-    pixels: &mut [u32],
-    sw: i32,
-    sh: i32,
-    x: i32,
-    y: i32,
-    w: i32,
-    h: i32,
-    argb: u32,
-) {
+fn fill_rect_alpha(pixels: &mut [u32], sw: i32, sh: i32, rect: PixelRect, argb: u32) {
+    let PixelRect {
+        x,
+        y,
+        width: w,
+        height: h,
+    } = rect;
     let alpha = (argb >> 24) & 0xFF;
     if alpha == 0 {
         return;
@@ -589,6 +597,14 @@ fn fill_rect_alpha(
             }
         }
     }
+}
+
+#[derive(Clone, Copy)]
+struct PixelRect {
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
 }
 
 fn color_to_argb32(c: Color) -> u32 {

@@ -170,6 +170,7 @@ extern "C" fn shim_dispatch_once_f(
 /// Routes the block through the queue model:
 /// - Serial queues: enqueued for FIFO execution on a dedicated worker thread
 /// - Concurrent queues: submitted to the bounded thread pool
+///
 /// SAFETY: The block must remain valid for the duration of execution.
 extern "C" fn shim_dispatch_async(queue: *const u8, block: *const u8) {
     let Some(block) = OwnedBlock::from_ptr(block) else {
@@ -409,7 +410,6 @@ mod tests {
     #[test]
     fn dispatch_async_executes_block() {
         use std::sync::atomic::{AtomicBool, Ordering};
-        use std::sync::Arc;
 
         static FLAG: AtomicBool = AtomicBool::new(false);
         FLAG.store(false, Ordering::SeqCst);

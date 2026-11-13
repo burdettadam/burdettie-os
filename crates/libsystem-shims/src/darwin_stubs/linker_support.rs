@@ -379,9 +379,8 @@ extern "C" fn shim_mkpath_np(path: *const libc::c_char, mode: libc::mode_t) -> i
         return libc::EINVAL;
     }
     let c_str = unsafe { std::ffi::CStr::from_ptr(path) };
-    let path_str = match c_str.to_str() {
-        Ok(s) => s,
-        Err(_) => return libc::EINVAL,
+    let Ok(path_str) = c_str.to_str() else {
+        return libc::EINVAL;
     };
 
     // Walk each component and mkdir
@@ -395,9 +394,8 @@ extern "C" fn shim_mkpath_np(path: *const libc::c_char, mode: libc::mode_t) -> i
             built.push('/');
         }
         built.push_str(component);
-        let c_path = match std::ffi::CString::new(built.as_str()) {
-            Ok(c) => c,
-            Err(_) => return libc::EINVAL,
+        let Ok(c_path) = std::ffi::CString::new(built.as_str()) else {
+            return libc::EINVAL;
         };
         let ret = unsafe { libc::mkdir(c_path.as_ptr(), mode) };
         if ret != 0 {
@@ -624,7 +622,7 @@ extern "C" fn shim_uuid_generate_random(out: *mut u8) {
     }
     // Read 16 random bytes from /dev/urandom.
     unsafe {
-        let fd = libc::open(b"/dev/urandom\0".as_ptr() as *const _, libc::O_RDONLY);
+        let fd = libc::open(c"/dev/urandom".as_ptr(), libc::O_RDONLY);
         if fd >= 0 {
             libc::read(fd, out as *mut libc::c_void, 16);
             libc::close(fd);

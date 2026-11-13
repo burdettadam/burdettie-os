@@ -129,13 +129,15 @@ jobs:
           components: clippy, rustfmt
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
 
       - name: Check formatting
         run: cargo fmt --all -- --check
 
       - name: Clippy (strict)
         run: |
-          cargo clippy --locked --workspace --all-targets -- \
+          cargo clippy --locked --workspace --all-targets --keep-going -- \
             -D warnings \
             -A clippy::unwrap-used \
             -A clippy::expect-used \
@@ -151,11 +153,34 @@ jobs:
       - name: Build (debug)
         run: cargo build --locked --workspace --all-targets
 
+      - name: Test
+        run: cargo test --locked --workspace --no-fail-fast
+
+      - name: Diagnose native process failures
+        if: failure()
+        timeout-minutes: 5
+        run: |
+          # Diagnostic reruns never replace the required parallel workspace test.
+          for stem in arm64_translate headless_tests libsystem_shims compat_score runtime_exec_tests; do
+            for binary in target/debug/deps/"$stem"-*; do
+              [[ -f "$binary" && -x "$binary" ]] || continue
+              echo "::group::Native backtrace: $stem"
+              lldb --batch \
+                -o 'settings set target.disable-aslr false' \
+                -o run -k 'thread backtrace all' -k 'register read' \
+                -- "$binary" --nocapture || true
+              echo '::endgroup::'
+            done
+          done
+          echo '::group::Objective-C category sections'
+          otool -l fixtures/objc_category/objc_category || true
+          echo '::endgroup::'
+
+      - name: Test GPU text layout and glyph cache
+        run: cargo test --locked -p graphics-core --lib --features gpu
+
       - name: Build (release)
         run: cargo build --locked --workspace --release
-
-      - name: Test
-        run: cargo test --locked --workspace
 
       - name: Bundle runtime
         run: |

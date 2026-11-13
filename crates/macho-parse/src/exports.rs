@@ -11,6 +11,8 @@
 use macho_types::load_command::{LoadCommandPayload, LoadCommandType};
 use serde::{Deserialize, Serialize};
 
+use crate::leb128::read_uleb128;
+
 /// Flags from the export trie terminal nodes.
 pub const EXPORT_SYMBOL_FLAGS_KIND_MASK: u64 = 0x03;
 pub const EXPORT_SYMBOL_FLAGS_KIND_REGULAR: u64 = 0x00;
@@ -51,127 +53,220 @@ impl ExportedSymbol {
     }
 }
 
-fn read_uleb128(data: &[u8], pos: &mut usize) -> u64 {
-    let mut result: u64 = 0;
-    let mut shift = 0u32;
-    loop {
-        if *pos >= data.len() {
-            break;
-        }
-        let byte = data[*pos];
-        *pos += 1;
-        result |= ((byte & 0x7F) as u64) << shift;
-        if byte & 0x80 == 0 {
-            break;
-        }
-        shift += 7;
-        if shift >= 64 {
-            break;
-        }
-    }
-    result
+fn read_cstring<'a>(data: &'a [u8], pos: &mut usize, scan_budget: &mut usize) -> Option<&'a [u8]> {
+    let remaining = data.get(*pos..)?;
+    let scan = &remaining[..remaining.len().min(*scan_budget)];
+    let length = scan.iter().position(|&byte| byte == 0);
+    // Charge failed scans too: a shared unterminated name must not be
+    // rescanned once per path through a compact DAG.
+    *scan_budget -= length.map_or(scan.len(), |length| length + 1);
+    let length = length?;
+    *pos += length + 1;
+    Some(&remaining[..length])
 }
 
-fn read_cstring(data: &[u8], pos: &mut usize) -> String {
-    let start = *pos;
-    while *pos < data.len() && data[*pos] != 0 {
-        *pos += 1;
+fn parse_terminal(
+    data: &[u8],
+    name: String,
+    name_budget: &mut usize,
+    scan_budget: &mut usize,
+) -> Option<ExportedSymbol> {
+    let mut pos = 0;
+    let flags = read_uleb128(data, &mut pos)?;
+    if flags & EXPORT_SYMBOL_FLAGS_REEXPORT != 0 {
+        let ordinal = read_uleb128(data, &mut pos)?;
+        let reexport_name = read_cstring(data, &mut pos, scan_budget)?;
+        // Lossy UTF-8 can expand each invalid byte into three bytes.
+        *name_budget = name_budget.checked_sub(reexport_name.len().checked_mul(3)?)?;
+        let reexport_name = String::from_utf8_lossy(reexport_name).into_owned();
+        Some(ExportedSymbol {
+            name,
+            flags,
+            address: 0,
+            reexport_ordinal: Some(ordinal),
+            reexport_name: (!reexport_name.is_empty()).then_some(reexport_name),
+        })
+    } else {
+        let address = read_uleb128(data, &mut pos)?;
+        let address = if flags & EXPORT_SYMBOL_FLAGS_STUB_AND_RESOLVER != 0 {
+            read_uleb128(data, &mut pos)?
+        } else {
+            address
+        };
+        Some(ExportedSymbol {
+            name,
+            flags,
+            address,
+            reexport_ordinal: None,
+            reexport_name: None,
+        })
     }
-    let s = String::from_utf8_lossy(&data[start..*pos]).into_owned();
-    if *pos < data.len() {
-        *pos += 1;
-    }
-    s
 }
 
 /// Parse the export trie from raw bytes.
+///
+/// Malformed branches are skipped. Terminal records must fit inside their
+/// declared lengths, and cycles are rejected without discarding valid aliases
+/// that reach a shared node through different prefixes. To prevent compact DAGs
+/// from expanding into unbounded output, the walk schedules at most four times
+/// the input length (and at most one million nodes). Decoded prefix and symbol
+/// names share a byte budget of 64 times the input length, capped at 64 MiB.
+/// C-string scanning has a separate byte budget with the same limits, including
+/// failed scans, so malformed shared nodes cannot cause quadratic rescanning.
+/// If a budget is exhausted, symbols successfully parsed so far are returned.
 pub fn parse_export_trie(trie_data: &[u8]) -> Vec<ExportedSymbol> {
+    enum StackEntry {
+        Visit { offset: usize, prefix: String },
+        Leave(usize),
+    }
+
     let mut results = Vec::new();
-    if trie_data.is_empty() {
-        return results;
-    }
-
-    // DFS through the trie
-    struct StackEntry {
-        offset: usize,
-        prefix: String,
-    }
-
-    let mut stack = vec![StackEntry {
+    let max_nodes = trie_data.len().saturating_mul(4).min(1_000_000);
+    let mut remaining_nodes = max_nodes.saturating_sub(1);
+    let mut remaining_name_bytes = trie_data.len().saturating_mul(64).min(64 * 1024 * 1024);
+    let mut remaining_scan_bytes = remaining_name_bytes;
+    let mut active = std::collections::HashSet::new();
+    let mut stack = vec![StackEntry::Visit {
         offset: 0,
         prefix: String::new(),
     }];
 
-    while let Some(entry) = stack.pop() {
-        if entry.offset >= trie_data.len() {
-            continue;
-        }
-
-        let mut pos = entry.offset;
-        let terminal_size = read_uleb128(trie_data, &mut pos) as usize;
-
-        if terminal_size > 0 {
-            let terminal_start = pos;
-            let flags = read_uleb128(trie_data, &mut pos);
-
-            if flags & EXPORT_SYMBOL_FLAGS_REEXPORT != 0 {
-                let ordinal = read_uleb128(trie_data, &mut pos);
-                let reexport_name = read_cstring(trie_data, &mut pos);
-                results.push(ExportedSymbol {
-                    name: entry.prefix.clone(),
-                    flags,
-                    address: 0,
-                    reexport_ordinal: Some(ordinal),
-                    reexport_name: if reexport_name.is_empty() {
-                        None
-                    } else {
-                        Some(reexport_name)
-                    },
-                });
-            } else {
-                let address = read_uleb128(trie_data, &mut pos);
-                let final_address = if flags & EXPORT_SYMBOL_FLAGS_STUB_AND_RESOLVER != 0 {
-                    // STUB_AND_RESOLVER: `address` above consumed stub_offset.
-                    // Read the resolver_offset as the real address.
-                    read_uleb128(trie_data, &mut pos)
-                } else {
-                    address
-                };
-                results.push(ExportedSymbol {
-                    name: entry.prefix.clone(),
-                    flags,
-                    address: final_address,
-                    reexport_ordinal: None,
-                    reexport_name: None,
-                });
+    'traversal: while let Some(entry) = stack.pop() {
+        let (offset, prefix) = match entry {
+            StackEntry::Visit { offset, prefix } => (offset, prefix),
+            StackEntry::Leave(offset) => {
+                active.remove(&offset);
+                continue;
             }
-
-            // Skip any remaining terminal bytes
-            pos = terminal_start + terminal_size;
+        };
+        if remaining_scan_bytes == 0 {
+            log::debug!("export trie input-scan budget exhausted");
+            break;
         }
-
-        // Read children
-        if pos >= trie_data.len() {
+        if offset >= trie_data.len() || !active.insert(offset) {
             continue;
         }
-        let child_count = trie_data[pos] as usize;
-        pos += 1;
+        stack.push(StackEntry::Leave(offset));
 
-        for _ in 0..child_count {
-            if pos >= trie_data.len() {
+        let mut pos = offset;
+        let Some(terminal_size) =
+            read_uleb128(trie_data, &mut pos).and_then(|value| usize::try_from(value).ok())
+        else {
+            continue;
+        };
+        let Some(terminal_end) = pos.checked_add(terminal_size) else {
+            continue;
+        };
+        let Some(terminal) = trie_data.get(pos..terminal_end) else {
+            continue;
+        };
+        if !terminal.is_empty() {
+            let Some(budget) = remaining_name_bytes.checked_sub(prefix.len()) else {
+                log::debug!("export trie decoded-name budget exhausted");
+                break;
+            };
+            remaining_name_bytes = budget;
+            let Some(symbol) = parse_terminal(
+                terminal,
+                prefix.clone(),
+                &mut remaining_name_bytes,
+                &mut remaining_scan_bytes,
+            ) else {
+                continue;
+            };
+            results.push(symbol);
+            if results.len() >= max_nodes {
+                log::debug!("export trie symbol budget exhausted");
                 break;
             }
-            let edge_label = read_cstring(trie_data, &mut pos);
-            let child_offset = read_uleb128(trie_data, &mut pos) as usize;
+        }
+        pos = terminal_end;
 
-            stack.push(StackEntry {
+        let Some(&child_count) = trie_data.get(pos) else {
+            continue;
+        };
+        pos += 1;
+        for _ in 0..child_count {
+            let Some(edge_label) = read_cstring(trie_data, &mut pos, &mut remaining_scan_bytes)
+            else {
+                break;
+            };
+            let Some(child_offset) =
+                read_uleb128(trie_data, &mut pos).and_then(|value| usize::try_from(value).ok())
+            else {
+                break;
+            };
+            if child_offset >= trie_data.len() || active.contains(&child_offset) {
+                continue;
+            }
+            if remaining_nodes == 0 {
+                log::debug!("export trie traversal budget exhausted");
+                break 'traversal;
+            }
+            let Some(name_size) = edge_label
+                .len()
+                .checked_mul(3)
+                .and_then(|size| prefix.len().checked_add(size))
+            else {
+                break 'traversal;
+            };
+            let Some(budget) = remaining_name_bytes.checked_sub(name_size) else {
+                log::debug!("export trie decoded-name budget exhausted");
+                break 'traversal;
+            };
+            remaining_name_bytes = budget;
+            remaining_nodes -= 1;
+            let edge_label = String::from_utf8_lossy(edge_label);
+            stack.push(StackEntry::Visit {
                 offset: child_offset,
-                prefix: format!("{}{}", entry.prefix, edge_label),
+                prefix: format!("{prefix}{edge_label}"),
             });
         }
     }
 
     results
+}
+
+/// Extract exported symbols from a parsed Mach-O.
+pub fn extract_exports(parsed: &super::ParsedMachO, raw_data: &[u8]) -> Vec<ExportedSymbol> {
+    // Try LC_DYLD_EXPORTS_TRIE first (modern)
+    for cmd in &parsed.commands {
+        if cmd.cmd == LoadCommandType::DyldExportsTrie {
+            if let LoadCommandPayload::LinkEdit {
+                data_off,
+                data_size,
+            } = &cmd.payload
+            {
+                if let Some(data) =
+                    crate::bytes_at(raw_data, u64::from(*data_off), u64::from(*data_size))
+                {
+                    return parse_export_trie(data);
+                }
+            }
+        }
+    }
+
+    // Fall back to LC_DYLD_INFO(_ONLY) export_off/export_size
+    for cmd in &parsed.commands {
+        if cmd.cmd == LoadCommandType::DyldInfoOnly || cmd.cmd == LoadCommandType::DyldInfo {
+            if let LoadCommandPayload::DyldInfo {
+                export_off,
+                export_size,
+                ..
+            } = &cmd.payload
+            {
+                if *export_size > 0 {
+                    if let Some(data) =
+                        crate::bytes_at(raw_data, u64::from(*export_off), u64::from(*export_size))
+                    {
+                        return parse_export_trie(data);
+                    }
+                }
+            }
+        }
+    }
+
+    Vec::new()
 }
 
 #[cfg(test)]
@@ -239,7 +334,7 @@ mod tests {
     fn read_uleb128_single_byte() {
         let data = [0x05];
         let mut pos = 0;
-        assert_eq!(read_uleb128(&data, &mut pos), 5);
+        assert_eq!(read_uleb128(&data, &mut pos), Some(5));
         assert_eq!(pos, 1);
     }
 
@@ -248,7 +343,7 @@ mod tests {
         // 624485 = 0xE5 0x8E 0x26
         let data = [0xE5, 0x8E, 0x26];
         let mut pos = 0;
-        assert_eq!(read_uleb128(&data, &mut pos), 624485);
+        assert_eq!(read_uleb128(&data, &mut pos), Some(624485));
         assert_eq!(pos, 3);
     }
 
@@ -256,23 +351,34 @@ mod tests {
     fn read_uleb128_empty() {
         let data: [u8; 0] = [];
         let mut pos = 0;
-        assert_eq!(read_uleb128(&data, &mut pos), 0);
+        assert_eq!(read_uleb128(&data, &mut pos), None);
     }
 
     #[test]
     fn read_cstring_simple() {
         let data = b"hello\0world\0";
         let mut pos = 0;
-        assert_eq!(read_cstring(data, &mut pos), "hello");
+        let mut budget = data.len();
+        assert_eq!(
+            read_cstring(data, &mut pos, &mut budget),
+            Some(b"hello".as_slice())
+        );
         assert_eq!(pos, 6); // past the NUL
-        assert_eq!(read_cstring(data, &mut pos), "world");
+        assert_eq!(
+            read_cstring(data, &mut pos, &mut budget),
+            Some(b"world".as_slice())
+        );
     }
 
     #[test]
     fn read_cstring_empty_string() {
         let data = b"\0rest";
         let mut pos = 0;
-        assert_eq!(read_cstring(data, &mut pos), "");
+        let mut budget = data.len();
+        assert_eq!(
+            read_cstring(data, &mut pos, &mut budget),
+            Some(b"".as_slice())
+        );
         assert_eq!(pos, 1);
     }
 
@@ -280,46 +386,28 @@ mod tests {
     fn parse_export_trie_empty() {
         assert!(parse_export_trie(&[]).is_empty());
     }
-}
 
-/// Extract exported symbols from a parsed Mach-O.
-pub fn extract_exports(parsed: &super::ParsedMachO, raw_data: &[u8]) -> Vec<ExportedSymbol> {
-    // Try LC_DYLD_EXPORTS_TRIE first (modern)
-    for cmd in &parsed.commands {
-        if cmd.cmd == LoadCommandType::DyldExportsTrie {
-            if let LoadCommandPayload::LinkEdit {
-                data_off,
-                data_size,
-            } = &cmd.payload
-            {
-                let start = *data_off as usize;
-                let end = start + *data_size as usize;
-                if end <= raw_data.len() {
-                    return parse_export_trie(&raw_data[start..end]);
-                }
-            }
-        }
+    #[test]
+    fn cstring_scan_stops_before_a_nul_beyond_its_budget() {
+        let mut pos = 0;
+        let mut budget = 3;
+        assert_eq!(read_cstring(b"long_name\0", &mut pos, &mut budget), None);
+        assert_eq!(budget, 0);
+        assert_eq!(pos, 0);
+        assert_eq!(read_cstring(b"\0", &mut pos, &mut budget), None);
     }
 
-    // Fall back to LC_DYLD_INFO(_ONLY) export_off/export_size
-    for cmd in &parsed.commands {
-        if cmd.cmd == LoadCommandType::DyldInfoOnly || cmd.cmd == LoadCommandType::DyldInfo {
-            if let LoadCommandPayload::DyldInfo {
-                export_off,
-                export_size,
-                ..
-            } = &cmd.payload
-            {
-                if *export_size > 0 {
-                    let start = *export_off as usize;
-                    let end = start + *export_size as usize;
-                    if end <= raw_data.len() {
-                        return parse_export_trie(&raw_data[start..end]);
-                    }
-                }
-            }
-        }
+    #[test]
+    fn cstring_scan_charges_only_bytes_examined() {
+        let mut pos = 0;
+        let mut budget = 9;
+        assert_eq!(
+            read_cstring(b"ok\0tail", &mut pos, &mut budget),
+            Some(b"ok".as_slice())
+        );
+        assert_eq!(budget, 6);
+        assert_eq!(pos, 3);
+        assert_eq!(read_cstring(b"ok\0tail", &mut pos, &mut budget), None);
+        assert_eq!(budget, 2);
     }
-
-    Vec::new()
 }

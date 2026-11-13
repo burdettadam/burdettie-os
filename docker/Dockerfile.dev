@@ -31,7 +31,8 @@ RUN cargo build --locked \
     -p macho-fixtures \
     -p test-harness
 
-# Default: run clippy on cross-platform crates
+# Use the same strict lint policy as the macOS CI job, including its explicit
+# allowances for test assertions and intentional low-level numeric conversions.
 CMD ["cargo", "clippy", "--locked", \
      "-p", "platform-core", \
      "-p", "macho-types", \
@@ -44,4 +45,14 @@ CMD ["cargo", "clippy", "--locked", \
      "-p", "trust-policy", \
      "-p", "macho-fixtures", \
      "-p", "test-harness", \
-     "--all-targets", "--", "-D", "warnings"]
+     "--all-targets", "--", "-D", "warnings", \
+     "-A", "clippy::unwrap-used", \
+     "-A", "clippy::expect-used", \
+     "-A", "clippy::cast-possible-truncation", \
+     "-A", "clippy::cast-sign-loss", \
+     "-A", "clippy::cast-possible-wrap", \
+     "-A", "clippy::cast-lossless", \
+     "-A", "clippy::ptr-as-ptr", \
+     "-A", "clippy::print-stderr", \
+     "-A", "clippy::redundant-closure-for-method-calls", \
+     "-A", "clippy::implicit-clone"]

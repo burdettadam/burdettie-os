@@ -37,17 +37,17 @@ struct NXArchInfo {
 unsafe impl Sync for NXArchInfo {}
 
 static ARM64_INFO: NXArchInfo = NXArchInfo {
-    name: b"arm64\0".as_ptr() as *const c_char,
+    name: c"arm64".as_ptr(),
     cputype: CPU_TYPE_ARM64,
     cpusubtype: CPU_SUBTYPE_ARM64_ALL,
-    description: b"arm64\0".as_ptr() as *const c_char,
+    description: c"arm64".as_ptr(),
 };
 
 static X86_64_INFO: NXArchInfo = NXArchInfo {
-    name: b"x86_64\0".as_ptr() as *const c_char,
+    name: c"x86_64".as_ptr(),
     cputype: CPU_TYPE_X86_64,
     cpusubtype: CPU_SUBTYPE_X86_64_ALL,
-    description: b"x86_64\0".as_ptr() as *const c_char,
+    description: c"x86_64".as_ptr(),
 };
 
 pub struct MachoArchStubs;
@@ -125,16 +125,16 @@ pub extern "C" fn shim_nx_get_arch_info_from_name(name: u64) -> u64 {
 // Static null-terminated table: [arm64, x86_64, {null sentinel}]
 static ARCH_TABLE: [NXArchInfo; 3] = [
     NXArchInfo {
-        name: b"arm64\0".as_ptr() as *const c_char,
+        name: c"arm64".as_ptr(),
         cputype: CPU_TYPE_ARM64,
         cpusubtype: CPU_SUBTYPE_ARM64_ALL,
-        description: b"arm64\0".as_ptr() as *const c_char,
+        description: c"arm64".as_ptr(),
     },
     NXArchInfo {
-        name: b"x86_64\0".as_ptr() as *const c_char,
+        name: c"x86_64".as_ptr(),
         cputype: CPU_TYPE_X86_64,
         cpusubtype: CPU_SUBTYPE_X86_64_ALL,
-        description: b"x86_64\0".as_ptr() as *const c_char,
+        description: c"x86_64".as_ptr(),
     },
     // Sentinel: name == NULL terminates the list
     NXArchInfo {
@@ -184,9 +184,9 @@ mod tests {
 
     #[test]
     fn name_lookup() {
-        let ptr = shim_nx_get_arch_info_from_name(b"arm64\0".as_ptr() as u64);
+        let ptr = shim_nx_get_arch_info_from_name(c"arm64".as_ptr() as u64);
         assert_ne!(ptr, 0);
-        let ptr2 = shim_nx_get_arch_info_from_name(b"unknown\0".as_ptr() as u64);
+        let ptr2 = shim_nx_get_arch_info_from_name(c"unknown".as_ptr() as u64);
         assert_eq!(ptr2, 0);
     }
 

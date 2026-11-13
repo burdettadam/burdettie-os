@@ -112,6 +112,8 @@ impl ObjcRuntime {
                 .insert(mapped_addr, Arc::clone(&name_arc));
             self.classes_by_name
                 .insert(Arc::clone(&name_arc), Arc::new(info));
+            self.mapped_class_addrs
+                .insert(Arc::clone(&name_arc), mapped_addr);
 
             if class_ref.metaclass_addr != 0 {
                 let meta_mapped = (class_ref.metaclass_addr as i64 + slide) as u64;
@@ -360,6 +362,9 @@ impl ObjcRuntime {
     }
 
     /// Register a synthetic class created by the runtime (not from parsed metadata).
+    ///
+    /// Its superclass is supplied in `info`; `mapped_addr` may be an opaque
+    /// handle, so superclass repair never reads memory through that address.
     pub fn register_synthetic_class(&mut self, mut info: ClassInfo) {
         let addr = info.mapped_addr;
         let name = info.name.clone();
@@ -380,8 +385,21 @@ impl ObjcRuntime {
             info.methods.len(),
         );
         let name_arc: Arc<str> = Arc::from(name.as_str());
+        self.mapped_class_addrs.remove(&name_arc);
         self.classes_by_addr.insert(addr, Arc::clone(&name_arc));
         self.classes_by_name.insert(name_arc, Arc::new(info));
+    }
+
+    /// Register a class backed by an image's mapped `objc_class_t` record.
+    ///
+    /// Use this when an exported class lacks parsed metadata but still needs
+    /// its superclass resolved from the image after fixups. The mapped record
+    /// must remain valid whenever [`Self::repair_superclass_addrs`] is called.
+    pub fn register_mapped_class(&mut self, info: ClassInfo) {
+        let addr = info.mapped_addr;
+        let name: Arc<str> = Arc::from(info.name.as_str());
+        self.register_synthetic_class(info);
+        self.mapped_class_addrs.insert(name, addr);
     }
 
     /// Register a metaclass address mapping for a synthetic class.
@@ -396,28 +414,32 @@ impl ObjcRuntime {
         );
     }
 
-    /// Repair `superclass_addr` for all registered classes by reading from
-    /// mapped memory (post-fixup).
+    /// Repair `superclass_addr` for image-backed classes by reading from
+    /// mapped memory (post-fixup). Synthetic class hierarchies are preserved.
     ///
     /// # Safety
     ///
     /// Must be called after fixups are applied and before `mprotect`.
-    /// The `mapped_addr` for each class must point to a valid, mapped
-    /// `objc_class_t` struct.
+    /// Each class registered via `register_image` or `register_mapped_class`
+    /// must still have a valid, readable mapped `objc_class_t` record at its
+    /// registered address. The memory must not be concurrently modified.
     pub unsafe fn repair_superclass_addrs(&mut self) {
-        for class_arc in self.classes_by_name.values_mut() {
-            let addr = class_arc.mapped_addr;
-            if addr == 0 {
+        for (name, &addr) in &self.mapped_class_addrs {
+            let Some(class_arc) = self.classes_by_name.get_mut(name) else {
+                continue;
+            };
+            if addr == 0 || class_arc.mapped_addr != addr {
                 continue;
             }
-            let super_ptr = unsafe { *((addr + 8) as *const u64) };
+            // Read the on-disk field layout without assuming a Rust allocation
+            // alignment for the image record. The caller guarantees its extent.
+            let super_ptr = unsafe { (addr as *const u64).add(1).read_unaligned() };
             let new_super = if super_ptr == 0 {
                 None
             } else {
                 Some(super_ptr)
             };
-            // Check before calling Arc::make_mut to avoid COW clones for
-            // Foundation synthetic classes whose superclass never changes.
+            // Preserve shared class metadata when the resolved parent matches.
             if class_arc.superclass_addr != new_super {
                 let class = Arc::make_mut(class_arc);
                 log::debug!(

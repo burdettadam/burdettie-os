@@ -6,6 +6,7 @@
 //!   offset 88: bounds_origin_x   (f64 — scroll x offset)
 //!   offset 96: bounds_origin_y   (f64 — scroll y offset)
 
+use crate::cg_types::CGRect;
 use crate::nsobj;
 
 fn read_u64(obj: u64, offset: usize) -> u64 {
@@ -108,8 +109,8 @@ pub extern "C" fn shim_nsclipview_constrain_bounds_rect(
     y: f64,
     w: f64,
     h: f64,
-) -> (f64, f64, f64, f64) {
-    (x, y, w, h)
+) -> CGRect {
+    CGRect::new(x, y, w, h)
 }
 
 /// `-[NSClipView drawRect:]` — applies the bounds offset as a CTM translate,
@@ -175,6 +176,16 @@ mod tests {
         assert_eq!(read_f64(cv, BOUNDS_X_OFF), 100.0);
         assert_eq!(read_f64(cv, BOUNDS_Y_OFF), 200.0);
         free_obj(cv);
+    }
+
+    #[test]
+    fn constrain_bounds_returns_rect_aggregate() {
+        let constrain: extern "C" fn(u64, u64, f64, f64, f64, f64) -> CGRect =
+            shim_nsclipview_constrain_bounds_rect;
+        assert_eq!(
+            constrain(0, 0, -10.5, 20.25, 300.0, 400.0),
+            CGRect::new(-10.5, 20.25, 300.0, 400.0)
+        );
     }
 
     #[test]

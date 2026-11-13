@@ -258,12 +258,9 @@ pub extern "C" fn shim_nsfilemanager_remove_item(
         return 0;
     };
 
-    let meta = match std::fs::metadata(&p) {
-        Ok(m) => m,
-        Err(_) => {
-            set_cocoa_error(err_ptr, 4);
-            return 0;
-        }
+    let Ok(meta) = std::fs::metadata(&p) else {
+        set_cocoa_error(err_ptr, 4);
+        return 0;
     };
 
     let result = if meta.is_dir() {
@@ -448,12 +445,9 @@ pub extern "C" fn shim_nsfilemanager_attributes_of_item(
         return 0;
     };
 
-    let meta = match std::fs::metadata(&p) {
-        Ok(m) => m,
-        Err(_) => {
-            set_cocoa_error(err_ptr, 260); // NSFileReadNoSuchFileError
-            return 0;
-        }
+    let Ok(meta) = std::fs::metadata(&p) else {
+        set_cocoa_error(err_ptr, 260); // NSFileReadNoSuchFileError
+        return 0;
     };
 
     // Build NSDictionary with NSFileSize key

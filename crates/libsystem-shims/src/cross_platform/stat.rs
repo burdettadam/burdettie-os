@@ -289,7 +289,7 @@ unsafe fn linux_statfs_to_darwin(linux: &libc::statfs, darwin: *mut DarwinStatfs
         d.f_files = linux.f_files;
         d.f_ffree = linux.f_ffree;
         // On Linux, fsid_t is { __val: [i32; 2] } — copy the raw bytes.
-        d.f_fsid = unsafe { std::mem::transmute(linux.f_fsid) };
+        d.f_fsid = std::mem::transmute::<libc::fsid_t, [i32; 2]>(linux.f_fsid);
         d.f_owner = 0; // no Linux equivalent
         d.f_type = linux.f_type as u32;
         // Linux glibc statfs doesn't expose f_flags directly;

@@ -241,7 +241,8 @@ fn find_service_by_handle(handle: u32) -> Option<SyntheticService> {
 // ── Iterator tracking ───────────────────────────────────────────────────────
 
 /// Maps iterator handle → (vec of service handles, current index).
-static ITERATORS: Mutex<Option<HashMap<u32, (Vec<u32>, usize)>>> = Mutex::new(None);
+type ServiceIterators = HashMap<u32, (Vec<u32>, usize)>;
+static ITERATORS: Mutex<Option<ServiceIterators>> = Mutex::new(None);
 
 fn create_iterator(services: Vec<u32>) -> u32 {
     let handle = alloc_handle();
@@ -1356,9 +1357,8 @@ pub extern "C" fn shim_io_service_matching(name: *const u8) -> u64 {
 /// Looks up the class from the tracked matching dict, then finds the first
 /// matching synthetic service in the registry.
 pub extern "C" fn shim_io_service_get_matching_service(_master_port: u32, matching: u64) -> u32 {
-    let class_name = match lookup_matching_class(matching) {
-        Some(c) => c,
-        None => return 0,
+    let Some(class_name) = lookup_matching_class(matching) else {
+        return 0;
     };
     log::debug!("IOServiceGetMatchingService(\"{}\")", class_name);
     find_service_by_class(&class_name).unwrap_or(0)
@@ -1372,16 +1372,13 @@ pub extern "C" fn shim_io_service_get_matching_services(
     matching: u64,
     existing: *mut u32,
 ) -> i32 {
-    let class_name = match lookup_matching_class(matching) {
-        Some(c) => c,
-        None => {
-            if !existing.is_null() {
-                unsafe {
-                    *existing = 0;
-                }
+    let Some(class_name) = lookup_matching_class(matching) else {
+        if !existing.is_null() {
+            unsafe {
+                *existing = 0;
             }
-            return K_IO_RETURN_SUCCESS;
         }
+        return K_IO_RETURN_SUCCESS;
     };
 
     let services = ensure_registry();
@@ -1581,9 +1578,8 @@ fn extract_key_string(key: u64) -> Option<String> {
 
 /// Look up a single property for a synthetic service by key name.
 fn lookup_service_property(service_handle: u32, key: &str) -> u64 {
-    let service = match find_service_by_handle(service_handle) {
-        Some(s) => s,
-        None => return 0,
+    let Some(service) = find_service_by_handle(service_handle) else {
+        return 0;
     };
 
     match service.class_name {
@@ -1779,9 +1775,8 @@ pub extern "C" fn shim_io_registry_entry_create_cf_property(
     _allocator: u64,
     _options: u32,
 ) -> u64 {
-    let key_str = match extract_key_string(key) {
-        Some(k) => k,
-        None => return 0,
+    let Some(key_str) = extract_key_string(key) else {
+        return 0;
     };
     log::debug!(
         "IORegistryEntryCreateCFProperty({}, \"{}\")",
@@ -1802,9 +1797,8 @@ pub extern "C" fn shim_io_registry_entry_search_cf_property(
     _allocator: u64,
     _options: u32,
 ) -> u64 {
-    let key_str = match extract_key_string(key) {
-        Some(k) => k,
-        None => return 0,
+    let Some(key_str) = extract_key_string(key) else {
+        return 0;
     };
     log::debug!(
         "IORegistryEntrySearchCFProperty({}, \"{}\")",
@@ -1880,14 +1874,11 @@ pub extern "C" fn shim_io_registry_entry_create_cf_properties(
     if properties.is_null() {
         return K_IO_RETURN_UNSUPPORTED;
     }
-    let service = match find_service_by_handle(entry) {
-        Some(s) => s,
-        None => {
-            unsafe {
-                *properties = 0;
-            }
-            return K_IO_RETURN_NOT_FOUND;
+    let Some(service) = find_service_by_handle(entry) else {
+        unsafe {
+            *properties = 0;
         }
+        return K_IO_RETURN_NOT_FOUND;
     };
 
     log::debug!(
@@ -2671,11 +2662,11 @@ mod tests {
         assert_ne!(service, 0);
 
         assert_eq!(
-            shim_io_object_conforms_to(service, b"IOPlatformExpertDevice\0".as_ptr()),
+            shim_io_object_conforms_to(service, c"IOPlatformExpertDevice".as_ptr().cast()),
             1
         );
         assert_eq!(
-            shim_io_object_conforms_to(service, b"IOHIDDevice\0".as_ptr()),
+            shim_io_object_conforms_to(service, c"IOHIDDevice".as_ptr().cast()),
             0
         );
     }

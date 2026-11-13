@@ -1,6 +1,5 @@
 use ab_glyph::{Font as AbFont, ScaleFont};
 
-use crate::color::Color;
 use crate::font::TextRun;
 use crate::font_manager::{FontFace, FontManager};
 use crate::unicode::{is_combining_mark, is_zero_width, normalize_nfc};
@@ -28,6 +27,9 @@ pub struct AttributedLayout<'a> {
 /// Each `TextRun` specifies a byte range in `text` and optional overrides
 /// for font, size, color, bold, and italic. The default font face and size
 /// are used where a run doesn't override them.
+/// NFC normalization is applied within each style span, after resolving
+/// ranges against the original text, so composition cannot shift styles or
+/// merge a combining mark into a base character with a different style.
 ///
 /// Returns an `AttributedLayout` whose glyphs carry per-glyph font and
 /// color info so the renderer can switch styles mid-line.
@@ -38,8 +40,6 @@ pub fn layout_attributed<'a>(
     default_font: &'a FontFace,
     default_size: f64,
 ) -> AttributedLayout<'a> {
-    let normalized = normalize_nfc(text);
-
     // Build a deduplicated list of font faces used and map run → font_index.
     let mut font_list: Vec<&FontFace> = vec![default_font];
     let mut run_font_indices: Vec<usize> = Vec::with_capacity(runs.len());
@@ -58,18 +58,24 @@ pub fn layout_attributed<'a>(
         run_sizes.push(run.size.unwrap_or(default_size));
     }
 
-    // Layout: iterate through chars, find the active run for each byte offset.
+    // Resolve styles before normalization changes the original byte offsets.
+    let spans = styled_spans(text, runs);
+
+    // Layout the normalized characters of each style span.
     let mut glyphs = Vec::new();
     let mut cursor_x = 0.0f64;
-    let mut prev_glyph: Option<(ab_glyph::GlyphId, usize)> = None; // (glyph_id, font_index)
+    let mut prev_glyph: Option<(ab_glyph::GlyphId, usize, f64)> = None;
     let mut last_base_x = 0.0f64;
     let mut max_ascent = 0.0f64;
     let mut max_line_height = 0.0f64;
 
-    // Precompute ascent/line_height for each run.
-    for (i, _run) in runs.iter().enumerate() {
-        let face = font_list[run_font_indices[i]];
-        let sz = run_sizes[i];
+    // Include default-styled spans; a small explicit run must not clip the
+    // larger unstyled text that shares its baseline.
+    for (_, run) in &spans {
+        let (font_index, sz) = run
+            .map(|i| (run_font_indices[i], run_sizes[i]))
+            .unwrap_or((0, default_size));
+        let face = font_list[font_index];
         let m = face.metrics(sz);
         if m.ascent > max_ascent {
             max_ascent = m.ascent;
@@ -80,69 +86,58 @@ pub fn layout_attributed<'a>(
         }
     }
 
-    // If no runs, fall back to default metrics.
-    if runs.is_empty() {
+    if spans.is_empty() {
         let m = default_font.metrics(default_size);
         max_ascent = m.ascent;
         max_line_height = m.line_height();
     }
 
-    let mut byte_offset = 0usize;
-    for ch in normalized.chars() {
-        let ch_len = ch.len_utf8();
-
-        if is_zero_width(ch) {
-            byte_offset += ch_len;
-            continue;
-        }
-
-        // Find active run for this byte offset.
-        let (font_index, size, color) = find_run_for_offset(
-            byte_offset,
-            runs,
-            &run_font_indices,
-            &run_sizes,
-            default_size,
-        );
+    for (text_span, run) in spans {
+        let (font_index, size, color) = run
+            .map(|i| (run_font_indices[i], run_sizes[i], runs[i].color))
+            .unwrap_or((0, default_size, None));
 
         let face = font_list[font_index];
         let ab_font = face.inner();
         let scaled = ab_font.as_scaled(size as f32);
-        let glyph_id = ab_font.glyph_id(ch);
-        let missing = glyph_id == ab_glyph::GlyphId(0);
-
-        if is_combining_mark(ch) {
-            glyphs.push(LayoutGlyph {
-                glyph_id,
-                x: last_base_x,
-                y: max_ascent,
-                size,
-                missing,
-                font_index,
-                color,
-            });
-        } else {
-            // Kerning only within same font
-            if let Some((prev_id, prev_fi)) = prev_glyph {
-                if prev_fi == font_index {
-                    cursor_x += scaled.kern(prev_id, glyph_id) as f64;
-                }
+        for ch in normalize_nfc(text_span).chars() {
+            if is_zero_width(ch) {
+                continue;
             }
-            last_base_x = cursor_x;
-            glyphs.push(LayoutGlyph {
-                glyph_id,
-                x: cursor_x,
-                y: max_ascent,
-                size,
-                missing,
-                font_index,
-                color,
-            });
-            cursor_x += scaled.h_advance(glyph_id) as f64;
-            prev_glyph = Some((glyph_id, font_index));
-        }
+            let glyph_id = ab_font.glyph_id(ch);
+            let missing = glyph_id == ab_glyph::GlyphId(0);
 
-        byte_offset += ch_len;
+            if is_combining_mark(ch) {
+                glyphs.push(LayoutGlyph {
+                    glyph_id,
+                    x: last_base_x,
+                    y: max_ascent,
+                    size,
+                    missing,
+                    font_index,
+                    color,
+                });
+            } else {
+                // Kerning only within the same font and scale.
+                if let Some((prev_id, prev_fi, prev_size)) = prev_glyph {
+                    if prev_fi == font_index && prev_size == size {
+                        cursor_x += scaled.kern(prev_id, glyph_id) as f64;
+                    }
+                }
+                last_base_x = cursor_x;
+                glyphs.push(LayoutGlyph {
+                    glyph_id,
+                    x: cursor_x,
+                    y: max_ascent,
+                    size,
+                    missing,
+                    font_index,
+                    color,
+                });
+                cursor_x += scaled.h_advance(glyph_id) as f64;
+                prev_glyph = Some((glyph_id, font_index, size));
+            }
+        }
     }
 
     AttributedLayout {
@@ -168,18 +163,23 @@ fn resolve_run_font<'a>(run: &TextRun, fm: &'a FontManager, default: &'a FontFac
     }
 }
 
-/// Find the active run for a given byte offset, returning (font_index, size, color).
-fn find_run_for_offset(
-    byte_offset: usize,
-    runs: &[TextRun],
-    run_font_indices: &[usize],
-    run_sizes: &[f64],
-    default_size: f64,
-) -> (usize, f64, Option<Color>) {
-    for (i, run) in runs.iter().enumerate() {
-        if byte_offset >= run.range.start && byte_offset < run.range.end {
-            return (run_font_indices[i], run_sizes[i], run.color);
+/// Partition at character boundaries while preserving first-run precedence.
+fn styled_spans<'a>(text: &'a str, runs: &[TextRun]) -> Vec<(&'a str, Option<usize>)> {
+    let mut spans = Vec::new();
+    let mut start = 0;
+    let mut active_run = None;
+    for (offset, _) in text.char_indices() {
+        let run = runs.iter().position(|run| run.range.contains(&offset));
+        if run != active_run {
+            if start < offset {
+                spans.push((&text[start..offset], active_run));
+            }
+            start = offset;
+            active_run = run;
         }
     }
-    (0, default_size, None)
+    if start < text.len() {
+        spans.push((&text[start..], active_run));
+    }
+    spans
 }

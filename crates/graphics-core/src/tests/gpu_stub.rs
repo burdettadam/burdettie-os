@@ -1,6 +1,6 @@
 use crate::gpu_stub::GpuStubRenderer;
 use crate::renderer::Renderer;
-use crate::{create_renderer, Color, Font, Point, Rect, RendererBackend};
+use crate::{create_renderer, Color, Point, Rect, RendererBackend};
 
 #[test]
 fn gpu_renderer_creates() {

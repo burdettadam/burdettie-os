@@ -15,7 +15,7 @@
 //!
 //! Total: 80 bytes.
 
-use crate::cg_types::{CGPoint, CGRect, CGSize};
+use crate::cg_types::{CGPoint, CGRect};
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -1070,12 +1070,10 @@ pub(crate) fn display_view_recursive(view: u64, cg_ctx: u64) {
                 let sh = c.surface.height();
                 crate::layer_compositor::render_layer_contents(
                     c.surface.pixels_mut(),
-                    sw,
-                    sh,
+                    (sw, sh),
                     0,
                     0,
-                    vw,
-                    vh,
+                    (vw, vh),
                     props.contents,
                 );
             });
@@ -1103,11 +1101,9 @@ pub(crate) fn display_view_recursive(view: u64, cg_ctx: u64) {
                 #[allow(clippy::cast_possible_truncation)]
                 crate::layer_compositor::composite_layer(
                     &src_pixels,
-                    vw,
-                    vh,
+                    (vw, vh),
                     c.surface.pixels_mut(),
-                    dst_w,
-                    dst_h,
+                    (dst_w, dst_h),
                     x as i32,
                     y as i32,
                     &props,
@@ -1129,12 +1125,10 @@ pub(crate) fn display_view_recursive(view: u64, cg_ctx: u64) {
                     #[allow(clippy::cast_possible_truncation)]
                     crate::layer_compositor::draw_layer_background(
                         c.surface.pixels_mut(),
-                        dst_w,
-                        dst_h,
+                        (dst_w, dst_h),
                         x as i32,
                         y as i32,
-                        w.max(0.0) as u32,
-                        h.max(0.0) as u32,
+                        (w.max(0.0) as u32, h.max(0.0) as u32),
                         bg_color,
                         &props,
                     );
@@ -1149,12 +1143,10 @@ pub(crate) fn display_view_recursive(view: u64, cg_ctx: u64) {
                     #[allow(clippy::cast_possible_truncation)]
                     crate::layer_compositor::render_layer_contents(
                         c.surface.pixels_mut(),
-                        dst_w,
-                        dst_h,
+                        (dst_w, dst_h),
                         x as i32,
                         y as i32,
-                        w.max(0.0) as u32,
-                        h.max(0.0) as u32,
+                        (w.max(0.0) as u32, h.max(0.0) as u32),
                         props.contents,
                     );
                 });
@@ -1376,16 +1368,14 @@ pub extern "C" fn shim_nsview_previous_key_view(obj: u64, _cmd: u64) -> u64 {
     })
 }
 
-/// `-[NSView nextValidKeyView]` — walks the nextKeyView chain to find one that accepts
-/// first responder (any non-nil nextKeyView is assumed valid for now).
+/// `-[NSView nextValidKeyView]` — returns the immediate next key view unless
+/// it is nil or self. Any other next key view is assumed valid for now.
 pub extern "C" fn shim_nsview_next_valid_key_view(obj: u64, _cmd: u64) -> u64 {
     if obj == 0 {
         return 0;
     }
     let cursor = shim_nsview_next_key_view(obj, 0);
-    let start = obj;
-    while cursor != 0 && cursor != start {
-        // For now, any view in the chain is considered valid.
+    if cursor != 0 && cursor != obj {
         return cursor;
     }
     0
@@ -1408,6 +1398,9 @@ mod tests {
     use crate::shim_test_helpers::*;
 
     const SIZE: usize = VIEW_SIZE;
+
+    // Protect each priority test through allocation, assertions, free, and reset.
+    static VIEW_PRIORITIES_TEST_LOCK: Mutex<()> = Mutex::new(());
 
     fn isa() -> u64 {
         crate::nsobj::nsview_class_addr()
@@ -1912,6 +1905,9 @@ mod tests {
 
     #[test]
     fn content_hugging_default_low() {
+        let _guard = VIEW_PRIORITIES_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let view = make_view();
         assert!((shim_nsview_content_hugging_priority(view, 0, 0) - 250.0).abs() < f64::EPSILON);
         assert!((shim_nsview_content_hugging_priority(view, 0, 1) - 250.0).abs() < f64::EPSILON);
@@ -1920,6 +1916,9 @@ mod tests {
 
     #[test]
     fn compression_resistance_default_high() {
+        let _guard = VIEW_PRIORITIES_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let view = make_view();
         assert!(
             (shim_nsview_content_compression_resistance_priority(view, 0, 0) - 750.0).abs()
@@ -1957,6 +1956,9 @@ mod tests {
 
     #[test]
     fn set_content_hugging_priority_roundtrip() {
+        let _guard = VIEW_PRIORITIES_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         reset_layout_priority_state();
         let view = make_view();
         shim_nsview_set_content_hugging_priority(view, 0, 500.0, 0); // horizontal
@@ -1969,6 +1971,9 @@ mod tests {
 
     #[test]
     fn set_compression_resistance_roundtrip() {
+        let _guard = VIEW_PRIORITIES_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         reset_layout_priority_state();
         let view = make_view();
         shim_nsview_set_content_compression_resistance_priority(view, 0, 900.0, 0);
@@ -1987,6 +1992,9 @@ mod tests {
 
     #[test]
     fn priorities_independent_per_view() {
+        let _guard = VIEW_PRIORITIES_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         reset_layout_priority_state();
         let v1 = make_view();
         let v2 = make_view();

@@ -35,13 +35,6 @@ mod tls {
     pub fn set_specific(key: TlvKey, value: *mut u8) -> i32 {
         unsafe { libc::pthread_setspecific(key, value as *mut libc::c_void) }
     }
-
-    #[cfg(test)]
-    pub fn delete_key(key: TlvKey) {
-        unsafe {
-            libc::pthread_key_delete(key);
-        }
-    }
 }
 
 #[cfg(windows)]
@@ -99,16 +92,6 @@ mod tls {
         });
         0
     }
-
-    #[cfg(test)]
-    pub fn delete_key(key: TlvKey) {
-        let block = BLOCKS.with(|blocks| blocks.borrow_mut().blocks.remove(&key));
-        if let Some(block) = block {
-            unsafe {
-                super::tlv_block_destructor(block.cast());
-            }
-        }
-    }
 }
 
 #[cfg(not(any(unix, windows)))]
@@ -126,9 +109,6 @@ mod tls {
     pub fn set_specific(_key: TlvKey, _value: *mut u8) -> i32 {
         0
     }
-
-    #[cfg(test)]
-    pub fn delete_key(_key: TlvKey) {}
 }
 
 /// TLV descriptor layout matching the Mach-O ABI (3 pointers, 24 bytes on arm64).
@@ -240,25 +220,91 @@ unsafe extern "C" fn tlv_block_destructor(ptr: *mut libc::c_void) {
 /// Called from guest code via function pointer. `desc` must point to
 /// a valid TLV descriptor in mapped memory with a key value that was
 /// registered via `patch_tlv_thunks`.
+// Darwin TLV calls preserve live registers across lookup, unlike the C ABI.
+// In particular LLVM keeps prior TLV addresses in x8 across the next lookup.
+// See dyld/libdyld/threadLocalHelpers.s. Preserve all vector registers too.
+#[cfg(target_arch = "aarch64")]
+#[unsafe(naked)]
+unsafe extern "C" fn tlv_get_addr_thunk(desc: *mut TlvDescriptor) -> *mut u8 {
+    core::arch::naked_asm!(
+        "sub sp, sp, #688",
+        "stp x1, x2, [sp, #0]",
+        "stp x3, x4, [sp, #16]",
+        "stp x5, x6, [sp, #32]",
+        "stp x7, x8, [sp, #48]",
+        "stp x9, x10, [sp, #64]",
+        "stp x11, x12, [sp, #80]",
+        "stp x13, x14, [sp, #96]",
+        "stp x15, x16, [sp, #112]",
+        "stp x17, x18, [sp, #128]",
+        "stp x29, x30, [sp, #144]",
+        "add x29, sp, #144",
+        "mrs x16, nzcv",
+        "str x16, [sp, #672]",
+        "stp q0, q1, [sp, #160]",
+        "stp q2, q3, [sp, #192]",
+        "stp q4, q5, [sp, #224]",
+        "stp q6, q7, [sp, #256]",
+        "stp q8, q9, [sp, #288]",
+        "stp q10, q11, [sp, #320]",
+        "stp q12, q13, [sp, #352]",
+        "stp q14, q15, [sp, #384]",
+        "stp q16, q17, [sp, #416]",
+        "stp q18, q19, [sp, #448]",
+        "stp q20, q21, [sp, #480]",
+        "stp q22, q23, [sp, #512]",
+        "stp q24, q25, [sp, #544]",
+        "stp q26, q27, [sp, #576]",
+        "stp q28, q29, [sp, #608]",
+        "stp q30, q31, [sp, #640]",
+        "bl {resolve}",
+        "ldp q0, q1, [sp, #160]",
+        "ldp q2, q3, [sp, #192]",
+        "ldp q4, q5, [sp, #224]",
+        "ldp q6, q7, [sp, #256]",
+        "ldp q8, q9, [sp, #288]",
+        "ldp q10, q11, [sp, #320]",
+        "ldp q12, q13, [sp, #352]",
+        "ldp q14, q15, [sp, #384]",
+        "ldp q16, q17, [sp, #416]",
+        "ldp q18, q19, [sp, #448]",
+        "ldp q20, q21, [sp, #480]",
+        "ldp q22, q23, [sp, #512]",
+        "ldp q24, q25, [sp, #544]",
+        "ldp q26, q27, [sp, #576]",
+        "ldp q28, q29, [sp, #608]",
+        "ldp q30, q31, [sp, #640]",
+        "ldr x16, [sp, #672]",
+        "msr nzcv, x16",
+        "ldp x1, x2, [sp, #0]",
+        "ldp x3, x4, [sp, #16]",
+        "ldp x5, x6, [sp, #32]",
+        "ldp x7, x8, [sp, #48]",
+        "ldp x9, x10, [sp, #64]",
+        "ldp x11, x12, [sp, #80]",
+        "ldp x13, x14, [sp, #96]",
+        "ldp x15, x16, [sp, #112]",
+        "ldp x17, x18, [sp, #128]",
+        "ldp x29, x30, [sp, #144]",
+        "add sp, sp, #688",
+        "ret",
+        resolve = sym tlv_get_addr,
+    );
+}
+
 unsafe extern "C" fn tlv_get_addr(desc: *mut TlvDescriptor) -> *mut u8 {
     let d = unsafe { &*desc };
     let offset = d.offset;
     let descriptor_addr = desc as usize;
 
     let guard = TLV_IMAGE_REGISTRY.lock().unwrap_or_else(|e| e.into_inner());
-    let registry = match guard.as_ref() {
-        Some(r) => r,
-        None => {
-            log::error!("tlv_get_addr: registry not initialized");
-            return std::ptr::null_mut();
-        }
+    let Some(registry) = guard.as_ref() else {
+        log::error!("tlv_get_addr: registry not initialized");
+        return std::ptr::null_mut();
     };
-    let info = match registry.descriptors.get(&descriptor_addr).cloned() {
-        Some(i) => i,
-        None => {
-            log::error!("tlv_get_addr: unknown descriptor {descriptor_addr:#x}");
-            return std::ptr::null_mut();
-        }
+    let Some(info) = registry.descriptors.get(&descriptor_addr).cloned() else {
+        log::error!("tlv_get_addr: unknown descriptor {descriptor_addr:#x}");
+        return std::ptr::null_mut();
     };
     let info_ptr = Arc::as_ptr(&info) as usize;
     let snapshot = registry.image_snapshots.get(&info_ptr).cloned();
@@ -327,17 +373,14 @@ unsafe extern "C" fn tlv_get_addr(desc: *mut TlvDescriptor) -> *mut u8 {
             if chunk.data.is_empty() {
                 continue;
             }
-            let chunk_end = match chunk.offset.checked_add(chunk_len) {
-                Some(end) => end,
-                None => {
-                    log::error!(
-                        "tlv_get_addr: template chunk overflow descriptor={descriptor_addr:#x} image={info_ptr:#x} index={index} offset={} len={}",
-                        chunk.offset,
-                        chunk_len
-                    );
-                    unsafe { libc::free(block as *mut libc::c_void) };
-                    return std::ptr::null_mut();
-                }
+            let Some(chunk_end) = chunk.offset.checked_add(chunk_len) else {
+                log::error!(
+                    "tlv_get_addr: template chunk overflow descriptor={descriptor_addr:#x} image={info_ptr:#x} index={index} offset={} len={}",
+                    chunk.offset,
+                    chunk_len
+                );
+                unsafe { libc::free(block as *mut libc::c_void) };
+                return std::ptr::null_mut();
             };
             if chunk_end > total_size {
                 log::error!(
@@ -471,9 +514,8 @@ pub fn patch_tlv_thunks(image: &MappedImage, parsed: &ParsedMachO) -> usize {
         .sections
         .iter()
         .find(|s| s.section_type_name() == SectionType::ThreadLocalVariables);
-    let thread_vars = match thread_vars {
-        Some(tv) => tv,
-        None => return 0, // No TLVs in this image
+    let Some(thread_vars) = thread_vars else {
+        return 0; // No TLVs in this image
     };
 
     let tlv_sections: Vec<_> = parsed
@@ -486,9 +528,8 @@ pub fn patch_tlv_thunks(image: &MappedImage, parsed: &ParsedMachO) -> usize {
             )
         })
         .collect();
-    let block_base_addr = match tlv_sections.iter().map(|s| s.addr).min() {
-        Some(addr) => addr,
-        None => return 0,
+    let Some(block_base_addr) = tlv_sections.iter().map(|s| s.addr).min() else {
+        return 0;
     };
     let block_end_addr = tlv_sections
         .iter()
@@ -530,7 +571,7 @@ pub fn patch_tlv_thunks(image: &MappedImage, parsed: &ParsedMachO) -> usize {
             // Diagnostic: dump first 32 bytes of template as u64 values
             {
                 let mut hex = String::new();
-                for (_i, chunk) in src.chunks(8).take(4).enumerate() {
+                for chunk in src.chunks(8).take(4) {
                     let val = u64::from_le_bytes(chunk.try_into().unwrap_or([0u8;8]));
                     hex.push_str(&format!(" {val:#018x}"));
                 }
@@ -574,14 +615,11 @@ pub fn patch_tlv_thunks(image: &MappedImage, parsed: &ParsedMachO) -> usize {
         .segments
         .iter()
         .find(|s| tv_section_addr >= s.vmaddr && tv_section_addr < s.vmaddr + s.size as u64);
-    let seg = match seg {
-        Some(s) => s,
-        None => {
-            log::error!(
-                "patch_tlv_thunks: cannot find segment for __thread_vars at {tv_section_addr:#x}"
-            );
-            return 0;
-        }
+    let Some(seg) = seg else {
+        log::error!(
+            "patch_tlv_thunks: cannot find segment for __thread_vars at {tv_section_addr:#x}"
+        );
+        return 0;
     };
 
     let section_offset_in_seg = (tv_section_addr - seg.vmaddr) as usize;
@@ -605,7 +643,14 @@ pub fn patch_tlv_thunks(image: &MappedImage, parsed: &ParsedMachO) -> usize {
                 .insert(desc_ptr as usize, Arc::clone(&image_info));
         }
         unsafe {
-            (*desc_ptr).thunk = tlv_get_addr;
+            #[cfg(target_arch = "aarch64")]
+            {
+                (*desc_ptr).thunk = tlv_get_addr_thunk;
+            }
+            #[cfg(not(target_arch = "aarch64"))]
+            {
+                (*desc_ptr).thunk = tlv_get_addr;
+            }
             (*desc_ptr).key = pkey as usize;
             // offset stays as-is (it's the offset within the TLV block).
         }
@@ -623,6 +668,10 @@ pub fn patch_tlv_thunks(image: &MappedImage, parsed: &ParsedMachO) -> usize {
 mod tests {
     use super::*;
 
+    // Each test replaces the process-wide registry and must retain its entries
+    // until its lookups, destructor callbacks, and cleanup are complete.
+    static TLV_TEST_LOCK: Mutex<()> = Mutex::new(());
+
     fn cleanup_test_key(pkey: libc::pthread_key_t) {
         unsafe {
             let block = libc::pthread_getspecific(pkey);
@@ -636,8 +685,54 @@ mod tests {
         *guard = None;
     }
 
+    #[cfg(target_arch = "aarch64")]
+    #[test]
+    fn tlv_thunk_preserves_live_integer_and_fp_registers() {
+        let _registry_guard = TLV_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let pkey = tls::create_key(tlv_block_destructor).expect("TLV key");
+        let info = Arc::new(TlvImageInfo {
+            pthread_key: pkey,
+            total_size: 16,
+            allocation_size: 16,
+            template_chunks: Vec::new(),
+        });
+        let mut descriptor = TlvDescriptor {
+            thunk: tlv_get_addr_thunk,
+            key: 0,
+            offset: 0,
+        };
+        {
+            let mut guard = TLV_IMAGE_REGISTRY.lock().unwrap();
+            let registry = guard.insert(TlvImageRegistry::new());
+            registry
+                .descriptors
+                .insert((&mut descriptor as *mut TlvDescriptor) as usize, info);
+        }
+        let pointer: *mut u8;
+        let live_integer: u64;
+        let live_float: f64;
+        unsafe {
+            core::arch::asm!(
+                "blr x16",
+                inlateout("x0") &mut descriptor as *mut TlvDescriptor => pointer,
+                inlateout("x8") 0x1234_5678_9abc_def0_u64 => live_integer,
+                inlateout("d0") 3.25_f64 => live_float,
+                in("x16") tlv_get_addr_thunk as *const (),
+                clobber_abi("C"),
+            );
+        }
+        assert!(!pointer.is_null());
+        assert_eq!(live_integer, 0x1234_5678_9abc_def0);
+        assert_eq!(live_float.to_bits(), 3.25_f64.to_bits());
+        cleanup_test_key(pkey);
+    }
+
     #[test]
     fn tlv_get_addr_returns_distinct_offsets() {
+        let _registry_guard = TLV_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+
         // Set up a mock TLV with two descriptors sharing the same key
         let mut pkey: libc::pthread_key_t = 0;
         unsafe {
@@ -686,6 +781,10 @@ mod tests {
 
     #[test]
     fn tlv_get_addr_copies_template() {
+        let _registry_guard = TLV_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+
         let mut pkey: libc::pthread_key_t = 0;
         unsafe {
             libc::pthread_key_create(&mut pkey, Some(tlv_block_destructor));
@@ -728,6 +827,10 @@ mod tests {
 
     #[test]
     fn tlv_get_addr_ignores_guest_key_field() {
+        let _registry_guard = TLV_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+
         let mut pkey: libc::pthread_key_t = 0;
         unsafe {
             libc::pthread_key_create(&mut pkey, Some(tlv_block_destructor));
@@ -761,6 +864,10 @@ mod tests {
 
     #[test]
     fn tlv_get_addr_copies_template_with_gap() {
+        let _registry_guard = TLV_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+
         let mut pkey: libc::pthread_key_t = 0;
         unsafe {
             libc::pthread_key_create(&mut pkey, Some(tlv_block_destructor));
@@ -797,6 +904,10 @@ mod tests {
 
     #[test]
     fn tlv_atexit_runs_destructors_before_block_free() {
+        let _registry_guard = TLV_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+
         static DTOR_VALUES: Mutex<Vec<u8>> = Mutex::new(Vec::new());
 
         extern "C" fn record_byte(arg: *mut u8) {
@@ -854,6 +965,10 @@ mod tests {
 
     #[test]
     fn tlv_atexit_accepts_null_arg_for_single_live_block() {
+        let _registry_guard = TLV_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+
         static NULL_ARG_CALLS: Mutex<usize> = Mutex::new(0);
 
         extern "C" fn record_null(arg: *mut u8) {

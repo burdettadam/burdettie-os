@@ -8,8 +8,6 @@ fn px(surface: &Surface, x: u32, y: u32) -> u32 {
 
 const WHITE_ARGB: u32 = 0xFFFFFFFF;
 const RED_ARGB: u32 = 0xFFFF0000;
-const GREEN_ARGB: u32 = 0xFF00FF00;
-const BLACK_ARGB: u32 = 0xFF000000;
 
 // ── Rotation tests ─────────────────────────────────────────────────
 
@@ -96,7 +94,7 @@ fn rotation_field_saved() {
 
 fn make_red_image(w: u32, h: u32) -> ImageBuffer {
     // RGBA8: every pixel is opaque red.
-    let data = vec![255u8, 0, 0, 255].repeat((w * h) as usize);
+    let data = [255u8, 0, 0, 255].repeat((w * h) as usize);
     ImageBuffer::from_rgba(w, h, data).unwrap()
 }
 

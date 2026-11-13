@@ -18,7 +18,12 @@ pub static RUNTIME_LOCK: Mutex<()> = Mutex::new(());
 /// and returns the `RuntimeResult`.  Panics on load failure.
 ///
 /// `fixture_rel` is the relative path under `fixtures/`, e.g. `"return42/return42"`.
+#[allow(
+    dead_code,
+    reason = "Each integration-test binary compiles this shared module and uses a different subset of its helpers"
+)]
 pub fn run_fixture(fixture_rel: &str) -> Option<RuntimeResult> {
+    eprintln!("[runtime fixture] {fixture_rel}");
     let _lock = RUNTIME_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let fixture = fixtures_dir().join(fixture_rel);
     if !fixture.exists() {
@@ -125,10 +130,13 @@ impl IsolatedResult {
 ///
 /// Call this from a `#[test] fn __subprocess_runner()` in any test file
 /// that needs crash isolation.
+#[allow(
+    dead_code,
+    reason = "Each integration-test binary compiles this shared module and uses a different subset of its helpers"
+)]
 pub fn subprocess_entry_point() {
-    let path_str = match std::env::var("__RUNTIME_FIXTURE_PATH") {
-        Ok(p) => p,
-        Err(_) => return,
+    let Ok(path_str) = std::env::var("__RUNTIME_FIXTURE_PATH") else {
+        return;
     };
     let path = Path::new(&path_str);
     let config = RuntimeConfig::permissive(path);

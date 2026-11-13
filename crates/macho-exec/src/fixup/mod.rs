@@ -1,6 +1,7 @@
 //! Fixup application: rebases, symbol binds, and chained fixup walking.
 
 mod chained;
+#[cfg(any(test, all(target_arch = "aarch64", not(target_os = "macos"))))]
 pub mod ctor_thunk;
 pub mod data_symbols;
 mod resolver;

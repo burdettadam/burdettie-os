@@ -5,6 +5,8 @@
 //! delta is added to a running address to produce the next function
 //! start address.
 
+use crate::leb128::read_uleb128;
+
 use macho_types::load_command::{LoadCommandPayload, LoadCommandType};
 
 /// Parse the LC_FUNCTION_STARTS blob into a list of function start
@@ -52,34 +54,18 @@ fn decode_uleb128_deltas(data: &[u8], base: u64) -> Vec<u64> {
     let mut pos = 0;
 
     while pos < data.len() {
-        let delta = read_uleb128(data, &mut pos);
+        let Some(delta) = read_uleb128(data, &mut pos) else {
+            break;
+        };
         if delta == 0 {
             break; // terminator
         }
-        addr += delta;
+        let Some(next_addr) = addr.checked_add(delta) else {
+            break;
+        };
+        addr = next_addr;
         addrs.push(addr);
     }
 
     addrs
-}
-
-fn read_uleb128(data: &[u8], pos: &mut usize) -> u64 {
-    let mut result: u64 = 0;
-    let mut shift = 0u32;
-    loop {
-        if *pos >= data.len() {
-            break;
-        }
-        let byte = data[*pos];
-        *pos += 1;
-        result |= ((byte & 0x7F) as u64) << shift;
-        if byte & 0x80 == 0 {
-            break;
-        }
-        shift += 7;
-        if shift >= 64 {
-            break;
-        }
-    }
-    result
 }

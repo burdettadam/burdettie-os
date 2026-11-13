@@ -294,11 +294,19 @@ fn notify_observers(activity: u64) {
 // ── Pending timer queue ────────────────────────────────────────────────────
 
 struct PendingTimer {
+    id: u64,          // Queue entry identity, preserved independently of its timer address
     timer: u64,       // NSTimer object address
     fire_at: Instant, // when to fire
 }
 
 static PENDING_TIMERS: OnceLock<Mutex<Vec<PendingTimer>>> = OnceLock::new();
+static NEXT_TIMER_ID: AtomicU64 = AtomicU64::new(1);
+
+// Serialize callbacks without locking the queue across guest code. Concurrent
+// or nested dispatch passes defer until a later run-loop iteration. Timer
+// storage must remain live through its fire call; clearing the queue during
+// runtime reset is not a callback-join or deallocation barrier.
+static TIMER_DISPATCH: Mutex<()> = Mutex::new(());
 
 fn pending_timers() -> &'static Mutex<Vec<PendingTimer>> {
     PENDING_TIMERS.get_or_init(|| Mutex::new(Vec::new()))
@@ -452,7 +460,7 @@ fn has_fd_sources() -> bool {
     !guard.is_empty()
 }
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 static FD_POLLER_RUNNING: AtomicBool = AtomicBool::new(false);
 
@@ -654,34 +662,56 @@ pub fn run_loop_blocking(deadline: Option<Instant>, single_pass: bool) -> i32 {
 
 /// Fire all timers whose `fire_at` is ≤ now, keeping repeating timers.
 fn fire_due_timers() {
+    let _dispatch = match TIMER_DISPATCH.try_lock() {
+        Ok(guard) => guard,
+        Err(std::sync::TryLockError::Poisoned(error)) => error.into_inner(),
+        Err(std::sync::TryLockError::WouldBlock) => return,
+    };
     let now = Instant::now();
-    let mut guard = pending_timers().lock().unwrap_or_else(|e| e.into_inner());
-    let mut i = 0;
-    while i < guard.len() {
-        if guard[i].fire_at <= now {
-            let timer = guard[i].timer;
+    let due_ids: Vec<u64> = {
+        let guard = pending_timers().lock().unwrap_or_else(|e| e.into_inner());
+        guard
+            .iter()
+            .filter(|pending| pending.fire_at <= now)
+            .map(|pending| pending.id)
+            .collect()
+    };
+
+    // Snapshot entry identities, not timer addresses: callbacks may clear the
+    // queue or enqueue another entry for the same timer. Newly queued entries
+    // wait for the next pass, and existing entries retain insertion order.
+    for id in due_ids {
+        let (timer, interval_bits, flags) = {
+            let mut guard = pending_timers().lock().unwrap_or_else(|e| e.into_inner());
+            let Some(index) = guard.iter().position(|pending| pending.id == id) else {
+                continue;
+            };
+            let timer = guard[index].timer;
             // Read interval and repeats flag from NSTimer layout
             // [0]=isa [1]=interval_bits [2]=block_ptr [3]=flags
             let interval_bits = unsafe { *((timer as *const u64).add(1)) };
             let flags = unsafe { *((timer as *const u64).add(3)) };
             let flag_valid: u64 = 1;
-            let flag_repeats: u64 = 2;
             if flags & flag_valid == 0 {
-                guard.remove(i);
+                guard.remove(index);
                 continue;
             }
-            // Call the timer's fire shim directly
-            crate::nstimer::shim_nstimer_fire(timer, 0);
-            let repeats = flags & flag_repeats != 0;
-            if repeats {
-                let interval = f64::from_bits(interval_bits);
-                guard[i].fire_at = now + std::time::Duration::from_secs_f64(interval.max(0.001));
-                i += 1;
-            } else {
-                guard.remove(i);
-            }
+            (timer, interval_bits, flags)
+        };
+
+        // The queue lock is released so the callback can schedule or reset timers.
+        crate::nstimer::shim_nstimer_fire(timer, 0);
+
+        let mut guard = pending_timers().lock().unwrap_or_else(|e| e.into_inner());
+        let Some(index) = guard.iter().position(|pending| pending.id == id) else {
+            continue;
+        };
+        let flag_repeats: u64 = 2;
+        if flags & flag_repeats != 0 {
+            let interval = f64::from_bits(interval_bits);
+            guard[index].fire_at = now + Duration::from_secs_f64(interval.max(0.001));
         } else {
-            i += 1;
+            guard.remove(index);
         }
     }
 }
@@ -720,7 +750,7 @@ fn deadline_from_nsdate(date: u64) -> Option<Instant> {
 }
 
 fn get_or_create_main_run_loop() -> u64 {
-    *MAIN_RUN_LOOP.get_or_init(|| alloc_run_loop_obj())
+    *MAIN_RUN_LOOP.get_or_init(alloc_run_loop_obj)
 }
 
 /// Allocate a fresh 16-byte NSRunLoop object (isa + flags).
@@ -868,7 +898,11 @@ pub extern "C" fn shim_nsrunloop_add_timer_for_mode(_obj: u64, _cmd: u64, timer:
     let interval = f64::from_bits(interval_bits);
     let fire_at = Instant::now() + std::time::Duration::from_secs_f64(interval.max(0.0));
     let mut guard = pending_timers().lock().unwrap_or_else(|e| e.into_inner());
-    guard.push(PendingTimer { timer, fire_at });
+    guard.push(PendingTimer {
+        id: NEXT_TIMER_ID.fetch_add(1, Ordering::Relaxed),
+        timer,
+        fire_at,
+    });
     drop(guard);
     // Wake the run loop so it picks up the new timer promptly.
     wakeup();
@@ -907,15 +941,245 @@ pub extern "C" fn shim_nsrunloop_accept_input(_obj: u64, _cmd: u64, _mode: u64, 
     0
 }
 
+/// `-[NSRunLoop description]`
+pub extern "C" fn shim_nsrunloop_description(_obj: u64, _cmd: u64) -> u64 {
+    let c = std::ffi::CString::new("<NSRunLoop: kCFRunLoopDefaultMode>").unwrap();
+    crate::cfstring::shim_cf_string_create_with_cstring(0, c.as_ptr(), 0)
+}
+
 #[cfg(test)]
-mod tests {
-    use super::*;
+pub(crate) mod test_support {
     use std::sync::Mutex;
 
     static RUN_LOOP_TEST_LOCK: Mutex<()> = Mutex::new(());
 
-    fn lock_runloop_state() -> std::sync::MutexGuard<'static, ()> {
+    pub(crate) fn lock_runloop_state() -> std::sync::MutexGuard<'static, ()> {
         RUN_LOOP_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    pub(crate) fn unschedule_timer(timer: u64) {
+        // Test cleanup must call this outside a timer callback. Wait for active
+        // dispatch before removing the entry so no callback can retain this raw
+        // address when the test subsequently frees its timer allocation.
+        let _dispatch = super::TIMER_DISPATCH
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        super::pending_timers()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .retain(|pending| pending.timer != timer);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::test_support::lock_runloop_state;
+    use super::*;
+
+    static TIMER_CALLBACK_EVENTS: Mutex<Vec<u64>> = Mutex::new(Vec::new());
+
+    extern "C" fn record_timer_callback(_block: u64, timer: u64) {
+        TIMER_CALLBACK_EVENTS
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .push(timer);
+    }
+
+    extern "C" fn enqueue_timer_callback(block: u64, timer: u64) {
+        record_timer_callback(block, timer);
+        let next_timer = unsafe { *((block as *const u64).add(3)) };
+        shim_nsrunloop_add_timer_for_mode(0, 0, next_timer, 0);
+        // A nested pass must defer while the outer callback is still running.
+        fire_due_timers();
+    }
+
+    extern "C" fn reset_and_reenqueue_timer_callback(block: u64, timer: u64) {
+        record_timer_callback(block, timer);
+        reset_runtime_state_for_reuse();
+        // The new queue entry has a different deadline from the old repeating
+        // entry, even though it refers to the same still-live timer object.
+        unsafe {
+            *((timer as *mut u64).add(1)) = 10.0_f64.to_bits();
+        }
+        shim_nsrunloop_add_timer_for_mode(0, 0, timer, 0);
+    }
+
+    extern "C" fn invalidate_timer_callback(block: u64, timer: u64) {
+        record_timer_callback(block, timer);
+        crate::nstimer::shim_nstimer_invalidate(timer, 0);
+        let later_timer = unsafe { *((block as *const u64).add(3)) };
+        crate::nstimer::shim_nstimer_invalidate(later_timer, 0);
+    }
+
+    fn with_bounded_timer_dispatch(test_name: &'static str, body: fn()) {
+        crate::shim_test_helpers::with_isolated_test_process(test_name, move || {
+            let (sender, receiver) = std::sync::mpsc::channel();
+            let worker = std::thread::spawn(move || {
+                let _guard = lock_runloop_state();
+                reset_runtime_state_for_reuse();
+                body();
+                reset_runtime_state_for_reuse();
+                sender.send(()).expect("report timer dispatch completion");
+            });
+
+            // On timeout, fail this isolated child without joining a deadlocked
+            // worker. Its process exits, so the parent test cannot hang in CI.
+            receiver
+                .recv_timeout(Duration::from_secs(5))
+                .expect("timer dispatch must complete without deadlocking");
+            worker.join().expect("timer dispatch worker panicked");
+        });
+    }
+
+    #[test]
+    fn timer_callback_can_enqueue_without_deadlock() {
+        with_bounded_timer_dispatch(
+            "nsrunloop::tests::timer_callback_can_enqueue_without_deadlock",
+            || {
+                let record_block = [0, 0, record_timer_callback as *const () as u64, 0];
+                let next = crate::nstimer::shim_nstimer_timer_with_block(
+                    0,
+                    0,
+                    0.0,
+                    0,
+                    record_block.as_ptr() as u64,
+                );
+                let enqueue_block = [0, 0, enqueue_timer_callback as *const () as u64, next];
+                let first = crate::nstimer::shim_nstimer_timer_with_block(
+                    0,
+                    0,
+                    0.0,
+                    0,
+                    enqueue_block.as_ptr() as u64,
+                );
+                let second = crate::nstimer::shim_nstimer_timer_with_block(
+                    0,
+                    0,
+                    0.0,
+                    0,
+                    record_block.as_ptr() as u64,
+                );
+                assert!(first != 0 && second != 0 && next != 0);
+                shim_nsrunloop_add_timer_for_mode(0, 0, first, 0);
+                shim_nsrunloop_add_timer_for_mode(0, 0, second, 0);
+
+                fire_due_timers();
+                assert_eq!(*TIMER_CALLBACK_EVENTS.lock().unwrap(), [first, second]);
+                {
+                    let queue = pending_timers().lock().unwrap();
+                    assert_eq!(queue.len(), 1);
+                    assert_eq!(queue[0].timer, next);
+                }
+
+                fire_due_timers();
+                assert_eq!(
+                    *TIMER_CALLBACK_EVENTS.lock().unwrap(),
+                    [first, second, next]
+                );
+                assert!(pending_timers().lock().unwrap().is_empty());
+                for timer in [first, second, next] {
+                    test_support::unschedule_timer(timer);
+                    crate::shim_test_helpers::free_obj(timer);
+                }
+            },
+        );
+    }
+
+    #[test]
+    fn timer_callback_reset_does_not_resurrect_old_entries() {
+        with_bounded_timer_dispatch(
+            "nsrunloop::tests::timer_callback_reset_does_not_resurrect_old_entries",
+            || {
+                let reset_block = [
+                    0,
+                    0,
+                    reset_and_reenqueue_timer_callback as *const () as u64,
+                    0,
+                ];
+                let resetter = crate::nstimer::shim_nstimer_timer_with_block(
+                    0,
+                    0,
+                    0.0,
+                    1,
+                    reset_block.as_ptr() as u64,
+                );
+                let record_block = [0, 0, record_timer_callback as *const () as u64, 0];
+                let discarded = crate::nstimer::shim_nstimer_timer_with_block(
+                    0,
+                    0,
+                    0.0,
+                    0,
+                    record_block.as_ptr() as u64,
+                );
+                assert!(resetter != 0 && discarded != 0);
+                shim_nsrunloop_add_timer_for_mode(0, 0, resetter, 0);
+                shim_nsrunloop_add_timer_for_mode(0, 0, discarded, 0);
+
+                let minimum_new_deadline = Instant::now() + Duration::from_secs(9);
+                fire_due_timers();
+                assert_eq!(*TIMER_CALLBACK_EVENTS.lock().unwrap(), [resetter]);
+                {
+                    let queue = pending_timers().lock().unwrap();
+                    assert_eq!(queue.len(), 1);
+                    assert_eq!(queue[0].timer, resetter);
+                    assert!(queue[0].fire_at >= minimum_new_deadline);
+                }
+                for timer in [resetter, discarded] {
+                    test_support::unschedule_timer(timer);
+                    crate::shim_test_helpers::free_obj(timer);
+                }
+            },
+        );
+    }
+
+    #[test]
+    fn timer_callback_invalidation_preserves_repeat_policy() {
+        with_bounded_timer_dispatch(
+            "nsrunloop::tests::timer_callback_invalidation_preserves_repeat_policy",
+            || {
+                let record_block = [0, 0, record_timer_callback as *const () as u64, 0];
+                let later = crate::nstimer::shim_nstimer_timer_with_block(
+                    0,
+                    0,
+                    0.0,
+                    0,
+                    record_block.as_ptr() as u64,
+                );
+                let invalidate_block = [0, 0, invalidate_timer_callback as *const () as u64, later];
+                let repeating = crate::nstimer::shim_nstimer_timer_with_block(
+                    0,
+                    0,
+                    0.0,
+                    1,
+                    invalidate_block.as_ptr() as u64,
+                );
+                assert!(repeating != 0 && later != 0);
+                shim_nsrunloop_add_timer_for_mode(0, 0, repeating, 0);
+                shim_nsrunloop_add_timer_for_mode(0, 0, later, 0);
+
+                let minimum_repeat_deadline = Instant::now() + Duration::from_millis(1);
+                fire_due_timers();
+                assert_eq!(*TIMER_CALLBACK_EVENTS.lock().unwrap(), [repeating]);
+                assert_eq!(crate::nstimer::shim_nstimer_is_valid(repeating, 0), 0);
+                assert_eq!(crate::nstimer::shim_nstimer_is_valid(later, 0), 0);
+                {
+                    let mut queue = pending_timers().lock().unwrap();
+                    assert_eq!(queue.len(), 1);
+                    assert_eq!(queue[0].timer, repeating);
+                    assert!(queue[0].fire_at >= minimum_repeat_deadline);
+                    // Make the preserved repeat entry due without a timing-sensitive sleep.
+                    queue[0].fire_at = Instant::now();
+                }
+
+                fire_due_timers();
+                assert_eq!(*TIMER_CALLBACK_EVENTS.lock().unwrap(), [repeating]);
+                assert!(pending_timers().lock().unwrap().is_empty());
+                for timer in [repeating, later] {
+                    test_support::unschedule_timer(timer);
+                    crate::shim_test_helpers::free_obj(timer);
+                }
+            },
+        );
     }
 
     #[test]
@@ -926,10 +1190,16 @@ mod tests {
 
     #[test]
     fn main_equals_current() {
-        let main = shim_nsrunloop_main_run_loop(0, 0);
-        let curr = shim_nsrunloop_current_run_loop(0, 0);
-        assert_ne!(main, 0);
-        assert_eq!(main, curr);
+        crate::shim_test_helpers::with_isolated_test_process(
+            "nsrunloop::tests::main_equals_current",
+            || {
+                crate::nsthread::init_main_thread_id();
+                let main = shim_nsrunloop_main_run_loop(0, 0);
+                let curr = shim_nsrunloop_current_run_loop(0, 0);
+                assert_ne!(main, 0);
+                assert_eq!(main, curr);
+            },
+        );
     }
 
     #[test]
@@ -940,11 +1210,13 @@ mod tests {
 
     #[test]
     fn run_nil_is_safe() {
+        let _guard = lock_runloop_state();
         shim_nsrunloop_run(0, 0);
     }
 
     #[test]
     fn run_until_date_nil_is_safe() {
+        let _guard = lock_runloop_state();
         shim_nsrunloop_run_until_date(0, 0, 0);
     }
 
@@ -1142,7 +1414,7 @@ mod tests {
         remove_observer(obs);
         let guard = observers().lock().unwrap();
         assert!(
-            guard.iter().find(|o| o.addr == obs).is_none(),
+            !guard.iter().any(|o| o.addr == obs),
             "observer should be removed"
         );
         drop(guard);
@@ -1298,34 +1570,44 @@ mod tests {
 
     #[test]
     fn per_thread_run_loop_is_same_on_main() {
-        let _guard = lock_runloop_state();
-        crate::nsthread::init_main_thread_id();
-        let rl1 = shim_nsrunloop_current_run_loop(0, 0);
-        let rl2 = shim_nsrunloop_main_run_loop(0, 0);
-        assert_eq!(
-            rl1, rl2,
-            "main thread currentRunLoop should equal mainRunLoop"
+        crate::shim_test_helpers::with_isolated_test_process(
+            "nsrunloop::tests::per_thread_run_loop_is_same_on_main",
+            || {
+                let _guard = lock_runloop_state();
+                crate::nsthread::init_main_thread_id();
+                let rl1 = shim_nsrunloop_current_run_loop(0, 0);
+                let rl2 = shim_nsrunloop_main_run_loop(0, 0);
+                assert_eq!(
+                    rl1, rl2,
+                    "main thread currentRunLoop should equal mainRunLoop"
+                );
+            },
         );
     }
 
     #[test]
     fn worker_thread_cannot_claim_main_run_loop() {
-        let _guard = lock_runloop_state();
-        crate::nsthread::init_main_thread_id();
+        crate::shim_test_helpers::with_isolated_test_process(
+            "nsrunloop::tests::worker_thread_cannot_claim_main_run_loop",
+            || {
+                let _guard = lock_runloop_state();
+                crate::nsthread::init_main_thread_id();
 
-        let main_rl = shim_nsrunloop_main_run_loop(0, 0);
-        let worker_rl = std::thread::spawn(|| shim_nsrunloop_current_run_loop(0, 0))
-            .join()
-            .unwrap();
-        let current_main = shim_nsrunloop_current_run_loop(0, 0);
+                let main_rl = shim_nsrunloop_main_run_loop(0, 0);
+                let worker_rl = std::thread::spawn(|| shim_nsrunloop_current_run_loop(0, 0))
+                    .join()
+                    .unwrap();
+                let current_main = shim_nsrunloop_current_run_loop(0, 0);
 
-        assert_eq!(
-            current_main, main_rl,
-            "main thread must retain the main run loop"
-        );
-        assert_ne!(
-            worker_rl, main_rl,
-            "worker thread must not steal the main run loop"
+                assert_eq!(
+                    current_main, main_rl,
+                    "main thread must retain the main run loop"
+                );
+                assert_ne!(
+                    worker_rl, main_rl,
+                    "worker thread must not steal the main run loop"
+                );
+            },
         );
     }
 
@@ -1337,7 +1619,7 @@ mod tests {
         let _guard = lock_runloop_state();
         reset_runtime_state_for_reuse();
         let src = create_source(0);
-        register_fd_source(999, src, libc::POLLIN as i16);
+        register_fd_source(999, src, libc::POLLIN);
         assert!(has_fd_sources(), "should have fd sources after registering");
         unregister_fd_source(999);
         assert!(
@@ -1353,7 +1635,7 @@ mod tests {
         let _guard = lock_runloop_state();
         reset_runtime_state_for_reuse();
         let src = create_source(0);
-        register_fd_source(998, src, libc::POLLIN as i16);
+        register_fd_source(998, src, libc::POLLIN);
 
         // With an fd source registered, the run loop should NOT exit due to being empty.
         // It should block — so use a short deadline.
@@ -1383,7 +1665,7 @@ mod tests {
 
         // Create a source and register its fd
         let src = create_source(0);
-        register_fd_source(read_fd, src, libc::POLLIN as i16);
+        register_fd_source(read_fd, src, libc::POLLIN);
 
         // Write to the pipe from another thread to make the read end readable
         std::thread::spawn(move || {
@@ -1394,7 +1676,7 @@ mod tests {
 
         // The fd poller should detect readability, signal the source, and wake the loop
         let deadline = Some(Instant::now() + Duration::from_millis(500));
-        let result = run_loop_blocking(deadline, false);
+        let _result = run_loop_blocking(deadline, false);
         // Should either time out (the source was signaled and fired in a cycle,
         // then with no valid sources left it might exit) or be stopped.
         // The key assertion is that source was signaled:
@@ -1427,15 +1709,9 @@ mod tests {
     fn reset_clears_fd_sources() {
         let _guard = lock_runloop_state();
         let src = create_source(0);
-        register_fd_source(997, src, libc::POLLIN as i16);
+        register_fd_source(997, src, libc::POLLIN);
         assert!(has_fd_sources());
         reset_runtime_state_for_reuse();
         assert!(!has_fd_sources(), "reset should clear fd sources");
     }
-}
-
-/// `-[NSRunLoop description]`
-pub extern "C" fn shim_nsrunloop_description(_obj: u64, _cmd: u64) -> u64 {
-    let c = std::ffi::CString::new("<NSRunLoop: kCFRunLoopDefaultMode>").unwrap();
-    crate::cfstring::shim_cf_string_create_with_cstring(0, c.as_ptr(), 0)
 }

@@ -35,7 +35,7 @@ pub(super) fn decode_bitmask_imm(n: u32, imms: u32, immr: u32, sf: bool) -> u64 
         if not_imms == 0 {
             return 0;
         }
-        (31 - not_imms.leading_zeros()) as u32
+        31 - not_imms.leading_zeros()
     };
 
     if len == 0 {

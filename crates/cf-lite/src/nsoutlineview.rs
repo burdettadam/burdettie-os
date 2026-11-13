@@ -82,9 +82,8 @@ fn dispatch_3arg(target: u64, selector: &str, a1: u64, a2: u64, a3: u64) -> u64 
     let Some(rt) = guard.as_ref() else {
         return 0;
     };
-    let imp = match rt.msg_lookup(isa, selector) {
-        Some(p) => p,
-        None => return 0,
+    let Some(imp) = rt.msg_lookup(isa, selector) else {
+        return 0;
     };
     let sel_ptr = rt.selector_ptr(selector).unwrap_or(0) as u64;
     drop(guard);

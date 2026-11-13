@@ -166,7 +166,7 @@ pub(super) fn walk_chain(
 
                 if is_bind {
                     let ordinal = (raw & 0x00FFFFFF) as usize;
-                    let addend = ((raw >> 24) & 0xFF) as u64;
+                    let addend = (raw >> 24) & 0xFF;
                     log::trace!("  ptr64_offset bind: ordinal={ordinal}, addend={addend}");
                     if resolve_and_write_bind(seg, offset, ordinal, addend, imports, resolver) {
                         binds += 1;

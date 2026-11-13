@@ -70,10 +70,8 @@ struct CachedImage {
 /// Shared cache bytes, backed by mmap on Unix and owned memory elsewhere.
 enum Mmap {
     #[cfg(unix)]
-    Raw {
-        ptr: *mut u8,
-        len: usize,
-    },
+    Raw { ptr: *mut u8, len: usize },
+    #[cfg(not(unix))]
     Owned(Vec<u8>),
 }
 
@@ -90,6 +88,7 @@ impl Mmap {
                 // mapped as PROT_READ. The slice is valid for the lifetime of `self`.
                 unsafe { std::slice::from_raw_parts(*ptr, *len) }
             }
+            #[cfg(not(unix))]
             Self::Owned(bytes) => bytes.as_slice(),
         }
     }
@@ -98,7 +97,8 @@ impl Mmap {
 impl Drop for Mmap {
     fn drop(&mut self) {
         #[cfg(unix)]
-        if let Self::Raw { ptr, len } = self {
+        {
+            let Self::Raw { ptr, len } = self;
             // Safety: ptr and len come from a successful mmap call.
             unsafe {
                 libc::munmap(*ptr as *mut libc::c_void, *len);
@@ -169,9 +169,8 @@ impl SharedCacheLoader {
                 }
             });
 
-            let file_offset = match file_offset {
-                Some(off) => off,
-                None => continue, // skip unmappable images
+            let Some(file_offset) = file_offset else {
+                continue; // skip unmappable images
             };
 
             // Read the Mach-O header to get the header+load commands size.

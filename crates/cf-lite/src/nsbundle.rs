@@ -392,7 +392,7 @@ fn decode_strings_bytes(bytes: &[u8]) -> Option<String> {
         return Some(text.to_owned());
     }
 
-    if bytes.len() >= 4 && bytes.len() % 2 == 0 {
+    if bytes.len() >= 4 && bytes.len().is_multiple_of(2) {
         let even_zeroes = bytes.iter().step_by(2).filter(|byte| **byte == 0).count();
         let odd_zeroes = bytes
             .iter()

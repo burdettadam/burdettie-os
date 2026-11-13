@@ -488,6 +488,7 @@ pub extern "C" fn shim_nsurlsession_data_task_with_request_completion(
 /// completionHandler block with:
 ///   - data/upload tasks: `(NSData, NSHTTPURLResponse, NSError)`
 ///   - download tasks:    `(NSURL, NSHTTPURLResponse, NSError)`
+///
 /// Falls back to a 200-stub response if no URL is available.
 pub extern "C" fn shim_nsurlsessiondatatask_resume(obj: u64, _cmd: u64) {
     if obj == 0 {

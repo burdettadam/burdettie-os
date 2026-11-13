@@ -219,7 +219,7 @@ fn load_storyboard_info(storyboard_dir: &Path) -> Option<plist::Dictionary> {
 
 fn plist_string_for_keys(dict: &plist::Dictionary, keys: &[&str]) -> Option<String> {
     keys.iter()
-        .find_map(|key| dict.get(*key).and_then(plist::Value::as_string))
+        .find_map(|key| dict.get(key).and_then(plist::Value::as_string))
         .map(ToOwned::to_owned)
 }
 
@@ -240,7 +240,7 @@ fn nib_name_from_plist_value(value: &plist::Value) -> Option<String> {
 
 fn mapped_nib_name(info: &plist::Dictionary, identifier: &str) -> Option<String> {
     for key in IDENTIFIER_TO_NIB_MAP_KEYS {
-        let Some(map) = info.get(*key).and_then(plist::Value::as_dictionary) else {
+        let Some(map) = info.get(key).and_then(plist::Value::as_dictionary) else {
             continue;
         };
         let Some(value) = map.get(identifier) else {

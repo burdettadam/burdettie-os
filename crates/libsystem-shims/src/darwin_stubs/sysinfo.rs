@@ -333,9 +333,9 @@ pub extern "C" fn shim_getgrouplist_2(name: u64, basegid: u32, groups_out: u64) 
         }
         // Copy as u32 (gid_t) for the macOS ABI caller
         let out = ptr as *mut u32;
-        for i in 0..ngroups as usize {
+        for (i, &group) in buf[..ngroups as usize].iter().enumerate() {
             unsafe {
-                *out.add(i) = buf[i] as u32;
+                *out.add(i) = group as u32;
             }
         }
         unsafe {
@@ -537,7 +537,7 @@ mod tests {
 
     #[test]
     fn test_getpwnam_root() {
-        let name = b"root\0".as_ptr() as u64;
+        let name = c"root".as_ptr() as u64;
         let result = shim_getpwnam(name);
         assert_ne!(result, 0, "getpwnam(\"root\") should return non-null");
     }
@@ -640,7 +640,7 @@ mod tests {
 
     #[test]
     fn test_getgrouplist_root() {
-        let name = b"root\0".as_ptr() as u64;
+        let name = c"root".as_ptr() as u64;
         let mut groups = [0u32; 64];
         let mut ngroups: i32 = 64;
         let rc = shim_getgrouplist(

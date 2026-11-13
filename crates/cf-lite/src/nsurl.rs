@@ -11,7 +11,9 @@
 //! This is a minimal implementation sufficient for file-path-based URLs
 //! and simple URL string manipulation. Not a full RFC 3986 parser.
 
-use std::ffi::{c_char, CString};
+#[cfg(target_os = "macos")]
+use std::ffi::c_char;
+use std::ffi::CString;
 
 use crate::cfstring;
 use crate::nsobj;
@@ -54,9 +56,7 @@ fn host_cf_symbol(name: &[u8]) -> *mut libc::c_void {
 
     let handle = *COREFOUNDATION_HANDLE.get_or_init(|| unsafe {
         libc::dlopen(
-            b"/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation\0"
-                .as_ptr()
-                .cast(),
+            c"/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation".as_ptr(),
             libc::RTLD_LAZY,
         ) as usize
     }) as *mut libc::c_void;
@@ -564,7 +564,7 @@ pub extern "C" fn shim_nsurl_path_components(obj: u64, _cmd: u64) -> u64 {
     if path.starts_with('/') {
         components.push(cfstring::shim_cf_string_create_with_cstring(
             0,
-            b"/\0".as_ptr().cast(),
+            c"/".as_ptr(),
             0,
         ));
     }

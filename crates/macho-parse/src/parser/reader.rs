@@ -48,14 +48,16 @@ impl<'a> Reader<'a> {
 
     pub(super) fn read_u64(&mut self) -> Result<u64, ParseError> {
         let b = self.read_bytes(8)?;
-        Ok(u64::from_le_bytes(b.try_into().unwrap()))
+        Ok(u64::from_le_bytes([
+            b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7],
+        ]))
     }
 
     pub(super) fn read_fixed_string(&mut self, len: usize) -> Result<String, ParseError> {
         let bytes = self.read_bytes(len)?;
         let end = bytes.iter().position(|&b| b == 0).unwrap_or(len);
         std::str::from_utf8(&bytes[..end])
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .map_err(|e| ParseError::InvalidUtf8 {
                 context: "fixed string",
                 source: e,
@@ -154,10 +156,10 @@ impl<'a> Reader<'a> {
 
     pub(super) fn read_segment_32(&mut self) -> Result<Segment, ParseError> {
         let name = self.read_fixed_string(16)?;
-        let vmaddr = self.read_u32()? as u64;
-        let vmsize = self.read_u32()? as u64;
-        let fileoff = self.read_u32()? as u64;
-        let filesize = self.read_u32()? as u64;
+        let vmaddr = u64::from(self.read_u32()?);
+        let vmsize = u64::from(self.read_u32()?);
+        let fileoff = u64::from(self.read_u32()?);
+        let filesize = u64::from(self.read_u32()?);
         let maxprot = VmProt::from_bits_truncate(self.read_u32()?);
         let initprot = VmProt::from_bits_truncate(self.read_u32()?);
         let nsects = self.read_u32()?;
@@ -185,8 +187,8 @@ impl<'a> Reader<'a> {
     fn read_section_32(&mut self) -> Result<Section, ParseError> {
         let sectname = self.read_fixed_string(16)?;
         let segname = self.read_fixed_string(16)?;
-        let addr = self.read_u32()? as u64;
-        let size = self.read_u32()? as u64;
+        let addr = u64::from(self.read_u32()?);
+        let size = u64::from(self.read_u32()?);
         let offset = self.read_u32()?;
         let align = self.read_u32()?;
         let reloff = self.read_u32()?;
@@ -257,7 +259,7 @@ impl<'a> Reader<'a> {
         let bytes = &self.data[abs_offset..];
         let end = bytes.iter().position(|&b| b == 0).unwrap_or(bytes.len());
         std::str::from_utf8(&bytes[..end])
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .map_err(|e| ParseError::InvalidUtf8 {
                 context: "lc_string",
                 source: e,

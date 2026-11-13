@@ -160,7 +160,6 @@ pub(super) fn decode_branch(raw: u32, pc: u64) -> Instruction {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::cpu::Condition;
     use crate::decode::{decode, Instruction};
     use crate::test_helpers::*;

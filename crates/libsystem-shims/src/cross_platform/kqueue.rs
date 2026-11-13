@@ -221,9 +221,8 @@ fn registry_count_for_kq(kq: i32) -> usize {
 #[cfg(target_os = "linux")]
 fn registry_only_pipes_for_kq(kq: i32) -> bool {
     let guard = EVENT_REGISTRY.lock().unwrap_or_else(|e| e.into_inner());
-    let map = match guard.as_ref() {
-        Some(m) => m,
-        None => return false,
+    let Some(map) = guard.as_ref() else {
+        return false;
     };
     let mut count = 0usize;
     for ((epfd, ident, filter), reg) in map.iter() {
@@ -420,11 +419,10 @@ pub extern "C" fn shim_kevent(
     let mut out_idx: usize = 0;
     let out_max = nevents as usize;
 
-    for i in 0..n as usize {
+    for epev in epoll_events.iter().take(n as usize) {
         if out_idx >= out_max {
             break;
         }
-        let epev = &epoll_events[i];
         let fd = epev.u64 as i32;
 
         // ── timerfd → EVFILT_TIMER ──────────────────────────────────

@@ -151,7 +151,8 @@ impl Handler for AdminHandler {
 
 impl AdminHandler {
     fn memory_index(&self) -> Result<SemanticMemoryIndex, HandlerResponse> {
-        SemanticMemoryIndex::new(&self.workspace_root).map_err(memory_error_response)
+        SemanticMemoryIndex::new(&self.workspace_root)
+            .map_err(|error| memory_error_response(&error))
     }
 
     fn handle_memory_status(&self) -> HandlerResponse {
@@ -162,7 +163,7 @@ impl AdminHandler {
         let db_exists = index.db_path().exists();
         let snapshot = match index.snapshot() {
             Ok(snapshot) => snapshot,
-            Err(error) => return memory_error_response(error),
+            Err(error) => return memory_error_response(&error),
         };
         let active_objects = snapshot
             .objects
@@ -213,7 +214,7 @@ impl AdminHandler {
         };
         let summary = match index.sync() {
             Ok(summary) => summary,
-            Err(error) => return memory_error_response(error),
+            Err(error) => return memory_error_response(&error),
         };
 
         let response = serde_json::json!({
@@ -247,7 +248,7 @@ impl AdminHandler {
         };
         let hits = match index.query_chunks(&q, top_k) {
             Ok(hits) => hits,
-            Err(error) => return memory_error_response(error),
+            Err(error) => return memory_error_response(&error),
         };
         let total = hits.len();
 
@@ -306,7 +307,7 @@ impl AdminHandler {
                 HandlerResponse::json(response.to_string().into_bytes())
             }
             Ok(None) => not_found_response(),
-            Err(error) => memory_error_response(error),
+            Err(error) => memory_error_response(&error),
         }
     }
 
@@ -341,7 +342,7 @@ impl AdminHandler {
                     )
                 }
             }
-            Err(error) => memory_error_response(error),
+            Err(error) => memory_error_response(&error),
         }
     }
 
@@ -406,20 +407,17 @@ impl AdminHandler {
                 });
                 HandlerResponse::json(response.to_string().into_bytes())
             }
-            Err(error) => memory_error_response(error),
+            Err(error) => memory_error_response(&error),
         }
     }
 
     fn handle_requests(&self, request: &Request) -> HandlerResponse {
-        let recorder = match crate::global_recorder() {
-            Some(r) => r,
-            None => {
-                return HandlerResponse::with_status(
-                    503,
-                    "application/json",
-                    br#"{"error":"recorder_not_available"}"#.to_vec(),
-                )
-            }
+        let Some(recorder) = crate::global_recorder() else {
+            return HandlerResponse::with_status(
+                503,
+                "application/json",
+                br#"{"error":"recorder_not_available"}"#.to_vec(),
+            );
         };
 
         let url = request.url();
@@ -447,15 +445,12 @@ impl AdminHandler {
     }
 
     fn handle_summary(&self) -> HandlerResponse {
-        let recorder = match crate::global_recorder() {
-            Some(r) => r,
-            None => {
-                return HandlerResponse::with_status(
-                    503,
-                    "application/json",
-                    br#"{"error":"recorder_not_available"}"#.to_vec(),
-                )
-            }
+        let Some(recorder) = crate::global_recorder() else {
+            return HandlerResponse::with_status(
+                503,
+                "application/json",
+                br#"{"error":"recorder_not_available"}"#.to_vec(),
+            );
         };
 
         let groups = recorder.count_by_source();
@@ -524,7 +519,7 @@ fn not_found_response() -> HandlerResponse {
     )
 }
 
-fn memory_error_response(error: burdettie_memory_index::MemoryIndexError) -> HandlerResponse {
+fn memory_error_response(error: &burdettie_memory_index::MemoryIndexError) -> HandlerResponse {
     HandlerResponse::with_status(
         500,
         "application/json",

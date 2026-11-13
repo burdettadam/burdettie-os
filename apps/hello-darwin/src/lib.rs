@@ -77,6 +77,8 @@ pub fn run_scorecard_from(root: &Path) -> String {
             _ => 0,
         };
         let config = RuntimeConfig::permissive(binary);
+        // Each scorecard entry is an independent guest application lifecycle.
+        macho_runtime::reset_runtime_state_for_reuse();
         if let Ok(result) = Runtime::load_and_run(binary, &config) {
             if result.exit_code == expected {
                 passed += 1;

@@ -407,8 +407,7 @@ pub extern "C" fn shim_nsoutputstream_property_for_key(obj: u64, _cmd: u64, key:
     // Pointer comparison first (Apple-aligned), then string fallback for literals
     let is_data_key = key
         == crate::foundation_constants::nsstream_data_written_to_memory_key_addr()
-        || cfstring::extract_cfstring_cstr(key).as_deref()
-            == Some("NSStreamDataWrittenToMemoryStreamKey");
+        || cfstring::extract_cfstring_cstr(key) == Some("NSStreamDataWrittenToMemoryStreamKey");
     if is_data_key {
         unsafe { *((obj as usize + BUFFER_OFF) as *const u64) }
     } else {

@@ -10,7 +10,6 @@ use super::types::{LayoutGlyph, TextLayout, WrapMode};
 ///
 /// The input is NFC-normalized before layout. Combining marks are positioned
 /// over the preceding base character. Zero-width formatting characters are skipped.
-
 pub fn layout_single_line(text: &str, font: &FontFace, size: f64) -> TextLayout {
     let normalized = normalize_nfc(text);
     let ab_font = font.inner();
