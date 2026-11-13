@@ -29,21 +29,16 @@ fn query_display_size() -> (f64, f64) {
 
         unsafe {
             let cg = libc::dlopen(
-                b"/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics\0".as_ptr()
-                    as *const _,
+                c"/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics".as_ptr(),
                 libc::RTLD_LAZY,
             );
             if !cg.is_null() {
                 let main_id: Option<CGMainDisplayIDFn> =
-                    std::mem::transmute(libc::dlsym(cg, b"CGMainDisplayID\0".as_ptr() as *const _));
-                let pixels_wide: Option<CGDisplayPixelsFn> = std::mem::transmute(libc::dlsym(
-                    cg,
-                    b"CGDisplayPixelsWide\0".as_ptr() as *const _,
-                ));
-                let pixels_high: Option<CGDisplayPixelsFn> = std::mem::transmute(libc::dlsym(
-                    cg,
-                    b"CGDisplayPixelsHigh\0".as_ptr() as *const _,
-                ));
+                    std::mem::transmute(libc::dlsym(cg, c"CGMainDisplayID".as_ptr()));
+                let pixels_wide: Option<CGDisplayPixelsFn> =
+                    std::mem::transmute(libc::dlsym(cg, c"CGDisplayPixelsWide".as_ptr()));
+                let pixels_high: Option<CGDisplayPixelsFn> =
+                    std::mem::transmute(libc::dlsym(cg, c"CGDisplayPixelsHigh".as_ptr()));
                 if let (Some(mid), Some(pw), Some(ph)) = (main_id, pixels_wide, pixels_high) {
                     let display = mid();
                     let w = pw(display) as f64;

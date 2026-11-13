@@ -1174,9 +1174,7 @@ mod tests {
 
         let handle = *COREFOUNDATION_HANDLE.get_or_init(|| unsafe {
             libc::dlopen(
-                b"/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation\0"
-                    .as_ptr()
-                    .cast(),
+                c"/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation".as_ptr(),
                 libc::RTLD_LAZY,
             ) as usize
         }) as *mut libc::c_void;
