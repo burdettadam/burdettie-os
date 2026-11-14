@@ -17,7 +17,8 @@ arm64-translate = { workspace = true }
 trust-policy   = { workspace = true }
 libsystem-shims = { workspace = true }
 objc-runtime   = { workspace = true }
-cf-lite        = { workspace = true }
+# A direct path permits opting out of workspace defaults on Rust 1.93.
+cf-lite        = { path = "../cf-lite", default-features = false }
 cg-shims       = { workspace = true }
 platform-core  = { workspace = true }
 macho-shared-cache  = { workspace = true }
@@ -41,8 +42,11 @@ platform-linux       = { workspace = true }
 [dev-dependencies]
 macho-fixtures = { workspace = true }
 objc-runtime   = { workspace = true }
-cf-lite        = { workspace = true }
 env_logger     = { workspace = true }
+
+[features]
+default = ["host-dialogs"]
+host-dialogs = ["cf-lite/host-dialogs"]
 
 [lints]
 workspace = true
