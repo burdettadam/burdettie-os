@@ -127,6 +127,11 @@ that an evidence reference is genuine or that a runtime actually applied it.
 
 ## Validation and promotion
 
+The [native sandbox operation probe](../milestones/M1_SANDBOX_PROBE.md) supplies
+source-owned direct file-operation and fork-inheritance tests, including retained
+descriptor negative cases. Its source/local harness checks do not qualify the
+selected guest: guest execution is unrun and all 17 controls remain unavailable.
+
 From the repository root, with the pinned contract development dependency:
 
 ```sh
