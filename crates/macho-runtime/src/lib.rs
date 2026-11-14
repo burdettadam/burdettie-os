@@ -22,6 +22,7 @@ mod app_bundle;
 pub mod config;
 pub mod context;
 pub mod error;
+mod exit_lifecycle;
 pub mod interp_bridge;
 mod loader;
 pub mod objc_setup;

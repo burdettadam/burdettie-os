@@ -62,10 +62,11 @@ impl GlyphAtlas {
         // Get the font face and rasterize
         let font_inner = face.inner();
 
-        let ab_glyph_id = ab_glyph::GlyphId(glyph_id);
-        let glyph = ab_glyph_id.with_scale_and_position(px_size, ab_glyph::point(0.0, 0.0));
+        let font_glyph_id = crate::GlyphId(glyph_id);
+        let glyph =
+            font_glyph_id.with_scale_and_position(px_size, ab_glyph_rasterizer::point(0.0, 0.0));
 
-        let outlined = ab_glyph::Font::outline_glyph(font_inner, glyph)?;
+        let outlined = font_inner.outline_glyph(glyph)?;
         let bounds = outlined.px_bounds();
 
         let gw = (bounds.max.x - bounds.min.x).ceil() as u32;
@@ -135,7 +136,6 @@ impl GlyphAtlas {
 mod tests {
     use super::*;
     use crate::font_manager::FontManager;
-    use ab_glyph::Font as _;
 
     fn bitmap(atlas: &GlyphAtlas, entry: GlyphEntry) -> Vec<u8> {
         let x = (entry.u0 * ATLAS_SIZE as f32) as usize;

@@ -304,6 +304,10 @@ pub fn call_entry_interpreted(
             log::warn!("Interpreter: instruction limit reached ({count})");
             return Err(ExecError::NoEntryPoint);
         }
+        arm64_translate::ExitReason::CallbackDepthLimit { limit } => {
+            log::warn!("Interpreter: callback nesting limit reached ({limit})");
+            return Err(ExecError::NoEntryPoint);
+        }
         arm64_translate::ExitReason::Unimplemented { pc, raw } => {
             eprintln!("Interpreter: unimplemented instruction {raw:#010x} at {pc:#x}");
             return Err(ExecError::NoEntryPoint);

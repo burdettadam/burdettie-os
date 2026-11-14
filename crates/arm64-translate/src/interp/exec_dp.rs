@@ -11,9 +11,12 @@ impl Interpreter {
                 self.cpu.pc = pc + 4;
             }
             Instruction::Svc { imm } => {
-                log::debug!("SVC #{imm} at {pc:#x} — treating as exit(x0)");
-                return StepResult::Exit(ExitReason::Exit {
-                    code: self.cpu.x[0] as i64,
+                // There is no kernel syscall backend. A trap must not masquerade
+                // as normal exit and trigger callbacks or a shared stdio flush.
+                log::warn!("Unsupported SVC #{imm} at {pc:#x}");
+                return StepResult::Exit(ExitReason::Unimplemented {
+                    pc,
+                    raw: 0xd400_0001 | (u32::from(imm) << 5),
                 });
             }
 

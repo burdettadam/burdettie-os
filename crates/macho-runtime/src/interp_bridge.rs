@@ -26,11 +26,12 @@ extern "C" {
     ) -> *mut std::ffi::c_void;
 }
 
-fn host_symbol_addr(symbol: &std::ffi::CStr) -> u64 {
+pub(crate) fn host_symbol_addr(symbol: &std::ffi::CStr) -> u64 {
     #[cfg(unix)]
     unsafe {
-        // SAFETY: looking up a well-known process symbol via dlsym.
-        dlsym(std::ptr::null_mut(), symbol.as_ptr()) as u64
+        // SAFETY: looking up a well-known process symbol via dlsym using the
+        // platform's global search handle (which is not null on Darwin).
+        dlsym(libc::RTLD_DEFAULT, symbol.as_ptr()) as u64
     }
 
     #[cfg(not(unix))]
@@ -93,19 +94,45 @@ pub fn build_interpreter_bridge(guest_ranges: &[(u64, u64)]) -> FfiBridge {
         guest_ranges,
     );
 
-    // Register exit/_exit handlers so the interpreter terminates cleanly
-    // instead of auto_call_host actually calling libc::exit (which would
-    // kill the test process).
-    for sym in &["_exit", "exit", "__exit"] {
-        let c_name = std::ffi::CString::new(*sym).unwrap();
-        let addr = host_symbol_addr(&c_name);
-        if addr != 0 {
-            let name = sym.to_string();
-            bridge.register(addr, &name, Box::new(|args| FfiResult::Exit(args.x[0])));
+    // No owner: exit is intercepted, but callback registration must fail.
+    // The runtime pipelines replace these handlers with their launch registry.
+    crate::exit_lifecycle::install_interpreter_lifecycle(&mut bridge, None, false);
+
+    bridge
+}
+
+/// Call a resolved host IMP after the caller has excluded guest code.
+///
+/// # Safety
+///
+/// The receiver and arguments must be valid for the resolved implementation.
+/// Unrecognized IMPs retain `call_host_capturing`'s existing ABI requirements
+/// and limitations; this helper does not infer their signatures.
+unsafe fn call_host_imp(imp: u64, receiver: u64, args: &FfiCallArgs) -> FfiResult {
+    #[cfg(target_arch = "x86_64")]
+    {
+        // SAFETY: the caller excluded guest code and supplies live arguments.
+        // The adapter compares the actual IMP and calls only its known typed
+        // implementation, never a selector-based or guessed function cast.
+        if let Some((x0, x1)) = unsafe {
+            cf_lite::FoundationShims::call_known_nsrange_imp(imp, receiver, args.x[1], args.x[2])
+        } {
+            return FfiResult::ReturnFull {
+                x0,
+                x1,
+                d0: 0,
+                d1: 0,
+            };
         }
     }
 
-    bridge
+    let mut host_args = args.x;
+    host_args[0] = receiver;
+    // SAFETY: this preserves the existing host-call contract for all other
+    // IMPs. Super dispatch has replaced the objc_super pointer with receiver.
+    let (x0, x1, d0, d1) =
+        unsafe { call_host_capturing(imp, &host_args, args.host_x8, args.guest_sp, &args.d) };
+    FfiResult::ReturnFull { x0, x1, d0, d1 }
 }
 
 /// Register an `objc_msgSend` handler: look up IMP, then tail-call or direct-call.
@@ -143,12 +170,9 @@ fn register_msg_send(bridge: &mut FfiBridge, addr: u64, name: &str, guest_ranges
                 return FfiResult::TailCall(imp);
             }
 
-            // Host IMP — call directly with full ABI capture (integer + FP args).
-            unsafe {
-                let (x0, x1, d0, d1) =
-                    call_host_capturing(imp, &args.x, args.host_x8, args.guest_sp, &args.d);
-                FfiResult::ReturnFull { x0, x1, d0, d1 }
-            }
+            // SAFETY: lookup resolved the host implementation; guest code was
+            // excluded above. The call retains its existing argument contract.
+            unsafe { call_host_imp(imp, obj, args) }
         }),
     );
 }
@@ -191,14 +215,9 @@ fn register_msg_send_super(
                 return FfiResult::TailCallWithX0(imp, receiver);
             }
 
-            unsafe {
-                let super_args = [
-                    receiver, sel, args.x[2], args.x[3], args.x[4], args.x[5], args.x[6], args.x[7],
-                ];
-                let (x0, x1, d0, d1) =
-                    call_host_capturing(imp, &super_args, args.host_x8, args.guest_sp, &args.d);
-                FfiResult::ReturnFull { x0, x1, d0, d1 }
-            }
+            // SAFETY: the resolved IMP is outside guest code and receives the
+            // receiver with the original selector and remaining arguments.
+            unsafe { call_host_imp(imp, receiver, args) }
         }),
     );
 }
@@ -238,14 +257,9 @@ fn register_msg_send_super2(
                 return FfiResult::TailCallWithX0(imp, receiver);
             }
 
-            unsafe {
-                let super_args = [
-                    receiver, sel, args.x[2], args.x[3], args.x[4], args.x[5], args.x[6], args.x[7],
-                ];
-                let (x0, x1, d0, d1) =
-                    call_host_capturing(imp, &super_args, args.host_x8, args.guest_sp, &args.d);
-                FfiResult::ReturnFull { x0, x1, d0, d1 }
-            }
+            // SAFETY: the resolved IMP is outside guest code and receives the
+            // receiver with the original selector and remaining arguments.
+            unsafe { call_host_imp(imp, receiver, args) }
         }),
     );
 }
@@ -253,4 +267,111 @@ fn register_msg_send_super2(
 /// Check if an address is within the guest (mapped image) memory ranges.
 fn is_in_guest(addr: u64, ranges: &[(u64, u64)]) -> bool {
     ranges.iter().any(|&(lo, hi)| addr >= lo && addr < hi)
+}
+
+#[cfg(all(test, unix, any(target_arch = "x86_64", target_arch = "aarch64")))]
+#[path = "interp_bridge_nsrange_tests.rs"]
+mod nsrange_tests;
+
+#[cfg(all(test, unix))]
+mod exit_tests {
+    use super::*;
+
+    #[test]
+    fn callback_registration_without_launch_never_reaches_host_atexit() {
+        let bridge = build_interpreter_bridge(&[]);
+        let mut table = libsystem_shims::ShimTable::new();
+        libsystem_shims::LifecycleShims::install(&mut table);
+        let args = FfiCallArgs {
+            x: [0x1234, 0x5678, 0, 0, 0, 0, 0, 0],
+            d: [0; 8],
+            x8: 0,
+            host_x8: 0,
+            guest_sp: 0,
+        };
+        for (host, shim) in [(c"atexit", "_atexit"), (c"__cxa_atexit", "___cxa_atexit")] {
+            let address = table.resolve(shim).unwrap();
+            assert!(
+                matches!(bridge.call_or_stub(address, &args), FfiResult::Return(result) if result as i32 == -1)
+            );
+            let address = host_symbol_addr(host);
+            if address != 0 {
+                assert!(
+                    matches!(bridge.call_or_stub(address, &args), FfiResult::Return(result) if result as i32 == -1)
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn exit_symbols_stop_interpreter_without_terminating_host() {
+        const CHILD_TARGET: &str = "BURDETTIE_INTERPRETER_EXIT_TARGET";
+        if let Ok(target) = std::env::var(CHILD_TARGET) {
+            let (provider, symbol) = target.split_once(':').unwrap();
+            let address = if provider == "shim" {
+                let mut table = libsystem_shims::ShimTable::new();
+                libsystem_shims::LifecycleShims::install(&mut table);
+                table.resolve(symbol).unwrap()
+            } else {
+                host_symbol_addr(&std::ffi::CString::new(symbol).unwrap())
+            };
+            assert_ne!(address, 0, "exit target {target} is missing");
+
+            // Source-owned AArch64 BLR X16, with status in X0 and the actual
+            // resolved shim/libc address in X16. Run the real decode/FFI path.
+            let mut code = 0xd63f_0200_u32.to_le_bytes();
+            let base = code.as_mut_ptr() as u64;
+            // SAFETY: code stays alive and is never mutated while Memory and
+            // the interpreter refer to its read-only instruction bytes.
+            let memory = unsafe {
+                arm64_translate::Memory::from_segments(&[(
+                    base,
+                    code.as_mut_ptr(),
+                    code.len(),
+                    false,
+                )])
+            };
+            let mut cpu = arm64_translate::CpuState::new();
+            cpu.pc = base;
+            cpu.sp = memory.initial_sp();
+            cpu.x[0] = 37;
+            cpu.x[16] = address;
+            let bridge = build_interpreter_bridge(&[(base, base + code.len() as u64)]);
+            let mut interpreter = arm64_translate::Interpreter::new(cpu, memory, bridge);
+            assert!(matches!(
+                interpreter.run(),
+                arm64_translate::ExitReason::Exit { code: 37 }
+            ));
+            println!("BURDETTIE_INTERPRETER_HOST_SURVIVED");
+            return;
+        }
+
+        // A regression may call libc::_exit through auto_call_host. Isolate it
+        // so the parent reports a test failure instead of silently exiting the
+        // entire test harness with the guest's exit code.
+        for target in [
+            "shim:_exit",
+            "shim:__exit",
+            "shim:_Exit",
+            "shim:__Exit",
+            "host:exit",
+            "host:_exit",
+            "host:_Exit",
+        ] {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", "interp_bridge::exit_tests::exit_symbols_stop_interpreter_without_terminating_host", "--nocapture"])
+                .env(CHILD_TARGET, target)
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "{target} terminated its host: {output:?}"
+            );
+            assert!(
+                String::from_utf8_lossy(&output.stdout)
+                    .contains("BURDETTIE_INTERPRETER_HOST_SURVIVED"),
+                "{target} did not complete the interpreter path: {output:?}"
+            );
+        }
+    }
 }
