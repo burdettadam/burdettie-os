@@ -320,6 +320,10 @@ pub fn call_entry_interpreted(
             eprintln!("Interpreter: bad branch at {pc:#x} → {target:#x}");
             return Err(ExecError::NoEntryPoint);
         }
+        arm64_translate::ExitReason::FfiRejected { pc, target, reason } => {
+            eprintln!("Interpreter: rejected FFI at {pc:#x} → {target:#x}: {reason}");
+            return Err(ExecError::NoEntryPoint);
+        }
     };
 
     Ok(EntryResult {

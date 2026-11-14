@@ -61,6 +61,7 @@ impl FfiResult {
 }
 
 /// Arguments passed to a host function from interpreted ARM64 code.
+#[derive(Clone, Copy)]
 pub struct FfiCallArgs {
     /// Integer registers x0-x7.
     pub x: [u64; 8],

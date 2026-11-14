@@ -18,7 +18,7 @@ coverage.
 
 ### ARM64 interpretation on an x86_64 host
 
-The interpreter has one explicit typed adapter for the built-in Foundation
+The interpreter has an explicit typed adapter for the built-in Foundation
 `rangeOfCharacterFromSet:` IMP. It calls the known three-argument shim with
 its declared `NSRange` return type and writes both `location` and `length`
 to the guest's X0/X1 registers. Normal, `objc_msgSendSuper`, and
@@ -32,8 +32,11 @@ specific two-word return through the
 x86_64 host-call fallback still captures only an integer result and ignores
 the guest's variadic stack, FP arguments and indirect-result register. Other
 struct-return methods and arbitrary host functions remain outside this
-adapter's scope. Passing an exit-code assertion does not make formatted
-`printf`/`NSLog` values reliable. These remaining ABI gaps are tracked in
+adapter's scope. A separate [bounded printf adapter](INTERPRETED_PRINTF.md)
+handles literal bytes, `%%`, `%d`, `%lu` and `%s` on Unix x86_64 hosts, with
+strict stack reads and explicit immutable string exports. Other printf formats,
+variadic functions and `NSLog` remain unsupported by that adapter. Passing an
+exit-code assertion alone does not qualify formatted output. Remaining ABI gaps are tracked in
 [issue #9](https://github.com/burdettadam/burdettie-os/issues/9).
 
 The [source-owned regression](../crates/macho-runtime/src/interp_bridge_nsrange_tests.rs)
@@ -47,9 +50,10 @@ cargo test --locked -p macho-runtime --lib interp_bridge::nsrange_tests -- --noc
 ```
 
 The existing `interp_nscharacterset_basics` fixture remains a separate
-end-to-end check and requires its compiled Mach-O input. This host-side
-adapter does not qualify native x86_64 execution inside the selected M1
-Darwin guest, variadic marshalling, worker isolation or security enforcement.
+end-to-end check and requires its compiled Mach-O input. On Unix x86_64 hosts
+it checks both the semantic exit and its 415-byte stdout golden. These host
+adapters do not qualify native x86_64 execution inside the selected M1 Darwin
+guest, general variadic marshalling, worker isolation or security enforcement.
 
 ## Quick Start
 
