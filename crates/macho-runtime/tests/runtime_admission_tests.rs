@@ -55,7 +55,38 @@ impl FixtureDirectory {
 
     fn write(&self, name: &str, file_type: u32, dependencies: &[&str]) -> PathBuf {
         let path = self.0.join(name);
+        std::fs::create_dir_all(path.parent().unwrap()).expect("create fixture parent");
         std::fs::write(&path, image(file_type, dependencies)).expect("write generated image");
+        path
+    }
+
+    fn write_with_rpaths(
+        &self,
+        name: &str,
+        dependencies: &[&str],
+        rpaths: &[&str],
+    ) -> PathBuf {
+        let path = self.0.join(name);
+        std::fs::create_dir_all(path.parent().unwrap()).expect("create fixture parent");
+        let mut bytes = image(6, dependencies);
+        let old_size = u32::from_le_bytes(bytes[20..24].try_into().unwrap()) as usize;
+        let mut end = 32 + old_size;
+        for rpath in rpaths {
+            let length = (12 + rpath.len() + 1).div_ceil(8) * 8;
+            assert!(end + length < bytes.len());
+            bytes[end..end + 4].copy_from_slice(&0x8000_001c_u32.to_le_bytes());
+            bytes[end + 4..end + 8]
+                .copy_from_slice(&u32::try_from(length).unwrap().to_le_bytes());
+            bytes[end + 8..end + 12].copy_from_slice(&12_u32.to_le_bytes());
+            bytes[end + 12..end + 12 + rpath.len()].copy_from_slice(rpath.as_bytes());
+            end += length;
+        }
+        let count = u32::try_from(1 + dependencies.len() + rpaths.len()).unwrap();
+        bytes[16..20].copy_from_slice(&count.to_le_bytes());
+        bytes[20..24].copy_from_slice(&u32::try_from(end - 32).unwrap().to_le_bytes());
+        let parsed = macho_parse::parse(&bytes).expect("rpath fixture must parse");
+        assert_eq!(parsed.rpaths, rpaths);
+        std::fs::write(&path, bytes).expect("write generated rpath image");
         path
     }
 }
@@ -285,5 +316,234 @@ fn cached_main_bytes_do_not_cache_an_allow_decision() {
         let config = config_for(&main, &main, &seen);
         assert_denied(route, route.load(&main, config));
         assert_eq!(*seen.lock().unwrap(), vec![main.clone()]);
+    }
+}
+
+fn insert_library(config: &mut RuntimeConfig, path: &Path, via_environment: bool) {
+    if via_environment {
+        config.env_overrides.push((
+            "DYLD_INSERT_LIBRARIES".to_string(),
+            format!(": {} :", path.display()),
+        ));
+    } else {
+        config.insert_libraries.push(path.to_path_buf());
+    }
+}
+
+#[test]
+fn every_route_rejects_an_inserted_librarys_direct_dependency() {
+    let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let directory = FixtureDirectory::new();
+    let main = directory.write("main", 2, &[]);
+    let inserted = directory.write("plugins/inserted.dylib", 6, &["@loader_path/denied.dylib"]);
+    let denied = directory.write("plugins/denied.dylib", 6, &[]);
+    for route in ROUTES {
+        for via_environment in [false, true] {
+            let seen = Arc::new(Mutex::new(Vec::new()));
+            let mut config = config_for(&main, &denied, &seen);
+            insert_library(&mut config, &inserted, via_environment);
+            assert_denied(route, route.load(&main, config));
+            assert_eq!(
+                *seen.lock().unwrap(),
+                vec![main.clone(), inserted.clone(), denied.clone()]
+            );
+        }
+    }
+}
+
+#[test]
+fn every_route_rejects_an_inserted_librarys_transitive_dependency() {
+    let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let directory = FixtureDirectory::new();
+    let main = directory.write("main", 2, &[]);
+    let inserted = directory.write(
+        "plugins/inserted.dylib",
+        6,
+        &["@loader_path/deps/parent.dylib"],
+    );
+    let parent = directory.write("plugins/deps/parent.dylib", 6, &["@loader_path/denied.dylib"]);
+    let denied = directory.write("plugins/deps/denied.dylib", 6, &[]);
+    for route in ROUTES {
+        for via_environment in [false, true] {
+            let seen = Arc::new(Mutex::new(Vec::new()));
+            let mut config = config_for(&main, &denied, &seen);
+            insert_library(&mut config, &inserted, via_environment);
+            assert_denied(route, route.load(&main, config));
+            assert_eq!(
+                *seen.lock().unwrap(),
+                vec![main.clone(), inserted.clone(), parent.clone(), denied.clone()]
+            );
+        }
+    }
+}
+
+#[test]
+fn inserted_dependencies_use_the_actual_executable_directory() {
+    let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let directory = FixtureDirectory::new();
+    let main = directory.write("main", 2, &[]);
+    let inserted = directory.write(
+        "plugins/inserted.dylib",
+        6,
+        &["@executable_path/denied.dylib"],
+    );
+    let denied = directory.write("denied.dylib", 6, &[]);
+    for route in ROUTES {
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let mut config = config_for(&main, &denied, &seen);
+        // Process metadata must not redirect the dependency resolver.
+        config.process_path = directory.0.join("unrelated/fake-main");
+        config.insert_libraries.push(inserted.clone());
+        assert_denied(route, route.load(&main, config));
+        assert_eq!(
+            *seen.lock().unwrap(),
+            vec![main.clone(), inserted.clone(), denied.clone()]
+        );
+    }
+}
+
+#[test]
+fn inserted_dependencies_use_their_roots_rpaths() {
+    let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    for (rpath, dependency_name) in [
+        ("@loader_path/private", "plugins/private/denied.dylib"),
+        ("@executable_path/private", "private/denied.dylib"),
+    ] {
+        let directory = FixtureDirectory::new();
+        let main = directory.write("main", 2, &[]);
+        let inserted = directory.write_with_rpaths(
+            "plugins/inserted.dylib",
+            &["@rpath/denied.dylib"],
+            &[rpath],
+        );
+        let denied = directory.write(dependency_name, 6, &[]);
+        for route in ROUTES {
+            let seen = Arc::new(Mutex::new(Vec::new()));
+            let mut config = config_for(&main, &denied, &seen);
+            config.insert_libraries.push(inserted.clone());
+            assert_denied(route, route.load(&main, config));
+            assert_eq!(
+                *seen.lock().unwrap(),
+                vec![main.clone(), inserted.clone(), denied.clone()]
+            );
+        }
+    }
+}
+
+#[test]
+fn every_inserted_root_is_traversed() {
+    let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let directory = FixtureDirectory::new();
+    let main = directory.write("main", 2, &[]);
+    let first = directory.write("first.dylib", 6, &[]);
+    let second = directory.write("second.dylib", 6, &["@loader_path/denied.dylib"]);
+    let denied = directory.write("denied.dylib", 6, &[]);
+    for route in ROUTES {
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let mut config = config_for(&main, &denied, &seen);
+        config.insert_libraries = vec![first.clone(), second.clone()];
+        assert_denied(route, route.load(&main, config));
+        assert_eq!(
+            *seen.lock().unwrap(),
+            vec![main.clone(), first.clone(), second.clone(), denied.clone()]
+        );
+    }
+}
+
+#[test]
+fn inserted_and_main_roots_share_an_admitted_dependency() {
+    let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let directory = FixtureDirectory::new();
+    let deps = &["@executable_path/shared.dylib"];
+    let main = directory.write("main", 2, deps);
+    let first = directory.write("plugins/first.dylib", 6, deps);
+    let second = directory.write("plugins/second.dylib", 6, deps);
+    let shared = directory.write("shared.dylib", 6, &[]);
+    let seen = Arc::new(Mutex::new(Vec::new()));
+    let mut config = config_for(&main, &directory.0.join("not-present"), &seen);
+    config.insert_libraries = vec![first.clone(), second.clone()];
+    let mapped = Loader::parse(&main, config)
+        .expect("parse")
+        .check_security()
+        .expect("allow main")
+        .map_images()
+        .expect("map shared dependency once");
+    assert_eq!(mapped.images_loaded(), 4);
+    assert_eq!(*seen.lock().unwrap(), vec![main, first, second, shared]);
+}
+
+#[test]
+fn inserted_dependency_cycles_terminate_without_duplicate_mapping() {
+    let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let directory = FixtureDirectory::new();
+    let main = directory.write("main", 2, &[]);
+    let inserted = directory.write("inserted.dylib", 6, &["@loader_path/a.dylib"]);
+    let a = directory.write("a.dylib", 6, &["@loader_path/b.dylib"]);
+    let b = directory.write("b.dylib", 6, &["@loader_path/a.dylib"]);
+    let seen = Arc::new(Mutex::new(Vec::new()));
+    let mut config = config_for(&main, &directory.0.join("not-present"), &seen);
+    config.insert_libraries.push(inserted.clone());
+    let mapped = Loader::parse(&main, config)
+        .expect("parse")
+        .check_security()
+        .expect("allow main")
+        .map_images()
+        .expect("map cyclic graph");
+    assert_eq!(mapped.images_loaded(), 4);
+    assert_eq!(*seen.lock().unwrap(), vec![main, inserted, a, b]);
+}
+
+#[test]
+fn absent_policy_still_loads_the_inserted_dependency_closure() {
+    let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let directory = FixtureDirectory::new();
+    let main = directory.write("main", 2, &[]);
+    let inserted = directory.write("inserted.dylib", 6, &["@loader_path/parent.dylib"]);
+    directory.write("parent.dylib", 6, &["@loader_path/leaf.dylib"]);
+    directory.write("leaf.dylib", 6, &[]);
+    let mut config = RuntimeConfig::permissive(&main);
+    config.shim_set.objc = false;
+    config.shim_set.foundation = false;
+    config.insert_libraries.push(inserted);
+    let checked = Loader::parse(&main, config)
+        .expect("parse")
+        .check_security()
+        .expect("permissive admission");
+    assert!(checked.security_report().is_none());
+    let mapped = checked.map_images().expect("map complete inserted graph");
+    assert_eq!(mapped.images_loaded(), 4);
+}
+
+#[test]
+fn parent_relative_dependencies_are_resolved_before_name_normalization() {
+    let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    for inserted_root in [false, true] {
+        let directory = FixtureDirectory::new();
+        directory.write("denied.dylib", 6, &[]);
+        let main = if inserted_root {
+            directory.write("main", 2, &[])
+        } else {
+            directory.write("nested/main", 2, &["@loader_path/../denied.dylib"])
+        };
+        let inserted = inserted_root.then(|| {
+            directory.write(
+                "nested/inserted.dylib",
+                6,
+                &["@loader_path/../denied.dylib"],
+            )
+        });
+        let denied = directory.0.join("nested/../denied.dylib");
+        for route in ROUTES {
+            let seen = Arc::new(Mutex::new(Vec::new()));
+            let mut config = config_for(&main, &denied, &seen);
+            if let Some(path) = &inserted {
+                config.insert_libraries.push(path.clone());
+            }
+            assert_denied(route, route.load(&main, config));
+            let mut expected = vec![main.clone()];
+            expected.extend(inserted.iter().cloned());
+            expected.push(denied.clone());
+            assert_eq!(*seen.lock().unwrap(), expected);
+        }
     }
 }

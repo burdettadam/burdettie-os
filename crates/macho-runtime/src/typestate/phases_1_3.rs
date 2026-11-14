@@ -242,6 +242,7 @@ impl Loader<Checked> {
             let count = loader::load_insert_libraries(
                 &insert_paths,
                 &mut registry,
+                binary_dir,
                 inner.config.platform.fs(),
                 &inner.config,
             )?;

@@ -242,6 +242,7 @@ pub(super) fn run_native(
         let insert_count = loader::load_insert_libraries(
             &insert_lib_paths,
             &mut registry,
+            binary_dir,
             config.platform.fs(),
             config,
         )?;

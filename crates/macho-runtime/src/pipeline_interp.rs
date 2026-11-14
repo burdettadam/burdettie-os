@@ -129,6 +129,7 @@ pub(super) fn run_interpreted(
         let count = loader::load_insert_libraries(
             &insert_paths,
             &mut registry,
+            binary_dir,
             config.platform.fs(),
             config,
         )?;

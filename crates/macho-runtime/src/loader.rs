@@ -82,7 +82,7 @@ impl DependencyLoadStats {
     }
 }
 
-/// BFS-load dylib dependencies, skipping system libraries.
+/// BFS-load the main image's dylib dependencies, skipping system libraries.
 pub(crate) fn load_dependencies(
     main_parsed: &ParsedMachO,
     registry: &mut ImageRegistry,
@@ -90,19 +90,33 @@ pub(crate) fn load_dependencies(
     fs: &dyn FilesystemProvider,
     config: &RuntimeConfig,
 ) -> Result<DependencyLoadStats, RuntimeError> {
+    load_dependencies_from_root(main_parsed, registry, binary_dir, binary_dir, fs, config)
+}
+
+/// Use the same traversal and admission path for main and inserted roots.
+/// `binary_dir` always belongs to the actual executable; `root_dir` belongs
+/// to the image whose load commands seed this traversal.
+fn load_dependencies_from_root(
+    root_parsed: &ParsedMachO,
+    registry: &mut ImageRegistry,
+    binary_dir: &Path,
+    root_dir: &Path,
+    fs: &dyn FilesystemProvider,
+    config: &RuntimeConfig,
+) -> Result<DependencyLoadStats, RuntimeError> {
     let mut queue: VecDeque<(String, Vec<String>, PathBuf)> = VecDeque::new();
     let mut stats = DependencyLoadStats::default();
 
-    // Seed with main binary's direct deps
-    let rpaths = main_parsed.rpaths.clone();
-    for dlib in &main_parsed.dylibs {
+    // Seed with this root's direct dependencies and its own loader directory.
+    let rpaths = root_parsed.rpaths.clone();
+    for dlib in &root_parsed.dylibs {
         if is_system_library(&dlib.name) {
             stats.system_libraries_skipped += 1;
             continue;
         }
         stats.direct_deps_requested += 1;
         stats.deps_enqueued += 1;
-        queue.push_back((dlib.name.clone(), rpaths.clone(), binary_dir.to_path_buf()));
+        queue.push_back((dlib.name.clone(), rpaths.clone(), root_dir.to_path_buf()));
     }
 
     while let Some((raw_name, rpaths, loader_dir)) = queue.pop_front() {
@@ -118,7 +132,9 @@ pub(crate) fn load_dependencies(
         });
 
         let resolve_start = Instant::now();
-        let resolved_path = resolve_dylib_path(&install_name, &rpaths, binary_dir, &loader_dir, fs);
+        // Registry-key normalization is not filesystem resolution. In particular,
+        // @loader_path/../ must retain its parent traversal until after expansion.
+        let resolved_path = resolve_dylib_path(&raw_name, &rpaths, binary_dir, &loader_dir, fs);
         stats.resolve_time += resolve_start.elapsed();
 
         let Some(path) = resolved_path else {
@@ -280,19 +296,23 @@ pub(crate) fn resolve_dylib_path(
     None
 }
 
-/// Load insert libraries (from `DYLD_INSERT_LIBRARIES`) into the registry
-/// before normal dependency loading.  Each library is parsed and loaded;
-/// its sub-dependencies are NOT loaded (they'll be resolved normally later
-/// through the dependency BFS).
+/// Load inserted libraries and traverse each successfully mapped root's
+/// dependencies through the same admission path as the main executable.
+/// All inserted roots are mapped first, preserving their symbol precedence.
+/// `binary_dir` is supplied by the caller, not inferred from process metadata.
 ///
-/// Returns the number of libraries successfully loaded.
+/// Returns the number of inserted roots loaded, excluding their dependencies.
+/// Missing/malformed images, system providers, and install-name alias identity
+/// still follow the legacy loader behavior; this is not a complete trust boundary.
 pub(crate) fn load_insert_libraries(
     paths: &[std::path::PathBuf],
     registry: &mut ImageRegistry,
+    binary_dir: &Path,
     fs: &dyn FilesystemProvider,
     config: &RuntimeConfig,
 ) -> Result<usize, RuntimeError> {
     let mut loaded = 0;
+    let mut roots = Vec::new();
     for path in paths {
         let install_name = path
             .file_name()
@@ -322,15 +342,25 @@ pub(crate) fn load_insert_libraries(
         };
         // Inserted libraries are executable inputs too; reject them before mapping.
         crate::security::evaluate_security(&parsed, path, config)?;
-        match registry.load_preparsed(&install_name, Arc::new(parsed), Arc::from(data)) {
+        let parsed = Arc::new(parsed);
+        match registry.load_preparsed(&install_name, parsed.clone(), Arc::from(data)) {
             Ok(_) => {
                 log::info!("DYLD_INSERT_LIBRARIES: loaded {}", path.display());
                 loaded += 1;
+                let loader_dir = path.parent().unwrap_or(Path::new(".")).to_path_buf();
+                roots.push((parsed, loader_dir));
             }
             Err(e) => {
                 log::warn!("DYLD_INSERT_LIBRARIES: cannot load {}: {e}", path.display());
             }
         }
+    }
+
+    // Admission of an inserted root is not admission of its dependency closure.
+    // Reuse the retained parse result, rather than rereading that root by path.
+    // All callers propagate a dependency denial before fixups/guest initialization.
+    for (parsed, loader_dir) in roots {
+        load_dependencies_from_root(&parsed, registry, binary_dir, &loader_dir, fs, config)?;
     }
     Ok(loaded)
 }
