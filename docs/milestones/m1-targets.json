@@ -275,16 +275,20 @@
   "runtime_prerequisites": {
     "headless_and_exit": {
       "pull_request": "https://github.com/burdettadam/burdettie-os/pull/7",
-      "revision": "f6918f029c65144eea3ca7e3b437a58bdefebb4e",
+      "revision": "d3ee4a2dd9483193bb3d01e38e4b2051751fdb17",
       "status": "published_draft_unmerged",
       "selected_guest_link_and_execution": "not_run",
-      "launch_owned_normal_exit_cleanup": "not_implemented"
+      "launch_owned_normal_exit_cleanup": "implemented_for_direct_pipelines_host_tests_pass",
+      "admission_integrated_from_revision": "4a74a51502a29bc65ef1fe4a8ce92ce2c11ec498",
+      "required_checks": "functional_pass_security_and_hygiene_fail",
+      "evidence": "evidence/runtime-integration-2026-11-14.json"
     },
     "admission": {
       "pull_request": "https://github.com/burdettadam/burdettie-os/pull/5",
       "revision": "4a74a51502a29bc65ef1fe4a8ce92ce2c11ec498",
       "status": "published_unmerged",
-      "selected_guest_qualification": "not_run"
+      "selected_guest_qualification": "not_run",
+      "integrated_into_runtime_pr_revision": "d3ee4a2dd9483193bb3d01e38e4b2051751fdb17"
     }
   }
 }

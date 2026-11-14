@@ -1,0 +1,158 @@
+{
+  "schema_version": 1,
+  "scope": "published_host_runtime_admission_and_cleanup_integration",
+  "source": {
+    "pull_request": "https://github.com/burdettadam/burdettie-os/pull/7",
+    "revision": "d3ee4a2dd9483193bb3d01e38e4b2051751fdb17",
+    "tree": "2d4ff957f0f128bf92d3d3065369c510dc3cc447",
+    "parents": [
+      "8af68e1e07170ece508ee8d1ed0be18914202e80",
+      "4a74a51502a29bc65ef1fe4a8ce92ce2c11ec498"
+    ],
+    "ci_checkout": "69210711fe31df906a763a464b0ca6ae9e355184",
+    "ci_checkout_tree_matches_head": true,
+    "merged_into_platform_branch": false,
+    "merged_into_main": false
+  },
+  "behavior": {
+    "initializer_aware_exit_code_preserved": true,
+    "evaluated_admission_report_preserved": true,
+    "normal_cleanup_before_direct_pipeline_unmap": true
+  },
+  "validation": {
+    "full_ci": {
+      "url": "https://github.com/burdettadam/burdettie-os/actions/runs/43624594318",
+      "status": "completed",
+      "conclusion": "failure",
+      "jobs": [
+        {
+          "id": 132537513388,
+          "name": "README quickstart (macOS ARM64)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 132537513559,
+          "name": "Build native Mach-O fixtures",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 132537513678,
+          "name": "Security Scanning",
+          "status": "completed",
+          "conclusion": "failure"
+        },
+        {
+          "id": 132537830579,
+          "name": "FFI Interop (C + Swift)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 132537830614,
+          "name": "Linux ARM64 E2E (Interpreter)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 132537830616,
+          "name": "Docker Dev Build",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 132537830622,
+          "name": "Build & Test",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    "hygiene": {
+      "url": "https://github.com/burdettadam/burdettie-os/actions/runs/43624594376",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    "exact_head_tests": {
+      "runtime_admission": {
+        "passed": 17,
+        "failed": 0,
+        "ignored": 0,
+        "filtered": 0
+      },
+      "lifecycle": {
+        "rust_harnesses_passed": 1,
+        "isolated_child_cases": 17,
+        "failed": 0,
+        "ignored": 0,
+        "filtered": 0,
+        "note": "The source harness checks each child exit status and marker; successful runtime cases also assert the evaluated security report survives."
+      },
+      "entitlement_report": {
+        "named_tests_passed": 6,
+        "failed": 0,
+        "note": "Each test name in the integration test source was matched to its success line because stderr runner headings interleave with other test output."
+      },
+      "arm64_interpreter": {
+        "suite": "interpreted_objc_tests",
+        "reported_passed": 40,
+        "reported_failed": 0,
+        "reported_ignored": 0,
+        "reported_filtered": 0,
+        "fixture_presence_step": "success",
+        "caveat": "PR7 lacks PR8's --nocapture refinement. This records the reported suite result plus the passing fixture-presence gate; absence of hidden skip text alone is not used as proof."
+      }
+    },
+    "required_failures": {
+      "cargo_audit": {
+        "conclusion": "success",
+        "warnings": [
+          "RUSTSEC-2024-0436: paste is unmaintained",
+          "RUSTSEC-2026-0192: ttf-parser is unmaintained"
+        ]
+      },
+      "cargo_deny": {
+        "conclusion": "failure",
+        "exit_code": 1,
+        "failure": "ttf-parser 0.25.1; RUSTSEC-2026-0192; error[unmaintained]",
+        "summary": "advisories FAILED, bans ok, licenses ok, sources ok"
+      },
+      "hygiene": {
+        "tracked_files_checked": 1212,
+        "tracked_artifact_check": "success",
+        "history_scan_exit_code": 1,
+        "commits_scanned": 150,
+        "bytes_scanned": 19240619,
+        "findings": 2
+      }
+    },
+    "local_negative_control": {
+      "intentional_mutation": "security_report: None while preserving initializer-aware exit_code",
+      "expected_failure_observed": "launch_owned_callbacks_follow_real_runtime_paths failed with 'admitted execution must retain its security report'",
+      "mutation_restored_before_commit": true,
+      "positive_retest_before_commit": "17 admission tests and all 17 lifecycle child cases passed"
+    }
+  },
+  "qualification": {
+    "selected_darwin_fixture_link": "not_run",
+    "selected_guest_runtime_execution": "not_run",
+    "worker_isolation": "not_qualified",
+    "security_backend_enforcement": "not_qualified",
+    "apple_application_workflow": "not_run",
+    "m1_complete": false
+  },
+  "limits": [
+    "Native explicit termination still exits the embedding host.",
+    "Native callbacks and blocking host FFI are not preemptible.",
+    "Guest workers do not inherit launch ownership; streams remain shared.",
+    "Typestate/direct-entry callers and native configurations disabling lifecycle shims remain outside the cleanup contract.",
+    "Dynamic DSO unload, TLS destructors, block-based atexit and exception unwinding remain unsupported by this slice.",
+    "The non-AArch64 host FFI fallback still lacks complete ARM64 ABI translation; issue #9 remains open."
+  ],
+  "policy_changes": {
+    "scanner_exception_published": false,
+    "scanner_scope_changed": false,
+    "required_failures_bypassed": false
+  }
+}
