@@ -12,6 +12,7 @@ The development validator needs Python 3.10 or later and the pinned `jsonschema=
 python3 -m pip install -r requirements.txt
 python3 validate_contract.py --self-test
 python3 validate_contract.py examples/*.json
+python3 validate_contract.py --allocation backends/puredarwin-x86_64.json
 ```
 
 Run these commands from this directory. Installation is unnecessary when the required package is already present. The validator is development tooling; it is not linked into the OS or used as an authorization service.
@@ -27,6 +28,8 @@ Owner authority references, document grants, and profile revisions must be resol
 Network rules in v1 are `deny` or `allow_all`. Unsupported destination rules are rejected instead of accepted with partial enforcement. Limits explicitly use milliseconds, bytes per process tree, process count, and separate stdout/stderr bytes; `null` means no optional ceiling. Operational ceilings and host permission failures are separately reported.
 
 Backend evidence binds the backend/runtime/image version, OS/kernel, host architecture, guest architecture, execution route, and worker strategy. Reusing ARM64 evidence to qualify x86_64 is invalid. Each required capability must cover the needed scopes, be verified and available, and be established before an enforced launch is allowed. A valid record still needs real test evidence before it can represent supported behavior.
+
+Evidence also names its exact capability ID, kind and covered scopes; a supervision test cannot qualify filesystem confinement. Required capabilities cannot have empty scopes. The [M1 backend allocation](BACKEND_ALLOCATION.md) maps all 17 control families to owners, source findings, candidate mechanisms and qualification tests. Its validator checks engineering coverage separately from launch records. Every control is still unsupported on the selected Burdettie guest; no allocation document authorizes launch or proves enforcement.
 
 Every allowed enforced report must include a verified, available and established `launch.supervision` capability of kind `supervision` with application and descendant scope, as well as finalized findings. Each required capability names its expected kind; the provided control must match it exactly. This structural baseline does not derive the full selected policy. No document validator can establish complete policy enforcement by validating self-reported records.
 

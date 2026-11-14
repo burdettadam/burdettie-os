@@ -180,11 +180,35 @@
                 },
                 "context": {
                   "$ref": "#/$defs/context"
+                },
+                "capability_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "kind": {
+                  "enum": [
+                    "admission",
+                    "observation",
+                    "resource_enforcement",
+                    "supervision"
+                  ]
+                },
+                "scopes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true
                 }
               },
               "required": [
                 "test_ref",
-                "context"
+                "context",
+                "capability_id",
+                "kind",
+                "scopes"
               ],
               "additionalProperties": false
             }
@@ -973,7 +997,8 @@
                   "type": "string",
                   "minLength": 1
                 },
-                "uniqueItems": true
+                "uniqueItems": true,
+                "minItems": 1
               },
               "kind": {
                 "enum": [

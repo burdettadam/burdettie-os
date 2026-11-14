@@ -87,7 +87,7 @@ A capability manifest names backend ID/version, OS/kernel build, host and guest 
 - Implementation state: `unsupported`, `implemented_unverified`, or `verified`.
 - Runtime availability: available, unavailable, or failed to establish.
 - Kind and scope: `admission`, `observation`, `resource_enforcement`, or `supervision`; native/interpreter coverage; descendants; supported operations and limits. Each required capability specifies its expected kind and scopes. A supplied capability must match the kind exactly; admission cannot substitute for resource enforcement.
-- Evidence reference: test/source revision and platform tuple that justify a verified claim.
+- Evidence reference: test/source revision and platform tuple that justify a verified claim, bound to the exact capability ID, kind and covered scopes. Required capabilities have at least one explicit scope. Evidence for another control, kind or narrower scope cannot qualify the advertised control.
 
 These are separate dimensions. A verified backend feature may be unavailable on this boot; a compiled feature may never have been qualified. Matching a trait method, mock implementation, or `is_enforcing()` boolean is insufficient. The supervisor derives required capabilities from the selected profile, not from a client-provided capability list. Any unsupported, unverified, unavailable, or incorrectly scoped required control prevents a production enforced launch. Development experiments may exercise unverified implementations but cannot emit a successful enforced qualification report.
 
@@ -144,6 +144,8 @@ Legacy in-process C/Rust embedding remains a documented development/permissive c
 | Embedding bindings | Versioned supervisor client; legacy ABI remains explicitly scoped |
 
 The current `PlatformProvider` supplies host service abstractions but its process trait exposes only PID/main-thread information. Add a separate process-supervision/confinement interface; do not label ordinary filesystem or memory provider wrappers a sandbox. Security-sensitive runtime helpers receive a launch-bound context rather than looking up mutable process-global policy.
+
+The [M1 Darwin backend allocation](BACKEND_ALLOCATION.md) and its [machine-readable catalog](backends/puredarwin-x86_64.json) assign each control to an owner and a concrete next mechanism or explicit unsupported status. The catalog includes inspected native PureDarwin sandbox hooks and their limitations; it does not promote those source findings into guest enforcement evidence.
 
 ## Acceptance cases
 
