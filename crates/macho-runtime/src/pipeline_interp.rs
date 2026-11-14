@@ -126,16 +126,25 @@ pub(super) fn run_interpreted(
         paths
     };
     if !insert_paths.is_empty() {
-        let count =
-            loader::load_insert_libraries(&insert_paths, &mut registry, config.platform.fs(), config)?;
+        let count = loader::load_insert_libraries(
+            &insert_paths,
+            &mut registry,
+            config.platform.fs(),
+            config,
+        )?;
         log::info!(
             "DYLD_INSERT_LIBRARIES: loaded {count}/{} libraries",
             insert_paths.len()
         );
     }
 
-    let _dep_stats =
-        loader::load_dependencies(&arc_parsed, &mut registry, binary_dir, config.platform.fs(), config)?;
+    let _dep_stats = loader::load_dependencies(
+        &arc_parsed,
+        &mut registry,
+        binary_dir,
+        config.platform.fs(),
+        config,
+    )?;
     let app_idx = registry.load_preparsed("__main__", arc_parsed, main_data)?;
 
     // 7. Apply fixups

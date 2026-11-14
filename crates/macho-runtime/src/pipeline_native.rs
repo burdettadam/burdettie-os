@@ -239,8 +239,12 @@ pub(super) fn run_native(
 
     // 5.6. Load insert libraries first (before normal deps).
     if !insert_lib_paths.is_empty() {
-        let insert_count =
-            loader::load_insert_libraries(&insert_lib_paths, &mut registry, config.platform.fs(), config)?;
+        let insert_count = loader::load_insert_libraries(
+            &insert_lib_paths,
+            &mut registry,
+            config.platform.fs(),
+            config,
+        )?;
         tracer.record(
             EventKind::Pipeline,
             format!(
@@ -251,8 +255,13 @@ pub(super) fn run_native(
     }
 
     // BFS dependency loading (skip system libraries)
-    let dep_stats =
-        loader::load_dependencies(&arc_parsed, &mut registry, binary_dir, config.platform.fs(), config)?;
+    let dep_stats = loader::load_dependencies(
+        &arc_parsed,
+        &mut registry,
+        binary_dir,
+        config.platform.fs(),
+        config,
+    )?;
     dep_stats.record_to(&tracer);
 
     // Load the main binary last

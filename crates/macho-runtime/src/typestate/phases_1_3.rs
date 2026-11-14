@@ -211,11 +211,55 @@ impl Loader<Checked> {
 
         let mut registry = ImageRegistry::new(inner.config.platform.memory(), unwind_registry);
         let binary_dir = inner.binary_path.parent().unwrap_or(Path::new("."));
+
+        // Embedding callers must not silently lose configured inserted libraries.
+        // Apply the same admission report and loader as native/interpreted routes.
+        let mut insert_paths = inner.config.insert_libraries.clone();
+        for (key, value) in &inner.config.env_overrides {
+            if key == "DYLD_INSERT_LIBRARIES" {
+                for path in value.split(':').map(str::trim).filter(|p| !p.is_empty()) {
+                    insert_paths.push(std::path::PathBuf::from(path));
+                }
+            }
+        }
+        if inner
+            .security_report
+            .as_ref()
+            .is_some_and(|report| report.strip_dyld_env)
+        {
+            if !insert_paths.is_empty() {
+                inner.tracer.record(
+                    EventKind::Pipeline,
+                    format!(
+                        "DYLD_INSERT_LIBRARIES: blocked by hardened runtime ({} libraries)",
+                        insert_paths.len()
+                    ),
+                );
+            }
+            insert_paths.clear();
+        }
+        if !insert_paths.is_empty() {
+            let count = loader::load_insert_libraries(
+                &insert_paths,
+                &mut registry,
+                inner.config.platform.fs(),
+                &inner.config,
+            )?;
+            inner.tracer.record(
+                EventKind::Pipeline,
+                format!(
+                    "DYLD_INSERT_LIBRARIES: loaded {count}/{} libraries",
+                    insert_paths.len()
+                ),
+            );
+        }
+
         let dep_stats = loader::load_dependencies(
             &inner.parsed,
             &mut registry,
             binary_dir,
             inner.config.platform.fs(),
+            &inner.config,
         )?;
         dep_stats.record_to(&inner.tracer);
 
