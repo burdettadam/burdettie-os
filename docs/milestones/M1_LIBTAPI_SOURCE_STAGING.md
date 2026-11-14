@@ -136,6 +136,29 @@ scan](https://github.com/burdettadam/burdettie-os/actions/runs/43627478517) rema
 failed. Those results are bound to `f8c5917`; a later evidence update must pass
 its own checks. M1 remains incomplete.
 
+## Observed realization
+
+A separate bounded build at the same `f8c5917` source completed on 2026-11-14
+at **20:08:20 UTC**. Its realization phase passed in **4,082.6 seconds**, and
+its installed-output inspection passed. The [new build
+receipt](evidence/libtapi-build-2026-11-14.json) binds the complete recovered
+result, build log, NAR sidecar and journal. It leaves the earlier metadata and
+failed-build receipts unchanged.
+
+Actual prepatch staging allocated **50,089,984 bytes**, copying 74 regular files
+and linking 10,592 to the complete source. The original patch, shebang rewrites
+and config.guess hook then ran. The output contains eight ordinary headers and
+the inspected 4,910,128-byte x86_64 ELF library, with no source-output symlinks
+or complete-source/temporary-build references. Registered NAR size is
+4,940,088 bytes. The prepatch source check is distinct from the later native
+metadata plan's fresh complete-source rehash.
+
+The build stayed above the 8-GiB reserve: its observed minimum free space was
+8,995,893,248 bytes, its final free space was 9,317,019,648 bytes, and maximum
+observed whole-host growth was 526,663,680 bytes. Cgroup memory peaked at
+1,096,855,552 bytes without high/max/OOM events. This is a measured success for
+this bounded library build; it does not qualify subsequent build peaks.
+
 ## Capacity and qualification gates
 
 The allocation estimate covers the directory structure, file symlinks and
@@ -159,12 +182,14 @@ there are no output symlinks. Confirm the effective compiler include paths and
 the applied architecture patch in the recorded build commands. Do not manually
 register copied files under a predicted store path.
 
-This candidate is deliberately not wired into the native linker or downstream
-libraries. Rebinding it requires a later explicit recipe change, new linker and
-downstream derivation identities, an unchanged SDK check and fresh plans. A
-successful libtapi build alone would not qualify native linking, executable
-fixtures, the selected Darwin guest, Burdettie runtime ABI or any security
-backend. Those gates remain open.
+The existing default helpers still select their original dependencies. The
+separate [staged-linker recipe](M1_STAGED_LIBTAPI_LINKER.md) now provides an
+explicit rebind and has an actual **32.21-second metadata-plan pass**, with nine
+local derivations and no fetched paths. The [downstream composition and shared
+inspector](M1_STAGED_LIBRARIES.md) require a separately successful native build
+before their planning path can run. LibTAPI success alone does not qualify
+native linking, executable fixtures, the selected Darwin guest, Burdettie
+runtime ABI or any security backend. Those gates remain open.
 
 ## Focused validation
 

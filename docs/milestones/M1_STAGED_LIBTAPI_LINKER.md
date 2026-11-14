@@ -47,6 +47,26 @@ identities and behavior.
 
 ## Required retained evidence
 
+### Observed plan on 2026-11-14
+
+After the staged libtapi build succeeded, this helper ran at Burdettie
+`e5ff8bf1fc332b6fc0c08dd904a38e8de34f8af4`. Its metadata phase passed in
+**32.21 seconds**, finishing at **20:18:42 UTC**. The [actual plan
+receipt](evidence/staged-linker-plan-2026-11-14.json) binds that earlier helper
+revision, the successful `f8c5917` libtapi build and the unchanged SDK.
+
+Fresh complete-source inventory, installed-file, registered NAR and default
+offline store checks passed. The dry-run listed **nine local derivations and
+zero fetched paths**, without compiling or realizing the native linker. Final
+free disk space was **9,289,572,352 bytes**, above the retained 8-GiB reserve.
+The complete result, dry-run and selected live-check logs were recovered and
+verified. This metadata result does not establish build peak capacity or a
+working native linker. The [shared output inspector](M1_STAGED_LIBRARIES.md)
+defines the separate live registration, dynamic-binding and smoke checks that
+must follow a successful realization.
+
+### Inputs for a plan
+
 Keep these private files together with the original build evidence:
 
 - The libtapi plan's `result.json` and its reviewed SHA-256.

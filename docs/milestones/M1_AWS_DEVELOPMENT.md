@@ -1,6 +1,6 @@
 # M1 development on the retained AWS host
 
-Status on 2026-11-14 UTC: **the original experiment has been retrieved and diagnosed; a corrected, bounded PureDarwin 20.5 bootstrap passes shell execution and exact-file persistence across two QEMU processes. M1 remains in progress.** The selected source-derived SDK and two Mach-O object probes also built successfully. The later native-linker attempt has now been retrieved: it failed at its wall-time limit while building libtapi, before completing the linker. Selected-image construction, executable linking, Burdettie runtime execution, Apple applications, display/session and enforcement remain separate gates.
+Status on 2026-11-14 UTC: **the staged libtapi build and output inspection passed, and the following staged-native-linker metadata plan passed. M1 remains in progress.** The original bootstrap has been retrieved and diagnosed; its corrected, bounded PureDarwin 20.5 follow-up passes shell execution and exact-file persistence across two QEMU processes. The selected source-derived SDK and two Mach-O objects also built successfully. The earlier native-linker attempt remains a retained wall-time failure. The new native linker has not yet been realized. Selected-image construction, executable linking, Burdettie runtime execution, Apple applications, display/session and enforcement remain separate gates.
 
 The [sanitized bootstrap receipt](evidence/bootstrap-2026-11-14.json) records all three outcomes, input identities, timings and log hashes. Raw logs, writable disks, private recovery records, cloud identifiers and command receipts are retained outside the public repository.
 
@@ -142,28 +142,80 @@ not a new build-peak qualification. A bounded candidate build and output
 inspection remain pending in this receipt. The earlier failed tree, full source,
 VM artifacts and existing services remain preserved.
 
-A separate bounded staged-libtapi build was launched at **19:00:16 UTC** from
-`f8c5917`. Its final result has not yet been retrieved. That subsequent launch is
-outside the historical plan receipt and does not establish successful
-realization, output inspection or native linking.
+## Completed staged-libtapi build
+
+The separate build from `f8c5917` started at **19:00:16 UTC** and finished at
+**20:08:20 UTC**, with its realization phase passing in **4,082.6 seconds**.
+The complete terminal result, 1,235,828-byte build log, registered-output sidecar
+and unit journal have been recovered and hash-verified. The [build
+receipt](evidence/libtapi-build-2026-11-14.json) is additive; the earlier failed
+build and metadata-only plan keep their original outcomes.
+
+The new output contains the 4,910,128-byte x86_64 ELF `libtapi.so.12git`, its
+relative `libtapi.so` link and eight regular public headers. Its registered NAR
+size is **4,940,088 bytes**. The inspected references contain the existing
+glibc and GCC runtime outputs, with no complete-source or temporary-build path
+reference. Actual staging allocated **50,089,984 bytes**. The unchanged-source
+staging proof applies before the upstream patch and setup hooks; it is not a
+claim that this build rehashed the source after compilation.
+
+The monitored build observed a minimum **8,995,893,248 free disk bytes** and
+finished with **9,317,019,648 bytes**. Maximum observed whole-host disk growth
+was **526,663,680 bytes**, within its 640-MiB stop budget. The cgroup peaked at
+**1,096,855,552 memory bytes**, with no memory-high, memory-max or OOM events.
+The existing 25%-of-one-CPU quota, 1280/1536-MiB memory high/max, no swap,
+one-job/one-core build and 8-GiB disk reserve were retained. Upstream compiler
+warnings remain in the full log. The old failed tree, sources, disks and logs
+remain preserved, and k3s was active at capture. This completed library build
+does not predict a later stage's peak capacity.
+
+## Staged-native-linker metadata plan
+
+The opt-in [linker rebind](M1_STAGED_LIBTAPI_LINKER.md), executed at
+`e5ff8bf1fc332b6fc0c08dd904a38e8de34f8af4`, passed its metadata phase in
+**32.21 seconds**, finishing at **20:18:42 UTC**. The [separate
+receipt](evidence/staged-linker-plan-2026-11-14.json) binds the exact successful
+libtapi result, unchanged SDK, fresh complete-source inventory check, installed
+file checks, NAR metadata and default offline store verification.
+
+Its dry-run lists **nine local derivations and zero fetch paths**. No native
+compilation, dependency download or realization ran. The original linker,
+previous bounded linker, rebound baseline and new candidate have distinct
+identities; the source, other flags, install phase and bootstrap toolchain stay
+unchanged. The metadata phase finished with **9,289,572,352 free bytes**, or
+**699,637,760 bytes** above the reserve. Its observed memory peak was
+**741,339,136 bytes**, with no high/max/OOM events. These are preparation and
+metadata measurements, not native-build capacity evidence.
+
+The complete helper result and selected ten result/log/check files were
+recovered and verified. Two initial single-response readers refused their
+payload-size bound; their failures remain retained. A reviewed chunk capture
+retrieved the existing records without rerunning the plan. The new
+[downstream planner and shared native inspector](M1_STAGED_LIBRARIES.md)
+require an actual successful native build, registered content, observed loader
+resolution of this staged libtapi and a bounded version probe before planning
+cross-toolchain, compiler-rt or libSystem. Their source tests do not supply that
+live result.
 
 ## Runtime and security work
 
-[PR #7](https://github.com/burdettadam/burdettie-os/pull/7), at `aade8484a773bfa88433526a2039084cc31d6b20`, combines optional native dialogs, launch-owned cleanup, #5 admission, #8 maintained fonts/CFConstantString alignment and the typed NSRange adapter. The initializer-aware exit status, evaluated security report, callback ownership, shared interpreter budget and cleanup-before-unmap ordering remain intact. All seven full-CI jobs passed at this component revision, including Security Scanning, 17 admission tests, the 17-child lifecycle harness, six entitlement-report tests, two CFConstantString regressions and the 15-child NSRange harness on macOS ARM64. The separate Linux x86_64 regression establishes the new exact-IMP adapter, and its original NSCharacterSet fixture now passes the semantic exit check. Formatted variadic values remain unqualified.
+At the historical `aade8484a773bfa88433526a2039084cc31d6b20` checkpoint, [PR #7](https://github.com/burdettadam/burdettie-os/pull/7) combined optional native dialogs, launch-owned cleanup, #5 admission, #8 maintained fonts/CFConstantString alignment and the typed NSRange adapter. All seven full-CI jobs passed there, including Security Scanning, 17 admission tests, the 17-child lifecycle harness, six entitlement-report tests, two CFConstantString regressions and the 15-child NSRange harness on macOS ARM64. The separate Linux x86_64 regression established the exact-IMP adapter, and the original NSCharacterSet fixture passed its semantic exit check while its formatted variadic values remained corrupted.
 
-Cargo-audit retains the paste warning; default and both Linux-target cargo-deny checks pass. Repository hygiene still fails on the same two public checksum findings. The [runtime/platform receipt](evidence/runtime-platform-integration-2026-11-14.json) separately records current `aade848`, preceding `d865636` and the platform parent's checks; the [older integration record](evidence/runtime-integration-2026-11-14.json) remains unchanged. Native explicit exit, worker lifetime, shared streams and unsupported lifecycle routes remain limits. These host results do not qualify Darwin linking, selected-guest execution or an enforced security backend.
+At that same historical checkpoint, cargo-audit retained the paste warning; default and both Linux-target cargo-deny checks passed. Repository hygiene failed on two public checksum findings. The [runtime/platform receipt](evidence/runtime-platform-integration-2026-11-14.json) retains `aade848`, preceding `d865636` and the platform parent's checks; the [older integration record](evidence/runtime-integration-2026-11-14.json) remains unchanged. Native explicit exit, worker lifetime, shared streams and unsupported lifecycle routes remain limits.
 
-The M1 platform feature branch now includes [PR #7](https://github.com/burdettadam/burdettie-os/pull/7) through `aade8484a773bfa88433526a2039084cc31d6b20`, carrying [PR #5](https://github.com/burdettadam/burdettie-os/pull/5) admission, cleanup, maintained fonts and the narrow typed NSRange adapter. The automatic merge preserves all platform and runtime source files from their respective public parents. Main remains unchanged, and required CI on the combined feature head is still needed. Admission does not establish complete mode, provider or lifecycle enforcement; remaining integration is tracked in [issue #6](https://github.com/burdettadam/burdettie-os/issues/6).
+The M1 platform feature branch now includes [PR #7](https://github.com/burdettadam/burdettie-os/pull/7) through `c6b40679da2a814008bc5f6ec030e784c369d0ff`. The [bounded printf adapter](https://github.com/burdettadam/burdettie-os/blob/c6b40679da2a814008bc5f6ec030e784c369d0ff/docs/INTERPRETED_PRINTF.md) adds explicit Darwin ARM64 stack-format handling and interpreter-owned immutable string exports. The original ARM64 fixture executes on the Linux x86_64 interpreter host with a zero exit and the exact 415-byte stdout golden, without a missing-input skip. The [source-bound receipt](evidence/interpreted-printf-2026-11-14.json) retains the earlier corrupted output and the nested-invalidation red/green regression, and separates the passing local checks from the additional core Clippy probe's 37 existing JIT failures. This was host-interpreter execution, not an AWS Darwin-guest run.
+
+The runtime source merge preserves both public parents without overlapping changed paths. Initializer-aware exit status, evaluated security reports, callback ownership, shared interpreter budgets and cleanup-before-unmap ordering remain intact. Main remains unchanged. All seven `c6b4067` full-CI jobs passed at **20:23:13 UTC**; both required repository-hygiene runs failed with two history findings. The [additive CI receipt](evidence/interpreted-printf-ci-2026-11-14.json) retains those final component results without rewriting the earlier pending checkpoint. Exact combined-feature-head checks remain required. These results do not qualify selected-guest linking/runtime execution or an enforced backend. Remaining admission integration is tracked in [issue #6](https://github.com/burdettadam/burdettie-os/issues/6); generic host ABI translation remains in [issue #9](https://github.com/burdettadam/burdettie-os/issues/9).
 
 The [backend allocation](../contracts/BACKEND_ALLOCATION.md) assigns 17 control families to concrete candidate mechanisms and qualification tests. All start unavailable/unsupported with no qualification evidence. The contract validator now binds evidence to the specific capability, evidence kind and scopes as well as platform context. Neither that consistency check nor this bootstrap promotes a security capability to enforced.
 
 ## Remaining gates
 
-1. Resolve the measured linker time/capacity blocker within the unchanged host budget, then realize and inspect the remaining inputs. The existing attempt has been retrieved and diagnosed; its failed tree remains preserved. The SDK and object-compilation stages have passed; linked executable fixtures remain unqualified.
+1. Realize and inspect the new native linker within the unchanged host budget, then assess each downstream input separately. The staged libtapi dependency has now built successfully; the earlier failed attempt and its tree remain preserved. The SDK and object-compilation stages have passed; linked executable fixtures remain unqualified.
 2. Build and independently boot the selected image, including its own persistence, recovery and graceful-shutdown assessment.
 3. Qualify Rust standard-library/libSystem linkage and execute the x86_64 fixture through Burdettie inside that guest.
 4. Resolve the concrete worker-lifetime, display/input and backend gaps before advertising the corresponding behaviors.
-5. Respect all repository checks. At `f8c5917`, all six functional CI jobs and the 100 script/37 contract tests pass, while `cargo-deny` still fails for unmaintained `ttf-parser` and the history scan still reports two public-source checksum findings. The [plan receipt](evidence/libtapi-plan-2026-11-14.json) links those exact-head checks. Neither failure is suppressed by this work.
+5. Respect all repository checks. The historical `f8c5917` [plan receipt](evidence/libtapi-plan-2026-11-14.json) keeps its `ttf-parser` advisory and history failures. Later runtime component `c6b4067` passes all seven full-CI jobs, including Security Scanning, while its required history scan still fails on two findings. The new combined platform head requires its own checks. Scanner policy, history scope and main remain unchanged.
 
 Physical Mac ownership and a real Apple application are not M1 prerequisites. The independent OS, real-application and selectable-security goals remain unchanged, and retain their own later acceptance evidence.
 

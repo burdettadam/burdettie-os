@@ -118,6 +118,40 @@
       "native_linker_rebinding": "not_run",
       "build_peak_capacity_qualified": false,
       "evidence": "evidence/libtapi-plan-2026-11-14.json"
+    },
+    "libtapi_staging_build": {
+      "status": "staged_libtapi_built",
+      "burdettie_revision": "f8c59175784edb89e0087734d5020d142256297d",
+      "duration_seconds": 4082.6,
+      "output_inspection": "pass",
+      "candidate": {
+        "drv": "pzi6pfykji7lp60p9y7934rvanhqdyrh-apple-libtapi-1300.6.5.drv",
+        "out": "apk3lq9svmlncaipqzc4gw7a3mdcmsmc-apple-libtapi-1300.6.5"
+      },
+      "registered_nar_hash": "sha256-EXyvQDuHv90QIWHE5N3uc+AcSBOUKd634cxGkN6Ju60=",
+      "registered_nar_size": 4940088,
+      "staged_allocated_bytes": 50089984,
+      "observed_min_free_disk_bytes": 8995893248,
+      "final_free_disk_bytes": 9317019648,
+      "completed_within_guards": true,
+      "future_build_capacity_qualified": false,
+      "native_linker_build": "not_run",
+      "evidence": "evidence/libtapi-build-2026-11-14.json"
+    },
+    "staged_native_linker_plan": {
+      "status": "planned_not_built",
+      "burdettie_revision": "e5ff8bf1fc332b6fc0c08dd904a38e8de34f8af4",
+      "duration_seconds": 32.21,
+      "local_derivations": 9,
+      "planned_fetch_paths": 0,
+      "candidate": {
+        "drv": "z0i9acp9rl54vmr877l37xmq7x11i525-puredarwin-native-ld-0.1.drv",
+        "out": "qhdkgmj1f26029524iiv8jsrhixlbazd-puredarwin-native-ld-0.1"
+      },
+      "fresh_complete_source_and_output_verification": "pass",
+      "native_linker_realization": "not_run",
+      "build_peak_capacity_qualified": false,
+      "evidence": "evidence/staged-linker-plan-2026-11-14.json"
     }
   },
   "vm": {
@@ -245,7 +279,7 @@
   "mac_hardware_required_for_m1": false,
   "development_host": {
     "provider": "existing_aws_free_plan_instance",
-    "role": "bootstrap_sdk_objects_and_bounded_native_linker_attempt",
+    "role": "bootstrap_sdk_objects_staged_libtapi_and_native_linker_planning",
     "os": "Ubuntu 24.04",
     "architecture": "x86_64",
     "vcpus": 2,
@@ -261,6 +295,16 @@
       "same_driver_3_gib_growth_preflight": "would_reject",
       "new_build_capacity_qualified": false,
       "evidence": "evidence/libtapi-plan-2026-11-14.json"
+    },
+    "latest_capacity_checkpoint": {
+      "observed_at": "2026-11-14T20:18:42.772359+00:00",
+      "scope": "staged_native_linker_metadata_plan_finish",
+      "free_disk_bytes": 9289572352,
+      "minimum_free_disk_reserve_bytes": 8589934592,
+      "remaining_above_reserve_bytes": 699637760,
+      "new_build_capacity_qualified": false,
+      "evidence": "evidence/staged-linker-plan-2026-11-14.json",
+      "prior_capacity_checkpoint_retained": true
     }
   },
   "bootstrap_experiment": {
@@ -312,6 +356,48 @@
       "status": "included_in_platform_feature_branch_not_main",
       "selected_guest_qualification": "not_run",
       "integrated_into_runtime_pr_revision": "aade8484a773bfa88433526a2039084cc31d6b20"
+    },
+    "current_runtime_revision": "c6b40679da2a814008bc5f6ec030e784c369d0ff",
+    "current_source_evidence": "evidence/interpreted-printf-2026-11-14.json",
+    "bounded_printf": {
+      "pull_request": "https://github.com/burdettadam/burdettie-os/pull/7",
+      "revision": "c6b40679da2a814008bc5f6ec030e784c369d0ff",
+      "status": "included_in_platform_feature_branch_not_main",
+      "scope": "Darwin_ARM64_printf_on_Unix_x86_64_interpreter_hosts",
+      "supported_forms": [
+        "literal bytes",
+        "%%",
+        "%d",
+        "%lu",
+        "%s"
+      ],
+      "owned_immutable_exports": "same_interpreter_exact_known_UTF8String_IMP",
+      "original_fixture_semantic_exit": 0,
+      "original_fixture_stdout_bytes": 415,
+      "original_fixture_stdout_sha256": "b7c07d4e81d2bd4d1a4293821950eb09874df5e1e3897aaf5c4dd5cefa7688b6",
+      "missing_fixture_skip": false,
+      "component_full_ci": "pending_at_evidence_checkpoint",
+      "component_repository_hygiene": "failure_two_findings",
+      "combined_required_checks": "pending_exact_published_combined_head",
+      "separate_x86_core_clippy_probe": "failed_37_existing_JIT_dead_code_diagnostics_no_new_allowances",
+      "selected_guest_qualification": "not_run",
+      "evidence": "evidence/interpreted-printf-2026-11-14.json",
+      "source_merge_parents": [
+        "0e7d0b00ba1887496c43f8e7d24749ed932633b9",
+        "c6b40679da2a814008bc5f6ec030e784c369d0ff"
+      ],
+      "source_merge_tree_before_evidence_update": "ee63cb514803c04411d4db892ed336c0ece7c402",
+      "preceding_component_checkpoint_retained": "aade8484a773bfa88433526a2039084cc31d6b20",
+      "final_component_ci": {
+        "head": "c6b40679da2a814008bc5f6ec030e784c369d0ff",
+        "full_ci": "success_seven_jobs",
+        "full_ci_run": 43636498136,
+        "required_repository_hygiene": "failure_two_history_findings",
+        "required_pr_hygiene_run": 43636498065,
+        "required_push_hygiene_run": 43636493545,
+        "evidence": "evidence/interpreted-printf-ci-2026-11-14.json",
+        "earlier_pending_checkpoint_retained": true
+      }
     }
   }
 }
