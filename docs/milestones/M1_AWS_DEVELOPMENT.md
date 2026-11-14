@@ -1,6 +1,6 @@
 # M1 development on the retained AWS host
 
-Status on 2026-11-14 UTC: **the original experiment has been retrieved and diagnosed; a corrected, bounded PureDarwin 20.5 bootstrap passes shell execution and exact-file persistence across two QEMU processes. M1 remains in progress.** The selected source-derived SDK and two Mach-O object probes also built successfully. Selected-image construction, executable linking, Burdettie runtime execution, Apple applications, display/session and enforcement remain separate gates.
+Status on 2026-11-14 UTC: **the original experiment has been retrieved and diagnosed; a corrected, bounded PureDarwin 20.5 bootstrap passes shell execution and exact-file persistence across two QEMU processes. M1 remains in progress.** The selected source-derived SDK and two Mach-O object probes also built successfully. The later native-linker attempt has now been retrieved: it failed at its wall-time limit while building libtapi, before completing the linker. Selected-image construction, executable linking, Burdettie runtime execution, Apple applications, display/session and enforcement remain separate gates.
 
 The [sanitized bootstrap receipt](evidence/bootstrap-2026-11-14.json) records all three outcomes, input identities, timings and log hashes. Raw logs, writable disks, private recovery records, cloud identifiers and command receipts are retained outside the public repository.
 
@@ -51,7 +51,7 @@ A subsequent **no-build** evaluation of `apple-sdk`, `native-ld`, `darwin-cross-
 
 The shared-host reserve is 8 GiB. The combined unpacked download estimate leaves little room above that reserve for local outputs and temporary trees. Measure individual stages and enforce disk, memory, CPU and time limits before realization. The full-image 60-GB upstream guideline does not by itself reject the narrower fixture lane; the actual plan also does not prove that all stages fit. No selected-candidate image build or boot is established by this dry run.
 
-The individual SDK plan was 3 local derivations and 72 fetched paths (412.25 MiB download, 1908.90 MiB unpacked). A bounded SDK-only build then passed in **75.11 seconds** using the unchanged selected source. The final SDK's stdio, pthread and Mach headers and libSystem link stub were checked and hashed. Free space afterward was **12243050496 bytes**, above the 8-GiB reserve; the 3-GiB growth guard was not reached. SDK warnings remain in its log. This is a source-derived SDK result, not an image, linked fixture or runtime result. At that SDK checkpoint, larger linker/libSystem stages had not been launched. The later bounded linker attempt is recorded below; its final outcome remains unretrieved.
+The individual SDK plan was 3 local derivations and 72 fetched paths (412.25 MiB download, 1908.90 MiB unpacked). A bounded SDK-only build then passed in **75.11 seconds** using the unchanged selected source. The final SDK's stdio, pthread and Mach headers and libSystem link stub were checked and hashed. Free space afterward was **12243050496 bytes**, above the 8-GiB reserve; the 3-GiB growth guard was not reached. SDK warnings remain in its log. This is a source-derived SDK result, not an image, linked fixture or runtime result. At that SDK checkpoint, larger linker/libSystem stages had not been launched. The later bounded linker failure and its separately measured recovery capacity are recorded below.
 
 The subsequent **offline object-only probe passed** using that already-realized SDK and its LLVM 21.1.8 compiler: 12 seconds of input preflight followed by 11 seconds for compilation and inspection. `simple_cli` produced a 768-byte x86_64 `MH_OBJECT`; `m1_abi_probe` produced a 5136-byte x86_64 `MH_OBJECT`. Both report minimum OS 26.5.0 and SDK command field 0.0.0; the selected SDK is bound independently by its input and header hashes. The run used no new dependency download and finished with 12219154432 disk bytes free, a stage decrease of 24576 bytes. Symbol inspection was not run because LLVM nm was absent. The [object receipt](evidence/objects-2026-11-14.json) preserves those exact boundaries: no executable link, guest execution, Burdettie runtime execution or enforcement was attempted.
 
@@ -81,13 +81,37 @@ growth guard, a 1200-second phase deadline and a 1500-second service deadline.
 Remote builders and automatic garbage collection were disabled; the command
 requested retention of failed build trees and printed build logs. No instance or disk expansion was introduced.
 
-The last retrieved observation, **08:53:16 UTC**, showed `apple-libtapi` at **20%**
-and the unit still running. The observed cgroup memory peak was 1343332352 bytes
-and free disk space was 10120871936 bytes. The console session subsequently
-expired before the final receipt was retrieved. **The final build outcome is
-unknown.** Neither the progress marker nor the configured deadline establishes
-a success, timeout, compiler failure, realized linker or current host state.
-Retrieve this existing attempt before launching another build.
+The final receipt and complete **373573-byte build log** have now been recovered
+and verified against their hashes. All 20 members of the private recovery
+manifest also matched. The receipt reports **failure after 1201.12 seconds**, at
+**08:56:24 UTC**, with `stage wall-time budget reached`. The last compile marker
+was libtapi at **26%**, building `CodeGenDAGPatterns.cpp` for LLVM TableGen. The
+harness stopped its own build process group; Nix reported interruption and kept
+the failed build tree. The earlier 08:53:16 observation and its retrieval gap
+remain in the sanitized receipt as historical evidence.
+
+The full captured log contains warnings but no compiler-fatal diagnostic. The
+cgroup memory peak was **1343332352 bytes**; memory-high events were **3160**, while
+memory-max, OOM and OOM-kill events were all **zero**. The observed minimum free
+disk space during the phase was **10114813952 bytes**, above the 8-GiB reserve.
+This result establishes a time-budget failure under the configured limits. It
+does not establish a compiler defect, a completed libtapi/native-linker output,
+fixture linking or selected-guest execution.
+
+The later **18:01:21 UTC recovery checkpoint** measured **9554071552 free bytes**.
+After preserving the 8589934592-byte reserve, only **964136960 bytes (about
+0.90 GiB)** remained. The same driver's 3-GiB growth-budget preflight requires
+11811160064 initial free bytes and would reject another attempt at that
+checkpoint. The retained failed tree occupies 341536768 allocated bytes and
+remains preserved. These are separate recovery measurements, not the build's
+terminal free-space values or a new build-peak qualification.
+
+Another Nix invocation does not resume the retained failed tree. Any changed
+source-staging recipe needs independent review, new derivation/output
+identities, an offline plan and fresh capacity measurements before a bounded
+realization. Keep full source inputs, the failed tree, all VM disks/logs and
+existing services. No resource expansion or reduction of the reserve follows
+from this failure.
 
 ## Runtime and security work
 
@@ -99,7 +123,7 @@ The [backend allocation](../contracts/BACKEND_ALLOCATION.md) assigns 17 control 
 
 ## Remaining gates
 
-1. Retrieve the existing bounded linker build result, diagnose its actual outcome, then realize and inspect the remaining inputs within the unchanged host budget. The SDK and object-compilation stages have passed; linked executable fixtures remain unqualified.
+1. Resolve the measured linker time/capacity blocker within the unchanged host budget, then realize and inspect the remaining inputs. The existing attempt has been retrieved and diagnosed; its failed tree remains preserved. The SDK and object-compilation stages have passed; linked executable fixtures remain unqualified.
 2. Build and independently boot the selected image, including its own persistence, recovery and graceful-shutdown assessment.
 3. Qualify Rust standard-library/libSystem linkage and execute the x86_64 fixture through Burdettie inside that guest.
 4. Resolve the concrete worker-lifetime, display/input and backend gaps before advertising the corresponding behaviors.

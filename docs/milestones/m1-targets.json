@@ -95,6 +95,16 @@
       "security_enforcement": "not_run",
       "symbol_inspection": "not_run",
       "evidence": "evidence/objects-2026-11-14.json"
+    },
+    "native_linker_attempt": {
+      "experiment": "native-linker-build-20261114-01",
+      "status": "fail_wall_time_budget",
+      "duration_seconds": 1201.12,
+      "completed_native_linker": false,
+      "failed_dependency": "apple-libtapi-1300.6.5",
+      "last_logged_build_progress_percent": 26,
+      "failed_build_tree_retained": true,
+      "evidence": "evidence/native-linker-2026-11-14.json"
     }
   },
   "vm": {
@@ -222,13 +232,22 @@
   "mac_hardware_required_for_m1": false,
   "development_host": {
     "provider": "existing_aws_free_plan_instance",
-    "role": "bootstrap_sdk_realization_and_bounded_object_compilation",
+    "role": "bootstrap_sdk_objects_and_bounded_native_linker_attempt",
     "os": "Ubuntu 24.04",
     "architecture": "x86_64",
     "vcpus": 2,
     "memory_gib": 8,
     "existing_root_disk_gib": 40,
-    "full_image_build_capacity_qualified": false
+    "full_image_build_capacity_qualified": false,
+    "capacity_checkpoint": {
+      "observed_at": "2026-11-14T18:01:21.795099+00:00",
+      "free_disk_bytes": 9554071552,
+      "minimum_free_disk_reserve_bytes": 8589934592,
+      "remaining_above_reserve_bytes": 964136960,
+      "same_driver_3_gib_growth_preflight": "would_reject",
+      "new_build_capacity_qualified": false,
+      "evidence": "evidence/native-linker-2026-11-14.json"
+    }
   },
   "bootstrap_experiment": {
     "release": "PureDarwin 20.5",
