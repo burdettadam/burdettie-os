@@ -101,6 +101,40 @@ pub fn build_interpreter_bridge(guest_ranges: &[(u64, u64)]) -> FfiBridge {
     bridge
 }
 
+/// Call a resolved host IMP after the caller has excluded guest code.
+///
+/// # Safety
+///
+/// The receiver and arguments must be valid for the resolved implementation.
+/// Unrecognized IMPs retain `call_host_capturing`'s existing ABI requirements
+/// and limitations; this helper does not infer their signatures.
+unsafe fn call_host_imp(imp: u64, receiver: u64, args: &FfiCallArgs) -> FfiResult {
+    #[cfg(target_arch = "x86_64")]
+    {
+        // SAFETY: the caller excluded guest code and supplies live arguments.
+        // The adapter compares the actual IMP and calls only its known typed
+        // implementation, never a selector-based or guessed function cast.
+        if let Some((x0, x1)) = unsafe {
+            cf_lite::FoundationShims::call_known_nsrange_imp(imp, receiver, args.x[1], args.x[2])
+        } {
+            return FfiResult::ReturnFull {
+                x0,
+                x1,
+                d0: 0,
+                d1: 0,
+            };
+        }
+    }
+
+    let mut host_args = args.x;
+    host_args[0] = receiver;
+    // SAFETY: this preserves the existing host-call contract for all other
+    // IMPs. Super dispatch has replaced the objc_super pointer with receiver.
+    let (x0, x1, d0, d1) =
+        unsafe { call_host_capturing(imp, &host_args, args.host_x8, args.guest_sp, &args.d) };
+    FfiResult::ReturnFull { x0, x1, d0, d1 }
+}
+
 /// Register an `objc_msgSend` handler: look up IMP, then tail-call or direct-call.
 fn register_msg_send(bridge: &mut FfiBridge, addr: u64, name: &str, guest_ranges: &[(u64, u64)]) {
     let ranges: Vec<(u64, u64)> = guest_ranges.to_vec();
@@ -136,12 +170,9 @@ fn register_msg_send(bridge: &mut FfiBridge, addr: u64, name: &str, guest_ranges
                 return FfiResult::TailCall(imp);
             }
 
-            // Host IMP — call directly with full ABI capture (integer + FP args).
-            unsafe {
-                let (x0, x1, d0, d1) =
-                    call_host_capturing(imp, &args.x, args.host_x8, args.guest_sp, &args.d);
-                FfiResult::ReturnFull { x0, x1, d0, d1 }
-            }
+            // SAFETY: lookup resolved the host implementation; guest code was
+            // excluded above. The call retains its existing argument contract.
+            unsafe { call_host_imp(imp, obj, args) }
         }),
     );
 }
@@ -184,14 +215,9 @@ fn register_msg_send_super(
                 return FfiResult::TailCallWithX0(imp, receiver);
             }
 
-            unsafe {
-                let super_args = [
-                    receiver, sel, args.x[2], args.x[3], args.x[4], args.x[5], args.x[6], args.x[7],
-                ];
-                let (x0, x1, d0, d1) =
-                    call_host_capturing(imp, &super_args, args.host_x8, args.guest_sp, &args.d);
-                FfiResult::ReturnFull { x0, x1, d0, d1 }
-            }
+            // SAFETY: the resolved IMP is outside guest code and receives the
+            // receiver with the original selector and remaining arguments.
+            unsafe { call_host_imp(imp, receiver, args) }
         }),
     );
 }
@@ -231,14 +257,9 @@ fn register_msg_send_super2(
                 return FfiResult::TailCallWithX0(imp, receiver);
             }
 
-            unsafe {
-                let super_args = [
-                    receiver, sel, args.x[2], args.x[3], args.x[4], args.x[5], args.x[6], args.x[7],
-                ];
-                let (x0, x1, d0, d1) =
-                    call_host_capturing(imp, &super_args, args.host_x8, args.guest_sp, &args.d);
-                FfiResult::ReturnFull { x0, x1, d0, d1 }
-            }
+            // SAFETY: the resolved IMP is outside guest code and receives the
+            // receiver with the original selector and remaining arguments.
+            unsafe { call_host_imp(imp, receiver, args) }
         }),
     );
 }
@@ -247,6 +268,10 @@ fn register_msg_send_super2(
 fn is_in_guest(addr: u64, ranges: &[(u64, u64)]) -> bool {
     ranges.iter().any(|&(lo, hi)| addr >= lo && addr < hi)
 }
+
+#[cfg(all(test, unix, any(target_arch = "x86_64", target_arch = "aarch64")))]
+#[path = "interp_bridge_nsrange_tests.rs"]
+mod nsrange_tests;
 
 #[cfg(all(test, unix))]
 mod exit_tests {
