@@ -1,0 +1,262 @@
+{
+  "schema_version": 1,
+  "scope": "selected_sdk_object_compilation_only",
+  "experiment": "objects-20261114-01",
+  "status": "objects_compiled_and_inspected",
+  "started_at": "2026-11-14T07:40:43.797681+00:00",
+  "finished_at": "2026-11-14T07:41:06.804571+00:00",
+  "captured_at": "2026-11-14T07:42:05.791316+00:00",
+  "source": {
+    "repository": "https://github.com/PureDarwin/PureDarwin",
+    "revision": "0163b2db225b85e3bf96fc25646ea290105ac298",
+    "lock": {
+      "sha256": "00c598d3efca4bbda302fec4a43fffbfa787dc642c8c0b2c4202c65339e684d0",
+      "nixpkgs_node": "nixpkgs_3",
+      "nixpkgs_revision": "fd1462031fdee08f65fd0b4c6b64e22239a77870"
+    },
+    "submodules": [
+      {
+        "revision": "f577aafe4b9a89727968666237d20cc51d2f770d",
+        "path": "external/corecrypto"
+      }
+    ]
+  },
+  "recipe": {
+    "repository": "https://github.com/burdettadam/burdettie-os",
+    "revision": "89130c63edd0226933e8abd2ff556d3d0c4d5fe0",
+    "path": "scripts/compile_puredarwin_objects.py",
+    "sha256": "6aafad78b6d5436d9da536903d27a801b58bce02ff496581c9686901f2c86eb1"
+  },
+  "tooling": {
+    "nix_version": "2.28.3",
+    "compiler": {
+      "output_identity": "h6wfr7hsc4013lzp1igizkcd1awx8mcm-clang-21.1.8",
+      "derivation_identity": "9zj7rybfycw7xxx4zc66gix73ifx755g-clang-21.1.8.drv",
+      "binary": "bin/clang",
+      "version": "21.1.8",
+      "default_target": "x86_64-unknown-linux-gnu",
+      "sha256": "11bf6869e7866346479161f5e469256d188e2a9a084c549c845439a8dce60c24"
+    },
+    "sdk": {
+      "output_identity": "nnsb7h396vc5xmwn59kky88inslcdw1m-puredarwin-oss-sdk-26.5",
+      "derivation_identity": "0nwq5lg8853m0rdvsncvjwyjk0dmffxd-puredarwin-oss-sdk-26.5.drv",
+      "selected_sdk_identity_version": "26.5",
+      "checked_files_sha256": {
+        "usr/include/stdio.h": "d2220614f42d3cb678ae0de176ba0ab3256e15fb45b3efdb5d17b8ac1f6a4b54",
+        "usr/include/pthread.h": "e7b93de15e9a0942c780d1cb8195f80e7471010640e6774c1e742fae1d23c185",
+        "usr/lib/libSystem.tbd": "742103cad143a52c69823f8ae845c4c340e90d241b13084eba287d2893d1e458"
+      },
+      "prior_build_evidence": "source-preflight-2026-11-14.json"
+    },
+    "llvm_nm": null
+  },
+  "compilation": {
+    "host_os": "Linux",
+    "host_architecture": "x86_64",
+    "target": "x86_64-apple-macosx26.5",
+    "sysroot": "selected_source_derived_sdk",
+    "flags": [
+      "-std=c11",
+      "-O0",
+      "-g0",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-U_FORTIFY_SOURCE",
+      "-D_FORTIFY_SOURCE=0",
+      "-c"
+    ],
+    "source_snapshots_used": true,
+    "offline_input_resolution": true,
+    "lock_updates": false,
+    "import_from_derivation": false,
+    "dependency_fetch": "not_run",
+    "dependency_build": "not_run"
+  },
+  "configured_launch_limits": {
+    "cpu_quota_percent_of_one_cpu": 25,
+    "cpu_quota_per_second_ms": 250,
+    "memory_max_bytes": 1610612736,
+    "swap_max_bytes": 0,
+    "tasks_max": 128,
+    "run_as": "non_root",
+    "private_network": true,
+    "no_new_privileges": true,
+    "runtime_max_seconds": 300,
+    "minimum_free_disk_bytes": 8589934592,
+    "maximum_stage_growth_bytes": 268435456,
+    "provenance": {
+      "basis": "accepted_launch_configuration_and_launch_time_SSM_checks",
+      "launch_time_properties_verified_by_execution_owner": [
+        "cpu_quota",
+        "memory_max",
+        "swap_max",
+        "non_root_user",
+        "private_network",
+        "runtime_max_seconds"
+      ],
+      "accepted_launch_configuration_properties": [
+        "tasks_max",
+        "no_new_privileges"
+      ],
+      "unloaded_unit_default_limits_used_as_evidence": false,
+      "note": "The transient unit had unloaded before the final systemctl query. Its returned default limit properties do not describe the active experiment."
+    }
+  },
+  "phases": [
+    {
+      "name": "offline-preflight",
+      "status": "pass",
+      "exit_code": 0,
+      "duration_seconds": 12.0
+    },
+    {
+      "name": "compile-objects",
+      "status": "pass",
+      "exit_code": 0,
+      "duration_seconds": 11.0
+    }
+  ],
+  "disk_observations": {
+    "initial_free_bytes": 12219179008,
+    "final_free_bytes": 12219154432,
+    "stage_growth_bytes": 24576,
+    "capture_free_bytes": 12218937344,
+    "minimum_free_disk_reserve_bytes": 8589934592
+  },
+  "objects": [
+    {
+      "name": "simple_cli",
+      "object_bytes": 768,
+      "sha256": "0ea862d8e952770429f7bf41743d10a6d5c264594f047c30ca98ba65efff734d",
+      "source_path": "fixtures/simple_cli/main.c",
+      "source_snapshot_bytes": 72,
+      "source_sha256": "f85badd2007451bbda4791e7fe820b41be0a424172a567573511688bff975235",
+      "macho": {
+        "format": "thin",
+        "slices": [
+          {
+            "architecture": "x86_64",
+            "cpu_type": 16777223,
+            "cpu_subtype": 3,
+            "file_type": 1,
+            "offset": 0,
+            "size_bytes": 768,
+            "dependencies": [],
+            "rpaths": [],
+            "platform_versions": [
+              {
+                "command": "LC_BUILD_VERSION",
+                "platform_id": 1,
+                "minimum_os": "26.5.0",
+                "sdk": "0.0.0"
+              }
+            ],
+            "code_signature_command_present": false,
+            "encrypted": false
+          }
+        ]
+      },
+      "header_details": {
+        "load_command_count": 4,
+        "load_command_bytes": 520,
+        "flags": 8192
+      },
+      "symbol_inspection": "not_run",
+      "undefined_symbols": null
+    },
+    {
+      "name": "m1_abi_probe",
+      "object_bytes": 5136,
+      "sha256": "d06d8c27bdfcbece014188d110448e34d1c0584ee36e1eaabff6147c73b3286d",
+      "source_path": "fixtures/m1_abi_probe/probe.c",
+      "source_snapshot_bytes": 4854,
+      "source_sha256": "836843a2437a1ea95dea62aa45fef9c95e488d17aa00bca9104367cf5c399301",
+      "macho": {
+        "format": "thin",
+        "slices": [
+          {
+            "architecture": "x86_64",
+            "cpu_type": 16777223,
+            "cpu_subtype": 3,
+            "file_type": 1,
+            "offset": 0,
+            "size_bytes": 5136,
+            "dependencies": [],
+            "rpaths": [],
+            "platform_versions": [
+              {
+                "command": "LC_BUILD_VERSION",
+                "platform_id": 1,
+                "minimum_os": "26.5.0",
+                "sdk": "0.0.0"
+              }
+            ],
+            "code_signature_command_present": false,
+            "encrypted": false
+          }
+        ]
+      },
+      "header_details": {
+        "load_command_count": 4,
+        "load_command_bytes": 600,
+        "flags": 8192
+      },
+      "symbol_inspection": "not_run",
+      "undefined_symbols": null
+    }
+  ],
+  "evidence": {
+    "stage_result": {
+      "bytes": 1331,
+      "sha256": "d3da05f6ea16247882cc503e5fd062212986f1b41d9c0c7e9648397552ba9ba8"
+    },
+    "compiler_result": {
+      "bytes": 5113,
+      "sha256": "dacc858ec0378ebb71c8e6673b511aef36c042ade4d70c5a967f81ebfbb36fc7"
+    },
+    "logs": {
+      "offline-preflight.log": {
+        "bytes": 1822,
+        "sha256": "3f23e71199c8f97730486de0194c87aac08e531c03fe4b428214fdb5491d6e0f"
+      },
+      "compile-objects.log": {
+        "bytes": 5113,
+        "sha256": "dacc858ec0378ebb71c8e6673b511aef36c042ade4d70c5a967f81ebfbb36fc7"
+      }
+    },
+    "recovery_archive": {
+      "bytes": 6248,
+      "sha256": "901859c1c0fbde2b93bbbb183f57c7a1a83433301f3ad3062b6577a0926df0fe"
+    },
+    "recovery_manifest_sha256": "d552355feeac850f096464895fdcd1dcb9ab65f59eee5cf403d29f04d316681a",
+    "launch_receipt_sha256": "863ab848fda65abcb570a5db1813b7bbd138ec9a9cdaefb641e1b29e803267e4"
+  },
+  "independent_review": {
+    "archive_digest_and_extracted_bytes_verified": true,
+    "all_eight_manifest_file_hashes_verified": true,
+    "recipe_matches_recorded_source_revision": true,
+    "source_snapshots_match_recorded_source_revision": true,
+    "macho_headers_and_load_command_bounds_parsed_from_object_bytes": true,
+    "sdk_identity_and_checked_files_match_prior_sdk_receipt": true
+  },
+  "qualification": {
+    "object_compilation": "pass",
+    "fixture_executable_link": "not_run",
+    "symbol_inspection": "not_run",
+    "undefined_symbols": null,
+    "selected_image_build": "not_run",
+    "selected_image_boot": "not_run",
+    "guest_execution": "not_run",
+    "burdettie_runtime_execution": "not_run",
+    "security_enforcement": "not_run"
+  },
+  "notes": [
+    "The two recovered outputs are relocatable Mach-O objects, not linked or runnable executables.",
+    "Both object LC_BUILD_VERSION commands report minimum_os 26.5.0 and sdk 0.0.0. The reported SDK header field is preserved exactly; the selected source-derived SDK input is independently identified as version 26.5.",
+    "No LLVM nm tool was supplied. Undefined-symbol lists are null and symbol inspection remains not_run.",
+    "Configured launch limits come from the accepted launch and launch-time checks; unloaded transient-unit defaults are excluded.",
+    "The preflight and compile phases returned zero. Their success does not qualify a selected image, guest application, runtime ABI execution or security backend.",
+    "Raw logs, source snapshots, object binaries, private host paths and cloud identifiers are retained outside the public repository."
+  ]
+}

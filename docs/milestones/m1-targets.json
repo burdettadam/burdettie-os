@@ -1,0 +1,271 @@
+{
+  "schema_version": 1,
+  "milestone": "M1",
+  "status": "in_progress",
+  "source_revision": "7bf375562ca9edf513c353da7ec3309c0337f457",
+  "product": "bootable_darwin_compatible_os",
+  "substrate": {
+    "status": "selected_for_feasibility",
+    "repository": "https://github.com/PureDarwin/PureDarwin",
+    "revision": "0163b2db225b85e3bf96fc25646ea290105ac298",
+    "nixpkgs_revision": "fd1462031fdee08f65fd0b4c6b64e22239a77870",
+    "kernel_family": "XNU",
+    "build_host": "x86_64-linux",
+    "image_target": "image-minimal",
+    "image_sha256": null,
+    "boot_result": "not_run",
+    "preflight_result": "source_prepared_nix_plan_sdk_and_objects_passed_image_unqualified",
+    "build_result": "not_run",
+    "source_preflight": {
+      "nix_version": "2.28.3",
+      "checkout": "exact_complete_shallow_source_and_submodules",
+      "lock_sha256": "00c598d3efca4bbda302fec4a43fffbfa787dc642c8c0b2c4202c65339e684d0",
+      "lock_unchanged": true,
+      "no_build_plan": {
+        "status": "pass",
+        "outputs": [
+          "apple-sdk",
+          "native-ld",
+          "darwin-cross-toolchain",
+          "libsystem"
+        ],
+        "duration_seconds": 232.21,
+        "planned_local_derivations": 32,
+        "planned_fetched_paths": 264,
+        "planned_download_mib": 916.73,
+        "planned_unpacked_mib": 4811.47
+      },
+      "per_output_dry_run": "assessed_no_build",
+      "free_disk_bytes_at_checkpoint": 14387019776,
+      "minimum_free_disk_reserve_bytes": 8589934592,
+      "build_peak_qualified": false,
+      "evidence": "evidence/source-preflight-2026-11-14.json",
+      "per_output_plans": {
+        "apple-sdk": {
+          "local_derivations": 3,
+          "fetch_paths": 72,
+          "download_mib": 412.25,
+          "unpacked_mib": 1908.9
+        },
+        "native-ld": {
+          "local_derivations": 23,
+          "fetch_paths": 262,
+          "download_mib": 768.52,
+          "unpacked_mib": 2993.9
+        },
+        "darwin-cross-toolchain": {
+          "local_derivations": 27,
+          "fetch_paths": 262,
+          "download_mib": 768.52,
+          "unpacked_mib": 2993.9
+        },
+        "libsystem": {
+          "local_derivations": 32,
+          "fetch_paths": 264,
+          "download_mib": 916.73,
+          "unpacked_mib": 4811.47
+        }
+      },
+      "plans_overlap": true
+    },
+    "sdk_realization": {
+      "status": "sdk_built_and_headers_checked",
+      "duration_seconds": 75.11,
+      "source_revision": "0163b2db225b85e3bf96fc25646ea290105ac298",
+      "nix_version": "2.28.3",
+      "final_free_disk_bytes": 12243050496,
+      "only_sdk_stage_realized": true,
+      "image_build": "not_run",
+      "fixture_link": "not_run",
+      "guest_execution": "not_run",
+      "evidence": "evidence/source-preflight-2026-11-14.json"
+    },
+    "object_compilation": {
+      "status": "objects_compiled_and_inspected",
+      "burdettie_revision": "89130c63edd0226933e8abd2ff556d3d0c4d5fe0",
+      "recipe_path": "scripts/compile_puredarwin_objects.py",
+      "target": "x86_64-apple-macosx26.5",
+      "compiler_version": "21.1.8",
+      "preflight_seconds": 12.0,
+      "compile_and_inspect_seconds": 11.0,
+      "final_free_disk_bytes": 12219154432,
+      "linking": "not_run",
+      "guest_execution": "not_run",
+      "runtime_execution": "not_run",
+      "security_enforcement": "not_run",
+      "symbol_inspection": "not_run",
+      "evidence": "evidence/objects-2026-11-14.json"
+    }
+  },
+  "vm": {
+    "id": "puredarwin-x86_64-q35-tcg",
+    "guest_architecture": "x86_64",
+    "application_architecture": "x86_64",
+    "machine": "q35",
+    "accelerator": "tcg,thread=single",
+    "cpu": "IvyBridge,vendor=GenuineIntel",
+    "vcpus": 2,
+    "memory_mib": 2048,
+    "firmware": "OVMF-X64",
+    "disk": "AHCI-raw",
+    "root_filesystem": "ext4",
+    "input": "QEMU-xHCI-keyboard-mouse",
+    "display": "std-vga-with-serial-console",
+    "network": "none",
+    "qualification": "not_run",
+    "profile_status": "derived_bounded_profile_selected_candidate_unqualified",
+    "upstream_4_vcpu_4096_mib_profile_executed": false,
+    "host_limits": {
+      "cpu_quota_percent_of_one_cpu": 75,
+      "memory_max_bytes": 3221225472,
+      "swap_max_bytes": 0,
+      "per_boot_timeout_seconds": 600
+    }
+  },
+  "physical_target": {
+    "status": "deferred_hardware_support_track",
+    "architecture_intent": "x86_64",
+    "model_identifier": null,
+    "cpu_model": null,
+    "firmware": null,
+    "memory_bytes": null,
+    "storage_controller": null,
+    "gpu": null,
+    "input_controllers": null,
+    "network_devices": null,
+    "boot_result": "not_run",
+    "required_for_m1": false
+  },
+  "apple_application": {
+    "name": "Stickies",
+    "status": "candidate_pending_inventory",
+    "bundle_identifier": null,
+    "version": null,
+    "build": null,
+    "source_macos_version": null,
+    "source_macos_build": null,
+    "selected_architecture": null,
+    "executable_sha256": null,
+    "bundle_manifest_sha256": null,
+    "dependency_closure": null,
+    "workflow": "create_edit_unicode_select_clipboard_quit_reboot_reopen_notes",
+    "qualification": "not_run",
+    "required_for_m1": false,
+    "qualification_milestone": "M4"
+  },
+  "public_fixtures": [
+    {
+      "name": "simple_cli",
+      "status": "selected_sdk_object_compiled_executable_link_not_run",
+      "source_path": "fixtures/simple_cli/main.c",
+      "source_revision": "7bf375562ca9edf513c353da7ec3309c0337f457",
+      "target_architecture": "x86_64",
+      "role": "first_runtime_execution_probe",
+      "build_recipe_path": "scripts/build_puredarwin_fixtures.py",
+      "object_recipe_path": "scripts/compile_puredarwin_objects.py",
+      "object_sha256": "0ea862d8e952770429f7bf41743d10a6d5c264594f047c30ca98ba65efff734d",
+      "object_bytes": 768,
+      "object_evidence": "evidence/objects-2026-11-14.json",
+      "selected_guest_qualification": "not_run",
+      "burdettie_runtime_qualification": "not_run"
+    },
+    {
+      "name": "m1_abi_probe",
+      "status": "selected_sdk_object_compiled_executable_link_not_run",
+      "source_path": "fixtures/m1_abi_probe/probe.c",
+      "source_revision": "d90a5e2a658ca11f026de576d9390eb6d44376d3",
+      "build_recipe_path": "scripts/build_puredarwin_fixtures.py",
+      "target_architecture": "x86_64",
+      "role": "allocation_file_thread_exit_cleanup_and_persistence_probe",
+      "selected_guest_qualification": "not_run",
+      "burdettie_runtime_qualification": "not_run",
+      "object_recipe_path": "scripts/compile_puredarwin_objects.py",
+      "object_sha256": "d06d8c27bdfcbece014188d110448e34d1c0584ee36e1eaabff6147c73b3286d",
+      "object_bytes": 5136,
+      "object_evidence": "evidence/objects-2026-11-14.json"
+    },
+    {
+      "name": "BurdettieDocument",
+      "version": "0.1.0",
+      "status": "specified_for_M4_not_implemented",
+      "target_architecture": "x86_64",
+      "role": "document_persistence_errors_and_policy_grants"
+    }
+  ],
+  "security": {
+    "contract_version": 1,
+    "modes": [
+      "permissive",
+      "audit",
+      "enforced"
+    ],
+    "mode_independent_of_signer_policy": true,
+    "production_enforcement_backend": null,
+    "enforcement_qualification": "not_run",
+    "backend_allocation": {
+      "status": "reviewed",
+      "path": "../contracts/backends/puredarwin-x86_64.json",
+      "control_families": 17,
+      "available_control_families": 0,
+      "qualified_control_families": 0,
+      "required_enforced_behavior": "refuse_before_guest_initialization_when_required_capabilities_are_unavailable_or_unverified"
+    }
+  },
+  "closure_blockers": [
+    "selected_source_build_capacity_within_existing_host_budget",
+    "selected_fixture_executable_link_and_direct_guest_execution",
+    "selected_image_build_boot_persistence_and_recovery_evidence",
+    "rust_std_and_headless_runtime_abi_on_selected_guest",
+    "target_acceptance_and_measured_implementation_estimates"
+  ],
+  "reference_platform": "puredarwin-x86_64-q35-tcg",
+  "mac_hardware_required_for_m1": false,
+  "development_host": {
+    "provider": "existing_aws_free_plan_instance",
+    "role": "bootstrap_sdk_realization_and_bounded_object_compilation",
+    "os": "Ubuntu 24.04",
+    "architecture": "x86_64",
+    "vcpus": 2,
+    "memory_gib": 8,
+    "existing_root_disk_gib": 40,
+    "full_image_build_capacity_qualified": false
+  },
+  "bootstrap_experiment": {
+    "release": "PureDarwin 20.5",
+    "release_revision": "1bbaeb2ee6aa41e6f792a0b1e2943cc295b3b290",
+    "image_sha256": "ef65a816395680ef9210f401cebe3783c131badca1a942cb80e56bec97e717ac",
+    "harness_revision": "b0752ab4278e31be34253d9adacccad35b8fb262",
+    "result": "pass_bootstrap_only",
+    "last_observed_state": "completed_both_qemu_processes_exited",
+    "shell_evidence": "nonce_verified_darwin_x86_64_on_both_boots",
+    "persistence_evidence": "exact_byte_cmp_across_two_qemu_processes",
+    "qualifies_selected_candidate": false,
+    "checkpoint": "M1_AWS_DEVELOPMENT.md",
+    "experiment": "bootstrap-20261114-02",
+    "write_duration_seconds": 235.948,
+    "read_duration_seconds": 233.682,
+    "original_experiment_result": "fail_timeout_waiting_for_prompt",
+    "original_write_duration_seconds": 600.166,
+    "interrupted_followup_retained": true,
+    "graceful_guest_shutdown_tested": false,
+    "read_boot_replayed_ext4_journal": true,
+    "qualifies_burdettie_runtime": false,
+    "qualifies_security_enforcement": false,
+    "evidence": "evidence/bootstrap-2026-11-14.json"
+  },
+  "runtime_prerequisites": {
+    "headless_and_exit": {
+      "pull_request": "https://github.com/burdettadam/burdettie-os/pull/7",
+      "revision": "f6918f029c65144eea3ca7e3b437a58bdefebb4e",
+      "status": "published_draft_unmerged",
+      "selected_guest_link_and_execution": "not_run",
+      "launch_owned_normal_exit_cleanup": "not_implemented"
+    },
+    "admission": {
+      "pull_request": "https://github.com/burdettadam/burdettie-os/pull/5",
+      "revision": "4a74a51502a29bc65ef1fe4a8ce92ce2c11ec498",
+      "status": "published_unmerged",
+      "selected_guest_qualification": "not_run"
+    }
+  }
+}

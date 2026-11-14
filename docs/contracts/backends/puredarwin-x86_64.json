@@ -1,0 +1,658 @@
+{
+  "allocation_version": 1,
+  "purpose": "engineering_allocation_not_authorization",
+  "boundary": "guest_application",
+  "platform_source": {
+    "repository": "PureDarwin/PureDarwin",
+    "revision": "0163b2db225b85e3bf96fc25646ea290105ac298"
+  },
+  "backend": {
+    "schema_version": 1,
+    "message_type": "backend_capabilities",
+    "context": {
+      "backend_id": "puredarwin-x86_64-native",
+      "backend_version": "m1-allocation-only",
+      "runtime_revision": "4e804df245b122137d67c45f9d026e261ac68e42",
+      "image_revision": "not-built:0163b2db225b85e3bf96fc25646ea290105ac298",
+      "host_os": "Darwin",
+      "kernel_build": "not-observed",
+      "host_arch": "x86_64",
+      "guest_arch": "x86_64",
+      "execution_route": "native",
+      "worker_model": "managed_process"
+    },
+    "capabilities": [
+      {
+        "id": "launch.supervision",
+        "kind": "supervision",
+        "implementation": "unsupported",
+        "availability": "unavailable",
+        "scopes": [
+          "application",
+          "descendants"
+        ],
+        "evidence": null
+      },
+      {
+        "id": "resource.limits",
+        "kind": "resource_enforcement",
+        "implementation": "unsupported",
+        "availability": "unavailable",
+        "scopes": [
+          "application",
+          "descendants"
+        ],
+        "evidence": null
+      },
+      {
+        "id": "filesystem.grants",
+        "kind": "resource_enforcement",
+        "implementation": "unsupported",
+        "availability": "unavailable",
+        "scopes": [
+          "application",
+          "descendants"
+        ],
+        "evidence": null
+      },
+      {
+        "id": "network.policy",
+        "kind": "resource_enforcement",
+        "implementation": "unsupported",
+        "availability": "unavailable",
+        "scopes": [
+          "application",
+          "descendants"
+        ],
+        "evidence": null
+      },
+      {
+        "id": "process.descendants",
+        "kind": "resource_enforcement",
+        "implementation": "unsupported",
+        "availability": "unavailable",
+        "scopes": [
+          "application",
+          "descendants"
+        ],
+        "evidence": null
+      },
+      {
+        "id": "process.inspection",
+        "kind": "resource_enforcement",
+        "implementation": "unsupported",
+        "availability": "unavailable",
+        "scopes": [
+          "application",
+          "descendants"
+        ],
+        "evidence": null
+      },
+      {
+        "id": "memory.executable",
+        "kind": "resource_enforcement",
+        "implementation": "unsupported",
+        "availability": "unavailable",
+        "scopes": [
+          "application",
+          "descendants"
+        ],
+        "evidence": null
+      },
+      {
+        "id": "ipc.services",
+        "kind": "resource_enforcement",
+        "implementation": "unsupported",
+        "availability": "unavailable",
+        "scopes": [
+          "application",
+          "descendants"
+        ],
+        "evidence": null
+      },
+      {
+        "id": "devices.grants",
+        "kind": "resource_enforcement",
+        "implementation": "unsupported",
+        "availability": "unavailable",
+        "scopes": [
+          "application",
+          "descendants"
+        ],
+        "evidence": null
+      },
+      {
+        "id": "code.dependencies",
+        "kind": "admission",
+        "implementation": "unsupported",
+        "availability": "unavailable",
+        "scopes": [
+          "application",
+          "dependencies",
+          "inserted_libraries",
+          "dynamic_loads",
+          "providers"
+        ],
+        "evidence": null
+      },
+      {
+        "id": "identity.immutable_inputs",
+        "kind": "admission",
+        "implementation": "unsupported",
+        "availability": "unavailable",
+        "scopes": [
+          "application",
+          "dependencies"
+        ],
+        "evidence": null
+      },
+      {
+        "id": "identity.signature",
+        "kind": "admission",
+        "implementation": "unsupported",
+        "availability": "unavailable",
+        "scopes": [
+          "application",
+          "dependencies",
+          "bundle_resources"
+        ],
+        "evidence": null
+      },
+      {
+        "id": "identity.entitlements",
+        "kind": "admission",
+        "implementation": "unsupported",
+        "availability": "unavailable",
+        "scopes": [
+          "application",
+          "dependencies"
+        ],
+        "evidence": null
+      },
+      {
+        "id": "launch.environment",
+        "kind": "admission",
+        "implementation": "unsupported",
+        "availability": "unavailable",
+        "scopes": [
+          "application",
+          "descendants"
+        ],
+        "evidence": null
+      },
+      {
+        "id": "policy.storage",
+        "kind": "supervision",
+        "implementation": "unsupported",
+        "availability": "unavailable",
+        "scopes": [
+          "supervisor"
+        ],
+        "evidence": null
+      },
+      {
+        "id": "broker.authorization",
+        "kind": "supervision",
+        "implementation": "unsupported",
+        "availability": "unavailable",
+        "scopes": [
+          "supervisor",
+          "application"
+        ],
+        "evidence": null
+      },
+      {
+        "id": "audit.events",
+        "kind": "observation",
+        "implementation": "unsupported",
+        "availability": "unavailable",
+        "scopes": [
+          "application",
+          "descendants",
+          "supervisor"
+        ],
+        "evidence": null
+      }
+    ]
+  },
+  "allocations": [
+    {
+      "owner": "Platform lead",
+      "backend_mechanism": null,
+      "candidate_mechanism": "A separate Burdettie supervisor starts unprivileged workers behind a pre-initialization barrier; waitpid and signals report lifecycle. Reuse PureDarwin launchd to start the supervisor.",
+      "source_refs": [
+        {
+          "repository": "burdettadam/burdettie-os",
+          "revision": "4e804df245b122137d67c45f9d026e261ac68e42",
+          "path": "crates/platform-core/src/process.rs",
+          "observation": "ProcessInfo exposes only PID and main-thread identity; it is not a worker supervisor."
+        },
+        {
+          "repository": "PureDarwin/PureDarwin",
+          "revision": "0163b2db225b85e3bf96fc25646ea290105ac298",
+          "path": "nix/pkgs/apple/launchd.nix",
+          "observation": "Builds a launchd PID-1 candidate; this is not Burdettie per-app supervision."
+        }
+      ],
+      "gaps": [
+        "No integrated Burdettie managed-worker service or pre-initialization barrier on this guest.",
+        "Process groups alone do not prove control of daemonized or reparented descendants."
+      ],
+      "qualification_tests": [
+        "A rejected launch cannot run a constructor marker.",
+        "Crash, cancel and timeout terminate and reap all descendants while the supervisor stays usable."
+      ],
+      "capability_id": "launch.supervision"
+    },
+    {
+      "owner": "Platform lead",
+      "backend_mechanism": null,
+      "candidate_mechanism": "Supervisor timers and bounded output pipes for wall time/output; separately qualify guest kernel mechanisms for aggregate process-tree memory and process counts.",
+      "source_refs": [
+        {
+          "repository": "burdettadam/burdettie-os",
+          "revision": "4e804df245b122137d67c45f9d026e261ac68e42",
+          "path": "crates/libsystem-shims/src/cross_platform/posix_extras.rs",
+          "observation": "shim_setrlimit forwards to libc; no per-launch process-tree policy is established."
+        }
+      ],
+      "gaps": [
+        "No qualified guest process-tree memory/count mechanism.",
+        "Host cgroup limits around QEMU protect the experiment and do not enforce guest per-app limits."
+      ],
+      "qualification_tests": [
+        "Forking cannot multiply the permitted memory/process budget; inherited limits cannot be raised.",
+        "Audit reports would-limit while a distinct operational ceiling remains labelled operational."
+      ],
+      "capability_id": "resource.limits"
+    },
+    {
+      "owner": "Security and platform leads",
+      "backend_mechanism": null,
+      "candidate_mechanism": "Evaluate PureDarwin libsandbox native profiles and Sandbox.kext vnode hooks. Add a supervisor grant resolver only if object identity, aliases and handle semantics can satisfy the contract.",
+      "source_refs": [
+        {
+          "repository": "PureDarwin/PureDarwin",
+          "revision": "0163b2db225b85e3bf96fc25646ea290105ac298",
+          "path": "src/Kernel/Extensions/Sandbox/sandbox_kext.c",
+          "observation": "Native profile vnode hooks exist; decisions use paths and last matching rule. Apple compiled profiles are permissive markers."
+        },
+        {
+          "repository": "burdettadam/burdettie-os",
+          "revision": "4e804df245b122137d67c45f9d026e261ac68e42",
+          "path": "crates/platform-darwin-host/src/fs.rs",
+          "observation": "Filesystem provider calls std::fs without owner-grant confinement."
+        },
+        {
+          "repository": "burdettadam/burdettie-os",
+          "revision": "4e804df245b122137d67c45f9d026e261ac68e42",
+          "path": "crates/libsystem-shims/src/darwin_stubs/sandbox.rs",
+          "observation": "Compatibility sandbox calls return success without enforcing restrictions."
+        }
+      ],
+      "gaps": [
+        "No translation from owner object/tree grants to native profiles and no verified establishment.",
+        "Path matching alone does not qualify object grants, hard links, rename races or inherited descriptors.",
+        "The contract requires deny precedence; the candidate rule ordering needs an explicit translation and tests."
+      ],
+      "qualification_tests": [
+        "Direct open/read/write/create and mmap bypassing shims are denied outside grants.",
+        "Test symlink, hard-link, rename, pre-opened descriptor and descendant paths; owner-granted access succeeds after relaunch."
+      ],
+      "capability_id": "filesystem.grants"
+    },
+    {
+      "owner": "Security and platform leads",
+      "backend_mechanism": null,
+      "candidate_mechanism": "Evaluate native PureDarwin Sandbox.kext socket hooks for the v1 deny policy; allow_all is a visible policy choice.",
+      "source_refs": [
+        {
+          "repository": "PureDarwin/PureDarwin",
+          "revision": "0163b2db225b85e3bf96fc25646ea290105ac298",
+          "path": "src/Kernel/Extensions/Sandbox/sandbox_kext.c",
+          "observation": "Registers socket bind/connect checks; source inspection does not prove coverage of sendto, inherited connected sockets or other families."
+        },
+        {
+          "repository": "burdettadam/burdettie-os",
+          "revision": "4e804df245b122137d67c45f9d026e261ac68e42",
+          "path": "crates/libsystem-shims/src/socket.rs",
+          "observation": "shim_connect permits destinations through libc; unsupported-family errors are compatibility behavior."
+        }
+      ],
+      "gaps": [
+        "No qualified deny-all backend; bind/connect hook presence is insufficient.",
+        "The offline VM profile restricts the entire guest environment and cannot establish per-app network isolation."
+      ],
+      "qualification_tests": [
+        "Direct IPv4, IPv6, UDP sendto, inherited sockets and descendant connections obey the selected policy.",
+        "Audit records would-deny without applying the optional restriction; missing observation is incomplete."
+      ],
+      "capability_id": "network.policy"
+    },
+    {
+      "owner": "Security and runtime leads",
+      "backend_mechanism": null,
+      "candidate_mechanism": "Combine immutable reviewed executable admission with native profile inheritance and guest exec controls, then close process creation and privilege-change gaps.",
+      "source_refs": [
+        {
+          "repository": "PureDarwin/PureDarwin",
+          "revision": "0163b2db225b85e3bf96fc25646ea290105ac298",
+          "path": "src/Kernel/Extensions/Sandbox/sandbox_kext.c",
+          "observation": "Credential-label association and process-exec checks are candidate pieces, not full child authorization."
+        },
+        {
+          "repository": "burdettadam/burdettie-os",
+          "revision": "4e804df245b122137d67c45f9d026e261ac68e42",
+          "path": "crates/libsystem-shims/src/cross_platform/posix_extras.rs",
+          "observation": "posix_spawn and posix_spawnp call host libc without supervisor-issued child plans."
+        }
+      ],
+      "gaps": [
+        "No complete fork/exec/posix_spawn/daemonization admission path.",
+        "A path-based exec rule does not bind reviewed executable digests."
+      ],
+      "qualification_tests": [
+        "Denied children create no marker; reviewed child bytes execute only with equal or narrower policy.",
+        "Double-fork, setsid, direct exec and credential changes cannot escape restrictions or lifecycle ownership."
+      ],
+      "capability_id": "process.descendants"
+    },
+    {
+      "owner": "Security and platform leads",
+      "backend_mechanism": null,
+      "candidate_mechanism": "Qualify guest kernel task/debug access checks plus unprivileged identities; do not implement denial only in task or ptrace shims.",
+      "source_refs": [
+        {
+          "repository": "PureDarwin/PureDarwin",
+          "revision": "0163b2db225b85e3bf96fc25646ea290105ac298",
+          "path": "src/Kernel/Extensions/Sandbox/sandbox_kext.c",
+          "observation": "Inspected operation table does not allocate a complete process-inspection policy."
+        }
+      ],
+      "gaps": [
+        "No per-app denial for task ports, debugger operations and process-control interfaces."
+      ],
+      "qualification_tests": [
+        "Direct task-port, ptrace and process-memory access to the supervisor or another app is denied, including from descendants."
+      ],
+      "capability_id": "process.inspection"
+    },
+    {
+      "owner": "Security and runtime leads",
+      "backend_mechanism": null,
+      "candidate_mechanism": "Admitted immutable code mappings need an explicit execution path; qualify a guest kernel rule that rejects runtime-generated executable mappings and protection changes.",
+      "source_refs": [
+        {
+          "repository": "burdettadam/burdettie-os",
+          "revision": "4e804df245b122137d67c45f9d026e261ac68e42",
+          "path": "crates/platform-darwin-host/src/memory.rs",
+          "observation": "Mapping/protection services support runtime execution, not a per-app JIT prohibition."
+        },
+        {
+          "repository": "PureDarwin/PureDarwin",
+          "revision": "0163b2db225b85e3bf96fc25646ea290105ac298",
+          "path": "src/Kernel/Extensions/Sandbox/sandbox_kext.c",
+          "observation": "Inspected policy table is not evidence of mmap/mprotect JIT restriction."
+        }
+      ],
+      "gaps": [
+        "No qualified distinction between admitted mapped code and newly generated executable memory."
+      ],
+      "qualification_tests": [
+        "Direct mmap/mprotect and native FFI cannot create executable writable or generated code under deny; admitted fixture code still runs."
+      ],
+      "capability_id": "memory.executable"
+    },
+    {
+      "owner": "Security and platform leads",
+      "backend_mechanism": null,
+      "candidate_mechanism": "Use per-worker service namespaces and authenticated brokers only where guest kernel/IPC rights also prevent direct access to non-granted services.",
+      "source_refs": [
+        {
+          "repository": "burdettadam/burdettie-os",
+          "revision": "4e804df245b122137d67c45f9d026e261ac68e42",
+          "path": "crates/libsystem-shims/src/darwin_stubs/xpc_transport.rs",
+          "observation": "Compatibility XPC transport exists; it is not an owner-grant service namespace."
+        }
+      ],
+      "gaps": [
+        "No qualified Mach-port, Unix-socket or handle-transfer isolation for service allowlists."
+      ],
+      "qualification_tests": [
+        "Direct IPC and transferred/inherited handles cannot reach an ungranted supervisor or peer service; granted services work."
+      ],
+      "capability_id": "ipc.services"
+    },
+    {
+      "owner": "Security and platform leads",
+      "backend_mechanism": null,
+      "candidate_mechanism": "Resolve explicit owner device grants through a broker and qualify guest device-node and IOKit access denial for all other devices.",
+      "source_refs": [
+        {
+          "repository": "burdettadam/burdettie-os",
+          "revision": "4e804df245b122137d67c45f9d026e261ac68e42",
+          "path": "crates/libsystem-shims/src/darwin_stubs/iokit.rs",
+          "observation": "IOKit compatibility entry points do not establish a guest kernel device boundary."
+        }
+      ],
+      "gaps": [
+        "No owner-issued device-grant broker or complete direct device restriction."
+      ],
+      "qualification_tests": [
+        "Direct device-node open, ioctl and IOKit user-client access are denied unless an exact reviewed grant permits them."
+      ],
+      "capability_id": "devices.grants"
+    },
+    {
+      "owner": "Runtime lead",
+      "backend_mechanism": null,
+      "candidate_mechanism": "Extend shared runtime admission to immutable initial/transitive/inserted/dynamic dependencies and the exact allowed shim/native provider set before initialization.",
+      "source_refs": [
+        {
+          "repository": "burdettadam/burdettie-os",
+          "revision": "4e804df245b122137d67c45f9d026e261ac68e42",
+          "path": "crates/macho-runtime/src/loader.rs",
+          "observation": "Loader is an integration point; its existence does not qualify full dependency policy."
+        },
+        {
+          "repository": "burdettadam/burdettie-os",
+          "revision": "4e804df245b122137d67c45f9d026e261ac68e42",
+          "path": "crates/macho-runtime/src/security.rs",
+          "observation": "Legacy admission evaluator is distinct from the M1 supervisor contract."
+        }
+      ],
+      "gaps": [
+        "PR #5 advances admission route parity but is unmerged and does not qualify the PureDarwin backend.",
+        "Later dynamic loads, native fallback and cached plans still need identity-bound provider/dependency admission."
+      ],
+      "qualification_tests": [
+        "Denied transitive, inserted and dlopen libraries never run constructors; cached plans are revalidated for the effective profile.",
+        "Replacing a provider or dependency after inventory cannot execute substituted bytes."
+      ],
+      "capability_id": "code.dependencies"
+    },
+    {
+      "owner": "Runtime and security leads",
+      "backend_mechanism": null,
+      "candidate_mechanism": "Bind inventory and policy to pinned open objects or a verified immutable content store used by mapping/execution.",
+      "source_refs": [
+        {
+          "repository": "burdettadam/burdettie-os",
+          "revision": "4e804df245b122137d67c45f9d026e261ac68e42",
+          "path": "crates/macho-runtime/src/loader.rs",
+          "observation": "Runtime loader paths need immutable content identity across parse, admission, cache and execution."
+        },
+        {
+          "repository": "burdettadam/burdettie-os",
+          "revision": "4e804df245b122137d67c45f9d026e261ac68e42",
+          "path": "scripts/collect_m1_inventory.py",
+          "observation": "Inventory hashes are passive observations, not immutable execution handles."
+        }
+      ],
+      "gaps": [
+        "No supervisor-issued identity and immutable executable/dependency store qualified on the guest."
+      ],
+      "qualification_tests": [
+        "Swap an executable/dependency after inventory and before initialization; unreviewed bytes cannot execute or inherit grants.",
+        "An app copying another bundle identifier or report cannot gain that app's grants."
+      ],
+      "capability_id": "identity.immutable_inputs"
+    },
+    {
+      "owner": "Security lead",
+      "backend_mechanism": null,
+      "candidate_mechanism": "Use a maintained cryptographic implementation to validate content hashes, CodeDirectory/CMS binding, code-signing chain usage, time and configured revocation behavior.",
+      "source_refs": [
+        {
+          "repository": "burdettadam/burdettie-os",
+          "revision": "4e804df245b122137d67c45f9d026e261ac68e42",
+          "path": "crates/trust-policy/src/apple.rs",
+          "observation": "Signature model explicitly checks presence rather than CMS/page integrity."
+        },
+        {
+          "repository": "burdettadam/burdettie-os",
+          "revision": "4e804df245b122137d67c45f9d026e261ac68e42",
+          "path": "crates/trust-policy/src/cert.rs",
+          "observation": "verify_cms_signature ignores CodeDirectory data and returns signature_verified=false; a root fingerprint in a certificate bag is not a verified chain."
+        }
+      ],
+      "gaps": [
+        "No complete authenticated executable/bundle/signature verifier integrated with immutable launch inputs.",
+        "Unsigned permission is an independent profile choice and cannot be treated as a confinement downgrade."
+      ],
+      "qualification_tests": [
+        "Tampered code, special slots, resources and entitlements fail the selected integrity requirement.",
+        "An unrelated trusted root placed in a fake CMS cannot qualify a signer; time/revocation/offline outcomes follow the exact profile."
+      ],
+      "capability_id": "identity.signature"
+    },
+    {
+      "owner": "Security and runtime leads",
+      "backend_mechanism": null,
+      "candidate_mechanism": "Bind entitlement bytes to verified content, evaluate presence-based v1 deny/request-only rules and finalize aggregate admission after all checks.",
+      "source_refs": [
+        {
+          "repository": "burdettadam/burdettie-os",
+          "revision": "4e804df245b122137d67c45f9d026e261ac68e42",
+          "path": "crates/trust-policy/src/lib.rs",
+          "observation": "Parsed entitlement evaluation exists; source baseline precedes the final-aggregation correction in PR #5."
+        }
+      ],
+      "gaps": [
+        "PR #5 fixes aggregate denial behavior but is unmerged; no selected-guest qualification.",
+        "Guest entitlements must never mint owner grants or override the profile."
+      ],
+      "qualification_tests": [
+        "A final denied entitlement prevents all initializers through every route.",
+        "Modified entitlement bytes invalidate integrity; request-only and unknown keys obey their explicit rules."
+      ],
+      "capability_id": "identity.entitlements"
+    },
+    {
+      "owner": "Runtime lead",
+      "backend_mechanism": null,
+      "candidate_mechanism": "Supervisor constructs explicit argument/environment data and passes a launch-bound context; policy transformations happen only in enforced mode.",
+      "source_refs": [
+        {
+          "repository": "burdettadam/burdettie-os",
+          "revision": "4e804df245b122137d67c45f9d026e261ac68e42",
+          "path": "crates/macho-runtime/src/config.rs",
+          "observation": "Legacy configuration has environment overrides and optional security policy; it is not the versioned owner mode/profile API."
+        }
+      ],
+      "gaps": [
+        "No complete owner-resolved permissive/audit/enforced environment path across all launch adapters."
+      ],
+      "qualification_tests": [
+        "Audit records would-strip without stripping; permissive skipped checks are not verified.",
+        "Workers and descendants receive no ambient secret environment, and reports contain names rather than values."
+      ],
+      "capability_id": "launch.environment"
+    },
+    {
+      "owner": "Security and platform leads",
+      "backend_mechanism": null,
+      "candidate_mechanism": "Supervisor-owned versioned policy/grant store with atomic writes, stable identities and guest-inaccessible ownership; apply edits on relaunch.",
+      "source_refs": [
+        {
+          "repository": "burdettadam/burdettie-os",
+          "revision": "4e804df245b122137d67c45f9d026e261ac68e42",
+          "path": "crates/trust-policy/src/builder.rs",
+          "observation": "Policy builders construct runtime values; they do not establish a protected owner policy service."
+        }
+      ],
+      "gaps": [
+        "No durable owner-controlled store, authorization layer or rollback/recovery qualification."
+      ],
+      "qualification_tests": [
+        "A guest cannot edit profiles, grants, trust anchors or report history; legitimate owner changes survive a cold reboot.",
+        "Interrupted writes preserve a recoverable policy and never default to permissive."
+      ],
+      "capability_id": "policy.storage"
+    },
+    {
+      "owner": "Security and platform leads",
+      "backend_mechanism": null,
+      "candidate_mechanism": "Authenticate owner/delegated callers at a supervisor endpoint using kernel-established peer identity and launch-scoped, non-replayable grants.",
+      "source_refs": [
+        {
+          "repository": "burdettadam/burdettie-os",
+          "revision": "4e804df245b122137d67c45f9d026e261ac68e42",
+          "path": "crates/libsystem-shims/src/darwin_stubs/xpc.rs",
+          "observation": "Compatibility get_euid/get_egid query the current process; they do not authenticate a remote request peer."
+        },
+        {
+          "repository": "burdettadam/burdettie-os",
+          "revision": "4e804df245b122137d67c45f9d026e261ac68e42",
+          "path": "docs/contracts/launch-policy-v1.md",
+          "observation": "Defines owner authority and opaque grant references, not an implemented broker."
+        }
+      ],
+      "gaps": [
+        "No authenticated supervisor registration/launch/grant broker.",
+        "App-provided identifiers, entitlement JSON and compatibility identity calls are not authorization."
+      ],
+      "qualification_tests": [
+        "Forged/replayed grant references and calls from guest workers cannot change owner policy or launch with another app's authority.",
+        "Authorized owner requests remain usable in all three modes."
+      ],
+      "capability_id": "broker.authorization"
+    },
+    {
+      "owner": "Runtime and security leads",
+      "backend_mechanism": null,
+      "candidate_mechanism": "Supervisor collects launch-bound decisions and protected lifecycle/denial events, with explicit coverage and mandatory-channel failure handling.",
+      "source_refs": [
+        {
+          "repository": "burdettadam/burdettie-os",
+          "revision": "4e804df245b122137d67c45f9d026e261ac68e42",
+          "path": "crates/macho-runtime/src/tracer.rs",
+          "observation": "Runtime tracing provides diagnostics, not a protected complete policy event channel."
+        },
+        {
+          "repository": "PureDarwin/PureDarwin",
+          "revision": "0163b2db225b85e3bf96fc25646ea290105ac298",
+          "path": "src/Kernel/Extensions/Sandbox/sandbox_kext.c",
+          "observation": "Kernel denial printf output is limited; sandbox_check compatibility answers do not report full enforcement decisions."
+        }
+      ],
+      "gaps": [
+        "No authenticated durable event stream or complete guest direct-operation audit coverage.",
+        "Do not establish native sandbox restrictions just to obtain audit-mode events."
+      ],
+      "qualification_tests": [
+        "Audit would-deny events agree with enforced denials without restricting optional operations.",
+        "Missing observation or failed required event delivery is visible; guests cannot rewrite reports or hide descendant events."
+      ],
+      "capability_id": "audit.events"
+    }
+  ],
+  "related_work": [
+    {
+      "url": "https://github.com/burdettadam/burdettie-os/pull/5",
+      "revision": "4a74a51502a29bc65ef1fe4a8ce92ce2c11ec498",
+      "status": "published_unmerged",
+      "scope": "Admission parity and entitlement aggregation; no PureDarwin confinement qualification."
+    }
+  ]
+}

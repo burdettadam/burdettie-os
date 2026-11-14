@@ -1,0 +1,100 @@
+name: M1 contracts and inventory
+
+on:
+  push:
+    paths:
+      - '.github/workflows/m1-contracts.yml'
+      - 'docs/contracts/**'
+      - 'scripts/collect_m1_inventory.py'
+      - 'scripts/m1_boot_preflight.py'
+      - 'scripts/m1_vm_bootstrap.py'
+      - 'scripts/build_puredarwin_fixtures.py'
+      - 'scripts/compile_puredarwin_objects.py'
+      - 'scripts/plan_puredarwin_linker.py'
+      - 'scripts/puredarwin_native_linker.nix'
+      - 'fixtures/m1_abi_probe/probe.c'
+      - 'fixtures/simple_cli/main.c'
+      - 'scripts/tests/test_collect_m1_inventory.py'
+      - 'scripts/tests/test_m1_boot_preflight.py'
+      - 'scripts/tests/test_m1_vm_bootstrap.py'
+      - 'scripts/tests/test_build_puredarwin_fixtures.py'
+      - 'scripts/tests/test_compile_puredarwin_objects.py'
+      - 'scripts/tests/test_plan_puredarwin_linker.py'
+  pull_request:
+    paths:
+      - '.github/workflows/m1-contracts.yml'
+      - 'docs/contracts/**'
+      - 'scripts/collect_m1_inventory.py'
+      - 'scripts/m1_boot_preflight.py'
+      - 'scripts/m1_vm_bootstrap.py'
+      - 'scripts/build_puredarwin_fixtures.py'
+      - 'scripts/compile_puredarwin_objects.py'
+      - 'scripts/plan_puredarwin_linker.py'
+      - 'scripts/puredarwin_native_linker.nix'
+      - 'fixtures/m1_abi_probe/probe.c'
+      - 'fixtures/simple_cli/main.c'
+      - 'scripts/tests/test_collect_m1_inventory.py'
+      - 'scripts/tests/test_m1_boot_preflight.py'
+      - 'scripts/tests/test_m1_vm_bootstrap.py'
+      - 'scripts/tests/test_build_puredarwin_fixtures.py'
+      - 'scripts/tests/test_compile_puredarwin_objects.py'
+      - 'scripts/tests/test_plan_puredarwin_linker.py'
+
+permissions:
+  contents: read
+
+jobs:
+  contract-and-inventory:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install contract validation dependency
+        run: |
+          python3 -m venv "$RUNNER_TEMP/burdettie-m1-venv"
+          "$RUNNER_TEMP/burdettie-m1-venv/bin/python" -m pip install --disable-pip-version-check -r docs/contracts/requirements.txt
+      - name: Prepare pinned Nix evaluator without installing profiles
+        run: |
+          nix_bundle="$RUNNER_TEMP/burdettie-nix"
+          mkdir "$nix_bundle"
+          curl --fail --silent --show-error --location --max-time 90 \
+            https://releases.nixos.org/nix/nix-2.28.3/nix-2.28.3-x86_64-linux.tar.xz \
+            --output "$nix_bundle/nix.tar.xz"
+          printf '%s  %s\n' 85d1847d06d5d56167796d3f61cd992908de84584db3e700da031a782b59ea22 \
+            "$nix_bundle/nix.tar.xz" | sha256sum --check
+          tar -xJf "$nix_bundle/nix.tar.xz" -C "$nix_bundle"
+          NIX_BUNDLE="$nix_bundle" python3 - <<'PY'
+          import os
+          from pathlib import Path
+          import shlex
+          import subprocess
+
+          root = Path(os.environ["NIX_BUNDLE"])
+          store = root / "nix-2.28.3-x86_64-linux/store"
+          [loader] = store.glob("*-glibc-*/lib/ld-linux-x86-64.so.2")
+          [binary] = store.glob("*-nix-2.28.3/bin/nix")
+          libraries = ":".join(str(p) for p in sorted(store.glob("*/lib")) if p.is_dir())
+          launcher = root / "nix-eval"
+          launcher.write_text("#!/bin/sh\nexec " + shlex.join([
+              str(loader), "--library-path", libraries, str(binary)
+          ]) + ' "$@"\n')
+          launcher.chmod(0o700)
+          version = subprocess.check_output([str(launcher), "--version"], text=True).strip()
+          if version != "nix (Nix) 2.28.3":
+              raise SystemExit("Unexpected Nix version: " + version)
+          print(version)
+          with open(os.environ["GITHUB_ENV"], "a") as environment:
+              environment.write("NIX_BIN=" + str(launcher) + "\n")
+          PY
+      - name: Check inventory, preflight and bootstrap harness behavior
+        run: |
+          command -v cc
+          # Missing Nix must fail this job, not silently skip the overlay tests.
+          test -x "$NIX_BIN"
+          python3 -m unittest discover -s scripts/tests -p 'test_*.py' -v
+      - name: Check contract consistency examples
+        run: |
+          "$RUNNER_TEMP/burdettie-m1-venv/bin/python" docs/contracts/validate_contract.py --self-test
+          "$RUNNER_TEMP/burdettie-m1-venv/bin/python" docs/contracts/validate_contract.py docs/contracts/examples/*.json
