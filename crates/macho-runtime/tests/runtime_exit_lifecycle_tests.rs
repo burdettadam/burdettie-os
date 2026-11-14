@@ -338,7 +338,10 @@ fn launch_owned_callbacks_follow_real_runtime_paths() {
             arm_fixture(&mode, address)
         };
         let fixture = Fixture::write(&mode, &bytes);
-        let config = fixture.config();
+        let mut config = fixture.config();
+        // Exercise admission and lifecycle together: a successful return or
+        // guest exit must keep the report evaluated before initialization.
+        config.security_policy = Some(trust_policy::TrustPolicy::permissive());
         let result = if mode == "native_return" {
             Runtime::load_and_run(&fixture.0, &config)
         } else {
@@ -391,7 +394,13 @@ fn launch_owned_callbacks_follow_real_runtime_paths() {
                 "recursive_exit" | "callback_immediate" => 52,
                 _ => 37,
             };
-            assert_eq!(result.unwrap().exit_code, expected_status);
+            let result = result.unwrap();
+            assert_eq!(result.exit_code, expected_status);
+            let report = result
+                .security_report
+                .expect("admitted execution must retain its security report");
+            assert!(report.allowed);
+            assert!(report.denied_reasons.is_empty());
             let expected = match mode.as_str() {
                 "immediate" | "abort" => 0,
                 "callback_immediate" => 2,
