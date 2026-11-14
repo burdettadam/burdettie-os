@@ -101,6 +101,7 @@ pub extern "C" fn shim_nsstring_init_with_bytes_length_encoding(
     if obj == 0 {
         return 0;
     }
+    crate::cstring_observer::invalidate(obj);
     let length = len as usize;
     if bytes == 0 || length == 0 {
         // Empty string

@@ -41,6 +41,7 @@
 pub mod cf_core;
 pub(crate) mod cfstring;
 pub mod cg_types;
+pub mod cstring_observer;
 pub(crate) mod format;
 pub(crate) mod foundation_constants;
 

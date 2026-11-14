@@ -60,6 +60,7 @@ fn read_string_bytes(obj: u64) -> Vec<u8> {
 /// `obj` must be an NSMutableString whose `c_string_ptr` (offset 16)
 /// was allocated via `CString::into_raw`.
 unsafe fn replace_backing_store(obj: u64, new_bytes: &[u8]) {
+    crate::cstring_observer::invalidate(obj);
     let old_ptr = *((obj as usize + C_STRING_PTR_OFF) as *const u64) as *mut c_char;
     if !old_ptr.is_null() {
         drop(CString::from_raw(old_ptr));

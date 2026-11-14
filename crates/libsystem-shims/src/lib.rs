@@ -88,6 +88,7 @@ pub mod darwin_stubs;
 #[cfg(not(unix))]
 #[path = "darwin_stubs_non_unix.rs"]
 pub mod darwin_stubs;
+pub mod exit_registry;
 
 pub use darwin_compat::DarwinCompatShims;
 pub use darwin_stubs::install_darwin_stubs;

@@ -6,6 +6,27 @@
 //! convention translation.
 
 use std::collections::HashMap;
+use std::sync::Arc;
+
+use crate::interp::{ExitReason, Interpreter};
+
+/// A host request that must execute after the bridge borrow is released.
+/// Guest callbacks can then use this same interpreter's CPU, stack and memory.
+pub struct InterpreterCall(Box<dyn FnOnce(&mut Interpreter) -> FfiResult + Send>);
+
+impl std::fmt::Debug for InterpreterCall {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("InterpreterCall")
+    }
+}
+
+impl InterpreterCall {
+    pub(crate) fn invoke(self, interpreter: &mut Interpreter) -> FfiResult {
+        (self.0)(interpreter)
+    }
+}
+
+type CompletionHandler = Arc<dyn Fn(&mut Interpreter, ExitReason) -> ExitReason + Send + Sync>;
 
 /// Result of an FFI call from interpreted ARM64 code.
 #[derive(Debug)]
@@ -17,6 +38,11 @@ pub enum FfiResult {
     ReturnFull { x0: u64, x1: u64, d0: u64, d1: u64 },
     /// Exit the interpreter with this code.
     Exit(u64),
+    /// Propagate a callback fault/exit without replacing it with success.
+    Stop(ExitReason),
+    /// Perform a reentrant operation using this interpreter, never a native
+    /// cast of a guest code pointer.
+    WithInterpreter(InterpreterCall),
     /// Tail-call: redirect PC to this address without modifying registers.
     /// Used by `objc_msgSend` to jump to the resolved IMP in guest code.
     TailCall(u64),
@@ -26,7 +52,16 @@ pub enum FfiResult {
     TailCallWithX0(u64, u64),
 }
 
+impl FfiResult {
+    pub fn with_interpreter(
+        handler: impl FnOnce(&mut Interpreter) -> Self + Send + 'static,
+    ) -> Self {
+        Self::WithInterpreter(InterpreterCall(Box::new(handler)))
+    }
+}
+
 /// Arguments passed to a host function from interpreted ARM64 code.
+#[derive(Clone, Copy)]
 pub struct FfiCallArgs {
     /// Integer registers x0-x7.
     pub x: [u64; 8],
@@ -56,6 +91,7 @@ pub struct FfiBridge {
     /// This enables transparent forwarding to shim/libc functions resolved
     /// during fixups without requiring explicit registration of each one.
     pub auto_call_host: bool,
+    completion: Option<CompletionHandler>,
 }
 
 impl FfiBridge {
@@ -64,7 +100,21 @@ impl FfiBridge {
             handlers: HashMap::new(),
             names: HashMap::new(),
             auto_call_host: false,
+            completion: None,
         }
+    }
+
+    /// Handle the final stop while the interpreter and its stack are alive.
+    /// Callback subcalls bypass this hook, so they cannot finish the launch.
+    pub fn on_completion(
+        &mut self,
+        handler: impl Fn(&mut Interpreter, ExitReason) -> ExitReason + Send + Sync + 'static,
+    ) {
+        self.completion = Some(Arc::new(handler));
+    }
+
+    pub(crate) fn completion_handler(&self) -> Option<CompletionHandler> {
+        self.completion.clone()
     }
 
     /// Register a host function at a guest address.

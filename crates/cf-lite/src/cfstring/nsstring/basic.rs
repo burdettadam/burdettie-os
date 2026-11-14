@@ -187,6 +187,8 @@ pub extern "C" fn shim_nsstring_init_with_utf8string(
         return 0;
     }
 
+    crate::cstring_observer::invalidate(obj);
+
     let rust_str = unsafe { CStr::from_ptr(c_str) };
     let bytes = rust_str.to_bytes();
     let len = bytes.len();

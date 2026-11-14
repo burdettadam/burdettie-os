@@ -1,0 +1,12 @@
+CHECK-1: PASS (whitespace set created)
+CHECK-2: PASS (space is whitespace)
+CHECK-3: PASS ('A' is not whitespace)
+CHECK-4: PASS (Z and 5 are alphanumeric)
+CHECK-5: PASS (7 is digit, x is not)
+CHECK-6: PASS (trimmed: 'hello world')
+CHECK-7: PASS (split into 3 parts)
+CHECK-8: PASS (first digit at loc=3 len=1)
+CHECK-9: PASS (custom set: 'a' in, 'b' not in)
+CHECK-10: PASS (M is letter, 3 is not)
+
+10/10 checks passed

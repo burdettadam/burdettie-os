@@ -1,7 +1,5 @@
 //! SoftwareRenderer struct, constructors, helper methods, and text metrics.
 
-use ab_glyph::{Font as AbFont, ScaleFont};
-
 use crate::color::Color;
 use crate::font::Font;
 use crate::font_manager::FontManager;
@@ -29,7 +27,7 @@ pub(super) struct GraphicsState {
 /// A basic software renderer that draws into a `Surface`.
 ///
 /// When constructed with [`SoftwareRenderer::with_fonts`], text is rendered
-/// using TrueType glyph rasterization via `ab_glyph`. When constructed with
+/// using TrueType glyph rasterization from Fontations outlines. When constructed with
 /// [`SoftwareRenderer::new`], the legacy 5×7 bitmap font is used.
 pub struct SoftwareRenderer<'a> {
     pub(super) surface: &'a mut Surface,
@@ -223,7 +221,7 @@ impl SoftwareRenderer<'_> {
         }
     }
 
-    /// TrueType glyph rasterization via ab_glyph.
+    /// TrueType glyph rasterization from Fontations outlines.
     ///
     /// Handles NFC normalization, combining marks (overlay on base character),
     /// zero-width chars (skipped), and missing glyphs (emoji placeholder box).
@@ -237,9 +235,9 @@ impl SoftwareRenderer<'_> {
     ) {
         let normalized = normalize_nfc(text);
         let face = fm.resolve_font(font);
-        let ab_font = face.inner();
+        let font_data = face.inner();
         let size = font.size as f32;
-        let scaled = ab_font.as_scaled(size);
+        let scaled = font_data.as_scaled(size);
         let ascent = scaled.ascent();
 
         let cr = (color.r.clamp(0.0, 1.0) * 255.0) as u32;
@@ -252,7 +250,7 @@ impl SoftwareRenderer<'_> {
 
         let mut cursor_x = origin.x as f32;
         let baseline_y = origin.y as f32 + ascent;
-        let mut prev_glyph: Option<ab_glyph::GlyphId> = None;
+        let mut prev_glyph: Option<crate::GlyphId> = None;
         let mut last_base_x = cursor_x;
 
         // Precompute placeholder box size for missing glyphs
@@ -265,13 +263,15 @@ impl SoftwareRenderer<'_> {
                 continue;
             }
 
-            let glyph_id = ab_font.glyph_id(ch);
+            let glyph_id = font_data.glyph_id(ch);
 
             // Combining marks: position at same x as last base, no advance
             if is_combining_mark(ch) {
-                let glyph = glyph_id
-                    .with_scale_and_position(size, ab_glyph::point(last_base_x, baseline_y));
-                if let Some(outlined) = ab_font.outline_glyph(glyph) {
+                let glyph = glyph_id.with_scale_and_position(
+                    size,
+                    ab_glyph_rasterizer::point(last_base_x, baseline_y),
+                );
+                if let Some(outlined) = font_data.outline_glyph(glyph) {
                     let bounds = outlined.px_bounds();
                     outlined.draw(|rx, ry, coverage| {
                         self.blend_pixel(
@@ -295,7 +295,7 @@ impl SoftwareRenderer<'_> {
             last_base_x = cursor_x;
 
             // Missing glyph → draw placeholder rectangle
-            if glyph_id == ab_glyph::GlyphId(0) {
+            if glyph_id == crate::GlyphId(0) {
                 let px = cursor_x as i32;
                 let py = (baseline_y - ascent * 0.85) as i32;
                 self.draw_placeholder_box(px, py, placeholder_w, placeholder_h, color);
@@ -304,11 +304,11 @@ impl SoftwareRenderer<'_> {
                 continue;
             }
 
-            let glyph =
-                glyph_id.with_scale_and_position(size, ab_glyph::point(cursor_x, baseline_y));
+            let glyph = glyph_id
+                .with_scale_and_position(size, ab_glyph_rasterizer::point(cursor_x, baseline_y));
 
             // Rasterize and blend
-            if let Some(outlined) = ab_font.outline_glyph(glyph) {
+            if let Some(outlined) = font_data.outline_glyph(glyph) {
                 let bounds = outlined.px_bounds();
                 outlined.draw(|rx, ry, coverage| {
                     self.blend_pixel(
