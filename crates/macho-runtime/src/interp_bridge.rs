@@ -29,8 +29,9 @@ extern "C" {
 fn host_symbol_addr(symbol: &std::ffi::CStr) -> u64 {
     #[cfg(unix)]
     unsafe {
-        // SAFETY: looking up a well-known process symbol via dlsym.
-        dlsym(std::ptr::null_mut(), symbol.as_ptr()) as u64
+        // SAFETY: looking up a well-known process symbol via dlsym using the
+        // platform's global search handle (which is not null on Darwin).
+        dlsym(libc::RTLD_DEFAULT, symbol.as_ptr()) as u64
     }
 
     #[cfg(not(unix))]
@@ -93,15 +94,24 @@ pub fn build_interpreter_bridge(guest_ranges: &[(u64, u64)]) -> FfiBridge {
         guest_ranges,
     );
 
-    // Register exit/_exit handlers so the interpreter terminates cleanly
-    // instead of auto_call_host actually calling libc::exit (which would
-    // kill the test process).
-    for sym in &["_exit", "exit", "__exit"] {
+    // Host fallback and the lifecycle shim table have different addresses.
+    // Both must stop the interpreter; auto_call_host must never terminate its
+    // embedding process. Normal guest cleanup needs a separate, launch-scoped
+    // callback mechanism and is not implied by returning FfiResult::Exit.
+    for sym in &["exit", "_exit", "_Exit", "__exit", "__Exit"] {
         let c_name = std::ffi::CString::new(*sym).unwrap();
         let addr = host_symbol_addr(&c_name);
         if addr != 0 {
             let name = sym.to_string();
             bridge.register(addr, &name, Box::new(|args| FfiResult::Exit(args.x[0])));
+        }
+    }
+
+    let mut lifecycle_shims = libsystem_shims::ShimTable::new();
+    libsystem_shims::LifecycleShims::install(&mut lifecycle_shims);
+    for sym in ["_exit", "__exit", "_Exit", "__Exit"] {
+        if let Some(addr) = lifecycle_shims.resolve(sym) {
+            bridge.register(addr, sym, Box::new(|args| FfiResult::Exit(args.x[0])));
         }
     }
 
@@ -253,4 +263,81 @@ fn register_msg_send_super2(
 /// Check if an address is within the guest (mapped image) memory ranges.
 fn is_in_guest(addr: u64, ranges: &[(u64, u64)]) -> bool {
     ranges.iter().any(|&(lo, hi)| addr >= lo && addr < hi)
+}
+
+#[cfg(all(test, unix))]
+mod exit_tests {
+    use super::*;
+
+    #[test]
+    fn exit_symbols_stop_interpreter_without_terminating_host() {
+        const CHILD_TARGET: &str = "BURDETTIE_INTERPRETER_EXIT_TARGET";
+        if let Ok(target) = std::env::var(CHILD_TARGET) {
+            let (provider, symbol) = target.split_once(':').unwrap();
+            let address = if provider == "shim" {
+                let mut table = libsystem_shims::ShimTable::new();
+                libsystem_shims::LifecycleShims::install(&mut table);
+                table.resolve(symbol).unwrap()
+            } else {
+                host_symbol_addr(&std::ffi::CString::new(symbol).unwrap())
+            };
+            assert_ne!(address, 0, "exit target {target} is missing");
+
+            // Source-owned AArch64 BLR X16, with status in X0 and the actual
+            // resolved shim/libc address in X16. Run the real decode/FFI path.
+            let mut code = 0xd63f_0200_u32.to_le_bytes();
+            let base = code.as_mut_ptr() as u64;
+            // SAFETY: code stays alive and is never mutated while Memory and
+            // the interpreter refer to its read-only instruction bytes.
+            let memory = unsafe {
+                arm64_translate::Memory::from_segments(&[(
+                    base,
+                    code.as_mut_ptr(),
+                    code.len(),
+                    false,
+                )])
+            };
+            let mut cpu = arm64_translate::CpuState::new();
+            cpu.pc = base;
+            cpu.sp = memory.initial_sp();
+            cpu.x[0] = 37;
+            cpu.x[16] = address;
+            let bridge = build_interpreter_bridge(&[(base, base + code.len() as u64)]);
+            let mut interpreter = arm64_translate::Interpreter::new(cpu, memory, bridge);
+            assert!(matches!(
+                interpreter.run(),
+                arm64_translate::ExitReason::Exit { code: 37 }
+            ));
+            println!("BURDETTIE_INTERPRETER_HOST_SURVIVED");
+            return;
+        }
+
+        // A regression may call libc::_exit through auto_call_host. Isolate it
+        // so the parent reports a test failure instead of silently exiting the
+        // entire test harness with the guest's exit code.
+        for target in [
+            "shim:_exit",
+            "shim:__exit",
+            "shim:_Exit",
+            "shim:__Exit",
+            "host:exit",
+            "host:_exit",
+            "host:_Exit",
+        ] {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", "interp_bridge::exit_tests::exit_symbols_stop_interpreter_without_terminating_host", "--nocapture"])
+                .env(CHILD_TARGET, target)
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "{target} terminated its host: {output:?}"
+            );
+            assert!(
+                String::from_utf8_lossy(&output.stdout)
+                    .contains("BURDETTIE_INTERPRETER_HOST_SURVIVED"),
+                "{target} did not complete the interpreter path: {output:?}"
+            );
+        }
+    }
 }

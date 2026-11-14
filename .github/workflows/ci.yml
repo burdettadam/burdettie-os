@@ -135,6 +135,12 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all -- --check
 
+      - name: Check the headless Darwin dependency graph
+        run: python3 scripts/check_headless_cli_dependencies.py
+
+      - name: Test Darwin panels without native dialogs
+        run: cargo test --locked -p cf-lite --no-default-features --lib nsopenpanel::tests
+
       - name: Clippy (strict)
         run: |
           cargo clippy --locked --workspace --all-targets --keep-going -- \

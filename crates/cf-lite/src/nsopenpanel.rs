@@ -8,8 +8,8 @@
 //! NSOpenPanel layout: 104 bytes (same as NSSavePanel)
 //!   Additional behavior: allows multiple selection, can choose directories.
 //!
-//! `runModal` uses `rfd` (native file dialog) when available, otherwise
-//! returns NSModalResponseCancel (0).
+//! `runModal` uses `rfd` on macOS with the `host-dialogs` feature. Without
+//! that backend it returns NSModalResponseCancel (0), without selecting a file.
 //!
 //! URLs are stored in a global map keyed by object pointer.
 
@@ -205,14 +205,14 @@ pub extern "C" fn shim_nssavepanel_url(obj: u64, _cmd: u64) -> u64 {
 
 /// `-[NSSavePanel runModal]`
 ///
-/// Uses `rfd` (native file dialog) on macOS to show a real save panel.
-/// Falls back to NSModalResponseCancel on other platforms.
+/// Uses `rfd` on macOS with `host-dialogs` to show a real save panel.
+/// Returns NSModalResponseCancel when that backend is unavailable.
 pub extern "C" fn shim_nssavepanel_run_modal(obj: u64, _cmd: u64) -> u64 {
     if obj == 0 {
         return NS_MODAL_RESPONSE_CANCEL;
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(all(target_os = "macos", feature = "host-dialogs"))]
     {
         let mut dialog = rfd::FileDialog::new();
         // Apply allowed content types as file filters.
@@ -237,9 +237,9 @@ pub extern "C" fn shim_nssavepanel_run_modal(obj: u64, _cmd: u64) -> u64 {
             None => NS_MODAL_RESPONSE_CANCEL,
         }
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(all(target_os = "macos", feature = "host-dialogs")))]
     {
-        log::debug!("NSSavePanel runModal: stub — returning Cancel (no rfd on this platform)");
+        log::debug!("NSSavePanel runModal: returning Cancel (native host dialogs unavailable)");
         NS_MODAL_RESPONSE_CANCEL
     }
 }
@@ -325,14 +325,14 @@ pub extern "C" fn shim_nsopenpanel_urls(obj: u64, _cmd: u64) -> u64 {
 
 /// `-[NSOpenPanel runModal]`
 ///
-/// Uses `rfd` (native file dialog) on macOS to show a real open panel.
-/// Falls back to NSModalResponseCancel on other platforms.
+/// Uses `rfd` on macOS with `host-dialogs` to show a real open panel.
+/// Returns NSModalResponseCancel when that backend is unavailable.
 pub extern "C" fn shim_nsopenpanel_run_modal(obj: u64, _cmd: u64) -> u64 {
     if obj == 0 {
         return NS_MODAL_RESPONSE_CANCEL;
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(all(target_os = "macos", feature = "host-dialogs"))]
     {
         let flags = read_u64(obj, FLAGS_OFF);
         let can_files = flags & FLAG_CAN_CHOOSE_FILES != 0;
@@ -393,9 +393,9 @@ pub extern "C" fn shim_nsopenpanel_run_modal(obj: u64, _cmd: u64) -> u64 {
             }
         }
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(all(target_os = "macos", feature = "host-dialogs")))]
     {
-        log::debug!("NSOpenPanel runModal: stub — returning Cancel (no rfd on this platform)");
+        log::debug!("NSOpenPanel runModal: returning Cancel (native host dialogs unavailable)");
         NS_MODAL_RESPONSE_CANCEL
     }
 }
@@ -442,6 +442,37 @@ mod tests {
         let title = make_string("Save As…");
         shim_nssavepanel_set_title(panel, 0, title);
         assert_eq!(shim_nssavepanel_title(panel, 0), title);
+        free_obj(panel);
+    }
+
+    #[test]
+    #[cfg(not(all(target_os = "macos", feature = "host-dialogs")))]
+    fn unavailable_save_panel_cancels_without_selection() {
+        let panel = shim_nssavepanel_save_panel(0, 0);
+        assert_ne!(panel, 0);
+        // Make this independent of previous tests reusing an allocation address.
+        store_urls(panel, Vec::new());
+        assert_eq!(
+            shim_nssavepanel_run_modal(panel, 0),
+            NS_MODAL_RESPONSE_CANCEL
+        );
+        assert_eq!(shim_nssavepanel_url(panel, 0), 0);
+        free_obj(panel);
+    }
+
+    #[test]
+    #[cfg(not(all(target_os = "macos", feature = "host-dialogs")))]
+    fn unavailable_open_panel_cancels_without_selection() {
+        let panel = shim_nsopenpanel_open_panel(0, 0);
+        assert_ne!(panel, 0);
+        store_urls(panel, Vec::new());
+        shim_nsopenpanel_set_can_choose_directories(panel, 0, 1);
+        shim_nsopenpanel_set_allows_multiple_selection(panel, 0, 1);
+        assert_eq!(
+            shim_nsopenpanel_run_modal(panel, 0),
+            NS_MODAL_RESPONSE_CANCEL
+        );
+        assert!(get_urls(panel).is_empty());
         free_obj(panel);
     }
 

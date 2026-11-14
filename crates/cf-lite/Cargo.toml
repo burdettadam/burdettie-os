@@ -31,7 +31,7 @@ arboard = { version = "3.6.1", optional = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 platform-darwin-host = { workspace = true }
-rfd = { version = "0.15", default-features = false }
+rfd = { version = "0.15", default-features = false, optional = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 platform-linux       = { workspace = true }
@@ -43,4 +43,6 @@ cc = "1"
 workspace = true
 
 [features]
+default = ["host-dialogs"]
+host-dialogs = ["dep:rfd"]
 arboard = ["dep:arboard"]
