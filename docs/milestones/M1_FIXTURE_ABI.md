@@ -1,6 +1,6 @@
 # M1 Linux/PureDarwin fixture and runtime ABI gate
 
-Status: recipe and source probe implemented; **selected-target cross-build and guest execution are not yet qualified**. The native-host probe tests validate their C logic and evidence protocol. They do not establish PureDarwin ABI compatibility, Burdettie execution, reboot persistence or confinement.
+Status: the pinned source SDK was realized and both source-owned fixtures compiled successfully into x86_64 Mach-O object files on 2026-11-14. **Executable linking and selected-guest/runtime execution remain unqualified.** The [object compilation receipt](evidence/objects-2026-11-14.json) records this limited result. Object compilation and native-host probe tests do not establish PureDarwin ABI behavior, Burdettie execution, reboot persistence or confinement.
 
 ## Pinned build inputs
 
@@ -12,14 +12,49 @@ The recipe uses PureDarwin `0163b2db225b85e3bf96fc25646ea290105ac298` and its ac
 | Root Nixpkgs | `fd1462031fdee08f65fd0b4c6b64e22239a77870`, reached through the root input's `nixpkgs_3` node |
 | Source submodule | `external/corecrypto` at `f577aafe4b9a89727968666237d20cc51d2f770d`; recursive state must match the pinned tree |
 | Source-derived SDK output | `packages.x86_64-linux.apple-sdk`; `Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk` |
-| Host cross compiler | `packages.x86_64-linux.darwin-cross-toolchain`; `x86_64-apple-darwin20.4-clang` wrapper using upstream LLVM 21 |
+| Object-only compiler | Unwrapped Clang 21.1.8, resolved through `.cc` on the SDK's single compiler-bearing `nativeBuildInputs` entry |
+| Executable-build compiler wrapper | `packages.x86_64-linux.darwin-cross-toolchain`; `x86_64-apple-darwin20.4-clang` wrapper using upstream LLVM 21 |
 | Actual Clang target | `x86_64-apple-macosx26.5` |
 | Host linker | `packages.x86_64-linux.native-ld`; in-tree cctools ld64, not an arbitrary host linker |
 | Target library | `packages.x86_64-linux.libsystem`; source-built `libSystem.B.dylib` and `system/libdyld.dylib` |
 
 The wrapper's historical `darwin20.4` filename does not select the deployment version. `target-info.nix` and the compiler wrapper select 26.5. That label does not prove macOS 26.5 API coverage. The root Nixpkgs input must be followed through the lock graph; the node named simply `nixpkgs` belongs to another dependency. Sources: pinned [flake](https://github.com/PureDarwin/PureDarwin/blob/0163b2db225b85e3bf96fc25646ea290105ac298/flake.nix), [lock](https://github.com/PureDarwin/PureDarwin/blob/0163b2db225b85e3bf96fc25646ea290105ac298/flake.lock), [target selection](https://github.com/PureDarwin/PureDarwin/blob/0163b2db225b85e3bf96fc25646ea290105ac298/nix/lib/target-info.nix), [wrapper](https://github.com/PureDarwin/PureDarwin/blob/0163b2db225b85e3bf96fc25646ea290105ac298/nix/pkgs/toolchain/toolchain.nix), and [SDK construction](https://github.com/PureDarwin/PureDarwin/blob/0163b2db225b85e3bf96fc25646ea290105ac298/nix/pkgs/toolchain/apple-sdk-pinned.nix).
 
-## Build without starting a dependency build
+## Object-only compilation with the realized SDK
+
+[`compile_puredarwin_objects.py`](../../scripts/compile_puredarwin_objects.py) provides an earlier compile gate using the SDK and its already-realized native Clang input. It reuses the executable builder's pinned source/submodule/lock checks and Mach-O parser. Its offline Nix evaluation selects only `apple-sdk` and that input's unwrapped `.cc` output, with lock updates and import-from-derivation disabled. Missing inputs return `blocked`; the helper never fetches or builds a dependency.
+
+Run the default preflight first:
+
+```sh
+python3 scripts/compile_puredarwin_objects.py \
+  --puredarwin-source /path/to/pinned-puredarwin
+```
+
+After `ready_to_compile`, explicitly request compilation into a **new** private directory whose parent exists:
+
+```sh
+python3 scripts/compile_puredarwin_objects.py \
+  --puredarwin-source /path/to/pinned-puredarwin \
+  --compile --output-dir /path/to/private-runs/object-compile-01
+```
+
+The helper snapshots both C sources, then invokes unwrapped Clang with `--target=x86_64-apple-macosx26.5`, the selected `-isysroot`, C11, strict warnings and `-c`. It records source/compiler/SDK identities and hashes, exact commands and parsed object metadata in `result.json`. It requires thin x86_64 `MH_OBJECT` output and refuses existing output directories without modifying their contents. Optional `--llvm-nm /path/to/existing/llvm-nm` records actual undefined-symbol output; it never acquires that tool, and a supplied tool's failure remains a failure.
+
+### Observed result on 2026-11-14
+
+The SDK-only build had already completed in **75.11 seconds**, with pinned source and header checks recorded in the [source/SDK receipt](evidence/source-preflight-2026-11-14.json). The retained development host then ran the object helper from Burdettie `89130c63edd0226933e8abd2ff556d3d0c4d5fe0`: offline preflight passed in **12 seconds**, and compilation passed in **11 seconds**, both with exit status 0. These phases used the existing unwrapped **Clang 21.1.8** SDK input and performed no downloads or dependency realization. See the [object receipt](evidence/objects-2026-11-14.json) for artifact, source, compiler, header and log identities.
+
+| Captured artifact | Bytes | Parsed architecture/type |
+| --- | ---: | --- |
+| `simple_cli.o` | 768 | Thin x86_64 `MH_OBJECT` |
+| `m1_abi_probe.o` | 5,136 | Thin x86_64 `MH_OBJECT` |
+
+Both objects carry `LC_BUILD_VERSION` for macOS with minimum OS **26.5.0** and SDK field **0.0.0**. The latter is the observed object load-command value; SDK provenance comes from the separately recorded pinned derivation and header hashes. It does not satisfy or change the executable builder's stricter SDK load-command requirement below.
+
+No LLVM nm was supplied. Symbol inspection therefore remains `not_run`, and the tool identity and undefined-symbol lists remain `null`. Empty direct-library dependency lists in relocatable objects do not establish that their imports can be linked or resolved. No executable was linked or launched, and no allocation, file, thread or exit behavior was tested on the selected target. The report keeps linking, selected-guest execution, Burdettie execution and enforcement at `not_run` even with status `objects_compiled_and_inspected`.
+
+## Executable build without starting a dependency build
 
 [`build_puredarwin_fixtures.py`](../../scripts/build_puredarwin_fixtures.py) requires a complete, clean checkout at the selected revision, matching submodules, Nix with already-cached locked evaluation inputs, and the four already-realized outputs above. A depth-one checkout is supported: its exact-revision Git URL explicitly enables `submodules=1&shallow=1`, so Nix accepts the shallow source without requiring history expansion. It resolves the package output/derivation identities with offline Nix evaluation and disables import-from-derivation. It never invokes `nix build`, installs a toolchain, downloads a closure, updates a lock or launches a guest. Evaluation can materialize Nix source/derivation metadata; it is not a guarantee of zero Nix-store writes.
 
@@ -85,22 +120,41 @@ That second execution must produce the corresponding `mode=read` and cleanup mar
 
 ## Runtime ABI assessment and remaining port work
 
-This is a source assessment at Burdettie `4e804df245b122137d67c45f9d026e261ac68e42`, not a claim that a Rust binary has linked or run on the candidate.
+The baseline source assessment was made at Burdettie `4e804df245b122137d67c45f9d026e261ac68e42`. [PR #7](https://github.com/burdettadam/burdettie-os/pull/7), at `f6918f029c65144eea3ca7e3b437a58bdefebb4e`, now contains separately reviewed runtime prerequisites. It is not merged into this platform branch. Neither the assessment nor those host tests claim that a Rust binary has linked or run on the selected candidate.
 
 | Area | Concrete source finding | Required evidence or change |
 | --- | --- | --- |
-| Narrow CLI | `macho-inspect` defaults to no `gui` feature, but it unconditionally depends on `macho-runtime` and `cf-lite`. `cf-lite` has a non-optional macOS `rfd` dependency; the lock includes `objc2-app-kit`, Foundation and CoreFoundation for `rfd`. | Inspect the actual macOS target link and factor desktop-only host services behind explicit features if necessary. `--no-default-features` alone is not a verified AppKit-free runtime build. |
+| Narrow CLI | The baseline pulled `rfd` and AppKit through `cf-lite`. PR #7 makes native dialogs optional through the complete CLI/runtime dependency path while preserving defaults. Three locked Darwin dependency-graph checks and the new no-dialog tests pass on macOS CI. | Review/integrate the feature gate, then inspect the actual selected-target link. The AppKit-free graph is not a verified PureDarwin binary or runtime. |
 | Platform services | `platform-darwin-host` calls mmap/mprotect, pthread primitives, Mach clocks, `arc4random_buf`, dlopen/dlsym and libunwind dynamic-section registration. | Confirm the selected libSystem/dyld/unwind exports and behavior. Record unresolved symbols; do not replace them with successful stubs. |
 | Rust standard library | The repository pins Rust 1.93.0; an ordinary `x86_64-apple-darwin` standard library targets Apple's platform assumptions. | Bind Rust std and compiler/linker provenance to the selected target, inspect generated loads/imports and run a minimal Rust std probe before the larger runtime. No cross-target Rust build has been qualified here. |
 | Guest entry | `macho-exec/src/entry.rs` contains an x86_64 entry convention; the interpreted pipeline is ARM64. | Exercise native x86_64 mapping, fixups, constructors, argument passing and return in the guest. Existing ARM64 interpreter success does not establish that route. |
-| Exit cleanup | `libsystem-shims/src/lifecycle.rs` registers `atexit` callbacks, but the inspected runtime has no production call to `run_atexit_handlers`; its `exit` shim explicitly bypasses cleanup and calls host `_exit`. | Treat a missing cleanup marker as a runtime compatibility failure. Implement worker-owned cleanup while guest code remains valid; do not run stale callbacks in the supervisor. |
+| Exit cleanup | Normal `atexit`/C++ cleanup remains unimplemented. PR #7 separates immediate exit without flushing and intercepts actual interpreter exit shim addresses before host FFI. Native exit still terminates the embedding process. | Treat a missing cleanup marker as a runtime compatibility failure. Implement launch-owned callbacks with architecture/DSO/image lifetime and drain before unmapping; interpreted callbacks must execute through the interpreter. Do not drain stale process-global callbacks in the supervisor. |
 | Runtime framework loading | Foundation/CoreFoundation/CoreGraphics paths are opened in several compatibility components. | Determine which calls occur on the chosen console route and which require a source-built replacement or a properly reported unsupported capability. |
 | Display/session | `window-backend-darwin` uses `winit` and `softbuffer`; it does not establish a bare-PureDarwin session. | Qualify an explicit renderer/input integration separately. No GUI success is inferred from the console probe. |
 
 Repository entry points: [CLI dependencies](../../crates/macho-inspect/Cargo.toml), [runtime dependencies](../../crates/macho-runtime/Cargo.toml), [cf-lite dependencies](../../crates/cf-lite/Cargo.toml), [lock](../../Cargo.lock), [Darwin platform](../../crates/platform-darwin-host/src/lib.rs), [unwind registration](../../crates/platform-darwin-host/src/unwind.rs), [native entry](../../crates/macho-exec/src/entry.rs), [exit lifecycle](../../crates/libsystem-shims/src/lifecycle.rs), and [display dependencies](../../crates/window-backend-darwin/Cargo.toml).
 
+PR #7's [headless CLI contract](https://github.com/burdettadam/burdettie-os/blob/f6918f029c65144eea3ca7e3b437a58bdefebb4e/docs/HEADLESS_CLI.md) and [exit lifecycle requirements](https://github.com/burdettadam/burdettie-os/blob/f6918f029c65144eea3ca7e3b437a58bdefebb4e/docs/RUNTIME_EXIT_LIFECYCLE.md) describe the changes and remaining ownership limits. Its macOS build/tests, FFI, quickstart, Docker and Linux ARM64 interpreter jobs pass; dependency-policy scanning still fails on the existing unmaintained `ttf-parser` advisory. No check is suppressed and no guest qualification is inferred.
+
 ## Validation performed for this change
 
-The focused suite has 20 tests. It covers wrong-architecture/version/dependency rejection, malformed commands, lock-input indirection, pinned shallow Git input handling, Nix's required feature version, refusal of missing pinned inputs, retained-output preservation, and native-host C write/read/negative cases. The C probe compiles with `-std=c11 -Wall -Wextra -Werror -pthread` on the Linux development host. Its exact file bytes and cleanup markers pass there.
+The executable fixture suite has **20 passing tests**. It covers wrong-architecture/version/dependency rejection, malformed commands, lock-input indirection, pinned shallow Git input handling, Nix's required feature version, refusal of missing pinned inputs, retained-output preservation, and native-host C write/read/negative cases. The C probe compiles with `-std=c11 -Wall -Wextra -Werror -pthread` on the Linux development host. Its exact file bytes and cleanup markers pass there.
 
-An actual no-build preflight against the sparse pinned source inspection checkout returns `blocked` for the deliberately uninitialized submodule. Nix and the realized candidate outputs are also absent from that development environment. Offline Nix resolution, selected-target compilation, direct Darwin execution, Burdettie execution and reboot persistence remain unrun. Neither these 20 tests nor this document closes M1.
+The object helper adds **9 passing focused tests** for its offline input gate, object architecture/type checks, explicit compilation boundary, source snapshots, retained-output preservation, and compiler/optional-nm failures. The complete current script suite passes **63 tests**. Those workflow tests use synthetic Mach-O inputs; the separately captured objects above provide the actual selected-SDK compilation evidence. Their captured bytes, hashes, parsed metadata and source snapshots were checked against the retained report.
+
+The original no-build preflight against the sparse inspection checkout returned `blocked` for its deliberately uninitialized submodule. The retained AWS host now has the complete pinned checkout, exact corecrypto submodule and Nix 2.28.3. A no-build evaluation of the four inputs passed without a lock update or import-from-derivation; see the [AWS findings](M1_AWS_DEVELOPMENT.md) and [source receipt](evidence/source-preflight-2026-11-14.json).
+
+The per-output plans below overlap; do not sum their download or unpacked sizes. They are pre-build estimates, not measured peak storage.
+
+| Requested output | Local derivations | Fetch paths | Download MiB | Unpacked MiB |
+| --- | ---: | ---: | ---: | ---: |
+| `apple-sdk` | 3 | 72 | 412.25 | 1908.90 |
+| `native-ld` | 23 | 262 | 768.52 | 2993.90 |
+| `darwin-cross-toolchain` | 27 | 262 | 768.52 | 2993.90 |
+| `libsystem` / all four | 32 | 264 | 916.73 | 4811.47 |
+
+Two concrete constraints remain beyond those estimates. The pinned compiler-rt recipe unpacks the LLVM monorepo while building its builtins subset, and the generic PureDarwin build uses Debug configuration. Also, raw Ninja invocations in `native-ld.nix`, `compiler-rt.nix` and `build.nix` bypass Nixpkgs' default Ninja build-phase concurrency argument: `--cores 1` alone does not limit their compiler process count. Keep larger realization blocked until those peak-space and job-concurrency bounds are addressed explicitly. The SDK's small MIG compiler uses the source's `pcc.sh` helper, which does honor `NIX_BUILD_CORES`.
+
+The four outputs are link inputs, not a complete guest process closure. The selected libSystem source intentionally permits unresolved Objective-C runtime references and uses a separately loaded matching libobjc; its real loader requirements must be checked in the selected image. Header/export presence does not prove implementation behavior. Sources: [compiler-rt](https://github.com/PureDarwin/PureDarwin/blob/0163b2db225b85e3bf96fc25646ea290105ac298/nix/pkgs/toolchain/compiler-rt.nix), [native linker](https://github.com/PureDarwin/PureDarwin/blob/0163b2db225b85e3bf96fc25646ea290105ac298/nix/pkgs/toolchain/native-ld.nix), [generic build](https://github.com/PureDarwin/PureDarwin/blob/0163b2db225b85e3bf96fc25646ea290105ac298/build.nix), [MIG compiler](https://github.com/PureDarwin/PureDarwin/blob/0163b2db225b85e3bf96fc25646ea290105ac298/nix/pkgs/toolchain/migcom.nix), [libSystem linkage/startup contract](https://github.com/PureDarwin/PureDarwin/blob/0163b2db225b85e3bf96fc25646ea290105ac298/src/Libraries/libSystem/stub/CMakeLists.txt), and [libobjc dependencies](https://github.com/PureDarwin/PureDarwin/blob/0163b2db225b85e3bf96fc25646ea290105ac298/nix/pkgs/apple/libobjc.nix).
+
+Selected-SDK object compilation has passed. Executable linking, import resolution, direct execution in the selected guest, execution through Burdettie and security enforcement remain open gates. The successful older-image shell/file experiment is separate bootstrap evidence. M1 remains in progress.
