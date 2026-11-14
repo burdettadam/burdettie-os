@@ -1,5 +1,3 @@
-use ab_glyph::{Font as AbFont, ScaleFont};
-
 use crate::font::TextRun;
 use crate::font_manager::{FontFace, FontManager};
 use crate::unicode::{is_combining_mark, is_zero_width, normalize_nfc};
@@ -64,7 +62,7 @@ pub fn layout_attributed<'a>(
     // Layout the normalized characters of each style span.
     let mut glyphs = Vec::new();
     let mut cursor_x = 0.0f64;
-    let mut prev_glyph: Option<(ab_glyph::GlyphId, usize, f64)> = None;
+    let mut prev_glyph: Option<(crate::GlyphId, usize, f64)> = None;
     let mut last_base_x = 0.0f64;
     let mut max_ascent = 0.0f64;
     let mut max_line_height = 0.0f64;
@@ -98,14 +96,14 @@ pub fn layout_attributed<'a>(
             .unwrap_or((0, default_size, None));
 
         let face = font_list[font_index];
-        let ab_font = face.inner();
-        let scaled = ab_font.as_scaled(size as f32);
+        let font_data = face.inner();
+        let scaled = font_data.as_scaled(size as f32);
         for ch in normalize_nfc(text_span).chars() {
             if is_zero_width(ch) {
                 continue;
             }
-            let glyph_id = ab_font.glyph_id(ch);
-            let missing = glyph_id == ab_glyph::GlyphId(0);
+            let glyph_id = font_data.glyph_id(ch);
+            let missing = glyph_id == crate::GlyphId(0);
 
             if is_combining_mark(ch) {
                 glyphs.push(LayoutGlyph {

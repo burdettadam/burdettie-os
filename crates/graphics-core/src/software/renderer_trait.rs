@@ -1,7 +1,5 @@
 //! `impl Renderer for SoftwareRenderer` - all Renderer trait methods.
 
-use ab_glyph::Font as AbFont;
-
 use crate::color::Color;
 use crate::font::Font;
 use crate::font_manager::FontManager;
@@ -224,13 +222,13 @@ impl Renderer for SoftwareRenderer<'_> {
             }
 
             let face = layout.fonts[g.font_index];
-            let ab_font = face.inner();
+            let font_data = face.inner();
             let glyph = g.glyph_id.with_scale_and_position(
                 g.size as f32,
-                ab_glyph::point((origin.x + g.x) as f32, (origin.y + g.y) as f32),
+                ab_glyph_rasterizer::point((origin.x + g.x) as f32, (origin.y + g.y) as f32),
             );
 
-            if let Some(outlined) = ab_font.outline_glyph(glyph) {
+            if let Some(outlined) = font_data.outline_glyph(glyph) {
                 let bounds = outlined.px_bounds();
                 outlined.draw(|rx, ry, coverage| {
                     self.blend_pixel(

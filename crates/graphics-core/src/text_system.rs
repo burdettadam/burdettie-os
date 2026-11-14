@@ -1,7 +1,7 @@
 //! Cosmic-text based text system for shaped text layout and rendering.
 //!
 //! Provides a global `FontSystem` + `SwashCache` pair that uses the same
-//! embedded DejaVu fonts as the ab_glyph `FontManager`. Consumers call
+//! embedded DejaVu fonts as the Fontations-backed `FontManager`. Consumers call
 //! `draw_shaped_text` to render text onto a `Surface` pixel buffer, or
 //! `measure_shaped_text` / `layout_shaped_text` for measurement.
 
@@ -137,8 +137,8 @@ pub fn measure_shaped_text(
 
     with_text_system(|fs, _sc| {
         let mut buffer = Buffer::new(fs, metrics);
-        buffer.set_size(fs, buf_width, None);
-        buffer.set_text(fs, text, &attrs, Shaping::Advanced, None);
+        buffer.set_size(buf_width, None);
+        buffer.set_text(text, &attrs, Shaping::Advanced, None);
         buffer.shape_until_scroll(fs, false);
 
         let mut max_w: f32 = 0.0;
@@ -195,8 +195,8 @@ pub fn draw_shaped_text(
 
     with_text_system(|fs, sc| {
         let mut buffer = Buffer::new(fs, metrics);
-        buffer.set_size(fs, buf_width, None);
-        buffer.set_text(fs, text, &attrs, Shaping::Advanced, None);
+        buffer.set_size(buf_width, None);
+        buffer.set_text(text, &attrs, Shaping::Advanced, None);
         buffer.shape_until_scroll(fs, false);
 
         let sw = surface_width as i32;
@@ -285,8 +285,8 @@ pub fn editor_create(view_id: u64, text: &str, font_size: f64, max_width: f64) {
     with_text_system(|fs, _sc| {
         let mut editor = Editor::new(Buffer::new(fs, metrics));
         editor.with_buffer_mut(|buf| {
-            buf.set_size(fs, Some(max_width as f32), None);
-            buf.set_text(fs, text, &attrs, Shaping::Advanced, None);
+            buf.set_size(Some(max_width as f32), None);
+            buf.set_text(text, &attrs, Shaping::Advanced, None);
             buf.shape_until_scroll(fs, false);
         });
         let state = EditorState {
@@ -314,7 +314,7 @@ pub fn editor_set_text(view_id: u64, text: &str) {
         let mut guard = editors_map();
         if let Some(state) = guard.as_mut().and_then(|m| m.get_mut(&view_id)) {
             state.editor.with_buffer_mut(|buf| {
-                buf.set_text(fs, text, &attrs, Shaping::Advanced, None);
+                buf.set_text(text, &attrs, Shaping::Advanced, None);
                 buf.shape_until_scroll(fs, false);
             });
         }
@@ -362,7 +362,7 @@ pub fn editor_set_width(view_id: u64, max_width: f64) {
         let mut guard = editors_map();
         if let Some(state) = guard.as_mut().and_then(|m| m.get_mut(&view_id)) {
             state.editor.with_buffer_mut(|buf| {
-                buf.set_size(fs, Some(max_width as f32), None);
+                buf.set_size(Some(max_width as f32), None);
                 buf.shape_until_scroll(fs, false);
             });
         }

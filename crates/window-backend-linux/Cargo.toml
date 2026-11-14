@@ -10,7 +10,7 @@ rust-version.workspace = true
 window-backend = { workspace = true }
 graphics-core  = { workspace = true }
 log            = { workspace = true }
-winit          = "0.30"
+winit = { workspace = true }
 softbuffer     = "0.4"
 
 [lints]

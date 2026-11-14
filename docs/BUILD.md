@@ -7,6 +7,15 @@
 - **Xcode Command Line Tools** — `xcode-select --install`
 - **Docker** (optional) — for containerized builds of cross-platform crates
 
+Linux GUI builds also need FreeType and Fontconfig development packages for
+Wayland window-title rendering. On Debian/Ubuntu install `pkg-config`,
+`libfreetype-dev`, and `libfontconfig1-dev`, in addition to the existing
+Wayland/X11 prerequisites. The Linux runtime Dockerfiles include these build
+dependencies; the GUI runtime image includes `libfreetype6` and
+`libfontconfig1`. This does not add a native font dependency to macOS builds.
+See [FONT_BACKENDS.md](FONT_BACKENDS.md) for parser provenance and regression
+coverage.
+
 ## Quick Start
 
 ```bash

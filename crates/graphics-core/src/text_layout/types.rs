@@ -14,8 +14,8 @@ use crate::color::Color;
 /// A positioned glyph ready for rasterization.
 #[derive(Debug, Clone)]
 pub struct LayoutGlyph {
-    /// The ab_glyph glyph ID.
-    pub glyph_id: ab_glyph::GlyphId,
+    /// The font-local glyph index.
+    pub glyph_id: crate::GlyphId,
     /// X position (left edge of glyph bounding box) in pixels.
     pub x: f64,
     /// Y position (top edge of glyph bounding box) in pixels.

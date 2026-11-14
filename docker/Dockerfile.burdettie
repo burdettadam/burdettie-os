@@ -57,6 +57,8 @@ WORKDIR /workspace
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
+    libfreetype-dev \
+    libfontconfig1-dev \
     libwayland-dev \
     libxkbcommon-dev \
     libx11-dev \
@@ -97,6 +99,8 @@ ARG TARGETARCH
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libstdc++6 \
+    libfreetype6 \
+    libfontconfig1 \
     libatomic1 \
     file \
     libbz2-1.0 \

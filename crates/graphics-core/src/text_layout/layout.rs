@@ -1,5 +1,3 @@
-use ab_glyph::{Font as AbFont, ScaleFont};
-
 use crate::font_manager::FontFace;
 use crate::unicode::{is_combining_mark, is_zero_width, normalize_nfc};
 
@@ -12,13 +10,13 @@ use super::types::{LayoutGlyph, TextLayout, WrapMode};
 /// over the preceding base character. Zero-width formatting characters are skipped.
 pub fn layout_single_line(text: &str, font: &FontFace, size: f64) -> TextLayout {
     let normalized = normalize_nfc(text);
-    let ab_font = font.inner();
-    let scaled = ab_font.as_scaled(size as f32);
+    let font_data = font.inner();
+    let scaled = font_data.as_scaled(size as f32);
     let ascent = scaled.ascent() as f64;
 
     let mut glyphs = Vec::new();
     let mut cursor_x = 0.0f64;
-    let mut prev_glyph: Option<ab_glyph::GlyphId> = None;
+    let mut prev_glyph: Option<crate::GlyphId> = None;
     let mut last_base_x = 0.0f64;
 
     for ch in normalized.chars() {
@@ -26,8 +24,8 @@ pub fn layout_single_line(text: &str, font: &FontFace, size: f64) -> TextLayout 
             continue;
         }
 
-        let glyph_id = ab_font.glyph_id(ch);
-        let missing = glyph_id == ab_glyph::GlyphId(0);
+        let glyph_id = font_data.glyph_id(ch);
+        let missing = glyph_id == crate::GlyphId(0);
 
         if is_combining_mark(ch) {
             // Position combining mark over the last base character (no advance)
@@ -83,8 +81,8 @@ pub fn layout_wrapped(
     wrap: WrapMode,
 ) -> TextLayout {
     let normalized = normalize_nfc(text);
-    let ab_font = font.inner();
-    let scaled = ab_font.as_scaled(size as f32);
+    let font_data = font.inner();
+    let scaled = font_data.as_scaled(size as f32);
     let metrics = font.metrics(size);
     let line_height = metrics.line_height();
     let ascent = scaled.ascent() as f64;
@@ -99,7 +97,7 @@ pub fn layout_wrapped(
             // No wrapping — lay out the entire line without breaking
             layout_line_no_wrap(
                 text_line,
-                ab_font,
+                font_data,
                 &scaled,
                 size,
                 ascent,
@@ -111,7 +109,7 @@ pub fn layout_wrapped(
         } else if wrap == WrapMode::Word {
             layout_line_word_wrap(
                 text_line,
-                ab_font,
+                font_data,
                 &scaled,
                 size,
                 ascent,
@@ -124,7 +122,7 @@ pub fn layout_wrapped(
         } else {
             layout_line_char_wrap(
                 text_line,
-                ab_font,
+                font_data,
                 &scaled,
                 size,
                 ascent,
