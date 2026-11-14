@@ -12,6 +12,8 @@ on:
       - 'scripts/compile_puredarwin_objects.py'
       - 'scripts/plan_puredarwin_linker.py'
       - 'scripts/puredarwin_native_linker.nix'
+      - 'scripts/plan_puredarwin_libraries.py'
+      - 'scripts/puredarwin_libraries.nix'
       - 'fixtures/m1_abi_probe/probe.c'
       - 'fixtures/simple_cli/main.c'
       - 'scripts/tests/test_collect_m1_inventory.py'
@@ -20,6 +22,7 @@ on:
       - 'scripts/tests/test_build_puredarwin_fixtures.py'
       - 'scripts/tests/test_compile_puredarwin_objects.py'
       - 'scripts/tests/test_plan_puredarwin_linker.py'
+      - 'scripts/tests/test_plan_puredarwin_libraries.py'
   pull_request:
     paths:
       - '.github/workflows/m1-contracts.yml'
@@ -31,6 +34,8 @@ on:
       - 'scripts/compile_puredarwin_objects.py'
       - 'scripts/plan_puredarwin_linker.py'
       - 'scripts/puredarwin_native_linker.nix'
+      - 'scripts/plan_puredarwin_libraries.py'
+      - 'scripts/puredarwin_libraries.nix'
       - 'fixtures/m1_abi_probe/probe.c'
       - 'fixtures/simple_cli/main.c'
       - 'scripts/tests/test_collect_m1_inventory.py'
@@ -39,6 +44,7 @@ on:
       - 'scripts/tests/test_build_puredarwin_fixtures.py'
       - 'scripts/tests/test_compile_puredarwin_objects.py'
       - 'scripts/tests/test_plan_puredarwin_linker.py'
+      - 'scripts/tests/test_plan_puredarwin_libraries.py'
 
 permissions:
   contents: read
