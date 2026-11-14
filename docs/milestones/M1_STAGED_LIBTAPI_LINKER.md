@@ -65,6 +65,15 @@ working native linker. The [shared output inspector](M1_STAGED_LIBRARIES.md)
 defines the separate live registration, dynamic-binding and smoke checks that
 must follow a successful realization.
 
+A later [terminal observation](evidence/staged-native-linker-terminal-observation-2026-11-14.json)
+records the native driver's reported 459.99-second build and 14.29-second output
+inspection, finished at 21:08:52 UTC. The 32-file host archive was created and
+its manifest retrieved, but the browser connection was lost before archive
+transfer. Complete result/log/sidecar recovery and independent review remain
+pending; the reported success does not establish a recovered output audit or
+any downstream/guest result. This new observation leaves the earlier metadata
+plan's `planned_not_built` scope unchanged.
+
 ### Inputs for a plan
 
 Keep these private files together with the original build evidence:

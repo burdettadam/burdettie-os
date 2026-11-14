@@ -176,13 +176,19 @@ passed in **4,082.6 seconds**, including installed library/header and NAR
 inspection, while keeping the reserve and prior failed tree. A fresh
 [native-linker metadata plan](evidence/staged-linker-plan-2026-11-14.json) then
 passed in **32.21 seconds**, with nine local derivations and no fetched paths.
-This removes the earlier libtapi build blocker for the new staged dependency;
-it does not realize the native linker. The [new downstream
-composition](M1_STAGED_LIBRARIES.md) requires actual successful native output
-inspection before cross-toolchain, compiler-rt or libSystem planning. The old
-fixture helper continues to resolve its original package map; using the staged
-chain for executable compilation needs a separately reviewed opt-in entry point
-after those outputs exist.
+This removes the earlier libtapi build blocker for the new staged dependency.
+The subsequent native-linker driver [reports successful build and
+inspection](evidence/staged-native-linker-terminal-observation-2026-11-14.json)
+in **459.99 seconds** and **14.29 seconds**, finishing at **21:08:52 UTC**.
+The host captured all 32 selected result/log/inspection files, but the full
+archive remains unretrieved after a browser connection loss. The current status
+is `driver_reported_success_full_recovery_pending`: NAR, ELF/TAPI binding,
+complete logs and resource history still need independent review. The [new
+downstream composition](M1_STAGED_LIBRARIES.md) also requires fresh successful
+native-output verification before cross-toolchain, compiler-rt or libSystem
+planning. The old fixture helper continues to resolve its original package map;
+using the staged chain for executable compilation needs a separately reviewed
+opt-in entry point after those outputs exist.
 
 The four outputs are link inputs, not a complete guest process closure. The selected libSystem source intentionally permits unresolved Objective-C runtime references and uses a separately loaded matching libobjc; its real loader requirements must be checked in the selected image. Header/export presence does not prove implementation behavior. Sources: [compiler-rt](https://github.com/PureDarwin/PureDarwin/blob/0163b2db225b85e3bf96fc25646ea290105ac298/nix/pkgs/toolchain/compiler-rt.nix), [native linker](https://github.com/PureDarwin/PureDarwin/blob/0163b2db225b85e3bf96fc25646ea290105ac298/nix/pkgs/toolchain/native-ld.nix), [generic build](https://github.com/PureDarwin/PureDarwin/blob/0163b2db225b85e3bf96fc25646ea290105ac298/build.nix), [MIG compiler](https://github.com/PureDarwin/PureDarwin/blob/0163b2db225b85e3bf96fc25646ea290105ac298/nix/pkgs/toolchain/migcom.nix), [libSystem linkage/startup contract](https://github.com/PureDarwin/PureDarwin/blob/0163b2db225b85e3bf96fc25646ea290105ac298/src/Libraries/libSystem/stub/CMakeLists.txt), and [libobjc dependencies](https://github.com/PureDarwin/PureDarwin/blob/0163b2db225b85e3bf96fc25646ea290105ac298/nix/pkgs/apple/libobjc.nix).
 

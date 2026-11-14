@@ -4,7 +4,12 @@ This is an explicit **plan-only** path. It requires an actual successful,
 inspected native-linker build and verifies its currently realized output before
 planning a downstream stage. Synthetic tests, an existing output directory, a
 running build, a TAPI-only success, or a successful metadata plan do not satisfy
-that gate. No live native or downstream result is asserted by this change.
+that gate. The later [native terminal
+observation](evidence/staged-native-linker-terminal-observation-2026-11-14.json)
+reports build/inspection success, but its full result, sidecar and logs remain
+unretrieved. The public status is `driver_reported_success_full_recovery_pending`.
+That partial observation does not satisfy the consumer's evidence/fresh-output
+gates; no actual downstream plan or realization is claimed.
 
 The existing linker, libraries, object and fixture helpers retain their original
 bytes and defaults. The new files are
@@ -52,11 +57,13 @@ and [generic build recipe](https://github.com/PureDarwin/PureDarwin/blob/0163b2d
 
 ## Required native success receipt
 
-A future separately reviewed native build driver must produce schema version 1,
+A separately reviewed native build driver must produce schema version 1,
 scope `staged_libtapi_native_linker_build`, status
 `staged_libtapi_native_linker_built`, `realization_command_succeeded: true`, and
-`output_inspection_status: "pass"`. These are prospective interface names, not
-an observation that such a build has completed.
+`output_inspection_status: "pass"`. The first terminal status projection reports
+those values. Its complete receipt and inspection sidecar still require
+recovery, verification and independent review before use by this consumer;
+the public summary is not a substitute for those inputs.
 
 The required receipt contains:
 
@@ -106,7 +113,7 @@ earlier revision.
 ### Shared output inspection
 
 After validating the source/plan and successfully realizing the candidate, a
-future native driver can call:
+native driver can call:
 
 ```python
 inspection = inspect_native_output(

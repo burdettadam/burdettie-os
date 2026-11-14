@@ -152,6 +152,26 @@
       "native_linker_realization": "not_run",
       "build_peak_capacity_qualified": false,
       "evidence": "evidence/staged-linker-plan-2026-11-14.json"
+    },
+    "staged_native_linker_terminal_observation": {
+      "status": "driver_reported_success_full_recovery_pending",
+      "burdettie_revision": "dd1c5710c12bdcf23ba091eaa09c859a9a7fec2a",
+      "driver_reported_status": "staged_libtapi_native_linker_built",
+      "started_at": "2026-11-14T21:00:39.342641+00:00",
+      "finished_at": "2026-11-14T21:08:52.160253+00:00",
+      "build_duration_seconds": 459.99,
+      "inspection_duration_seconds": 14.29,
+      "realization": "driver_reported_pass_full_recovery_pending",
+      "output_inspection": "driver_reported_pass_full_recovery_pending",
+      "full_archive_retrieved": false,
+      "full_result_and_log_retrieved": false,
+      "independent_output_audit": "pending_full_recovery",
+      "next_consumer_fresh_verification": "not_run",
+      "captured_selected_file_count": 32,
+      "missing_selected_files": 0,
+      "reported_capture_consistency_errors": 0,
+      "future_build_capacity_qualified": false,
+      "evidence": "evidence/staged-native-linker-terminal-observation-2026-11-14.json"
     }
   },
   "vm": {
@@ -279,7 +299,7 @@
   "mac_hardware_required_for_m1": false,
   "development_host": {
     "provider": "existing_aws_free_plan_instance",
-    "role": "bootstrap_sdk_objects_staged_libtapi_and_native_linker_planning",
+    "role": "bootstrap_sdk_objects_staged_libtapi_and_native_linker_terminal_observation",
     "os": "Ubuntu 24.04",
     "architecture": "x86_64",
     "vcpus": 2,
@@ -297,6 +317,18 @@
       "evidence": "evidence/libtapi-plan-2026-11-14.json"
     },
     "latest_capacity_checkpoint": {
+      "observed_at": "2026-11-14T21:09:58.386178+00:00",
+      "scope": "native_terminal_status_read_not_build_peak_or_current_census_after_connection_loss",
+      "free_disk_bytes": 9199788032,
+      "minimum_free_disk_reserve_bytes": 8589934592,
+      "remaining_above_reserve_bytes": 609853440,
+      "available_memory_bytes": 3636842496,
+      "free_inodes": 4298559,
+      "new_build_capacity_qualified": false,
+      "evidence": "evidence/staged-native-linker-terminal-observation-2026-11-14.json",
+      "prior_capacity_checkpoints_retained": true
+    },
+    "staged_native_plan_capacity_checkpoint": {
       "observed_at": "2026-11-14T20:18:42.772359+00:00",
       "scope": "staged_native_linker_metadata_plan_finish",
       "free_disk_bytes": 9289572352,

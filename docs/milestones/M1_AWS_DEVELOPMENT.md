@@ -1,6 +1,6 @@
 # M1 development on the retained AWS host
 
-Status on 2026-11-14 UTC: **the staged libtapi build and output inspection passed, and the following staged-native-linker metadata plan passed. M1 remains in progress.** The original bootstrap has been retrieved and diagnosed; its corrected, bounded PureDarwin 20.5 follow-up passes shell execution and exact-file persistence across two QEMU processes. The selected source-derived SDK and two Mach-O objects also built successfully. The earlier native-linker attempt remains a retained wall-time failure. The new native linker has not yet been realized. Selected-image construction, executable linking, Burdettie runtime execution, Apple applications, display/session and enforcement remain separate gates.
+Status on 2026-11-14 UTC: **the staged-native-linker driver reports successful realization and output inspection; complete evidence recovery is pending. M1 remains in progress.** The [terminal observation](evidence/staged-native-linker-terminal-observation-2026-11-14.json) records the reported result and host capture manifest. The full result, build log and inspection sidecars have not yet been transferred and independently reviewed. The staged libtapi build, selected SDK and two Mach-O objects have separately recovered successful evidence. The older PureDarwin 20.5 bootstrap passes its narrow shell/persistence scope; the original native-linker attempt remains a retained wall-time failure. Selected-image construction, executable linking, Burdettie runtime execution, Apple applications, display/session and enforcement remain separate gates.
 
 The [sanitized bootstrap receipt](evidence/bootstrap-2026-11-14.json) records all three outcomes, input identities, timings and log hashes. Raw logs, writable disks, private recovery records, cloud identifiers and command receipts are retained outside the public repository.
 
@@ -197,6 +197,43 @@ resolution of this staged libtapi and a bounded version probe before planning
 cross-toolchain, compiler-rt or libSystem. Their source tests do not supply that
 live result.
 
+## Native-linker terminal observation; full recovery pending
+
+The later build from `dd1c5710c12bdcf23ba091eaa09c859a9a7fec2a` started at
+**21:00:39 UTC** and reports completion at **21:08:52 UTC**. Its bounded status
+reader observed a passing realization phase of **459.99 seconds** and a passing
+output-inspection phase of **14.29 seconds**, both with integer-zero exits and
+no recorded timeout. The [additive terminal
+observation](evidence/staged-native-linker-terminal-observation-2026-11-14.json)
+keeps the status **`driver_reported_success_full_recovery_pending`**.
+
+At **21:09:58 UTC**, the exact unit was absent/inactive/dead with both reported
+PIDs zero. Those collected-unit defaults do not establish success; the separate
+retained driver-result summary supplies the reported outcome. The reader saw
+**9,199,788,032 free disk bytes**, **3,636,842,496 available memory bytes** and
+k3s active. Its cgroup was no longer available. These are that read's host
+observations, not the build's minimum free space, peak memory or a current
+census after the connection loss.
+
+The **21:11:02 UTC** terminal capture created a **117,306-byte compressed
+archive** containing a **700,539-byte raw bundle**, with metadata for all
+**32 selected files**, no missing selected files and no reported receipt
+consistency errors. The manifest binds the **49,425-byte driver result**,
+**292,452-byte complete build log**, **754-byte registered-output sidecar**,
+inspection report and retained verification/loader/version streams. The public
+receipt records their hashes. The complete source manifests remain on the host.
+
+The originating browser connection became unavailable after retrieval of that
+capture manifest. No archive chunk recovery had begun at this checkpoint.
+Only the bounded status summary, its final 2,048-byte log tail and the capture
+manifest are locally available; the full archive and member bytes remain on
+the host. Recover and verify that existing archive before independently
+auditing NAR registration, output files, ELF/TAPI resolution, full logs and the
+complete resource history. A future downstream consumer must then perform its
+own fresh verification. No cross-toolchain plan, fixture link or selected-guest
+execution follows from this partial evidence, and no build needs to be rerun
+merely to retrieve it.
+
 ## Runtime and security work
 
 At the historical `aade8484a773bfa88433526a2039084cc31d6b20` checkpoint, [PR #7](https://github.com/burdettadam/burdettie-os/pull/7) combined optional native dialogs, launch-owned cleanup, #5 admission, #8 maintained fonts/CFConstantString alignment and the typed NSRange adapter. All seven full-CI jobs passed there, including Security Scanning, 17 admission tests, the 17-child lifecycle harness, six entitlement-report tests, two CFConstantString regressions and the 15-child NSRange harness on macOS ARM64. The separate Linux x86_64 regression established the exact-IMP adapter, and the original NSCharacterSet fixture passed its semantic exit check while its formatted variadic values remained corrupted.
@@ -211,7 +248,7 @@ The [backend allocation](../contracts/BACKEND_ALLOCATION.md) assigns 17 control 
 
 ## Remaining gates
 
-1. Realize and inspect the new native linker within the unchanged host budget, then assess each downstream input separately. The staged libtapi dependency has now built successfully; the earlier failed attempt and its tree remain preserved. The SDK and object-compilation stages have passed; linked executable fixtures remain unqualified.
+1. Recover the existing native terminal archive and independently review its complete result, log, registered output and inspection records. The driver reports build/inspection success, but the summary and capture manifest do not close that evidence gate. Then take a fresh census and assess each downstream input separately within the unchanged host bounds. Preserve the prior failed tree and all existing outputs; linked executable fixtures remain unqualified.
 2. Build and independently boot the selected image, including its own persistence, recovery and graceful-shutdown assessment.
 3. Qualify Rust standard-library/libSystem linkage and execute the x86_64 fixture through Burdettie inside that guest.
 4. Resolve the concrete worker-lifetime, display/input and backend gaps before advertising the corresponding behaviors.
