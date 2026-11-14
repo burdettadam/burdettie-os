@@ -345,6 +345,21 @@ impl TrustPolicy {
             }
         }
 
+        // Replacing a gate verdict must also replace the aggregate outcome.
+        // Preserve other gates' denials, but never retain a stale allow or deny.
+        report.denied_reasons = report
+            .decisions
+            .iter()
+            .filter_map(|decision| {
+                if let SecurityVerdict::Deny { reason } = &decision.verdict {
+                    Some(format!("{}: {reason}", decision.gate))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        report.allowed = report.denied_reasons.is_empty();
+
         // Override strip_dyld_env if CS_RESTRICT is set in the actual code signature
         if cs_info.restrict {
             report.strip_dyld_env = true;
