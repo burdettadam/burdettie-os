@@ -37,6 +37,7 @@ RUN cargo test --locked --no-run -p macho-runtime --test interpreted_objc_tests
 
 # Default: run the interpreted fixture tests (single-threaded for ObjC
 # runtime global state safety).
+# Print assertion diagnostics before a later fixture can terminate the process.
 CMD ["cargo", "test", "--locked", "-p", "macho-runtime", \
      "--test", "interpreted_objc_tests", \
-     "--", "--test-threads=1"]
+     "--", "--test-threads=1", "--nocapture"]
