@@ -87,7 +87,9 @@ def resolve_packages(source):
         raise BuildError("Nix is unavailable; no inputs were installed or fetched")
     if os.environ.get("NIX_REMOTE", "") not in ("", "local", "daemon"):
         raise BuildError("A remote Nix store is not supported by this local preflight")
-    flake = "git+" + source.as_uri() + f"?rev={PUREDARWIN_REVISION}&submodules=1"
+    # A bounded depth-one checkout is sufficient at this exact commit. Nix
+    # otherwise refuses shallow Git sources (or attempts to obtain history).
+    flake = source_flake_url(source)
     expression = "p: builtins.mapAttrs (n: v: { out = v.outPath; drv = v.drvPath; }) { inherit (p) "
     expression += " ".join(PACKAGES) + "; }"
     raw = command(["nix", "--extra-experimental-features", "nix-command flakes", "eval",
@@ -101,6 +103,10 @@ def resolve_packages(source):
         if not Path(record["out"]).is_dir():
             raise BuildError(f"Pinned {name} output is not realized; no dependency build was started")
     return packages
+
+
+def source_flake_url(source):
+    return "git+" + source.as_uri() + f"?rev={PUREDARWIN_REVISION}&submodules=1&shallow=1"
 
 
 def require_nix_version(version):

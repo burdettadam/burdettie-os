@@ -82,6 +82,11 @@ class FixtureInspectionTests(unittest.TestCase):
 
 
 class BuildSafetyTests(unittest.TestCase):
+    def test_source_url_accepts_pinned_shallow_checkout_without_unshallowing(self):
+        url = fixture.source_flake_url(Path("/source checkout/puredarwin"))
+        self.assertEqual(url, "git+file:///source%20checkout/puredarwin?rev="
+                         + fixture.PUREDARWIN_REVISION + "&submodules=1&shallow=1")
+
     def test_nix_version_floor_for_selected_flake_syntax(self):
         for version in ("nix (Nix) 2.18.1", "nix (Nix) 2.26.3", "unidentified"):
             with self.subTest(version=version), self.assertRaisesRegex(fixture.BuildError, "2.27"):
@@ -132,6 +137,7 @@ class BuildSafetyTests(unittest.TestCase):
             self.assertIn("--offline", argv)
             self.assertIn("--no-update-lock-file", argv)
             self.assertIn("allow-import-from-derivation", argv)
+            self.assertIn(fixture.source_flake_url(Path("/some/source")) + "#packages.x86_64-linux", argv)
             self.assertNotIn("build", argv)
 
     def test_link_never_masks_undefined_symbols(self):
