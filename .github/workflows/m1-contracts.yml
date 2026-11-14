@@ -8,9 +8,13 @@ on:
       - 'scripts/collect_m1_inventory.py'
       - 'scripts/m1_boot_preflight.py'
       - 'scripts/m1_vm_bootstrap.py'
+      - 'scripts/build_puredarwin_fixtures.py'
+      - 'fixtures/m1_abi_probe/probe.c'
+      - 'fixtures/simple_cli/main.c'
       - 'scripts/tests/test_collect_m1_inventory.py'
       - 'scripts/tests/test_m1_boot_preflight.py'
       - 'scripts/tests/test_m1_vm_bootstrap.py'
+      - 'scripts/tests/test_build_puredarwin_fixtures.py'
   pull_request:
     paths:
       - '.github/workflows/m1-contracts.yml'
@@ -18,9 +22,13 @@ on:
       - 'scripts/collect_m1_inventory.py'
       - 'scripts/m1_boot_preflight.py'
       - 'scripts/m1_vm_bootstrap.py'
+      - 'scripts/build_puredarwin_fixtures.py'
+      - 'fixtures/m1_abi_probe/probe.c'
+      - 'fixtures/simple_cli/main.c'
       - 'scripts/tests/test_collect_m1_inventory.py'
       - 'scripts/tests/test_m1_boot_preflight.py'
       - 'scripts/tests/test_m1_vm_bootstrap.py'
+      - 'scripts/tests/test_build_puredarwin_fixtures.py'
 
 permissions:
   contents: read
@@ -38,7 +46,9 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/burdettie-m1-venv"
           "$RUNNER_TEMP/burdettie-m1-venv/bin/python" -m pip install --disable-pip-version-check -r docs/contracts/requirements.txt
       - name: Check inventory, preflight and bootstrap harness behavior
-        run: python3 -m unittest discover -s scripts/tests -p 'test_*.py' -v
+        run: |
+          command -v cc
+          python3 -m unittest discover -s scripts/tests -p 'test_*.py' -v
       - name: Check contract consistency examples
         run: |
           "$RUNNER_TEMP/burdettie-m1-venv/bin/python" docs/contracts/validate_contract.py --self-test
