@@ -6,6 +6,7 @@
 
 mod color;
 mod font;
+mod font_backend;
 mod font_manager;
 mod geometry;
 pub mod gpu_stub;
@@ -25,6 +26,7 @@ pub mod gpu;
 
 pub use color::*;
 pub use font::*;
+pub use font_backend::GlyphId;
 pub use font_manager::*;
 pub use geometry::*;
 pub use gpu_stub::GpuStubRenderer;

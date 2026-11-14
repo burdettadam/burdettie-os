@@ -1,5 +1,6 @@
 [workspace]
 resolver = "2"
+exclude = ["vendor/cosmic-text"]
 members = [
     "crates/macho-types",
     "crates/macho-parse",
@@ -139,7 +140,8 @@ quick-xml = "0.41"
 rusqlite  = { version = "0.41", features = ["bundled", "fallible_uint"] }
 cassowary = "0.3.0"
 tiny-skia = "0.11"
-cosmic-text = "0.18"
+cosmic-text = "=0.19.0"
+winit = { version = "0.30", default-features = false, features = ["rwh_06", "x11", "wayland", "wayland-dlopen", "wayland-csd-adwaita-crossfont"] }
 # Open-source replacements for Apple framework stubs
 flate2    = "1"
 lz4_flex  = "0.11"
@@ -190,3 +192,8 @@ redundant_closure_for_method_calls = "warn"  # prefer method ref over closure
 # ── Deny — hard errors in CI ───────────────────────────────────
 dbg_macro                = "deny"    # no debug prints in committed code
 print_stderr             = "warn"    # prefer log::warn! over eprintln! where possible
+
+# Official cosmic-text 0.19.0 with its upstream fontdb 0.24 migration.
+# See vendor/README.md for the exact source, patch, and removal condition.
+[patch.crates-io]
+cosmic-text = { path = "vendor/cosmic-text" }

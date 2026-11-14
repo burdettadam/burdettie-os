@@ -7,7 +7,8 @@ license.workspace      = true
 rust-version.workspace = true
 
 [dependencies]
-ab_glyph = "0.2"
+ab_glyph_rasterizer = "0.1.10"
+skrifa = "0.50"
 cosmic-text = { workspace = true }
 unicode-normalization = "0.1"
 unicode-segmentation = "1.11"
@@ -17,6 +18,9 @@ wgpu = { version = "24", optional = true }
 bytemuck = { version = "1", features = ["derive"], optional = true }
 log = { version = "0.4", optional = true }
 pollster = { version = "0.4", optional = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
 
 [features]
 default = []

@@ -1,9 +1,9 @@
-//! Font loading and management using `ab_glyph` for TrueType/OpenType rasterization.
+//! Font loading and management using Fontations for TrueType/OpenType parsing.
 //!
 //! Provides a `FontManager` that holds loaded fonts keyed by name, with an
 //! embedded DejaVu Sans font as the default system font.
 
-use ab_glyph::{Font as AbFont, FontVec, ScaleFont};
+use crate::font_backend::FontData;
 
 #[cfg(feature = "gpu")]
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -25,9 +25,9 @@ pub(crate) const DEJAVU_SANS_OBLIQUE: &[u8] = include_bytes!("../fonts/DejaVuSan
 pub(crate) const DEJAVU_SANS_BOLD_OBLIQUE: &[u8] =
     include_bytes!("../fonts/DejaVuSans-BoldOblique.ttf");
 
-/// A loaded font face backed by `ab_glyph::FontVec`.
+/// A loaded font face backed by validated immutable font data.
 pub struct FontFace {
-    inner: FontVec,
+    inner: FontData,
     name: String,
     // Stable across moves and unique across managers, including custom fonts
     // that reuse the same name. An atlas can outlive an individual layout.
@@ -38,7 +38,13 @@ pub struct FontFace {
 impl FontFace {
     /// Load a font from raw TTF/OTF bytes.
     pub fn from_bytes(name: impl Into<String>, data: &[u8]) -> Option<Self> {
-        let inner = FontVec::try_from_vec(data.to_vec()).ok()?;
+        Self::from_bytes_at_index(name, data, 0)
+    }
+
+    /// Load one face of a TrueType/OpenType collection. A standalone font
+    /// accepts only index zero. Invalid tables and indices return `None`.
+    pub fn from_bytes_at_index(name: impl Into<String>, data: &[u8], index: u32) -> Option<Self> {
+        let inner = FontData::new(data, index)?;
         Some(Self {
             inner,
             name: name.into(),
@@ -84,7 +90,7 @@ impl FontFace {
         let normalized = normalize_nfc(text);
         let scaled = self.inner.as_scaled(size as f32);
         let mut width = 0.0f32;
-        let mut prev_glyph: Option<ab_glyph::GlyphId> = None;
+        let mut prev_glyph: Option<crate::GlyphId> = None;
 
         for ch in normalized.chars() {
             if is_zero_width(ch) || is_combining_mark(ch) {
@@ -105,11 +111,11 @@ impl FontFace {
     /// A character is considered present if its glyph ID is non-zero
     /// (glyph ID 0 is the `.notdef` glyph).
     pub fn has_glyph(&self, ch: char) -> bool {
-        self.inner.glyph_id(ch) != ab_glyph::GlyphId(0)
+        self.inner.glyph_id(ch) != crate::GlyphId(0)
     }
 
-    /// Access the underlying ab_glyph font for rasterization.
-    pub(crate) fn inner(&self) -> &FontVec {
+    /// Access the underlying Fontations-backed font for rasterization.
+    pub(crate) fn inner(&self) -> &FontData {
         &self.inner
     }
 
