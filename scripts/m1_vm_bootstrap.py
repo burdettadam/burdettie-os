@@ -33,8 +33,8 @@ M1_CANDIDATE = "0163b2db225b85e3bf96fc25646ea290105ac298"
 MIB = 1024 * 1024
 MAX_LOG_BYTES = 16 * MIB  # Combined serial and QEMU stderr, per boot.
 MAX_FIRMWARE_BYTES = 16 * MIB
-ANSI_CSI = re.compile(rb"\x1b\[[0-?]*[ -/]*[@-~]")
-PROMPT = re.compile(rb"(?:^|[\r\n])# $")
+TERMINAL_ESCAPE = re.compile(rb"\x1b(?:\[[0-?]*[ -/]*[@-~]|[()][0-2A-Z])")
+PROMPT_HINT = re.compile(rb"(?:^|[\r\n])# ")
 
 
 def utc_now():
@@ -68,7 +68,19 @@ def process_rss(pid):
 
 def complete_line(data, expected):
     """Require a complete response line, not a prompt, substring or partial line."""
-    return re.search(rb"(?:^|\n)" + re.escape(expected) + rb"\r?\n", data) is not None
+    return re.search(rb"(?:^|\n)" + re.escape(expected) + rb"\r*\n", data) is not None
+
+
+def shell_prompt_hint(data):
+    """Find a console readiness hint; only the nonce response proves a shell.
+
+    The release uses zsh's decorated '# ' prompt. Charset-selection escapes
+    (for example ESC(B) can precede it, and asynchronous daemon output can
+    follow it in the same serial read. Neither is a reason to withhold the
+    harmless challenge. Keep the accumulated buffer so split escapes/prompts
+    work too; a log that resembles a prompt still cannot verify execution.
+    """
+    return PROMPT_HINT.search(TERMINAL_ESCAPE.sub(b"", data)) is not None
 
 
 def shell_challenge(nonce):
@@ -143,7 +155,8 @@ def run_phase(command, directory, phase, data_nonce, timeout, memory_mib, cpu_id
     shell_command, shell_expected = shell_challenge(nonce)
     data_command, data_expected = data_challenge(phase, data_nonce, nonce)
     record = {"phase": phase, "status": "fail", "started_at": utc_now(),
-              "kernel_banner_observed": False, "shell_verified": False,
+              "kernel_banner_observed": False, "prompt_hint_observed": False,
+              "shell_verified": False,
               "data_verified": False, "peak_rss_bytes": 0,
               "serial_log": f"{phase}-serial.log", "qemu_log": f"{phase}-qemu.log",
               "shell_expected": shell_expected.decode(), "data_expected": data_expected.decode()}
@@ -193,7 +206,8 @@ def run_phase(command, directory, phase, data_nonce, timeout, memory_mib, cpu_id
                         continue
                     buffer = (buffer + data)[-MIB:]
                     record["kernel_banner_observed"] |= b"Darwin Kernel Version" in buffer
-                    if state == "prompt" and PROMPT.search(ANSI_CSI.sub(b"", buffer)):
+                    if state == "prompt" and shell_prompt_hint(buffer):
+                        record["prompt_hint_observed"] = True
                         process.stdin.write(("\n" + shell_command + "\n").encode())
                         state, buffer = "shell_response", b""
                     elif state == "shell_response" and complete_line(buffer, shell_expected):

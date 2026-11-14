@@ -16,8 +16,20 @@ spec = importlib.util.spec_from_file_location(
 bootstrap = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(bootstrap)
 
+# Source-owned reduction of the observed zsh prompt, followed by asynchronous
+# daemon output in the same serial chunk. It contains no private run data.
+NOISY_PROMPT = (b"\x1b[1m\x1b[7m#\x1b[27m\x1b[1m\x1b[0m\x1b(B\r \r\r"
+                b"\x1b[0m\x1b(B\x1b[27m\x1b[24m\x1b[J# \x1b[K\x1b[?2004h"
+                b"background service message\r\r\n")
+
 
 class BootstrapProtocolTests(unittest.TestCase):
+    def test_decorated_prompt_before_background_output_is_a_hint(self):
+        self.assertTrue(bootstrap.shell_prompt_hint(NOISY_PROMPT))
+        self.assertTrue(bootstrap.shell_prompt_hint(b"# "))
+        self.assertFalse(bootstrap.shell_prompt_hint(b"kernel log mentions # in text\n"))
+        self.assertFalse(bootstrap.shell_prompt_hint(b"\r\x1b[0m\x1b("))
+
     def test_echoed_command_and_partial_line_are_not_execution_evidence(self):
         for make in (
             lambda: bootstrap.shell_challenge("0123456789abcdef" * 2),
@@ -31,6 +43,7 @@ class BootstrapProtocolTests(unittest.TestCase):
             self.assertFalse(bootstrap.complete_line(b"prefix" + response + b"\n", response))
             self.assertFalse(bootstrap.complete_line(response + b"suffix\n", response))
             self.assertTrue(bootstrap.complete_line(b"echoed input\r\n" + response + b"\r\n", response))
+            self.assertTrue(bootstrap.complete_line(b"\r\r\n" + response + b"\r\r\n", response))
 
     def test_persistence_command_rejects_missing_and_changed_bytes(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -102,12 +115,13 @@ class BootstrapProtocolTests(unittest.TestCase):
 
     @unittest.skipUnless(sys.platform == "linux" and hasattr(os, "sched_getaffinity"), "Linux process controls")
     def test_echo_only_console_times_out_and_process_is_reaped(self):
-        emulator = "import sys\nsys.stdout.write('# '); sys.stdout.flush()\nfor line in sys.stdin:\n sys.stdout.write(line); sys.stdout.flush()\n"
+        emulator = "import sys\nsys.stdout.buffer.write(bytes.fromhex(sys.argv[1])); sys.stdout.flush()\nfor line in sys.stdin:\n sys.stdout.write(line); sys.stdout.flush()\n"
         with tempfile.TemporaryDirectory() as temporary:
             result = bootstrap.run_phase(
-                [sys.executable, "-u", "-c", emulator], Path(temporary), "write", "a" * 32,
+                [sys.executable, "-u", "-c", emulator, NOISY_PROMPT.hex()], Path(temporary), "write", "a" * 32,
                 1, 1024, [min(os.sched_getaffinity(0))])
             self.assertEqual(result["status"], "fail")
+            self.assertTrue(result["prompt_hint_observed"])
             self.assertFalse(result["shell_verified"])
             self.assertFalse(result["data_verified"])
             self.assertEqual(result["reason"], "timeout_waiting_for_shell_response")
@@ -117,19 +131,24 @@ class BootstrapProtocolTests(unittest.TestCase):
     def test_synthetic_console_protocol_requires_second_process_readback(self):
         # This ordinary Linux subprocess only tests the serial protocol. It
         # supplies a synthetic uname and redirects guest paths to a temp dir.
-        emulator = """import os, subprocess, sys
+        emulator = """import os, subprocess, sys, time
 root = sys.argv[1]
-sys.stdout.write('# '); sys.stdout.flush()
+prompt = bytes.fromhex(sys.argv[2])
+# Split inside ESC(B, then inside '# ', using separate pipe reads.
+split_escape = prompt.rfind(b'\\x1b(B') + 2
+split_prompt = prompt.rfind(b'# ') + 1
+for piece in (prompt[:split_escape], prompt[split_escape:split_prompt], prompt[split_prompt:]):
+    sys.stdout.buffer.write(piece); sys.stdout.flush(); time.sleep(0.05)
 for line in sys.stdin:
     sys.stdout.write(line); sys.stdout.flush()
     line = line.replace('/var/tmp', root).replace('&& sync', '&& :')
     prefix = 'uname() { if [ "$1" = "-s" ]; then echo Darwin; else echo x86_64; fi; }; '
     subprocess.run(['sh', '-c', prefix + line], check=False)
-    sys.stdout.write('# '); sys.stdout.flush()
+    sys.stdout.buffer.write(prompt); sys.stdout.flush()
 """
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
-            command = [sys.executable, "-u", "-c", emulator, temporary]
+            command = [sys.executable, "-u", "-c", emulator, temporary, NOISY_PROMPT.hex()]
             arguments = ("0123456789abcdef" * 2, 3, 1024, [min(os.sched_getaffinity(0))])
             first = bootstrap.run_phase(command, directory, "write", *arguments)
             self.assertEqual(first["status"], "pass", first)
