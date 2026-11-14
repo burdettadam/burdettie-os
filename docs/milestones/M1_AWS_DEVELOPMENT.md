@@ -113,6 +113,40 @@ realization. Keep full source inputs, the failed tree, all VM disks/logs and
 existing services. No resource expansion or reduction of the reserve follows
 from this failure.
 
+## Libtapi source-staging metadata plan
+
+The separately reviewed [opt-in staging
+recipe](M1_LIBTAPI_SOURCE_STAGING.md), at Burdettie
+`f8c59175784edb89e0087734d5020d142256297d`, passed its actual retained-host plan
+in **24.08 seconds**, finishing at **18:46:00 UTC**. Its status is
+**`planned_not_built`**. The complete captured result and 104-byte dry-run log
+were hash-verified. The dry-run listed only the new libtapi candidate derivation,
+with no dependency fetch paths, downloads or realization. The retained SDK and
+all 12 unchanged-recipe fields matched; the existing native-linker and downstream
+helpers remain unchanged.
+
+The complete source remains present at **217,415,680 allocated bytes**. The
+inventory proposes a **50,094,080-byte staging allocation estimate**, including
+74 private file copies and links for the other 10,592 regular files. This metadata plan ran no actual
+unpack or compilation. The estimate excludes build objects, generated data,
+linking, outputs and additional filesystem metadata. The full source manifest
+remains on the host; the public [plan
+receipt](evidence/libtapi-plan-2026-11-14.json) records its hash and the local
+capture limitation.
+
+The metadata phase observed a minimum **9,450,496,000 free disk bytes** and
+finished with **9,525,194,752 bytes**, leaving **935,260,160 bytes** above the
+unchanged 8-GiB reserve. Its cgroup memory peak was **657,637,376 bytes**, with
+no memory-high, memory-max or OOM events. These are metadata-phase measurements,
+not a new build-peak qualification. A bounded candidate build and output
+inspection remain pending in this receipt. The earlier failed tree, full source,
+VM artifacts and existing services remain preserved.
+
+A separate bounded staged-libtapi build was launched at **19:00:16 UTC** from
+`f8c5917`. Its final result has not yet been retrieved. That subsequent launch is
+outside the historical plan receipt and does not establish successful
+realization, output inspection or native linking.
+
 ## Runtime and security work
 
 [PR #7](https://github.com/burdettadam/burdettie-os/pull/7), at `d3ee4a2dd9483193bb3d01e38e4b2051751fdb17`, combines optional native dialogs, immediate-exit handling and launch-owned normal cleanup with the admission changes from #5. The conflict resolution retains both the initializer-aware exit status and the evaluated security report. Cleanup retains callback ABI/DSO/image ownership, runs ARM64 callbacks through the suspended interpreter, shares the instruction budget with cleanup and drains before image unmapping. All six functional CI jobs passed at this exact head, including 17 admission tests and 17 isolated lifecycle cases. The required dependency-policy and history-scan checks remain failed; see the [runtime integration receipt](evidence/runtime-integration-2026-11-14.json). Native explicit exit, worker lifetime, shared streams and unsupported lifecycle routes remain documented limits. These host results do not qualify Darwin linking or execution inside the selected guest.
@@ -127,7 +161,7 @@ The [backend allocation](../contracts/BACKEND_ALLOCATION.md) assigns 17 control 
 2. Build and independently boot the selected image, including its own persistence, recovery and graceful-shutdown assessment.
 3. Qualify Rust standard-library/libSystem linkage and execute the x86_64 fixture through Burdettie inside that guest.
 4. Resolve the concrete worker-lifetime, display/input and backend gaps before advertising the corresponding behaviors.
-5. Respect all repository checks. The existing `cargo-deny` failure for unmaintained `ttf-parser` is tracked in [issue #2](https://github.com/burdettadam/burdettie-os/issues/2); it is not suppressed by this work.
+5. Respect all repository checks. At `f8c5917`, all six functional CI jobs and the 100 script/37 contract tests pass, while `cargo-deny` still fails for unmaintained `ttf-parser` and the history scan still reports two public-source checksum findings. The [plan receipt](evidence/libtapi-plan-2026-11-14.json) links those exact-head checks. Neither failure is suppressed by this work.
 
 Physical Mac ownership and a real Apple application are not M1 prerequisites. The independent OS, real-application and selectable-security goals remain unchanged, and retain their own later acceptance evidence.
 

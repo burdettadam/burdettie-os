@@ -105,6 +105,19 @@
       "last_logged_build_progress_percent": 26,
       "failed_build_tree_retained": true,
       "evidence": "evidence/native-linker-2026-11-14.json"
+    },
+    "libtapi_staging_plan": {
+      "status": "planned_not_built",
+      "burdettie_revision": "f8c59175784edb89e0087734d5020d142256297d",
+      "duration_seconds": 24.08,
+      "local_derivations": 1,
+      "planned_fetch_paths": 0,
+      "source_allocated_bytes": 217415680,
+      "staging_allocation_estimate_bytes": 50094080,
+      "candidate_realization": "not_run",
+      "native_linker_rebinding": "not_run",
+      "build_peak_capacity_qualified": false,
+      "evidence": "evidence/libtapi-plan-2026-11-14.json"
     }
   },
   "vm": {
@@ -240,13 +253,14 @@
     "existing_root_disk_gib": 40,
     "full_image_build_capacity_qualified": false,
     "capacity_checkpoint": {
-      "observed_at": "2026-11-14T18:01:21.795099+00:00",
-      "free_disk_bytes": 9554071552,
+      "observed_at": "2026-11-14T18:46:00.435985+00:00",
+      "scope": "libtapi_metadata_plan_finish",
+      "free_disk_bytes": 9525194752,
       "minimum_free_disk_reserve_bytes": 8589934592,
-      "remaining_above_reserve_bytes": 964136960,
+      "remaining_above_reserve_bytes": 935260160,
       "same_driver_3_gib_growth_preflight": "would_reject",
       "new_build_capacity_qualified": false,
-      "evidence": "evidence/native-linker-2026-11-14.json"
+      "evidence": "evidence/libtapi-plan-2026-11-14.json"
     }
   },
   "bootstrap_experiment": {

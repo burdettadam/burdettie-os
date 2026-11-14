@@ -102,6 +102,40 @@ compact receipt remains in retained build logs after normal successful Nix
 cleanup removes temporary build files. This is a receipt for prepatch staging;
 the original patch and setup hooks still run afterward.
 
+## Observed metadata plan
+
+The actual retained-host plan at Burdettie
+`f8c59175784edb89e0087734d5020d142256297d` passed on 2026-11-14 in
+**24.08 seconds**, with status **`planned_not_built`**. Offline evaluation and
+the permitted cache-metadata dry-run listed only the new libtapi derivation,
+with no dependency fetch paths, downloads or realization. The retained SDK and
+all 12 unchanged-recipe checks matched. The [sanitized plan
+receipt](evidence/libtapi-plan-2026-11-14.json) binds the source, patch, recipe,
+stager, original/candidate identities and complete captured result/log hashes.
+
+The complete source inventory records 10,666 regular files, 1,515 directories
+including the root, and one original symlink. It proposes 74 private file copies
+and 10,592 immutable-file links. Measured original source allocation is
+**217,415,680 bytes**; estimated staging allocation is **50,094,080 bytes**.
+Staging itself has not run in this result. The estimate excludes configuration,
+generated files, objects, linking, outputs and additional filesystem metadata;
+it does not qualify build peak usage. The full 3,111,190-byte source manifest
+remains on the host with its recorded hash and was not locally captured.
+
+At the metadata phase's finish, 9,525,194,752 disk bytes remained free, leaving
+935,260,160 bytes above the unchanged 8-GiB reserve. This is a planning
+measurement. Candidate realization, output inspection, native-linker rebinding
+and downstream execution remain separate gates.
+
+This implementation head passed [100 script tests, 37 contract tests and four
+examples](https://github.com/burdettadam/burdettie-os/actions/runs/43627478562),
+with no skips. Its [six functional CI
+jobs](https://github.com/burdettadam/burdettie-os/actions/runs/43627478519) passed;
+the required `cargo-deny` advisory check and [repository history
+scan](https://github.com/burdettadam/burdettie-os/actions/runs/43627478517) remain
+failed. Those results are bound to `f8c5917`; a later evidence update must pass
+its own checks. M1 remains incomplete.
+
 ## Capacity and qualification gates
 
 The allocation estimate covers the directory structure, file symlinks and
