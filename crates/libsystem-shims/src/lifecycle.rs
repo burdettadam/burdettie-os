@@ -1,11 +1,16 @@
 //! Process lifecycle shims: atexit, exit, _exit, abort, signal handling.
 //!
-//! These intercept program termination to give the runtime a chance
-//! to report exit status cleanly. In the lab's single-threaded model:
-//! - `atexit` registers handlers but we don't call them (process is
-//!   about to return from main anyway)
-//! - `exit`/`_exit` delegate to the real libc (we're in-process)
-//! - `abort` delegates to the real libc
+//! Native `exit` still terminates the embedding process after flushing stdio;
+//! `_exit` and `_Exit` terminate immediately without that flush. The interpreter
+//! must intercept these shim addresses instead of invoking them on its host.
+//! Full normal-exit cleanup remains unsupported: the callback registry is
+//! process-global and is not bound to the lifetime or architecture of a guest.
+//! Do not drain it automatically after a guest's images have been unmapped.
+//!
+//! Other current limitations:
+//! - `atexit` records callbacks, but normal exit does not run them.
+//! - `__cxa_atexit` does not yet retain callback arguments or DSO ownership.
+//! - `abort` emits a diagnostic and terminates with `_exit(1)`.
 //! - `sigaction`/`signal` are intercepted to prevent guest code from
 //!   installing signal handlers that point into guest-mapped memory,
 //!   which would crash the host if a signal fires after the guest exits
@@ -33,7 +38,7 @@ impl LifecycleShims {
         table.register(
             "___cxa_atexit",
             shim_cxa_atexit as *const () as u64,
-            "__cxa_atexit (registered)",
+            "__cxa_atexit (cleanup registration unsupported)",
         );
         table.register(
             "__os_feature_enabled_impl",
@@ -43,22 +48,22 @@ impl LifecycleShims {
         table.register(
             "_exit",
             shim_exit as *const () as u64,
-            "exit (clean shutdown)",
+            "exit (stdio flush; guest callbacks unsupported)",
         );
         table.register(
             "__exit",
-            shim_exit as *const () as u64,
-            "_exit (clean shutdown)",
+            shim_immediate_exit as *const () as u64,
+            "_exit (immediate, no stdio flush)",
         );
         table.register(
             "_Exit",
-            shim_exit as *const () as u64,
-            "_Exit (clean shutdown)",
+            shim_immediate_exit as *const () as u64,
+            "_Exit (immediate, no stdio flush)",
         );
         table.register(
             "__Exit",
-            shim_exit as *const () as u64,
-            "_Exit (Darwin symbol, clean shutdown)",
+            shim_immediate_exit as *const () as u64,
+            "_Exit (Darwin symbol, immediate, no stdio flush)",
         );
         table.register(
             "_sigaction",
@@ -139,7 +144,11 @@ impl LifecycleShims {
     }
 
     /// Run all registered atexit handlers in LIFO order.
-    /// Called by the runtime during controlled shutdown.
+    ///
+    /// This is not currently called by the runtime's exit paths. A caller must
+    /// keep every callback's guest mapping alive and ensure that its code is
+    /// native to the calling process. Launch-scoped ownership is still needed
+    /// before this can safely become automatic normal-exit cleanup.
     pub fn run_atexit_handlers() {
         let handlers = {
             let mut guard = ATEXIT_HANDLERS.lock().unwrap_or_else(|e| e.into_inner());
@@ -346,6 +355,13 @@ extern "C" fn shim_exit(status: i32) -> ! {
     use std::io::Write;
     let _ = std::io::stdout().flush();
     let _ = std::io::stderr().flush();
+    unsafe { libc::_exit(status) }
+}
+
+/// Immediate termination must not flush streams or run cleanup callbacks.
+extern "C" fn shim_immediate_exit(status: i32) -> ! {
+    // SAFETY: this is the non-returning process-termination operation requested
+    // by the guest. The interpreter intercepts the shim instead of calling it.
     unsafe { libc::_exit(status) }
 }
 
@@ -874,6 +890,66 @@ mod tests {
     #[test]
     fn atexit_null_returns_error() {
         assert_eq!(shim_atexit(None), -1);
+    }
+
+    #[test]
+    fn exit_symbol_stdio_semantics() {
+        const CHILD_SYMBOL: &str = "BURDETTIE_EXIT_TEST_SYMBOL";
+        const MARKER: &str = "BURDETTIE_BUFFERED_STDIO_MARKER";
+        if let Ok(symbol) = std::env::var(CHILD_SYMBOL) {
+            let mut table = ShimTable::new();
+            LifecycleShims::install(&mut table);
+            let address = table.resolve(&symbol).expect("known exit test symbol");
+            let mut buffer = [0_u8; 4096];
+            // SAFETY: dup returns an owned descriptor for the child's stdout.
+            // fdopen owns it until the child exits; all C strings are terminated.
+            let stream = unsafe { libc::fdopen(libc::dup(libc::STDOUT_FILENO), c"w".as_ptr()) };
+            assert!(!stream.is_null());
+            // SAFETY: the buffer remains alive until the non-returning exit
+            // call, and stream is a valid newly opened FILE with no prior I/O.
+            assert_eq!(
+                unsafe {
+                    libc::setvbuf(
+                        stream,
+                        buffer.as_mut_ptr().cast(),
+                        libc::_IOFBF,
+                        buffer.len(),
+                    )
+                },
+                0
+            );
+            let marker = std::ffi::CString::new(MARKER).unwrap();
+            // SAFETY: both the terminated marker and the FILE remain valid.
+            assert!(unsafe { libc::fputs(marker.as_ptr(), stream) } >= 0);
+            // SAFETY: this exact table entry is one of the lifecycle module's
+            // extern-C, non-returning int-status exit functions.
+            let terminate: extern "C" fn(i32) -> ! =
+                unsafe { std::mem::transmute(address as usize) };
+            terminate(37);
+        }
+
+        for (symbol, flushes) in [
+            ("_exit", true),
+            ("__exit", false),
+            ("_Exit", false),
+            ("__Exit", false),
+        ] {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "lifecycle::tests::exit_symbol_stdio_semantics",
+                    "--nocapture",
+                ])
+                .env(CHILD_SYMBOL, symbol)
+                .output()
+                .unwrap();
+            assert_eq!(output.status.code(), Some(37), "{symbol}: {output:?}");
+            assert_eq!(
+                String::from_utf8_lossy(&output.stdout).contains(MARKER),
+                flushes,
+                "wrong buffered-output behavior for {symbol}: {output:?}"
+            );
+        }
     }
 
     #[test]
