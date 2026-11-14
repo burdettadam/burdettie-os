@@ -14,6 +14,9 @@ on:
       - 'scripts/puredarwin_native_linker.nix'
       - 'scripts/plan_puredarwin_libraries.py'
       - 'scripts/puredarwin_libraries.nix'
+      - 'scripts/plan_puredarwin_libtapi.py'
+      - 'scripts/puredarwin_libtapi.nix'
+      - 'scripts/stage_libtapi_source.py'
       - 'fixtures/m1_abi_probe/probe.c'
       - 'fixtures/simple_cli/main.c'
       - 'scripts/tests/test_collect_m1_inventory.py'
@@ -23,6 +26,8 @@ on:
       - 'scripts/tests/test_compile_puredarwin_objects.py'
       - 'scripts/tests/test_plan_puredarwin_linker.py'
       - 'scripts/tests/test_plan_puredarwin_libraries.py'
+      - 'scripts/tests/test_plan_puredarwin_libtapi.py'
+      - 'scripts/tests/test_stage_libtapi_source.py'
   pull_request:
     paths:
       - '.github/workflows/m1-contracts.yml'
@@ -36,6 +41,9 @@ on:
       - 'scripts/puredarwin_native_linker.nix'
       - 'scripts/plan_puredarwin_libraries.py'
       - 'scripts/puredarwin_libraries.nix'
+      - 'scripts/plan_puredarwin_libtapi.py'
+      - 'scripts/puredarwin_libtapi.nix'
+      - 'scripts/stage_libtapi_source.py'
       - 'fixtures/m1_abi_probe/probe.c'
       - 'fixtures/simple_cli/main.c'
       - 'scripts/tests/test_collect_m1_inventory.py'
@@ -45,6 +53,8 @@ on:
       - 'scripts/tests/test_compile_puredarwin_objects.py'
       - 'scripts/tests/test_plan_puredarwin_linker.py'
       - 'scripts/tests/test_plan_puredarwin_libraries.py'
+      - 'scripts/tests/test_plan_puredarwin_libtapi.py'
+      - 'scripts/tests/test_stage_libtapi_source.py'
 
 permissions:
   contents: read
@@ -97,6 +107,9 @@ jobs:
       - name: Check inventory, preflight and bootstrap harness behavior
         run: |
           command -v cc
+          command -v patch
+          command -v cmake
+          cmake --version
           # Missing Nix must fail this job, not silently skip the overlay tests.
           test -x "$NIX_BIN"
           python3 -m unittest discover -s scripts/tests -p 'test_*.py' -v
