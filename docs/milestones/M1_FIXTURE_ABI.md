@@ -160,7 +160,7 @@ The per-output plans below overlap; do not sum their download or unpacked sizes.
 | `darwin-cross-toolchain` | 27 | 262 | 768.52 | 2993.90 |
 | `libsystem` / all four | 32 | 264 | 916.73 | 4811.47 |
 
-Two concrete constraints remain beyond those estimates. The pinned compiler-rt recipe unpacks the LLVM monorepo while building its builtins subset, and the generic PureDarwin build uses Debug configuration. Also, raw Ninja invocations in `native-ld.nix`, `compiler-rt.nix` and `build.nix` bypass Nixpkgs' default Ninja build-phase concurrency argument: `--cores 1` alone does not limit their compiler process count. The [bounded recipes](M1_BOUNDED_BUILD_RECIPES.md) address the raw job counts and writable source duplication without changing full source inputs or build modes. The [native-linker continuation receipt](evidence/native-linker-2026-11-14.json) records a successful metadata plan and a retrieved build failure after 1201.12 seconds: the phase deadline stopped libtapi at 26%, with no compiler-fatal diagnostic or cgroup OOM event. Its failed tree is retained. The later recovery checkpoint leaves about 0.90 GiB above the 8-GiB reserve, insufficient for the same driver's 3-GiB growth-budget preflight. A new Nix invocation does not resume the kept tree; any changed staging recipe needs separate identities, planning and capacity evidence. Native-linker completion, downstream realization and peak capacity remain unqualified. The SDK's small MIG compiler uses the source's `pcc.sh` helper, which does honor `NIX_BUILD_CORES`.
+Two concrete constraints remain beyond those estimates. The pinned compiler-rt recipe unpacks the LLVM monorepo while building its builtins subset, and the generic PureDarwin build uses Debug configuration. Also, raw Ninja invocations in `native-ld.nix`, `compiler-rt.nix` and `build.nix` bypass Nixpkgs' default Ninja build-phase concurrency argument: `--cores 1` alone does not limit their compiler process count. The [bounded recipes](M1_BOUNDED_BUILD_RECIPES.md) address the raw job counts and writable source duplication without changing full source inputs or build modes. The [native-linker continuation receipt](evidence/native-linker-2026-11-14.json) records a successful metadata plan and a retrieved build failure after 1201.12 seconds: the phase deadline stopped libtapi at 26%, with no compiler-fatal diagnostic or cgroup OOM event. Its failed tree is retained. That historical recovery checkpoint left about 0.90 GiB above the 8-GiB reserve, insufficient for the same driver's 3-GiB growth-budget preflight. A new Nix invocation does not resume the kept tree; any changed staging recipe needs separate identities, planning and capacity evidence. The later staged native success below does not qualify downstream realization or its peak capacity. The SDK's small MIG compiler uses the source's `pcc.sh` helper, which does honor `NIX_BUILD_CORES`.
 
 The later [opt-in libtapi staging plan](evidence/libtapi-plan-2026-11-14.json)
 passed on the retained host in **24.08 seconds**. It lists only the new libtapi
@@ -172,23 +172,25 @@ no candidate compilation, native-linker rebinding, fixture link or guest ABI
 result follows from the plan.
 
 The later [actual staged libtapi build](evidence/libtapi-build-2026-11-14.json)
-passed in **4,082.6 seconds**, including installed library/header and NAR
-inspection, while keeping the reserve and prior failed tree. A fresh
+passed its build phase in **4,082.6 seconds**; installed library/header and NAR
+inspection also passed, while keeping the reserve and prior failed tree. A fresh
 [native-linker metadata plan](evidence/staged-linker-plan-2026-11-14.json) then
 passed in **32.21 seconds**, with nine local derivations and no fetched paths.
 This removes the earlier libtapi build blocker for the new staged dependency.
-The subsequent native-linker driver [reports successful build and
-inspection](evidence/staged-native-linker-terminal-observation-2026-11-14.json)
-in **459.99 seconds** and **14.29 seconds**, finishing at **21:08:52 UTC**.
-The host captured all 32 selected result/log/inspection files, but the full
-archive remains unretrieved after a browser connection loss. The current status
-is `driver_reported_success_full_recovery_pending`: NAR, ELF/TAPI binding,
-complete logs and resource history still need independent review. The [new
-downstream composition](M1_STAGED_LIBRARIES.md) also requires fresh successful
-native-output verification before cross-toolchain, compiler-rt or libSystem
-planning. The old fixture helper continues to resolve its original package map;
-using the staged chain for executable compilation needs a separately reviewed
-opt-in entry point after those outputs exist.
+The subsequent native-linker build passed in **459.99 seconds** and its
+installed-output inspection in **14.29 seconds**, finishing at **21:08:52 UTC**.
+Its [complete recovered evidence](evidence/staged-native-linker-recovered-2026-11-14.json)
+now binds all 32 selected files and independent review of NAR/deriver identity,
+native-output inventory, default store verification, static ELF and observed
+staged-TAPI loader binding, full logs and sampled resource history. The literal
+`LD64_VERSION_NUM` banner is retained without inventing a numeric linker
+version. The previous [terminal observation](evidence/staged-native-linker-terminal-observation-2026-11-14.json)
+remains historical. The [new downstream composition](M1_STAGED_LIBRARIES.md)
+still requires fresh successful native-output verification before
+cross-toolchain, compiler-rt or libSystem planning. Those downstream outputs and
+their capacity remain unqualified. The old fixture helper continues to resolve
+its original package map; using the staged chain for executable compilation
+needs a separately reviewed opt-in entry point after those outputs exist.
 
 The four outputs are link inputs, not a complete guest process closure. The selected libSystem source intentionally permits unresolved Objective-C runtime references and uses a separately loaded matching libobjc; its real loader requirements must be checked in the selected image. Header/export presence does not prove implementation behavior. Sources: [compiler-rt](https://github.com/PureDarwin/PureDarwin/blob/0163b2db225b85e3bf96fc25646ea290105ac298/nix/pkgs/toolchain/compiler-rt.nix), [native linker](https://github.com/PureDarwin/PureDarwin/blob/0163b2db225b85e3bf96fc25646ea290105ac298/nix/pkgs/toolchain/native-ld.nix), [generic build](https://github.com/PureDarwin/PureDarwin/blob/0163b2db225b85e3bf96fc25646ea290105ac298/build.nix), [MIG compiler](https://github.com/PureDarwin/PureDarwin/blob/0163b2db225b85e3bf96fc25646ea290105ac298/nix/pkgs/toolchain/migcom.nix), [libSystem linkage/startup contract](https://github.com/PureDarwin/PureDarwin/blob/0163b2db225b85e3bf96fc25646ea290105ac298/src/Libraries/libSystem/stub/CMakeLists.txt), and [libobjc dependencies](https://github.com/PureDarwin/PureDarwin/blob/0163b2db225b85e3bf96fc25646ea290105ac298/nix/pkgs/apple/libobjc.nix).
 

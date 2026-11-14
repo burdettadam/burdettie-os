@@ -4,12 +4,13 @@ This is an explicit **plan-only** path. It requires an actual successful,
 inspected native-linker build and verifies its currently realized output before
 planning a downstream stage. Synthetic tests, an existing output directory, a
 running build, a TAPI-only success, or a successful metadata plan do not satisfy
-that gate. The later [native terminal
-observation](evidence/staged-native-linker-terminal-observation-2026-11-14.json)
-reports build/inspection success, but its full result, sidecar and logs remain
-unretrieved. The public status is `driver_reported_success_full_recovery_pending`.
-That partial observation does not satisfy the consumer's evidence/fresh-output
-gates; no actual downstream plan or realization is claimed.
+that gate. The [recovered native
+evidence](evidence/staged-native-linker-recovered-2026-11-14.json) now establishes
+the historical successful build and installed-output inspection, including the
+complete result, sidecars and logs. Independent review accepted that receipt
+chain. The unchanged consumer must still perform fresh current-output and
+source verification before planning; this evidence does not claim an actual
+downstream plan or realization.
 
 The existing linker, libraries, object and fixture helpers retain their original
 bytes and defaults. The new files are
@@ -60,10 +61,10 @@ and [generic build recipe](https://github.com/PureDarwin/PureDarwin/blob/0163b2d
 A separately reviewed native build driver must produce schema version 1,
 scope `staged_libtapi_native_linker_build`, status
 `staged_libtapi_native_linker_built`, `realization_command_succeeded: true`, and
-`output_inspection_status: "pass"`. The first terminal status projection reports
-those values. Its complete receipt and inspection sidecar still require
-recovery, verification and independent review before use by this consumer;
-the public summary is not a substitute for those inputs.
+`output_inspection_status: "pass"`. The actual native build has produced those
+values, and its complete recovered receipt and inspection sidecar passed
+independent review and the receipt validator. The public sanitized receipt is
+not a substitute for the original private inputs or the fresh checks below.
 
 The required receipt contains:
 

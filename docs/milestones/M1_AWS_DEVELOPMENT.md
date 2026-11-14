@@ -1,6 +1,6 @@
 # M1 development on the retained AWS host
 
-Status on 2026-11-14 UTC: **the staged-native-linker driver reports successful realization and output inspection; complete evidence recovery is pending. M1 remains in progress.** The [terminal observation](evidence/staged-native-linker-terminal-observation-2026-11-14.json) records the reported result and host capture manifest. The full result, build log and inspection sidecars have not yet been transferred and independently reviewed. The staged libtapi build, selected SDK and two Mach-O objects have separately recovered successful evidence. The older PureDarwin 20.5 bootstrap passes its narrow shell/persistence scope; the original native-linker attempt remains a retained wall-time failure. Selected-image construction, executable linking, Burdettie runtime execution, Apple applications, display/session and enforcement remain separate gates.
+Status on 2026-11-14 UTC: **the staged native linker built successfully and passed installed-output inspection; its complete selected evidence archive is recovered and independently reviewed. M1 remains in progress.** The [recovered evidence](evidence/staged-native-linker-recovered-2026-11-14.json) records the full result, build log, registration sidecars, loader/version checks and sampled resource history. The earlier [terminal observation](evidence/staged-native-linker-terminal-observation-2026-11-14.json) remains unchanged as a historical record of the transfer interruption. The staged libtapi build, selected SDK and two Mach-O objects have separate successful evidence. The older PureDarwin 20.5 bootstrap passes its narrow shell/persistence scope; the original native-linker attempt remains a retained wall-time failure. Fresh downstream verification, executable linking, selected-image construction, Burdettie runtime execution, Apple applications, display/session and enforcement remain separate gates.
 
 The [sanitized bootstrap receipt](evidence/bootstrap-2026-11-14.json) records all three outcomes, input identities, timings and log hashes. Raw logs, writable disks, private recovery records, cloud identifiers and command receipts are retained outside the public repository.
 
@@ -197,42 +197,58 @@ resolution of this staged libtapi and a bounded version probe before planning
 cross-toolchain, compiler-rt or libSystem. Their source tests do not supply that
 live result.
 
-## Native-linker terminal observation; full recovery pending
+## Recovered native-linker build and installed-output inspection
 
-The later build from `dd1c5710c12bdcf23ba091eaa09c859a9a7fec2a` started at
-**21:00:39 UTC** and reports completion at **21:08:52 UTC**. Its bounded status
-reader observed a passing realization phase of **459.99 seconds** and a passing
-output-inspection phase of **14.29 seconds**, both with integer-zero exits and
-no recorded timeout. The [additive terminal
+The build from `dd1c5710c12bdcf23ba091eaa09c859a9a7fec2a` started at
+**21:00:39 UTC** and finished at **21:08:52 UTC**. Its complete recovered result
+records five passing phases: exact source fetch (**1.12 seconds**), exclusive
+worktree preparation (**1.09 seconds**), input verification (**14.39 seconds**),
+native-linker realization (**459.99 seconds**) and installed-output inspection
+(**14.29 seconds**). Every phase has an integer-zero exit and explicitly records
+no timeout. The [new recovered-evidence
+receipt](evidence/staged-native-linker-recovered-2026-11-14.json) binds these
+results to the original plan, source, SDK, staged TAPI and reviewed code.
+
+The **117,306-byte compressed archive**, **700,539-byte raw bundle** and all
+**32 selected files** have been retrieved and rehashed. The complete result,
+**292,452-byte build log**, registration sidecars and inspection streams agree;
+there are no missing selected files or capture-consistency errors. Independent
+review passed **116 evidence/contract checks**, including the actual downstream
+consumer's receipt validator. These were checks of recovered records, with no
+build or synthetic-test rerun. The earlier [terminal
 observation](evidence/staged-native-linker-terminal-observation-2026-11-14.json)
-keeps the status **`driver_reported_success_full_recovery_pending`**.
+retains its historical `driver_reported_success_full_recovery_pending` status;
+the connection interruption did not require rebuilding the output.
 
-At **21:09:58 UTC**, the exact unit was absent/inactive/dead with both reported
-PIDs zero. Those collected-unit defaults do not establish success; the separate
-retained driver-result summary supplies the reported outcome. The reader saw
-**9,199,788,032 free disk bytes**, **3,636,842,496 available memory bytes** and
-k3s active. Its cgroup was no longer available. These are that read's host
-observations, not the build's minimum free space, peak memory or a current
-census after the connection loss.
+The historical inspection binds the exact derivation and **4,831,360-byte NAR**,
+the regular `ld` wrapper, x86_64 ELF `ld.real` and `strip`, and their complete
+file hashes. Default offline store verification passed. Static ELF metadata
+and the checked loader's `--list` output both resolve `libtapi.so.12git` to the
+inspected staged library; the original TAPI output is absent from native-output
+references. The bounded `ld -v` check passed and reports TAPI **1300.6.5**. Its
+linker version is the literal token **`LD64_VERSION_NUM`**, so a numeric ld64
+version is not established. Compiler warnings remain in the full log.
 
-The **21:11:02 UTC** terminal capture created a **117,306-byte compressed
-archive** containing a **700,539-byte raw bundle**, with metadata for all
-**32 selected files**, no missing selected files and no reported receipt
-consistency errors. The manifest binds the **49,425-byte driver result**,
-**292,452-byte complete build log**, **754-byte registered-output sidecar**,
-inspection report and retained verification/loader/version streams. The public
-receipt records their hashes. The complete source manifests remain on the host.
+Across the recorded resource samples, minimum free disk was
+**9,175,244,800 bytes** and the maximum observed whole-host net decline from the
+pre-dispatch baseline was **203,493,376 bytes**. This stayed within the
+**512-MiB growth bound** and **8-GiB reserve**. Minimum available memory was
+**3,280,130,048 bytes**, and the driver's direct cgroup `memory.peak` was
+**553,099,264 bytes**, with no high/max/OOM events. The journal separately
+reports **478.5M** memory peak; those two measurements are retained without
+equating them. CPU, memory, swap and process bounds remained unchanged. These
+are this completed stage's sampled history, not a continuous sample series,
+current host census or capacity proof for a future stage.
 
-The originating browser connection became unavailable after retrieval of that
-capture manifest. No archive chunk recovery had begun at this checkpoint.
-Only the bounded status summary, its final 2,048-byte log tail and the capture
-manifest are locally available; the full archive and member bytes remain on
-the host. Recover and verify that existing archive before independently
-auditing NAR registration, output files, ELF/TAPI resolution, full logs and the
-complete resource history. A future downstream consumer must then perform its
-own fresh verification. No cross-toolchain plan, fixture link or selected-guest
-execution follows from this partial evidence, and no build needs to be rerun
-merely to retrieve it.
+The terminal capture observed the unit inactive with both PIDs zero and k3s
+active. Collected-unit defaults are not used as build-success proof. The two
+complete source-manifest contents remain host-only; their recovered matching
+hashes and inventory summaries are distinct from locally inspected manifest
+contents. The historical native-evidence prerequisite is now satisfied. Before
+downstream planning, the unchanged consumer must freshly verify the current
+source, registered outputs, file inventories, store contents and loader/version
+probes under a fresh capacity census. Cross-toolchain/compiler-rt/libSystem
+realization, executable fixtures and the selected guest remain unqualified.
 
 ## Runtime and security work
 
@@ -248,7 +264,7 @@ The [backend allocation](../contracts/BACKEND_ALLOCATION.md) assigns 17 control 
 
 ## Remaining gates
 
-1. Recover the existing native terminal archive and independently review its complete result, log, registered output and inspection records. The driver reports build/inspection success, but the summary and capture manifest do not close that evidence gate. Then take a fresh census and assess each downstream input separately within the unchanged host bounds. Preserve the prior failed tree and all existing outputs; linked executable fixtures remain unqualified.
+1. Use the recovered native success only after a fresh census and the downstream consumer's current source/output checks pass. Assess and realize each remaining cross-toolchain/compiler-rt/libSystem input separately within the unchanged host bounds. Preserve the prior failed tree and all existing outputs; this completed native stage does not establish later peak capacity or linked executable fixtures.
 2. Build and independently boot the selected image, including its own persistence, recovery and graceful-shutdown assessment.
 3. Qualify Rust standard-library/libSystem linkage and execute the x86_64 fixture through Burdettie inside that guest.
 4. Resolve the concrete worker-lifetime, display/input and backend gaps before advertising the corresponding behaviors.

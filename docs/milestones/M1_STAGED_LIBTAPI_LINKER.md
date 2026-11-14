@@ -65,14 +65,19 @@ working native linker. The [shared output inspector](M1_STAGED_LIBRARIES.md)
 defines the separate live registration, dynamic-binding and smoke checks that
 must follow a successful realization.
 
-A later [terminal observation](evidence/staged-native-linker-terminal-observation-2026-11-14.json)
-records the native driver's reported 459.99-second build and 14.29-second output
-inspection, finished at 21:08:52 UTC. The 32-file host archive was created and
-its manifest retrieved, but the browser connection was lost before archive
-transfer. Complete result/log/sidecar recovery and independent review remain
-pending; the reported success does not establish a recovered output audit or
-any downstream/guest result. This new observation leaves the earlier metadata
-plan's `planned_not_built` scope unchanged.
+The later native build passed in **459.99 seconds** and its installed-output
+inspection passed in **14.29 seconds**, finishing at **21:08:52 UTC**. The
+[separate recovered-evidence receipt](evidence/staged-native-linker-recovered-2026-11-14.json)
+binds all 32 retrieved result/log/inspection files and their independent review.
+The exact registered NAR, complete native-output inventory, default store check,
+static ELF binding, observed staged-TAPI loader resolution and bounded version
+probe passed. The version banner retains the literal `LD64_VERSION_NUM` token;
+no numeric ld64 version is claimed. The earlier [terminal
+observation](evidence/staged-native-linker-terminal-observation-2026-11-14.json)
+preserves the historical transfer interruption. Neither this completed host
+stage nor its sampled capacity result supplies a downstream or guest result;
+the next consumer must freshly verify its inputs. The earlier metadata plan
+remains `planned_not_built` within its original scope.
 
 ### Inputs for a plan
 
