@@ -26,7 +26,7 @@ extern "C" {
     ) -> *mut std::ffi::c_void;
 }
 
-fn host_symbol_addr(symbol: &std::ffi::CStr) -> u64 {
+pub(crate) fn host_symbol_addr(symbol: &std::ffi::CStr) -> u64 {
     #[cfg(unix)]
     unsafe {
         // SAFETY: looking up a well-known process symbol via dlsym using the
@@ -94,26 +94,9 @@ pub fn build_interpreter_bridge(guest_ranges: &[(u64, u64)]) -> FfiBridge {
         guest_ranges,
     );
 
-    // Host fallback and the lifecycle shim table have different addresses.
-    // Both must stop the interpreter; auto_call_host must never terminate its
-    // embedding process. Normal guest cleanup needs a separate, launch-scoped
-    // callback mechanism and is not implied by returning FfiResult::Exit.
-    for sym in &["exit", "_exit", "_Exit", "__exit", "__Exit"] {
-        let c_name = std::ffi::CString::new(*sym).unwrap();
-        let addr = host_symbol_addr(&c_name);
-        if addr != 0 {
-            let name = sym.to_string();
-            bridge.register(addr, &name, Box::new(|args| FfiResult::Exit(args.x[0])));
-        }
-    }
-
-    let mut lifecycle_shims = libsystem_shims::ShimTable::new();
-    libsystem_shims::LifecycleShims::install(&mut lifecycle_shims);
-    for sym in ["_exit", "__exit", "_Exit", "__Exit"] {
-        if let Some(addr) = lifecycle_shims.resolve(sym) {
-            bridge.register(addr, sym, Box::new(|args| FfiResult::Exit(args.x[0])));
-        }
-    }
+    // No owner: exit is intercepted, but callback registration must fail.
+    // The runtime pipelines replace these handlers with their launch registry.
+    crate::exit_lifecycle::install_interpreter_lifecycle(&mut bridge, None, false);
 
     bridge
 }
@@ -268,6 +251,32 @@ fn is_in_guest(addr: u64, ranges: &[(u64, u64)]) -> bool {
 #[cfg(all(test, unix))]
 mod exit_tests {
     use super::*;
+
+    #[test]
+    fn callback_registration_without_launch_never_reaches_host_atexit() {
+        let bridge = build_interpreter_bridge(&[]);
+        let mut table = libsystem_shims::ShimTable::new();
+        libsystem_shims::LifecycleShims::install(&mut table);
+        let args = FfiCallArgs {
+            x: [0x1234, 0x5678, 0, 0, 0, 0, 0, 0],
+            d: [0; 8],
+            x8: 0,
+            host_x8: 0,
+            guest_sp: 0,
+        };
+        for (host, shim) in [(c"atexit", "_atexit"), (c"__cxa_atexit", "___cxa_atexit")] {
+            let address = table.resolve(shim).unwrap();
+            assert!(
+                matches!(bridge.call_or_stub(address, &args), FfiResult::Return(result) if result as i32 == -1)
+            );
+            let address = host_symbol_addr(host);
+            if address != 0 {
+                assert!(
+                    matches!(bridge.call_or_stub(address, &args), FfiResult::Return(result) if result as i32 == -1)
+                );
+            }
+        }
+    }
 
     #[test]
     fn exit_symbols_stop_interpreter_without_terminating_host() {

@@ -124,6 +124,13 @@ pub(super) fn run_interpreted(
     // 7. Apply fixups
     registry.apply_all_fixups(&composite)?;
 
+    // The lifetime guard outlives +load/main and every cleanup subcall, and
+    // discards registrations on all failure paths before images are unmapped.
+    let exit_scope = crate::exit_lifecycle::enter_launch(
+        &registry,
+        libsystem_shims::exit_registry::ExitRoute::Arm64Interpreter,
+    )?;
+
     // 7.5. ObjC registration (phases A–E, no event tracing on interpreted path)
     if config.shim_set.objc {
         let _stats =
@@ -173,6 +180,7 @@ pub(super) fn run_interpreted(
         .collect();
 
     // 10b. Fire +load methods from app binary via the interpreter.
+    let mut initializer_exit = None;
     if config.shim_set.objc {
         let app_ranges: Vec<(u64, u64)> = registry.images()[app_idx]
             .image
@@ -213,7 +221,12 @@ pub(super) fn run_interpreted(
                         class_name,
                         imp
                     );
-                    let ffi = interp_bridge::build_interpreter_bridge(&guest_ranges);
+                    let mut ffi = interp_bridge::build_interpreter_bridge(&guest_ranges);
+                    crate::exit_lifecycle::install_interpreter_lifecycle(
+                        &mut ffi,
+                        Some(exit_scope.registry()),
+                        false,
+                    );
                     // SAFETY: segments are valid for the duration of this block.
                     let mut mem = unsafe { arm64_translate::Memory::from_segments(&load_segments) };
                     mem.host_passthrough = true;
@@ -222,14 +235,30 @@ pub(super) fn run_interpreted(
                     cpu.sp = mem.initial_sp();
                     cpu.x[30] = 0; // RET → 0 triggers ReturnedToHost exit
                     let mut interp = arm64_translate::Interpreter::new(cpu, mem, ffi);
-                    let _ = interp.run();
+                    match interp.run() {
+                        arm64_translate::ExitReason::Returned { .. }
+                        | arm64_translate::ExitReason::ReturnedToHost { .. } => {}
+                        arm64_translate::ExitReason::Exit { code } => {
+                            initializer_exit = Some(code as i32);
+                            break;
+                        }
+                        reason => {
+                            log::error!("Interpreter +load failed: {reason:?}");
+                            return Err(macho_exec::ExecError::NoEntryPoint.into());
+                        }
+                    }
                 }
             }
         }
     }
 
     // 11. Interpreter execution of main()
-    let ffi_bridge = interp_bridge::build_interpreter_bridge(&guest_ranges);
+    let mut ffi_bridge = interp_bridge::build_interpreter_bridge(&guest_ranges);
+    crate::exit_lifecycle::install_interpreter_lifecycle(
+        &mut ffi_bridge,
+        Some(exit_scope.registry()),
+        true,
+    );
 
     let entry_args = macho_exec::EntryArgs {
         program_name: config.process_name.clone(),
@@ -241,16 +270,21 @@ pub(super) fn run_interpreted(
             .collect(),
     };
 
-    let entry_result = macho_exec::call_entry_interpreted(
-        &registry.images()[app_idx].image,
-        &entry,
-        Some(&entry_args),
-        ffi_bridge,
-        &all_segments,
-    )?;
+    let exit_code = if let Some(code) = initializer_exit {
+        code
+    } else {
+        macho_exec::call_entry_interpreted(
+            &registry.images()[app_idx].image,
+            &entry,
+            Some(&entry_args),
+            ffi_bridge,
+            &all_segments,
+        )?
+        .exit_code
+    };
 
     Ok(RuntimeResult {
-        exit_code: entry_result.exit_code,
+        exit_code,
         security_report: None,
         images_loaded: registry.images().len(),
         shims_installed: ctx.shim_table.len(),
