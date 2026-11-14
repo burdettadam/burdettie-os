@@ -48,6 +48,34 @@ libSystem retains `Debug`. No debug-information or optimization flags are
 removed. The assertions compare phases after replacing only the intended
 dependency paths and job count.
 
+### Compiler target and archive inspection gate
+
+Source inspection leaves a target-precedence question for the actual compiler
+runtime build. The pinned
+[`compiler-rt.nix`](https://github.com/PureDarwin/PureDarwin/blob/0163b2db225b85e3bf96fc25646ea290105ac298/nix/pkgs/toolchain/compiler-rt.nix)
+sets `CMAKE_C_COMPILER_TARGET` and `CMAKE_CXX_COMPILER_TARGET` to
+`x86_64-apple-darwin20.4`. The
+[`toolchain.nix` wrapper](https://github.com/PureDarwin/PureDarwin/blob/0163b2db225b85e3bf96fc25646ea290105ac298/nix/pkgs/toolchain/toolchain.nix)
+prepends `-target x86_64-apple-macosx26.5`, then forwards caller arguments, including
+explicit target arguments. It also removes deployment-minimum arguments. A later
+target argument from CMake can therefore affect the effective target. The bounded
+recipe preserves this upstream behavior; the effective deployment target for
+its compiler-rt objects has not yet been observed.
+
+Retain the actual compile commands and use realized inspection tools with
+checked exit statuses to enumerate archive members, verify their architecture,
+inspect deployment-version load commands where present, and check required
+builtin symbol definitions. Record and explain absent version metadata, missing
+symbols and inspection failures before using the archive in a qualified fixture
+link. Neither a wrapper filename nor a preserved CMake flag establishes the
+resulting object ABI.
+
+The upstream compiler-rt install phase makes its `otool -h` diagnostic optional
+with `|| true`. A successful Nix build does not establish that this diagnostic
+succeeded. Archive/object qualification therefore requires the separate checked
+inspection above, with its output and failures retained. No target or deployment
+flags are changed by this documentation requirement.
+
 ### LLVM staging and its remaining cost
 
 The pinned
