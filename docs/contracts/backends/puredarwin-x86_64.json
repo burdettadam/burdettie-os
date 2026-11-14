@@ -462,7 +462,7 @@
         }
       ],
       "gaps": [
-        "PR #5 advances admission route parity but is unmerged and does not qualify the PureDarwin backend.",
+        "PR #5 admission route parity is included in the M1 platform feature branch through PR #7; it is not merged into main and does not qualify the PureDarwin backend.",
         "Later dynamic loads, native fallback and cached plans still need identity-bound provider/dependency admission."
       ],
       "qualification_tests": [
@@ -539,7 +539,7 @@
         }
       ],
       "gaps": [
-        "PR #5 fixes aggregate denial behavior but is unmerged; no selected-guest qualification.",
+        "PR #5 aggregate-denial correction is included in the M1 platform feature branch through PR #7; main and selected-guest qualification remain unchanged.",
         "Guest entitlements must never mint owner grants or override the profile."
       ],
       "qualification_tests": [
@@ -652,7 +652,7 @@
       "url": "https://github.com/burdettadam/burdettie-os/pull/5",
       "revision": "4a74a51502a29bc65ef1fe4a8ce92ce2c11ec498",
       "status": "published_unmerged",
-      "scope": "Admission parity and entitlement aggregation; no PureDarwin confinement qualification."
+      "scope": "Admission parity and entitlement aggregation, included in the M1 platform feature branch through PR #7 at aade8484a773bfa88433526a2039084cc31d6b20; the PR remains unmerged into main and supplies no PureDarwin confinement qualification."
     }
   ]
 }

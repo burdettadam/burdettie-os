@@ -289,20 +289,29 @@
   "runtime_prerequisites": {
     "headless_and_exit": {
       "pull_request": "https://github.com/burdettadam/burdettie-os/pull/7",
-      "revision": "d3ee4a2dd9483193bb3d01e38e4b2051751fdb17",
-      "status": "published_draft_unmerged",
+      "revision": "aade8484a773bfa88433526a2039084cc31d6b20",
+      "status": "included_in_platform_feature_branch_not_main",
       "selected_guest_link_and_execution": "not_run",
       "launch_owned_normal_exit_cleanup": "implemented_for_direct_pipelines_host_tests_pass",
       "admission_integrated_from_revision": "4a74a51502a29bc65ef1fe4a8ce92ce2c11ec498",
-      "required_checks": "functional_pass_security_and_hygiene_fail",
-      "evidence": "evidence/runtime-integration-2026-11-14.json"
+      "required_checks": "combined_feature_head_pending",
+      "evidence": "evidence/runtime-platform-integration-2026-11-14.json",
+      "checkpoint_kind": "component_ci_and_feature_integration",
+      "maintained_fonts_integrated_from_revision": "3335e6e3935dd7d77f544f570d5dcfbb92e3b183",
+      "prior_evidence": "evidence/runtime-integration-2026-11-14.json",
+      "typed_nsrange_adapter": "implemented_for_exact_known_imp_host_x86_64_tests_pass",
+      "source_merge_parents": [
+        "e5ff8bf1fc332b6fc0c08dd904a38e8de34f8af4",
+        "aade8484a773bfa88433526a2039084cc31d6b20"
+      ],
+      "source_merge_tree_before_evidence_update": "7f2cb185de44adb140bd69ed36f0f94f40a27d61"
     },
     "admission": {
       "pull_request": "https://github.com/burdettadam/burdettie-os/pull/5",
       "revision": "4a74a51502a29bc65ef1fe4a8ce92ce2c11ec498",
-      "status": "published_unmerged",
+      "status": "included_in_platform_feature_branch_not_main",
       "selected_guest_qualification": "not_run",
-      "integrated_into_runtime_pr_revision": "d3ee4a2dd9483193bb3d01e38e4b2051751fdb17"
+      "integrated_into_runtime_pr_revision": "aade8484a773bfa88433526a2039084cc31d6b20"
     }
   }
 }

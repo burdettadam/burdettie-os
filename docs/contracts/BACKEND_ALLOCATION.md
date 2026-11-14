@@ -96,6 +96,14 @@ unmerged at this allocation checkpoint. Preserve and review that work; this
 change does not reimplement it. Its code tests do not qualify the new guest or
 provide resource confinement.
 
+The subsequent M1 platform feature branch includes that admission work through
+PR #7 at `aade8484a773bfa88433526a2039084cc31d6b20`, together with launch-owned
+cleanup, maintained fonts and the narrow typed NSRange adapter. Main remains
+unchanged. The [runtime/platform receipt](../milestones/evidence/runtime-platform-integration-2026-11-14.json)
+separates component checks from pending combined-head checks. The allocation
+context and all 17 unavailable/unsupported capability records remain unchanged;
+source integration supplies no guest enforcement evidence.
+
 ## Mode and evidence rules
 
 Permissive mode skips optional controls without inventing successful evidence.
