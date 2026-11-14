@@ -51,15 +51,47 @@ A subsequent **no-build** evaluation of `apple-sdk`, `native-ld`, `darwin-cross-
 
 The shared-host reserve is 8 GiB. The combined unpacked download estimate leaves little room above that reserve for local outputs and temporary trees. Measure individual stages and enforce disk, memory, CPU and time limits before realization. The full-image 60-GB upstream guideline does not by itself reject the narrower fixture lane; the actual plan also does not prove that all stages fit. No selected-candidate image build or boot is established by this dry run.
 
-The individual SDK plan was 3 local derivations and 72 fetched paths (412.25 MiB download, 1908.90 MiB unpacked). A bounded SDK-only build then passed in **75.11 seconds** using the unchanged selected source. The final SDK's stdio, pthread and Mach headers and libSystem link stub were checked and hashed. Free space afterward was **12243050496 bytes**, above the 8-GiB reserve; the 3-GiB growth guard was not reached. SDK warnings remain in its log. This is a source-derived SDK result, not an image, linked fixture or runtime result. Larger linker/libSystem stages were not launched: their raw Ninja job counts and additional LLVM/Debug build footprint still need explicit bounds.
+The individual SDK plan was 3 local derivations and 72 fetched paths (412.25 MiB download, 1908.90 MiB unpacked). A bounded SDK-only build then passed in **75.11 seconds** using the unchanged selected source. The final SDK's stdio, pthread and Mach headers and libSystem link stub were checked and hashed. Free space afterward was **12243050496 bytes**, above the 8-GiB reserve; the 3-GiB growth guard was not reached. SDK warnings remain in its log. This is a source-derived SDK result, not an image, linked fixture or runtime result. At that SDK checkpoint, larger linker/libSystem stages had not been launched. The later bounded linker attempt is recorded below; its final outcome remains unretrieved.
 
 The subsequent **offline object-only probe passed** using that already-realized SDK and its LLVM 21.1.8 compiler: 12 seconds of input preflight followed by 11 seconds for compilation and inspection. `simple_cli` produced a 768-byte x86_64 `MH_OBJECT`; `m1_abi_probe` produced a 5136-byte x86_64 `MH_OBJECT`. Both report minimum OS 26.5.0 and SDK command field 0.0.0; the selected SDK is bound independently by its input and header hashes. The run used no new dependency download and finished with 12219154432 disk bytes free, a stage decrease of 24576 bytes. Symbol inspection was not run because LLVM nm was absent. The [object receipt](evidence/objects-2026-11-14.json) preserves those exact boundaries: no executable link, guest execution, Burdettie runtime execution or enforcement was attempted.
 
 See [the fixture and ABI gate](M1_FIXTURE_ABI.md) for the pinned SDK/linker/libSystem recipe and source-owned C probe. It refuses unavailable outputs and never launches a dependency build implicitly.
 
+## Bounded linker continuation
+
+The [bounded recipes](M1_BOUNDED_BUILD_RECIPES.md) now explicitly constrain raw
+Ninja invocations and carry the derived native linker through the cross-toolchain,
+compiler-rt and libSystem graph. The compiler-rt staging recipe copies only its
+writable subtree and retains all siblings through immutable source symlinks. The
+complete LLVM source input and upstream build/target flags remain required.
+These implementation changes do not establish that the downstream stages fit or
+build successfully.
+
+The actual native-linker metadata plan passed in **20.09 seconds**, reusing the
+unchanged realized SDK. It listed **20 local derivations and 190 fetched paths:
+356.27 MiB download and 1085.00 MiB unpacked**. The plan queried cache metadata
+without realizing or downloading dependencies. Its full private capture and
+eight-file checksum manifest were recovered and verified. The [sanitized
+receipt](evidence/native-linker-2026-11-14.json) records the exact source, recipe,
+SDK, candidate and plan hashes.
+
+One bounded build attempt started at **08:36:22 UTC**. It used one build job/core,
+25% of one CPU, a 1.5-GiB memory ceiling, no swap, an 8-GiB disk reserve, a 3-GiB
+growth guard, a 1200-second phase deadline and a 1500-second service deadline.
+Remote builders and automatic garbage collection were disabled; the command
+requested retention of failed build trees and printed build logs. No instance or disk expansion was introduced.
+
+The last retrieved observation, **08:53:16 UTC**, showed `apple-libtapi` at **20%**
+and the unit still running. The observed cgroup memory peak was 1343332352 bytes
+and free disk space was 10120871936 bytes. The console session subsequently
+expired before the final receipt was retrieved. **The final build outcome is
+unknown.** Neither the progress marker nor the configured deadline establishes
+a success, timeout, compiler failure, realized linker or current host state.
+Retrieve this existing attempt before launching another build.
+
 ## Runtime and security work
 
-[PR #7](https://github.com/burdettadam/burdettie-os/pull/7) publishes separately reviewed runtime prerequisites: optional native dialogs for the headless Darwin CLI, correct immediate-exit behavior and interception of actual interpreter exit shims. Host tests and dependency-graph checks pass; Darwin linking and execution inside the selected guest remain unqualified. Normal callback ownership and drain-before-unmap still need implementation.
+[PR #7](https://github.com/burdettadam/burdettie-os/pull/7) publishes separately reviewed runtime prerequisites: optional native dialogs, immediate-exit handling and launch-owned normal cleanup. Its new cleanup slice retains callback ABI/DSO/image ownership, runs ARM64 callbacks through the suspended interpreter, shares the instruction budget with cleanup and drains before image unmapping. Local public-pipeline tests passed in 17 isolated cases; required platform CI still applies. Native explicit exit, worker lifetime, shared streams and unsupported lifecycle routes remain documented limits. These host results do not qualify Darwin linking or execution inside the selected guest.
 
 [PR #5](https://github.com/burdettadam/burdettie-os/pull/5) already contains admission work for native, interpreter and typestate routes. It is a separate, unmerged change; it does not establish complete mode, provider or lifecycle enforcement. Remaining integration is tracked in [issue #6](https://github.com/burdettadam/burdettie-os/issues/6).
 
@@ -67,7 +99,7 @@ The [backend allocation](../contracts/BACKEND_ALLOCATION.md) assigns 17 control 
 
 ## Remaining gates
 
-1. Bound and realize the remaining linker/libSystem inputs within the existing host budget, then link and inspect the public fixture executables. The SDK and object-compilation stages have passed.
+1. Retrieve the existing bounded linker build result, diagnose its actual outcome, then realize and inspect the remaining inputs within the unchanged host budget. The SDK and object-compilation stages have passed; linked executable fixtures remain unqualified.
 2. Build and independently boot the selected image, including its own persistence, recovery and graceful-shutdown assessment.
 3. Qualify Rust standard-library/libSystem linkage and execute the x86_64 fixture through Burdettie inside that guest.
 4. Resolve the concrete worker-lifetime, display/input and backend gaps before advertising the corresponding behaviors.
