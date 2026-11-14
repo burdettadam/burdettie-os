@@ -9,12 +9,14 @@ on:
       - 'scripts/m1_boot_preflight.py'
       - 'scripts/m1_vm_bootstrap.py'
       - 'scripts/build_puredarwin_fixtures.py'
+      - 'scripts/compile_puredarwin_objects.py'
       - 'fixtures/m1_abi_probe/probe.c'
       - 'fixtures/simple_cli/main.c'
       - 'scripts/tests/test_collect_m1_inventory.py'
       - 'scripts/tests/test_m1_boot_preflight.py'
       - 'scripts/tests/test_m1_vm_bootstrap.py'
       - 'scripts/tests/test_build_puredarwin_fixtures.py'
+      - 'scripts/tests/test_compile_puredarwin_objects.py'
   pull_request:
     paths:
       - '.github/workflows/m1-contracts.yml'
@@ -23,12 +25,14 @@ on:
       - 'scripts/m1_boot_preflight.py'
       - 'scripts/m1_vm_bootstrap.py'
       - 'scripts/build_puredarwin_fixtures.py'
+      - 'scripts/compile_puredarwin_objects.py'
       - 'fixtures/m1_abi_probe/probe.c'
       - 'fixtures/simple_cli/main.c'
       - 'scripts/tests/test_collect_m1_inventory.py'
       - 'scripts/tests/test_m1_boot_preflight.py'
       - 'scripts/tests/test_m1_vm_bootstrap.py'
       - 'scripts/tests/test_build_puredarwin_fixtures.py'
+      - 'scripts/tests/test_compile_puredarwin_objects.py'
 
 permissions:
   contents: read
