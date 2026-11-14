@@ -17,6 +17,8 @@ on:
       - 'scripts/plan_puredarwin_libtapi.py'
       - 'scripts/puredarwin_libtapi.nix'
       - 'scripts/stage_libtapi_source.py'
+      - 'scripts/plan_puredarwin_staged_linker.py'
+      - 'scripts/puredarwin_staged_linker.nix'
       - 'fixtures/m1_abi_probe/probe.c'
       - 'fixtures/simple_cli/main.c'
       - 'scripts/tests/test_collect_m1_inventory.py'
@@ -28,6 +30,7 @@ on:
       - 'scripts/tests/test_plan_puredarwin_libraries.py'
       - 'scripts/tests/test_plan_puredarwin_libtapi.py'
       - 'scripts/tests/test_stage_libtapi_source.py'
+      - 'scripts/tests/test_plan_puredarwin_staged_linker.py'
   pull_request:
     paths:
       - '.github/workflows/m1-contracts.yml'
@@ -44,6 +47,8 @@ on:
       - 'scripts/plan_puredarwin_libtapi.py'
       - 'scripts/puredarwin_libtapi.nix'
       - 'scripts/stage_libtapi_source.py'
+      - 'scripts/plan_puredarwin_staged_linker.py'
+      - 'scripts/puredarwin_staged_linker.nix'
       - 'fixtures/m1_abi_probe/probe.c'
       - 'fixtures/simple_cli/main.c'
       - 'scripts/tests/test_collect_m1_inventory.py'
@@ -55,6 +60,7 @@ on:
       - 'scripts/tests/test_plan_puredarwin_libraries.py'
       - 'scripts/tests/test_plan_puredarwin_libtapi.py'
       - 'scripts/tests/test_stage_libtapi_source.py'
+      - 'scripts/tests/test_plan_puredarwin_staged_linker.py'
 
 permissions:
   contents: read

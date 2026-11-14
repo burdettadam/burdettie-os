@@ -105,6 +105,7 @@ class BootstrapProtocolTests(unittest.TestCase):
                     mock.patch.object(bootstrap, "IMAGE_SHA256", image_digest), \
                     mock.patch.object(bootstrap, "sha256", side_effect=digest), \
                     mock.patch.object(bootstrap, "memory_available", return_value=8 * 1024 * bootstrap.MIB), \
+                    mock.patch.object(bootstrap.shutil, "disk_usage", return_value=argparse.Namespace(free=1024 * bootstrap.MIB)), \
                     mock.patch.object(bootstrap.shutil, "which", return_value=sys.executable), \
                     mock.patch.object(bootstrap.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, b"QEMU test\n")), \
                     mock.patch.object(bootstrap, "run_phase", side_effect=executed_phase):
@@ -112,6 +113,32 @@ class BootstrapProtocolTests(unittest.TestCase):
             self.assertEqual(len(report["phases"]), 2)
             self.assertEqual(report["status"], "fail")
             self.assertIn("evidence read failure", report["error"])
+
+    def test_insufficient_disk_blocks_before_copy_or_execution(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            image = directory / "input.img"
+            image.write_bytes(b"test")
+            args = argparse.Namespace(output_dir=directory / "run", image=image,
+                                      firmware_code=image, firmware_vars=image,
+                                      memory_mib=1024, vcpus=1, timeout=30)
+            with mock.patch.object(bootstrap.platform, "system", return_value="Linux"), \
+                    mock.patch.object(bootstrap.platform, "machine", return_value="x86_64"), \
+                    mock.patch.object(bootstrap, "IMAGE_BYTES", 4), \
+                    mock.patch.object(bootstrap, "IMAGE_SHA256", bootstrap.sha256(image)), \
+                    mock.patch.object(bootstrap, "memory_available", return_value=8 * 1024 * bootstrap.MIB), \
+                    mock.patch.object(bootstrap.shutil, "disk_usage", return_value=argparse.Namespace(free=1024 * bootstrap.MIB - 1)), \
+                    mock.patch.object(bootstrap.shutil, "which", return_value=sys.executable), \
+                    mock.patch.object(bootstrap.shutil, "copyfile") as copy_file, \
+                    mock.patch.object(bootstrap.subprocess, "run") as command, \
+                    mock.patch.object(bootstrap, "run_phase") as phase:
+                report = bootstrap.run(args)
+            self.assertEqual(report["status"], "blocked")
+            self.assertEqual(report["phases"], [])
+            self.assertEqual(report["blockers"], ["At least 1 GiB free disk is required for this bounded experiment."])
+            copy_file.assert_not_called()
+            command.assert_not_called()
+            phase.assert_not_called()
 
     @unittest.skipUnless(sys.platform == "linux" and hasattr(os, "sched_getaffinity"), "Linux process controls")
     def test_echo_only_console_times_out_and_process_is_reaped(self):
