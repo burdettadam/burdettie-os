@@ -122,6 +122,12 @@ pub enum ExitReason {
     MemoryFault { pc: u64, addr: u64, is_write: bool },
     /// Branch to unmapped address (not FFI).
     BadBranch { pc: u64, target: u64 },
+    /// An explicitly typed FFI adapter rejected unsupported or unreadable input.
+    FfiRejected {
+        pc: u64,
+        target: u64,
+        reason: String,
+    },
 }
 
 /// Sentinel return address pushed as LR when calling main.

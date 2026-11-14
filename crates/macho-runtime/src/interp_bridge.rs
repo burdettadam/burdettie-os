@@ -18,6 +18,10 @@ use objc_runtime::shims::dispatch::{
     objc_msg_send_super_stret_addr,
 };
 
+#[cfg(all(unix, target_arch = "x86_64"))]
+#[path = "interp_printf.rs"]
+mod printf;
+
 #[cfg(unix)]
 extern "C" {
     fn dlsym(
@@ -98,6 +102,9 @@ pub fn build_interpreter_bridge(guest_ranges: &[(u64, u64)]) -> FfiBridge {
     // The runtime pipelines replace these handlers with their launch registry.
     crate::exit_lifecycle::install_interpreter_lifecycle(&mut bridge, None, false);
 
+    #[cfg(all(unix, target_arch = "x86_64"))]
+    printf::install(&mut bridge);
+
     bridge
 }
 
@@ -109,6 +116,49 @@ pub fn build_interpreter_bridge(guest_ranges: &[(u64, u64)]) -> FfiBridge {
 /// Unrecognized IMPs retain `call_host_capturing`'s existing ABI requirements
 /// and limitations; this helper does not infer their signatures.
 unsafe fn call_host_imp(imp: u64, receiver: u64, args: &FfiCallArgs) -> FfiResult {
+    #[cfg(all(unix, target_arch = "x86_64"))]
+    {
+        let args = *args;
+        FfiResult::with_interpreter(move |interpreter| {
+            use cf_lite::cstring_observer::{
+                with_cstring_observer, CStringObservation, CStringObserver,
+            };
+            let exports = interpreter.mem.cstring_exports();
+            let observer: CStringObserver = std::sync::Arc::new(move |event| match event {
+                CStringObservation::Created { object, value } => {
+                    exports.observe_immutable(object, value);
+                }
+                CStringObservation::Invalidated { object } => exports.invalidate(object),
+            });
+            let (result, returned_string) = with_cstring_observer(observer, || {
+                // SAFETY: the caller already excluded guest code and retains
+                // the host shim's valid receiver/argument contract. This helper
+                // matches an exact typed IMP; no pointer/length is reconstructed.
+                if let Some(pointer) = unsafe {
+                    cf_lite::FoundationShims::call_known_utf8string_imp(imp, receiver, args.x[1])
+                } {
+                    (FfiResult::Return(pointer), Some(pointer))
+                } else {
+                    // SAFETY: same resolved host-call contract, unchanged ABI.
+                    (unsafe { call_host_imp_inner(imp, receiver, &args) }, None)
+                }
+            });
+            if let Some(pointer) = returned_string {
+                // Unobserved, mutable and other-interpreter strings do not
+                // become exports. Preserve the getter's actual returned value.
+                interpreter.mem.export_observed_cstring(receiver, pointer);
+            }
+            result
+        })
+    }
+    #[cfg(not(all(unix, target_arch = "x86_64")))]
+    // SAFETY: all native ARM64 and other existing host routes are unchanged.
+    unsafe {
+        call_host_imp_inner(imp, receiver, args)
+    }
+}
+
+unsafe fn call_host_imp_inner(imp: u64, receiver: u64, args: &FfiCallArgs) -> FfiResult {
     #[cfg(target_arch = "x86_64")]
     {
         // SAFETY: the caller excluded guest code and supplies live arguments.
