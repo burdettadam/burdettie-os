@@ -60,12 +60,7 @@ impl FixtureDirectory {
         path
     }
 
-    fn write_with_rpaths(
-        &self,
-        name: &str,
-        dependencies: &[&str],
-        rpaths: &[&str],
-    ) -> PathBuf {
+    fn write_with_rpaths(&self, name: &str, dependencies: &[&str], rpaths: &[&str]) -> PathBuf {
         let path = self.0.join(name);
         std::fs::create_dir_all(path.parent().unwrap()).expect("create fixture parent");
         let mut bytes = image(6, dependencies);
@@ -75,8 +70,7 @@ impl FixtureDirectory {
             let length = (12 + rpath.len() + 1).div_ceil(8) * 8;
             assert!(end + length < bytes.len());
             bytes[end..end + 4].copy_from_slice(&0x8000_001c_u32.to_le_bytes());
-            bytes[end + 4..end + 8]
-                .copy_from_slice(&u32::try_from(length).unwrap().to_le_bytes());
+            bytes[end + 4..end + 8].copy_from_slice(&u32::try_from(length).unwrap().to_le_bytes());
             bytes[end + 8..end + 12].copy_from_slice(&12_u32.to_le_bytes());
             bytes[end + 12..end + 12 + rpath.len()].copy_from_slice(rpath.as_bytes());
             end += length;
@@ -361,7 +355,11 @@ fn every_route_rejects_an_inserted_librarys_transitive_dependency() {
         6,
         &["@loader_path/deps/parent.dylib"],
     );
-    let parent = directory.write("plugins/deps/parent.dylib", 6, &["@loader_path/denied.dylib"]);
+    let parent = directory.write(
+        "plugins/deps/parent.dylib",
+        6,
+        &["@loader_path/denied.dylib"],
+    );
     let denied = directory.write("plugins/deps/denied.dylib", 6, &[]);
     for route in ROUTES {
         for via_environment in [false, true] {
@@ -371,7 +369,12 @@ fn every_route_rejects_an_inserted_librarys_transitive_dependency() {
             assert_denied(route, route.load(&main, config));
             assert_eq!(
                 *seen.lock().unwrap(),
-                vec![main.clone(), inserted.clone(), parent.clone(), denied.clone()]
+                vec![
+                    main.clone(),
+                    inserted.clone(),
+                    parent.clone(),
+                    denied.clone()
+                ]
             );
         }
     }
