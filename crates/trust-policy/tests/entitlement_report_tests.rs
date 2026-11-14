@@ -75,7 +75,10 @@ fn evaluate(legacy_denied: bool, signature_denied: bool, key_names: &[&str]) -> 
     if signature_denied {
         policy.code_signature = Box::new(DenySignature);
     }
-    let keys: Vec<_> = key_names.iter().map(|key| (key.to_string(), true)).collect();
+    let keys: Vec<_> = key_names
+        .iter()
+        .map(|key| (key.to_string(), true))
+        .collect();
     let signature = CodeSignatureInfo {
         present: true,
         restrict: true,
@@ -108,7 +111,10 @@ fn assert_consistent(report: &SecurityReport) {
 fn parsed_entitlement_denial_replaces_earlier_allow() {
     let report = evaluate(false, false, &["deny"]);
     assert!(!report.allowed);
-    assert_eq!(report.denied_reasons, ["test.entitlements: parsed-key denial"]);
+    assert_eq!(
+        report.denied_reasons,
+        ["test.entitlements: parsed-key denial"]
+    );
     assert_consistent(&report);
 }
 
