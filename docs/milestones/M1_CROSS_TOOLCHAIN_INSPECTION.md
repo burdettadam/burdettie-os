@@ -7,8 +7,11 @@ wrappers, compile fixtures, or qualify a guest. Its local tests use small owned
 filesystem trees and synthetic Nix command results. They are not an actual
 cross-toolchain realization or output inspection.
 
-This is a prerequisite for the later bounded cross-toolchain producer and its
-consumers. [The staged downstream planner](M1_STAGED_LIBRARIES.md) remains
+The [bounded cross-toolchain producer](M1_CROSS_TOOLCHAIN_BUILD.md) now calls
+this inspector after revalidating a retained plan and observing its exact
+offline realization. Its source tests do not establish an actual build;
+recovering the private metadata archive and checking the current host remain
+execution prerequisites. [The staged downstream planner](M1_STAGED_LIBRARIES.md) remains
 unchanged, including all thirteen helper/recipe inputs. M1 remains incomplete;
 all seventeen security backend families remain unavailable and unqualified.
 

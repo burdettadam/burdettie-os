@@ -220,7 +220,11 @@ jobs, no remote builders, no automatic garbage collection, retained failed
 builds and a new output link. It is never executed by this helper. A separate
 reviewed runner must apply the owner's existing CPU, memory, reserve, growth,
 inode and time limits after inspecting the actual plan and taking a fresh host
-census. Every successful plan leaves `peak_space_qualified: false`.
+census. The [cross-toolchain producer](M1_CROSS_TOOLCHAIN_BUILD.md) implements
+that next step for an offline cross-only plan inside an existing bounded
+service; it does not create or enlarge the host environment. Actual realization
+still requires the retained private evidence and a fresh host assessment.
+Every successful plan leaves `peak_space_qualified: false`.
 
 ## Later fixture path and open gates
 
