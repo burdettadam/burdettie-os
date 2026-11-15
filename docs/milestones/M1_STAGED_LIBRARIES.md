@@ -243,6 +243,12 @@ actual libSystem/dyld output qualification. Target/build flags are unchanged.
 Fixture execution, ABI behavior, selected-source guest boot and all security
 backends require their own observed results.
 
+The [libSystem dylib inspector](M1_LIBSYSTEM_INSPECTION.md) now provides an
+additive, separately adopted static check for the two selected dylib identities
+and dependency paths. It consumes independently reviewed file hashes and
+expectations; it does not establish build/NAR provenance or close these live
+qualification gates. The existing helpers and their receipt hashes are unchanged.
+
 The focused tests use the real pinned Nix evaluator with small synthetic
 package records, source-owned synthetic ELF program headers/dynamic tables,
 and mocked Nix/loader/version responses. They test coherent propagation, lazy

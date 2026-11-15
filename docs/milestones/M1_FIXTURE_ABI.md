@@ -81,6 +81,12 @@ The link recipe follows the pinned upstream [small C program recipe](https://git
 
 `built_and_statically_checked` means only compilation and those checks passed. The report always keeps guest execution, Burdettie runtime execution and enforcement at `not_run`; observed execution requires separate records.
 
+The separate [libSystem dylib inspector](M1_LIBSYSTEM_INSPECTION.md) checks the
+two already available dylibs' identities and dependency paths against reviewed
+hashes and expectations. A future staged fixture entry point must adopt it
+alongside actual build/NAR evidence; this original fixture helper remains
+unchanged and continues to resolve the original upstream package map.
+
 ### Source and evaluation footprint
 
 Use Nix **2.27 or later** for this unchanged source. Relative `path:` lock inputs require the format introduced in [Nix 2.26](https://nix.dev/manual/nix/2.27/release-notes/rl-2.26.html); the `inputs.self.submodules` declaration was added in [Nix 2.27](https://nix.dev/manual/nix/2.27/release-notes/rl-2.27). This is a syntax floor, not a tested claim that every later Nix release behaves identically.

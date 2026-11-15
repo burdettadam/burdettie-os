@@ -171,6 +171,11 @@ archive. Its successful build and actual link provenance require their own
 checks. This helper does not change permissive, audit or enforced policy, and
 does not promote any backend capability.
 
+The additive [libSystem dylib inspector](M1_LIBSYSTEM_INSPECTION.md) supplies a
+source-tested static identity/dependency check for `libSystem.B.dylib` and
+`libdyld.dylib`. Its tests do not establish an actual library build or inspection,
+and it leaves the separate `dyld` executable and all execution gates unqualified.
+
 ## Focused tests
 
 ```sh
