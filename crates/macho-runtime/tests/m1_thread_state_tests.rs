@@ -31,14 +31,7 @@ fn __thread_state_child() {
     let binary = work.join("probe");
     let compiled = Command::new("xcrun")
         .args([
-            "--sdk",
-            "macosx",
-            "clang",
-            "-std=c11",
-            "-O2",
-            "-Wall",
-            "-Wextra",
-            "-Werror",
+            "--sdk", "macosx", "clang", "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror",
             "-pthread",
         ])
         .arg(&source)
@@ -53,7 +46,10 @@ fn __thread_state_child() {
     );
     let result = Runtime::load_and_run(&binary, &RuntimeConfig::permissive(&binary))
         .expect("thread-state runtime execution failed");
-    assert_eq!(result.exit_code, 0, "thread-state fixture rejected execution");
+    assert_eq!(
+        result.exit_code, 0,
+        "thread-state fixture rejected execution"
+    );
 }
 
 #[test]
