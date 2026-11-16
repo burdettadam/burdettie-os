@@ -86,6 +86,33 @@ pub(super) extern "C" fn shim_pthread_create(
     let Some(f) = start_routine else {
         return libc::EINVAL;
     };
+
+    // Attributes belong to their caller and remain reusable after creation,
+    // including a failed create. Keep the registry guard until the host has
+    // finished reading the opaque object; never copy or consume its bytes.
+    #[cfg(not(target_os = "macos"))]
+    let registry = if attr.is_null() {
+        None
+    } else {
+        Some(
+            pthread_attr_registry()
+                .lock()
+                .unwrap_or_else(|e| e.into_inner()),
+        )
+    };
+    #[cfg(not(target_os = "macos"))]
+    let host_attr = match &registry {
+        Some(registry) => match registry.get(&(attr as usize)) {
+            Some(host) => std::ptr::from_ref(&**host),
+            // A non-null guest object must have been initialized through the
+            // shim. Silently using defaults would discard requested settings.
+            None => return libc::EINVAL,
+        },
+        None => std::ptr::null(),
+    };
+    #[cfg(target_os = "macos")]
+    let host_attr = attr;
+
     let start = Box::new(GuestThreadStart {
         start_routine: f,
         arg,
@@ -97,54 +124,14 @@ pub(super) extern "C" fn shim_pthread_create(
         f as *const (),
     );
 
-    #[cfg(not(target_os = "macos"))]
-    let host_attr_storage = if attr.is_null() {
-        log::trace!("pthread_create: guest attr is null; using default host thread attrs");
-        None
-    } else {
-        let key = attr as usize;
-        let mut registry = pthread_attr_registry()
-            .lock()
-            .unwrap_or_else(|e| e.into_inner());
-        match registry.remove(&key) {
-            Some(host_attr) => {
-                log::trace!(
-                    "pthread_create: using virtualized host attr for guest attr {:p}",
-                    attr,
-                );
-                Some(host_attr)
-            }
-            None => {
-                log::trace!(
-                    "pthread_create: guest attr {:p} not initialized via shim; using default host thread attrs",
-                    attr,
-                );
-                None
-            }
-        }
-    };
-    #[cfg(target_os = "macos")]
-    let host_attr = attr;
-
-    #[cfg(not(target_os = "macos"))]
-    let host_attr = host_attr_storage
-        .as_deref()
-        .map_or(std::ptr::null(), |host| host as *const libc::pthread_attr_t);
-
     let rc = unsafe { libc::pthread_create(thread, host_attr, guest_thread_start, raw) };
+    // The new thread may itself use attribute shims. Do not keep the registry
+    // locked beyond the host call or wait for a child while holding this guard.
+    #[cfg(not(target_os = "macos"))]
+    drop(registry);
     if rc != 0 {
         unsafe {
             drop(Box::from_raw(raw.cast::<GuestThreadStart>()));
-        }
-    }
-    #[cfg(not(target_os = "macos"))]
-    if let Some(mut host_attr) = host_attr_storage {
-        let destroy_rc = unsafe { libc::pthread_attr_destroy(&mut *host_attr) };
-        if destroy_rc != 0 {
-            log::warn!(
-                "pthread_create: host attr destroy failed with {destroy_rc} for guest attr {:p}",
-                attr,
-            );
         }
     }
     rc
@@ -972,3 +959,7 @@ pub(super) extern "C" fn shim_std_mutex_try_lock(this: *mut libc::pthread_mutex_
     unsafe { maybe_reinit_darwin_mutex(this) };
     unsafe { libc::pthread_mutex_trylock(this) == 0 }
 }
+
+#[cfg(all(test, target_os = "linux"))]
+#[path = "attribute_lifetime_tests.rs"]
+mod attribute_lifetime_tests;
