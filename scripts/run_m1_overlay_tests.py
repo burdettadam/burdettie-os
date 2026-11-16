@@ -12,6 +12,8 @@ TEST_FILES = (
     'test_compiler_rt_regressions.py',
     'test_m1_evidence.py',
     'test_probe_m1_local_toolchain.py',
+    'test_capture_m1_link.py',
+    'test_probe_m1_captured_link.py',
 )
 
 

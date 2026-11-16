@@ -9,6 +9,11 @@ on:
       - 'scripts/inspect_puredarwin_dyld.py'
       - 'scripts/m1_evidence.py'
       - 'scripts/probe_m1_local_toolchain.py'
+      - 'scripts/capture_m1_link.py'
+      - 'scripts/probe_m1_captured_link.py'
+      - 'scripts/tests/test_capture_m1_link.py'
+      - 'scripts/tests/test_probe_m1_captured_link.py'
+      - 'docs/milestones/M1_OBSERVED_LINK_CAPTURE.md'
       - 'scripts/run_m1_overlay_tests.py'
       - 'scripts/tests/test_compiler_rt_regressions.py'
       - 'scripts/tests/test_dyld_layout_regressions.py'
@@ -73,6 +78,11 @@ on:
       - 'scripts/inspect_puredarwin_dyld.py'
       - 'scripts/m1_evidence.py'
       - 'scripts/probe_m1_local_toolchain.py'
+      - 'scripts/capture_m1_link.py'
+      - 'scripts/probe_m1_captured_link.py'
+      - 'scripts/tests/test_capture_m1_link.py'
+      - 'scripts/tests/test_probe_m1_captured_link.py'
+      - 'docs/milestones/M1_OBSERVED_LINK_CAPTURE.md'
       - 'scripts/run_m1_overlay_tests.py'
       - 'scripts/tests/test_compiler_rt_regressions.py'
       - 'scripts/tests/test_dyld_layout_regressions.py'
@@ -205,6 +215,12 @@ jobs:
             --ar /usr/lib/llvm-18/bin/llvm-ar \
             --linker /usr/lib/llvm-18/bin/ld64.lld \
             --output-dir "$RUNNER_TEMP/burdettie-m1-owned-link"
+      - name: Capture real positive and undefined-symbol links
+        run: |
+          python3 scripts/probe_m1_captured_link.py \
+            --input-dir "$RUNNER_TEMP/burdettie-m1-owned-link" \
+            --clang /usr/lib/llvm-18/bin/clang \
+            --linker /usr/lib/llvm-18/bin/ld64.lld
       - name: Retain owned link evidence including failures
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
