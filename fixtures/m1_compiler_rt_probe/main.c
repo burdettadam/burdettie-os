@@ -11,6 +11,8 @@
 #endif
 #if defined(__x86_64__)
 #define M1_ARCH "x86_64"
+#elif defined(__aarch64__) || defined(__arm64__)
+#define M1_ARCH "arm64"
 #else
 #define M1_ARCH "other"
 #endif

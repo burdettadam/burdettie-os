@@ -57,6 +57,30 @@ The M1 workflow adds this command to its existing job, using the already selecte
 LLVM 18 tools. It keeps its runner, permissions, time limits and existing artifact
 retention. No new job, tool installation or cloud resource is introduced.
 
+## Native macOS fixture integration
+
+The existing `scripts/build_fixtures.sh` reference build needs both C sources and
+generated vectors; its ordinary one-source discovery is insufficient. An explicit
+recipe copies the sources into a fresh temporary directory, generates `vectors.h`
+beside them, and builds ARM64 and x86_64 slices with the existing Xcode clang/SDK.
+It creates the normal `app` output and verifies both slices with `lipo`.
+
+The universal output remains in ordinary runtime compatibility discovery. Its
+ARM64 slice is required by that gate's native ARM64 entry path; a thin x86_64
+`app` must not enter that path. The reporter labels ARM64 execution as `arm64`.
+The explicit Linux x86_64 producer still rejects foreign architecture reports.
+Generation, compilation, linking and slice verification failures stop the build.
+Fresh source copies prevent an old untracked source-side `vectors.h` from taking
+precedence over newly generated inputs. Only successful temporary work is cleaned.
+
+Linux routing regressions drive the real shell builder through controlled
+macOS-discovery and compiler adapters, compile the arithmetic sources with a real
+host compiler, execute 7,008 comparisons, and retain generator/linker failure
+controls. They do not prove Mach-O slices or macOS SDK/runtime behavior; the
+unchanged native CI jobs must establish those results. This SDK-backed macOS
+reference is separate from the freestanding SDK-0.0.0 object check and does not
+qualify selected PureDarwin compiler-rt/libSystem, guest execution or M1 completion.
+
 ## Explicit Linux host execution with an identified builtins archive
 
 On an existing trusted Linux x86_64 test host, select the installed host
