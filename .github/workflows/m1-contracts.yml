@@ -5,6 +5,21 @@ on:
     paths:
       - '.github/workflows/m1-contracts.yml'
       - 'docs/contracts/**'
+      - 'scripts/inspect_puredarwin_compiler_rt.py'
+      - 'scripts/inspect_puredarwin_dyld.py'
+      - 'scripts/m1_evidence.py'
+      - 'scripts/probe_m1_local_toolchain.py'
+      - 'scripts/run_m1_overlay_tests.py'
+      - 'scripts/tests/test_compiler_rt_regressions.py'
+      - 'scripts/tests/test_dyld_layout_regressions.py'
+      - 'scripts/tests/test_inspect_puredarwin_compiler_rt.py'
+      - 'scripts/tests/test_inspect_puredarwin_dyld.py'
+      - 'scripts/tests/test_m1_evidence.py'
+      - 'scripts/tests/test_probe_m1_local_toolchain.py'
+      - 'scripts/tests/test_verify_compiler_rt_link.py'
+      - 'scripts/verify_compiler_rt_link.py'
+      - 'docs/milestones/M1_EVIDENCE_INTEGRATION.md'
+      - 'docs/milestones/M1_DYLD_EXECUTABLE_INSPECTION.md'
       - 'scripts/collect_m1_inventory.py'
       - 'scripts/m1_boot_preflight.py'
       - 'scripts/m1_vm_bootstrap.py'
@@ -54,6 +69,21 @@ on:
     paths:
       - '.github/workflows/m1-contracts.yml'
       - 'docs/contracts/**'
+      - 'scripts/inspect_puredarwin_compiler_rt.py'
+      - 'scripts/inspect_puredarwin_dyld.py'
+      - 'scripts/m1_evidence.py'
+      - 'scripts/probe_m1_local_toolchain.py'
+      - 'scripts/run_m1_overlay_tests.py'
+      - 'scripts/tests/test_compiler_rt_regressions.py'
+      - 'scripts/tests/test_dyld_layout_regressions.py'
+      - 'scripts/tests/test_inspect_puredarwin_compiler_rt.py'
+      - 'scripts/tests/test_inspect_puredarwin_dyld.py'
+      - 'scripts/tests/test_m1_evidence.py'
+      - 'scripts/tests/test_probe_m1_local_toolchain.py'
+      - 'scripts/tests/test_verify_compiler_rt_link.py'
+      - 'scripts/verify_compiler_rt_link.py'
+      - 'docs/milestones/M1_EVIDENCE_INTEGRATION.md'
+      - 'docs/milestones/M1_DYLD_EXECUTABLE_INSPECTION.md'
       - 'scripts/collect_m1_inventory.py'
       - 'scripts/m1_boot_preflight.py'
       - 'scripts/m1_vm_bootstrap.py'
@@ -148,6 +178,12 @@ jobs:
           with open(os.environ["GITHUB_ENV"], "a") as environment:
               environment.write("NIX_BIN=" + str(launcher) + "\n")
           PY
+      - name: Select existing LLVM tools for owned fixtures
+        run: |
+          test -x /usr/lib/llvm-18/bin/clang
+          test -x /usr/lib/llvm-18/bin/llvm-ar
+          test -x /usr/lib/llvm-18/bin/ld64.lld
+          echo /usr/lib/llvm-18/bin >> "$GITHUB_PATH"
       - name: Check inventory, preflight and bootstrap harness behavior
         run: |
           command -v cc
@@ -157,7 +193,23 @@ jobs:
           # Missing Nix must fail this job, not silently skip the overlay tests.
           test -x "$NIX_BIN"
           python3 -m unittest discover -s scripts/tests -p 'test_*.py' -v
+          python3 scripts/run_m1_overlay_tests.py
       - name: Check contract consistency examples
         run: |
           "$RUNNER_TEMP/burdettie-m1-venv/bin/python" docs/contracts/validate_contract.py --self-test
           "$RUNNER_TEMP/burdettie-m1-venv/bin/python" docs/contracts/validate_contract.py docs/contracts/examples/*.json
+      - name: Link and verify source-owned Mach-O archive fixture
+        run: |
+          python3 scripts/probe_m1_local_toolchain.py \
+            --clang /usr/lib/llvm-18/bin/clang \
+            --ar /usr/lib/llvm-18/bin/llvm-ar \
+            --linker /usr/lib/llvm-18/bin/ld64.lld \
+            --output-dir "$RUNNER_TEMP/burdettie-m1-owned-link"
+      - name: Retain owned link evidence including failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: m1-owned-link-evidence-${{ github.sha }}
+          path: ${{ runner.temp }}/burdettie-m1-owned-link
+          if-no-files-found: error
+          retention-days: 7
