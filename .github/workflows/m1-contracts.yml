@@ -19,6 +19,10 @@ on:
       - 'scripts/tests/test_m1_compiler_rt_abi.py'
       - 'scripts/build_fixtures.sh'
       - 'scripts/tests/test_build_native_fixtures.py'
+      - 'fixtures/m1_thread_state_probe/**'
+      - 'scripts/validate_m1_thread_state.py'
+      - 'scripts/tests/test_m1_thread_state_probe.py'
+      - 'docs/milestones/M1_THREAD_STATE_PROBE.md'
       - 'fixtures/m1_compiler_rt_probe/**'
       - 'docs/milestones/M1_COMPILER_RT_ABI_PROBE.md'
       - 'scripts/run_m1_overlay_tests.py'
@@ -95,6 +99,10 @@ on:
       - 'scripts/tests/test_m1_compiler_rt_abi.py'
       - 'scripts/build_fixtures.sh'
       - 'scripts/tests/test_build_native_fixtures.py'
+      - 'fixtures/m1_thread_state_probe/**'
+      - 'scripts/validate_m1_thread_state.py'
+      - 'scripts/tests/test_m1_thread_state_probe.py'
+      - 'docs/milestones/M1_THREAD_STATE_PROBE.md'
       - 'fixtures/m1_compiler_rt_probe/**'
       - 'docs/milestones/M1_COMPILER_RT_ABI_PROBE.md'
       - 'scripts/run_m1_overlay_tests.py'
@@ -240,6 +248,21 @@ jobs:
           python3 scripts/probe_m1_compiler_rt_abi.py \
             --clang /usr/lib/llvm-18/bin/clang \
             --output-dir "$RUNNER_TEMP/burdettie-m1-owned-link/compiler-rt-abi"
+      - name: Execute the source-owned POSIX thread-state reference
+        run: |
+          work="$RUNNER_TEMP/burdettie-m1-owned-link/thread-state"
+          mkdir "$work"
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pthread \
+            fixtures/m1_thread_state_probe/probe.c -o "$work/probe"
+          set +e
+          timeout 8 "$work/probe" > "$work/report.json" 2> "$work/stderr.log"
+          observed_exit=$?
+          set -e
+          printf '%s\n' "$observed_exit" > "$work/exit-code.txt"
+          sha256sum fixtures/m1_thread_state_probe/probe.c "$work/probe" > "$work/sha256.txt"
+          python3 scripts/validate_m1_thread_state.py \
+            --report "$work/report.json" --exit-code "$observed_exit" \
+            --platform linux --architecture x86_64
       - name: Retain owned link evidence including failures
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
