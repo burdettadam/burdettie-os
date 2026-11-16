@@ -103,7 +103,8 @@ for arch in arm64 x86_64; do
 done
 xcrun lipo -create "$M1_REFERENCE_WORK/app_arm64" "$M1_REFERENCE_WORK/app_x86_64" \
     -output "$M1_REFERENCE_WORK/app"
-xcrun lipo -verify_arch arm64 x86_64 "$M1_REFERENCE_WORK/app"
+# Apple lipo treats every operand after -verify_arch as an architecture.
+xcrun lipo "$M1_REFERENCE_WORK/app" -verify_arch arm64 x86_64
 if [[ -d "$dir/app" ]]; then
     echo "error: compiler-runtime app destination is a directory: $dir/app" >&2
     exit 1

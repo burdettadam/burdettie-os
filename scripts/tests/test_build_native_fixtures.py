@@ -68,7 +68,13 @@ elif args and args[0] == "lipo" and "-create" in args:
         raise SystemExit("lipo shim requires actual input files")
     shutil.copy2(inputs[0], args[args.index("-output") + 1])
 elif args and args[0] == "lipo" and "-verify_arch" in args:
-    if not Path(args[-1]).is_file():
+    # Apple lipo consumes every operand after -verify_arch as an architecture.
+    if args.index("-verify_arch") != 2:
+        raise SystemExit("lipo verification requires one input before -verify_arch")
+    architectures = args[3:]
+    if not architectures or any(arch not in ("arm64", "x86_64") for arch in architectures):
+        raise SystemExit("lipo verification requires only architectures after -verify_arch")
+    if not Path(args[1]).is_file():
         raise SystemExit("lipo verification shim requires an existing output")
     if os.environ.get("NATIVE_TEST_FAIL_VERIFY") == "1":
         print("injected lipo verification failure", file=sys.stderr)
@@ -154,10 +160,9 @@ output.write_bytes(b"stub unrelated fixture\\n")
         self.assertEqual(len(creates), 1)
         created = creates[0][creates[0].index("-output") + 1]
         verifies = [args for args in xcrun if "-verify_arch" in args
-                    and args[-1] in (created, str(self.output))]
+                    and args[1:3] == [created, "-verify_arch"]]
         self.assertEqual(len(verifies), 1)
-        self.assertEqual(set(verifies[0][verifies[0].index("-verify_arch") + 1:-1]),
-                         {"arm64", "x86_64"})
+        self.assertCountEqual(verifies[0][3:], ["arm64", "x86_64"])
         ordinary = self.invocations("simple_cli")
         self.assertEqual(len(ordinary), 1)
         self.assertEqual(ordinary[0][ordinary[0].index("-arch") + 1], "arm64")
@@ -198,6 +203,19 @@ output.write_bytes(b"stub unrelated fixture\\n")
         self.xcrun_log.unlink()
         sentinel = b"preserve the previously published app\n"
         self.output.write_bytes(sentinel)
+        bad_verification_arguments = (
+            (["lipo", "-verify_arch", "arm64", "x86_64", str(self.output)],
+             b"one input before -verify_arch"),
+            (["lipo", str(self.output), "-verify_arch", "arm64", "x86_64", str(self.output)],
+             b"only architectures after -verify_arch"),
+        )
+        for arguments, diagnostic in bad_verification_arguments:
+            with self.subTest(operation="reject misplaced lipo input", arguments=arguments):
+                process = subprocess.run([str(self.tools / "xcrun"), *arguments],
+                                         env=self.env, capture_output=True, timeout=5)
+                self.assertEqual(process.returncode, 1)
+                self.assertIn(diagnostic, process.stderr)
+                self.assertEqual(self.output.read_bytes(), sentinel)
         self.env["NATIVE_TEST_FAIL_VERIFY"] = "1"
         with self.subTest(operation="simulated lipo verification failure"):
             process = self.build()
