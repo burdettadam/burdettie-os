@@ -1,0 +1,234 @@
+{
+  "schema_version": 1,
+  "scope": "observed_staged_libtapi_realization_and_output_inspection",
+  "status": "staged_libtapi_built",
+  "burdettie_revision": "f8c59175784edb89e0087734d5020d142256297d",
+  "source": {
+    "revision": "0163b2db225b85e3bf96fc25646ea290105ac298",
+    "lock": {
+      "sha256": "00c598d3efca4bbda302fec4a43fffbfa787dc642c8c0b2c4202c65339e684d0",
+      "nixpkgs_node": "nixpkgs_3",
+      "nixpkgs_revision": "fd1462031fdee08f65fd0b4c6b64e22239a77870"
+    },
+    "submodules": [
+      [
+        "f577aafe4b9a89727968666237d20cc51d2f770d",
+        "external/corecrypto"
+      ]
+    ]
+  },
+  "nix_version": "nix (Nix) 2.28.3",
+  "recipe_sha256": "5daf2f02681357e00d3b5c8ef5fbcbdf279f681a44697780d5c578dee1872409",
+  "stager_sha256": "cec91393bc522d612336aaae950fdf0590a7f26dbc6ddcec2f2a04804fbb055b",
+  "helper_sha256": "7c18e1c623f976e52c70e81f99d8d1e566a7804ec7c9a082085f828c7640dcab",
+  "reviewed_private_driver_sha256": "618ccd72375c9f1192414e4badba97cc716bfcd5669bae3234442546a0b7f70d",
+  "successful_plan": {
+    "evidence": "libtapi-plan-2026-11-14.json",
+    "result_sha256": "55c9bfc2f7445c925544e5bb2676a30a4033cedadd1b3c2df81cffb5f76f0b98"
+  },
+  "candidate": {
+    "drv": "pzi6pfykji7lp60p9y7934rvanhqdyrh-apple-libtapi-1300.6.5.drv",
+    "out": "apk3lq9svmlncaipqzc4gw7a3mdcmsmc-apple-libtapi-1300.6.5"
+  },
+  "upstream": {
+    "drv": "kr9cik3jk4rjsfdjw3qx3z06bj8aq2c1-apple-libtapi-1300.6.5.drv",
+    "out": "q9bvm0m0ndp8x7ffd6cbixl73p9bi80y-apple-libtapi-1300.6.5"
+  },
+  "sdk": {
+    "drv": "0nwq5lg8853m0rdvsncvjwyjk0dmffxd-puredarwin-oss-sdk-26.5.drv",
+    "out": "nnsb7h396vc5xmwn59kky88inslcdw1m-puredarwin-oss-sdk-26.5",
+    "identity_matches_retained_baseline": true
+  },
+  "build": {
+    "started_at": "2026-11-14T19:00:16.770055+00:00",
+    "finished_at": "2026-11-14T20:08:20.177619+00:00",
+    "phase_started_at": "2026-11-14T19:00:17.481647+00:00",
+    "phase_finished_at": "2026-11-14T20:08:20.086568+00:00",
+    "duration_seconds": 4082.6,
+    "exit_code": 0,
+    "one_job": true,
+    "one_core": true,
+    "maximum_substitution_jobs": 2,
+    "store": "direct_local",
+    "remote_builders": "disabled",
+    "automatic_gc": "disabled",
+    "failed_builds_retained": true,
+    "new_exclusive_output_link": true,
+    "phase_timeout_seconds": 7200,
+    "service_timeout_seconds": 7500,
+    "earlier_failed_tree_resumed": false
+  },
+  "observed_staging": {
+    "status": "staged",
+    "source_unchanged_at_staging": true,
+    "source_inventory_sha256": "37d3807502b72b8b98100430aa5c5c6bac63d780fa9b389d04872e73ed5bb5f1",
+    "source_inventory_matches_inspected_plan": true,
+    "staging_manifest_sha256": "4983ae7d1ca6bc2153dc4ada9bb351b8ea936eab8e982d537d499cb0312d573a",
+    "manifest_hash_provenance": "reported by the pinned stager in the retained build log",
+    "staged_allocated_bytes": 50089984,
+    "planned_staging_allocation_bytes": 50094080,
+    "directories_including_root": 1515,
+    "regular_files": 10666,
+    "copied_regular_files": 74,
+    "linked_regular_files": 10592,
+    "original_symlinks": 1,
+    "scope": "prepatch unpacking; upstream patch and setup hooks followed"
+  },
+  "output_inspection": {
+    "status": "pass",
+    "registered_output": {
+      "path_basename": "apk3lq9svmlncaipqzc4gw7a3mdcmsmc-apple-libtapi-1300.6.5",
+      "deriver_basename": "pzi6pfykji7lp60p9y7934rvanhqdyrh-apple-libtapi-1300.6.5.drv",
+      "nar_hash": "sha256-EXyvQDuHv90QIWHE5N3uc+AcSBOUKd634cxGkN6Ju60=",
+      "nar_size": 4940088,
+      "raw_path_info_sha256": "4acefa4af2c705b9336f1980cc655e189864a8873f0411134c22b67c1d3224e5"
+    },
+    "files": {
+      "include/tapi/APIVersion.h": {
+        "bytes": 3077,
+        "sha256": "ca63453c8ed3378cbfe89aeee2a8cf5327dfd3052991598287022d062eb2b9f5"
+      },
+      "include/tapi/Defines.h": {
+        "bytes": 886,
+        "sha256": "5b99f9c0097e92d34ed3544dc5060e15e0a1ecb480ebe82623dbac82d1905ade"
+      },
+      "include/tapi/LinkerInterfaceFile.h": {
+        "bytes": 14368,
+        "sha256": "56c05e14cde33c21e99158ba3c2269e78f4138aab533c6892a2cdec4f6418afc"
+      },
+      "include/tapi/PackedVersion32.h": {
+        "bytes": 2636,
+        "sha256": "163a0b75a3bcee9eda687065a99d94efd4e2fb5b954b00b2bf846910b6f70fe9"
+      },
+      "include/tapi/Symbol.h": {
+        "bytes": 2905,
+        "sha256": "5f696c7bb27813edbbcd76613764830f7e63adf205c5b92536b928016a718862"
+      },
+      "include/tapi/Version.h": {
+        "bytes": 2470,
+        "sha256": "b9b9143965f243ef1ffb44482caceb81c3de7833b95cc7f96649e9f11f3a5cf1"
+      },
+      "include/tapi/Version.inc": {
+        "bytes": 123,
+        "sha256": "137e218628b09ef6e1cb5ee0922dc2eb60eb7ada09639d4f6e2a53a2b8496e91"
+      },
+      "include/tapi/tapi.h": {
+        "bytes": 903,
+        "sha256": "6d8c6ed70bb915da4ffee03efef38fbb016fe3bea1eeb25d5923316a21a39648"
+      },
+      "lib/libtapi.so.12git": {
+        "bytes": 4910128,
+        "sha256": "53984f87e367fe517d641e4e69a8029a10ee05cda4385e7e0059c5b1ccc903fa"
+      }
+    },
+    "symlinks": {
+      "lib/libtapi.so": "libtapi.so.12git"
+    },
+    "elf_files": [
+      "lib/libtapi.so.12git"
+    ],
+    "elf_architecture": "x86_64",
+    "elf_class_bits": 64,
+    "elf_byte_order": "little",
+    "references": [
+      "34dkjp1wxxh6djsvxk8nhvzp0izasds0-glibc-2.42-67",
+      "n35z8vvlr7c5k1406n5bwd0f8h2hgj1j-gcc-15.2.0-lib"
+    ],
+    "source_reference_absent": true,
+    "temporary_build_paths_absent": true,
+    "headers_are_regular_files": true,
+    "required_header_count": 8
+  },
+  "observed_resources": {
+    "scope": "this completed library build only; whole-host disk observations include other workloads",
+    "initial_free_disk_bytes": 9522556928,
+    "observed_min_free_disk_bytes": 8995893248,
+    "final_free_disk_bytes": 9317019648,
+    "observed_max_whole_host_disk_growth_bytes": 526663680,
+    "minimum_free_disk_reserve_bytes": 8589934592,
+    "maximum_stage_growth_bytes": 671088640,
+    "observed_min_host_available_memory_bytes": 3283656704,
+    "final_host_available_memory_bytes": 3871322112,
+    "observed_min_free_inodes": 4282101,
+    "final_free_inodes": 4307903,
+    "cpu_quota_percent_of_one_cpu": 25,
+    "memory_high_bytes": 1342177280,
+    "memory_max_bytes": 1610612736,
+    "memory_peak_bytes": 1096855552,
+    "memory_events": {
+      "low": 0,
+      "high": 0,
+      "max": 0,
+      "oom": 0,
+      "oom_kill": 0,
+      "oom_group_kill": 0,
+      "sock_throttled": 0
+    },
+    "swap_max_bytes": 0,
+    "tasks_max": 128,
+    "completed_within_guards": true,
+    "future_build_capacity_qualified": false
+  },
+  "private_evidence": {
+    "result": {
+      "bytes": 9074,
+      "sha256": "19e3608980f168a45c25a1c13ed12b45702886e85d88faf10e5381a01dc9da2d"
+    },
+    "complete_build_log": {
+      "bytes": 1235828,
+      "sha256": "06d140248de71115f5f261b7bc6ad28ba12f01cd36805b1fdcc9f8c497165b9f"
+    },
+    "registered_output_sidecar": {
+      "bytes": 446,
+      "sha256": "4acefa4af2c705b9336f1980cc655e189864a8873f0411134c22b67c1d3224e5"
+    },
+    "unit_journal": {
+      "bytes": 8809,
+      "sha256": "352cbe5020b62a3d1d8631e8d9c80d8bef10d3ae8130836bf94a54836549b4b8"
+    },
+    "lossless_capture_archive": {
+      "bytes": 71803,
+      "sha256": "bd7c295ebe615fb2b259748a71a27a60f43eece4a6d956be62a20881a8a9d25d"
+    },
+    "capture_bundle": {
+      "bytes": 1674584,
+      "sha256": "8874aaeb1954887190a46be4090026e4d6d85d3e11fe70b2fee136b1d65499a4"
+    },
+    "full_log_retrieved": true,
+    "all_captured_file_hashes_verified": true,
+    "source_manifest_content_retrieved": false,
+    "source_manifest": {
+      "sha256": "090b54ac4da796d4a59ee24df90f598f68c66a9af7eb81991335e1f32971ca74",
+      "bytes": 3111190,
+      "retained_on_host": true,
+      "captured_locally": false,
+      "qualification": "The plan records this inventory hash; the complete manifest remains on the host and was not included in the local capture."
+    },
+    "upstream_warning_lines_retained": 1166,
+    "terminal_unit_inactive": true,
+    "terminal_main_and_control_pids_zero": true,
+    "unit_collected_after_success": true,
+    "success_also_bound_to_complete_result_log_and_journal": true
+  },
+  "preservation": {
+    "earlier_failed_build_tree_retained": true,
+    "complete_source_retained": true,
+    "existing_k3s_active_at_capture": true,
+    "existing_host_and_disk_only": true,
+    "resource_expansion": false,
+    "paid_upgrade": false,
+    "vm_disks_and_logs_preserved": true
+  },
+  "qualification": {
+    "staged_host_libtapi_realization": "pass",
+    "installed_output_inspection": "pass",
+    "native_linker_build": "not_run",
+    "fixture_link": "not_run",
+    "selected_image_build": "not_run",
+    "selected_guest_execution": "not_run",
+    "burdettie_runtime_execution_in_selected_guest": "not_run",
+    "security_enforcement": "not_run",
+    "m1_complete": false
+  },
+  "observation_boundary": "The build ended at 20:08:20 UTC on 2026-11-14. The later staged-native-linker metadata plan is separate evidence."
+}

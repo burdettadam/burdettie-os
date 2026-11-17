@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "message_type": "policy_snapshot",
+  "profile": {
+    "id": "local-notes",
+    "revision": "1"
+  },
+  "policy_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "owner_authority_ref": "example-owner-session",
+  "code_trust": {
+    "requirement": "none",
+    "allow_unsigned": true,
+    "allow_ad_hoc": true,
+    "trust_anchor_sha256": [],
+    "allowed_signers": [],
+    "time_validation": "not_required",
+    "revocation": "not_required"
+  },
+  "entitlements": {
+    "deny_keys": [],
+    "request_only_keys": [],
+    "unknown_keys": "record"
+  },
+  "code_loading": {
+    "reviewed_dependency_sha256": [],
+    "inserted_libraries": "deny",
+    "dynamic_libraries": "deny",
+    "executable_memory": "deny",
+    "host_provider_ids": [
+      "example-fixed-shims"
+    ]
+  },
+  "environment": {
+    "inherit_ambient": false,
+    "allowed_names": [],
+    "strip_names": []
+  },
+  "resources": {
+    "filesystem": {
+      "mode": "allowlist",
+      "grants": [
+        {
+          "grant_ref": "example-app-data",
+          "operations": [
+            "read",
+            "write",
+            "create",
+            "delete",
+            "enumerate"
+          ]
+        }
+      ],
+      "denied_object_refs": []
+    },
+    "network": "deny",
+    "ipc": {
+      "mode": "deny",
+      "service_refs": []
+    },
+    "subprocess": {
+      "mode": "deny",
+      "reviewed_app_sha256": []
+    },
+    "process_inspection": "deny",
+    "devices": {
+      "mode": "deny",
+      "grant_refs": []
+    },
+    "limits": {
+      "wall_time_ms": null,
+      "memory_bytes_process_tree": null,
+      "max_process_count": 1,
+      "stdout_bytes": 1048576,
+      "stderr_bytes": 1048576
+    }
+  },
+  "audit": {
+    "sink_ref": "example-owner-audit",
+    "required_in_enforced": true
+  }
+}

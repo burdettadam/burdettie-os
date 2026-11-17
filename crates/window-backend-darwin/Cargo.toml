@@ -13,7 +13,7 @@ log            = { workspace = true }
 window-backend = { workspace = true }
 ui-controls    = { workspace = true }
 ui-view        = { workspace = true }
-winit      = "0.30"
+winit = { workspace = true }
 softbuffer = "0.4"
 accesskit      = { workspace = true }
 accesskit_winit = { workspace = true }

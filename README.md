@@ -6,6 +6,8 @@ Burdettie-OS explores what it takes to run software built for macOS through an i
 
 This is an experimental systems project. Compatibility depends on the binary, CPU architecture, platform backend, and APIs it uses. The implementation is a user-space runtime; the host operating system still provides the kernel, memory management, files, and display services.
 
+The product goal is a bootable, Darwin-compatible OS that runs a named set of macOS applications with owner-selectable permissive, audit and enforced security. [M1 platform and security contracts](docs/milestones/M1_PLATFORM_SECURITY.md) define a Linux-built PureDarwin/XNU x86_64 VM as the initial reference platform, with a bounded boot feasibility experiment and shared launch contract. [Development without Mac hardware](docs/milestones/M1_WITHOUT_MAC.md) separates the immediate build/runtime work from later exact-application and physical-device qualification.
+
 [Quick start](#quick-start) · [Architecture](#architecture) · [Engineering highlights](#engineering-highlights) · [Validation](#validation) · [Documentation](#documentation)
 
 ## Start here
@@ -116,6 +118,7 @@ Source files, fixture generators, and documented expectations belong in version 
 
 | Guide | Contents |
 | --- | --- |
+| [M1 platform and security contracts](docs/milestones/M1_PLATFORM_SECURITY.md) | Current OS direction, target inventory, boot experiment, shared launch contract and alpha acceptance. |
 | [Demo guide](docs/DEMO.md) | Showcase workflows and packaging. |
 | [Feature reference](docs/FEATURES.md) | Detailed runtime and tooling capabilities. |
 | [Roadmap](docs/roadmap.md) | Planned work and target-platform direction. |
@@ -128,3 +131,4 @@ Source files, fixture generators, and documented expectations belong in version 
 Project-owned source is dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your option. Preserve any separate license terms and notices supplied with third-party components. These licenses do not grant rights to redistribute locally imported Apple software or other external test inputs.
 
 Apple, macOS, Darwin, Objective-C, and other product names identify the interfaces and formats studied by this independent project. Burdettie-OS is not affiliated with Apple.
+

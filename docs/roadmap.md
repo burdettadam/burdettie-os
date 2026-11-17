@@ -1,5 +1,7 @@
 # Darwin Loader Lab — Strategic Roadmap
 
+> Active OS direction and milestone contracts are in [M1 platform and security contracts](milestones/M1_PLATFORM_SECURITY.md). The roadmap below records earlier runtime planning. Its dates, completion labels and broad compatibility claims are not current OS, application or security qualification evidence.
+
 > **As of 2026-03-28.** This document tracks where the project is headed.
 > For a complete reference of what works today, see [FEATURES.md](FEATURES.md).
 
@@ -302,4 +304,5 @@ Make the runtime easily consumable from the broader ecosystem:
 | L11 | **POSIX socket syscalls intercepted, deny-by-default** | Low | All 12 BSD socket calls return EOPNOTSUPP via shim table; accounting in place for future PAL routing |
 | L12 | **Tagged pointer / PAC boundary** | Low | `cf-lite` ISAs incompatible with ARM64 non-pointer ISA masking; cannot pass cf-lite objects to host `objc_msgSend` |
 | L13 | **Linux CI not wired** | Medium | Docker image exists; CI matrix not connected; Linux x86_64 requires E3d JIT (unstarted) |
+
 

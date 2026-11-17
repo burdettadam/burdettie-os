@@ -339,10 +339,67 @@ fn interp_nsjson_basics() {
 
 #[test]
 fn interp_nscharacterset_basics() {
-    let Some(r) = run_interpreted("nscharacterset_basics") else {
-        return;
-    };
-    assert_eq!(r.exit_code, 0, "nscharacterset_basics should exit 0");
+    #[cfg(all(unix, target_arch = "x86_64"))]
+    {
+        const CHILD: &str = "BURDETTIE_NSCHARSET_PRINTF_CHILD";
+        if std::env::var_os(CHILD).is_some() {
+            // SAFETY: static marker strings and valid C streams. The isolated
+            // child captures the actual guest's byte output without Rust's
+            // test-harness prefix/footer or another test's global ObjC state.
+            unsafe {
+                libc::puts(c"BURDETTIE_NSCHARSET_BEGIN".as_ptr());
+                libc::fflush(std::ptr::null_mut());
+            }
+            let result = run_interpreted("nscharacterset_basics")
+                .expect("parent verified the required fixture is present");
+            assert_eq!(result.exit_code, 0, "nscharacterset_basics should exit 0");
+            // SAFETY: the same static-marker and C-stream contract as above.
+            unsafe {
+                libc::puts(c"BURDETTIE_NSCHARSET_END".as_ptr());
+                libc::fflush(std::ptr::null_mut());
+            }
+            return;
+        }
+        if fixture_binary("nscharacterset_basics").is_none() {
+            eprintln!("Skipping: fixture not found for nscharacterset_basics");
+            return;
+        }
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "interp_nscharacterset_basics",
+                "--nocapture",
+                "--test-threads=1",
+            ])
+            .env(CHILD, "1")
+            .output()
+            .expect("run isolated source-owned fixture");
+        assert!(output.status.success(), "fixture child failed: {output:?}");
+        let begin = b"BURDETTIE_NSCHARSET_BEGIN\n";
+        let start = output
+            .stdout
+            .windows(begin.len())
+            .position(|bytes| bytes == begin)
+            .expect("fixture must enter execution")
+            + begin.len();
+        let end = b"BURDETTIE_NSCHARSET_END\n";
+        let length = output.stdout[start..]
+            .windows(end.len())
+            .position(|bytes| bytes == end)
+            .expect("fixture must finish execution");
+        assert_eq!(
+            &output.stdout[start..start + length],
+            include_bytes!("../../../fixtures/nscharacterset_basics/expected_stdout.txt"),
+            "semantic exit alone cannot detect variadic argument corruption"
+        );
+    }
+    #[cfg(not(all(unix, target_arch = "x86_64")))]
+    {
+        let Some(r) = run_interpreted("nscharacterset_basics") else {
+            return;
+        };
+        assert_eq!(r.exit_code, 0, "nscharacterset_basics should exit 0");
+    }
 }
 
 #[test]

@@ -7,6 +7,54 @@
 - **Xcode Command Line Tools** — `xcode-select --install`
 - **Docker** (optional) — for containerized builds of cross-platform crates
 
+Linux GUI builds also need FreeType and Fontconfig development packages for
+Wayland window-title rendering. On Debian/Ubuntu install `pkg-config`,
+`libfreetype-dev`, and `libfontconfig1-dev`, in addition to the existing
+Wayland/X11 prerequisites. The Linux runtime Dockerfiles include these build
+dependencies; the GUI runtime image includes `libfreetype6` and
+`libfontconfig1`. This does not add a native font dependency to macOS builds.
+See [FONT_BACKENDS.md](FONT_BACKENDS.md) for parser provenance and regression
+coverage.
+
+### ARM64 interpretation on an x86_64 host
+
+The interpreter has an explicit typed adapter for the built-in Foundation
+`rangeOfCharacterFromSet:` IMP. It calls the known three-argument shim with
+its declared `NSRange` return type and writes both `location` and `length`
+to the guest's X0/X1 registers. Normal, `objc_msgSendSuper`, and
+`objc_msgSendSuper2` dispatch use that adapter only after excluding guest
+code. A matching selector or guest-supplied type encoding does not authorize
+casting another IMP to this signature.
+
+The [adapter](../crates/cf-lite/src/foundation/interpreter_abi.rs) fixes this
+specific two-word return through the
+[runtime bridge](../crates/macho-runtime/src/interp_bridge.rs). The generic
+x86_64 host-call fallback still captures only an integer result and ignores
+the guest's variadic stack, FP arguments and indirect-result register. Other
+struct-return methods and arbitrary host functions remain outside this
+adapter's scope. A separate [bounded printf adapter](INTERPRETED_PRINTF.md)
+handles literal bytes, `%%`, `%d`, `%lu` and `%s` on Unix x86_64 hosts, with
+strict stack reads and explicit immutable string exports. Other printf formats,
+variadic functions and `NSLog` remain unsupported by that adapter. Passing an
+exit-code assertion alone does not qualify formatted output. Remaining ABI gaps are tracked in
+[issue #9](https://github.com/burdettadam/burdettie-os/issues/9).
+
+The [source-owned regression](../crates/macho-runtime/src/interp_bridge_nsrange_tests.rs)
+runs real ARM64 BLR/RET instructions through Objective-C lookup and interpreter
+return-register handling. Its child cases cover a matching range, no match,
+an empty string, a different host IMP with the same selector, and a guest IMP
+for all three dispatch routes. It needs no SDK or external fixture:
+
+```sh
+cargo test --locked -p macho-runtime --lib interp_bridge::nsrange_tests -- --nocapture
+```
+
+The existing `interp_nscharacterset_basics` fixture remains a separate
+end-to-end check and requires its compiled Mach-O input. On Unix x86_64 hosts
+it checks both the semantic exit and its 415-byte stdout golden. These host
+adapters do not qualify native x86_64 execution inside the selected M1 Darwin
+guest, general variadic marshalling, worker isolation or security enforcement.
+
 ## Quick Start
 
 ```bash

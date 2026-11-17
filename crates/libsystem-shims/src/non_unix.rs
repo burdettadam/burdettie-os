@@ -29,6 +29,12 @@ impl LifecycleShims {
     }
 
     pub fn reset() {}
+
+    pub fn flush_stdio() {
+        use std::io::Write;
+        let _ = std::io::stdout().flush();
+        let _ = std::io::stderr().flush();
+    }
 }
 
 pub struct TlsShims;

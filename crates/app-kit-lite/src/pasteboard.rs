@@ -43,10 +43,8 @@ impl NSPasteboard {
         #[cfg(all(feature = "arboard", not(target_os = "macos"), not(test)))]
         if let Ok(mut cb) = arboard::Clipboard::new() {
             if let Ok(text) = cb.get_text() {
-                if !text.is_empty() {
-                    self.contents
-                        .insert(NS_PASTEBOARD_TYPE_STRING.to_string(), text.into_bytes());
-                }
+                self.change_count = shared::observe_plain_text(&mut self.contents, text);
+                return;
             }
         }
 
@@ -56,7 +54,7 @@ impl NSPasteboard {
     /// Clear all contents and increment the change count.
     pub fn clear_contents(&mut self) -> u64 {
         self.contents.clear();
-        self.change_count = sync_snapshot_to_host(&self.contents, self.change_count);
+        self.change_count = sync_snapshot_to_host(&self.contents);
         self.change_count
     }
 
@@ -64,7 +62,7 @@ impl NSPasteboard {
     pub fn set_string(&mut self, string: &str, for_type: &str) -> bool {
         self.contents
             .insert(for_type.to_string(), string.as_bytes().to_vec());
-        self.change_count = sync_snapshot_to_host(&self.contents, self.change_count);
+        self.change_count = sync_snapshot_to_host(&self.contents);
         true
     }
 
@@ -78,7 +76,7 @@ impl NSPasteboard {
     /// Set raw data for the given type. Returns true on success.
     pub fn set_data(&mut self, data: &[u8], for_type: &str) -> bool {
         self.contents.insert(for_type.to_string(), data.to_vec());
-        self.change_count = sync_snapshot_to_host(&self.contents, self.change_count);
+        self.change_count = sync_snapshot_to_host(&self.contents);
         true
     }
 
@@ -98,7 +96,7 @@ impl NSPasteboard {
     }
 }
 
-fn sync_snapshot_to_host(contents: &PasteboardContents, current_change_count: u64) -> u64 {
+fn sync_snapshot_to_host(contents: &PasteboardContents) -> u64 {
     #[cfg(all(target_os = "macos", not(test)))]
     if native_clipboard_enabled() {
         if let Some(change_count) = native::write_snapshot(contents) {
@@ -115,7 +113,7 @@ fn sync_snapshot_to_host(contents: &PasteboardContents, current_change_count: u6
         }
     }
 
-    shared::store_snapshot(contents, current_change_count.saturating_add(1))
+    shared::write_snapshot(contents)
 }
 
 #[cfg(all(target_os = "macos", not(test)))]
@@ -142,12 +140,43 @@ mod shared {
         state.change_count
     }
 
+    // Native host counters are authoritative; test setup uses this same setter.
+    #[cfg(any(test, target_os = "macos"))]
     pub(super) fn store_snapshot(contents: &PasteboardContents, change_count: u64) -> u64 {
         let mut state = state()
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         state.contents = contents.clone();
         state.change_count = change_count;
+        state.change_count
+    }
+
+    // Allocate the generation from shared state, not the caller's stale copy.
+    // Contents and generation are published together under the same lock.
+    pub(super) fn write_snapshot(contents: &PasteboardContents) -> u64 {
+        let mut state = state()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        state.contents = contents.clone();
+        state.change_count = state.change_count.saturating_add(1);
+        state.change_count
+    }
+
+    #[cfg(any(test, all(feature = "arboard", not(target_os = "macos"))))]
+    pub(super) fn observe_plain_text(contents: &mut PasteboardContents, text: String) -> u64 {
+        let mut state = state()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let bytes = text.into_bytes();
+        let text_type = super::NS_PASTEBOARD_TYPE_STRING;
+        if state.contents.get(text_type) != Some(&bytes) {
+            // New host text invalidates formats from the previous snapshot.
+            // Empty text is a valid observed value, not a failed read.
+            state.contents.clear();
+            state.contents.insert(text_type.to_owned(), bytes);
+            state.change_count = state.change_count.saturating_add(1);
+        }
+        *contents = state.contents.clone();
         state.change_count
     }
 
@@ -233,14 +262,19 @@ mod native {
 mod tests {
     use super::*;
 
-    fn fresh_pasteboard() -> NSPasteboard {
+    // Only tests sharing this process-global clipboard serialize their setup.
+    // The concurrent-writer regression still starts real parallel writers.
+    static TEST_LOCK: Mutex<()> = Mutex::new(());
+
+    pub(super) fn fresh_pasteboard() -> (std::sync::MutexGuard<'static, ()>, NSPasteboard) {
+        let guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         shared::store_snapshot(&HashMap::new(), 0);
-        NSPasteboard::general()
+        (guard, NSPasteboard::general())
     }
 
     #[test]
     fn pasteboard_clear() {
-        let mut pb = fresh_pasteboard();
+        let (_guard, mut pb) = fresh_pasteboard();
         pb.set_string("hello", NS_PASTEBOARD_TYPE_STRING);
         let cc = pb.clear_contents();
         assert_eq!(cc, 2);
@@ -249,7 +283,7 @@ mod tests {
 
     #[test]
     fn pasteboard_set_and_get_string() {
-        let mut pb = fresh_pasteboard();
+        let (_guard, mut pb) = fresh_pasteboard();
         assert!(pb.set_string("clipboard text", NS_PASTEBOARD_TYPE_STRING));
         assert_eq!(
             pb.string_for_type(NS_PASTEBOARD_TYPE_STRING),
@@ -260,7 +294,7 @@ mod tests {
 
     #[test]
     fn pasteboard_set_and_get_data() {
-        let mut pb = fresh_pasteboard();
+        let (_guard, mut pb) = fresh_pasteboard();
         let data = b"\x89PNG\r\n\x1a\n";
         assert!(pb.set_data(data, NS_PASTEBOARD_TYPE_PNG));
         assert_eq!(
@@ -272,7 +306,7 @@ mod tests {
 
     #[test]
     fn pasteboard_types() {
-        let mut pb = fresh_pasteboard();
+        let (_guard, mut pb) = fresh_pasteboard();
         pb.set_string("text", NS_PASTEBOARD_TYPE_STRING);
         pb.set_data(b"pdf", NS_PASTEBOARD_TYPE_PDF);
         let mut types = pb.types();
@@ -282,7 +316,7 @@ mod tests {
 
     #[test]
     fn pasteboard_change_count_increments() {
-        let mut pb = fresh_pasteboard();
+        let (_guard, mut pb) = fresh_pasteboard();
         assert_eq!(pb.change_count(), 0);
         pb.clear_contents();
         assert_eq!(pb.change_count(), 1);
@@ -292,7 +326,7 @@ mod tests {
 
     #[test]
     fn pasteboard_change_count_tracks_writes() {
-        let mut pb = fresh_pasteboard();
+        let (_guard, mut pb) = fresh_pasteboard();
         assert_eq!(pb.change_count(), 0);
 
         pb.set_string("hello", NS_PASTEBOARD_TYPE_STRING);
@@ -302,3 +336,7 @@ mod tests {
         assert_eq!(pb.change_count(), 2);
     }
 }
+
+#[cfg(test)]
+#[path = "pasteboard_snapshot_tests.rs"]
+mod snapshot_tests;

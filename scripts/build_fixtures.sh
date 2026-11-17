@@ -26,7 +26,7 @@ for source in "$FIXTURES"/*/main.c "$FIXTURES"/*/main.m; do
     output="$dir/app"
     flags=("${COMMON[@]}")
     case "$name" in
-        dylib_chain|framework_style|fat_binary|weak_dylib|objc_category|objc_dylib_chain)
+        dylib_chain|framework_style|fat_binary|weak_dylib|objc_category|objc_dylib_chain|m1_compiler_rt_probe)
             continue
             ;;
         arm64e_basic)
@@ -69,6 +69,51 @@ for source in "$FIXTURES"/*/main.c "$FIXTURES"/*/main.m; do
         ln -sfn "$name" "$dir/app"
     fi
 done
+
+echo "Building m1_compiler_rt_probe (arm64 + x86_64)"
+dir="$FIXTURES/m1_compiler_rt_probe"
+if [[ -d "$dir/app" ]]; then
+    echo "error: compiler-runtime app destination is a directory: $dir/app" >&2
+    exit 1
+fi
+M1_REFERENCE_WORK="$(mktemp -d "${TMPDIR:-/tmp}/burdettie-m1-compiler-rt.XXXXXX")"
+# Quote includes must resolve against the generated header, even if the source
+# directory contains an old, untracked vectors.h. Preserve failed work for diagnosis.
+cp "$dir/main.c" "$dir/probe.c" "$dir/probe.h" "$M1_REFERENCE_WORK/"
+python3 - "$SCRIPT_DIR" "$M1_REFERENCE_WORK/vectors.h" <<'PYM1'
+import hashlib
+import sys
+
+sys.path.insert(0, sys.argv[1])
+import m1_compiler_rt_vectors as vectors
+
+data = vectors.header(vectors.corpus())
+with open(sys.argv[2], 'xb') as output:
+    output.write(data)
+print(f"Compiler-runtime reference vectors: {len(data)} bytes, sha256 {hashlib.sha256(data).hexdigest()}")
+PYM1
+# The normal app output is consumed by ARM64 runtime compatibility tests. Retain
+# that native slice as well as the x86_64 reference; do not route a thin x86_64
+# executable into the native ARM64 entry path.
+for arch in arm64 x86_64; do
+    "$CC" -isysroot "$SDK" -arch "$arch" -std=c11 -O2 -Wall -Wextra -Werror \
+        -fno-builtin -fno-stack-protector -fno-lto \
+        "$M1_REFERENCE_WORK/main.c" "$M1_REFERENCE_WORK/probe.c" -lm \
+        -o "$M1_REFERENCE_WORK/app_$arch"
+done
+xcrun lipo -create "$M1_REFERENCE_WORK/app_arm64" "$M1_REFERENCE_WORK/app_x86_64" \
+    -output "$M1_REFERENCE_WORK/app"
+# Apple lipo treats every operand after -verify_arch as an architecture.
+xcrun lipo "$M1_REFERENCE_WORK/app" -verify_arch arm64 x86_64
+if [[ -d "$dir/app" ]]; then
+    echo "error: compiler-runtime app destination is a directory: $dir/app" >&2
+    exit 1
+fi
+mv -f "$M1_REFERENCE_WORK/app" "$dir/app"
+rm -f "$M1_REFERENCE_WORK/main.c" "$M1_REFERENCE_WORK/probe.c" \
+    "$M1_REFERENCE_WORK/probe.h" "$M1_REFERENCE_WORK/vectors.h" \
+    "$M1_REFERENCE_WORK/app_arm64" "$M1_REFERENCE_WORK/app_x86_64"
+rmdir "$M1_REFERENCE_WORK"
 
 echo "Building return42"
 "$CC" "${COMMON[@]}" "$FIXTURES/return42/return42.c" \

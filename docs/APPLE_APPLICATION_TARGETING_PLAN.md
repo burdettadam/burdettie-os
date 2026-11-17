@@ -2,9 +2,18 @@
 
 ## Goal
 
-Push burdettie toward real Apple application execution as aggressively as the
-current architecture can support, while staying clean-room, Linux-first, and
-independently verifiable.
+Build toward a bootable Darwin-compatible Burdettie OS that runs named Apple
+applications with selectable security. Keep compatibility evidence independently
+verifiable. Linux and Docker remain development and validation lanes; they do
+not define the shipping OS substrate.
+
+The active initial target and acceptance contract is
+[M1 platform and security contracts](milestones/M1_PLATFORM_SECURITY.md): a
+Linux-built x86_64 Darwin VM and source-owned guest fixtures. Stickies remains
+the first Apple-authored GUI candidate for M4; its availability and physical Mac
+testing do not block M1. The broader corpus tiers below guide later expansion.
+Exact app version, architecture, dependency graph and useful behavior must be
+recorded before a candidate is described as supported.
 
 This is not a license to chase every Apple-private dependency tree. It is a
 priority rule: when two pieces of work are both plausible, prefer the one that
@@ -12,16 +21,16 @@ unlocks more real Apple application behavior.
 
 ## Operational Context
 
-- The primary runtime lane is an external Docker Compose deployment of
-  burdettie. The Compose file is not present in this workspace, so this repo can
-  define requirements for that lane but cannot verify the service wiring itself.
+- Earlier runtime experiments used an external Docker Compose deployment of
+  burdettie. Its Compose file is not present in this repository; it remains a
+  compatibility lane alongside the Linux-built Darwin VM selected for M1.
 - The current Linux container workflow already stages a Mac-extracted Xcode tool
   corpus for compatibility testing. That is acceptable as a validation input for
   today, but application targeting should treat imported Apple artifacts as an
   optional validation overlay, not as the definition of the base runtime.
-- A Mac host is available as an extraction oracle. Apple tools, frameworks, and
-  app bundles may be staged from that host through repo scripts or transferred
-  externally, including by wormhole.
+- When a Mac reference host is available, its observations and legitimately
+  staged application inputs can support comparison work. No Mac reference host
+  or proprietary application bundle is required for the M1 VM and fixture work.
 - Imported Apple artifacts may be required for compatibility testing in the
   current workflow, but the runtime substrate and build path must not require a
   live Apple host at execution time.
@@ -178,7 +187,8 @@ expands.
 Build a small curated corpus of Mac-sourced app bundles chosen by dependency
 shape, not by prestige.
 
-The first corpus should contain 3-5 apps with increasing pressure:
+After the first application workflow is qualified, expand the corpus to 3-5 apps
+with increasing pressure:
 
 1. one simple single-window app with minimal dependencies
 2. one nib-backed or keyed-archive-backed app
@@ -225,11 +235,10 @@ runtime coverage.
 
 ## Immediate Next Slice
 
-1. Select the first 3-5 Apple app bundles by dependency shape and public-surface
-  likelihood.
-  Start with `Stickies.app` as the first text-heavy imported target, and treat
-  `TextEdit.app` as the follow-on stretch target after the new document-controller
-  coverage is verified against a real document-based bundle.
+1. Inventory the exact local `Stickies.app` bundle and selected architecture
+   using the [M1 inventory procedure](milestones/M1_INVENTORY.md). Qualify its
+   dependency graph and create/edit/quit/reboot/reopen notes workflow before
+   expanding the corpus. Treat `TextEdit.app` as a later document-based target.
 2. Keep extending the Launchpad dependency gate as new imported apps expose
    additional public framework patterns.
 3. Keep Xcode build-driver work focused on building at least one simple app
@@ -247,3 +256,4 @@ runtime coverage.
 - `docs/XCODE_PUBLIC_COMPATIBILITY_PLAN.md`
 - `docs/XCODE_CLI_INVESTIGATION.md`
 - `scripts/extract_xcode_tools.sh`
+

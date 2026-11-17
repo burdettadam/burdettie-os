@@ -62,6 +62,10 @@ pub(super) fn run_interpreted(
         (main_data, arc_parsed)
     };
 
+    // 3. Apply the same admission policy as native execution before any
+    // shim setup, dependency loading, or guest initializer can run.
+    let security_report = crate::security::evaluate_security(&arc_parsed, binary_path, config)?;
+
     // 4. Build shim table
     let shim_config = ShimConfig {
         process_name: config.process_name.clone(),
@@ -94,35 +98,65 @@ pub(super) fn run_interpreted(
     let mut registry = ImageRegistry::new(config.platform.memory(), unwind_registry);
     let binary_dir = binary_path.parent().unwrap_or(Path::new("."));
 
-    // 5.5. Load DYLD_INSERT_LIBRARIES (if any, and not blocked by hardened runtime).
-    {
-        let mut insert_paths = config.insert_libraries.clone();
+    // 5.5. Load DYLD_INSERT_LIBRARIES and apply the same hardened-runtime
+    // transformation used by native execution.
+    let insert_paths: Vec<std::path::PathBuf> = {
+        let mut paths = config.insert_libraries.clone();
         for (key, val) in &config.env_overrides {
             if key == "DYLD_INSERT_LIBRARIES" {
                 for p in val.split(':') {
                     let p = p.trim();
                     if !p.is_empty() {
-                        insert_paths.push(std::path::PathBuf::from(p));
+                        paths.push(std::path::PathBuf::from(p));
                     }
                 }
             }
         }
-        if !insert_paths.is_empty() {
-            let count =
-                loader::load_insert_libraries(&insert_paths, &mut registry, config.platform.fs());
-            log::info!(
-                "DYLD_INSERT_LIBRARIES: loaded {count}/{} libraries",
-                insert_paths.len()
-            );
+        if !paths.is_empty() {
+            if let Some(ref report) = security_report {
+                if report.strip_dyld_env {
+                    log::warn!(
+                        "DYLD_INSERT_LIBRARIES blocked by hardened runtime ({} libraries ignored)",
+                        paths.len(),
+                    );
+                    paths.clear();
+                }
+            }
         }
+        paths
+    };
+    if !insert_paths.is_empty() {
+        let count = loader::load_insert_libraries(
+            &insert_paths,
+            &mut registry,
+            binary_dir,
+            config.platform.fs(),
+            config,
+        )?;
+        log::info!(
+            "DYLD_INSERT_LIBRARIES: loaded {count}/{} libraries",
+            insert_paths.len()
+        );
     }
 
-    let _dep_stats =
-        loader::load_dependencies(&arc_parsed, &mut registry, binary_dir, config.platform.fs())?;
+    let _dep_stats = loader::load_dependencies(
+        &arc_parsed,
+        &mut registry,
+        binary_dir,
+        config.platform.fs(),
+        config,
+    )?;
     let app_idx = registry.load_preparsed("__main__", arc_parsed, main_data)?;
 
     // 7. Apply fixups
     registry.apply_all_fixups(&composite)?;
+
+    // The lifetime guard outlives +load/main and every cleanup subcall, and
+    // discards registrations on all failure paths before images are unmapped.
+    let exit_scope = crate::exit_lifecycle::enter_launch(
+        &registry,
+        libsystem_shims::exit_registry::ExitRoute::Arm64Interpreter,
+    )?;
 
     // 7.5. ObjC registration (phases A–E, no event tracing on interpreted path)
     if config.shim_set.objc {
@@ -173,6 +207,7 @@ pub(super) fn run_interpreted(
         .collect();
 
     // 10b. Fire +load methods from app binary via the interpreter.
+    let mut initializer_exit = None;
     if config.shim_set.objc {
         let app_ranges: Vec<(u64, u64)> = registry.images()[app_idx]
             .image
@@ -213,7 +248,12 @@ pub(super) fn run_interpreted(
                         class_name,
                         imp
                     );
-                    let ffi = interp_bridge::build_interpreter_bridge(&guest_ranges);
+                    let mut ffi = interp_bridge::build_interpreter_bridge(&guest_ranges);
+                    crate::exit_lifecycle::install_interpreter_lifecycle(
+                        &mut ffi,
+                        Some(exit_scope.registry()),
+                        false,
+                    );
                     // SAFETY: segments are valid for the duration of this block.
                     let mut mem = unsafe { arm64_translate::Memory::from_segments(&load_segments) };
                     mem.host_passthrough = true;
@@ -222,14 +262,30 @@ pub(super) fn run_interpreted(
                     cpu.sp = mem.initial_sp();
                     cpu.x[30] = 0; // RET → 0 triggers ReturnedToHost exit
                     let mut interp = arm64_translate::Interpreter::new(cpu, mem, ffi);
-                    let _ = interp.run();
+                    match interp.run() {
+                        arm64_translate::ExitReason::Returned { .. }
+                        | arm64_translate::ExitReason::ReturnedToHost { .. } => {}
+                        arm64_translate::ExitReason::Exit { code } => {
+                            initializer_exit = Some(code as i32);
+                            break;
+                        }
+                        reason => {
+                            log::error!("Interpreter +load failed: {reason:?}");
+                            return Err(macho_exec::ExecError::NoEntryPoint.into());
+                        }
+                    }
                 }
             }
         }
     }
 
     // 11. Interpreter execution of main()
-    let ffi_bridge = interp_bridge::build_interpreter_bridge(&guest_ranges);
+    let mut ffi_bridge = interp_bridge::build_interpreter_bridge(&guest_ranges);
+    crate::exit_lifecycle::install_interpreter_lifecycle(
+        &mut ffi_bridge,
+        Some(exit_scope.registry()),
+        true,
+    );
 
     let entry_args = macho_exec::EntryArgs {
         program_name: config.process_name.clone(),
@@ -241,17 +297,22 @@ pub(super) fn run_interpreted(
             .collect(),
     };
 
-    let entry_result = macho_exec::call_entry_interpreted(
-        &registry.images()[app_idx].image,
-        &entry,
-        Some(&entry_args),
-        ffi_bridge,
-        &all_segments,
-    )?;
+    let exit_code = if let Some(code) = initializer_exit {
+        code
+    } else {
+        macho_exec::call_entry_interpreted(
+            &registry.images()[app_idx].image,
+            &entry,
+            Some(&entry_args),
+            ffi_bridge,
+            &all_segments,
+        )?
+        .exit_code
+    };
 
     Ok(RuntimeResult {
-        exit_code: entry_result.exit_code,
-        security_report: None,
+        exit_code,
+        security_report,
         images_loaded: registry.images().len(),
         shims_installed: ctx.shim_table.len(),
         initializers_run: 0,

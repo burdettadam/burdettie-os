@@ -239,8 +239,13 @@ pub(super) fn run_native(
 
     // 5.6. Load insert libraries first (before normal deps).
     if !insert_lib_paths.is_empty() {
-        let insert_count =
-            loader::load_insert_libraries(&insert_lib_paths, &mut registry, config.platform.fs());
+        let insert_count = loader::load_insert_libraries(
+            &insert_lib_paths,
+            &mut registry,
+            binary_dir,
+            config.platform.fs(),
+            config,
+        )?;
         tracer.record(
             EventKind::Pipeline,
             format!(
@@ -251,8 +256,13 @@ pub(super) fn run_native(
     }
 
     // BFS dependency loading (skip system libraries)
-    let dep_stats =
-        loader::load_dependencies(&arc_parsed, &mut registry, binary_dir, config.platform.fs())?;
+    let dep_stats = loader::load_dependencies(
+        &arc_parsed,
+        &mut registry,
+        binary_dir,
+        config.platform.fs(),
+        config,
+    )?;
     dep_stats.record_to(&tracer);
 
     // Load the main binary last
@@ -289,6 +299,13 @@ pub(super) fn run_native(
     // 7. Apply fixups across all images with shim-aware resolver
     registry.apply_all_fixups(&composite)?;
     tracer.record(EventKind::Pipeline, "fixups applied to all images");
+
+    // The guard borrows all fixed mappings before any guest initializer runs.
+    // Error paths discard pending callbacks; only normal completion invokes.
+    let exit_scope = crate::exit_lifecycle::enter_launch(
+        &registry,
+        libsystem_shims::exit_registry::ExitRoute::Native,
+    )?;
 
     // 7.3. Patch TLV thunks before protect() makes __DATA read-only
     for loaded in registry.images() {
@@ -381,6 +398,7 @@ pub(super) fn run_native(
             .collect(),
     };
     let entry_result = macho_exec::call_entry_with_args(&app.image, entry, Some(&entry_args))?;
+    crate::exit_lifecycle::complete_native(&exit_scope.registry(), entry_result.exit_code);
     tracer.record(
         EventKind::Pipeline,
         format!("entry point returned exit_code={}", entry_result.exit_code,),

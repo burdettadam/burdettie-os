@@ -1,0 +1,428 @@
+{
+  "schema_version": 1,
+  "scope": "selected_source_preparation_dependency_planning_and_sdk_build_only",
+  "captured_at": "2026-11-14T07:29:00.180585+00:00",
+  "source": {
+    "repository": "https://github.com/PureDarwin/PureDarwin",
+    "revision": "0163b2db225b85e3bf96fc25646ea290105ac298",
+    "complete_shallow_checkout": true,
+    "tracked_and_untracked_status_clean": true,
+    "corecrypto_revision": "f577aafe4b9a89727968666237d20cc51d2f770d",
+    "lock_sha256": "00c598d3efca4bbda302fec4a43fffbfa787dc642c8c0b2c4202c65339e684d0",
+    "lock_unchanged": true
+  },
+  "tooling": {
+    "nix_version": "2.28.3",
+    "nix_tarball_sha256": "85d1847d06d5d56167796d3f61cd992908de84584db3e700da031a782b59ea22",
+    "installation": "non_root_single_user_no_daemon_no_profile_edit"
+  },
+  "configured_limits": {
+    "cpu_quota_percent_of_one_cpu": 25,
+    "memory_max_bytes": 1610612736,
+    "swap_max_bytes": 0,
+    "minimum_free_disk_bytes": 8589934592,
+    "maximum_stage_growth_bytes": 3221225472,
+    "dry_run_build_jobs": 0,
+    "sdk_build_jobs": 1,
+    "sdk_build_cores": 1,
+    "sdk_stage_timeout_seconds": 1200
+  },
+  "combined_plan": {
+    "local_derivations": 32,
+    "fetch_paths": 264,
+    "download_mib": 916.73,
+    "unpacked_mib": 4811.47,
+    "duration_seconds": 232.21,
+    "log_sha256": "fae5ad69267693412f7620c79b22fd1cff52b80d91ad381280b8075a3e356bf8"
+  },
+  "experiments": [
+    {
+      "experiment": "source-preflight-20261114",
+      "status": "blocked",
+      "started_at": "2026-11-14T06:51:39.672657+00:00",
+      "finished_at": "2026-11-14T06:52:38.875745+00:00",
+      "error": "narrow-dry-run exited 1",
+      "initial_free_bytes": 17360650240,
+      "final_free_bytes": 16439648256,
+      "result_sha256": "cdd85716dae257ad6205ffcf473fb8e86ed0d4a16a20d370e3b86412a7d3e261",
+      "phases": [
+        {
+          "name": "download-nix",
+          "status": "pass",
+          "exit_code": 0,
+          "duration_seconds": 1.0
+        },
+        {
+          "name": "extract-nix",
+          "status": "pass",
+          "exit_code": 0,
+          "duration_seconds": 9.06
+        },
+        {
+          "name": "install-nix",
+          "status": "pass",
+          "exit_code": 0,
+          "duration_seconds": 2.0
+        },
+        {
+          "name": "nix-version",
+          "status": "pass",
+          "exit_code": 0,
+          "duration_seconds": 1.0
+        },
+        {
+          "name": "init-source",
+          "status": "pass",
+          "exit_code": 0,
+          "duration_seconds": 1.0
+        },
+        {
+          "name": "source-remote",
+          "status": "pass",
+          "exit_code": 0,
+          "duration_seconds": 1.0
+        },
+        {
+          "name": "fetch-source",
+          "status": "pass",
+          "exit_code": 0,
+          "duration_seconds": 28.09
+        },
+        {
+          "name": "checkout-source",
+          "status": "pass",
+          "exit_code": 0,
+          "duration_seconds": 12.0
+        },
+        {
+          "name": "corecrypto",
+          "status": "pass",
+          "exit_code": 0,
+          "duration_seconds": 1.0
+        },
+        {
+          "name": "source-status",
+          "status": "pass",
+          "exit_code": 0,
+          "duration_seconds": 1.0
+        },
+        {
+          "name": "submodule-status",
+          "status": "pass",
+          "exit_code": 0,
+          "duration_seconds": 1.0
+        },
+        {
+          "name": "narrow-dry-run",
+          "status": "fail",
+          "exit_code": 1,
+          "duration_seconds": 1.0
+        }
+      ],
+      "logs": {
+        "checkout-source.log": {
+          "bytes": 79,
+          "sha256": "dbbdf497b86cc220ec4cb17e9be760ec5a93580c7c580d054a4e1f429be04bc5"
+        },
+        "corecrypto.log": {
+          "bytes": 292,
+          "sha256": "8ae803a2ecb337e481a7508dc43525e90f0c9e3ea03dbe93c31809a5a15d3283"
+        },
+        "download-nix.log": {
+          "bytes": 396,
+          "sha256": "bd3bee3cb26b560138d458ecd941cdde907427902650df9189d95eec365c9c14"
+        },
+        "extract-nix.log": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "fetch-source.log": {
+          "bytes": 124,
+          "sha256": "8eaa58f2bb1a281b3fcf7e49f08099339087f3af0fc00ac66ce140e5c8cd3114"
+        },
+        "init-source.log": {
+          "bytes": 573,
+          "sha256": "8bbb2bfc8ee9faecb60e38dcd2866067c665ea50c176711c3671c09b0f146b01"
+        },
+        "install-nix.log": {
+          "bytes": 535,
+          "sha256": "1ff174b90af3e2395b346719c3e2322d658a5a13150ba8dc8b684447fbe64881"
+        },
+        "narrow-dry-run.log": {
+          "bytes": 440,
+          "sha256": "c23cd6d7f5b4090da88e49ee82ba31368693685b5a26b0e9a7f5625a47b46ca8"
+        },
+        "nix-version.log": {
+          "bytes": 17,
+          "sha256": "53ceb94a7ac0970d1e56f1b33969b841080a89db8c93ef261ab464175aec1329"
+        },
+        "source-remote.log": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "source-status.log": {
+          "bytes": 20,
+          "sha256": "ba051334ebc33f3162a4fd5be48615e03c8dac8ec7977e7c2752dbc1cf981841"
+        },
+        "submodule-status.log": {
+          "bytes": 77,
+          "sha256": "f6d7179cdc67b3af3c1b1c5c0dfe69b5a03d82ae9c509c4fbf6d48b02c08ada1"
+        }
+      },
+      "diagnosis": "explicit_shallow_git_input_attribute_required"
+    },
+    {
+      "experiment": "source-preflight-20261114-02",
+      "status": "assessed_no_build",
+      "started_at": "2026-11-14T06:57:19.122103+00:00",
+      "finished_at": "2026-11-14T07:01:14.415004+00:00",
+      "initial_free_bytes": 16439287808,
+      "final_free_bytes": 14387019776,
+      "result_sha256": "283ee65da726fe09334eb045d38e53cbf6c29493e722c36bf2d9a2322362dc09",
+      "phases": [
+        {
+          "name": "nix-version",
+          "status": "pass",
+          "exit_code": 0,
+          "duration_seconds": 1.07
+        },
+        {
+          "name": "source-status",
+          "status": "pass",
+          "exit_code": 0,
+          "duration_seconds": 1.0
+        },
+        {
+          "name": "submodule-status",
+          "status": "pass",
+          "exit_code": 0,
+          "duration_seconds": 1.0
+        },
+        {
+          "name": "narrow-dry-run",
+          "status": "pass",
+          "exit_code": 0,
+          "duration_seconds": 232.21
+        }
+      ],
+      "logs": {
+        "narrow-dry-run.log": {
+          "bytes": 19805,
+          "sha256": "fae5ad69267693412f7620c79b22fd1cff52b80d91ad381280b8075a3e356bf8"
+        },
+        "nix-version.log": {
+          "bytes": 17,
+          "sha256": "53ceb94a7ac0970d1e56f1b33969b841080a89db8c93ef261ab464175aec1329"
+        },
+        "source-status.log": {
+          "bytes": 20,
+          "sha256": "ba051334ebc33f3162a4fd5be48615e03c8dac8ec7977e7c2752dbc1cf981841"
+        },
+        "submodule-status.log": {
+          "bytes": 77,
+          "sha256": "f6d7179cdc67b3af3c1b1c5c0dfe69b5a03d82ae9c509c4fbf6d48b02c08ada1"
+        }
+      }
+    },
+    {
+      "experiment": "source-preflight-20261114-03",
+      "status": "assessed_no_build",
+      "started_at": "2026-11-14T07:12:10.474970+00:00",
+      "finished_at": "2026-11-14T07:12:29.568360+00:00",
+      "initial_free_bytes": 14386274304,
+      "final_free_bytes": 14386421760,
+      "result_sha256": "e6649a3ddd3e4d089e2676424e9ef6db50cb5b23556c4d15006d3ad455692611",
+      "phases": [
+        {
+          "name": "nix-version",
+          "status": "pass",
+          "exit_code": 0,
+          "duration_seconds": 1.0
+        },
+        {
+          "name": "source-status",
+          "status": "pass",
+          "exit_code": 0,
+          "duration_seconds": 1.0
+        },
+        {
+          "name": "submodule-status",
+          "status": "pass",
+          "exit_code": 0,
+          "duration_seconds": 1.0
+        },
+        {
+          "name": "apple-sdk-dry-run",
+          "status": "pass",
+          "exit_code": 0,
+          "duration_seconds": 13.07
+        },
+        {
+          "name": "native-ld-dry-run",
+          "status": "pass",
+          "exit_code": 0,
+          "duration_seconds": 1.0
+        },
+        {
+          "name": "darwin-cross-toolchain-dry-run",
+          "status": "pass",
+          "exit_code": 0,
+          "duration_seconds": 1.0
+        },
+        {
+          "name": "libsystem-dry-run",
+          "status": "pass",
+          "exit_code": 0,
+          "duration_seconds": 1.0
+        }
+      ],
+      "logs": {
+        "apple-sdk-dry-run.log": {
+          "bytes": 4894,
+          "sha256": "8bb4a91467503036b4261b1ca21b2744432485a6bd14441a3e66bde475b7aa8b"
+        },
+        "darwin-cross-toolchain-dry-run.log": {
+          "bytes": 18608,
+          "sha256": "a8817cb75133b3279462cf26b83ce86d5b715efe1ddf8128aa5e0121e749a391"
+        },
+        "libsystem-dry-run.log": {
+          "bytes": 19108,
+          "sha256": "42dc0f734bd81adb96e86d8785000fc49ca4eda16f329d9c2862cd2800534b26"
+        },
+        "native-ld-dry-run.log": {
+          "bytes": 18292,
+          "sha256": "ba2709719adafca6b9bfaea180d1a3372586177a2b8f975c242c0f1eb225a7df"
+        },
+        "nix-version.log": {
+          "bytes": 17,
+          "sha256": "53ceb94a7ac0970d1e56f1b33969b841080a89db8c93ef261ab464175aec1329"
+        },
+        "source-status.log": {
+          "bytes": 20,
+          "sha256": "ba051334ebc33f3162a4fd5be48615e03c8dac8ec7977e7c2752dbc1cf981841"
+        },
+        "submodule-status.log": {
+          "bytes": 77,
+          "sha256": "f6d7179cdc67b3af3c1b1c5c0dfe69b5a03d82ae9c509c4fbf6d48b02c08ada1"
+        }
+      },
+      "overlapping_package_plans": {
+        "apple-sdk": {
+          "local_derivations": 3,
+          "fetch_paths": 72,
+          "download_mib": 412.25,
+          "unpacked_mib": 1908.9
+        },
+        "native-ld": {
+          "local_derivations": 23,
+          "fetch_paths": 262,
+          "download_mib": 768.52,
+          "unpacked_mib": 2993.9
+        },
+        "darwin-cross-toolchain": {
+          "local_derivations": 27,
+          "fetch_paths": 262,
+          "download_mib": 768.52,
+          "unpacked_mib": 2993.9
+        },
+        "libsystem": {
+          "local_derivations": 32,
+          "fetch_paths": 264,
+          "download_mib": 916.73,
+          "unpacked_mib": 4811.47
+        }
+      }
+    },
+    {
+      "experiment": "source-sdk-20261114-01",
+      "status": "sdk_built_and_headers_checked",
+      "started_at": "2026-11-14T07:18:46.075324+00:00",
+      "finished_at": "2026-11-14T07:20:04.188969+00:00",
+      "initial_free_bytes": 14377615360,
+      "final_free_bytes": 12243050496,
+      "result_sha256": "470436d0a03509ebb2c3beeb26fe9b960ad91715384f32379f72b1cebe79c3ce",
+      "phases": [
+        {
+          "name": "nix-version",
+          "status": "pass",
+          "exit_code": 0,
+          "duration_seconds": 1.0
+        },
+        {
+          "name": "source-status",
+          "status": "pass",
+          "exit_code": 0,
+          "duration_seconds": 1.0
+        },
+        {
+          "name": "submodule-status",
+          "status": "pass",
+          "exit_code": 0,
+          "duration_seconds": 1.0
+        },
+        {
+          "name": "apple-sdk-build",
+          "status": "pass",
+          "exit_code": 0,
+          "duration_seconds": 75.11
+        }
+      ],
+      "logs": {
+        "apple-sdk-build.log": {
+          "bytes": 566100,
+          "sha256": "23c23e949a790c38e93cd7e757206a30a8af23c154484ad44e6008e35b7af2b0"
+        },
+        "nix-version.log": {
+          "bytes": 17,
+          "sha256": "53ceb94a7ac0970d1e56f1b33969b841080a89db8c93ef261ab464175aec1329"
+        },
+        "source-status.log": {
+          "bytes": 20,
+          "sha256": "ba051334ebc33f3162a4fd5be48615e03c8dac8ec7977e7c2752dbc1cf981841"
+        },
+        "submodule-status.log": {
+          "bytes": 77,
+          "sha256": "f6d7179cdc67b3af3c1b1c5c0dfe69b5a03d82ae9c509c4fbf6d48b02c08ada1"
+        }
+      },
+      "sdk_output_identity": "nnsb7h396vc5xmwn59kky88inslcdw1m-puredarwin-oss-sdk-26.5",
+      "sdk_derivation_identity": "0nwq5lg8853m0rdvsncvjwyjk0dmffxd-puredarwin-oss-sdk-26.5.drv",
+      "sdk_file_sha256": {
+        "usr/include/stdio.h": "d2220614f42d3cb678ae0de176ba0ab3256e15fb45b3efdb5d17b8ac1f6a4b54",
+        "usr/include/pthread.h": "e7b93de15e9a0942c780d1cb8195f80e7471010640e6774c1e742fae1d23c185",
+        "usr/include/mach/mach.h": "6b55c58c9445ff80fa3765a33f299704eda5f4c6a3495f82c7b039adda804eb3",
+        "usr/lib/libSystem.tbd": "742103cad143a52c69823f8ae845c4c340e90d241b13084eba287d2893d1e458"
+      }
+    }
+  ],
+  "checkpoint_free_bytes": 12242305024,
+  "qualification": {
+    "sdk": "built_and_headers_checked",
+    "fixture_executable_link": "not_run",
+    "native_linker_realization": "not_run",
+    "cross_toolchain_realization": "not_run",
+    "libsystem_realization": "not_run",
+    "selected_image_build": "not_run",
+    "selected_image_boot": "not_run",
+    "burdettie_runtime": "not_run",
+    "security_enforcement": "not_run",
+    "full_image_build_capacity": "unqualified"
+  },
+  "remaining_constraints": [
+    "Combined planned unpacked substitutions leave about 0.70 GiB above the reserve before local outputs and temporary build trees; this is not a peak-capacity measurement.",
+    "Individual package plans overlap and must not be summed.",
+    "Raw Ninja calls in larger recipes require explicit job-count bounds; --cores 1 alone does not constrain those overridden phases.",
+    "Compiler-rt unpacks LLVM monorepo source and the generic PureDarwin recipe builds Debug.",
+    "The four fixture-link inputs do not include the complete guest startup/transitive runtime closure."
+  ],
+  "warnings_retained": [
+    "SDK compiler wrapper target/hardening warnings",
+    "Mach eventlink type redefinition warnings"
+  ],
+  "notes": [
+    "All recovered result/log hashes were verified.",
+    "The first failed evaluation is preserved separately from the corrected plan.",
+    "No image, executable fixture, guest program or enforcement backend is qualified by SDK completion.",
+    "No paid upgrade, new cloud infrastructure or instance/volume expansion was made."
+  ]
+}

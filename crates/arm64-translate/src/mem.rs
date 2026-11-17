@@ -6,6 +6,17 @@
 
 use std::collections::BTreeMap;
 
+mod cstring_exports;
+pub use cstring_exports::{CStringExports, MAX_EXPORTED_CSTRING_BYTES};
+
+/// A bounded copy could not be completed using registered/owned memory.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BoundedReadError {
+    Unmapped,
+    AddressOverflow,
+    MissingTerminator,
+}
+
 fn access_last_byte(addr: u64, size: usize) -> Option<u64> {
     addr.checked_add(u64::try_from(size.checked_sub(1)?).ok()?)
 }
@@ -203,6 +214,8 @@ pub struct Memory {
     stack_top: u64,
     /// Owned stack storage. `u128` keeps the base at least 16-byte aligned.
     _stack_storage: Box<[u128]>,
+    /// Owned string snapshots, separate from general data/code mappings.
+    cstring_exports: CStringExports,
     /// When true, unmapped addresses are treated as direct host pointers.
     pub host_passthrough: bool,
 }
@@ -257,6 +270,7 @@ impl Memory {
             regions,
             stack_top,
             _stack_storage: stack_storage,
+            cstring_exports: CStringExports::default(),
             host_passthrough: false,
         }
     }
@@ -279,6 +293,63 @@ impl Memory {
             }
         }
         None
+    }
+
+    /// Share only this interpreter's bounded constructor observer state.
+    pub fn cstring_exports(&self) -> CStringExports {
+        self.cstring_exports.clone()
+    }
+
+    /// The caller observed the exact known UTF8String IMP returning `address`.
+    /// Approval additionally requires constructor-owned provenance for `object`.
+    pub fn export_observed_cstring(&self, object: u64, address: u64) -> bool {
+        self.cstring_exports.export(object, address)
+    }
+
+    /// Copy a scalar stack slot from registered memory only. Host passthrough
+    /// and string exports cannot authorize variadic stack reads.
+    pub fn read_u64_mapped(&self, address: u64) -> Option<u64> {
+        let pointer = self.translate_strict(address, 8)?;
+        // SAFETY: translate_strict checked all eight bytes of the live region.
+        Some(u64::from_le(unsafe {
+            pointer.cast::<u64>().read_unaligned()
+        }))
+    }
+
+    /// Copy a complete NUL-terminated byte string with an explicit limit.
+    /// Never consult host_passthrough or manufacture a borrowed guest slice.
+    /// Exported immutable snapshots do not become executable/writable regions.
+    pub fn copy_cstring_bounded(
+        &self,
+        address: u64,
+        limit: usize,
+    ) -> Result<Vec<u8>, BoundedReadError> {
+        if self.translate_strict(address, 1).is_none() {
+            return self
+                .cstring_exports
+                .copy_cstring(address, limit)
+                .ok_or(BoundedReadError::Unmapped);
+        }
+        let mut bytes = Vec::new();
+        for offset in 0..=limit {
+            let current = address
+                .checked_add(offset as u64)
+                .ok_or(BoundedReadError::AddressOverflow)?;
+            let pointer = self
+                .translate_strict(current, 1)
+                .ok_or(BoundedReadError::Unmapped)?;
+            // SAFETY: this byte is inside a region whose lifetime is held by
+            // this Memory's owner. No unregistered host address is read.
+            let byte = unsafe { pointer.read() };
+            if byte == 0 {
+                return Ok(bytes);
+            }
+            if offset == limit {
+                return Err(BoundedReadError::MissingTerminator);
+            }
+            bytes.push(byte);
+        }
+        unreachable!("the inclusive bounded loop returns at its limit")
     }
 
     /// Host fallback may only cover addresses outside all guest regions.

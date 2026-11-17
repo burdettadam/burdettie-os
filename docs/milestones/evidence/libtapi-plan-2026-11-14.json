@@ -1,0 +1,190 @@
+{
+  "schema_version": 1,
+  "scope": "observed_libtapi_source_staging_metadata_plan",
+  "status": "planned_not_built",
+  "burdettie_revision": "f8c59175784edb89e0087734d5020d142256297d",
+  "source": {
+    "revision": "0163b2db225b85e3bf96fc25646ea290105ac298",
+    "lock": {
+      "sha256": "00c598d3efca4bbda302fec4a43fffbfa787dc642c8c0b2c4202c65339e684d0",
+      "nixpkgs_node": "nixpkgs_3",
+      "nixpkgs_revision": "fd1462031fdee08f65fd0b4c6b64e22239a77870"
+    },
+    "submodules": [
+      [
+        "f577aafe4b9a89727968666237d20cc51d2f770d",
+        "external/corecrypto"
+      ]
+    ]
+  },
+  "nix_version": "nix (Nix) 2.28.3",
+  "recipe_sha256": "5daf2f02681357e00d3b5c8ef5fbcbdf279f681a44697780d5c578dee1872409",
+  "stager_sha256": "cec91393bc522d612336aaae950fdf0590a7f26dbc6ddcec2f2a04804fbb055b",
+  "helper_sha256": "7c18e1c623f976e52c70e81f99d8d1e566a7804ec7c9a082085f828c7640dcab",
+  "unpack_phase_sha256": "96026a9071b7f6cc6f588451530b88f782e0e9b7e92c56842574925f8848f777",
+  "upstream_build_phase_sha256": "8a7e617726c9d582a56f7af7e0335e2ca9edca0953e392ba23f5e0208c7e6d0e",
+  "upstream_post_patch_sha256": "da8b25e30dd167387031359370cdb030639ffd5d2fa5a7eaec21505f6a22ba8a",
+  "upstream_patch_files": [
+    {
+      "source_relative_path": "nix/pkgs/toolchain/libtapi-riscv.patch",
+      "sha256": "83a9479005803af81fa050d6f557fbb304013256fdd02786f3f62db7711e8e8a"
+    }
+  ],
+  "upstream_libtapi": {
+    "drv": "kr9cik3jk4rjsfdjw3qx3z06bj8aq2c1-apple-libtapi-1300.6.5.drv",
+    "out": "q9bvm0m0ndp8x7ffd6cbixl73p9bi80y-apple-libtapi-1300.6.5"
+  },
+  "candidate_libtapi": {
+    "drv": "pzi6pfykji7lp60p9y7934rvanhqdyrh-apple-libtapi-1300.6.5.drv",
+    "out": "apk3lq9svmlncaipqzc4gw7a3mdcmsmc-apple-libtapi-1300.6.5"
+  },
+  "sdk": {
+    "drv": "0nwq5lg8853m0rdvsncvjwyjk0dmffxd-puredarwin-oss-sdk-26.5.drv",
+    "out": "nnsb7h396vc5xmwn59kky88inslcdw1m-puredarwin-oss-sdk-26.5",
+    "identity_matches_retained_baseline": true
+  },
+  "full_libtapi_source": {
+    "drv": "jgvn6wjla64ij8qzvd0j3wmrkfabpyz1-source.drv",
+    "out": "lck5ww0br6h9z1v9k5psgmimb52ncm74-source",
+    "revision": "640b4623929c923c0468143ff2a363a48665fa54",
+    "output_hash": "sha256-eXzQRB07AcH9nBgPoGpIQZbC4O/bIzkdbjJ442qM9VA=",
+    "already_realized": true,
+    "retained_unchanged": true,
+    "source_inventory_sha256": "37d3807502b72b8b98100430aa5c5c6bac63d780fa9b389d04872e73ed5bb5f1",
+    "manifest": {
+      "sha256": "090b54ac4da796d4a59ee24df90f598f68c66a9af7eb81991335e1f32971ca74",
+      "bytes": 3111190,
+      "retained_on_host": true,
+      "captured_locally": false,
+      "qualification": "The plan records this inventory hash; the complete manifest remains on the host and was not included in the local capture."
+    }
+  },
+  "unchanged_recipe_fields": {
+    "build_inputs": true,
+    "build_phase": true,
+    "cmake_driver": true,
+    "configure_phase": true,
+    "dont_install": true,
+    "install_phase": true,
+    "native_build_inputs": true,
+    "patches": true,
+    "post_patch": true,
+    "post_unpack": true,
+    "pre_unpack": true,
+    "source": true
+  },
+  "plan": {
+    "started_at": "2026-11-14T18:45:36.354146+00:00",
+    "finished_at": "2026-11-14T18:46:00.435005+00:00",
+    "duration_seconds": 24.08,
+    "exit_code": 0,
+    "evaluation": "offline_no_lock_update_no_import_from_derivation",
+    "planning_mode": "substituter_metadata",
+    "substituter_metadata_queries_enabled": true,
+    "result_bytes": 27244,
+    "result_sha256": "55c9bfc2f7445c925544e5bb2676a30a4033cedadd1b3c2df81cffb5f76f0b98",
+    "driver_result_sha256": "30b57ef7c5732e51c624becfbbef50dc824abe660a700bb76d486e536904c22c",
+    "dry_run": {
+      "exit_code": 0,
+      "timed_out": false,
+      "local_derivations": 1,
+      "planned_fetch_paths": 0,
+      "only_local_derivation": "pzi6pfykji7lp60p9y7934rvanhqdyrh-apple-libtapi-1300.6.5.drv",
+      "log_bytes": 104,
+      "log_sha256": "901d4a305a785adf748c3aabe5ddff4df9f505affd0558f9ec9565e3954df632"
+    },
+    "dependency_downloads": "not_run",
+    "dependency_realization": "not_run"
+  },
+  "source_inventory": {
+    "directories_including_root": 1515,
+    "regular_files": 10666,
+    "original_symlinks": 1,
+    "planned_copied_regular_files": 74,
+    "planned_linked_regular_files": 10592,
+    "gnu_config_scripts": [
+      "src/llvm/cmake/config.guess"
+    ],
+    "source_allocated_bytes": 217415680,
+    "logical_file_bytes": 186210131,
+    "planned_copied_file_bytes": 296484
+  },
+  "staging_estimate": {
+    "allocation_bytes": 50094080,
+    "filesystem_block_bytes": 4096,
+    "method": "source directory blocks, rounded copies, at least one block per symlink",
+    "scope": "staging only; excludes build, output and additional filesystem metadata",
+    "staging_executed": false,
+    "peak_space_qualified": false
+  },
+  "metadata_phase_resources": {
+    "scope": "metadata planning only; not a build peak",
+    "initial_free_disk_bytes": 9528676352,
+    "observed_min_free_disk_bytes": 9450496000,
+    "final_free_disk_bytes": 9525194752,
+    "minimum_free_disk_reserve_bytes": 8589934592,
+    "final_remaining_above_reserve_bytes": 935260160,
+    "maximum_stage_growth_bytes": 134217728,
+    "initial_free_inodes": 4314429,
+    "observed_min_free_inodes": 4307624,
+    "final_free_inodes": 4314374,
+    "minimum_initial_free_inodes": 100000,
+    "minimum_free_inodes": 50000,
+    "observed_min_host_available_memory_bytes": 3600990208,
+    "final_host_available_memory_bytes": 3872772096,
+    "cpu_quota_percent_of_one_cpu": 25,
+    "memory_max_bytes": 1610612736,
+    "memory_high_bytes": 1342177280,
+    "memory_peak_bytes": 657637376,
+    "memory_events": {
+      "low": 0,
+      "high": 0,
+      "max": 0,
+      "oom": 0,
+      "oom_kill": 0,
+      "oom_group_kill": 0,
+      "sock_throttled": 0
+    },
+    "swap_max_bytes": 0,
+    "tasks_max": 128
+  },
+  "preservation": {
+    "original_worktree_preserved": true,
+    "earlier_failed_build_resumed": false,
+    "source_inputs_retained": true
+  },
+  "implementation_checks": {
+    "revision": "f8c59175784edb89e0087734d5020d142256297d",
+    "m1_run": "https://github.com/burdettadam/burdettie-os/actions/runs/43627478562",
+    "script_tests_passed": 100,
+    "contract_tests_passed": 37,
+    "examples_validated": 4,
+    "skipped_tests": 0,
+    "full_ci": "https://github.com/burdettadam/burdettie-os/actions/runs/43627478519",
+    "functional_ci_jobs_passed": 6,
+    "security_scanning": "fail_cargo_deny_ttf_parser_RUSTSEC_2026_0192",
+    "hygiene_run": "https://github.com/burdettadam/burdettie-os/actions/runs/43627478517",
+    "repository_hygiene": "fail_two_public_source_checksum_history_findings",
+    "failures_suppressed": false
+  },
+  "qualification": {
+    "candidate_libtapi_realization": "not_run",
+    "native_linker_rebinding": "not_run",
+    "native_linker_completion": "not_qualified",
+    "fixture_link": "not_run",
+    "selected_image_build": "not_run",
+    "selected_guest_execution": "not_run",
+    "burdettie_runtime_execution": "not_run",
+    "security_enforcement": "not_run",
+    "build_peak_capacity_qualified": false,
+    "m1_complete": false
+  },
+  "remaining_gates": [
+    "Retain the complete source and earlier failed build tree; any new build begins a new derivation.",
+    "Use a separately reviewed bounded realization with fresh capacity checks and the unchanged 8-GiB reserve.",
+    "Inspect the actual candidate output, NAR/deriver, regular installed headers, library format and references before accepting a build result.",
+    "Bind a successful staged library into a separately reviewed native-linker recipe, then plan and inspect downstream outputs.",
+    "Keep current required dependency-policy and history-scan failures visible; no scanner exception or scope reduction is included."
+  ],
+  "observation_boundary": "This receipt ends with the metadata phase at 2026-11-14T18:46:00.435985+00:00. A later build is outside its qualification fields."
+}

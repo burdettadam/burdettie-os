@@ -1,0 +1,181 @@
+{
+  "schema_version": 1,
+  "scope": "puredarwin_20.5_bootstrap_only",
+  "captured_at": "2026-11-14T07:01:57.456942+00:00",
+  "image_release": "20.5",
+  "release_revision": "1bbaeb2ee6aa41e6f792a0b1e2943cc295b3b290",
+  "image": {
+    "bytes": 274726912,
+    "sha256": "ef65a816395680ef9210f401cebe3783c131badca1a942cb80e56bec97e717ac"
+  },
+  "firmware_code": {
+    "bytes": 3653632,
+    "sha256": "ad23261d43116abc3747d59a7837fbf578c9586a8993f4eeba064cd07eccb083"
+  },
+  "firmware_vars": {
+    "bytes": 540672,
+    "sha256": "5d2ac383371b408398accee7ec27c8c09ea5b74a0de0ceea6513388b15be5d1e"
+  },
+  "qemu_version": "QEMU emulator version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.18)",
+  "qemu_sha256": "8a35ccba41582fc6c38b9df85fc9e35fa1d42f414d2d7d8090ee9b2f5e7c0854",
+  "configuration": {
+    "machine": "q35",
+    "cpu": "IvyBridge,vendor=GenuineIntel",
+    "accelerator": "tcg,thread=single",
+    "memory_mib": 2048,
+    "vcpus": 2,
+    "guest_network": "none",
+    "host_cpu_quota_percent_of_one_cpu": 75,
+    "cgroup_memory_max_bytes": 3221225472,
+    "swap_max_bytes": 0,
+    "per_boot_timeout_seconds": 600
+  },
+  "experiments": [
+    {
+      "status": "fail",
+      "started_at": "2026-11-13T06:18:45.561401+00:00",
+      "finished_at": "2026-11-13T06:28:46.505761+00:00",
+      "harness_sha256": "5b2653a72861b8d28c40fd8c21e692fb3ef57ab7c4f94ae672bb35daebaf0519",
+      "experiment": "bootstrap-20261113-01",
+      "harness_revision": "5800f5ec505c427bc335215d028e2ec9618ebfee",
+      "result_sha256": "1c9c98eff3b784891ea9751ec230f9a5f1bc703b3ddd8d57c0080fdc0fe94a0d",
+      "phases": [
+        {
+          "phase": "write",
+          "status": "fail",
+          "started_at": "2026-11-13T06:18:46.338459+00:00",
+          "finished_at": "2026-11-13T06:28:46.504578+00:00",
+          "kernel_banner_observed": true,
+          "shell_verified": false,
+          "data_verified": false,
+          "peak_rss_bytes": 510922752,
+          "reason": "timeout_waiting_for_prompt",
+          "termination": {
+            "method": "sigterm_after_guest_sync_or_failed_probe",
+            "exit_code": 0,
+            "process_exited": true
+          },
+          "duration_seconds": 600.166
+        }
+      ],
+      "logs": {
+        "write-qemu.log": {
+          "bytes": 404,
+          "sha256": "6f4e7909e105909a035b49f3ab9a42637f0f65c7799b6be81dd6cabcf5978c9f"
+        },
+        "write-serial.log": {
+          "bytes": 33333,
+          "sha256": "66428e49556793275e0e84f9280afe52e9d20682f5ea54114c29bacb4f0239dc"
+        }
+      },
+      "diagnosis": "readiness_matcher_missed_decorated_prompt_followed_by_async_console_output"
+    },
+    {
+      "status": "fail",
+      "started_at": "2026-11-14T06:42:17.996729+00:00",
+      "finished_at": "2026-11-14T06:43:07.757701+00:00",
+      "harness_sha256": "5076328a7c5fad280a7573b4f3aea21576db8dad721439d373d60696db30a3e8",
+      "error": "interrupted",
+      "experiment": "bootstrap-20261114-01",
+      "harness_revision": "b0752ab4278e31be34253d9adacccad35b8fb262",
+      "result_sha256": "4da513d09e011538e4379540c4f9aa463412cbca946ef6f57dc11d0fa241fc7e",
+      "phases": [],
+      "logs": {
+        "write-qemu.log": {
+          "bytes": 404,
+          "sha256": "6f4e7909e105909a035b49f3ab9a42637f0f65c7799b6be81dd6cabcf5978c9f"
+        },
+        "write-serial.log": {
+          "bytes": 10351,
+          "sha256": "f2fedb751eef0c205a0da5dbef779cdf467c441115e26c247470f5127b0021ab"
+        }
+      },
+      "diagnosis": "host_service_interruption_during_scheduled_package_maintenance"
+    },
+    {
+      "status": "pass",
+      "started_at": "2026-11-14T06:50:15.120733+00:00",
+      "finished_at": "2026-11-14T06:58:05.613726+00:00",
+      "harness_sha256": "5076328a7c5fad280a7573b4f3aea21576db8dad721439d373d60696db30a3e8",
+      "experiment": "bootstrap-20261114-02",
+      "harness_revision": "b0752ab4278e31be34253d9adacccad35b8fb262",
+      "result_sha256": "e60b37fa22202e9e9753769a0719baa670bd7953d7fd514f7ffea2e7bbb217dd",
+      "phases": [
+        {
+          "phase": "write",
+          "status": "pass",
+          "started_at": "2026-11-14T06:50:15.979510+00:00",
+          "finished_at": "2026-11-14T06:54:11.927477+00:00",
+          "kernel_banner_observed": true,
+          "prompt_hint_observed": true,
+          "shell_verified": true,
+          "data_verified": true,
+          "peak_rss_bytes": 557182976,
+          "termination": {
+            "method": "sigterm_after_guest_sync_or_failed_probe",
+            "exit_code": 0,
+            "process_exited": true
+          },
+          "duration_seconds": 235.948
+        },
+        {
+          "phase": "read",
+          "status": "pass",
+          "started_at": "2026-11-14T06:54:11.928059+00:00",
+          "finished_at": "2026-11-14T06:58:05.609789+00:00",
+          "kernel_banner_observed": true,
+          "prompt_hint_observed": true,
+          "shell_verified": true,
+          "data_verified": true,
+          "peak_rss_bytes": 555991040,
+          "termination": {
+            "method": "sigterm_after_guest_sync_or_failed_probe",
+            "exit_code": 0,
+            "process_exited": true
+          },
+          "duration_seconds": 233.682
+        }
+      ],
+      "logs": {
+        "read-qemu.log": {
+          "bytes": 404,
+          "sha256": "6f4e7909e105909a035b49f3ab9a42637f0f65c7799b6be81dd6cabcf5978c9f"
+        },
+        "read-serial.log": {
+          "bytes": 34474,
+          "sha256": "79a1df4934ded4787f725027921c18eafa2a1ab016d3ba35b602feeca1ad9a0b"
+        },
+        "write-qemu.log": {
+          "bytes": 404,
+          "sha256": "6f4e7909e105909a035b49f3ab9a42637f0f65c7799b6be81dd6cabcf5978c9f"
+        },
+        "write-serial.log": {
+          "bytes": 33934,
+          "sha256": "72bc3f5cfb8501e3a46454b8e52d55d31cd8068c224f05fd9ecffa6b6ef3dfb4"
+        }
+      }
+    }
+  ],
+  "independent_review": {
+    "complete_nonce_responses_are_standalone": true,
+    "command_echoes_do_not_contain_complete_responses": true,
+    "read_phase_compares_exact_retained_bytes": true,
+    "both_qemu_processes_exited": true,
+    "all_log_hashes_verified": true
+  },
+  "limits": {
+    "graceful_guest_shutdown_tested": false,
+    "read_boot_replayed_ext4_journal": true,
+    "selected_source_candidate_qualified": false,
+    "fixture_cross_build_qualified": false,
+    "burdettie_runtime_executed": false,
+    "apple_application_qualified": false,
+    "security_enforcement_qualified": false
+  },
+  "notes": [
+    "Original failure is preserved; the corrected harness did not retroactively qualify it.",
+    "Follow-up uses the same image, firmware, QEMU and resource profile.",
+    "Host stops QEMU after guest sync; readback demonstrates this tested file surviving that termination and restart, including journal replay.",
+    "Raw logs, writable disks, command receipts and cloud identifiers remain private."
+  ]
+}
