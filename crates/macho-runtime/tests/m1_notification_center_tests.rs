@@ -407,7 +407,11 @@ mod process_tests {
                 );
             }));
             assert!(result.is_err(), "oversized {label} was accepted");
-            let stream = if redirect.is_empty() { "stdout" } else { "stderr" };
+            let stream = if redirect.is_empty() {
+                "stdout"
+            } else {
+                "stderr"
+            };
             let length = fs::metadata(work.join(format!("{label}.{stream}")))
                 .unwrap()
                 .len();
