@@ -10,7 +10,9 @@ struct RegistryGuard {
 
 impl RegistryGuard {
     fn new() -> Self {
-        let lock = DISTRIBUTED_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let lock = DISTRIBUTED_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         clear_all_distributed_observers();
         Self { _lock: lock }
     }
@@ -23,7 +25,12 @@ impl Drop for RegistryGuard {
 }
 
 fn names() -> Vec<Option<String>> {
-    dist_observers().lock().unwrap().iter().map(|entry| entry.name.clone()).collect()
+    dist_observers()
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|entry| entry.name.clone())
+        .collect()
 }
 
 struct CallbackState {
@@ -151,7 +158,10 @@ fn cf_callback_receives_all_five_arguments() {
     shim_nsdistributed_post_name_object_userinfo(0, 0, name, object, info);
     assert_eq!(state.calls.load(Ordering::Relaxed), 1);
     assert!(state.lock_free.load(Ordering::Relaxed));
-    assert_eq!(*state.args.lock().unwrap(), [distributed_center_ptr(), state.addr(), name, object, info]);
+    assert_eq!(
+        *state.args.lock().unwrap(),
+        [distributed_center_ptr(), state.addr(), name, object, info]
+    );
     clear_all_distributed_observers();
 }
 
@@ -211,7 +221,10 @@ fn distributed_sender_filter_compares_string_contents() {
     dist_observers().lock().unwrap().push(DistObserver {
         name: Some("SenderFilter".to_owned()),
         object: Some("same sender".to_owned()),
-        kind: ObserverKind::CfCallback { callback: callback as *const () as u64, context: state.addr() },
+        kind: ObserverKind::CfCallback {
+            callback: callback as *const () as u64,
+            context: state.addr(),
+        },
         active: Arc::new(AtomicBool::new(true)),
     });
     post_distributed_by_cstr("SenderFilter", None, 0);

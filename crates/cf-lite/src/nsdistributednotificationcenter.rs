@@ -48,7 +48,9 @@ struct DistObserver {
 impl DistObserver {
     fn matches_observer(&self, observer: u64) -> bool {
         match self.kind {
-            ObserverKind::Selector { observer: value, .. } => value == observer,
+            ObserverKind::Selector {
+                observer: value, ..
+            } => value == observer,
             ObserverKind::CfCallback { context, .. } => context == observer,
         }
     }
@@ -94,7 +96,10 @@ fn deliver_to_distributed_observers(name_str: &str, notification: u64) {
         .iter()
         .filter(|entry| {
             entry.name.as_deref().is_none_or(|name| name == name_str)
-                && entry.object.as_deref().is_none_or(|name| Some(name) == object_str)
+                && entry
+                    .object
+                    .as_deref()
+                    .is_none_or(|name| Some(name) == object_str)
         })
         .map(|entry| (Arc::clone(&entry.active), entry.kind))
         .collect();
@@ -219,7 +224,10 @@ pub extern "C" fn shim_nsdistributed_add_observer_suspension(
     dist_observers().lock().unwrap().push(DistObserver {
         name: cfstring::extract_cfstring_cstr(name).map(str::to_owned),
         object: cfstring::extract_cfstring_cstr(object).map(str::to_owned),
-        kind: ObserverKind::Selector { observer, sel_ptr: sel },
+        kind: ObserverKind::Selector {
+            observer,
+            sel_ptr: sel,
+        },
         active: Arc::new(AtomicBool::new(true)),
     });
 }
@@ -284,9 +292,9 @@ pub fn add_distributed_cf_observer(name: Option<&str>, callback: u64, context: u
 }
 
 pub fn remove_distributed_cf_observer(callback: u64) {
-    remove_matching(|entry| {
-        matches!(entry.kind, ObserverKind::CfCallback { callback: value, .. } if value == callback)
-    });
+    remove_matching(
+        |entry| matches!(entry.kind, ObserverKind::CfCallback { callback: value, .. } if value == callback),
+    );
 }
 
 #[cfg(test)]

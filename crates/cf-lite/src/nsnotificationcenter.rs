@@ -4,6 +4,9 @@
 //! Delivery snapshots registrations without holding the registry lock while
 //! invoking guest code. This shim does not implement queues or block copying;
 //! observers, blocks and captured objects must remain live during delivery.
+//! Registrations belong to the receiving center, not the process as a whole.
+//! Center pointers are borrowed identities, not retained/validated capabilities;
+//! callers must remove registrations before releasing a custom center.
 
 use crate::cfstring;
 use crate::nsobj;
@@ -78,6 +81,7 @@ enum ObserverKind {
 }
 
 struct Observer {
+    center: u64,
     name: Option<String>,
     object: u64,
     kind: ObserverKind,
@@ -87,7 +91,9 @@ struct Observer {
 impl Observer {
     fn matches_observer(&self, observer: u64) -> bool {
         match self.kind {
-            ObserverKind::Selector { observer: value, .. } => value == observer,
+            ObserverKind::Selector {
+                observer: value, ..
+            } => value == observer,
             ObserverKind::Block { handle, .. } => handle == observer,
         }
     }
@@ -99,9 +105,9 @@ fn observers() -> &'static Mutex<Vec<Observer>> {
     OBSERVERS.get_or_init(|| Mutex::new(Vec::new()))
 }
 
-fn remove_matching(mut matches: impl FnMut(&Observer) -> bool) {
+fn remove_matching(center: u64, mut matches: impl FnMut(&Observer) -> bool) {
     observers().lock().unwrap().retain(|entry| {
-        if matches(entry) {
+        if entry.center == center && matches(entry) {
             entry.active.store(false, Ordering::Release);
             false
         } else {
@@ -120,7 +126,7 @@ pub fn clear_all_observers() {
     NEXT_TOKEN.store(1, Ordering::Relaxed);
 }
 
-fn deliver_to_observers(name_str: &str, notification: u64) {
+fn deliver_to_observers(center: u64, name_str: &str, notification: u64) {
     if notification == 0 {
         return;
     }
@@ -130,7 +136,8 @@ fn deliver_to_observers(name_str: &str, notification: u64) {
         .unwrap()
         .iter()
         .filter(|entry| {
-            entry.name.as_deref().is_none_or(|name| name == name_str)
+            entry.center == center
+                && entry.name.as_deref().is_none_or(|name| name == name_str)
                 && (entry.object == 0 || entry.object == object)
         })
         .map(|entry| (Arc::clone(&entry.active), entry.kind))
@@ -182,6 +189,16 @@ fn default_center_ptr() -> u64 {
     })
 }
 
+// Direct internal shim calls historically use zero for the default center.
+// Preserve that bridge convention without conflating nonzero custom centers.
+fn center_key(center: u64) -> u64 {
+    if center == 0 {
+        default_center_ptr()
+    } else {
+        center
+    }
+}
+
 pub fn default_center_addr() -> u64 {
     default_center_ptr()
 }
@@ -200,7 +217,7 @@ pub extern "C" fn shim_nsnotificationcenter_post_notification_name_object(
 }
 
 pub extern "C" fn shim_nsnotificationcenter_post_notification_name_object_userinfo(
-    _obj: u64,
+    obj: u64,
     _cmd: u64,
     name: u64,
     object: u64,
@@ -208,23 +225,23 @@ pub extern "C" fn shim_nsnotificationcenter_post_notification_name_object_userin
 ) {
     let name_str = cfstring::extract_cfstring_cstr(name).unwrap_or("");
     let notification = make_nsnotification(name, object, userinfo);
-    deliver_to_observers(name_str, notification);
+    deliver_to_observers(center_key(obj), name_str, notification);
 }
 
 pub extern "C" fn shim_nsnotificationcenter_post_notification(
-    _obj: u64,
+    obj: u64,
     _cmd: u64,
     notification: u64,
 ) {
     if notification != 0 {
         let name = shim_nsnotification_name(notification, 0);
         let name_str = cfstring::extract_cfstring_cstr(name).unwrap_or("");
-        deliver_to_observers(name_str, notification);
+        deliver_to_observers(center_key(obj), name_str, notification);
     }
 }
 
 pub extern "C" fn shim_nsnotificationcenter_add_observer(
-    _obj: u64,
+    obj: u64,
     _cmd: u64,
     observer: u64,
     sel: u64,
@@ -234,16 +251,21 @@ pub extern "C" fn shim_nsnotificationcenter_add_observer(
     if observer == 0 || sel == 0 {
         return;
     }
+    let center = center_key(obj);
     observers().lock().unwrap().push(Observer {
+        center,
         name: cfstring::extract_cfstring_cstr(name).map(str::to_owned),
         object,
-        kind: ObserverKind::Selector { observer, sel_ptr: sel },
+        kind: ObserverKind::Selector {
+            observer,
+            sel_ptr: sel,
+        },
         active: Arc::new(AtomicBool::new(true)),
     });
 }
 
 pub extern "C" fn shim_nsnotificationcenter_add_observer_for_name(
-    _obj: u64,
+    obj: u64,
     _cmd: u64,
     name: u64,
     object: u64,
@@ -263,7 +285,9 @@ pub extern "C" fn shim_nsnotificationcenter_add_observer_for_name(
         *(handle as *mut u64) = nsobj::nsobject_class_addr();
         *((handle + 8) as *mut u64) = token;
     }
+    let center = center_key(obj);
     observers().lock().unwrap().push(Observer {
+        center,
         name: cfstring::extract_cfstring_cstr(name).map(str::to_owned),
         object,
         kind: ObserverKind::Block { block, handle },
@@ -272,16 +296,16 @@ pub extern "C" fn shim_nsnotificationcenter_add_observer_for_name(
     handle
 }
 
-pub extern "C" fn shim_nsnotificationcenter_remove_observer(_obj: u64, _cmd: u64, observer: u64) {
+pub extern "C" fn shim_nsnotificationcenter_remove_observer(obj: u64, _cmd: u64, observer: u64) {
     if observer != 0 {
         // Match registered identities, never read arbitrary observer memory to
         // guess whether an object's first ivar happens to look like a token.
-        remove_matching(|entry| entry.matches_observer(observer));
+        remove_matching(center_key(obj), |entry| entry.matches_observer(observer));
     }
 }
 
 pub extern "C" fn shim_nsnotificationcenter_remove_observer_name_object(
-    _obj: u64,
+    obj: u64,
     _cmd: u64,
     observer: u64,
     name: u64,
@@ -291,7 +315,7 @@ pub extern "C" fn shim_nsnotificationcenter_remove_observer_name_object(
         return;
     }
     let name_filter = cfstring::extract_cfstring_cstr(name);
-    remove_matching(|entry| {
+    remove_matching(center_key(obj), |entry| {
         entry.matches_observer(observer)
             && name_filter.is_none_or(|name| entry.name.as_deref() == Some(name))
             && (object == 0 || entry.object == object)
