@@ -167,6 +167,60 @@ fn assert_success(output: &Captured) -> serde_json::Value {
     value
 }
 
+const REMOVAL_CASES: [&str; 13] = [
+    "owner_plain",
+    "foreign_plain",
+    "default_plain",
+    "owner_exact",
+    "foreign_exact",
+    "owner_wrong_name",
+    "foreign_wrong_name",
+    "owner_wrong_sender",
+    "foreign_wrong_sender",
+    "owner_nil_filters",
+    "foreign_nil_filters",
+    "owner_wildcard_registration",
+    "foreign_wildcard_registration",
+];
+
+fn removal_reports(stdout: &str) -> Vec<serde_json::Value> {
+    let records: Vec<serde_json::Value> = stdout
+        .lines()
+        .filter_map(|line| line.find('{').map(|start| &line[start..]))
+        .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+        .filter(|value| value["scope"] == "m1_block_removal_observation")
+        .collect();
+    assert_eq!(
+        records.len(),
+        REMOVAL_CASES.len(),
+        "missing/repeated removal case"
+    );
+    for (value, case) in records.iter().zip(REMOVAL_CASES) {
+        assert_eq!(value.as_object().expect("object required").len(), 6);
+        assert_eq!(value["case"], case, "unknown, repeated or reordered case");
+        for (field, expected) in [
+            ("before", 1),
+            ("after", 0),
+            ("after_cleanup", 0),
+            ("control_failures", 0),
+        ] {
+            assert_eq!(value[field].as_u64(), Some(expected), "{case}: {field}");
+        }
+    }
+    records
+}
+
+fn assert_removal_success(output: &Captured) -> Vec<serde_json::Value> {
+    assert!(
+        output.status.success(),
+        "block removal process failed: {}\n{}\n{}",
+        output.status,
+        output.stdout,
+        output.stderr
+    );
+    removal_reports(&output.stdout)
+}
+
 #[test]
 fn __notification_center_child() {
     let Some(binary) = std::env::var_os(CHILD_BINARY) else {
@@ -223,7 +277,7 @@ fn native_notification_centers_match_foundation_and_reject_collapsed_identity() 
         "native notification compilation failed: {}",
         compiled.stderr
     );
-    // Isolated native observations precede the unchanged compatibility gate.
+    // Preserve the independent observer source from the characterization run.
     // A fresh token in each case proves delivery before any removal operation.
     let observation_binary = work.join("removal-observation");
     let observation_compile = run_bounded(
@@ -260,12 +314,7 @@ fn native_notification_centers_match_foundation_and_reject_collapsed_identity() 
         8,
     );
     println!("Native block removal observations:\n{}", observation.stdout);
-    assert!(
-        observation.status.success(),
-        "native removal observation controls failed: {}\n{}",
-        observation.status,
-        observation.stderr
-    );
+    let expected_removals = assert_removal_success(&observation);
     let reference = run_bounded(&mut Command::new(&binary), &work, "reference", 8);
     let expected = assert_success(&reference);
     println!("Native Foundation notification reference: {expected}");
@@ -283,6 +332,20 @@ fn native_notification_centers_match_foundation_and_reject_collapsed_identity() 
     assert!(rejected["failures"].as_u64().expect("missing failures") > 0);
     println!("Native center-collapse negative control: {rejected}");
 
+    let suppressed = run_bounded(
+        Command::new(&binary).arg("--suppress-blocks"),
+        &work,
+        "suppressed-blocks",
+        8,
+    );
+    assert_eq!(suppressed.status.code(), Some(1));
+    let rejected = report(&suppressed);
+    assert_eq!(rejected["status"], "fail");
+    assert_eq!(rejected["checks"].as_u64(), Some(31));
+    assert_eq!(rejected["block_calls"].as_u64(), Some(0));
+    assert!(rejected["failures"].as_u64().expect("missing failures") > 0);
+    println!("Native missing-callback negative control: {rejected}");
+
     let runtime = run_bounded(
         Command::new(std::env::current_exe().expect("cannot locate test executable"))
             .args(["__notification_center_child", "--exact", "--nocapture"])
@@ -294,6 +357,21 @@ fn native_notification_centers_match_foundation_and_reject_collapsed_identity() 
     let observed = assert_success(&runtime);
     assert_eq!(observed, expected, "runtime and Foundation reports differ");
     println!("Burdettie native notification execution: {observed}");
+
+    let runtime_removals = run_bounded(
+        Command::new(std::env::current_exe().expect("cannot locate test executable"))
+            .args(["__notification_center_child", "--exact", "--nocapture"])
+            .env(CHILD_BINARY, &observation_binary),
+        &work,
+        "runtime-removals",
+        8,
+    );
+    let observed_removals = assert_removal_success(&runtime_removals);
+    assert_eq!(observed_removals, expected_removals);
+    println!(
+        "Burdettie block removal observations:\n{}",
+        runtime_removals.stdout
+    );
 }
 
 #[cfg(test)]
@@ -494,5 +572,68 @@ mod process_tests {
         assert!(result.is_err());
         assert_eq!(fs::read(work.join("spawn.stdout")).unwrap(), b"");
         assert_eq!(fs::read(work.join("spawn.stderr")).unwrap(), b"");
+    }
+}
+
+#[cfg(test)]
+mod report_tests {
+    use super::*;
+    use std::panic::catch_unwind;
+
+    fn reports() -> Vec<serde_json::Value> {
+        REMOVAL_CASES
+            .iter()
+            .map(|case| {
+                serde_json::json!({
+                    "scope": "m1_block_removal_observation",
+                    "case": case,
+                    "before": 1,
+                    "after": 0,
+                    "after_cleanup": 0,
+                    "control_failures": 0,
+                })
+            })
+            .collect()
+    }
+
+    fn output(reports: &[serde_json::Value]) -> String {
+        reports
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    #[test]
+    fn removal_gate_requires_all_thirteen_positive_then_cancelled_cases() {
+        let reports = reports();
+        assert_eq!(removal_reports(&output(&reports)), reports);
+    }
+
+    #[test]
+    fn removal_gate_rejects_missing_duplicate_unknown_or_incorrect_evidence() {
+        let baseline = reports();
+        let mut variants = Vec::new();
+        let mut missing = baseline.clone();
+        missing.pop();
+        variants.push(missing);
+        let mut duplicate = baseline.clone();
+        duplicate[0] = duplicate[1].clone();
+        variants.push(duplicate);
+        for (field, value) in [
+            ("case", serde_json::json!("unknown")),
+            ("before", serde_json::json!(0)),
+            ("after", serde_json::json!(1)),
+            ("after_cleanup", serde_json::json!(1)),
+            ("control_failures", serde_json::json!(1)),
+            ("unexpected", serde_json::json!(0)),
+        ] {
+            let mut changed = baseline.clone();
+            changed[0][field] = value;
+            variants.push(changed);
+        }
+        for changed in variants {
+            assert!(catch_unwind(|| removal_reports(&output(&changed))).is_err());
+        }
     }
 }

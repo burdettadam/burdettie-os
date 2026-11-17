@@ -175,6 +175,7 @@ fn notification_with_name_object_userinfo_shim() {
     let notification = shim_nsnotification_with_name_object_userinfo(0, 0, name, 0, info);
     assert_ne!(notification, 0);
     assert_eq!(shim_nsnotification_name(notification, 0), name);
+    assert_eq!(shim_nsnotification_object(notification, 0), 0);
     assert_eq!(shim_nsnotification_userinfo(notification, 0), info);
     free_obj(notification);
 }
@@ -185,6 +186,7 @@ fn notification_with_name_object_shim_no_userinfo() {
     let notification = shim_nsnotification_with_name_object(0, 0, name, 0);
     assert_ne!(notification, 0);
     assert_eq!(shim_nsnotification_name(notification, 0), name);
+    assert_eq!(shim_nsnotification_object(notification, 0), 0);
     assert_eq!(shim_nsnotification_userinfo(notification, 0), 0);
     free_obj(notification);
 }
@@ -320,29 +322,34 @@ fn sender_and_name_filters_apply_to_delivery() {
 }
 
 #[test]
-fn named_removal_honors_sender_and_supports_block_handles() {
+fn named_block_removal_cancels_token_despite_a_different_sender() {
     let _guard = RegistryGuard::new();
     let block = TestBlock::new();
     let name = make_string("NamedRemoval");
     let sender = make_string("sender");
     let other = make_string("other");
     let handle = block.register(name, sender);
+    shim_nsnotificationcenter_post_notification_name_object(0, 0, name, sender);
+    assert_eq!(block.calls.load(Ordering::Relaxed), 1);
     shim_nsnotificationcenter_remove_observer_name_object(0, 0, handle, name, other);
-    assert_eq!(count(), 1);
-    shim_nsnotificationcenter_remove_observer_name_object(0, 0, handle, name, sender);
     assert_eq!(count(), 0);
+    shim_nsnotificationcenter_post_notification_name_object(0, 0, name, sender);
+    assert_eq!(block.calls.load(Ordering::Relaxed), 1);
     free_obj(handle);
 }
 
 #[test]
-fn specific_name_removal_preserves_wildcard_registration() {
+fn specific_name_removal_cancels_a_wildcard_block_token() {
     let _guard = RegistryGuard::new();
     let block = TestBlock::new();
+    let name = make_string("Specific");
     let handle = block.register(0, 0);
-    shim_nsnotificationcenter_remove_observer_name_object(0, 0, handle, make_string("Specific"), 0);
-    assert_eq!(count(), 1);
-    shim_nsnotificationcenter_remove_observer_name_object(0, 0, handle, 0, 0);
+    shim_nsnotificationcenter_post_notification_name_object(0, 0, name, 0);
+    assert_eq!(block.calls.load(Ordering::Relaxed), 1);
+    shim_nsnotificationcenter_remove_observer_name_object(0, 0, handle, name, 0);
     assert_eq!(count(), 0);
+    shim_nsnotificationcenter_post_notification_name_object(0, 0, name, 0);
+    assert_eq!(block.calls.load(Ordering::Relaxed), 1);
     free_obj(handle);
 }
 
@@ -508,24 +515,32 @@ fn filtered_selector_removal_keeps_foreign_and_unmatched_entries() {
 }
 
 #[test]
-fn foreign_center_cannot_remove_a_block_handle() {
+fn foreign_center_cancels_fresh_block_tokens_with_either_removal_method() {
     let _guard = RegistryGuard::new();
     let first = TestCenter::new();
     let second = TestCenter::new();
-    let block = TestBlock::new();
     let name = make_string("ForeignRemoval");
-    let handle = block.register_in(first.addr(), name, 0);
-    shim_nsnotificationcenter_remove_observer(second.addr(), 0, handle);
-    assert_eq!(count(), 1);
-    first.post(name, 0);
-    assert_eq!(block.calls.load(Ordering::Relaxed), 1);
-    shim_nsnotificationcenter_remove_observer_name_object(second.addr(), 0, handle, name, 0);
-    assert_eq!(count(), 1);
-    first.post(name, 0);
-    assert_eq!(block.calls.load(Ordering::Relaxed), 2);
-    shim_nsnotificationcenter_remove_observer_name_object(first.addr(), 0, handle, name, 0);
-    assert_eq!(count(), 0);
-    free_obj(handle);
+    for named in [false, true] {
+        let block = TestBlock::new();
+        let handle = block.register_in(first.addr(), name, 0);
+        first.post(name, 0);
+        assert_eq!(block.calls.load(Ordering::Relaxed), 1);
+        if named {
+            shim_nsnotificationcenter_remove_observer_name_object(
+                second.addr(),
+                0,
+                handle,
+                name,
+                0,
+            );
+        } else {
+            shim_nsnotificationcenter_remove_observer(second.addr(), 0, handle);
+        }
+        assert_eq!(count(), 0);
+        first.post(name, 0);
+        assert_eq!(block.calls.load(Ordering::Relaxed), 1);
+        free_obj(handle);
+    }
 }
 
 #[test]
@@ -564,7 +579,7 @@ fn wildcard_registration_does_not_subscribe_to_foreign_centers() {
 }
 
 #[test]
-fn callback_foreign_removal_does_not_cancel_local_pending_delivery() {
+fn callback_foreign_token_removal_invalidates_pending_delivery() {
     let _guard = RegistryGuard::new();
     let first = TestCenter::new();
     let second = TestCenter::new();
@@ -580,8 +595,13 @@ fn callback_foreign_removal_does_not_cancel_local_pending_delivery() {
     first.post(name, 0);
     assert!(remover.lock_free.load(Ordering::Relaxed));
     assert_eq!(remover.calls.load(Ordering::Relaxed), 1);
-    assert_eq!(pending.calls.load(Ordering::Relaxed), 1);
-    assert_eq!(center_count(first.addr()), 2);
+    assert_eq!(pending.calls.load(Ordering::Relaxed), 0);
+    assert_eq!(center_count(first.addr()), 1);
+    first.post(name, 0);
+    assert_eq!(remover.calls.load(Ordering::Relaxed), 2);
+    assert_eq!(pending.calls.load(Ordering::Relaxed), 0);
+    clear_all_observers();
+    free_obj(handle);
 }
 
 #[test]
@@ -677,4 +697,58 @@ fn parallel_posts_preserve_exact_per_center_delivery_counts() {
     assert_eq!(a.calls.load(Ordering::Relaxed), 64);
     assert_eq!(b.calls.load(Ordering::Relaxed), 64);
     assert_eq!(default.calls.load(Ordering::Relaxed), 64);
+}
+
+#[test]
+fn removing_one_token_preserves_other_tokens_for_the_same_block() {
+    let _guard = RegistryGuard::new();
+    let first = TestCenter::new();
+    let second = TestCenter::new();
+    let block = TestBlock::new();
+    let name = make_string("DistinctBlockTokens");
+    let a = block.register_in(first.addr(), name, 0);
+    let b = block.register_in(first.addr(), name, 0);
+    let c = block.register_in(second.addr(), name, 0);
+    assert_ne!(a, b);
+    assert_ne!(a, c);
+    first.post(name, 0);
+    second.post(name, 0);
+    assert_eq!(block.calls.load(Ordering::Relaxed), 3);
+    shim_nsnotificationcenter_remove_observer(second.addr(), 0, a);
+    assert_eq!(center_count(first.addr()), 1);
+    assert_eq!(center_count(second.addr()), 1);
+    first.post(name, 0);
+    second.post(name, 0);
+    assert_eq!(block.calls.load(Ordering::Relaxed), 5);
+    shim_nsnotificationcenter_remove_observer(first.addr(), 0, a);
+    assert_eq!(count(), 2);
+    clear_all_observers();
+    for handle in [a, b, c] {
+        free_obj(handle);
+    }
+}
+
+#[test]
+fn selector_removal_still_honors_mismatched_name_and_sender() {
+    let _guard = RegistryGuard::new();
+    let center = TestCenter::new();
+    let name = make_string("SelectorFilters");
+    let other_name = make_string("OtherSelectorName");
+    let sender = make_string("sender");
+    let other_sender = make_string("other sender");
+    let observer_storage = Box::new([0u64; 2]);
+    let observer = observer_storage.as_ptr() as u64;
+    shim_nsnotificationcenter_add_observer(center.addr(), 0, observer, 1, name, sender);
+    for (remove_name, remove_sender) in [(other_name, sender), (name, other_sender)] {
+        shim_nsnotificationcenter_remove_observer_name_object(
+            center.addr(),
+            0,
+            observer,
+            remove_name,
+            remove_sender,
+        );
+        assert_eq!(count(), 1);
+    }
+    shim_nsnotificationcenter_remove_observer_name_object(center.addr(), 0, observer, name, sender);
+    assert_eq!(count(), 0);
 }

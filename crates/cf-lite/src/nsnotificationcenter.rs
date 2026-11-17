@@ -4,7 +4,9 @@
 //! Delivery snapshots registrations without holding the registry lock while
 //! invoking guest code. This shim does not implement queues or block copying;
 //! observers, blocks and captured objects must remain live during delivery.
-//! Registrations belong to the receiving center, not the process as a whole.
+//! Delivery and selector removal are scoped to the receiving center. A known
+//! block token cancels its registration regardless of the removal receiver or
+//! filters, matching the isolated native Foundation observations in M1.
 //! Center pointers are borrowed identities, not retained/validated capabilities;
 //! callers must remove registrations before releasing a custom center.
 
@@ -105,9 +107,21 @@ fn observers() -> &'static Mutex<Vec<Observer>> {
     OBSERVERS.get_or_init(|| Mutex::new(Vec::new()))
 }
 
-fn remove_matching(center: u64, mut matches: impl FnMut(&Observer) -> bool) {
+fn remove_registered_observer(center: u64, observer: u64, name_filter: Option<&str>, object: u64) {
     observers().lock().unwrap().retain(|entry| {
-        if entry.center == center && matches(entry) {
+        // A block token identifies its own registration. Selector identities
+        // still require the receiving center and supplied removal filters.
+        // Never dereference an arbitrary observer to guess whether it is a token.
+        let matches = entry.matches_observer(observer)
+            && match entry.kind {
+                ObserverKind::Block { .. } => true,
+                ObserverKind::Selector { .. } => {
+                    entry.center == center
+                        && name_filter.is_none_or(|name| entry.name.as_deref() == Some(name))
+                        && (object == 0 || entry.object == object)
+                }
+            };
+        if matches {
             entry.active.store(false, Ordering::Release);
             false
         } else {
@@ -298,9 +312,7 @@ pub extern "C" fn shim_nsnotificationcenter_add_observer_for_name(
 
 pub extern "C" fn shim_nsnotificationcenter_remove_observer(obj: u64, _cmd: u64, observer: u64) {
     if observer != 0 {
-        // Match registered identities, never read arbitrary observer memory to
-        // guess whether an object's first ivar happens to look like a token.
-        remove_matching(center_key(obj), |entry| entry.matches_observer(observer));
+        remove_registered_observer(center_key(obj), observer, None, 0);
     }
 }
 
@@ -315,11 +327,7 @@ pub extern "C" fn shim_nsnotificationcenter_remove_observer_name_object(
         return;
     }
     let name_filter = cfstring::extract_cfstring_cstr(name);
-    remove_matching(center_key(obj), |entry| {
-        entry.matches_observer(observer)
-            && name_filter.is_none_or(|name| entry.name.as_deref() == Some(name))
-            && (object == 0 || entry.object == object)
-    });
+    remove_registered_observer(center_key(obj), observer, name_filter, object);
 }
 
 #[cfg(test)]

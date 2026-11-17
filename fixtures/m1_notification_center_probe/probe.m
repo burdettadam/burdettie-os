@@ -145,15 +145,16 @@ int main(int argc, const char *argv[]) {
         ++block_calls;
     }];
     CHECK(token != nil);
+    // Keep delivery and owning-center removal separate from the independently
+    // characterized token-removal matrix. Never accept an empty callback loop.
+    if (argc == 2 && strcmp(argv[1], "--suppress-blocks") == 0) [first removeObserver:token];
     [second postNotificationName:block_name object:sender];
     CHECK(block_calls == 0);
-    [second removeObserver:token];
     [first postNotificationName:block_name object:sender];
     CHECK(block_calls == 1);
-    [second removeObserver:token name:block_name object:sender];
-    [first postNotificationName:block_name object:sender];
-    CHECK(block_calls == 2);
     [first postNotificationName:block_name object:other];
+    CHECK(block_calls == 1);
+    [first postNotificationName:block_name object:sender];
     CHECK(block_calls == 2);
     [first removeObserver:token name:block_name object:sender];
     [first postNotificationName:block_name object:sender];
