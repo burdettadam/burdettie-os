@@ -16,6 +16,7 @@ TEST_FILES = (
     'test_probe_m1_captured_link.py',
     'test_m1_compiler_rt_abi.py',
     'test_build_native_fixtures.py',
+    'test_m1_thread_state_probe.py',
 )
 
 
