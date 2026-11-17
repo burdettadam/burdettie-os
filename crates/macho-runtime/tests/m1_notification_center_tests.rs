@@ -106,7 +106,10 @@ fn report(output: &Captured) -> serde_json::Value {
         output.stderr
     );
     let value = records.into_iter().next().expect("one report required");
-    assert_eq!(value.as_object().expect("report is not an object").len(), 14);
+    assert_eq!(
+        value.as_object().expect("report is not an object").len(),
+        14
+    );
     value
 }
 
@@ -153,7 +156,10 @@ fn __notification_center_child() {
     assert!(binary.is_absolute() && binary.is_file());
     let result = Runtime::load_and_run(binary, &RuntimeConfig::permissive(binary))
         .expect("notification runtime execution failed");
-    assert_eq!(result.exit_code, 0, "notification fixture rejected execution");
+    assert_eq!(
+        result.exit_code, 0,
+        "notification fixture rejected execution"
+    );
 }
 
 #[test]
@@ -173,8 +179,17 @@ fn native_notification_centers_match_foundation_and_reject_collapsed_identity() 
     let compiled = run_bounded(
         Command::new("xcrun")
             .args([
-                "--sdk", "macosx", "clang", "-O0", "-Wall", "-Wextra", "-Werror",
-                "-fno-objc-arc", "-fblocks", "-framework", "Foundation",
+                "--sdk",
+                "macosx",
+                "clang",
+                "-O0",
+                "-Wall",
+                "-Wextra",
+                "-Werror",
+                "-fno-objc-arc",
+                "-fblocks",
+                "-framework",
+                "Foundation",
             ])
             .arg(&source)
             .arg("-o")

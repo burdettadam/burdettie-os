@@ -83,8 +83,14 @@ impl TestBlock {
     }
 
     fn register_in(&self, center: u64, name: u64, object: u64) -> u64 {
-        let handle =
-            shim_nsnotificationcenter_add_observer_for_name(center, 0, name, object, 0, self.addr());
+        let handle = shim_nsnotificationcenter_add_observer_for_name(
+            center,
+            0,
+            name,
+            object,
+            0,
+            self.addr(),
+        );
         assert_ne!(handle, 0);
         handle
     }
@@ -567,7 +573,9 @@ fn callback_foreign_removal_does_not_cancel_local_pending_delivery() {
     let name = make_string("PendingCenterIdentity");
     remover.register_in(first.addr(), name, 0);
     let handle = pending.register_in(first.addr(), name, 0);
-    remover.action_center.store(second.addr(), Ordering::Relaxed);
+    remover
+        .action_center
+        .store(second.addr(), Ordering::Relaxed);
     remover.remove.store(handle, Ordering::Relaxed);
     first.post(name, 0);
     assert!(remover.lock_free.load(Ordering::Relaxed));
@@ -586,7 +594,9 @@ fn callback_reposts_only_to_the_requested_foreign_center() {
     let name = make_string("CrossCenterReentry");
     reposting.register_in(first.addr(), name, 0);
     foreign.register_in(second.addr(), name, 0);
-    reposting.action_center.store(second.addr(), Ordering::Relaxed);
+    reposting
+        .action_center
+        .store(second.addr(), Ordering::Relaxed);
     reposting.repost.store(name, Ordering::Relaxed);
     first.post(name, 0);
     assert!(reposting.lock_free.load(Ordering::Relaxed));
@@ -604,7 +614,9 @@ fn registration_from_callback_waits_for_its_own_center() {
     let added = TestBlock::new();
     let name = make_string("RegistrationCenterIdentity");
     registering.register_in(first.addr(), name, 0);
-    registering.action_center.store(second.addr(), Ordering::Relaxed);
+    registering
+        .action_center
+        .store(second.addr(), Ordering::Relaxed);
     registering.add_block.store(added.addr(), Ordering::Relaxed);
     registering.add_name.store(name, Ordering::Relaxed);
     first.post(name, 0);
