@@ -154,7 +154,10 @@ fn changed_host_text_invalidates_unobserved_old_formats() {
     let mut observed = HashMap::new();
     assert_eq!(shared::observe_plain_text(&mut observed, "new".into()), 4);
     assert_eq!(observed.len(), 1);
-    assert_eq!(observed.get(NS_PASTEBOARD_TYPE_STRING), Some(&b"new".to_vec()));
+    assert_eq!(
+        observed.get(NS_PASTEBOARD_TYPE_STRING),
+        Some(&b"new".to_vec())
+    );
 }
 
 #[test]
