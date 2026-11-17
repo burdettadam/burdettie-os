@@ -223,6 +223,49 @@ fn native_notification_centers_match_foundation_and_reject_collapsed_identity() 
         "native notification compilation failed: {}",
         compiled.stderr
     );
+    // Isolated native observations precede the unchanged compatibility gate.
+    // A fresh token in each case proves delivery before any removal operation.
+    let observation_binary = work.join("removal-observation");
+    let observation_compile = run_bounded(
+        Command::new("xcrun")
+            .args([
+                "--sdk",
+                "macosx",
+                "clang",
+                "-O0",
+                "-Wall",
+                "-Wextra",
+                "-Werror",
+                "-fno-objc-arc",
+                "-fblocks",
+                "-framework",
+                "Foundation",
+            ])
+            .arg(source.with_file_name("removal_observation.m"))
+            .arg("-o")
+            .arg(&observation_binary),
+        &work,
+        "observation-compile",
+        15,
+    );
+    assert!(
+        observation_compile.status.success(),
+        "native removal observation compilation failed: {}",
+        observation_compile.stderr
+    );
+    let observation = run_bounded(
+        &mut Command::new(&observation_binary),
+        &work,
+        "removal-observation",
+        8,
+    );
+    println!("Native block removal observations:\n{}", observation.stdout);
+    assert!(
+        observation.status.success(),
+        "native removal observation controls failed: {}\n{}",
+        observation.status,
+        observation.stderr
+    );
     let reference = run_bounded(&mut Command::new(&binary), &work, "reference", 8);
     let expected = assert_success(&reference);
     println!("Native Foundation notification reference: {expected}");
