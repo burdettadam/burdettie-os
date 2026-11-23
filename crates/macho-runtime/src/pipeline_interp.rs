@@ -65,7 +65,7 @@ pub(super) fn run_interpreted(
             arc_parsed.clone(),
         );
         (main_data, arc_parsed)
-        };
+    };
 
     // 3. Apply the same admission policy as native execution before any
     // shim setup, dependency loading, or guest initializer can run.

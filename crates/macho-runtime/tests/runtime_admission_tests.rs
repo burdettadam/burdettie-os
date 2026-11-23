@@ -593,10 +593,7 @@ fn every_route_rejects_distinct_bytes_for_the_same_dependency_install_name() {
     let main = directory.write(
         "main",
         2,
-        &[
-            "@loader_path/one/root.dylib",
-            "@loader_path/two/root.dylib",
-        ],
+        &["@loader_path/one/root.dylib", "@loader_path/two/root.dylib"],
     );
     directory.write("one/root.dylib", 6, &["@loader_path/child.dylib"]);
     directory.write("two/root.dylib", 6, &["@loader_path/child.dylib"]);
@@ -649,7 +646,7 @@ fn every_route_rejects_distinct_inserted_roots_with_the_same_basename() {
             ),
             other => {
                 panic!("{route:?}: expected fail-closed inserted-root collision, got {other:?}")
-            },
+            }
         }
     }
 }

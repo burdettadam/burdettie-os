@@ -69,7 +69,7 @@ pub(super) fn run_native(
             arc_parsed.clone(),
         );
         (main_data, arc_parsed)
-        };
+    };
     tracer.record(
         EventKind::Pipeline,
         format!(
