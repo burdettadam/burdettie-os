@@ -74,3 +74,35 @@ been executed with a local Rust toolchain in the current environment.
 
 See [Issue #6](https://github.com/burdettadam/burdettie-os/issues/6) for the
 remaining M2 acceptance criteria.
+
+
+## Follow-on: dependency alias identity
+
+The shared dependency loader now resolves, reads, parses and evaluates each
+resolved dependency edge before considering registry reuse. A normalized
+install name is not treated as proof that two paths identify the same image.
+If an existing registry key resolves to different bytes, the loader returns a
+fail-closed security denial instead of silently skipping the second path.
+
+Dependency expansion is tracked by canonical resolved path plus SHA-256 of
+the image bytes. This allows two directories to contain the same relative
+`@loader_path/child.dylib` name without conflating their dependency closures.
+Each edge is admitted before an already-mapped image can be reused. Inserted
+libraries receive the same byte comparison for basename collisions; identical
+bytes can reuse the mapping while their loader directories are still traversed.
+
+Three additional cross-route tests cover:
+- A second loader edge denied after the same normalized install name was mapped
+  from a different directory.
+- Different bytes resolving under the same normalized dependency install name.
+- Different inserted roots with the same basename.
+
+The PR is based on the M1 development branch so these M2 checks are exercised
+with the M1 platform changes in the synthetic merge. The CI workflow now
+includes that branch in its pull-request target filter. Security tools are
+pinned to `cargo-audit 0.23.0` and `cargo-deny 0.21.0` for Rust 1.93.0.
+
+The M2 acceptance gaps listed above remain open: dynamic-load admission,
+versioned system-provider identity, required/weak dependency semantics,
+signature-verification-to-mapping byte identity, complete mode integration,
+and initializer-level negative execution tests.
