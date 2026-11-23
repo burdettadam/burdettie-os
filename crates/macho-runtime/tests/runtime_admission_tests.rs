@@ -551,7 +551,6 @@ fn parent_relative_dependencies_are_resolved_before_name_normalization() {
     }
 }
 
-
 #[test]
 fn every_route_admits_each_resolved_loader_edge_before_alias_reuse() {
     let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
@@ -559,10 +558,7 @@ fn every_route_admits_each_resolved_loader_edge_before_alias_reuse() {
     let main = directory.write(
         "main",
         2,
-        &[
-            "@loader_path/one/root.dylib",
-            "@loader_path/two/root.dylib",
-        ],
+        &["@loader_path/one/root.dylib", "@loader_path/two/root.dylib"],
     );
     let first_root = directory.write("one/root.dylib", 6, &["@loader_path/child.dylib"]);
     let second_root = directory.write("two/root.dylib", 6, &["@loader_path/child.dylib"]);
@@ -617,7 +613,9 @@ fn every_route_rejects_distinct_bytes_for_the_same_dependency_install_name() {
         config.shim_set.foundation = false;
         match route.load(&main, config) {
             Err(RuntimeError::SecurityDenied { reasons }) => assert!(
-                reasons.iter().any(|reason| reason.contains("install-name collision")),
+                reasons
+                    .iter()
+                    .any(|reason| reason.contains("install-name collision")),
                 "{route:?}: unexpected denial: {reasons:?}"
             ),
             other => panic!("{route:?}: expected fail-closed alias collision, got {other:?}"),
@@ -644,10 +642,14 @@ fn every_route_rejects_distinct_inserted_roots_with_the_same_basename() {
         config.insert_libraries = vec![first.clone(), second.clone()];
         match route.load(&main, config) {
             Err(RuntimeError::SecurityDenied { reasons }) => assert!(
-                reasons.iter().any(|reason| reason.contains("insert-library install-name collision")),
+                reasons
+                    .iter()
+                    .any(|reason| reason.contains("insert-library install-name collision")),
                 "{route:?}: unexpected denial: {reasons:?}"
             ),
-            other => panic!("{route:?}: expected fail-closed inserted-root collision, got {other:?}"),
+            other => {
+                panic!("{route:?}: expected fail-closed inserted-root collision, got {other:?}")
+            },
         }
     }
 }

@@ -46,25 +46,25 @@ pub(super) fn run_interpreted(
     {
         cached
     } else {
-            let parsed_result = macho_parse::parse_auto(&source_data, macho_types::CpuType::Arm64)?;
-            let main_data: std::sync::Arc<[u8]> = if macho_parse::is_fat(&source_data) {
-                let slice = macho_parse::fat_slice_for_cpu(&source_data, macho_types::CpuType::Arm64)?;
-                std::sync::Arc::from(slice)
-            } else {
-                source_data.clone()
-            };
-            let arc_parsed = std::sync::Arc::new(parsed_result);
-            let canonical = binary_path
-                .canonicalize()
-                .unwrap_or_else(|_| binary_path.to_path_buf());
-            crate::parse_cache::insert_both(
-                binary_path,
-                canonical,
-                &source_data,
-                main_data.clone(),
-                arc_parsed.clone(),
-            );
-            (main_data, arc_parsed)
+        let parsed_result = macho_parse::parse_auto(&source_data, macho_types::CpuType::Arm64)?;
+        let main_data: std::sync::Arc<[u8]> = if macho_parse::is_fat(&source_data) {
+            let slice = macho_parse::fat_slice_for_cpu(&source_data, macho_types::CpuType::Arm64)?;
+            std::sync::Arc::from(slice)
+        } else {
+            source_data.clone()
+        };
+        let arc_parsed = std::sync::Arc::new(parsed_result);
+        let canonical = binary_path
+            .canonicalize()
+            .unwrap_or_else(|_| binary_path.to_path_buf());
+        crate::parse_cache::insert_both(
+            binary_path,
+            canonical,
+            &source_data,
+            main_data.clone(),
+            arc_parsed.clone(),
+        );
+        (main_data, arc_parsed)
         };
 
     // 3. Apply the same admission policy as native execution before any
