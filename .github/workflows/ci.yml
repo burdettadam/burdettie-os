@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, chore/public-portfolio-prep]
   pull_request:
-    branches: [main]
+    branches: [main, milestone/m1-platform-security-contracts]
 
 permissions:
   contents: read
