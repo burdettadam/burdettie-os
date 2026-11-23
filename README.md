@@ -8,6 +8,8 @@ This is an experimental systems project. Compatibility depends on the binary, CP
 
 The product goal is a bootable, Darwin-compatible OS that runs a named set of macOS applications with owner-selectable permissive, audit and enforced security. [M1 platform and security contracts](docs/milestones/M1_PLATFORM_SECURITY.md) define a Linux-built PureDarwin/XNU x86_64 VM as the initial reference platform, with a bounded boot feasibility experiment and shared launch contract. [Development without Mac hardware](docs/milestones/M1_WITHOUT_MAC.md) separates the immediate build/runtime work from later exact-application and physical-device qualification.
 
+PureDarwin is the short-term platform and integration reference. The long-term destination is a Burdettie-owned Rust operating system, including its kernel and core userland, with Darwin compatibility demonstrated for declared application targets. We will replace platform dependencies in stages while continuing the current PureDarwin milestones. [ADR 0002: Rust platform transition](docs/adr/0002-rust-platform-transition.md) records the scope, sequence and acceptance gates.
+
 [Quick start](#quick-start) · [Architecture](#architecture) · [Engineering highlights](#engineering-highlights) · [Validation](#validation) · [Documentation](#documentation)
 
 ## Start here
@@ -121,7 +123,8 @@ Source files, fixture generators, and documented expectations belong in version 
 | [M1 platform and security contracts](docs/milestones/M1_PLATFORM_SECURITY.md) | Current OS direction, target inventory, boot experiment, shared launch contract and alpha acceptance. |
 | [Demo guide](docs/DEMO.md) | Showcase workflows and packaging. |
 | [Feature reference](docs/FEATURES.md) | Detailed runtime and tooling capabilities. |
-| [Roadmap](docs/roadmap.md) | Planned work and target-platform direction. |
+| [Rust platform transition](docs/adr/0002-rust-platform-transition.md) | PureDarwin as the short-term platform; staged replacement of userland and kernel with Burdettie-owned Rust implementations. |
+| [Roadmap](docs/roadmap.md) | Current milestones, the Rust transition track and historical runtime planning. |
 | [FFI guide](docs/FFI_GUIDE.md) | Embedding, API examples, memory ownership, and thread-safety notes. |
 | [Technical manuscript](book/README.md) | Draft chapters explaining the loader, runtime, interpreter, and GUI. |
 | [Changelog](CHANGELOG.md) | Recorded project changes. |

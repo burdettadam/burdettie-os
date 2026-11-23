@@ -1,6 +1,39 @@
-# Darwin Loader Lab — Strategic Roadmap
+# Burdettie OS — Strategic Roadmap
 
-> Active OS direction and milestone contracts are in [M1 platform and security contracts](milestones/M1_PLATFORM_SECURITY.md). The roadmap below records earlier runtime planning. Its dates, completion labels and broad compatibility claims are not current OS, application or security qualification evidence.
+## Current strategy — 2026-11-23
+
+Use current PureDarwin as the short-term boot and integration platform, then progressively replace it with Burdettie's own Rust operating system. The destination includes the kernel and core userland. A Rust runtime on a PureDarwin/XNU kernel is an intermediate stage.
+
+The product remains a bootable Darwin-compatible OS that completes named, versioned macOS application workflows with owner-selectable permissive, audit and enforced security. Application compatibility, independent boot and security enforcement each need their own evidence.
+
+[ADR 0002](adr/0002-rust-platform-transition.md) records this decision and the replacement gates. [ADR 0001](adr/0001-darwin-boot-substrate.md) remains the active short-term boot decision. Existing M1–M7 milestone identifiers and acceptance contracts remain in place.
+
+### Continue the current milestones
+
+Continue M1 platform, toolchain, image, runtime and security qualification and M2 admission work. PureDarwin `main` is pinned at `0c1990c803c13b68cad4df3f6dc34ba4306fc789`, verified on 2026-11-23. The [source refresh record](milestones/M1_PUREDARWIN_SOURCE_REFRESH_20261123.md) identifies what must be re-evaluated; earlier-source results remain historical. The refreshed image has not yet qualified build, boot, guest runtime or enforcement.
+
+For the next platform work, re-evaluate the selected source, verify which toolchain artifacts still match its derivations, and assess available capacity before realization. Then proceed through executable linking, image boot and selected-guest runtime gates. Preserve the existing resource and shared-service constraints.
+
+### Rust transition track
+
+These R stages organize the long-term work; they do not renumber or close the existing M milestones. The table is a delivery sequence, not a claim that the replacements already exist.
+
+| Stage | Work | Acceptance focus |
+| --- | --- | --- |
+| R1 — Qualify the reference platform | Continue the current PureDarwin work and maintain exact source and artifact identities. | Observed build, boot, runtime and security results on the selected guest. |
+| R2 — Prepare replaceable interfaces | Review host dependencies, define supported behavior and identify component ownership. | Tests identify the implementation under test; host calls and unsupported operations remain explicit. |
+| R3 — Replace bounded services | Substitute Rust userland components one at a time. | Declared behavior, resource lifetimes, security semantics, persistence and fallback are verified. |
+| R4 — Establish the Rust kernel | Build a bounded virtual-machine foundation with memory, scheduling, processes, IPC and required drivers. | Independent boot and a minimal program, with isolation and persistence checks appropriate to the prototype. |
+| R5 — Integrate the Rust platform | Run the runtime, supervisor, session and selected application workflows on the new kernel and core services. | Compatibility and security are qualified on the Rust platform itself. |
+| R6 — Retire PureDarwin from the release target | Remove required PureDarwin/XNU build and runtime dependencies for a declared target. | A reproducible independent image meets that target's boot, application, persistence, recovery and security acceptance. |
+
+R2 interface work can accompany current milestones. A bounded R4 prototype can run in parallel when its scope and resources are justified; it must not become a prerequisite for completing M1/M2. Kernel architecture, subsystem replacement order beyond the first bounded target, delivery dates and additional hardware support require later decisions.
+
+The next Rust transition task is to refresh the [host dependency register](HOST_DEPENDENCY_REGISTER.md) against current code and select one small replacement boundary with a named fixture and measurable exit gate. The [replacement inventory](BURDETTIE_REPLACEMENT_TARGETS.md) is a starting point for that audit, not evidence of full platform independence.
+
+## Historical runtime roadmap
+
+> The material below is retained as historical runtime planning. Its dates, completion labels, dependency reports and broad compatibility claims are not current OS, application or security qualification evidence. The strategy above and [M1 platform and security contracts](milestones/M1_PLATFORM_SECURITY.md) govern current work.
 
 > **As of 2026-03-28.** This document tracks where the project is headed.
 > For a complete reference of what works today, see [FEATURES.md](FEATURES.md).

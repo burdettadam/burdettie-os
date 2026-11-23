@@ -2,7 +2,9 @@
 
 Track progress replacing macOS system services with cross-platform Rust implementations.
 
-## Completed
+> Strategy update — 2026-11-23: [ADR 0002](adr/0002-rust-platform-transition.md) extends the long-term destination to an independently bootable Burdettie Rust platform, including kernel and core userland. This document is a historical runtime implementation inventory. Its “Done” labels and counts do not establish complete Darwin semantics, selected-guest qualification, security enforcement or removal of the host kernel. Reassess each candidate against current code, declared interfaces and the ADR's replacement gates before using it in the platform transition. [M1 platform and security contracts](milestones/M1_PLATFORM_SECURITY.md) continue to govern the current PureDarwin work.
+
+## Historical completed runtime entries
 
 | # | Target | Description | Status |
 |---|--------|-------------|--------|

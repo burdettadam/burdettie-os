@@ -2,6 +2,8 @@
 
 Status: selected for a bounded feasibility spike. The production substrate is conditional on the evidence below. The x86_64 QEMU VM is the initial reference platform. M1 remains in progress until its build/boot/runtime experiment and contract decisions are recorded; physical Mac and real-application qualification proceed later.
 
+Strategic scope updated 2026-11-23: this remains the short-term PureDarwin boot decision. [ADR 0002](0002-rust-platform-transition.md) establishes the long-term destination as a Burdettie-owned Rust kernel and core userland. It supersedes any interpretation that PureDarwin/XNU must remain the permanent platform; the current M1 experiment and its acceptance gates continue.
+
 ## PureDarwin source refresh — 2026-11-23
 
 The current upstream candidate supersedes the earlier `0163b2d` pin. Use PureDarwin `main` at `0c1990c803c13b68cad4df3f6dc34ba4306fc789` (commit date 2026-11-22), not the older `upstream-xnu-12377` branch or the October 20.5 release image. The current repository README identifies `main` as the development branch; GitHub reports the previous candidate is 155 commits behind this head and the old branch is 65 commits behind it. The exact source, unchanged flake lock, current corecrypto submodule, and next-step preflight are recorded in [M1 PureDarwin source refresh](../milestones/M1_PUREDARWIN_SOURCE_REFRESH_20261123.md).
@@ -31,7 +33,7 @@ The [fixture and runtime ABI assessment](../milestones/M1_FIXTURE_ABI.md) provid
 | --- | --- | --- |
 | PureDarwin XNU image plus Burdettie runtime and session | Selected for feasibility | Closest existing boot integration to the Darwin product goal; requires runtime ABI, display and confinement qualification |
 | Build directly from current Apple XNU source | Reserve | Adds bootstrap, drivers, userland and image assembly before the application/runtime question can be tested |
-| New Rust kernel | Deferred | Rust components remain welcome; replacing kernel mechanisms adds a separate substantial research program before useful app workflows |
+| New Rust kernel | Planned long-term destination; outside the M1 boot gate | ADR 0002 defines staged platform replacement; a bounded kernel prototype may proceed separately without blocking the current PureDarwin experiment |
 | Linux guest as shipping OS | Not selected by this decision | Existing portability/testing backend remains useful; changing the final substrate requires an explicit product decision |
 | Full macOS VM with Burdettie session | Reference development environment | Does not satisfy independent OS boot acceptance |
 
