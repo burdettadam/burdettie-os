@@ -472,7 +472,19 @@ fn inserted_and_main_roots_share_an_admitted_dependency() {
         .map_images()
         .expect("map shared dependency once");
     assert_eq!(mapped.images_loaded(), 4);
-    assert_eq!(*seen.lock().unwrap(), vec![main, first, second, shared]);
+    // The shared image is mapped once, but each of the three loader-to-image
+    // edges (main, first inserted root, second inserted root) is admitted.
+    assert_eq!(
+        *seen.lock().unwrap(),
+        vec![
+            main,
+            first,
+            second,
+            shared.clone(),
+            shared.clone(),
+            shared,
+        ]
+    );
 }
 
 #[test]
@@ -493,7 +505,9 @@ fn inserted_dependency_cycles_terminate_without_duplicate_mapping() {
         .map_images()
         .expect("map cyclic graph");
     assert_eq!(mapped.images_loaded(), 4);
-    assert_eq!(*seen.lock().unwrap(), vec![main, inserted, a, b]);
+    // The back-edge to A is admitted again, but its canonical path/content
+    // identity has already been expanded, so it is not mapped or expanded twice.
+    assert_eq!(*seen.lock().unwrap(), vec![main, inserted, a.clone(), b, a]);
 }
 
 #[test]
