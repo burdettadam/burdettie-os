@@ -64,6 +64,19 @@ def cstring_region(data: bytes, offset: int, minimum: int) -> str:
         raise InspectionError("load-command string is empty or contains unsupported bytes")
     return raw.decode("ascii")
 
+def reject_overlaps(ranges: list[tuple[int, int, object]], message: str) -> None:
+    """Reject nonempty half-open aliases; touching and empty ranges are valid.
+
+    Sort only by numeric bounds so diagnostics can mix command IDs and names.
+    No input-controlled payload is interpreted by this range-only check.
+    """
+    ordered = sorted((span for span in ranges if span[0] < span[1]),
+                     key=lambda span: (span[0], span[1]))
+    for left, right in zip(ordered, ordered[1:]):
+        if right[0] < left[1]:
+            raise InspectionError(f"{message}: {left[2]} / {right[2]}")
+
+
 def parse(data: bytes, expected: dict) -> dict:
     if len(data) > MAX_INPUT:
         raise InspectionError("dyld input exceeds size bound")
@@ -86,6 +99,8 @@ def parse(data: bytes, expected: dict) -> dict:
     forbidden = []
     seen_singletons = set()
     linkedit_ranges = []
+    symbol_table = None
+    dynamic_table = None
     for _ in range(ncmds):
         if offset + 8 > end_commands:
             raise InspectionError("truncated load command")
@@ -133,14 +148,25 @@ def parse(data: bytes, expected: dict) -> dict:
                 raise InspectionError("symbol/string table overlaps header/load commands")
             if symoff + nsyms * 16 > len(data) or stroff + strsize > len(data):
                 raise InspectionError("symbol/string table range exceeds file")
+            symbol_table = (symoff, nsyms, stroff, strsize)
+            if nsyms:
+                linkedit_ranges.append((symoff, symoff + nsyms * 16, "symbol table"))
+            if strsize:
+                linkedit_ranges.append((stroff, stroff + strsize, "string table"))
         elif cmd == LC_DYSYMTAB:
             if cmdsize != 80: raise InspectionError("invalid LC_DYSYMTAB size")
             fields = struct.unpack_from("<18I", raw, 8)
-            # Validate the six table offset/count pairs; indirect-symbol entries
-            # are 4 bytes and relocation entries are 8 bytes.
+            dynamic_table = fields
+            # Offset/count pairs: TOC, 64-bit modules, external references,
+            # indirect symbols, external relocations and local relocations.
+            # This validates byte ranges, not the tables' entry semantics.
             for index, width in ((6, 8), (8, 56), (10, 4), (12, 4), (14, 8), (16, 8)):
                 start, count = fields[index], fields[index + 1]
                 if start + count * width > len(data): raise InspectionError("dynamic symbol table range exceeds file")
+                if count:
+                    if start < end_commands:
+                        raise InspectionError("dynamic symbol table overlaps header/load commands")
+                    linkedit_ranges.append((start, start + count * width, f"dynamic table {index}"))
         elif cmd in (LC_CODE_SIGNATURE, LC_FUNCTION_STARTS, LC_DATA_IN_CODE, LC_DYLD_CHAINED_FIXUPS, LC_DYLD_EXPORTS_TRIE):
             if cmdsize != 16: raise InspectionError("invalid linkedit-data command size")
             dataoff, datasize = struct.unpack_from("<II", raw, 8)
@@ -198,6 +224,18 @@ def parse(data: bytes, expected: dict) -> dict:
         offset += cmdsize
     if offset != end_commands:
         raise InspectionError("load-command count does not consume declared region")
+    if dynamic_table is not None:
+        if symbol_table is None:
+            raise InspectionError("LC_DYSYMTAB requires LC_SYMTAB")
+        symbol_count = symbol_table[1]
+        groups = []
+        for index, label in ((0, "local"), (2, "external definition"), (4, "undefined")):
+            first, count = dynamic_table[index:index + 2]
+            if first + count > symbol_count:
+                raise InspectionError(f"{label} symbol group exceeds LC_SYMTAB symbol count")
+            if count:
+                groups.append((first, first + count, label))
+        reject_overlaps(groups, "dynamic symbol groups overlap")
     if ids != [INSTALL_NAME]: raise InspectionError("expected exactly one /usr/lib/dyld LC_ID_DYLINKER")
     if len(builds) != 1: raise InspectionError("expected exactly one LC_BUILD_VERSION")
     build = builds[0]
@@ -220,10 +258,7 @@ def parse(data: bytes, expected: dict) -> dict:
                 raise InspectionError("file-backed segments overlap")
             if left["vmsize"] and right["vmsize"] and max(left["vmaddr"], right["vmaddr"]) < min(left["vmaddr"] + left["vmsize"], right["vmaddr"] + right["vmsize"]):
                 raise InspectionError("VM segments overlap")
-    for i, left in enumerate(linkedit_ranges):
-        for right in linkedit_ranges[i + 1:]:
-            if max(left[0], right[0]) < min(left[1], right[1]):
-                raise InspectionError("linkedit payload ranges overlap")
+    reject_overlaps(linkedit_ranges, "metadata payload ranges overlap")
     if not any(s["name"] == "__TEXT" and s["fileoff"] == 0 and s["filesize"] >= end_commands and s["initprot"] & VM_PROT_READ and s["initprot"] & VM_PROT_EXECUTE for s in segments):
         raise InspectionError("missing file-backed executable __TEXT segment")
     return {"file_type": "MH_DYLINKER", "architecture": "x86_64", "install_name": ids[0], "build_version": build, "entry_point": entry, "entry_file_offset": entry_file_offset, "entry_segment": entry_segment, "segments": segments}
