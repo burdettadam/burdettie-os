@@ -106,3 +106,18 @@ The M2 acceptance gaps listed above remain open: dynamic-load admission,
 versioned system-provider identity, required/weak dependency semantics,
 signature-verification-to-mapping byte identity, complete mode integration,
 and initializer-level negative execution tests.
+
+
+## M1 substrate source refresh — 2026-11-23
+
+The M2 PR is based on the refreshed M1 branch head
+`a179710f681c08fce678fed051654c79b333e7e1`. M1 now pins the current
+PureDarwin development head `0c1990c803c13b68cad4df3f6dc34ba4306fc789`
+instead of the prior `0163b2d` candidate. The current-source image build and
+guest boot are not yet qualified; the previous 20.5 bootstrap and previous
+source-specific toolchain results remain historical.
+
+This M1 source-selection change does not alter the M2 runtime implementation,
+but the full M2 CI must run again against the updated synthetic merge base.
+Host tests and Linux ARM64 interpreter tests do not establish current
+PureDarwin guest execution or OS-level confinement.
