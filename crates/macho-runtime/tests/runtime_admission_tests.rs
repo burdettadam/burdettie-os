@@ -476,14 +476,7 @@ fn inserted_and_main_roots_share_an_admitted_dependency() {
     // edges (main, first inserted root, second inserted root) is admitted.
     assert_eq!(
         *seen.lock().unwrap(),
-        vec![
-            main,
-            first,
-            second,
-            shared.clone(),
-            shared.clone(),
-            shared,
-        ]
+        vec![main, first, second, shared.clone(), shared.clone(), shared]
     );
 }
 
