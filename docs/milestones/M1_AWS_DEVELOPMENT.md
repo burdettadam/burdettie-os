@@ -1,5 +1,10 @@
 # M1 development on the retained AWS host
 
+## Current PureDarwin source selection — 2026-11-23
+
+The current candidate is PureDarwin `main` at `0c1990c803c13b68cad4df3f6dc34ba4306fc789`, not the prior `0163b2d` checkout. The current repository README documents `nix build .#image-minimal` and `nix run .#vm`. The official 20.5 image bootstrap and all source-specific plans/builds below remain historical evidence for their exact older inputs; they do not qualify the current main tree. The flake lock is unchanged, but the corecrypto submodule changed and the source tree is 155 commits newer. Fresh checkout, submodule verification, no-build evaluation and capacity review are required before any realization. See [the source refresh record](M1_PUREDARWIN_SOURCE_REFRESH_20261123.md).
+
+
 Status on 2026-11-14 UTC: **the staged native linker built successfully and passed installed-output inspection; its complete selected evidence archive is recovered and independently reviewed. M1 remains in progress.** The [recovered evidence](evidence/staged-native-linker-recovered-2026-11-14.json) records the full result, build log, registration sidecars, loader/version checks and sampled resource history. The earlier [terminal observation](evidence/staged-native-linker-terminal-observation-2026-11-14.json) remains unchanged as a historical record of the transfer interruption. The staged libtapi build, selected SDK and two Mach-O objects have separate successful evidence. The older PureDarwin 20.5 bootstrap passes its narrow shell/persistence scope; the original native-linker attempt remains a retained wall-time failure. Fresh downstream verification, executable linking, selected-image construction, Burdettie runtime execution, Apple applications, display/session and enforcement remain separate gates.
 
 The [sanitized bootstrap receipt](evidence/bootstrap-2026-11-14.json) records all three outcomes, input identities, timings and log hashes. Raw logs, writable disks, private recovery records, cloud identifiers and command receipts are retained outside the public repository.
@@ -41,9 +46,9 @@ The successful follow-up changed the harness while preserving the image, QEMU, f
 
 **Shutdown limitation:** the harness issues guest `sync` and then stops QEMU from the host. The second boot replays a dirty ext4 journal before the successful readback. This demonstrates persistence of the tested exact bytes through that termination/restart; it is not graceful guest shutdown, general filesystem durability or a warning-free boot. TCG feature warnings and guest service diagnostics remain in the logs.
 
-## Selected-source preparation and capacity
+## Historical source preparation and capacity — superseded 0163b2d candidate
 
-The selected M1 candidate remains `0163b2db225b85e3bf96fc25646ea290105ac298`. Its complete shallow checkout and exact corecrypto submodule were obtained; `flake.lock` remains unchanged at SHA-256 `00c598d3efca4bbda302fec4a43fffbfa787dc642c8c0b2c4202c65339e684d0`.
+The historical M1 candidate was `0163b2db225b85e3bf96fc25646ea290105ac298`. Its complete shallow checkout and exact corecrypto submodule were obtained; `flake.lock` remains unchanged at SHA-256 `00c598d3efca4bbda302fec4a43fffbfa787dc642c8c0b2c4202c65339e684d0`. This entire section records work on that superseded source, not current-main validation.
 
 Nix 2.28.3 was installed in a non-root profile without a system daemon or shell-profile modification. Its official release tarball SHA-256 is `85d1847d06d5d56167796d3f61cd992908de84584db3e700da031a782b59ea22`. The first evaluation refused a shallow Git input without an explicit shallow attribute. The fixture recipe now supplies `submodules=1&shallow=1` with the exact revision, and has a regression test for that URL.
 
@@ -272,4 +277,4 @@ The [backend allocation](../contracts/BACKEND_ALLOCATION.md) assigns 17 control 
 
 Physical Mac ownership and a real Apple application are not M1 prerequisites. The independent OS, real-application and selectable-security goals remain unchanged, and retain their own later acceptance evidence.
 
-Sources: [20.5 release](https://github.com/PureDarwin/PureDarwin/releases/tag/20.5), [matching release runner](https://github.com/PureDarwin/PureDarwin/blob/1bbaeb2ee6aa41e6f792a0b1e2943cc295b3b290/nix/image-contents.nix), [selected source lock](https://github.com/PureDarwin/PureDarwin/blob/0163b2db225b85e3bf96fc25646ea290105ac298/flake.lock), and [upstream build budget](https://puredarwin.org/handbook/getting-started.html).
+Sources: [current PureDarwin main](https://github.com/PureDarwin/PureDarwin/tree/0c1990c803c13b68cad4df3f6dc34ba4306fc789), [20.5 historical release](https://github.com/PureDarwin/PureDarwin/releases/tag/20.5), [matching release runner](https://github.com/PureDarwin/PureDarwin/blob/1bbaeb2ee6aa41e6f792a0b1e2943cc295b3b290/nix/image-contents.nix), [current source lock](https://github.com/PureDarwin/PureDarwin/blob/0c1990c803c13b68cad4df3f6dc34ba4306fc789/flake.lock), and [upstream build budget](https://puredarwin.org/handbook/getting-started.html).

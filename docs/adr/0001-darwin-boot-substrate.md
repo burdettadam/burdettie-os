@@ -2,9 +2,16 @@
 
 Status: selected for a bounded feasibility spike. The production substrate is conditional on the evidence below. The x86_64 QEMU VM is the initial reference platform. M1 remains in progress until its build/boot/runtime experiment and contract decisions are recorded; physical Mac and real-application qualification proceed later.
 
+## PureDarwin source refresh — 2026-11-23
+
+The current upstream candidate supersedes the earlier `0163b2d` pin. Use PureDarwin `main` at `0c1990c803c13b68cad4df3f6dc34ba4306fc789` (commit date 2026-11-22), not the older `upstream-xnu-12377` branch or the October 20.5 release image. The current repository README identifies `main` as the development branch; GitHub reports the previous candidate is 155 commits behind this head and the old branch is 65 commits behind it. The exact source, unchanged flake lock, current corecrypto submodule, and next-step preflight are recorded in [M1 PureDarwin source refresh](../milestones/M1_PUREDARWIN_SOURCE_REFRESH_20261123.md).
+
+The November 14 20.5 image bootstrap remains valid only for that historical image. The prior source preflight, SDK, object, libtapi and native-linker results were generated from the superseded `0163b2d` source tree. They are retained as historical evidence and are not current-main build/boot qualification. Reuse any Nix output only after a fresh evaluation proves its derivation and output identities match the refreshed source. The current-main image build, boot, runtime and enforcement gates remain open.
+
+
 ## Decision
 
-Use an x86_64 Darwin guest built from the PureDarwin XNU distribution as the first boot candidate. Pin PureDarwin at `0163b2db225b85e3bf96fc25646ea290105ac298`, observed on `upstream-xnu-12377`. Preserve its `flake.lock` and exact submodules. Begin with its minimal image, open-source `xnu-loader`, UEFI firmware and QEMU q35. Use x86_64 Linux as the reproducible build host only. Burdettie supplies its runtime, application session, launch supervisor, policy interface and selected application compatibility above the Darwin substrate.
+Use an x86_64 Darwin guest built from the PureDarwin XNU distribution as the first boot candidate. Pin PureDarwin at `0c1990c803c13b68cad4df3f6dc34ba4306fc789`, observed on `main`. Preserve its `flake.lock` and exact submodules. Begin with its minimal image, open-source `xnu-loader`, UEFI firmware and QEMU q35. Use x86_64 Linux as the reproducible build host only. Burdettie supplies its runtime, application session, launch supervisor, policy interface and selected application compatibility above the Darwin substrate.
 
 This decision establishes where to invest the first platform experiment. It does not establish that the Burdettie runtime already runs on PureDarwin, that an arbitrary Intel Mac boots it, or that the substrate enforces Burdettie policies. Those are separate gates.
 
@@ -32,7 +39,7 @@ The [fixture and runtime ABI assessment](../milestones/M1_FIXTURE_ABI.md) provid
 
 Use the exact PureDarwin commit above rather than following the development branch during a run. Record the actual Nix version, lock hash, QEMU/OVMF derivations, generated image SHA-256, kernel version and any local patch hash. Pinning the branch alone is insufficient.
 
-There is an upstream documentation mismatch. The pinned README still tells builders to supply Apple's `MacOSX11.3.sdk.tar.xz` and describes a different development branch. The pinned `nix/pkgs/toolchain/apple-sdk-pinned.nix` assembles a source-derived SDK; the current SDK handbook states that the proprietary SDK requirement has been removed. Follow the selected revision's build definitions and record any actual evaluation/build disagreement. Do not copy an Apple SDK into the public repository or treat a dependency's label as a distribution-rights review. Review the actual component closure and retain its separate notices before publishing an image.
+The current repository README and flake at the pinned `main` commit document a Linux/Nix build using PureDarwin's source-derived open-source SDK; no Apple SDK is required. Use `nix build .#image-minimal` and `nix run .#vm` as the upstream build/runner entry points. The website handbook still names `upstream-xnu-12377` as the development branch and calls `main` frozen, so the website and repository documentation are out of sync. For this refresh, the exact pinned repository commit and its README/flake are authoritative. Record any actual evaluation/build disagreement. Do not copy an Apple SDK into the public repository or treat a dependency's label as a distribution-rights review. Review the actual component closure and retain its separate notices before publishing an image.
 
 ## Initial target matrix
 
@@ -73,10 +80,10 @@ The following selected-image build/boot commands remain prospective. Reuse the r
 ```sh
 set -eu
 cd /path/to/pinned-puredarwin
-test "$(git rev-parse HEAD)" = 0163b2db225b85e3bf96fc25646ea290105ac298
+test "$(git rev-parse HEAD)" = 0c1990c803c13b68cad4df3f6dc34ba4306fc789
 git submodule status --recursive
 git status --short
-puredarwin_input="git+file://$(pwd)?rev=0163b2db225b85e3bf96fc25646ea290105ac298&submodules=1&shallow=1"
+puredarwin_input="git+file://$(pwd)?rev=0c1990c803c13b68cad4df3f6dc34ba4306fc789&submodules=1&shallow=1"
 nix build --no-update-lock-file --out-link result-minimal "${puredarwin_input}#image-minimal"
 nix build --no-update-lock-file --out-link result-qemu \
   github:NixOS/nixpkgs/fd1462031fdee08f65fd0b4c6b64e22239a77870#legacyPackages.x86_64-linux.qemu
@@ -117,9 +124,9 @@ cat /var/tmp/burdettie-m1/probe.txt
 
 Exit QEMU completely, rerun the identical host command against the same image, then read the file again. Save an evidence record with separate `build`, `boot`, `persistence`, `runtime`, `physical_hardware` and `confinement` statuses. A pass in one field does not promote the others.
 
-## Observed feasibility result in this session
+## Historical feasibility result for the superseded 0163b2d source
 
-The retained AWS host has QEMU/OVMF, the verified official 20.5 image, Nix 2.28.3 and the complete selected shallow source checkout with its exact corecrypto submodule. The lock remains unchanged at SHA-256 `00c598d3efca4bbda302fec4a43fffbfa787dc642c8c0b2c4202c65339e684d0`. The first shallow-source evaluation was blocked by the missing shallow attribute; the corrected exact-revision input explicitly carries `submodules=1&shallow=1`.
+This historical result is for the superseded PureDarwin `0163b2d` source candidate and the official 20.5 bootstrap image. It does not qualify the refreshed `main` source. The retained host's QEMU/OVMF and Nix observations remain historical until freshly verified; the current source checkout, submodule, preflight and image build are still required. The lock remains unchanged at SHA-256 `00c598d3efca4bbda302fec4a43fffbfa787dc642c8c0b2c4202c65339e684d0`. The first shallow-source evaluation was blocked by the missing shallow attribute; the corrected exact-revision input explicitly carries `submodules=1&shallow=1`.
 
 The subsequent no-build plan for `apple-sdk`, `native-ld`, `darwin-cross-toolchain` and `libsystem` passed in 232.21 seconds, with 32 planned local derivations, 264 fetched paths, 916.73 MiB download and 4811.47 MiB unpacked data. The host had 14387019776 free disk bytes at that checkpoint, with an 8-GiB reserve to preserve. Individual no-build plans have also passed; the SDK-only plan is 3 local derivations and 1908.90 MiB unpacked, and the plans overlap. The bounded SDK-only realization then passed in 75.11 seconds, with required headers/link stub checked and 12243050496 disk bytes still free. Larger linker/libSystem stages had not been launched at that SDK checkpoint. The full-image 60-GB guideline is not a measurement of this narrower fixture lane, and the combined download estimate is not a peak-build capacity pass. See the [source-preflight evidence](../milestones/evidence/source-preflight-2026-11-14.json).
 
@@ -135,6 +142,6 @@ The fixture recipe/probe and reviewed backend allocation are implemented. The se
 - [Burdettie VM guide](https://github.com/burdettadam/burdettie-os/blob/7bf375562ca9edf513c353da7ec3309c0337f457/docs/VM_DEMO.md) and [actual VM launcher](https://github.com/burdettadam/burdettie-os/blob/7bf375562ca9edf513c353da7ec3309c0337f457/vm-image/Sources/main.swift)
 - [Burdettie Darwin host platform](https://github.com/burdettadam/burdettie-os/blob/7bf375562ca9edf513c353da7ec3309c0337f457/crates/platform-darwin-host/src/lib.rs) and [display backend dependencies](https://github.com/burdettadam/burdettie-os/blob/7bf375562ca9edf513c353da7ec3309c0337f457/crates/window-backend-darwin/Cargo.toml)
 - [Current Apple XNU](https://github.com/apple-oss-distributions/xnu/blob/main/README.md)
-- [Pinned PureDarwin image and runner source](https://github.com/PureDarwin/PureDarwin/blob/0163b2db225b85e3bf96fc25646ea290105ac298/nix/image-contents.nix)
-- [Pinned PureDarwin lock](https://github.com/PureDarwin/PureDarwin/blob/0163b2db225b85e3bf96fc25646ea290105ac298/flake.lock) and [SDK recipe](https://github.com/PureDarwin/PureDarwin/blob/0163b2db225b85e3bf96fc25646ea290105ac298/nix/pkgs/toolchain/apple-sdk-pinned.nix)
+- [Pinned PureDarwin image and runner source](https://github.com/PureDarwin/PureDarwin/blob/0c1990c803c13b68cad4df3f6dc34ba4306fc789/nix/image-contents.nix)
+- [Pinned PureDarwin lock](https://github.com/PureDarwin/PureDarwin/blob/0c1990c803c13b68cad4df3f6dc34ba4306fc789/flake.lock) and [SDK recipe](https://github.com/PureDarwin/PureDarwin/blob/0c1990c803c13b68cad4df3f6dc34ba4306fc789/nix/pkgs/toolchain/apple-sdk-pinned.nix)
 - [PureDarwin getting started](https://puredarwin.org/handbook/getting-started.html), [SDK](https://puredarwin.org/handbook/building/apple-sdk.html), [boot chain](https://puredarwin.org/handbook/images/boot-chain.html), and [hardware evidence](https://puredarwin.org/handbook/images/hardware.html)

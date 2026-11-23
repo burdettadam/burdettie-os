@@ -1,5 +1,7 @@
 # M1 platform and security contracts
 
+Current PureDarwin source: `main` at `0c1990c803c13b68cad4df3f6dc34ba4306fc789`; the previous `0163b2d` source and 20.5 bootstrap results are historical only. See [the source refresh record](M1_PUREDARWIN_SOURCE_REFRESH_20261123.md).
+
 Status: **in progress**. The initial reference platform is an x86_64 Darwin VM to be built and tested from Linux. Closing M1 requires the pinned VM build/boot/runtime feasibility result and the launch/security contracts; physical Mac access and an exact Stickies bundle are deferred qualification work. This milestone defines the first bootable Darwin-compatible Burdettie OS, with owner-selectable permissive, audit and enforced security. See [development without Mac hardware](M1_WITHOUT_MAC.md).
 
 Source baseline: [`7bf375562ca9edf513c353da7ec3309c0337f457`](https://github.com/burdettadam/burdettie-os/commit/7bf375562ca9edf513c353da7ec3309c0337f457), which integrates recovery PR #1. The M1 changes define contracts, implement the fixture recipe and probe, and record platform evidence. The feature branch includes [PR #5](https://github.com/burdettadam/burdettie-os/pull/5) admission, headless/exit prerequisites, maintained fonts/CFConstantString alignment and the typed NSRange adapter through [PR #7](https://github.com/burdettadam/burdettie-os/pull/7).
