@@ -63,6 +63,11 @@ fn collect_pairs(obj: u64) -> (Vec<u64>, Vec<u64>) {
 
 // ── Class methods ──────────────────────────────────────────────────
 
+/// `+[NSDictionary dictionary]` — creates an empty immutable dictionary.
+pub extern "C" fn shim_nsdictionary_dictionary(_cls: u64, _cmd: u64) -> u64 {
+    make_nsdictionary(&[], &[])
+}
+
 /// `+[NSDictionary dictionaryWithObjects:forKeys:count:]`
 ///
 /// Class factory: creates an immutable dictionary from parallel C arrays.

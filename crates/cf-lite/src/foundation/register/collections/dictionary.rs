@@ -93,6 +93,11 @@ pub fn register_nsdictionary_class(rt: &mut objc_runtime::ObjcRuntime) {
         ],
         class_methods: vec![
             me(
+                "dictionary",
+                nsdictionary::shim_nsdictionary_dictionary as *const () as u64,
+                "@@:",
+            ),
+            me(
                 "dictionaryWithObjects:forKeys:count:",
                 nsdictionary::shim_nsdictionary_with_objects_for_keys_count as *const () as u64,
                 "@@:^@^@Q",
