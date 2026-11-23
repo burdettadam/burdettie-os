@@ -87,8 +87,7 @@ impl Loader<Parsed> {
         // Keep complete source bytes for the cache digest; map only the
         // selected architecture slice for a universal/fat executable.
         let main_data: Arc<[u8]> = if macho_parse::is_fat(&source_data) {
-            let slice =
-                macho_parse::fat_slice_for_cpu(&source_data, macho_types::CpuType::Arm64)?;
+            let slice = macho_parse::fat_slice_for_cpu(&source_data, macho_types::CpuType::Arm64)?;
             Arc::from(slice)
         } else {
             source_data.clone()

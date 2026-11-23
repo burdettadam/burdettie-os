@@ -45,15 +45,14 @@ pub(super) fn run_native(
             source: e,
         })?;
     let source_data: std::sync::Arc<[u8]> = std::sync::Arc::from(source_data);
-    let (main_data, arc_parsed) =
-        if let Some(cached) = crate::parse_cache::lookup(binary_path, &source_data) {
-            cached
-        } else {
-            let parsed_result =
-                macho_parse::parse_auto(&source_data, macho_types::CpuType::Arm64)?;
+    let (main_data, arc_parsed) = if let Some(cached) =
+        crate::parse_cache::lookup(binary_path, &source_data)
+    {
+        cached
+    } else {
+            let parsed_result = macho_parse::parse_auto(&source_data, macho_types::CpuType::Arm64)?;
             let main_data: std::sync::Arc<[u8]> = if macho_parse::is_fat(&source_data) {
-                let slice =
-                    macho_parse::fat_slice_for_cpu(&source_data, macho_types::CpuType::Arm64)?;
+                let slice = macho_parse::fat_slice_for_cpu(&source_data, macho_types::CpuType::Arm64)?;
                 std::sync::Arc::from(slice)
             } else {
                 source_data.clone()

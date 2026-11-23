@@ -41,10 +41,7 @@ fn digest(source_data: &[u8]) -> [u8; 32] {
 /// pass those exact bytes here. The returned data and parsed object were created
 /// from the same source revision. A miss leaves parsing and cache replacement
 /// to the caller.
-pub(crate) fn lookup(
-    path: &Path,
-    source_data: &[u8],
-) -> Option<(Arc<[u8]>, Arc<ParsedMachO>)> {
+pub(crate) fn lookup(path: &Path, source_data: &[u8]) -> Option<(Arc<[u8]>, Arc<ParsedMachO>)> {
     let source_sha256 = digest(source_data);
     let mut guard = binary_parse_cache()
         .lock()
@@ -125,10 +122,8 @@ mod tests {
     impl TempDirectory {
         fn new() -> Self {
             let id = NEXT_DIRECTORY.fetch_add(1, Ordering::Relaxed);
-            let path = std::env::temp_dir().join(format!(
-                "burdettie-parse-cache-{}-{id}",
-                std::process::id()
-            ));
+            let path = std::env::temp_dir()
+                .join(format!("burdettie-parse-cache-{}-{id}", std::process::id()));
             std::fs::create_dir(&path).expect("create isolated cache test directory");
             Self(path)
         }
@@ -153,16 +148,7 @@ mod tests {
         segment[60..64].copy_from_slice(&5_u32.to_le_bytes());
 
         let mut bytes = Vec::with_capacity(0x4000);
-        for value in [
-            0xfeed_facf_u32,
-            0x0100_000c_u32,
-            0,
-            2,
-            1,
-            72,
-            0,
-            0,
-        ] {
+        for value in [0xfeed_facf_u32, 0x0100_000c_u32, 0, 2, 1, 72, 0, 0] {
             bytes.extend_from_slice(&value.to_le_bytes());
         }
         bytes.extend_from_slice(&segment);
@@ -183,13 +169,7 @@ mod tests {
         let mapped: Arc<[u8]> = Arc::from(source.clone());
         let canonical = path.canonicalize().unwrap();
 
-        insert_both(
-            &path,
-            canonical,
-            &source,
-            mapped.clone(),
-            parsed.clone(),
-        );
+        insert_both(&path, canonical, &source, mapped.clone(), parsed.clone());
 
         let (cached_data, cached_parsed) =
             lookup(&path, &std::fs::read(&path).unwrap()).expect("matching source cache hit");
@@ -210,13 +190,7 @@ mod tests {
         let parsed = Arc::new(macho_parse::parse(&original).expect("valid original"));
         let mapped: Arc<[u8]> = Arc::from(original.clone());
         let canonical = file.canonicalize().unwrap();
-        insert_both(
-            &raw_alias,
-            canonical.clone(),
-            &original,
-            mapped,
-            parsed,
-        );
+        insert_both(&raw_alias, canonical.clone(), &original, mapped, parsed);
 
         assert!(lookup(&raw_alias, &original).is_some());
         assert!(lookup(&canonical, &original).is_some());
@@ -240,13 +214,7 @@ mod tests {
         let parsed = Arc::new(macho_parse::parse(&original).expect("valid original"));
         let mapped: Arc<[u8]> = Arc::from(original.clone());
         let canonical = file.canonicalize().unwrap();
-        insert_both(
-            &raw_alias,
-            canonical,
-            &original,
-            mapped,
-            parsed,
-        );
+        insert_both(&raw_alias, canonical, &original, mapped, parsed);
 
         assert!(lookup(&raw_alias, &replacement).is_none());
         assert!(lookup(&raw_alias, &original).is_some());
