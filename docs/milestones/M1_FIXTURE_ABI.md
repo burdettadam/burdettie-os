@@ -1,5 +1,7 @@
 # M1 Linux/PureDarwin fixture and runtime ABI gate
 
+> Scope update, 2026-11-25: this component/reference record retains its original source and evidence scope. Current product work follows [ADR 0003](../adr/0003-linux-foundation-and-upstream-reuse.md) and the [Linux M1 plan](M1_PLATFORM_SECURITY.md). PureDarwin build/guest instructions below are optional reference or upstream-qualification work, not shipping prerequisites or the default next task. Existing receipts do not qualify the new Linux target.
+
 Status: the pinned source SDK was realized and both source-owned fixtures compiled successfully into x86_64 Mach-O object files on 2026-11-14. **Executable linking and selected-guest/runtime execution remain unqualified.** The [object compilation receipt](evidence/objects-2026-11-14.json) records this limited result. Object compilation and native-host probe tests do not establish PureDarwin ABI behavior, Burdettie execution, reboot persistence or confinement.
 
 ## Pinned build inputs

@@ -1,5 +1,7 @@
 # Cocoa Application Support Plan
 
+> Strategy scope, 2026-11-25: retain the behavior gaps below as compatibility research. [ADR 0003](adr/0003-linux-foundation-and-upstream-reuse.md) requires evaluating reusable framework/runtime implementations and upstream fixes before expanding custom Rust replacements. This historical plan is not a commitment to implement all Cocoa frameworks ourselves; see [RQ-02](RESEARCH_QUESTIONS.md#rq-02--puredarwin-libraryframework-reuse).
+
 Strategy for supporting real Cocoa (AppKit) applications using open-source libraries
 to reduce implementation effort and maintenance burden.
 

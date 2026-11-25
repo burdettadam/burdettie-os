@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Make Linux the explicit shipping foundation under
+  [ADR 0003](docs/adr/0003-linux-foundation-and-upstream-reuse.md), with Rust
+  interfaces/bridges and upstream contributions. Withdraw the XNU-product and
+  owned-Rust-kernel transition requirements.
+- Rebaseline the roadmap, M1 target planning and developer-tool strategy around
+  existing Linux, compatibility, desktop and compiler/debugger components.
+  Add a sourced research register, contribution candidates and a Linux control
+  allocation. Retain historical evidence without promoting it to Linux support.
+
 ### Fixed
 
 - Preserve live ARM64 TLV registers across storage lookup and isolate the

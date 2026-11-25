@@ -1,5 +1,7 @@
 # M1 pthread attribute lifetime
 
+> Scope update, 2026-11-25: this component/reference record retains its original source and evidence scope. Current product work follows [ADR 0003](../adr/0003-linux-foundation-and-upstream-reuse.md) and the [Linux M1 plan](M1_PLATFORM_SECURITY.md). PureDarwin build/guest instructions below are optional reference or upstream-qualification work, not shipping prerequisites or the default next task. Existing receipts do not qualify the new Linux target.
+
 ## Defect and correction
 
 At public baseline `6257197c7aa9121910856c8bb3b1b9e9e68d7027`, the non-macOS

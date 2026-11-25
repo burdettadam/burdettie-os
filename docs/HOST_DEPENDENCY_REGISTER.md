@@ -1,5 +1,7 @@
 # Host Dependency Register — v0.1.0
 
+> Current direction: [ADR 0003](adr/0003-linux-foundation-and-upstream-reuse.md) selects Linux and upstream reuse. This inventory helps identify Rust adapter/FFI boundaries; it does not require removing Linux or replacing every host library. Reconcile its historical entries against current code and the selected upstream backend.
+
 > Every direct host OS coupling point in the codebase, grouped by
 > abstraction category and mapped to its target PAL trait (Phase 31).
 >

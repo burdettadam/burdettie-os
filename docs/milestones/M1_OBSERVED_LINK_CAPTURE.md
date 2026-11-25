@@ -1,5 +1,7 @@
 # Observed compiler-rt linker capture
 
+> Scope update, 2026-11-25: this component/reference record retains its original source and evidence scope. Current product work follows [ADR 0003](../adr/0003-linux-foundation-and-upstream-reuse.md) and the [Linux M1 plan](M1_PLATFORM_SECURITY.md). PureDarwin build/guest instructions below are optional reference or upstream-qualification work, not shipping prerequisites or the default next task. Existing receipts do not qualify the new Linux target.
+
 `capture_m1_link.py` fills the producer gap between the static archive inspector
 and `verify_compiler_rt_link.py`: it observes a real direct linker invocation,
 retains its exit and bounded logs, then runs the existing member-selection check.

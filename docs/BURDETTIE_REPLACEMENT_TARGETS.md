@@ -1,62 +1,34 @@
-# BurdettieOS — Rust Replacement Targets
+# Component reuse and integration decisions
 
-Track progress replacing macOS system services with cross-platform Rust implementations.
+Current strategy: [ADR 0003](adr/0003-linux-foundation-and-upstream-reuse.md),
+2026-11-25. This file's historical name is retained for links. It is no longer a
+checklist for replacing macOS/PureDarwin services or a kernel with our own Rust
+implementations.
 
-> Strategy update — 2026-11-23: [ADR 0002](adr/0002-rust-platform-transition.md) extends the long-term destination to an independently bootable Burdettie Rust platform, including kernel and core userland. This document is a historical runtime implementation inventory. Its “Done” labels and counts do not establish complete Darwin semantics, selected-guest qualification, security enforcement or removal of the host kernel. Reassess each candidate against current code, declared interfaces and the ADR's replacement gates before using it in the platform transition. [M1 platform and security contracts](milestones/M1_PLATFORM_SECURITY.md) continue to govern the current PureDarwin work.
+## Disposition of existing work
 
-## Historical completed runtime entries
+| Area | Keep and use now | Reuse-first next decision |
+| --- | --- | --- |
+| Mach-O parsing, mapping and diagnostics | Existing Rust tools and source-owned fixtures | Compare upstream parsing/loading where it reduces maintenance; preserve diagnostic/behavior contracts |
+| Runtime, libSystem shims and interpreter | Current supported baseline and regression knowledge | Evaluate a complete upstream runtime; add narrow adapters or shared fixes before expanding our own syscall/Mach implementation |
+| Objective-C and Foundation/AppKit subsets | Existing working fixtures and UI/bridge behavior | Select a coherent upstream object/runtime model; migrate only after ownership, ABI and workflow qualification |
+| Linux platform services | Existing PAL backend and host integration | Use Linux libraries/APIs directly through narrow Rust boundaries; no kernel replacement |
+| PureDarwin libraries/toolchain | Portable components and existing build/test knowledge | Small native packages, shared regression tests and SDK fixes; port only when the dependency boundary is understood |
+| Dispatch, crypto, text and media | Maintained existing implementations and regression fixes | Prefer original upstream Linux libraries rather than duplicating their algorithms |
+| Developer tooling | Existing project parsers and narrow CLI frontends | Delegate compile/build/index/debug to upstream tools; own the workflow/UX |
+| Desktop | Existing GUI bridge and demos | Integrate with an established Linux session/compositor/toolkit; own the product experience |
+| Trust and supervision | Existing policy/admission contract and useful code | Rust owner-policy adapters plus qualified Linux controls and maintained verification libraries |
 
-| # | Target | Description | Status |
-|---|--------|-------------|--------|
-| — | `launchd` / systemd | Full in-process reimplementation of liblaunch/bootstrap/vproc | ✅ Done |
-| — | XPC pipe handlers | 17 daemon handlers (analyticsd, diagnosticd, securityd, trustd, etc.) | ✅ Done |
-| — | `os_log` | burdettie-log-pipeline: ring buffer → JSON/logfmt/text formatter → sink | ✅ Done |
-| — | Apple cloud APIs | burdettie-services: 20+ endpoint categories via domain rewrite + HTTP intercept | ✅ Done |
-| — | `plutil` | burdettie-plutil: native Rust CLI (lint/convert/insert/replace/remove/extract) | ✅ Done |
-| — | ObjC runtime | objc-runtime: 131 shims, ARM64 trampolines | ✅ Done |
-| — | libSystem.B.dylib | libsystem-shims: 443 shim functions, 37 modules | ✅ Done |
-| — | CoreFoundation | core-foundation-lite + cf-lite/cf_core | ✅ Done |
-| — | Foundation | cf-lite: 193 classes, 867 selectors, 2001 shim functions | ✅ Done |
-| — | CommonCrypto | Real AES CBC/ECB via ring | ✅ Done |
-| — | Security.framework | trust-eval: real X.509/webpki, ECDSA P-256 | ✅ Done |
-| — | LibreSSL bundle | Native Docker multi-stage build, 67/67 tests | ✅ Done |
-| — | ICU (`libicucore`) | icu-shims: ICU4X-backed collation/datetime (~48%) | ✅ Done |
+A component's presence or historical completion label does not prove semantic
+coverage or confinement. Each adopted replacement must pass the declared
+positive/negative behavior, lifetime, architecture, security and recovery
+checks. Keep old and new behavior distinguishable during evaluation; remove
+obsolete duplication after qualification.
 
-## In Progress
+The [research register](RESEARCH_QUESTIONS.md) records the unresolved choices.
+The [upstream strategy](UPSTREAM_STRATEGY.md) identifies contribution routes and
+first candidates. No percentage of Rust implementation or independence from
+all external libraries is a release metric.
 
-| # | Target | Description | Effort | Impact | Status |
-|---|--------|-------------|--------|--------|--------|
-| 4 | IOKit (power/device) | IOPMAssertion, IOServiceMatching, IORegistryEntry → Linux sysfs/upower | Medium | High | ✅ Done |
-| 1 | `configd` / SCDynamicStore | Network state + change keys via Linux sysfs/procfs/resolv.conf | Medium | High | ✅ Done |
-
-## Tier 1 — High impact, moderate effort
-
-| # | Target | Description | Effort | Impact | Status |
-|---|--------|-------------|--------|--------|--------|
-| 1 | `configd` / SCDynamicStore | Network change notifications via Linux netlink (RTMGRP_LINK, RTMGRP_IPV4_IFADDR) | Medium | High | ✅ Done |
-| 2 | `distnoted` / distributed notifications | Cross-process pub/sub via Unix domain sockets or inotify | Medium | High | ✅ Done |
-| 3 | `mDNSResponder` / Bonjour | dns_sd.h API (Browse/Resolve/Register) via mdns/zeroconf crate | Medium | High | ✅ Done |
-
-## Tier 2 — Medium impact, focused effort
-
-| # | Target | Description | Effort | Impact | Status |
-|---|--------|-------------|--------|--------|--------|
-| 5 | `opendirectoryd` | User/group resolution via Linux NSS (getpwnam_r, getgrnam_r, getgrouplist) | Low | Medium | ✅ Done — sysinfo.rs +5 shims (mbr_uid/gid_to_uuid, mbr_uuid_to_id, mbr_check_membership, getgrouplist) |
-| 6 | CoreAudio stub | Null audio backend so audio-aware apps can launch | Low | Medium | ✅ Done — core_audio.rs: 39 shims + 1 data symbol, 6 tests |
-| 7 | `FSEvents` → inotify | File system event stream translation for file-watching tools | Medium | Medium | ✅ Done — fsevents.rs: 17 shims + 1 data symbol, 6 tests (inotify on Linux) |
-
-## Tier 3 — Strategic, higher effort
-
-| # | Target | Description | Effort | Impact | Status |
-|---|--------|-------------|--------|--------|--------|
-| 8 | Keychain Services | Real credential storage via secret-service D-Bus or encrypted SQLite | High | Medium | ⬜ Not Started |
-| 9 | Network.framework | nw_connection/nw_listener state machine via tokio/socket2 | High | Medium | ⬜ Not Started |
-| 10 | WindowServer / CoreDisplay | Headless compositor for virtual framebuffer rendering in CI | High | Low | ⬜ Not Started |
-
-## Notes
-
-- **Current test counts**: cf-lite 2910, libsystem-shims 585, Docker 580/580
-- **IOKit coverage**: ~80% (130+ shims + 28 data symbols)
-- **SC coverage**: ~75% (36 shims + 27 data symbols, real network state from sysfs/procfs)
-- **Distributed notifications**: NSDistributedNotificationCenter (ObjC, 10+2 methods, 8 tests) + CFNotificationCenter (C-level, 8 shims, 9 tests) + notify.rs dirty-bit fix
-- **Priority rationale**: Items 1-4 unblock real application workflows; items 5-7 prevent silent failures; items 8-10 enable advanced scenarios
+The previous implementation inventory and its historical counts are available
+in [Git history](https://github.com/burdettadam/burdettie-os/blob/a55b71930e5aee279214daa934e084dba8863cfa/docs/BURDETTIE_REPLACEMENT_TARGETS.md).

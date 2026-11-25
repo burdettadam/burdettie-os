@@ -1,5 +1,7 @@
 # Docker-First Development Workflow
 
+> Product strategy, 2026-11-25: Linux is the shipping runtime foundation under [ADR 0003](adr/0003-linux-foundation-and-upstream-reuse.md). These Docker recipes are development/component workflows; their ARM64/imported-tool lanes do not choose the shipping CPU, qualify a bootable image or require recreating the Xcode stack. Begin with the [Linux build guide](BUILD.md) and [developer-tool plan](XCODE_PUBLIC_COMPATIBILITY_PLAN.md).
+
 ## Goal
 
 Use Docker as the primary development and verification lane now, without

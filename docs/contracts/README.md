@@ -2,6 +2,8 @@
 
 [launch-policy-v1.md](launch-policy-v1.md) fixes the M1 behavior contract. `launch-v1.schema.json` fixes version 1 wire shapes for a launch request, owner policy snapshot, backend capability manifest, pre-initialization launch report, and subsequent lifecycle events. M2 implements these interfaces in the actual runtime and launch adapters.
 
+The shipping foundation is now Linux under [ADR 0003](../adr/0003-linux-foundation-and-upstream-reuse.md). Use [Linux backend allocation](LINUX_BACKEND_ALLOCATION.md) for current product planning. The existing PureDarwin allocation JSON and examples remain reference/validator inputs; they are not the current product selection or Linux support evidence. This strategy change does not alter wire schemas or relax mode/authority requirements.
+
 The four JSON examples are illustrative. All zero digests and `example` or `fixture` identifiers are placeholders, not application identities, credentials, platform support, or test evidence. The enforced example intentionally accepts unsigned code in its policy and refuses launch because the required resource backend is unsupported. It does not present a mock backend as a working security layer.
 
 ## Run
@@ -29,7 +31,7 @@ Network rules in v1 are `deny` or `allow_all`. Unsupported destination rules are
 
 Backend evidence binds the backend/runtime/image version, OS/kernel, host architecture, guest architecture, execution route, and worker strategy. Reusing ARM64 evidence to qualify x86_64 is invalid. Each required capability must cover the needed scopes, be verified and available, and be established before an enforced launch is allowed. A valid record still needs real test evidence before it can represent supported behavior.
 
-Evidence also names its exact capability ID, kind and covered scopes; a supervision test cannot qualify filesystem confinement. Required capabilities cannot have empty scopes. The [M1 backend allocation](BACKEND_ALLOCATION.md) maps all 17 control families to owners, source findings, candidate mechanisms and qualification tests. Its validator checks engineering coverage separately from launch records. Every control is still unsupported on the selected Burdettie guest; no allocation document authorizes launch or proves enforcement.
+Evidence also names its exact capability ID, kind and covered scopes; a supervision test cannot qualify filesystem confinement. Required capabilities cannot have empty scopes. The [Linux allocation](LINUX_BACKEND_ALLOCATION.md) maps current product responsibilities and qualification questions. The [historical PureDarwin allocation](BACKEND_ALLOCATION.md) and its validator still check that reference record's engineering coverage separately from launch records. Neither allocation authorizes launch or proves enforcement; no historical guest result establishes a supported Linux control.
 
 Every allowed enforced report must include a verified, available and established `launch.supervision` capability of kind `supervision` with application and descendant scope, as well as finalized findings. Each required capability names its expected kind; the provided control must match it exactly. This structural baseline does not derive the full selected policy. No document validator can establish complete policy enforcement by validating self-reported records.
 

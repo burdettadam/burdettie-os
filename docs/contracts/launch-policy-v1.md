@@ -145,7 +145,7 @@ Legacy in-process C/Rust embedding remains a documented development/permissive c
 
 The current `PlatformProvider` supplies host service abstractions but its process trait exposes only PID/main-thread information. Add a separate process-supervision/confinement interface; do not label ordinary filesystem or memory provider wrappers a sandbox. Security-sensitive runtime helpers receive a launch-bound context rather than looking up mutable process-global policy.
 
-The [M1 Darwin backend allocation](BACKEND_ALLOCATION.md) and its [machine-readable catalog](backends/puredarwin-x86_64.json) assign each control to an owner and a concrete next mechanism or explicit unsupported status. The catalog includes inspected native PureDarwin sandbox hooks and their limitations; it does not promote those source findings into guest enforcement evidence.
+The [Linux backend allocation](LINUX_BACKEND_ALLOCATION.md) assigns current product controls to owners, candidate mechanisms and qualification questions under [ADR 0003](../adr/0003-linux-foundation-and-upstream-reuse.md). The [historical Darwin allocation](BACKEND_ALLOCATION.md) and its [machine-readable catalog](backends/puredarwin-x86_64.json) remain reference inputs with their original scope. Neither source inspection nor an allocation document establishes enforcement on the selected Linux route. This platform change does not modify v1 wire shapes, authority rules or deny-only controls.
 
 ## Acceptance cases
 

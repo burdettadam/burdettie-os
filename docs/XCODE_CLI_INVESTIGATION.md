@@ -1,5 +1,7 @@
 # Xcode CLI Tool Deep Investigation
 
+> Historical investigation scope: startup/CLI observations below do not establish useful workflows or a complete IDE. The current [developer-tool plan](XCODE_PUBLIC_COMPATIBILITY_PLAN.md) implements the Linux/upstream strategy in [ADR 0003](adr/0003-linux-foundation-and-upstream-reuse.md); new work need not reproduce every imported Apple tool.
+
 > Empirical investigation of Xcode command-line tool support under the darwin-loader.
 > Initial investigation: 2025-06-28 · Last updated: 2026-03-30
 

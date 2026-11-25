@@ -1,5 +1,7 @@
 # Darwin Loader Lab — Security, Platform Support & Known Limitations
 
+> Product strategy, 2026-11-25: Linux is the shipping foundation. The [launch contract](contracts/launch-policy-v1.md) and [Linux backend allocation](contracts/LINUX_BACKEND_ALLOCATION.md) govern owner policy and qualification. Compatibility shims, Rust implementation and signature metadata do not by themselves establish confinement. See [ADR 0003](adr/0003-linux-foundation-and-upstream-reuse.md).
+
 > This historical lab overview does not establish production security or current platform support. Use the [current runtime limits](../README.md#scope-and-limitations) and the [M1 launch and selectable security contract](contracts/launch-policy-v1.md). A policy gate, signature metadata or successful sandbox shim is not an isolation guarantee; the required admission and backend enforcement remain separate implementation milestones.
 
 > See [FEATURES.md](FEATURES.md) for the full feature index and
