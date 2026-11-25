@@ -32,8 +32,19 @@ impl Loader<Parsed> {
         macho_parse::set_platform_hasher(Arc::new(ProviderHasher::new(config.platform.clone())));
         let tracer = config.tracer.take().unwrap_or_else(RuntimeTracer::disabled);
 
-        // Fast path: try raw path first (no realpath syscall), then canonical.
-        if let Some((main_data, parsed)) = lookup(binary_path) {
+        // Read the current source revision before consulting the parse cache.
+        // Cached metadata is reusable only when these exact bytes match its digest.
+        let source_data = config
+            .platform
+            .fs()
+            .read(binary_path)
+            .map_err(|e| RuntimeError::Io {
+                path: binary_path.to_path_buf(),
+                source: e,
+            })?;
+        let source_data: Arc<[u8]> = Arc::from(source_data);
+
+        if let Some((main_data, parsed)) = lookup(binary_path, &source_data) {
             tracer.record(
                 EventKind::Pipeline,
                 format!(
@@ -62,17 +73,7 @@ impl Loader<Parsed> {
             });
         }
 
-        // Slow path: read file, parse, and populate the cache.
-        let data = config
-            .platform
-            .fs()
-            .read(binary_path)
-            .map_err(|e| RuntimeError::Io {
-                path: binary_path.to_path_buf(),
-                source: e,
-            })?;
-
-        let parsed_result = macho_parse::parse_auto(&data, macho_types::CpuType::Arm64)?;
+        let parsed_result = macho_parse::parse_auto(&source_data, macho_types::CpuType::Arm64)?;
         tracer.record(
             EventKind::Pipeline,
             format!(
@@ -83,19 +84,26 @@ impl Loader<Parsed> {
             ),
         );
 
-        // Convert to Arc types — zero-copy for thin binaries, slice copy for fat.
-        let main_data: Arc<[u8]> = if macho_parse::is_fat(&data) {
-            let slice = macho_parse::fat_slice_for_cpu(&data, macho_types::CpuType::Arm64)?;
+        // Keep complete source bytes for the cache digest; map only the
+        // selected architecture slice for a universal/fat executable.
+        let main_data: Arc<[u8]> = if macho_parse::is_fat(&source_data) {
+            let slice = macho_parse::fat_slice_for_cpu(&source_data, macho_types::CpuType::Arm64)?;
             Arc::from(slice)
         } else {
-            Arc::from(data)
+            source_data.clone()
         };
         let parsed: Arc<ParsedMachO> = Arc::new(parsed_result);
 
         let canonical = binary_path
             .canonicalize()
             .unwrap_or_else(|_| binary_path.to_path_buf());
-        insert_both(binary_path, canonical, main_data.clone(), parsed.clone());
+        insert_both(
+            binary_path,
+            canonical,
+            &source_data,
+            main_data.clone(),
+            parsed.clone(),
+        );
 
         Ok(Loader {
             inner: LoaderInner {

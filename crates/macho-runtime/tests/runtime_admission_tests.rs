@@ -472,7 +472,12 @@ fn inserted_and_main_roots_share_an_admitted_dependency() {
         .map_images()
         .expect("map shared dependency once");
     assert_eq!(mapped.images_loaded(), 4);
-    assert_eq!(*seen.lock().unwrap(), vec![main, first, second, shared]);
+    // The shared image is mapped once, but each of the three loader-to-image
+    // edges (main, first inserted root, second inserted root) is admitted.
+    assert_eq!(
+        *seen.lock().unwrap(),
+        vec![main, first, second, shared.clone(), shared.clone(), shared]
+    );
 }
 
 #[test]
@@ -493,7 +498,9 @@ fn inserted_dependency_cycles_terminate_without_duplicate_mapping() {
         .map_images()
         .expect("map cyclic graph");
     assert_eq!(mapped.images_loaded(), 4);
-    assert_eq!(*seen.lock().unwrap(), vec![main, inserted, a, b]);
+    // The back-edge to A is admitted again, but its canonical path/content
+    // identity has already been expanded, so it is not mapped or expanded twice.
+    assert_eq!(*seen.lock().unwrap(), vec![main, inserted, a.clone(), b, a]);
 }
 
 #[test]
@@ -547,6 +554,106 @@ fn parent_relative_dependencies_are_resolved_before_name_normalization() {
             expected.extend(inserted.iter().cloned());
             expected.push(denied.clone());
             assert_eq!(*seen.lock().unwrap(), expected);
+        }
+    }
+}
+
+#[test]
+fn every_route_admits_each_resolved_loader_edge_before_alias_reuse() {
+    let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let directory = FixtureDirectory::new();
+    let main = directory.write(
+        "main",
+        2,
+        &["@loader_path/one/root.dylib", "@loader_path/two/root.dylib"],
+    );
+    let first_root = directory.write("one/root.dylib", 6, &["@loader_path/child.dylib"]);
+    let second_root = directory.write("two/root.dylib", 6, &["@loader_path/child.dylib"]);
+    let first_child = directory.write("one/child.dylib", 6, &[]);
+    let second_child = directory.write("two/child.dylib", 6, &[]);
+    let mut second_bytes = std::fs::read(&second_child).unwrap();
+    let last = second_bytes.len() - 1;
+    second_bytes[last] = 0x5a;
+    std::fs::write(&second_child, second_bytes).unwrap();
+
+    for route in ROUTES {
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let config = config_for(&main, &second_child, &seen);
+        assert_denied(route, route.load(&main, config));
+        assert_eq!(
+            *seen.lock().unwrap(),
+            vec![
+                main.clone(),
+                first_root.clone(),
+                second_root.clone(),
+                first_child.clone(),
+                second_child.clone(),
+            ]
+        );
+    }
+}
+
+#[test]
+fn every_route_rejects_distinct_bytes_for_the_same_dependency_install_name() {
+    let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let directory = FixtureDirectory::new();
+    let main = directory.write(
+        "main",
+        2,
+        &["@loader_path/one/root.dylib", "@loader_path/two/root.dylib"],
+    );
+    directory.write("one/root.dylib", 6, &["@loader_path/child.dylib"]);
+    directory.write("two/root.dylib", 6, &["@loader_path/child.dylib"]);
+    directory.write("one/child.dylib", 6, &[]);
+    let second_child = directory.write("two/child.dylib", 6, &[]);
+    let mut second_bytes = std::fs::read(&second_child).unwrap();
+    let last = second_bytes.len() - 1;
+    second_bytes[last] = 0xa5;
+    std::fs::write(&second_child, second_bytes).unwrap();
+
+    for route in ROUTES {
+        let mut config = RuntimeConfig::permissive(&main);
+        config.shim_set.objc = false;
+        config.shim_set.foundation = false;
+        match route.load(&main, config) {
+            Err(RuntimeError::SecurityDenied { reasons }) => assert!(
+                reasons
+                    .iter()
+                    .any(|reason| reason.contains("install-name collision")),
+                "{route:?}: unexpected denial: {reasons:?}"
+            ),
+            other => panic!("{route:?}: expected fail-closed alias collision, got {other:?}"),
+        }
+    }
+}
+
+#[test]
+fn every_route_rejects_distinct_inserted_roots_with_the_same_basename() {
+    let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let directory = FixtureDirectory::new();
+    let main = directory.write("main", 2, &[]);
+    let first = directory.write("plugins/one/duplicate.dylib", 6, &[]);
+    let second = directory.write("plugins/two/duplicate.dylib", 6, &[]);
+    let mut second_bytes = std::fs::read(&second).unwrap();
+    let last = second_bytes.len() - 1;
+    second_bytes[last] = 0x3c;
+    std::fs::write(&second, second_bytes).unwrap();
+
+    for route in ROUTES {
+        let mut config = RuntimeConfig::permissive(&main);
+        config.shim_set.objc = false;
+        config.shim_set.foundation = false;
+        config.insert_libraries = vec![first.clone(), second.clone()];
+        match route.load(&main, config) {
+            Err(RuntimeError::SecurityDenied { reasons }) => assert!(
+                reasons
+                    .iter()
+                    .any(|reason| reason.contains("insert-library install-name collision")),
+                "{route:?}: unexpected denial: {reasons:?}"
+            ),
+            other => {
+                panic!("{route:?}: expected fail-closed inserted-root collision, got {other:?}")
+            }
         }
     }
 }

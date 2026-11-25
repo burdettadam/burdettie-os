@@ -34,26 +34,28 @@ pub(super) fn run_native(
         config.platform.clone(),
     )));
 
-    // 1–2. Read + parse — fast path returns cached Arc<[u8]> + Arc<ParsedMachO>
-    // without any file I/O or realpath syscalls on iterations after the first.
-    let (main_data, arc_parsed) = if let Some(cached) = crate::parse_cache::lookup(binary_path) {
+    // Read the current source revision before consulting the parse cache. A
+    // path-only cache hit must never reuse a parse for replaced executable bytes.
+    let source_data = config
+        .platform
+        .fs()
+        .read(binary_path)
+        .map_err(|e| RuntimeError::Io {
+            path: binary_path.to_path_buf(),
+            source: e,
+        })?;
+    let source_data: std::sync::Arc<[u8]> = std::sync::Arc::from(source_data);
+    let (main_data, arc_parsed) = if let Some(cached) =
+        crate::parse_cache::lookup(binary_path, &source_data)
+    {
         cached
     } else {
-        // Slow path: read file and parse, then populate cache.
-        let data = config
-            .platform
-            .fs()
-            .read(binary_path)
-            .map_err(|e| RuntimeError::Io {
-                path: binary_path.to_path_buf(),
-                source: e,
-            })?;
-        let parsed_result = macho_parse::parse_auto(&data, macho_types::CpuType::Arm64)?;
-        let main_data: std::sync::Arc<[u8]> = if macho_parse::is_fat(&data) {
-            let slice = macho_parse::fat_slice_for_cpu(&data, macho_types::CpuType::Arm64)?;
+        let parsed_result = macho_parse::parse_auto(&source_data, macho_types::CpuType::Arm64)?;
+        let main_data: std::sync::Arc<[u8]> = if macho_parse::is_fat(&source_data) {
+            let slice = macho_parse::fat_slice_for_cpu(&source_data, macho_types::CpuType::Arm64)?;
             std::sync::Arc::from(slice)
         } else {
-            std::sync::Arc::from(data)
+            source_data.clone()
         };
         let arc_parsed = std::sync::Arc::new(parsed_result);
         let canonical = binary_path
@@ -62,6 +64,7 @@ pub(super) fn run_native(
         crate::parse_cache::insert_both(
             binary_path,
             canonical,
+            &source_data,
             main_data.clone(),
             arc_parsed.clone(),
         );

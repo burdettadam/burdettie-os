@@ -1,9 +1,11 @@
 //! BFS dependency loading and dylib path resolution.
 
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+
+use sha2::{Digest, Sha256};
 
 use macho_exec::{normalize_install_name, ImageRegistry};
 use macho_parse::{parse, ParsedMachO};
@@ -105,6 +107,7 @@ fn load_dependencies_from_root(
     config: &RuntimeConfig,
 ) -> Result<DependencyLoadStats, RuntimeError> {
     let mut queue: VecDeque<(String, Vec<String>, PathBuf)> = VecDeque::new();
+    let mut expanded_images: HashSet<(PathBuf, [u8; 32])> = HashSet::new();
     let mut stats = DependencyLoadStats::default();
 
     // Seed with this root's direct dependencies and its own loader directory.
@@ -121,10 +124,6 @@ fn load_dependencies_from_root(
 
     while let Some((raw_name, rpaths, loader_dir)) = queue.pop_front() {
         let install_name = normalize_install_name(&raw_name);
-        if registry.get(&install_name).is_some() {
-            stats.already_loaded_skipped += 1;
-            continue; // already loaded
-        }
 
         runtime_diagnostics::emit(DiagEvent::ResourceRequest {
             kind: "dylib".into(),
@@ -189,15 +188,37 @@ fn load_dependencies_from_root(
         // the main executable before its children are considered or it is mapped.
         crate::security::evaluate_security(&sub_parsed, &path, config)?;
 
-        // Enqueue sub-dependencies
-        let sub_rpaths = sub_parsed.rpaths.clone();
-        let sub_loader_dir = path.parent().unwrap_or(binary_dir).to_path_buf();
-        for sub_dlib in &sub_parsed.dylibs {
-            if is_system_library(&sub_dlib.name) {
-                stats.system_libraries_skipped += 1;
-                continue;
+        // A normalized install name is an alias, not an identity. Resolve and
+        // inspect the actual file before reusing an existing registry entry.
+        let already_loaded = if let Some(existing) = registry.get(&install_name) {
+            if existing.data.as_ref() != dylib_data.as_slice() {
+                return Err(RuntimeError::SecurityDenied {
+                    reasons: vec![format!(
+                        "install-name collision for {install_name}: {} resolves to different bytes than the already mapped image",
+                        path.display()
+                    )],
+                });
             }
-            if registry.get(&sub_dlib.name).is_none() {
+            stats.already_loaded_skipped += 1;
+            true
+        } else {
+            false
+        };
+
+        // Expand each resolved file identity once, not each install-name alias.
+        // This preserves @loader_path semantics when two directories contain
+        // images with the same relative install name.
+        let canonical_path = path.canonicalize().unwrap_or_else(|_| path.clone());
+        let content_digest: [u8; 32] = Sha256::digest(&dylib_data).into();
+        let expansion_key = (canonical_path, content_digest);
+        if expanded_images.insert(expansion_key) {
+            let sub_rpaths = sub_parsed.rpaths.clone();
+            let sub_loader_dir = path.parent().unwrap_or(binary_dir).to_path_buf();
+            for sub_dlib in &sub_parsed.dylibs {
+                if is_system_library(&sub_dlib.name) {
+                    stats.system_libraries_skipped += 1;
+                    continue;
+                }
                 stats.subdeps_enqueued += 1;
                 stats.deps_enqueued += 1;
                 queue.push_back((
@@ -206,6 +227,10 @@ fn load_dependencies_from_root(
                     sub_loader_dir.clone(),
                 ));
             }
+        }
+
+        if already_loaded {
+            continue;
         }
 
         let load_start = Instant::now();
@@ -319,10 +344,6 @@ pub(crate) fn load_insert_libraries(
             .and_then(|n| n.to_str())
             .unwrap_or("insert_lib")
             .to_string();
-        if registry.get(&install_name).is_some() {
-            log::debug!("insert library already loaded: {install_name}");
-            continue;
-        }
         let data = match fs.read(path) {
             Ok(d) => d,
             Err(e) => {
@@ -343,6 +364,20 @@ pub(crate) fn load_insert_libraries(
         // Inserted libraries are executable inputs too; reject them before mapping.
         crate::security::evaluate_security(&parsed, path, config)?;
         let parsed = Arc::new(parsed);
+        if let Some(existing) = registry.get(&install_name) {
+            if existing.data.as_ref() != data.as_slice() {
+                return Err(RuntimeError::SecurityDenied {
+                    reasons: vec![format!(
+                        "insert-library install-name collision for {install_name}: {} resolves to different bytes than the already mapped image",
+                        path.display()
+                    )],
+                });
+            }
+            log::debug!("insert library alias already mapped with identical bytes: {install_name}");
+            let loader_dir = path.parent().unwrap_or(Path::new(".")).to_path_buf();
+            roots.push((parsed, loader_dir));
+            continue;
+        }
         match registry.load_preparsed(&install_name, parsed.clone(), Arc::from(data)) {
             Ok(_) => {
                 log::info!("DYLD_INSERT_LIBRARIES: loaded {}", path.display());
