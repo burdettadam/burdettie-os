@@ -1,5 +1,7 @@
 # M1 libtapi source staging
 
+> Scope update, 2026-11-25: this component/reference record retains its original source and evidence scope. Current product work follows [ADR 0003](../adr/0003-linux-foundation-and-upstream-reuse.md) and the [Linux M1 plan](M1_PLATFORM_SECURITY.md). PureDarwin build/guest instructions below are optional reference or upstream-qualification work, not shipping prerequisites or the default next task. Existing receipts do not qualify the new Linux target.
+
 This opt-in recipe reduces the writable source copy for the pinned native
 linker's `apple-libtapi` dependency. It preserves the complete immutable source
 input and changes only the derivation's unpack phase. The existing

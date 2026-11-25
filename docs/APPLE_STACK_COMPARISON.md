@@ -1,5 +1,7 @@
 # Apple Stack Comparison
 
+> Historical implementation comparison: counts and broad completion labels below are not current qualification evidence or rewrite goals. [ADR 0003](adr/0003-linux-foundation-and-upstream-reuse.md) selects Linux, Rust bridges and upstream contributions. In particular, current `mach_msg` handles three selected MIG routines, not general Mach IPC; see the [research register](RESEARCH_QUESTIONS.md).
+
 How burdettieOS maps to Apple's real system stack, layer by layer.
 
 ```

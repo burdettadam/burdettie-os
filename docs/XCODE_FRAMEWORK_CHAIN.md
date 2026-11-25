@@ -1,5 +1,7 @@
 # Xcode IDE Framework Chain: Linux-First Architecture
 
+> Strategy scope, 2026-11-25: this is a historical imported-tool dependency investigation. [ADR 0003](adr/0003-linux-foundation-and-upstream-reuse.md) and the [developer-tool plan](XCODE_PUBLIC_COMPATIBILITY_PLAN.md) govern new work: Linux-native tools, upstream compilers/language services/debuggers, and bounded Mach-O compatibility. The custom Rust resolution/stub expansion below is not a requirement to reproduce every private Xcode framework.
+
 ## Design Principle
 
 **Linux in Docker is the primary target.**  The loader must resolve every

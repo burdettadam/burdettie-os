@@ -1,4 +1,6 @@
-# M1 Darwin backend allocation
+# Historical M1 Darwin backend allocation
+
+> Superseded for product planning on 2026-11-25 by [ADR 0003](../adr/0003-linux-foundation-and-upstream-reuse.md) and the [Linux allocation](LINUX_BACKEND_ALLOCATION.md). The source findings, target identities and statuses below describe the historical PureDarwin experiment only. Its JSON is retained for the reference tooling; it is not the selected shipping backend and does not qualify Linux controls.
 
 The [machine-readable allocation](backends/puredarwin-x86_64.json) assigns all 17
 control families to engineering owners, inspected source, candidate mechanisms,

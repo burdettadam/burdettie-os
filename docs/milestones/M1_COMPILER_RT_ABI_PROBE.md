@@ -1,5 +1,7 @@
 # M1 compiler-runtime arithmetic and calling-convention fixture
 
+> Scope update, 2026-11-25: this component/reference record retains its original source and evidence scope. Current product work follows [ADR 0003](../adr/0003-linux-foundation-and-upstream-reuse.md) and the [Linux M1 plan](M1_PLATFORM_SECURITY.md). PureDarwin build/guest instructions below are optional reference or upstream-qualification work, not shipping prerequisites or the default next task. Existing receipts do not qualify the new Linux target.
+
 This change adds executable test code, rather than another assertion that an
 archive exists. It prepares the compiler-runtime part of the M1 runtime-ABI
 lane. **It does not close the selected PureDarwin build or guest-execution gate.**

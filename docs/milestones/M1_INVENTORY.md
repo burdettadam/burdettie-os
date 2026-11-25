@@ -1,5 +1,7 @@
 # M1 application and hardware inventory
 
+> Scope update, 2026-11-25: this component/reference record retains its original source and evidence scope. Current product work follows [ADR 0003](../adr/0003-linux-foundation-and-upstream-reuse.md) and the [Linux M1 plan](M1_PLATFORM_SECURITY.md). PureDarwin build/guest instructions below are optional reference or upstream-qualification work, not shipping prerequisites or the default next task. Existing receipts do not qualify the new Linux target.
+
 The initial M1 reference platform is the Linux-hosted x86_64 Darwin VM. This collector supports later application and physical-hardware qualification; a Mac inventory is not required to close M1. An existing `.app` can be inspected on Linux or Windows with `--no-hardware`, without running it or invoking Apple's `codesign` tool.
 
 Run this passive collector on the intended Mac. It does not launch the selected

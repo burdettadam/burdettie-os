@@ -1,5 +1,7 @@
 # Architecture Plan — burdettie-os
 
+> Product strategy updated 2026-11-25: [ADR 0003](adr/0003-linux-foundation-and-upstream-reuse.md) makes Linux the shipping foundation and prioritizes upstream reuse with Rust interfaces. The loader design below is a component reference, not a requirement to recreate the complete stack. New work follows the [roadmap](roadmap.md) and [research register](RESEARCH_QUESTIONS.md).
+
 > A Rust-based Mach-O loader laboratory aligned with Apple's dyld architecture,
 > POSIX dynamic linking standards, and Darwin security model.
 

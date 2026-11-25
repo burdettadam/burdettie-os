@@ -1,36 +1,42 @@
 # Apple Application Targeting Plan
 
+> Strategy scope, 2026-11-25: [ADR 0003](adr/0003-linux-foundation-and-upstream-reuse.md) selects Linux plus qualified compatibility routes. Treat the target/dependency analysis below as input, not a mandatory custom-framework implementation schedule. The current [M1 plan](milestones/M1_PLATFORM_SECURITY.md) and [research register](RESEARCH_QUESTIONS.md) define application/version selection and reuse experiments.
+
 ## Goal
 
-Build toward a bootable Darwin-compatible Burdettie OS that runs named Apple
-applications with selectable security. Keep compatibility evidence independently
-verifiable. Linux and Docker remain development and validation lanes; they do
-not define the shipping OS substrate.
+Build a bootable Linux-based Burdettie OS that runs named Apple application
+workflows through qualified compatibility routes, with owner-selectable policy.
+Linux is the shipping kernel and runtime foundation. Docker remains a useful
+development/component environment; its results do not qualify a bootable image.
 
 The active initial target and acceptance contract is
 [M1 platform and security contracts](milestones/M1_PLATFORM_SECURITY.md): a
-Linux-built x86_64 Darwin VM and source-owned guest fixtures. Stickies remains
+Linux x86_64 evaluation lane, source-owned fixtures and an upstream-runtime
+comparison. PureDarwin is a source/test partner with an optional reference VM.
+Stickies remains
 the first Apple-authored GUI candidate for M4; its availability and physical Mac
 testing do not block M1. The broader corpus tiers below guide later expansion.
 Exact app version, architecture, dependency graph and useful behavior must be
 recorded before a candidate is described as supported.
 
-This is not a license to chase every Apple-private dependency tree. It is a
-priority rule: when two pieces of work are both plausible, prefer the one that
-unlocks more real Apple application behavior.
+Within application-compatibility work, prefer reusable implementations and
+shared fixes that enable a named real workflow. Do not expand private-framework
+stubs solely to improve startup counts. Native Linux developer and desktop
+workflows have their own first-class milestones in the current roadmap.
 
 ## Operational Context
 
 - Earlier runtime experiments used an external Docker Compose deployment of
   burdettie. Its Compose file is not present in this repository; it remains a
-  compatibility lane alongside the Linux-built Darwin VM selected for M1.
+  historical compatibility lane, not the definition of the selected Linux image.
 - The current Linux container workflow already stages a Mac-extracted Xcode tool
   corpus for compatibility testing. That is acceptable as a validation input for
   today, but application targeting should treat imported Apple artifacts as an
   optional validation overlay, not as the definition of the base runtime.
 - When a Mac reference host is available, its observations and legitimately
   staged application inputs can support comparison work. No Mac reference host
-  or proprietary application bundle is required for the M1 VM and fixture work.
+  or proprietary application bundle is required for native Linux integration,
+  source-owned fixtures or upstream library/package work.
 - Imported Apple artifacts may be required for compatibility testing in the
   current workflow, but the runtime substrate and build path must not require a
   live Apple host at execution time.
@@ -70,7 +76,7 @@ its repo-native applications.
 
 ## Strategic Bias
 
-### Prefer application-enabling work over tool-only wins
+### Within compatibility work, prefer application behavior over startup counts
 
 Additional banner or usage-output wins for Apple developer tools are lower
 priority than work that makes real app bundles launch, paint, respond to input,

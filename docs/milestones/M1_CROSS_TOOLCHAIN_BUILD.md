@@ -1,5 +1,7 @@
 # Bounded cross-toolchain realization
 
+> Scope update, 2026-11-25: this component/reference record retains its original source and evidence scope. Current product work follows [ADR 0003](../adr/0003-linux-foundation-and-upstream-reuse.md) and the [Linux M1 plan](M1_PLATFORM_SECURITY.md). PureDarwin build/guest instructions below are optional reference or upstream-qualification work, not shipping prerequisites or the default next task. Existing receipts do not qualify the new Linux target.
+
 [`build_puredarwin_cross_toolchain.py`](../../scripts/build_puredarwin_cross_toolchain.py)
 connects a retained cross-toolchain metadata plan to the existing
 [installed-wrapper inspector](M1_CROSS_TOOLCHAIN_INSPECTION.md). It is a source

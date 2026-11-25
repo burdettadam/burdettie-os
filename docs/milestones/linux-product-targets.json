@@ -1,0 +1,63 @@
+{
+  "kind": "product-target-plan",
+  "strategy_revision": "linux-2026-11-25",
+  "decision": "../adr/0003-linux-foundation-and-upstream-reuse.md",
+  "status": "planning_not_qualified",
+  "shipping_kernel": "linux",
+  "owned_interface_language": "rust",
+  "reuse_policy": "upstream_first_with_small_owned_adapters",
+  "initial_evaluation": {
+    "host_architecture": "x86_64",
+    "native_application_format": "ELF",
+    "compatibility_application_format": "Mach-O",
+    "compatibility_application_architecture": "x86_64",
+    "cpu_route": "same_isa",
+    "distribution": null,
+    "kernel_version": null,
+    "kernel_configuration_digest": null,
+    "image_digest": null,
+    "desktop_session": null,
+    "compatibility_backend_selection": null
+  },
+  "backend_candidates": [
+    {
+      "name": "existing_burdettie_runtime",
+      "reviewed_revision": "a55b71930e5aee279214daa934e084dba8863cfa",
+      "role": "baseline_and_reusable_components",
+      "qualification": "existing_receipts_only_no_new_product_qualification"
+    },
+    {
+      "name": "darling_complete_worker",
+      "reviewed_revision": "90af44da21d314b9acd24de1d1272e4aba8b9cc6",
+      "darlingserver_revision": "3604875f2d3fa46985e914650d23ce124f99ac27",
+      "role": "evaluation_candidate_not_adopted",
+      "qualification": "source_review_only"
+    }
+  ],
+  "puredarwin": {
+    "reviewed_revision": "0c1990c803c13b68cad4df3f6dc34ba4306fc789",
+    "role": "selected_source_tooling_shared_tests_optional_reference_vm",
+    "shipping_kernel_dependency": false
+  },
+  "application_candidate": {
+    "name": "Stickies",
+    "version": null,
+    "source_os": null,
+    "executable_digest": null,
+    "dependency_inventory": null,
+    "status": "candidate_pending_exact_inventory"
+  },
+  "public_document_fixture": {
+    "name": "BurdettieDocument",
+    "specification_version": "0.1.0",
+    "status": "specified_not_qualified"
+  },
+  "security": {
+    "contract": "../contracts/launch-policy-v1.md",
+    "allocation": "../contracts/LINUX_BACKEND_ALLOCATION.md",
+    "status": "no_new_linux_enforcement_qualification",
+    "missing_required_controls": "refuse_enforced_launch_before_initialization"
+  },
+  "resource_policy": "existing_resources_and_limits_no_new_paid_infrastructure",
+  "historical_reference_manifest": "m1-targets.json"
+}

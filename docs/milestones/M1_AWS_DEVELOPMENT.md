@@ -1,5 +1,7 @@
 # M1 development on the retained AWS host
 
+> Scope update, 2026-11-25: this component/reference record retains its original source and evidence scope. Current product work follows [ADR 0003](../adr/0003-linux-foundation-and-upstream-reuse.md) and the [Linux M1 plan](M1_PLATFORM_SECURITY.md). PureDarwin build/guest instructions below are optional reference or upstream-qualification work, not shipping prerequisites or the default next task. Existing receipts do not qualify the new Linux target.
+
 ## Current PureDarwin source selection — 2026-11-23
 
 The current candidate is PureDarwin `main` at `0c1990c803c13b68cad4df3f6dc34ba4306fc789`, not the prior `0163b2d` checkout. The current repository README documents `nix build .#image-minimal` and `nix run .#vm`. The official 20.5 image bootstrap and all source-specific plans/builds below remain historical evidence for their exact older inputs; they do not qualify the current main tree. The flake lock is unchanged, but the corecrypto submodule changed and the source tree is 155 commits newer. Fresh checkout, submodule verification, no-build evaluation and capacity review are required before any realization. See [the source refresh record](M1_PUREDARWIN_SOURCE_REFRESH_20261123.md).

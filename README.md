@@ -1,14 +1,14 @@
 # Burdettie-OS
 
-**A Rust laboratory for loading Mach-O binaries, implementing Darwin runtime behavior, and building a portable desktop.**
+**A Linux-based OS with our own UI, developer experience and owner-controlled trust, built by reusing and improving open-source foundations.**
 
-Burdettie-OS explores what it takes to run software built for macOS through an independently implemented loader and runtime. It brings together binary parsing, dependency resolution, Objective-C dispatch, Foundation-compatible APIs, ARM64 interpretation, and a software-rendered GUI. The project includes macOS and Linux platform backends, source-built test fixtures, command-line inspection tools, small desktop applications, and experimental semantic-memory services.
+Burdettie-OS builds on Linux for the shipping kernel, drivers and platform services. Rust provides owned interfaces, compatibility bridges, supervision and product logic where its strengths help. Native Linux applications and selected macOS application workflows are distinct targets. We prefer maintained upstream implementations and contribute general fixes to the projects that own them.
 
-This is an experimental systems project. Compatibility depends on the binary, CPU architecture, platform backend, and APIs it uses. The implementation is a user-space runtime; the host operating system still provides the kernel, memory management, files, and display services.
+The existing repository contains a user-space Mach-O loader/runtime, Rust shims, Objective-C and framework work, Linux and macOS platform backends, an ARM64 interpreter, source-owned fixtures, developer-tool adapters and GUI demonstrations. These are useful integration assets and regression baselines; they do not require us to maintain a separate implementation of every subsystem. Compatibility depends on the exact binary, CPU route, backend and APIs.
 
-The product goal is a bootable, Darwin-compatible OS that runs a named set of macOS applications with owner-selectable permissive, audit and enforced security. [M1 platform and security contracts](docs/milestones/M1_PLATFORM_SECURITY.md) define a Linux-built PureDarwin/XNU x86_64 VM as the initial reference platform, with a bounded boot feasibility experiment and shared launch contract. [Development without Mac hardware](docs/milestones/M1_WITHOUT_MAC.md) separates the immediate build/runtime work from later exact-application and physical-device qualification.
+The product goal is a bootable Linux-based system with Burdettie's own UI and developer experience, named application workflows and owner-selectable permissive, audit and enforced policy. [ADR 0003](docs/adr/0003-linux-foundation-and-upstream-reuse.md) makes Linux the explicit product foundation. The former PureDarwin/XNU shipping decision and eventual owned Rust-kernel transition are withdrawn. Rust is an implementation choice for useful interfaces, not a requirement to replace the kernel or shared userland.
 
-PureDarwin is the short-term platform and integration reference. The long-term destination is a Burdettie-owned Rust operating system, including its kernel and core userland, with Darwin compatibility demonstrated for declared application targets. We will replace platform dependencies in stages while continuing the current PureDarwin milestones. [ADR 0002: Rust platform transition](docs/adr/0002-rust-platform-transition.md) records the scope, sequence and acceptance gates.
+PureDarwin is a source, tooling and test partner. Reuse selected portable components and evaluate coherent upstream compatibility implementations for larger gaps. Darling is an evaluation candidate, not an adopted backend. The [research register](docs/RESEARCH_QUESTIONS.md), [upstream strategy](docs/UPSTREAM_STRATEGY.md) and [M1 Linux plan](docs/milestones/M1_PLATFORM_SECURITY.md) define the next experiments. A PureDarwin VM is optional reference infrastructure; its build/boot work is not on the shipping path.
 
 [Quick start](#quick-start) · [Architecture](#architecture) · [Engineering highlights](#engineering-highlights) · [Validation](#validation) · [Documentation](#documentation)
 
@@ -35,7 +35,20 @@ For a code review, begin with [`macho-runtime`](crates/macho-runtime), [`macho-p
 
 ## Quick start
 
-### Native macOS development
+### Native Linux development
+
+Start with the existing native developer-tool adapters and a host C compiler:
+
+```sh
+git clone https://github.com/burdettadam/burdettie-os.git
+cd burdettie-os
+cargo build --locked -p burdettie-xcode-tools --bins
+cargo test --locked -p burdettie-xcode-tools
+```
+
+Rust is pinned to **1.93.0**. The sample-project compile/run test returns early if no compiler is available, so record compiler availability before treating it as build evidence. The adapters are a bounded CLI/project subset, not a complete IDE. See the [Linux build guide](docs/BUILD.md) for broader runtime, Docker and GUI workflows and the [developer plan](docs/XCODE_PUBLIC_COMPATIBILITY_PLAN.md) for upstream compiler/LSP/debugger integration. Linux ELF output and Darwin Mach-O output require separate target configuration and qualification.
+
+### Optional native macOS reference workflow
 
 Use macOS 13 or later on Apple Silicon, Rust **1.93.0** as pinned in [`rust-toolchain.toml`](rust-toolchain.toml), and Xcode Command Line Tools. Parsing a file and executing it have different platform requirements; this walkthrough uses the native ARM64 execution path.
 
@@ -78,11 +91,13 @@ The scorecard describes the fixture set available in your checkout. The shell li
 
 ### Docker and Linux
 
-The repository also contains Linux runtime and browser-viewer development workflows in [`docker/Dockerfile.burdettie`](docker/Dockerfile.burdettie) and [`scripts/docker-gui.sh`](scripts/docker-gui.sh). The image builds its Rust binaries and LibreSSL from source. The ARM64 lane also builds an alternate-layout libc++ from a pinned LLVM release; its [build recipe, ABI smoke test, and upstream notices](docker/apple-libcxx/README.md) are included.
+The repository provides Linux runtime and browser-viewer development workflows in [`docker/Dockerfile.burdettie`](docker/Dockerfile.burdettie) and [`scripts/docker-gui.sh`](scripts/docker-gui.sh). The image builds its Rust binaries and LibreSSL from source. The ARM64 lane also builds an alternate-layout libc++ from a pinned LLVM release; its [build recipe, ABI smoke test, and upstream notices](docker/apple-libcxx/README.md) are included. These are development/runtime images, not a qualified bootable Linux release.
 
-Treat locally imported guest software as a separate development input. Imported tools are excluded from the default build context and can be mounted read-only for [local compatibility experiments](docker/xcode-tools/README.md). Use the native fixture walkthrough above as the first reproducible demonstration; guest compatibility still depends on the selected platform and interfaces.
+Treat locally imported guest software as a separate development input. Imported tools are excluded from the default build context and can be mounted read-only for [local compatibility experiments](docker/xcode-tools/README.md). Source-owned Mach-O fixtures and exact application inputs have their own build/provenance requirements; guest compatibility still depends on the selected platform and interfaces.
 
 ## Architecture
+
+The table inventories existing implementation assets. [ADR 0003](docs/adr/0003-linux-foundation-and-upstream-reuse.md) governs the product architecture: Linux underneath native applications and compatibility workers, Rust integration and owner policy, and reused desktop/developer components. An upstream worker may replace custom runtime components after qualification; the inventory is not a rewrite obligation.
 
 | Area | Main components | Responsibility |
 | --- | --- | --- |
@@ -101,7 +116,7 @@ The [feature reference](docs/FEATURES.md) provides the detailed subsystem invent
 
 The [CI workflow](.github/workflows/ci.yml) builds the project's own Mach-O fixtures. In [run 43343829535](https://github.com/burdettadam/burdettie-os/actions/runs/43343829535) for source commit `1bf44e2e552254c450d3a7a86cc55487e7f49b51`, native macOS ARM64 formatting, strict Clippy, debug/release builds, full workspace tests, GPU-feature tests, runtime packaging, README quick start, and C/Swift interop passed. Docker's 344 portable library tests and all 40 Linux ARM64 interpreter fixtures passed in their separate Linux environments.
 
-The security workflow remains failed for the unsuppressed `ttf-parser` maintenance advisory; [issue #2](https://github.com/burdettadam/burdettie-os/issues/2) tracks replacement of both font dependency paths. `cargo audit`, license/source policy, repository hygiene and reachable-history secret scanning passed. See the [revision-specific validation record](docs/PUBLICATION.md#validation-status) and [recovery manifest](docs/RECOVERY_MANIFEST.json) for environments, ignored tests, source preservation and runtime limits. These results describe the tested revision and inputs; framework and application coverage remains incremental.
+That historical checkpoint also recorded an unsuppressed font-maintenance advisory and separate passing audit/hygiene checks. See the [revision-specific validation record](docs/PUBLICATION.md#validation-status), [font backend reference](docs/FONT_BACKENDS.md) and [recovery manifest](docs/RECOVERY_MANIFEST.json) for their exact sources and scope. Historical CI does not qualify the current Linux image, a newly selected compatibility backend or enforced policy. The strategy update adds no new runtime passing-result claim.
 
 ## Scope and limitations
 
@@ -120,11 +135,14 @@ Source files, fixture generators, and documented expectations belong in version 
 
 | Guide | Contents |
 | --- | --- |
-| [M1 platform and security contracts](docs/milestones/M1_PLATFORM_SECURITY.md) | Current OS direction, target inventory, boot experiment, shared launch contract and alpha acceptance. |
+| [Linux product decision](docs/adr/0003-linux-foundation-and-upstream-reuse.md) | Accepted Linux foundation, Rust interfaces and upstream reuse; supersedes the XNU/Rust-kernel transition. |
+| [M1 platform and security contracts](docs/milestones/M1_PLATFORM_SECURITY.md) | Linux baseline, target/backend selection, shared launch contract and alpha acceptance. |
+| [Research questions](docs/RESEARCH_QUESTIONS.md) | Sourced findings, remaining decisions, bounded experiments and exit criteria. |
+| [Upstream strategy](docs/UPSTREAM_STRATEGY.md) | Reuse/contribution routing, first candidates and dependency/patch records. |
 | [Demo guide](docs/DEMO.md) | Showcase workflows and packaging. |
 | [Feature reference](docs/FEATURES.md) | Detailed runtime and tooling capabilities. |
-| [Rust platform transition](docs/adr/0002-rust-platform-transition.md) | PureDarwin as the short-term platform; staged replacement of userland and kernel with Burdettie-owned Rust implementations. |
-| [Roadmap](docs/roadmap.md) | Current milestones, the Rust transition track and historical runtime planning. |
+| [Developer-tool plan](docs/XCODE_PUBLIC_COMPATIBILITY_PLAN.md) | Our developer experience over upstream build, language-service and debugger tools. |
+| [Roadmap](docs/roadmap.md) | Linux product milestones, integration experiments and historical-reference boundaries. |
 | [FFI guide](docs/FFI_GUIDE.md) | Embedding, API examples, memory ownership, and thread-safety notes. |
 | [Technical manuscript](book/README.md) | Draft chapters explaining the loader, runtime, interpreter, and GUI. |
 | [Changelog](CHANGELOG.md) | Recorded project changes. |

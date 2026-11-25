@@ -1,5 +1,7 @@
 # Runtime Architecture — burdettie-os
 
+> Strategy scope, 2026-11-25: [ADR 0003](adr/0003-linux-foundation-and-upstream-reuse.md) governs the Linux product. This document retains the earlier runtime design, phase history and counts; current source is authoritative for implementation details. Existing shims/runtime are reusable assets and a comparison baseline, not mandatory replacements for every upstream component. Use the [research register](RESEARCH_QUESTIONS.md) before expanding them.
+
 > *Build the smallest usable macOS runtime layer above an already-strong
 > loader, and let real binaries decide what comes next.*
 

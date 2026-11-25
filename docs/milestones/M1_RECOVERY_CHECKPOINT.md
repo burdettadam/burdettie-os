@@ -1,5 +1,7 @@
 # M1 recovery checkpoint — November 16, 2026 (America/Denver)
 
+> Scope update, 2026-11-25: this component/reference record retains its original source and evidence scope. Current product work follows [ADR 0003](../adr/0003-linux-foundation-and-upstream-reuse.md) and the [Linux M1 plan](M1_PLATFORM_SECURITY.md). PureDarwin build/guest instructions below are optional reference or upstream-qualification work, not shipping prerequisites or the default next task. Existing receipts do not qualify the new Linux target.
+
 ## Recovery scope
 
 The available conversation artifacts were reconciled against public PR #3 at

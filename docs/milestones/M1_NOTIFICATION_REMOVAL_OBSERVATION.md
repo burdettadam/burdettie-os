@@ -1,5 +1,7 @@
 # Native block-token removal characterization and runtime correction
 
+> Scope update, 2026-11-25: this component/reference record retains its original source and evidence scope. Current product work follows [ADR 0003](../adr/0003-linux-foundation-and-upstream-reuse.md) and the [Linux M1 plan](M1_PLATFORM_SECURITY.md). PureDarwin build/guest instructions below are optional reference or upstream-qualification work, not shipping prerequisites or the default next task. Existing receipts do not qualify the new Linux target.
+
 ## Retained native evidence
 
 Diagnostic head `f0ac4612e31b67cfed38135f855f880584be3f74` ran in the existing
