@@ -17,6 +17,14 @@ programs and keeps dedicated recipes for dylib chains, categories and the
 framework fixture. Compiler or linker errors stop the build. GUI fixtures
 are compiled without launching their windows.
 
+The multi-source `m1_compiler_rt_probe` also has an explicit recipe. It generates
+the deterministic arithmetic vectors beside fresh copies of its sources, then
+builds and verifies a universal ARM64 + x86_64 `app`. The ARM64 slice keeps it in
+the existing native runtime compatibility gate; the x86_64 slice is a macOS SDK
+reference build. Compiler, generator and slice-verification failures stop the
+build. Failed temporary work remains available for diagnosis. This reference
+does not qualify the selected PureDarwin libraries, guest or runtime ABI.
+
 Most outputs are named `app`. The historical `return42`, `process_info`,
 `dispatch_test`, `objc_minimal`, and `objc_category` executable names remain
 available, with `app` symlinks for consumers that expect a common name.

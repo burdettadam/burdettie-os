@@ -1,0 +1,141 @@
+{
+  "schema_version": 1,
+  "scope": "recovered_source_reconciliation_not_guest_qualification",
+  "repository": "burdettadam/burdettie-os",
+  "branch": "milestone/m1-platform-security-contracts",
+  "public_base_commit": "4073ffcf59852c1ed92d94df53d917f92d227933",
+  "public_base_tree": "850b7c568bc4c42b2793edead70f4444defec700",
+  "main_unchanged_at_audit": "7bf375562ca9edf513c353da7ec3309c0337f457",
+  "local_overlay_tip": "d3aca41ea49c59d4ba4fe4f046b461f1af1504ed",
+  "local_overlay_is_separate_root": true,
+  "original_history_pushed": false,
+  "recovery_inventory": {
+    "top_level_zip_files": 11,
+    "unique_git_bundles": 8,
+    "all_bundle_tips_contained_in_latest_overlay": true,
+    "local_commits": 20,
+    "manifest_file_hashes_verified": 504,
+    "manifest_mismatches": 0,
+    "manifest_missing_files": 0
+  },
+  "path_disposition_counts": {
+    "already_published_identical": 35,
+    "merge_test_group_union": 1,
+    "restore_historical_guide": 3,
+    "retain_newer_published_guide": 1,
+    "retain_overlay_only_do_not_replace_repository_metadata": 5
+  },
+  "paths": [
+    {"path":".github/workflows/m1-contracts.yml","local_blob":"10ac949bb4f06f075daab725c94a9665b2223fc8","disposition":"already_published_identical","public_blob":"10ac949bb4f06f075daab725c94a9665b2223fc8"},
+    {"path":".gitignore","local_blob":"a160f494b397adda8d5741d811f8444558aa261a","disposition":"retain_overlay_only_do_not_replace_repository_metadata","public_blob":"fd195402bccbdf0228347193be295f0293f52bcb"},
+    {"path":"BASELINE.txt","local_blob":"0dc555c758e2cdc87c2f510953ccb4aec5ea2e11","disposition":"retain_overlay_only_do_not_replace_repository_metadata"},
+    {"path":"CODEX_HANDOFF.md","local_blob":"27f4db093c04fb54cab3a581f2c3ff84bf4661fe","disposition":"retain_overlay_only_do_not_replace_repository_metadata"},
+    {"path":"README.md","local_blob":"ca30f97882f4c36ed8aeea3dc1d095e135055466","disposition":"retain_overlay_only_do_not_replace_repository_metadata","public_blob":"b17fed10efa77f98f8cd2d8076435d6d1cde3d98"},
+    {"path":"VALIDATION.txt","local_blob":"ef58bcb85486d72eeb419d2f01bc723e4c04dc7f","disposition":"retain_overlay_only_do_not_replace_repository_metadata"},
+    {"path":"crates/libsystem-shims/src/pthread/attribute_lifetime_tests.rs","local_blob":"2e9a92c1a471012d005db140e63daadb32eabc4c","disposition":"already_published_identical","public_blob":"2e9a92c1a471012d005db140e63daadb32eabc4c"},
+    {"path":"crates/libsystem-shims/src/pthread/shims.rs","local_blob":"7f457651556cf9efb708fc62434c6e577d1bf538","disposition":"already_published_identical","public_blob":"7f457651556cf9efb708fc62434c6e577d1bf538"},
+    {"path":"crates/macho-runtime/tests/m1_thread_state_tests.rs","local_blob":"1d887d6c001ba8be827f91ec6e4c089775b8c08c","disposition":"already_published_identical","public_blob":"1d887d6c001ba8be827f91ec6e4c089775b8c08c"},
+    {"path":"docker/Dockerfile.dev","local_blob":"3e5206c92fcd4fa6d46912360d77c3fc56a70e0f","disposition":"already_published_identical","public_blob":"3e5206c92fcd4fa6d46912360d77c3fc56a70e0f"},
+    {"path":"docs/milestones/M1_COMPILER_RT_ABI_PROBE.md","local_blob":"397a4a62ed92c059012a8260926fb2267802636e","disposition":"retain_newer_published_guide","public_blob":"20771fe63cd7bd9d77af02db5576a7a3d2531be1"},
+    {"path":"docs/milestones/M1_COMPILER_RT_INSPECTOR.md","local_blob":"a6534561709ef96e52de6a7bb80945cfa92143b5","disposition":"restore_historical_guide","public_path":"docs/archive/m1-local-recovery/M1_COMPILER_RT_INSPECTOR.md"},
+    {"path":"docs/milestones/M1_COMPILER_RT_QUALIFICATION.md","local_blob":"14a214687a756e6f287d81bf815418127792af15","disposition":"restore_historical_guide","public_path":"docs/archive/m1-local-recovery/M1_COMPILER_RT_QUALIFICATION.md"},
+    {"path":"docs/milestones/M1_DYLD_EXECUTABLE_INSPECTION.md","local_blob":"ccd14caaea97350006cc38d6ffbf943c3f410c70","disposition":"already_published_identical","public_blob":"ccd14caaea97350006cc38d6ffbf943c3f410c70"},
+    {"path":"docs/milestones/M1_EVIDENCE_INTEGRATION.md","local_blob":"3fb6e37cc0c190672b294b8da8ecb5527101907d","disposition":"already_published_identical","public_blob":"3fb6e37cc0c190672b294b8da8ecb5527101907d"},
+    {"path":"docs/milestones/M1_LOCAL_EVIDENCE_CAPTURE.md","local_blob":"0c9099dba9223fccaff52fbbf6f5441289d10f4c","disposition":"restore_historical_guide","public_path":"docs/archive/m1-local-recovery/M1_LOCAL_EVIDENCE_CAPTURE.md"},
+    {"path":"docs/milestones/M1_OBSERVED_LINK_CAPTURE.md","local_blob":"60054ebf533ff50f521f20084bbdf7b1256d12b3","disposition":"already_published_identical","public_blob":"60054ebf533ff50f521f20084bbdf7b1256d12b3"},
+    {"path":"docs/milestones/M1_PTHREAD_ATTRIBUTE_LIFETIME.md","local_blob":"ff0a471b8f06de71b20d42a3e3571d3e26635d42","disposition":"already_published_identical","public_blob":"ff0a471b8f06de71b20d42a3e3571d3e26635d42"},
+    {"path":"docs/milestones/M1_THREAD_STATE_PROBE.md","local_blob":"f373e01b45a5c183cc50577cdb42043eba82821e","disposition":"already_published_identical","public_blob":"f373e01b45a5c183cc50577cdb42043eba82821e"},
+    {"path":"fixtures/m1_compiler_rt_probe/main.c","local_blob":"60ab4633c6dfe83d490e3d5d184b35a63eb4ebf2","disposition":"already_published_identical","public_blob":"60ab4633c6dfe83d490e3d5d184b35a63eb4ebf2"},
+    {"path":"fixtures/m1_compiler_rt_probe/probe.c","local_blob":"180537d074522994dc566097a35c4f1eea918c41","disposition":"already_published_identical","public_blob":"180537d074522994dc566097a35c4f1eea918c41"},
+    {"path":"fixtures/m1_compiler_rt_probe/probe.h","local_blob":"2b036b19fff44f67686ba50327dc1f2fb01b8df3","disposition":"already_published_identical","public_blob":"2b036b19fff44f67686ba50327dc1f2fb01b8df3"},
+    {"path":"fixtures/m1_thread_state_probe/probe.c","local_blob":"cdea5af88b97ddb3b3b665f3b7228282f0c3f18c","disposition":"already_published_identical","public_blob":"cdea5af88b97ddb3b3b665f3b7228282f0c3f18c"},
+    {"path":"scripts/capture_m1_link.py","local_blob":"3be1dd4dbaaffbbf6a0e807ea7f930ed0b382174","disposition":"already_published_identical","public_blob":"3be1dd4dbaaffbbf6a0e807ea7f930ed0b382174"},
+    {"path":"scripts/inspect_puredarwin_compiler_rt.py","local_blob":"1e3d86beadcf401f913ee0252c35b22b43b2bd9c","disposition":"already_published_identical","public_blob":"1e3d86beadcf401f913ee0252c35b22b43b2bd9c"},
+    {"path":"scripts/inspect_puredarwin_dyld.py","local_blob":"34693c2ab1d6c321d699a49656cd2ea5509d41a7","disposition":"already_published_identical","public_blob":"34693c2ab1d6c321d699a49656cd2ea5509d41a7"},
+    {"path":"scripts/m1_compiler_rt_vectors.py","local_blob":"8f37d246bd06e10add3287909d7450d156027293","disposition":"already_published_identical","public_blob":"8f37d246bd06e10add3287909d7450d156027293"},
+    {"path":"scripts/m1_evidence.py","local_blob":"79ff8756f5309798ae285c2b035cf7d9d889696e","disposition":"already_published_identical","public_blob":"79ff8756f5309798ae285c2b035cf7d9d889696e"},
+    {"path":"scripts/probe_m1_captured_link.py","local_blob":"28902cfcfedf97b89054db2418f53997defa62e0","disposition":"already_published_identical","public_blob":"28902cfcfedf97b89054db2418f53997defa62e0"},
+    {"path":"scripts/probe_m1_compiler_rt_abi.py","local_blob":"444f5d566c8373398342cc525681a174ddeba7a4","disposition":"already_published_identical","public_blob":"444f5d566c8373398342cc525681a174ddeba7a4"},
+    {"path":"scripts/probe_m1_local_toolchain.py","local_blob":"d5b10e958c1fb05190004a9b92449d60c3ae5ba0","disposition":"already_published_identical","public_blob":"d5b10e958c1fb05190004a9b92449d60c3ae5ba0"},
+    {"path":"scripts/run_m1_overlay_tests.py","local_blob":"32c663cd21e478c86c1ff36043d572bc26dc9170","disposition":"merge_test_group_union","public_blob":"1409fe1b8eadbfc3170d2f69cd894adc931c2f13","recovered_blob":"716bfb256463ef73aa25bf3396210e59e8907136"},
+    {"path":"scripts/tests/test_capture_m1_link.py","local_blob":"16ae351b4d46da82440062981facd73f61aac819","disposition":"already_published_identical","public_blob":"16ae351b4d46da82440062981facd73f61aac819"},
+    {"path":"scripts/tests/test_compiler_rt_regressions.py","local_blob":"4ea9ec595cca4bb249f030a3c5ed1351bdd08a65","disposition":"already_published_identical","public_blob":"4ea9ec595cca4bb249f030a3c5ed1351bdd08a65"},
+    {"path":"scripts/tests/test_dyld_layout_regressions.py","local_blob":"e0252bd86c708b60147e07b78dd9e6c6a972076a","disposition":"already_published_identical","public_blob":"e0252bd86c708b60147e07b78dd9e6c6a972076a"},
+    {"path":"scripts/tests/test_inspect_puredarwin_compiler_rt.py","local_blob":"814028caea3e410764b33fffcb2de79d85b5de39","disposition":"already_published_identical","public_blob":"814028caea3e410764b33fffcb2de79d85b5de39"},
+    {"path":"scripts/tests/test_inspect_puredarwin_dyld.py","local_blob":"a5cb55145a04b8bc4b7e2d98a07052ead386915b","disposition":"already_published_identical","public_blob":"a5cb55145a04b8bc4b7e2d98a07052ead386915b"},
+    {"path":"scripts/tests/test_m1_compiler_rt_abi.py","local_blob":"ba3ae870da46e4ca66c4476f271bcfb01c34260d","disposition":"already_published_identical","public_blob":"ba3ae870da46e4ca66c4476f271bcfb01c34260d"},
+    {"path":"scripts/tests/test_m1_evidence.py","local_blob":"e4be07c77e3603780dbee0f11f1e5e63d13f4c95","disposition":"already_published_identical","public_blob":"e4be07c77e3603780dbee0f11f1e5e63d13f4c95"},
+    {"path":"scripts/tests/test_m1_thread_state_probe.py","local_blob":"0694795ef66789c7c1e60009b76a16a4ae9761f6","disposition":"already_published_identical","public_blob":"0694795ef66789c7c1e60009b76a16a4ae9761f6"},
+    {"path":"scripts/tests/test_probe_m1_captured_link.py","local_blob":"5d122687356358a450a70ea1d055b8552f986e66","disposition":"already_published_identical","public_blob":"5d122687356358a450a70ea1d055b8552f986e66"},
+    {"path":"scripts/tests/test_probe_m1_local_toolchain.py","local_blob":"7a8db82a3916ad1f8b6e3cd39a0c1fbe010493f2","disposition":"already_published_identical","public_blob":"7a8db82a3916ad1f8b6e3cd39a0c1fbe010493f2"},
+    {"path":"scripts/tests/test_verify_compiler_rt_link.py","local_blob":"a338f4bb8c4a69e76fac7e9be99cbeb9b1948819","disposition":"already_published_identical","public_blob":"a338f4bb8c4a69e76fac7e9be99cbeb9b1948819"},
+    {"path":"scripts/validate_m1_thread_state.py","local_blob":"49cefe3362d0a17910a00863d5781cc53402f818","disposition":"already_published_identical","public_blob":"49cefe3362d0a17910a00863d5781cc53402f818"},
+    {"path":"scripts/verify_compiler_rt_link.py","local_blob":"3a2ef40909a693c682c8028f53f418877d722c0a","disposition":"already_published_identical","public_blob":"3a2ef40909a693c682c8028f53f418877d722c0a"}
+  ],
+  "preserved_local_history": [
+    {"local_commit":"50280a199cacc4814b6016bd5b7c40f0adc94dec","subject":"Add bounded static inspector for selected dyld executable"},
+    {"local_commit":"442a6ce1066b50cc788c37e81961907f4655c9cd","subject":"Harden dyld inspector and document Codex application"},
+    {"local_commit":"6ebe69bf6f3b4af69b980f1fac20c0dde1f83d66","subject":"Document selected compiler-rt qualification gates"},
+    {"local_commit":"9a7fc71733edd77cd080d187f059e446d48b3d2b","subject":"Add bounded compiler-rt archive inspector"},
+    {"local_commit":"12881153f26c3e86b40228144ddc154992e5c4ce","subject":"Verify compiler-rt ordinary archive link evidence"},
+    {"local_commit":"f437a71243d26acaed3881e063209d49c7eeb475","subject":"Harden compiler-rt archive and link evidence"},
+    {"local_commit":"416fcc14dfc9da42ab239c2cb01c4a3043451862","subject":"Record latest compiler-rt qualification handoff"},
+    {"local_commit":"f3699fcae57d9a43c65988ebcee344b78a77e7e2","subject":"Inventory compiler-rt archive member symbols"},
+    {"local_commit":"108c8e259540461b1d165a09d8d6ea91c67dcc0b","subject":"Ignore local Python test artifacts"},
+    {"local_commit":"9e8f599f75cc8d16e131a9e9caa9dbc25560bbbe","subject":"Bind compiler-rt link evidence and preserve failed local qualification"},
+    {"local_commit":"b27d1d31d64c0b32864271ef4330a8144854a7f1","subject":"Integrate recovered M1 evidence tooling and require an owned real-link CI probe"},
+    {"local_commit":"13968dc78af6dc2cb8b55864bc3a3338ac87f71d","subject":"Record published M1 integration and recovered real-link evidence"},
+    {"local_commit":"293f6a60a4f1d0ff9ce46d1b7b8faf43e10d2365","subject":"Observe reviewed linker invocations and qualify real rejection evidence"},
+    {"local_commit":"04a8cb74b33bce3bd8b50f267b5a027dfa6430cd","subject":"Add executable compiler-runtime arithmetic ABI fixture and host qualification lane"},
+    {"local_commit":"dc2825aa54a98a833897a8febd81e61630ca3f48","subject":"Refresh recovered overlay inputs to published ffca47d baseline"},
+    {"local_commit":"8db28268bf3cf7ec6fdfe3e90dad3979f56a4310","subject":"Add thread-state ABI fixture, real fault controls and isolated native runtime gate"},
+    {"local_commit":"bb44e303e9ccda76a3ec631b8eea29437ba79db6","subject":"Match pinned Rust formatting for native thread-state gate"},
+    {"local_commit":"f3884ceea1d42337c2ae04cfb4a3392ab55cf348","subject":"Retain exact public pthread and Docker baselines from 6257197"},
+    {"local_commit":"e3160ac6076a2137f3128e2b600149ae86d23aeb","subject":"Preserve pthread attributes across successful and failed thread creation"},
+    {"local_commit":"d3aca41ea49c59d4ba4fe4f046b461f1af1504ed","subject":"Record published pthread fix, actual CI test evidence and recovery boundaries"}
+  ],
+  "validation": {
+    "recovered_overlay_python_tests": {
+      "passed": 177,
+      "failed": 0,
+      "skipped": 0,
+      "exit_code": 0
+    },
+    "runner_union": {
+      "groups": 12,
+      "preserves_all_published_groups": true,
+      "preserves_all_recovered_groups": true,
+      "only_change_to_published_runner": "add test_m1_thread_state_probe.py"
+    },
+    "native_builder_tests_rerun_locally": false,
+    "full_ci_for_recovery_commit": "pending_at_preparation",
+    "gitleaks_for_recovery_commit": "pending_at_preparation",
+    "preceding_head_full_ci": {
+      "run_id": 43977720472,
+      "status": "success_previously_observed"
+    },
+    "preceding_head_hygiene": {
+      "run_id": 43977720483,
+      "status": "failure_previously_observed",
+      "findings": 2
+    }
+  },
+  "publication_exclusions": [
+    "unrelated overlay root history",
+    "generated Python bytecode in historical commits",
+    "raw execution logs and generated binaries",
+    "private cloud and recovery records",
+    "proprietary inputs"
+  ],
+  "access_limits": {
+    "browser_extension": "missing_originating_browser_context",
+    "direct_git_transport": "dns_resolution_unavailable",
+    "github_connector": "read_and_write_available",
+    "aws_disk_and_working_tree_reinspected": false
+  },
+  "qualification": {
+    "selected_guest_boot": "not_run",
+    "selected_runtime_abi": "not_run",
+    "selected_security_enforcement": "not_run"
+  }
+}

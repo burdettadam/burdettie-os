@@ -1,0 +1,402 @@
+{
+  "schema_version": 1,
+  "scope": "observed_published_runtime_component_ci_after_bounded_printf_change",
+  "status": "full_ci_passed_repository_hygiene_failed",
+  "observation_date": "2026-11-14",
+  "evidence_recorded_at_utc": "2026-11-14T20:33:42.261489+00:00",
+  "repository": "burdettadam/burdettie-os",
+  "pull_request": {
+    "number": 7,
+    "url": "https://github.com/burdettadam/burdettie-os/pull/7",
+    "draft_at_observation": true,
+    "merged_at_observation": false
+  },
+  "source": {
+    "head": "c6b40679da2a814008bc5f6ec030e784c369d0ff",
+    "head_tree": "424ada19eeb00c558c547fed3d39e8ded5c21c29",
+    "parent": "aade8484a773bfa88433526a2039084cc31d6b20",
+    "base": "7bf375562ca9edf513c353da7ec3309c0337f457",
+    "ci_merge": "c24a4af9e91ea1fea33bf83cabf04e33d8789b1b",
+    "ci_merge_tree": "424ada19eeb00c558c547fed3d39e8ded5c21c29",
+    "ci_merge_tree_matches_head": true
+  },
+  "historical_runtime_checkpoint": {
+    "evidence": "interpreted-printf-2026-11-14.json",
+    "bytes": 17825,
+    "sha256": "2ca506cbbeb725d13a8cdfdada2788654214b66fda00f99b787e572985eb097a",
+    "preserved_byte_for_byte": true,
+    "full_ci_at_that_checkpoint": "pending",
+    "this_receipt": "additive completed-CI checkpoint; does not rewrite the earlier observation"
+  },
+  "full_ci": {
+    "id": 43636498136,
+    "name": "CI",
+    "head_sha": "c6b40679da2a814008bc5f6ec030e784c369d0ff",
+    "event": "pull_request",
+    "status": "completed",
+    "conclusion": "success",
+    "created_at": "2026-11-14T20:15:12Z",
+    "updated_at": "2026-11-14T20:23:13Z",
+    "html_url": "https://github.com/burdettadam/burdettie-os/actions/runs/43636498136",
+    "run_attempt": 1
+  },
+  "jobs": [
+    {
+      "id": 132574341463,
+      "name": "Build native Mach-O fixtures",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-14T20:15:15Z",
+      "completed_at": "2026-11-14T20:16:32Z",
+      "labels": [
+        "macos-latest"
+      ],
+      "html_url": "https://github.com/burdettadam/burdettie-os/actions/runs/43636498136/job/132574341463"
+    },
+    {
+      "id": 132574341663,
+      "name": "README quickstart (macOS ARM64)",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-14T20:15:15Z",
+      "completed_at": "2026-11-14T20:17:12Z",
+      "labels": [
+        "macos-latest"
+      ],
+      "html_url": "https://github.com/burdettadam/burdettie-os/actions/runs/43636498136/job/132574341663"
+    },
+    {
+      "id": 132574341804,
+      "name": "Security Scanning",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-14T20:15:14Z",
+      "completed_at": "2026-11-14T20:15:43Z",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "html_url": "https://github.com/burdettadam/burdettie-os/actions/runs/43636498136/job/132574341804"
+    },
+    {
+      "id": 132574709543,
+      "name": "FFI Interop (C + Swift)",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-14T20:16:35Z",
+      "completed_at": "2026-11-14T20:18:38Z",
+      "labels": [
+        "macos-latest"
+      ],
+      "html_url": "https://github.com/burdettadam/burdettie-os/actions/runs/43636498136/job/132574709543"
+    },
+    {
+      "id": 132574709545,
+      "name": "Linux ARM64 E2E (Interpreter)",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-14T20:16:37Z",
+      "completed_at": "2026-11-14T20:23:12Z",
+      "labels": [
+        "ubuntu-24.04-arm"
+      ],
+      "html_url": "https://github.com/burdettadam/burdettie-os/actions/runs/43636498136/job/132574709545"
+    },
+    {
+      "id": 132574709551,
+      "name": "Build & Test",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-14T20:16:36Z",
+      "completed_at": "2026-11-14T20:21:07Z",
+      "labels": [
+        "macos-latest"
+      ],
+      "html_url": "https://github.com/burdettadam/burdettie-os/actions/runs/43636498136/job/132574709551"
+    },
+    {
+      "id": 132574709571,
+      "name": "Docker Dev Build",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-14T20:16:35Z",
+      "completed_at": "2026-11-14T20:17:38Z",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "html_url": "https://github.com/burdettadam/burdettie-os/actions/runs/43636498136/job/132574709571"
+    }
+  ],
+  "focused_log_evidence": {
+    "build_test_host": "aarch64-apple-darwin",
+    "arm64_translate": {
+      "passed": 506,
+      "failed": 0,
+      "ignored": 0
+    },
+    "new_owned_memory_tests": {
+      "passed": 4,
+      "names": [
+        "bounded_strings_reject_address_wraparound",
+        "export_requires_observation_identity_and_keeps_owned_bytes",
+        "strict_byte_reads_never_use_host_passthrough_or_export_code",
+        "observation_limits_and_reinitialization_retire_old_export"
+      ]
+    },
+    "observer_tests": {
+      "passed": 2,
+      "names": [
+        "constructor_reports_owned_bytes_and_reinitialization_invalidates",
+        "observer_is_nested_unwind_safe_and_not_inherited_by_workers"
+      ]
+    },
+    "admission": {
+      "passed": 17,
+      "failed": 0,
+      "ignored": 0
+    },
+    "lifecycle": {
+      "harness_passed": 1,
+      "isolated_child_cases": 17,
+      "case_count_source": "Reviewed unchanged lifecycle harness source; log reports its successful parent harness."
+    },
+    "shared_callback_budget": {
+      "harness_passed": 1,
+      "source_unchanged": true
+    },
+    "nsrange": {
+      "harness_passed": 1,
+      "isolated_child_cases": 15,
+      "host": "macOS ARM64; existing host-capture path",
+      "case_count_source": "Reviewed unchanged NSRange harness source; all child assertions are required by the parent."
+    },
+    "entitlement_report_passed_names": [
+      "parsed_allow_clears_obsolete_entitlement_denial",
+      "empty_keys_retain_legacy_entitlement_verdict",
+      "multiple_final_denials_are_preserved_in_gate_order",
+      "parsed_allow_does_not_clear_other_gate_denials",
+      "parsed_entitlement_denial_replaces_earlier_allow",
+      "warnings_and_signature_flags_survive_aggregation"
+    ],
+    "cfconstantstring_passed_names": [
+      "foundation::cfconstant_string::tests::class_storage_has_pointer_alignment",
+      "foundation::cfconstant_string::tests::class_symbol_preserves_constant_and_created_string_identity"
+    ],
+    "gpu_text_layout_cache": {
+      "passed": 257,
+      "failed": 0,
+      "ignored": 0
+    },
+    "linux_arm64": {
+      "runner_label": "ubuntu-24.04-arm",
+      "image_platform": "linux/arm64",
+      "toolchain_host": "1.93.0-aarch64-unknown-linux-gnu",
+      "passed": 40,
+      "failed": 0,
+      "ignored": 0,
+      "nocapture": true,
+      "missing_fixture_messages": 0,
+      "nscharacterset_fixture_observed": true,
+      "nscharacterset_output_lines_correct": true,
+      "x86_printf_adapter_executed": false
+    },
+    "fixture_presence_gate": {
+      "job_id": 132574341463,
+      "step": "Verify interpreter fixtures are present",
+      "conclusion": "success",
+      "verified_count": 40
+    },
+    "broader_workspace_ignored_tests": [
+      {
+        "suite": "perf_bench",
+        "passed": 219,
+        "ignored": 1
+      },
+      {
+        "suite": "libxo doctests",
+        "passed": 0,
+        "ignored": 1
+      }
+    ],
+    "no_blanket_no_skips_claim": true,
+    "x86_only_printf_harness_present_in_ARM_build_log": false
+  },
+  "dependency_policy": {
+    "vendor_retained_files": 76,
+    "omitted_binary_fixture_records": 34,
+    "audit": "passed",
+    "audit_remaining_warning": {
+      "package": "paste",
+      "version": "1.0.15",
+      "id": "RUSTSEC-2024-0436",
+      "kind": "unmaintained"
+    },
+    "deny_default": "passed",
+    "deny_linux_x86_64": "passed",
+    "deny_linux_arm64": "passed",
+    "prior_ttf_parser_failure_present": false,
+    "policy_exceptions_added": false
+  },
+  "repository_hygiene": {
+    "runs": [
+      {
+        "id": 43636498065,
+        "name": "Repository hygiene",
+        "head_sha": "c6b40679da2a814008bc5f6ec030e784c369d0ff",
+        "event": "pull_request",
+        "status": "completed",
+        "conclusion": "failure",
+        "created_at": "2026-11-14T20:15:12Z",
+        "updated_at": "2026-11-14T20:15:21Z",
+        "html_url": "https://github.com/burdettadam/burdettie-os/actions/runs/43636498065",
+        "run_attempt": 1,
+        "job": {
+          "id": 132574341229,
+          "name": "source-and-secrets",
+          "status": "completed",
+          "conclusion": "failure",
+          "html_url": "https://github.com/burdettadam/burdettie-os/actions/runs/43636498065/job/132574341229"
+        },
+        "tracked_artifact_check": {
+          "conclusion": "success",
+          "files": 1306
+        },
+        "history_scan": {
+          "conclusion": "failure",
+          "commits": 158,
+          "bytes": 19480622,
+          "findings": 2
+        }
+      },
+      {
+        "id": 43636493545,
+        "name": "Repository hygiene",
+        "head_sha": "c6b40679da2a814008bc5f6ec030e784c369d0ff",
+        "event": "push",
+        "status": "completed",
+        "conclusion": "failure",
+        "created_at": "2026-11-14T20:15:09Z",
+        "updated_at": "2026-11-14T20:15:18Z",
+        "html_url": "https://github.com/burdettadam/burdettie-os/actions/runs/43636493545",
+        "run_attempt": 1,
+        "job": {
+          "id": 132574328249,
+          "name": "source-and-secrets",
+          "status": "completed",
+          "conclusion": "failure",
+          "html_url": "https://github.com/burdettadam/burdettie-os/actions/runs/43636493545/job/132574328249"
+        },
+        "tracked_artifact_check": {
+          "conclusion": "success",
+          "files": 1306
+        },
+        "history_scan": {
+          "conclusion": "failure",
+          "commits": 158,
+          "bytes": 19480622,
+          "findings": 2
+        }
+      }
+    ],
+    "tracked_artifacts": {
+      "passed": true,
+      "count": 1306
+    },
+    "history_scan": {
+      "result": "failed",
+      "commits": 158,
+      "bytes": 19480622,
+      "findings": 2,
+      "gitleaks_version": "8.30.1",
+      "configuration_sha256": "c68175d649e93d620aff406ea95efc04f903d90872a7a0cd548c61a2131bfe0c",
+      "current_logs_expose_individual_fingerprints": false,
+      "current_head_reproduction_performed": false,
+      "historical_diagnosis_boundary": "Earlier exact-ref scans identified two public-source checksum findings. Current retained nonverbose logs establish the counts below, not a new observation of individual fingerprints."
+    },
+    "scanner_scope_or_configuration_changed": false,
+    "failure_waived": false
+  },
+  "local_x86_64_printf_evidence": {
+    "evidence": "interpreted-printf-2026-11-14.json",
+    "execution_host": "Linux x86_64",
+    "observed_before_published_component_ci": true,
+    "source_tree_equals_published_tree": true,
+    "memory_tests": 4,
+    "observer_tests": 2,
+    "bridge_harnesses": 8,
+    "printf_dispatch_children": 4,
+    "owned_export_children": 13,
+    "callback_budget_harnesses": 1,
+    "original_fixture_exit_code": 0,
+    "missing_fixture_skip": false,
+    "guest_stdout_bytes": 415,
+    "guest_stdout_sha256": "b7c07d4e81d2bd4d1a4293821950eb09874df5e1e3897aaf5c4dd5cefa7688b6",
+    "raw_stdout_bytes": 619,
+    "raw_stdout_sha256": "22cfb0a1d52e165fadcf55347260b296a3ee07bb892c7d42168f756ec3681f9f",
+    "nested_negative_control_preserved": true,
+    "nested_regression_after_passed": true,
+    "separate_core_clippy_probe": "failed:37 unchanged JIT dead-code diagnostics; no new allowance",
+    "architectural_limit": "ARM64 CI does not execute the x86_64-only printf adapter; these local source-bound runs supply that distinct evidence."
+  },
+  "retained_evidence": {
+    "final_private_ci_receipt": {
+      "bytes": 11976,
+      "sha256": "f15e6ea48a269e291f7bd9214957860912c2ed8623616249dc00d779e1258839"
+    },
+    "ci_metadata": {
+      "bytes": 108697,
+      "sha256": "29391c05f8de620ecf00d97ffa28c3578cd8f18d05a26254c09a022be434a8b8"
+    },
+    "logs": {
+      "security": {
+        "job_id": 132574341804,
+        "bytes": 716615,
+        "sha256": "dac1b01d8c8d4133f1b8ddb8e6e2cf7331b3c22fe5d887817f6d89cb29276fd4"
+      },
+      "hygiene_pull_request": {
+        "job_id": 132574341229,
+        "bytes": 14836,
+        "sha256": "2dc993c5bd78dfb6571f366c3283b2f8ade2cf4bcb2a449bff1f30497eac6c9b"
+      },
+      "hygiene_push": {
+        "job_id": 132574328249,
+        "bytes": 14051,
+        "sha256": "66a20d066150de5d6d846780b0f3cf77669f2e3c0d5f285095b06a02f51b15c0"
+      },
+      "build_and_test": {
+        "job_id": 132574709551,
+        "bytes": 962463,
+        "sha256": "1d0aff65d2613a51c38b6221d38fa030e5397685048cc4435a3f21b00eb94bb5"
+      },
+      "linux_arm64_interpreter": {
+        "job_id": 132574709545,
+        "bytes": 137473,
+        "sha256": "0c65d20a9f9a594022e7731317458cc8d1b73846a124cd5bcaed54e9e10a1bef"
+      },
+      "native_fixture_build": {
+        "job_id": 132574341463,
+        "bytes": 28371,
+        "sha256": "6d376258afe734f0d6d86f554c9ee2abf29be2f020c0b2a43f9bcb07ab144e81"
+      }
+    },
+    "complete_logs_retained": true,
+    "log_and_metadata_hashes_verified": true,
+    "raw_private_records_published": false
+  },
+  "qualification": {
+    "runtime_component_full_ci": "pass",
+    "dependency_policy_ci": "pass_with_retained_paste_unmaintained_warning",
+    "repository_hygiene": "fail_two_history_findings",
+    "all_required_checks_passed": false,
+    "local_x86_printf_adapter": "separate source-bound execution evidence; not executed by native ARM64 CI",
+    "m1_platform_checks": "not run by this component workflow; the combined feature head requires its own checks",
+    "combined_platform_head": "not qualified by this component run",
+    "selected_darwin_linker_guest_runtime": "not established by these checks",
+    "security_backend_enforcement": "not qualified",
+    "apple_application_workflow": "not_run",
+    "m1_complete": false,
+    "main_merged": false,
+    "scanner_or_policy_exceptions_added": false,
+    "failures_waived": false
+  },
+  "observation_boundary": "This records completed checks for the exact PR7 runtime component head. The earlier local Linux x86_64 tests establish its bounded printf adapter behavior. Native ARM64 CI exercises its existing route. These results do not replace exact combined-head CI or selected-Darwin linker, image, guest, runtime and security-backend qualification."
+}

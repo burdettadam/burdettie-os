@@ -100,6 +100,9 @@ use crate::ffi::FfiBridge;
 use crate::jit::JitCache;
 use crate::mem::Memory;
 
+#[cfg(test)]
+mod callback_tests;
+
 /// Why the interpreter stopped.
 #[derive(Debug, Clone)]
 pub enum ExitReason {
@@ -111,12 +114,20 @@ pub enum ExitReason {
     ReturnedToHost { lr: u64 },
     /// Hit the maximum instruction count.
     InstructionLimit { count: u64 },
+    /// Reentrant guest callbacks exceeded the bounded host recursion depth.
+    CallbackDepthLimit { limit: usize },
     /// Encountered an instruction the interpreter doesn't implement.
     Unimplemented { pc: u64, raw: u32 },
     /// Memory access fault.
     MemoryFault { pc: u64, addr: u64, is_write: bool },
     /// Branch to unmapped address (not FFI).
     BadBranch { pc: u64, target: u64 },
+    /// An explicitly typed FFI adapter rejected unsupported or unreadable input.
+    FfiRejected {
+        pc: u64,
+        target: u64,
+        reason: String,
+    },
 }
 
 /// Sentinel return address pushed as LR when calling main.
@@ -125,6 +136,7 @@ pub(super) const SENTINEL_LR: u64 = 0xDEAD_CAFE_FEED_F00D;
 
 /// Maximum instructions before forced exit (infinite loop guard).
 const MAX_INSTRUCTIONS: u64 = 100_000_000;
+const MAX_CALLBACK_DEPTH: usize = 64;
 
 /// Maximum number of instructions per basic block.
 ///
@@ -231,12 +243,14 @@ pub struct Interpreter {
     pub cpu: CpuState,
     pub mem: Memory,
     pub ffi: FfiBridge,
-    /// Number of instructions executed in the last `run()` call.
+    /// Total instructions in the latest top-level run, including callbacks.
     pub instruction_count: u64,
     /// Pre-decoded basic block cache (eliminates re-decode on hot paths).
     pub block_cache: BlockCache,
     /// JIT compilation cache for native execution of hot blocks.
     pub jit_cache: JitCache,
+    callback_depth: usize,
+    instruction_limit: u64,
 }
 
 impl Interpreter {
@@ -250,7 +264,15 @@ impl Interpreter {
             instruction_count: 0,
             block_cache: BlockCache::new(),
             jit_cache: jit,
+            callback_depth: 0,
+            instruction_limit: MAX_INSTRUCTIONS,
         }
+    }
+
+    /// Set the instruction budget for a top-level run and all of its callbacks.
+    /// This does not preempt native host FFI calls or establish a security limit.
+    pub fn set_instruction_limit(&mut self, limit: u64) {
+        self.instruction_limit = limit;
     }
 
     /// Run from the current PC until exit.
@@ -259,25 +281,78 @@ impl Interpreter {
     /// 1. Block cache for pre-decoded instruction sequences (cold paths)
     /// 2. JIT compilation for hot basic blocks (aarch64 hosts only)
     pub fn run(&mut self) -> ExitReason {
-        let mut count: u64 = 0;
+        self.instruction_count = 0;
+        let reason = self.run_inner();
+        if let Some(handler) = self.ffi.completion_handler() {
+            handler(self, reason)
+        } else {
+            reason
+        }
+    }
+
+    /// Execute a guest callback on this interpreter's existing stack/memory,
+    /// restoring the suspended call's CPU registers when the callback stops.
+    /// This does not reset the top-level instruction budget or run the launch
+    /// completion handler recursively. Exclusive reservations are invalidated.
+    pub fn call_guest_callback(&mut self, address: u64, argument: u64) -> ExitReason {
+        if self.callback_depth >= MAX_CALLBACK_DEPTH {
+            return ExitReason::CallbackDepthLimit {
+                limit: MAX_CALLBACK_DEPTH,
+            };
+        }
+        if !address.is_multiple_of(4) || self.mem.read_u32_mapped(address).is_none() {
+            return ExitReason::BadBranch {
+                pc: self.cpu.pc,
+                target: address,
+            };
+        }
+        let saved_cpu = self.cpu.clone();
+        self.cpu.pc = address;
+        self.cpu.x[0] = argument;
+        self.cpu.x[30] = SENTINEL_LR;
+        self.callback_depth += 1;
+        let reason = match self.run_inner() {
+            ExitReason::ReturnedToHost { lr } => ExitReason::BadBranch {
+                pc: self.cpu.pc,
+                target: lr,
+            },
+            reason => reason,
+        };
+        self.callback_depth -= 1;
+        self.cpu = saved_cpu;
+        // A callback may store to reserved memory or execute CLREX/LDXR/STXR.
+        // Restoring the snapshot must never resurrect the caller's reservation.
+        self.cpu.exclusive_monitor = None;
+        reason
+    }
+
+    fn run_inner(&mut self) -> ExitReason {
         loop {
-            if count >= MAX_INSTRUCTIONS {
-                self.instruction_count = count;
-                return ExitReason::InstructionLimit { count };
+            if self.instruction_count >= self.instruction_limit {
+                return ExitReason::InstructionLimit {
+                    count: self.instruction_count,
+                };
             }
 
             let pc = self.cpu.pc;
 
             // ── Tier 2: JIT execution for hot blocks ──────────────────────
-            if let Some(jit_fn) = self.jit_cache.get(pc) {
-                let insn_count =
-                    unsafe { jit_fn(&mut self.cpu as *mut _, &mut self.mem as *mut _) };
-                count += insn_count;
-                self.jit_cache.exec_count += 1;
-                // JIT block updates cpu.pc internally on success.
-                // If insn_count == 0, something went wrong; fall through to interpreter.
-                if insn_count > 0 {
-                    continue;
+            // Only run a complete compiled block if it fits the remaining
+            // shared budget. Interpret the tail one instruction at a time.
+            let cached_block_fits = self.block_cache.blocks.get(&pc).is_some_and(|block| {
+                block.len() as u64 <= self.instruction_limit - self.instruction_count
+            });
+            if cached_block_fits {
+                if let Some(jit_fn) = self.jit_cache.get(pc) {
+                    let insn_count =
+                        unsafe { jit_fn(&mut self.cpu as *mut _, &mut self.mem as *mut _) };
+                    self.instruction_count += insn_count;
+                    self.jit_cache.exec_count += 1;
+                    // JIT block updates cpu.pc internally on success.
+                    // If insn_count == 0, fall through to the interpreter.
+                    if insn_count > 0 {
+                        continue;
+                    }
                 }
             }
 
@@ -294,12 +369,14 @@ impl Interpreter {
             let block = Arc::clone(self.block_cache.blocks.get(&pc).unwrap());
 
             // ── Tier 2: Attempt JIT compilation for hot blocks ────────────
-            if self.jit_cache.is_hot(pc) {
+            if block.len() as u64 <= self.instruction_limit - self.instruction_count
+                && self.jit_cache.is_hot(pc)
+            {
                 if let Some(jit_fn) = self.jit_cache.compile(pc, &block) {
                     log::debug!("JIT compiled block at {pc:#x} ({} insns)", block.len());
                     let insn_count =
                         unsafe { jit_fn(&mut self.cpu as *mut _, &mut self.mem as *mut _) };
-                    count += insn_count;
+                    self.instruction_count += insn_count;
                     self.jit_cache.exec_count += 1;
                     if insn_count > 0 {
                         continue;
@@ -309,15 +386,20 @@ impl Interpreter {
 
             // ── Tier 0: Interpret the block ───────────────────────────────
             for (i, insn) in block.iter().enumerate() {
+                if self.instruction_count >= self.instruction_limit {
+                    return ExitReason::InstructionLimit {
+                        count: self.instruction_count,
+                    };
+                }
                 let insn_pc = pc + (i as u64) * 4;
-                count += 1;
+                self.instruction_count += 1;
                 match self.execute(*insn, insn_pc, 0) {
                     StepResult::Continue => {}
                     StepResult::Exit(reason) => {
-                        self.instruction_count = count;
                         log::info!(
-                            "Interpreter exited after {count} instructions \
+                            "Interpreter stopped after {} total instructions \
                              (cache: {}/{} hit rate {:.1}%, JIT: {} blocks, {} execs): {reason:?}",
+                            self.instruction_count,
                             self.block_cache.hits,
                             self.block_cache.hits + self.block_cache.misses,
                             self.block_cache.hit_rate() * 100.0,

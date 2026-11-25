@@ -1,0 +1,306 @@
+{
+  "schema_version": 1,
+  "scope": "observed_staged_libtapi_native_linker_metadata_plan",
+  "status": "planned_not_built",
+  "burdettie_revision": "e5ff8bf1fc332b6fc0c08dd904a38e8de34f8af4",
+  "source": {
+    "revision": "0163b2db225b85e3bf96fc25646ea290105ac298",
+    "lock": {
+      "sha256": "00c598d3efca4bbda302fec4a43fffbfa787dc642c8c0b2c4202c65339e684d0",
+      "nixpkgs_node": "nixpkgs_3",
+      "nixpkgs_revision": "fd1462031fdee08f65fd0b4c6b64e22239a77870"
+    },
+    "submodules": [
+      [
+        "f577aafe4b9a89727968666237d20cc51d2f770d",
+        "external/corecrypto"
+      ]
+    ]
+  },
+  "nix_version": "nix (Nix) 2.28.3",
+  "reviewed_private_driver_sha256": "9a1bb75c7454b18ab1db7bfbceb749e510f775c4eab3bc12f4d9ff1db4cbe165",
+  "successful_libtapi": {
+    "evidence": "libtapi-build-2026-11-14.json",
+    "burdettie_revision": "f8c59175784edb89e0087734d5020d142256297d",
+    "plan_result_sha256": "55c9bfc2f7445c925544e5bb2676a30a4033cedadd1b3c2df81cffb5f76f0b98",
+    "build_result_sha256": "19e3608980f168a45c25a1c13ed12b45702886e85d88faf10e5381a01dc9da2d",
+    "registered_output": {
+      "path_basename": "apk3lq9svmlncaipqzc4gw7a3mdcmsmc-apple-libtapi-1300.6.5",
+      "deriver_basename": "pzi6pfykji7lp60p9y7934rvanhqdyrh-apple-libtapi-1300.6.5.drv",
+      "nar_hash": "sha256-EXyvQDuHv90QIWHE5N3uc+AcSBOUKd634cxGkN6Ju60=",
+      "nar_size": 4940088
+    }
+  },
+  "sdk": {
+    "drv": "0nwq5lg8853m0rdvsncvjwyjk0dmffxd-puredarwin-oss-sdk-26.5.drv",
+    "out": "nnsb7h396vc5xmwn59kky88inslcdw1m-puredarwin-oss-sdk-26.5",
+    "identity_matches_expected": true
+  },
+  "upstream": {
+    "drv": "pi6rmr72l49nmzlgwsrvjvf92p0y4vlf-puredarwin-native-ld-0.1.drv",
+    "out": "zps2la9dxyrrk00svjh1d5ig2lkfdlwl-puredarwin-native-ld-0.1"
+  },
+  "previous_bounded": {
+    "drv": "sq9k9yvwrp9m9zkj5lsn4x10112hp9m8-puredarwin-native-ld-0.1.drv",
+    "out": "7kz4m6aipfdn9i1lps34lkn3ljm3slwg-puredarwin-native-ld-0.1"
+  },
+  "rebound_unbounded": {
+    "drv": "bnw6afwfb0656vaxwpfb1kijxih7rcp8-puredarwin-native-ld-0.1.drv",
+    "out": "vza2yfv8wf0c2z4qmqdbw68lqhqkmmkj-puredarwin-native-ld-0.1"
+  },
+  "candidate": {
+    "drv": "z0i9acp9rl54vmr877l37xmq7x11i525-puredarwin-native-ld-0.1.drv",
+    "out": "qhdkgmj1f26029524iiv8jsrhixlbazd-puredarwin-native-ld-0.1"
+  },
+  "recipe_sha256": "d493034708bb62dc8191590f2e86132727219e968d655f4fa48a3b40cd6d9d3c",
+  "unchanged_recipe_fields": {
+    "bootstrap_toolchain": true,
+    "install_phase": true,
+    "native_build_inputs": true,
+    "original_build_before_job_bound": true,
+    "other_build_inputs": true,
+    "other_configure_flags": true,
+    "sdk": true,
+    "source": true
+  },
+  "changed": {
+    "libtapi_build_inputs": 1,
+    "libtapi_configure_paths": 2,
+    "ninja_commands": 1
+  },
+  "configure_phase_sha256": {
+    "candidate": "e980c4e875db0a97428aa53cfb3c1b409d3ceeb8a43b252ebaca87f2707c98ee",
+    "upstream": "e158d526e25d33249292dfba31b9c378fc13af3bada8994d29dbbf55bc32daf9"
+  },
+  "build_phase_sha256": {
+    "candidate": "dd48749cb7d47db3408272f8eaeada0f589ea727ddc92349b9e2c7d6aacace1c",
+    "upstream": "59feef659b22a7433c7a3bd0d977fda005bc76030ea4dd684588547804303d5a"
+  },
+  "ninja_patch_sha256": "07a12f1ee8784dd0161723a90df2c4c802996d13c55dba4363670cf1475d8c0e",
+  "plan": {
+    "driver_started_at": "2026-11-14T20:18:07.155925+00:00",
+    "driver_finished_at": "2026-11-14T20:18:42.772359+00:00",
+    "phase_started_at": "2026-11-14T20:18:09.877282+00:00",
+    "phase_finished_at": "2026-11-14T20:18:42.082864+00:00",
+    "duration_seconds": 32.21,
+    "planning_mode": "substituter_metadata",
+    "substituter_metadata_queries_enabled": true,
+    "local_derivations": 9,
+    "planned_fetch_paths": 0,
+    "derivation_basenames": [
+      "700b8r24597p60rk4xmb2c23lljlzh5j-x86_64-apple-darwin20.4-otool.drv",
+      "hbcspjn0dd7kiak50yh6lcmbqm9x5clz-x86_64-apple-darwin20.4-lipo.drv",
+      "ndalv0397pl030rhhz0c2z46dpwy2n9q-x86_64-apple-darwin20.4-nm.drv",
+      "r3qhwb80l1nrd197bvfzpd53m996z0ai-x86_64-apple-darwin20.4-strip.drv",
+      "sdcqcd9m7ddig1kfq8jb1h9mqfnchgsx-x86_64-apple-darwin20.4-objdump.drv",
+      "xsb4hbh2yqix5610s5qkkp80vcr723xv-x86_64-apple-darwin20.4-install_name_tool.drv",
+      "zf0vw8cidavkq5r263vidslpglw6x01f-x86_64-apple-darwin20.4-ranlib.drv",
+      "s943cbhz142x42haymcb63409rvs007h-darwin-cross-toolchain-nix.drv",
+      "z0i9acp9rl54vmr877l37xmq7x11i525-puredarwin-native-ld-0.1.drv"
+    ],
+    "dry_run_exit_code": 0,
+    "dry_run_timed_out": false,
+    "dry_run_log": {
+      "bytes": 758,
+      "sha256": "7ff0e5f0d8a8fde0337803a453d21dfa32382532af77480bf98b641c4619948d"
+    },
+    "result": {
+      "bytes": 39297,
+      "sha256": "15ee24d7acfefbc78a40f809df41b7378f29c752425a4e70f016e15ddfff2f17"
+    },
+    "direct_local_store": true,
+    "lock_updates": false,
+    "import_from_derivation": false,
+    "dependency_realization": "not_run",
+    "dependency_downloads": "not_run"
+  },
+  "fresh_verification": {
+    "complete_source_inventory_rehashed": true,
+    "source_inventory_sha256": "37d3807502b72b8b98100430aa5c5c6bac63d780fa9b389d04872e73ed5bb5f1",
+    "libtapi_file_inventory_matches_successful_build": true,
+    "registered_outputs": {
+      "libtapi": {
+        "path_basename": "apk3lq9svmlncaipqzc4gw7a3mdcmsmc-apple-libtapi-1300.6.5",
+        "deriver_basename": "pzi6pfykji7lp60p9y7934rvanhqdyrh-apple-libtapi-1300.6.5.drv",
+        "nar_hash": "sha256-EXyvQDuHv90QIWHE5N3uc+AcSBOUKd634cxGkN6Ju60=",
+        "nar_size": 4940088
+      },
+      "sdk": {
+        "path_basename": "nnsb7h396vc5xmwn59kky88inslcdw1m-puredarwin-oss-sdk-26.5",
+        "deriver_basename": "0nwq5lg8853m0rdvsncvjwyjk0dmffxd-puredarwin-oss-sdk-26.5.drv",
+        "nar_hash": "sha256-uQbGCee5rNyPwpUOuwIsvcJl32ETr52Ne5W5L3GK5H4=",
+        "nar_size": 42750632
+      }
+    },
+    "read_checks": {
+      "path-info": {
+        "exit_code": 0,
+        "timed_out": false,
+        "stdout_sha256": "9069d0f0b7ec2e1324ed70b98ed504d48d742f0177d4e0f6cc78f8313200741b",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "store-verify": {
+        "exit_code": 0,
+        "timed_out": false,
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_sha256": "da5d333d548053061443da72b48bd0a48f8984c5df8ea921afe0cbdb9be0fdde"
+      }
+    },
+    "default_store_verification_passed": true,
+    "repair_or_verification_waiver": false,
+    "source_manifest_content_retrieved": false,
+    "full_source_manifest": {
+      "bytes": 3111190,
+      "sha256": "090b54ac4da796d4a59ee24df90f598f68c66a9af7eb81991335e1f32971ca74"
+    }
+  },
+  "observed_resources": {
+    "scope": "metadata and preparation only; not a native build peak",
+    "initial_free_disk_bytes": 9315315712,
+    "observed_min_free_disk_bytes": 9210847232,
+    "final_free_disk_bytes": 9289572352,
+    "observed_max_whole_host_disk_growth_bytes": 104468480,
+    "minimum_free_disk_reserve_bytes": 8589934592,
+    "maximum_stage_growth_bytes": 134217728,
+    "final_above_reserve_bytes": 699637760,
+    "observed_min_host_available_memory_bytes": 3436761088,
+    "final_host_available_memory_bytes": 3925782528,
+    "cpu_quota_percent_of_one_cpu": 25,
+    "memory_high_bytes": 1342177280,
+    "memory_max_bytes": 1610612736,
+    "memory_peak_bytes": 741339136,
+    "swap_max_bytes": 0,
+    "tasks_max": 128,
+    "memory_events": {
+      "low": 0,
+      "high": 0,
+      "max": 0,
+      "oom": 0,
+      "oom_kill": 0,
+      "oom_group_kill": 0,
+      "sock_throttled": 0
+    },
+    "phase_timeout_seconds": 300,
+    "outer_service_timeout_seconds": 600,
+    "future_build_capacity_qualified": false
+  },
+  "private_evidence": {
+    "driver_result": {
+      "bytes": 11446,
+      "sha256": "1c613297d2654b010853fda2a4fe5a46f278144cb7276a30bd1c30f5e4de581f"
+    },
+    "captured_files": {
+      "result.json": {
+        "bytes": 11446,
+        "sha256": "1c613297d2654b010853fda2a4fe5a46f278144cb7276a30bd1c30f5e4de581f"
+      },
+      "fetch-exact-revision.log": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "prepare-exclusive-worktree.log": {
+        "bytes": 115,
+        "sha256": "0d731c3bd753a30731855569e8b76e1a3c23b8c860be2185e7d76dc96ea93876"
+      },
+      "metadata-plan.log": {
+        "bytes": 39297,
+        "sha256": "15ee24d7acfefbc78a40f809df41b7378f29c752425a4e70f016e15ddfff2f17"
+      },
+      "plan/result.json": {
+        "bytes": 39297,
+        "sha256": "15ee24d7acfefbc78a40f809df41b7378f29c752425a4e70f016e15ddfff2f17"
+      },
+      "plan/dry-run.log": {
+        "bytes": 758,
+        "sha256": "7ff0e5f0d8a8fde0337803a453d21dfa32382532af77480bf98b641c4619948d"
+      },
+      "plan/path-info.stdout": {
+        "bytes": 825,
+        "sha256": "9069d0f0b7ec2e1324ed70b98ed504d48d742f0177d4e0f6cc78f8313200741b"
+      },
+      "plan/path-info.stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "plan/store-verify.stdout": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "plan/store-verify.stderr": {
+        "bytes": 163,
+        "sha256": "da5d333d548053061443da72b48bd0a48f8984c5df8ea921afe0cbdb9be0fdde"
+      }
+    },
+    "unit_journal": {
+      "bytes": 10648,
+      "sha256": "a9b05e679f9e9b7774b7c94e1e42234d9de48feb64bbd45f59a32bc3422d30b0"
+    },
+    "lossless_capture_archive": {
+      "bytes": 44176,
+      "sha256": "071a0873e1f0b88ecbf43db181aa8ec1b954d479d9f8cfab167382dfb5ba39f1"
+    },
+    "capture_bundle": {
+      "bytes": 139991,
+      "sha256": "657d843aeffec2922d91903cb0569bf725725f234180602c41057866cff4fa13"
+    },
+    "all_selected_files_and_complete_result_hashes_verified": true,
+    "terminal_unit_inactive": true,
+    "terminal_main_and_control_pids_zero": true,
+    "retrieval_failures_retained": "Two initial bounded single-response readers rejected their payload size. The plan was not rerun; a separately reviewed chunk capture recovered the selected files."
+  },
+  "preservation": {
+    "original_checkout_preserved": true,
+    "selected_checkout_preserved": true,
+    "prior_libtapi_build_inactive": true,
+    "existing_k3s_active_at_capture": true,
+    "existing_host_and_disk_only": true,
+    "resource_expansion": false,
+    "paid_upgrade": false
+  },
+  "qualification": {
+    "staged_native_linker_metadata_plan": "pass",
+    "native_linker_realization": "not_run",
+    "native_linker_output_inspection": "not_run",
+    "downstream_realization": "not_run",
+    "fixture_link": "not_run",
+    "selected_image_build": "not_run",
+    "selected_guest_execution": "not_run",
+    "burdettie_runtime_execution_in_selected_guest": "not_run",
+    "security_enforcement": "not_run",
+    "m1_complete": false
+  },
+  "reviewed_code": [
+    {
+      "path": "scripts/plan_puredarwin_staged_linker.py",
+      "sha256": "8712704390bb1f1727934144e4e844b286e5e78423e6144c61a5465b04fa6727"
+    },
+    {
+      "path": "scripts/puredarwin_staged_linker.nix",
+      "sha256": "d493034708bb62dc8191590f2e86132727219e968d655f4fa48a3b40cd6d9d3c"
+    },
+    {
+      "path": "scripts/plan_puredarwin_libtapi.py",
+      "sha256": "7c18e1c623f976e52c70e81f99d8d1e566a7804ec7c9a082085f828c7640dcab"
+    },
+    {
+      "path": "scripts/puredarwin_libtapi.nix",
+      "sha256": "5daf2f02681357e00d3b5c8ef5fbcbdf279f681a44697780d5c578dee1872409"
+    },
+    {
+      "path": "scripts/stage_libtapi_source.py",
+      "sha256": "cec91393bc522d612336aaae950fdf0590a7f26dbc6ddcec2f2a04804fbb055b"
+    },
+    {
+      "path": "scripts/plan_puredarwin_linker.py",
+      "sha256": "2c682e27e0717220ffc9e80b64685ddeedd444d0de9a7706cb45e11e83ed695a"
+    },
+    {
+      "path": "scripts/puredarwin_native_linker.nix",
+      "sha256": "3f4fa3423f8ccb67145c140aff193ad4684bb37a98b805583a92630d03a19070"
+    },
+    {
+      "path": "scripts/build_puredarwin_fixtures.py",
+      "sha256": "1f5a536dff89e4d276908e582af3e08d4c0e71268944a5822a4b4ae4f82be09f"
+    }
+  ]
+}

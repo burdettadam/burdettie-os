@@ -1,9 +1,9 @@
 # docker/Dockerfile.dev — Build & lint image for burdettie-os.
 #
 # Builds the cross-platform subset of crates (Mach-O parsing, analysis,
-# run-plan, diff, trust-policy). macOS-only crates (objc-runtime, cf-lite,
-# libsystem-shims, platform-darwin-host, macho-runtime, macho-inspect)
-# require ARM64 macOS and are excluded.
+# run-plan, diff, trust-policy), plus focused Linux pthread-shim regressions.
+# This is not the full Linux runtime suite or selected Darwin guest validation.
+# Native macOS runtime coverage remains in its existing CI jobs.
 #
 # Usage:
 #   docker build -f docker/Dockerfile.dev -t burdettie-os-dev .
@@ -30,6 +30,16 @@ RUN cargo build --locked \
     -p trust-policy \
     -p macho-fixtures \
     -p test-harness
+
+# Exercise the actual Linux production shim, not a reimplementation. Retain
+# native process failures and refuse an empty or ignored regression group.
+RUN timeout 180s cargo test --locked -p libsystem-shims --lib \
+    pthread::shims::attribute_lifetime_tests -- --nocapture \
+    > /tmp/pthread-attribute-tests.log 2>&1; \
+    status=$?; \
+    cat /tmp/pthread-attribute-tests.log; \
+    test "$status" -eq 0 && \
+    grep -F 'test result: ok. 7 passed; 0 failed; 0 ignored;' /tmp/pthread-attribute-tests.log
 
 # Use the same strict lint policy as the macOS CI job, including its explicit
 # allowances for test assertions and intentional low-level numeric conversions.

@@ -1,5 +1,3 @@
-use ab_glyph::{Font as AbFont, ScaleFont};
-
 use crate::unicode::{is_combining_mark, is_zero_width};
 
 use super::types::LayoutGlyph;
@@ -11,8 +9,8 @@ use super::types::LayoutGlyph;
 #[allow(clippy::too_many_arguments)]
 pub(super) fn layout_line_word_wrap(
     text: &str,
-    ab_font: &ab_glyph::FontVec,
-    scaled: &ab_glyph::PxScaleFont<&ab_glyph::FontVec>,
+    font_data: &crate::font_backend::FontData,
+    scaled: &crate::font_backend::ScaledFont<'_>,
     size: f64,
     ascent: f64,
     line_height: f64,
@@ -23,7 +21,7 @@ pub(super) fn layout_line_word_wrap(
 ) {
     let words: Vec<&str> = text.split(' ').collect();
     let mut cursor_x = 0.0f64;
-    let mut prev_glyph: Option<ab_glyph::GlyphId> = None;
+    let mut prev_glyph: Option<crate::GlyphId> = None;
     let mut last_base_x = 0.0f64;
     let mut first_word_on_line = true;
 
@@ -31,7 +29,7 @@ pub(super) fn layout_line_word_wrap(
         // Measure the word (including preceding space if not first on line)
         let prefix = if first_word_on_line { "" } else { " " };
         let to_measure = format!("{prefix}{word}");
-        let word_width = measure_str(&to_measure, ab_font, scaled);
+        let word_width = measure_str(&to_measure, font_data, scaled);
 
         // Would this word overflow?
         if !first_word_on_line && cursor_x + word_width > max_width {
@@ -46,7 +44,7 @@ pub(super) fn layout_line_word_wrap(
 
         // Emit space before word (if not first on line)
         if !first_word_on_line {
-            let space_id = ab_font.glyph_id(' ');
+            let space_id = font_data.glyph_id(' ');
             if let Some(prev) = prev_glyph {
                 cursor_x += scaled.kern(prev, space_id) as f64;
             }
@@ -69,8 +67,8 @@ pub(super) fn layout_line_word_wrap(
             if is_zero_width(ch) {
                 continue;
             }
-            let glyph_id = ab_font.glyph_id(ch);
-            let missing = glyph_id == ab_glyph::GlyphId(0);
+            let glyph_id = font_data.glyph_id(ch);
+            let missing = glyph_id == crate::GlyphId(0);
 
             if is_combining_mark(ch) {
                 glyphs.push(LayoutGlyph {
@@ -117,8 +115,8 @@ pub(super) fn layout_line_word_wrap(
 #[allow(clippy::too_many_arguments)]
 pub(super) fn layout_line_char_wrap(
     text: &str,
-    ab_font: &ab_glyph::FontVec,
-    scaled: &ab_glyph::PxScaleFont<&ab_glyph::FontVec>,
+    font_data: &crate::font_backend::FontData,
+    scaled: &crate::font_backend::ScaledFont<'_>,
     size: f64,
     ascent: f64,
     line_height: f64,
@@ -128,7 +126,7 @@ pub(super) fn layout_line_char_wrap(
     max_line_width: &mut f64,
 ) {
     let mut cursor_x = 0.0f64;
-    let mut prev_glyph: Option<ab_glyph::GlyphId> = None;
+    let mut prev_glyph: Option<crate::GlyphId> = None;
     let mut last_base_x = 0.0f64;
 
     for ch in text.chars() {
@@ -136,8 +134,8 @@ pub(super) fn layout_line_char_wrap(
             continue;
         }
 
-        let glyph_id = ab_font.glyph_id(ch);
-        let missing = glyph_id == ab_glyph::GlyphId(0);
+        let glyph_id = font_data.glyph_id(ch);
+        let missing = glyph_id == crate::GlyphId(0);
 
         if is_combining_mark(ch) {
             // Combining marks don't advance and can't trigger a line break
@@ -196,8 +194,8 @@ pub(super) fn layout_line_char_wrap(
 #[allow(clippy::too_many_arguments)]
 pub(super) fn layout_line_no_wrap(
     text: &str,
-    ab_font: &ab_glyph::FontVec,
-    scaled: &ab_glyph::PxScaleFont<&ab_glyph::FontVec>,
+    font_data: &crate::font_backend::FontData,
+    scaled: &crate::font_backend::ScaledFont<'_>,
     size: f64,
     ascent: f64,
     line_height: f64,
@@ -206,7 +204,7 @@ pub(super) fn layout_line_no_wrap(
     max_line_width: &mut f64,
 ) {
     let mut cursor_x = 0.0f64;
-    let mut prev_glyph: Option<ab_glyph::GlyphId> = None;
+    let mut prev_glyph: Option<crate::GlyphId> = None;
     let mut last_base_x = 0.0f64;
 
     for ch in text.chars() {
@@ -214,8 +212,8 @@ pub(super) fn layout_line_no_wrap(
             continue;
         }
 
-        let glyph_id = ab_font.glyph_id(ch);
-        let missing = glyph_id == ab_glyph::GlyphId(0);
+        let glyph_id = font_data.glyph_id(ch);
+        let missing = glyph_id == crate::GlyphId(0);
 
         if is_combining_mark(ch) {
             glyphs.push(LayoutGlyph {
@@ -257,16 +255,16 @@ pub(super) fn layout_line_no_wrap(
 /// zero-width characters.
 pub(super) fn measure_str(
     text: &str,
-    ab_font: &ab_glyph::FontVec,
-    scaled: &ab_glyph::PxScaleFont<&ab_glyph::FontVec>,
+    font_data: &crate::font_backend::FontData,
+    scaled: &crate::font_backend::ScaledFont<'_>,
 ) -> f64 {
     let mut width = 0.0f32;
-    let mut prev: Option<ab_glyph::GlyphId> = None;
+    let mut prev: Option<crate::GlyphId> = None;
     for ch in text.chars() {
         if is_zero_width(ch) || is_combining_mark(ch) {
             continue;
         }
-        let gid = ab_font.glyph_id(ch);
+        let gid = font_data.glyph_id(ch);
         if let Some(p) = prev {
             width += scaled.kern(p, gid);
         }

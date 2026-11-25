@@ -178,9 +178,11 @@ impl Interpreter {
             Instruction::Nop => {
                 self.cpu.pc = pc + 4;
             }
-            Instruction::Svc { .. } => {
-                // SVC is treated as NOP in the interpreter (no kernel syscall support).
-                self.cpu.pc = pc + 4;
+            Instruction::Svc { imm } => {
+                return StepResult::Exit(ExitReason::Unimplemented {
+                    pc,
+                    raw: 0xd400_0001 | (u32::from(imm) << 5),
+                });
             }
             Instruction::Mrs { rt, sysreg } => {
                 // Known system registers: return plausible stub values.
@@ -346,12 +348,13 @@ impl Interpreter {
         };
         let name = self.ffi.name_of(target);
         let result = self.ffi.call_or_stub(target, &args);
+        log::trace!("FFI {target:#x} ({}) completed", name.unwrap_or("?"));
+        self.apply_ffi_result(result)
+    }
+
+    fn apply_ffi_result(&mut self, result: crate::ffi::FfiResult) -> StepResult {
         match result {
             crate::ffi::FfiResult::Return(val) => {
-                log::trace!(
-                    "FFI {target:#x} ({}) returned {val:#x}",
-                    name.unwrap_or("?")
-                );
                 self.cpu.x[0] = val;
                 self.cpu.pc = self.cpu.x[30];
                 StepResult::Continue
@@ -366,6 +369,11 @@ impl Interpreter {
             }
             crate::ffi::FfiResult::Exit(code) => {
                 StepResult::Exit(ExitReason::Exit { code: code as i64 })
+            }
+            crate::ffi::FfiResult::Stop(reason) => StepResult::Exit(reason),
+            crate::ffi::FfiResult::WithInterpreter(call) => {
+                let result = call.invoke(self);
+                self.apply_ffi_result(result)
             }
             crate::ffi::FfiResult::TailCall(addr) => {
                 self.cpu.pc = addr;

@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "message_type": "launch_report",
+  "launch_id": "example-launch",
+  "request_id": "example-request",
+  "identity": {
+    "app_id": "example-registration",
+    "content_revision": "0000000000000000000000000000000000000000000000000000000000000000",
+    "executable_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "selected_slice": "x86_64",
+    "bundle_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "dependency_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "requested_mode": "enforced",
+  "effective_mode": null,
+  "requested_profile": {
+    "id": "local-notes",
+    "revision": "1"
+  },
+  "effective_profile": null,
+  "disposition": "deny",
+  "failure_category": "policy",
+  "guest_started": false,
+  "audit_coverage": "not_requested",
+  "backend": {
+    "schema_version": 1,
+    "message_type": "backend_capabilities",
+    "context": {
+      "backend_id": "fixture_backend",
+      "backend_version": "example-only",
+      "runtime_revision": "fixture-revision",
+      "image_revision": "fixture-image",
+      "host_os": "fixture-os",
+      "kernel_build": "fixture-kernel",
+      "host_arch": "x86_64",
+      "guest_arch": "x86_64",
+      "execution_route": "native",
+      "worker_model": "managed_process"
+    },
+    "capabilities": [
+      {
+        "id": "launch.supervision",
+        "kind": "supervision",
+        "implementation": "unsupported",
+        "availability": "unavailable",
+        "scopes": [
+          "application",
+          "descendants"
+        ],
+        "evidence": null
+      },
+      {
+        "id": "example.resource_controls",
+        "kind": "resource_enforcement",
+        "implementation": "unsupported",
+        "availability": "unavailable",
+        "scopes": [
+          "application",
+          "descendants"
+        ],
+        "evidence": null
+      }
+    ]
+  },
+  "required_capabilities": [
+    {
+      "id": "launch.supervision",
+      "kind": "supervision",
+      "scopes": [
+        "application",
+        "descendants"
+      ]
+    },
+    {
+      "id": "example.resource_controls",
+      "scopes": [
+        "application",
+        "descendants"
+      ],
+      "kind": "resource_enforcement"
+    }
+  ],
+  "establishment": [
+    {
+      "capability_id": "launch.supervision",
+      "state": "not_established"
+    },
+    {
+      "capability_id": "example.resource_controls",
+      "state": "not_established"
+    }
+  ],
+  "findings": [
+    {
+      "control": "example.resource_controls",
+      "required": true,
+      "finding": "unsupported",
+      "action": "denied",
+      "evidence_state": "unavailable",
+      "reason_code": "required_backend_unavailable"
+    }
+  ],
+  "effective_environment_names": [],
+  "environment_transformations": [],
+  "grant_refs": [],
+  "report_time": "2026-11-13T00:00:00Z"
+}

@@ -32,8 +32,19 @@ impl Loader<Parsed> {
         macho_parse::set_platform_hasher(Arc::new(ProviderHasher::new(config.platform.clone())));
         let tracer = config.tracer.take().unwrap_or_else(RuntimeTracer::disabled);
 
-        // Fast path: try raw path first (no realpath syscall), then canonical.
-        if let Some((main_data, parsed)) = lookup(binary_path) {
+        // Read the current source revision before consulting the parse cache.
+        // Cached metadata is reusable only when these exact bytes match its digest.
+        let source_data = config
+            .platform
+            .fs()
+            .read(binary_path)
+            .map_err(|e| RuntimeError::Io {
+                path: binary_path.to_path_buf(),
+                source: e,
+            })?;
+        let source_data: Arc<[u8]> = Arc::from(source_data);
+
+        if let Some((main_data, parsed)) = lookup(binary_path, &source_data) {
             tracer.record(
                 EventKind::Pipeline,
                 format!(
@@ -62,17 +73,7 @@ impl Loader<Parsed> {
             });
         }
 
-        // Slow path: read file, parse, and populate the cache.
-        let data = config
-            .platform
-            .fs()
-            .read(binary_path)
-            .map_err(|e| RuntimeError::Io {
-                path: binary_path.to_path_buf(),
-                source: e,
-            })?;
-
-        let parsed_result = macho_parse::parse_auto(&data, macho_types::CpuType::Arm64)?;
+        let parsed_result = macho_parse::parse_auto(&source_data, macho_types::CpuType::Arm64)?;
         tracer.record(
             EventKind::Pipeline,
             format!(
@@ -83,19 +84,26 @@ impl Loader<Parsed> {
             ),
         );
 
-        // Convert to Arc types — zero-copy for thin binaries, slice copy for fat.
-        let main_data: Arc<[u8]> = if macho_parse::is_fat(&data) {
-            let slice = macho_parse::fat_slice_for_cpu(&data, macho_types::CpuType::Arm64)?;
+        // Keep complete source bytes for the cache digest; map only the
+        // selected architecture slice for a universal/fat executable.
+        let main_data: Arc<[u8]> = if macho_parse::is_fat(&source_data) {
+            let slice = macho_parse::fat_slice_for_cpu(&source_data, macho_types::CpuType::Arm64)?;
             Arc::from(slice)
         } else {
-            Arc::from(data)
+            source_data.clone()
         };
         let parsed: Arc<ParsedMachO> = Arc::new(parsed_result);
 
         let canonical = binary_path
             .canonicalize()
             .unwrap_or_else(|_| binary_path.to_path_buf());
-        insert_both(binary_path, canonical, main_data.clone(), parsed.clone());
+        insert_both(
+            binary_path,
+            canonical,
+            &source_data,
+            main_data.clone(),
+            parsed.clone(),
+        );
 
         Ok(Loader {
             inner: LoaderInner {
@@ -211,11 +219,56 @@ impl Loader<Checked> {
 
         let mut registry = ImageRegistry::new(inner.config.platform.memory(), unwind_registry);
         let binary_dir = inner.binary_path.parent().unwrap_or(Path::new("."));
+
+        // Embedding callers must not silently lose configured inserted libraries.
+        // Apply the same admission report and loader as native/interpreted routes.
+        let mut insert_paths = inner.config.insert_libraries.clone();
+        for (key, value) in &inner.config.env_overrides {
+            if key == "DYLD_INSERT_LIBRARIES" {
+                for path in value.split(':').map(str::trim).filter(|p| !p.is_empty()) {
+                    insert_paths.push(std::path::PathBuf::from(path));
+                }
+            }
+        }
+        if inner
+            .security_report
+            .as_ref()
+            .is_some_and(|report| report.strip_dyld_env)
+        {
+            if !insert_paths.is_empty() {
+                inner.tracer.record(
+                    EventKind::Pipeline,
+                    format!(
+                        "DYLD_INSERT_LIBRARIES: blocked by hardened runtime ({} libraries)",
+                        insert_paths.len()
+                    ),
+                );
+            }
+            insert_paths.clear();
+        }
+        if !insert_paths.is_empty() {
+            let count = loader::load_insert_libraries(
+                &insert_paths,
+                &mut registry,
+                binary_dir,
+                inner.config.platform.fs(),
+                &inner.config,
+            )?;
+            inner.tracer.record(
+                EventKind::Pipeline,
+                format!(
+                    "DYLD_INSERT_LIBRARIES: loaded {count}/{} libraries",
+                    insert_paths.len()
+                ),
+            );
+        }
+
         let dep_stats = loader::load_dependencies(
             &inner.parsed,
             &mut registry,
             binary_dir,
             inner.config.platform.fs(),
+            &inner.config,
         )?;
         dep_stats.record_to(&inner.tracer);
 

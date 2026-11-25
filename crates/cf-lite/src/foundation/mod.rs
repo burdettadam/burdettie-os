@@ -1,4 +1,5 @@
 pub(crate) mod cfconstant_string;
+mod interpreter_abi;
 mod register;
 mod shim_classes;
 mod shim_core;

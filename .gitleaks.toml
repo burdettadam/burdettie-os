@@ -24,3 +24,14 @@ condition = "AND"
 paths = ['''^scripts/test_xcode_tools_docker\.sh$''']
 regexTarget = "secret"
 regexes = ['''^sk-12345secret$''']
+
+# The vendored cosmic-text manifest stores only SHA-256 file digests. The
+# hygiene check validates every digest against the exact 64-character lowercase
+# hexadecimal format, so this exception is limited to checksum values in this
+# one generated manifest rather than arbitrary source text.
+[[rules.allowlists]]
+description = "Validated SHA-256 values in the vendored cosmic-text file manifest"
+condition = "AND"
+paths = ['''^vendor/cosmic-text-upstream-files\.json$''']
+regexTarget = "secret"
+regexes = ['''^[0-9a-f]{64}$''']

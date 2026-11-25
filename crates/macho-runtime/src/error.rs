@@ -29,6 +29,9 @@ pub enum RuntimeError {
 
     #[error("binary has no entry point")]
     NoEntryPoint,
+
+    #[error("launch cleanup is unsupported: {reason}")]
+    LifecycleUnsupported { reason: String },
 }
 
 #[cfg(test)]

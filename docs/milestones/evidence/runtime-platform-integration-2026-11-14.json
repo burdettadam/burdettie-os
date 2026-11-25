@@ -1,0 +1,342 @@
+{
+  "schema_version": 1,
+  "scope": "m1_feature_branch_source_integration_with_revision_bound_component_ci",
+  "feature_integration": {
+    "platform_parent": "e5ff8bf1fc332b6fc0c08dd904a38e8de34f8af4",
+    "runtime_parent": "aade8484a773bfa88433526a2039084cc31d6b20",
+    "merge_base": "7bf375562ca9edf513c353da7ec3309c0337f457",
+    "source_merge_tree_before_evidence_update": "7f2cb185de44adb140bd69ed36f0f94f40a27d61",
+    "platform_changed_paths": 57,
+    "runtime_changed_paths": 139,
+    "overlapping_changed_paths": 0,
+    "conflicts": 0,
+    "all_source_entries_equal_public_parent_union": true,
+    "included_in_platform_feature_branch": true,
+    "merged_into_main": false,
+    "combined_required_checks": "pending_exact_published_feature_head",
+    "component_checks_do_not_replace_combined_checks": true
+  },
+  "runtime_component": {
+    "revision": "aade8484a773bfa88433526a2039084cc31d6b20",
+    "tree": "53a81054ee24b9ac2430a66402f9ce5546718539",
+    "ci_checkout": "749e7d3472e6cca99784f590e74fe2d607123745",
+    "ci_checkout_tree_matches_head": true,
+    "full_ci": {
+      "url": "https://github.com/burdettadam/burdettie-os/actions/runs/43631917122",
+      "status": "completed",
+      "conclusion": "success",
+      "completed_at_utc": "2026-11-14T19:32:02Z",
+      "jobs": [
+        {
+          "id": 132560192430,
+          "name": "Security Scanning",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 132560192745,
+          "name": "Build native Mach-O fixtures",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 132560192752,
+          "name": "README quickstart (macOS ARM64)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 132560520569,
+          "name": "Build & Test",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 132560520599,
+          "name": "FFI Interop (C + Swift)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 132560520648,
+          "name": "Linux ARM64 E2E (Interpreter)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 132560520717,
+          "name": "Docker Dev Build",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    "dependency_policy": {
+      "vendor_retained_files": 76,
+      "omitted_binary_fixture_records": 34,
+      "audit": "passed",
+      "audit_remaining_warning": {
+        "package": "paste",
+        "version": "1.0.15",
+        "id": "RUSTSEC-2024-0436",
+        "kind": "unmaintained"
+      },
+      "deny_default": "passed",
+      "deny_linux_x86_64": "passed",
+      "deny_linux_arm64": "passed",
+      "ttf_parser_prior_failure_present": false,
+      "policy_exceptions_added": false
+    },
+    "repository_hygiene": {
+      "pr_url": "https://github.com/burdettadam/burdettie-os/actions/runs/43631917115",
+      "push_url": "https://github.com/burdettadam/burdettie-os/actions/runs/43631912382",
+      "conclusion": "failure",
+      "tracked_artifact_check": "success",
+      "tracked_files": 1299,
+      "history_scan_exit_code": 1,
+      "commits_scanned": 156,
+      "bytes_scanned": 19399061,
+      "finding_fingerprints": [
+        "19329732cc53aab0d583e7b3d5c600c024c33735:vendor/cosmic-text-upstream-files.json:generic-api-key:21",
+        "19329732cc53aab0d583e7b3d5c600c024c33735:vendor/cosmic-text-upstream-files.json:generic-api-key:115"
+      ],
+      "gitleaks_version": "8.30.1",
+      "scanner_config_sha256": "c68175d649e93d620aff406ea95efc04f903d90872a7a0cd548c61a2131bfe0c",
+      "reproduction": "Retained contemporaneous all-branch/tag refs plus actual CI merge/head reproduce the same commit/byte counts and both immutable findings."
+    },
+    "pull_request": "https://github.com/burdettadam/burdettie-os/pull/7",
+    "behavior": {
+      "initializer_aware_exit_code_preserved": true,
+      "evaluated_admission_report_preserved": true,
+      "normal_cleanup_before_direct_pipeline_unmap": true
+    },
+    "validation": {
+      "admission": {
+        "passed": 17,
+        "failed": 0,
+        "ignored": 0
+      },
+      "lifecycle": {
+        "harnesses_passed": 1,
+        "isolated_child_cases": 17,
+        "note": "Source harness checks each child exit status/marker and retains evaluated security reports on successful cases."
+      },
+      "entitlement_report": {
+        "named_tests_passed": 6
+      },
+      "cf_constant_string": {
+        "named_tests_passed": 2
+      },
+      "gpu_text_layout_cache": {
+        "passed": 257,
+        "failed": 0,
+        "ignored": 0
+      },
+      "linux_arm64_interpreter": {
+        "reported_passed": 40,
+        "reported_failed": 0,
+        "reported_ignored": 0,
+        "fixture_presence_gate": "success",
+        "nocapture": true
+      },
+      "nsrange_ci": {
+        "harnesses_passed": 1,
+        "isolated_child_cases": 15,
+        "host": "macOS ARM64",
+        "scope": "The native ARM64 host-capture route; the x86_64-only adapter is covered separately by the local regression below."
+      },
+      "broader_workspace": "Existing ignored tests remain; focused counts do not imply every workspace test ran."
+    },
+    "nsrange_x86_64_regression": {
+      "host": "Linux x86_64",
+      "rust": "1.93.0",
+      "source_revision": "aade8484a773bfa88433526a2039084cc31d6b20",
+      "signature": "exact known extern C fn(u64,u64,u64) -> NSRange",
+      "dispatch_routes": [
+        "normal",
+        "Super",
+        "Super2"
+      ],
+      "before": {
+        "failed_positive_cases": 3,
+        "observed_words": [
+          3,
+          0
+        ],
+        "expected_words": [
+          3,
+          1
+        ],
+        "other_cases_passed": 12
+      },
+      "after": {
+        "isolated_child_cases_passed": 15,
+        "original_nscharacterset_fixture_semantic_exit_code": 0,
+        "original_fixture_test_passed": 1,
+        "missing_input_skip": false,
+        "fixture_bytes": 51024,
+        "fixture_sha256": "a80d3c8d7e20894d9bc8aeb240f0ed3f55e93e5c893bc080e0ba9b4d482edd2c"
+      },
+      "guest_imp_checks_before_adapter": true,
+      "selector_or_type_encoding_is_not_signature_authority": true,
+      "formatted_variadic_values_qualified": false,
+      "generic_variadic_fp_indirect_or_struct_abi_qualified": false
+    }
+  },
+  "platform_component": {
+    "revision": "e5ff8bf1fc332b6fc0c08dd904a38e8de34f8af4",
+    "tree": "68e85dddde1330e41ba719a8266621476edd1fd4",
+    "ci_checkout": "f069dc25cf69e94ad330444e4e91a387e4647e5f",
+    "ci_checkout_tree_matches_head": true,
+    "full_ci": {
+      "url": "https://github.com/burdettadam/burdettie-os/actions/runs/43631110122",
+      "conclusion": "failure",
+      "functional_jobs_passed": 6,
+      "security_failure": "ttf-parser 0.25.1 / RUSTSEC-2026-0192 / error[unmaintained]"
+    },
+    "m1_ci": {
+      "pull_request_url": "https://github.com/burdettadam/burdettie-os/actions/runs/43631110094",
+      "push_url": "https://github.com/burdettadam/burdettie-os/actions/runs/43631103957",
+      "conclusion": "success",
+      "script_tests": 115,
+      "contract_tests": 37,
+      "examples_validated": 4,
+      "skips": 0,
+      "nix_version": "2.28.3",
+      "cmake_version": "3.31.6"
+    },
+    "hygiene": {
+      "pull_request_url": "https://github.com/burdettadam/burdettie-os/actions/runs/43631110199",
+      "push_url": "https://github.com/burdettadam/burdettie-os/actions/runs/43631103969",
+      "conclusion": "failure",
+      "tracked_artifacts": "success",
+      "tracked_files": 1254,
+      "commits_scanned": 155,
+      "bytes_scanned": 19387257,
+      "findings": 2
+    },
+    "failures_preserved": true
+  },
+  "preceding_runtime_checkpoint": {
+    "revision": "d8656362b9729ee99f1ae8fe494af81b59ad4637",
+    "tree": "fab91c8bbedf23b85cb8d1ac3951990b9f7b5b94",
+    "ci_checkout": "aff84bd63c7d3861c749b84ae31e8ec34aadf08a",
+    "ci_checkout_tree_matches_head": true,
+    "full_ci": {
+      "url": "https://github.com/burdettadam/burdettie-os/actions/runs/43630429574",
+      "status": "completed",
+      "conclusion": "success",
+      "completed_at_utc": "2026-11-14T19:15:34Z",
+      "jobs": [
+        {
+          "id": 132555591196,
+          "name": "Security Scanning",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 132555591447,
+          "name": "README quickstart (macOS ARM64)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 132555591528,
+          "name": "Build native Mach-O fixtures",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 132555780661,
+          "name": "Docker Dev Build",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 132555780664,
+          "name": "Build & Test",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 132555780683,
+          "name": "Linux ARM64 E2E (Interpreter)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 132555780692,
+          "name": "FFI Interop (C + Swift)",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    "dependency_policy": {
+      "vendor_retained_files": 76,
+      "omitted_binary_fixture_records": 34,
+      "audit": "passed",
+      "audit_remaining_warning": {
+        "package": "paste",
+        "version": "1.0.15",
+        "id": "RUSTSEC-2024-0436",
+        "kind": "unmaintained"
+      },
+      "deny_default": "passed",
+      "deny_linux_x86_64": "passed",
+      "deny_linux_arm64": "passed",
+      "ttf_parser_prior_failure_present": false,
+      "policy_exceptions_added": false
+    },
+    "repository_hygiene": {
+      "pr_url": "https://github.com/burdettadam/burdettie-os/actions/runs/43630429672",
+      "push_url": "https://github.com/burdettadam/burdettie-os/actions/runs/43630425391",
+      "conclusion": "failure",
+      "tracked_artifact_check": "success",
+      "tracked_files": 1297,
+      "history_scan_exit_code": 1,
+      "commits_scanned": 153,
+      "bytes_scanned": 19320140,
+      "finding_fingerprints": [
+        "19329732cc53aab0d583e7b3d5c600c024c33735:vendor/cosmic-text-upstream-files.json:generic-api-key:21",
+        "19329732cc53aab0d583e7b3d5c600c024c33735:vendor/cosmic-text-upstream-files.json:generic-api-key:115"
+      ],
+      "gitleaks_version": "8.30.1",
+      "scanner_config_sha256": "c68175d649e93d620aff406ea95efc04f903d90872a7a0cd548c61a2131bfe0c",
+      "reproduction": "Retained contemporaneous all-branch/tag refs plus actual CI merge/head reproduce the same commit/byte counts and both immutable findings."
+    },
+    "runtime_admission_security_paths_unchanged_from_d3ee_checkpoint": 198
+  },
+  "preceding_admission_cleanup_checkpoint": {
+    "revision": "d3ee4a2dd9483193bb3d01e38e4b2051751fdb17",
+    "evidence": "runtime-integration-2026-11-14.json",
+    "record_preserved_byte_for_byte": true,
+    "full_ci": "failure",
+    "dependency_policy": "ttf-parser 0.25.1 / RUSTSEC-2026-0192",
+    "hygiene": "failure"
+  },
+  "qualification": {
+    "selected_darwin_fixture_link": "not_run",
+    "selected_guest_runtime_execution": "not_run",
+    "worker_isolation": "not_qualified",
+    "security_backend_enforcement": "not_qualified",
+    "apple_application_workflow": "not_run",
+    "m1_complete": false
+  },
+  "limits": [
+    "Native explicit termination still exits the embedding host.",
+    "Native callbacks and blocking host FFI are not preemptible.",
+    "Guest workers do not inherit launch ownership; streams remain shared.",
+    "Typestate/direct-entry callers and native configurations disabling lifecycle shims remain outside the cleanup contract.",
+    "Dynamic DSO unload, TLS destructors, block-based atexit and exception unwinding remain unsupported by this slice.",
+    "The non-AArch64 host FFI fallback still lacks complete ARM64 ABI translation; issue #9 remains open.",
+    "The typed NSRange adapter covers one known host implementation; general variadic, FP, indirect-result and other struct translation remain incomplete.",
+    "Dependency Security Scanning success is not evidence of an enforced guest security backend.",
+    "Local/component tests and source-tree preservation do not qualify the final combined feature head or selected guest."
+  ],
+  "policy_changes": {
+    "scanner_exception_published": false,
+    "scanner_scope_changed": false,
+    "required_failures_bypassed": false
+  }
+}

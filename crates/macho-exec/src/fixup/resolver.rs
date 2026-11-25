@@ -1159,7 +1159,7 @@ impl StubResolver {
             | "uuid_unparse" | "uuid_unparse_upper" | "uuid_unparse_lower"
             // Compiler helpers
             | "__progname" | "__udivti3" | "__umodti3"
-            | "__divti3" | "__modti3"
+            | "__divti3" | "__modti3" | "__fixdfti" | "__floattidf"
             | "__muloti4" | "__multi3"
             | "__darwin_check_fd_set_overflow"
             // BSD string extras
@@ -1301,6 +1301,123 @@ mod tests {
     use super::*;
     use std::ptr::NonNull;
     use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Mutex;
+
+    const COMPILER_HELPER_IMPORTS: [(&str, &str); 6] = [
+        ("___divti3", "__divti3"),
+        ("___modti3", "__modti3"),
+        ("___udivti3", "__udivti3"),
+        ("___umodti3", "__umodti3"),
+        ("___fixdfti", "__fixdfti"),
+        ("___floattidf", "__floattidf"),
+    ];
+
+    #[derive(Default)]
+    struct RecordingHostResolver {
+        lookups: Mutex<Vec<(Option<usize>, String)>>,
+        address_slots: [u8; 7],
+        handle_token: u8,
+        missing_name: Option<&'static str>,
+    }
+
+    impl RecordingHostResolver {
+        fn address(&self, index: usize) -> *const () {
+            std::ptr::from_ref(&self.address_slots[index]).cast()
+        }
+
+        fn lookup(&self, handle: Option<usize>, name: &str) -> Option<*const ()> {
+            self.lookups.lock().unwrap().push((handle, name.to_owned()));
+            if self.missing_name == Some(name) {
+                return None;
+            }
+            let index = COMPILER_HELPER_IMPORTS
+                .iter()
+                .position(|(_, host_name)| *host_name == name)
+                .unwrap_or(6);
+            // Every name, including policy-denied names, could resolve here.
+            // The distinct addresses are opaque tokens and are never called.
+            Some(self.address(index))
+        }
+    }
+
+    impl HostSymbolResolver for RecordingHostResolver {
+        fn resolve(&self, name: &str) -> Option<*const ()> {
+            self.lookup(None, name)
+        }
+
+        fn resolve_in(&self, handle: *mut (), name: &str) -> Option<*const ()> {
+            self.lookup(Some(handle as usize), name)
+        }
+
+        fn open_library(&self, _path: &str) -> Option<*mut ()> {
+            panic!("isolated resolver tests must not preload host libraries")
+        }
+
+        fn default_handle(&self) -> *mut () {
+            std::ptr::from_ref(&self.handle_token).cast_mut().cast()
+        }
+    }
+
+    fn recording_resolver(host: Arc<RecordingHostResolver>) -> StubResolver {
+        // Do not consume the process-global preload Once with a fake host.
+        StubResolver {
+            handle: host.default_handle(),
+            host,
+            #[cfg(target_os = "linux")]
+            cxx_handle: None,
+        }
+    }
+
+    #[test]
+    fn compiler_helpers_resolve_exact_imports_through_default_handle() {
+        let host = Arc::new(RecordingHostResolver::default());
+        let resolver = recording_resolver(host.clone());
+        let actual: Vec<_> = COMPILER_HELPER_IMPORTS
+            .iter()
+            .map(|(import, _)| resolver.resolve(import))
+            .collect();
+        let expected: Vec<_> = (0..COMPILER_HELPER_IMPORTS.len())
+            .map(|index| Some(host.address(index) as u64))
+            .collect();
+        assert_eq!(actual, expected);
+        let expected_lookups: Vec<_> = COMPILER_HELPER_IMPORTS
+            .iter()
+            .map(|(_, name)| (Some(host.default_handle() as usize), (*name).to_owned()))
+            .collect();
+        assert_eq!(*host.lookups.lock().unwrap(), expected_lookups);
+    }
+
+    #[test]
+    fn compiler_helper_near_misses_and_unsafe_names_never_reach_host() {
+        let host = Arc::new(RecordingHostResolver::default());
+        let resolver = recording_resolver(host.clone());
+        for name in [
+            "___fixdfti_extra",
+            "___floattidf_extra",
+            "____fixdfti",
+            "__floattidf",
+            "_setuid",
+            "_chroot",
+            "_ptrace",
+        ] {
+            assert_eq!(resolver.resolve(name), None, "must reject {name}");
+        }
+        assert!(host.lookups.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn compiler_helper_allowed_but_missing_from_host_stays_unresolved() {
+        let host = Arc::new(RecordingHostResolver {
+            missing_name: Some("__divti3"),
+            ..RecordingHostResolver::default()
+        });
+        let resolver = recording_resolver(host.clone());
+        assert_eq!(resolver.resolve("___divti3"), None);
+        assert_eq!(
+            *host.lookups.lock().unwrap(),
+            vec![(Some(host.default_handle() as usize), "__divti3".to_owned())]
+        );
+    }
 
     #[derive(Default)]
     struct CountingHostResolver {

@@ -2,6 +2,8 @@
 """Reject accidentally tracked build outputs and local-only inputs."""
 
 from pathlib import Path
+import json
+import re
 import subprocess
 import sys
 
@@ -19,6 +21,28 @@ def main() -> int:
         if p
     }
     problems = [f"{p}: tracked despite an ignore rule" for p in sorted(ignored)]
+
+    # Gitleaks treats long hexadecimal strings as potential API keys. This
+    # vendored manifest is a checksum inventory, not a credential store.
+    # Validate its schema before the path-scoped Gitleaks allowlist exempts
+    # only 64-character lowercase SHA-256 values in this exact file.
+    manifest_path = root / "vendor/cosmic-text-upstream-files.json"
+    if manifest_path.is_file():
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            file_hashes = manifest.get("upstream_files_sha256")
+            if not isinstance(file_hashes, dict):
+                raise ValueError("upstream_files_sha256 must be an object")
+            digests = [manifest.get("crate_sha256"), *file_hashes.values()]
+            if not digests or any(
+                not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None
+                for value in digests
+            ):
+                raise ValueError("all manifest digests must be 64 lowercase hexadecimal characters")
+        except (OSError, json.JSONDecodeError, TypeError, ValueError) as error:
+            problems.append(
+                f"vendor/cosmic-text-upstream-files.json: invalid checksum manifest: {error}"
+            )
     synthetic_inputs = {"fixtures/malformed/bad_magic", "fixtures/malformed/truncated_header"}
     executable_magic = {
         b"\x7fELF",

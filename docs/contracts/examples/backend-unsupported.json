@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "message_type": "backend_capabilities",
+  "context": {
+    "backend_id": "fixture_backend",
+    "backend_version": "example-only",
+    "runtime_revision": "fixture-revision",
+    "image_revision": "fixture-image",
+    "host_os": "fixture-os",
+    "kernel_build": "fixture-kernel",
+    "host_arch": "x86_64",
+    "guest_arch": "x86_64",
+    "execution_route": "native",
+    "worker_model": "managed_process"
+  },
+  "capabilities": [
+    {
+      "id": "launch.supervision",
+      "kind": "supervision",
+      "implementation": "unsupported",
+      "availability": "unavailable",
+      "scopes": [
+        "application",
+        "descendants"
+      ],
+      "evidence": null
+    },
+    {
+      "id": "example.resource_controls",
+      "kind": "resource_enforcement",
+      "implementation": "unsupported",
+      "availability": "unavailable",
+      "scopes": [
+        "application",
+        "descendants"
+      ],
+      "evidence": null
+    }
+  ]
+}

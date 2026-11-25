@@ -1,26 +1,24 @@
 //! Process lifecycle shims: atexit, exit, _exit, abort, signal handling.
 //!
-//! These intercept program termination to give the runtime a chance
-//! to report exit status cleanly. In the lab's single-threaded model:
-//! - `atexit` registers handlers but we don't call them (process is
-//!   about to return from main anyway)
-//! - `exit`/`_exit` delegate to the real libc (we're in-process)
-//! - `abort` delegates to the real libc
+//! Native `exit` drains the current launch before flushing shared host stdio
+//! and terminating the embedding process. `_exit` and `_Exit` skip both steps.
+//! The interpreter intercepts these addresses and executes callbacks through
+//! its own CPU/memory. Registration without an active launch owner fails.
+//!
+//! Other current limitations:
+//! - Guest pthreads do not yet inherit launch ownership.
+//! - `abort` emits a diagnostic and terminates with `_exit(1)`.
 //! - `sigaction`/`signal` are intercepted to prevent guest code from
 //!   installing signal handlers that point into guest-mapped memory,
 //!   which would crash the host if a signal fires after the guest exits
 
+use crate::exit_registry::{ExitCallbackAbi, ExitKind, LaunchExitRegistry};
+use crate::table::ShimTable;
 use std::ffi::CStr;
 use std::os::raw::c_char;
-use std::sync::Mutex;
-
-use crate::table::ShimTable;
 
 /// Process lifecycle shims.
 pub struct LifecycleShims;
-
-/// Registered atexit handlers (LIFO order per spec).
-static ATEXIT_HANDLERS: Mutex<Vec<extern "C" fn()>> = Mutex::new(Vec::new());
 
 impl LifecycleShims {
     /// Register lifecycle shims in the table.
@@ -28,12 +26,17 @@ impl LifecycleShims {
         table.register(
             "_atexit",
             shim_atexit as *const () as u64,
-            "atexit (registered but not called)",
+            "atexit (launch-owned registration)",
         );
         table.register(
             "___cxa_atexit",
             shim_cxa_atexit as *const () as u64,
-            "__cxa_atexit (registered)",
+            "__cxa_atexit (launch-owned argument and DSO)",
+        );
+        table.register(
+            "___cxa_finalize",
+            shim_cxa_finalize as *const () as u64,
+            "__cxa_finalize (current launch and DSO only)",
         );
         table.register(
             "__os_feature_enabled_impl",
@@ -43,22 +46,22 @@ impl LifecycleShims {
         table.register(
             "_exit",
             shim_exit as *const () as u64,
-            "exit (clean shutdown)",
+            "exit (launch cleanup, stdio flush, host termination)",
         );
         table.register(
             "__exit",
-            shim_exit as *const () as u64,
-            "_exit (clean shutdown)",
+            shim_immediate_exit as *const () as u64,
+            "_exit (immediate, no stdio flush)",
         );
         table.register(
             "_Exit",
-            shim_exit as *const () as u64,
-            "_Exit (clean shutdown)",
+            shim_immediate_exit as *const () as u64,
+            "_Exit (immediate, no stdio flush)",
         );
         table.register(
             "__Exit",
-            shim_exit as *const () as u64,
-            "_Exit (Darwin symbol, clean shutdown)",
+            shim_immediate_exit as *const () as u64,
+            "_Exit (Darwin symbol, immediate, no stdio flush)",
         );
         table.register(
             "_sigaction",
@@ -135,58 +138,66 @@ impl LifecycleShims {
             "kill (diagnostic + signal translation)",
         );
 
-        log::debug!("LifecycleShims: registered 21 lifecycle shims");
+        log::debug!("LifecycleShims: registered 22 lifecycle shims");
     }
 
-    /// Run all registered atexit handlers in LIFO order.
-    /// Called by the runtime during controlled shutdown.
+    /// Finalize callbacks for the current native launch only. A scope guard
+    /// keeps its images alive; no inactive or interpreted callback is invoked.
     pub fn run_atexit_handlers() {
-        let handlers = {
-            let mut guard = ATEXIT_HANDLERS.lock().unwrap_or_else(|e| e.into_inner());
-            let h = guard.clone();
-            guard.clear();
-            h
-        };
-        // LIFO order per C standard
-        for handler in handlers.into_iter().rev() {
-            handler();
+        if let Some(registry) = LaunchExitRegistry::current() {
+            registry.finalize_native(None);
         }
     }
 
-    /// Reset atexit handlers (useful between test runs).
+    /// Discard callbacks for this thread's current launch, without executing.
     pub fn reset() {
-        let mut guard = ATEXIT_HANDLERS.lock().unwrap_or_else(|e| e.into_inner());
-        guard.clear();
+        if let Some(registry) = LaunchExitRegistry::current() {
+            registry.discard();
+        }
+    }
+
+    /// Flush shared host stdio after normal cleanup. Stream ownership is not
+    /// yet isolated per guest; this is not a managed-worker implementation.
+    pub fn flush_stdio() {
+        // SAFETY: a null stream flushes the host C library's open output streams.
+        unsafe { libc::fflush(std::ptr::null_mut()) };
+        use std::io::Write;
+        let _ = std::io::stdout().flush();
+        let _ = std::io::stderr().flush();
     }
 }
 
 /// `int atexit(void (*function)(void))`
 extern "C" fn shim_atexit(function: Option<extern "C" fn()>) -> i32 {
-    if let Some(f) = function {
-        let mut guard = ATEXIT_HANDLERS.lock().unwrap_or_else(|e| e.into_inner());
-        guard.push(f);
-        log::trace!("atexit: registered handler ({} total)", guard.len());
-        0
-    } else {
-        -1
+    match (LaunchExitRegistry::current(), function) {
+        (Some(registry), Some(function)) => {
+            registry.register(function as *const () as u64, ExitCallbackAbi::Plain, 0, 0)
+        }
+        _ => -1,
     }
 }
 
 /// `int __cxa_atexit(void (*function)(void *), void *arg, void *dso_handle)`
-///
-/// C++ ABI variant. We ignore arg and dso_handle for now.
 extern "C" fn shim_cxa_atexit(
     function: Option<extern "C" fn(*mut u8)>,
-    _arg: *mut u8,
-    _dso_handle: *mut u8,
+    arg: *mut u8,
+    dso_handle: *mut u8,
 ) -> i32 {
-    if function.is_some() {
-        // We store a simplified version — the arg semantics are tricky
-        // and in practice most __cxa_atexit calls in simple programs pass NULL arg
-        log::trace!("__cxa_atexit: registered (arg ignored)");
-        0
-    } else {
-        -1
+    match (LaunchExitRegistry::current(), function) {
+        (Some(registry), Some(function)) => registry.register(
+            function as *const () as u64,
+            ExitCallbackAbi::Cxa,
+            arg as u64,
+            dso_handle as u64,
+        ),
+        _ => -1,
+    }
+}
+
+/// `void __cxa_finalize(void *dso_handle)`; null selects all pending entries.
+extern "C" fn shim_cxa_finalize(dso_handle: *mut u8) {
+    if let Some(registry) = LaunchExitRegistry::current() {
+        registry.finalize_native((!dso_handle.is_null()).then_some(dso_handle as u64));
     }
 }
 
@@ -333,19 +344,27 @@ extern "C" fn shim_os_feature_enabled_impl(domain: *const c_char, feature: *cons
 
 /// `void exit(int status)`
 ///
-/// Intercept `exit()` to bypass C++ static destructors and atexit handlers
-/// that may reference guest-mapped memory. We flush stdio then call `_exit()`
-/// to terminate immediately without running cleanup callbacks.
+/// Native exit remains non-returning and terminates the embedding process.
+/// Only callbacks owned by its currently active native launch are eligible.
 extern "C" fn shim_exit(status: i32) -> ! {
-    log::trace!("exit({status}): bypassing atexit handlers, calling _exit");
-    // Flush C stdio so guest printf output is not lost
-    unsafe {
-        libc::fflush(std::ptr::null_mut());
+    if let Some(registry) = LaunchExitRegistry::current() {
+        registry.request_exit(ExitKind::Normal, status);
+        registry.finalize_native(None);
+        registry.discard();
     }
-    // Flush Rust stdio
-    use std::io::Write;
-    let _ = std::io::stdout().flush();
-    let _ = std::io::stderr().flush();
+    LifecycleShims::flush_stdio();
+    // SAFETY: native guest exit requests process termination. No unwind crosses
+    // guest/C/Rust frames; a future managed worker must isolate this operation.
+    unsafe { libc::_exit(status) }
+}
+
+/// Immediate termination must not flush streams or run cleanup callbacks.
+extern "C" fn shim_immediate_exit(status: i32) -> ! {
+    if let Some(registry) = LaunchExitRegistry::current() {
+        registry.request_exit(ExitKind::Immediate, status);
+    }
+    // SAFETY: this is the non-returning process-termination operation requested
+    // by the guest. The interpreter intercepts the shim instead of calling it.
     unsafe { libc::_exit(status) }
 }
 
@@ -801,8 +820,25 @@ mod tests {
     use super::*;
     use std::sync::Mutex;
 
-    /// Serializes atexit tests that share global handler state.
+    /// Serializes callbacks that use shared test observation counters.
     static ATEXIT_TEST_LOCK: Mutex<()> = Mutex::new(());
+
+    fn native_test_scope(addresses: &[u64]) -> crate::exit_registry::LaunchExitScope<'static> {
+        use crate::exit_registry::{ExitImageRange, ExitRoute, LaunchExitScope};
+        let ranges = addresses
+            .iter()
+            .enumerate()
+            .map(|(image, &start)| ExitImageRange {
+                image,
+                start,
+                end: start + 1,
+                executable: true,
+            })
+            .collect();
+        // SAFETY: these test callbacks are native C ABI functions with static
+        // code lifetime. Their callback arguments are retained by each test.
+        unsafe { LaunchExitScope::enter(&(), ExitRoute::Native, ranges) }
+    }
 
     #[test]
     fn lifecycle_shims_registered() {
@@ -819,13 +855,12 @@ mod tests {
         assert!(table.resolve("___deregister_frame").is_some());
         assert!(table.resolve("_abort").is_some());
         assert!(table.resolve("_strlen").is_some());
-        assert_eq!(table.len(), 21);
+        assert_eq!(table.len(), 22);
     }
 
     #[test]
     fn atexit_registers_handler() {
         let _lock = ATEXIT_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-        LifecycleShims::reset();
 
         use std::sync::atomic::{AtomicBool, Ordering};
         static CALLED: AtomicBool = AtomicBool::new(false);
@@ -833,6 +868,7 @@ mod tests {
             CALLED.store(true, Ordering::Relaxed);
         }
 
+        let _scope = native_test_scope(&[handler as *const () as u64]);
         let result = shim_atexit(Some(handler));
         assert_eq!(result, 0);
 
@@ -843,7 +879,6 @@ mod tests {
     #[test]
     fn atexit_lifo_order() {
         let _lock = ATEXIT_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-        LifecycleShims::reset();
 
         use std::sync::Mutex;
         static ORDER: Mutex<Vec<i32>> = Mutex::new(Vec::new());
@@ -858,6 +893,11 @@ mod tests {
             ORDER.lock().unwrap_or_else(|e| e.into_inner()).push(3);
         }
 
+        let _scope = native_test_scope(&[
+            first as *const () as u64,
+            second as *const () as u64,
+            third as *const () as u64,
+        ]);
         shim_atexit(Some(first));
         shim_atexit(Some(second));
         shim_atexit(Some(third));
@@ -874,6 +914,173 @@ mod tests {
     #[test]
     fn atexit_null_returns_error() {
         assert_eq!(shim_atexit(None), -1);
+    }
+
+    #[test]
+    fn atexit_without_launch_returns_error() {
+        extern "C" fn callback() {}
+        assert_eq!(shim_atexit(Some(callback)), -1);
+        assert_eq!(
+            shim_cxa_atexit(None, std::ptr::null_mut(), std::ptr::null_mut()),
+            -1
+        );
+    }
+
+    #[test]
+    fn cxa_argument_and_recursive_finalization_are_once_only() {
+        static ORDER: Mutex<Vec<u64>> = Mutex::new(Vec::new());
+        extern "C" fn first() {
+            ORDER.lock().unwrap().push(1);
+        }
+        extern "C" fn added() {
+            ORDER.lock().unwrap().push(4);
+        }
+        extern "C" fn recursive(argument: *mut u8) {
+            // SAFETY: the test retains this u64 until finalization returns.
+            ORDER
+                .lock()
+                .unwrap()
+                .push(unsafe { argument.cast::<u64>().read() });
+            assert_eq!(shim_atexit(Some(added)), 0);
+            shim_cxa_finalize(std::ptr::null_mut());
+            ORDER.lock().unwrap().push(5);
+        }
+        let _scope = native_test_scope(&[
+            first as *const () as u64,
+            added as *const () as u64,
+            recursive as *const () as u64,
+        ]);
+        let mut argument = 3_u64;
+        assert_eq!(shim_atexit(Some(first)), 0);
+        assert_eq!(
+            shim_cxa_atexit(
+                Some(recursive),
+                (&raw mut argument).cast(),
+                std::ptr::null_mut()
+            ),
+            0
+        );
+        LifecycleShims::run_atexit_handlers();
+        shim_cxa_finalize(std::ptr::null_mut());
+        assert_eq!(*ORDER.lock().unwrap(), vec![3, 4, 1, 5]);
+    }
+
+    #[test]
+    fn exit_symbol_stdio_semantics() {
+        const CHILD_SYMBOL: &str = "BURDETTIE_EXIT_TEST_SYMBOL";
+        const MARKER: &str = "BURDETTIE_BUFFERED_STDIO_MARKER";
+        const CALLBACK: &[u8] = b"BURDETTIE_NATIVE_CALLBACK_RAN\n";
+        extern "C" fn callback() {
+            // SAFETY: the constant bytes and stdout descriptor are valid for
+            // this child; direct write makes invocation observable without
+            // depending on the normal-exit flush being tested separately.
+            unsafe {
+                libc::write(
+                    libc::STDOUT_FILENO,
+                    CALLBACK.as_ptr().cast(),
+                    CALLBACK.len(),
+                );
+            }
+        }
+        if let Ok(symbol) = std::env::var(CHILD_SYMBOL) {
+            let _scope = native_test_scope(&[callback as *const () as u64]);
+            assert_eq!(shim_atexit(Some(callback)), 0);
+            let mut table = ShimTable::new();
+            LifecycleShims::install(&mut table);
+            let address = table.resolve(&symbol).expect("known exit test symbol");
+            let mut buffer = [0_u8; 4096];
+            // SAFETY: dup returns an owned descriptor for the child's stdout.
+            // fdopen owns it until the child exits; all C strings are terminated.
+            let stream = unsafe { libc::fdopen(libc::dup(libc::STDOUT_FILENO), c"w".as_ptr()) };
+            assert!(!stream.is_null());
+            // SAFETY: the buffer remains alive until the non-returning exit
+            // call, and stream is a valid newly opened FILE with no prior I/O.
+            assert_eq!(
+                unsafe {
+                    libc::setvbuf(
+                        stream,
+                        buffer.as_mut_ptr().cast(),
+                        libc::_IOFBF,
+                        buffer.len(),
+                    )
+                },
+                0
+            );
+            let marker = std::ffi::CString::new(MARKER).unwrap();
+            // SAFETY: both the terminated marker and the FILE remain valid.
+            assert!(unsafe { libc::fputs(marker.as_ptr(), stream) } >= 0);
+            // SAFETY: this exact table entry is one of the lifecycle module's
+            // extern-C, non-returning int-status exit functions.
+            let terminate: extern "C" fn(i32) -> ! =
+                unsafe { std::mem::transmute(address as usize) };
+            terminate(37);
+        }
+
+        for (symbol, flushes) in [
+            ("_exit", true),
+            ("__exit", false),
+            ("_Exit", false),
+            ("__Exit", false),
+        ] {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "lifecycle::tests::exit_symbol_stdio_semantics",
+                    "--nocapture",
+                ])
+                .env(CHILD_SYMBOL, symbol)
+                .output()
+                .unwrap();
+            assert_eq!(output.status.code(), Some(37), "{symbol}: {output:?}");
+            assert_eq!(
+                String::from_utf8_lossy(&output.stdout).contains(MARKER),
+                flushes,
+                "wrong buffered-output behavior for {symbol}: {output:?}"
+            );
+            assert_eq!(
+                output
+                    .stdout
+                    .windows(CALLBACK.len())
+                    .any(|window| window == CALLBACK),
+                flushes,
+                "wrong callback behavior for {symbol}: {output:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn recursive_native_exit_drains_remaining_callbacks_once() {
+        const CHILD: &str = "BURDETTIE_RECURSIVE_NATIVE_EXIT";
+        extern "C" fn first() {
+            // SAFETY: fixed valid bytes and the child's stdout descriptor.
+            unsafe { libc::write(libc::STDOUT_FILENO, b"FIRST\n".as_ptr().cast(), 6) };
+        }
+        extern "C" fn recursive() {
+            // SAFETY: fixed valid bytes and the child's stdout descriptor.
+            unsafe { libc::write(libc::STDOUT_FILENO, b"RECURSIVE\n".as_ptr().cast(), 10) };
+            shim_exit(52);
+        }
+        if std::env::var_os(CHILD).is_some() {
+            let _scope =
+                native_test_scope(&[first as *const () as u64, recursive as *const () as u64]);
+            assert_eq!(shim_atexit(Some(first)), 0);
+            assert_eq!(shim_atexit(Some(recursive)), 0);
+            shim_exit(37);
+        }
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "lifecycle::tests::recursive_native_exit_drains_remaining_callbacks_once",
+                "--nocapture",
+            ])
+            .env(CHILD, "1")
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(52), "{output:?}");
+        let text = String::from_utf8_lossy(&output.stdout);
+        assert!(text.contains("RECURSIVE\nFIRST\n"), "{text}");
+        assert_eq!(text.matches("FIRST\n").count(), 1);
+        assert_eq!(text.matches("RECURSIVE\n").count(), 1);
     }
 
     #[test]

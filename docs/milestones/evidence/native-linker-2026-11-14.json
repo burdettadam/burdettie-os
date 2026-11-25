@@ -1,0 +1,187 @@
+{
+  "schema_version": 1,
+  "scope": "bounded_native_linker_plan_and_retrieved_build_failure",
+  "source": {
+    "revision": "0163b2db225b85e3bf96fc25646ea290105ac298",
+    "lock": {
+      "sha256": "00c598d3efca4bbda302fec4a43fffbfa787dc642c8c0b2c4202c65339e684d0",
+      "nixpkgs_node": "nixpkgs_3",
+      "nixpkgs_revision": "fd1462031fdee08f65fd0b4c6b64e22239a77870"
+    },
+    "submodules": [
+      [
+        "f577aafe4b9a89727968666237d20cc51d2f770d",
+        "external/corecrypto"
+      ]
+    ]
+  },
+  "burdettie_revision": "2bbc34c0e1774c8993ff94894ffc2dad04935b4f",
+  "nix_version": "nix (Nix) 2.28.3",
+  "recipe_sha256": "3f4fa3423f8ccb67145c140aff193ad4684bb37a98b805583a92630d03a19070",
+  "helper_sha256": "2c682e27e0717220ffc9e80b64685ddeedd444d0de9a7706cb45e11e83ed695a",
+  "patch_sha256": "07a12f1ee8784dd0161723a90df2c4c802996d13c55dba4363670cf1475d8c0e",
+  "sdk": {
+    "drv": "0nwq5lg8853m0rdvsncvjwyjk0dmffxd-puredarwin-oss-sdk-26.5.drv",
+    "out": "nnsb7h396vc5xmwn59kky88inslcdw1m-puredarwin-oss-sdk-26.5"
+  },
+  "sdk_identity_matches_retained_baseline": true,
+  "native_linker": {
+    "upstream": {
+      "drv": "pi6rmr72l49nmzlgwsrvjvf92p0y4vlf-puredarwin-native-ld-0.1.drv",
+      "out": "zps2la9dxyrrk00svjh1d5ig2lkfdlwl-puredarwin-native-ld-0.1"
+    },
+    "candidate": {
+      "drv": "sq9k9yvwrp9m9zkj5lsn4x10112hp9m8-puredarwin-native-ld-0.1.drv",
+      "out": "7kz4m6aipfdn9i1lps34lkn3ljm3slwg-puredarwin-native-ld-0.1"
+    }
+  },
+  "unchanged_recipe_fields": {
+    "configure": true,
+    "dependencies": true,
+    "install": true,
+    "source": true
+  },
+  "plan": {
+    "experiment": "native-linker-plan-20261114-01",
+    "status": "planned_not_built",
+    "started_at": "2026-11-14T08:28:25.248658+00:00",
+    "finished_at": "2026-11-14T08:28:45.333862+00:00",
+    "duration_seconds": 20.09,
+    "planning_mode": "substituter_metadata",
+    "dry_run_exit_code": 0,
+    "local_derivations": 20,
+    "fetch_paths": 190,
+    "download_mib": 356.27,
+    "unpacked_mib": 1085.0,
+    "dependency_realization": "not_run",
+    "dependency_downloads": "not_run",
+    "peak_space_qualified": false,
+    "observed_min_free_bytes": 12128309248,
+    "cgroup_peak_memory_bytes": 832344064,
+    "result_sha256": "2dc0860744543609edf958fbebcb9d886280e8e74605e6c058437d2f88b6338a",
+    "helper_result_sha256": "d28b20882e46dc6d00caa3ff32d1810ee1ee44e783478b99ac93ff8ce8e230f5",
+    "dry_run_log_sha256": "ca8d29c3f936aa7e72a4309ca80d06ab335449eb30569b6253520601e68f2fb1",
+    "driver_started_at": "2026-11-14T08:28:24.532613+00:00",
+    "driver_finished_at": "2026-11-14T08:28:45.334690+00:00"
+  },
+  "build_attempt": {
+    "experiment": "native-linker-build-20261114-01",
+    "started_at": "2026-11-14T08:36:22.784073+00:00",
+    "phase_started_at": "2026-11-14T08:36:23.582107+00:00",
+    "phase_finished_at": "2026-11-14T08:56:24.699416+00:00",
+    "finished_at": "2026-11-14T08:56:24.701190+00:00",
+    "duration_seconds": 1201.12,
+    "status": "fail",
+    "final_outcome": "fail_wall_time_budget",
+    "exit_code": 1,
+    "error": "stage wall-time budget reached",
+    "final_result_sha256": "b609fafb072013f6140d9bc6f5de52d5f02c6364630617cedad8485ae48feebd",
+    "driver_sha256": "678fd895137eb0fdda0646252c3c7ff541b4965d43f0fbd4a68eb3a14aca9f35",
+    "log": {
+      "bytes": 373573,
+      "sha256": "1e0b3d2ef4a3d344212a602453400a214bd4ad5b2b14420625d90094643569c1",
+      "full_capture_verified": true,
+      "last_logged_dependency": "apple-libtapi-1300.6.5",
+      "last_logged_build_progress_percent": 26,
+      "last_logged_compile_target": "utils/TableGen/CMakeFiles/obj.llvm-tblgen.dir/CodeGenDAGPatterns.cpp.o",
+      "compiler_fatal_diagnostic_observed": false,
+      "terminal_diagnostic": "error: interrupted by the user",
+      "warnings_retained": true
+    },
+    "initial_free_disk_bytes": 12210565120,
+    "observed_min_free_disk_bytes": 10114813952,
+    "final_free_disk_bytes": 10121490432,
+    "observed_min_host_available_memory_bytes": 3414528000,
+    "final_host_available_memory_bytes": 3874377728,
+    "cgroup_at_finish": {
+      "memory_peak_bytes": 1343332352,
+      "memory_events": {
+        "low": 0,
+        "high": 3160,
+        "max": 0,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0,
+        "sock_throttled": 0
+      },
+      "cpu_usage_microseconds": 298538714,
+      "cpu_throttled_microseconds": 909076769
+    },
+    "configured_limits": {
+      "cpu_quota_percent_of_one_cpu": 25,
+      "memory_max_bytes": 1610612736,
+      "memory_high_bytes": 1342177280,
+      "swap_max_bytes": 0,
+      "tasks_max": 128,
+      "minimum_free_disk_bytes": 8589934592,
+      "maximum_stage_growth_bytes": 3221225472,
+      "minimum_host_available_memory_bytes": 1073741824,
+      "phase_timeout_seconds": 1200,
+      "service_runtime_max_seconds": 1500,
+      "build_jobs": 1,
+      "build_cores": 1,
+      "substitution_jobs": 2,
+      "remote_builders": false,
+      "automatic_garbage_collection": false,
+      "keep_failed_builds": true
+    },
+    "failed_build_tree_retained": true,
+    "libtapi_completed_by_this_attempt": false,
+    "native_linker_completed_by_this_attempt": false,
+    "diagnosis": "The harness reached its 1200-second phase deadline and terminated only its build process group. Nix reported interruption and retained the failed tree. No compiler-fatal diagnostic or cgroup memory-max/OOM event was observed; memory-high events remain recorded. This is a bounded build failure, not a successful linker realization or a demonstrated compiler defect.",
+    "prior_incomplete_observation": {
+      "last_observed_at": "2026-11-14T08:53:16.590445+00:00",
+      "status_at_last_observation": "running",
+      "last_observed_dependency": "apple-libtapi-1300.6.5",
+      "last_observed_build_progress_percent": 20,
+      "compiler_failure_observed_in_last_tail": false,
+      "last_observed_free_disk_bytes": 10120871936,
+      "last_observed_cgroup_memory_bytes": 1048174592,
+      "last_observed_cgroup_memory_peak_bytes": 1343332352,
+      "last_observed_cgroup_cpu_nanoseconds": 251584146000,
+      "log_bytes_at_last_observation": 330655,
+      "retrieval_blocker_at_that_checkpoint": "The signed-in console session expired before the final receipt was retrieved.",
+      "qualification_at_that_checkpoint": "Last observed progress is not a final result. Do not infer success, timeout, failure, current host state or output realization."
+    }
+  },
+  "qualification": {
+    "fixture_linking": "not_run",
+    "selected_image_build": "not_run",
+    "selected_image_boot": "not_run",
+    "burdettie_runtime_execution": "not_run",
+    "guest_security_enforcement": "not_run"
+  },
+  "remaining_gates": [
+    "Preserve the retrieved failure, full logs, failed build tree, existing sources, VM disks and services.",
+    "Remeasure free blocks and inodes before any new bounded stage; the same driver cannot reserve its 3-GiB growth budget at the recovery checkpoint.",
+    "Review any source-staging change separately, retain full source inputs, bind new derivation/output identities and inspect an offline plan; do not treat it as resuming the retained tree.",
+    "Realize and inspect the native linker before planning downstream stages.",
+    "Plan and qualify cross-toolchain, compiler-rt and libSystem separately using the reviewed bounded recipes.",
+    "Retain complete LLVM source; writable-only staging does not establish peak capacity or build completion.",
+    "No new infrastructure, paid upgrade or resource expansion is authorized."
+  ],
+  "libtapi_dependency": {
+    "version": "1300.6.5",
+    "repository": "https://github.com/tpoechtrager/apple-libtapi",
+    "revision": "640b4623929c923c0468143ff2a363a48665fa54",
+    "drv": "kr9cik3jk4rjsfdjw3qx3z06bj8aq2c1-apple-libtapi-1300.6.5.drv",
+    "expected_out": "q9bvm0m0ndp8x7ffd6cbixl73p9bi80y-apple-libtapi-1300.6.5",
+    "source_store_basename": "lck5ww0br6h9z1v9k5psgmimb52ncm74-source",
+    "source_allocated_bytes": 217415680,
+    "source_allocation_is_not_build_peak": true
+  },
+  "recovery_checkpoint": {
+    "captured_at": "2026-11-14T18:01:21.795099+00:00",
+    "private_manifest_members_verified": 20,
+    "free_disk_bytes": 9554071552,
+    "minimum_free_disk_reserve_bytes": 8589934592,
+    "remaining_above_reserve_bytes": 964136960,
+    "same_driver_required_initial_free_bytes": 11811160064,
+    "same_driver_initial_headroom_shortfall_bytes": 2257088512,
+    "same_driver_3_gib_growth_preflight": "would_reject_at_this_checkpoint",
+    "failed_build_tree_allocated_bytes": 341536768,
+    "failed_build_tree_deleted": false,
+    "new_nix_build_resumes_kept_tree": false,
+    "interpretation": "The later capacity measurement is distinct from the build-finish measurement. The retained tree remains evidence; another Nix invocation does not resume it. A changed staging recipe needs new derivation/output identities and an offline plan before any bounded realization. Neither reduced staging nor completion within the remaining margin is qualified."
+  }
+}

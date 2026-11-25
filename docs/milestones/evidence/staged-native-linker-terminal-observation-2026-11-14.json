@@ -1,0 +1,260 @@
+{
+  "schema_version": 1,
+  "scope": "native_linker_terminal_status_and_host_capture_manifest_observation",
+  "status": "driver_reported_success_full_recovery_pending",
+  "burdettie_revision": "dd1c5710c12bdcf23ba091eaa09c859a9a7fec2a",
+  "source_revision_from_prior_verified_plan": "0163b2db225b85e3bf96fc25646ea290105ac298",
+  "prior_native_plan": {
+    "evidence": "staged-linker-plan-2026-11-14.json",
+    "result_sha256": "15ee24d7acfefbc78a40f809df41b7378f29c752425a4e70f016e15ddfff2f17"
+  },
+  "native_output_identity": {
+    "expected_candidate_from_prior_verified_plan": {
+      "drv": "z0i9acp9rl54vmr877l37xmq7x11i525-puredarwin-native-ld-0.1.drv",
+      "out": "qhdkgmj1f26029524iiv8jsrhixlbazd-puredarwin-native-ld-0.1"
+    },
+    "reported_realized_output_basename": "qhdkgmj1f26029524iiv8jsrhixlbazd-puredarwin-native-ld-0.1",
+    "reported_output_matches_expected": true,
+    "fresh_current_registered_output": null,
+    "fresh_current_output_inventory": null,
+    "qualification": "Expected derivation comes from the recovered plan; realized output basename comes from the terminal status projection. Current output contents/registration have not been independently rechecked."
+  },
+  "reviewed_output_inspector": {
+    "path": "scripts/inspect_puredarwin_native.py",
+    "sha256": "a7d7fb6f00474fbaf537e460d86bc98414d18b676ffa27d3a3577219c6e9c585"
+  },
+  "reviewed_private_driver_sha256": "1660629d22b0280f8a331c1486d385c42f06482b5a29ab0511dc27e9ce785118",
+  "observed_driver_summary": {
+    "status": "staged_libtapi_native_linker_built",
+    "started_at": "2026-11-14T21:00:39.342641+00:00",
+    "finished_at": "2026-11-14T21:08:52.160253+00:00",
+    "realization_command_succeeded": true,
+    "output_inspection_status": "pass",
+    "phases": [
+      {
+        "name": "fetch-exact-revision",
+        "status": "pass",
+        "exit_code": 0,
+        "timed_out": false,
+        "started_at": "2026-11-14T21:00:39.864324+00:00",
+        "finished_at": "2026-11-14T21:00:40.980622+00:00",
+        "duration_seconds": 1.12,
+        "timeout_seconds": 90
+      },
+      {
+        "name": "prepare-exclusive-worktree",
+        "status": "pass",
+        "exit_code": 0,
+        "timed_out": false,
+        "started_at": "2026-11-14T21:00:40.981227+00:00",
+        "finished_at": "2026-11-14T21:00:42.068670+00:00",
+        "duration_seconds": 1.09,
+        "timeout_seconds": 90
+      },
+      {
+        "name": "verify-inputs",
+        "status": "pass",
+        "exit_code": 0,
+        "timed_out": false,
+        "started_at": "2026-11-14T21:00:42.660942+00:00",
+        "finished_at": "2026-11-14T21:00:57.056186+00:00",
+        "duration_seconds": 14.39,
+        "timeout_seconds": 180
+      },
+      {
+        "name": "staged-native-linker-build",
+        "status": "pass",
+        "exit_code": 0,
+        "timed_out": false,
+        "started_at": "2026-11-14T21:00:57.071686+00:00",
+        "finished_at": "2026-11-14T21:08:37.065184+00:00",
+        "duration_seconds": 459.99,
+        "timeout_seconds": 7200
+      },
+      {
+        "name": "inspect-output",
+        "status": "pass",
+        "exit_code": 0,
+        "timed_out": false,
+        "started_at": "2026-11-14T21:08:37.067390+00:00",
+        "finished_at": "2026-11-14T21:08:51.359809+00:00",
+        "duration_seconds": 14.29,
+        "timeout_seconds": 180
+      }
+    ],
+    "source_of_values": "Bounded status reader projection of the retained driver result; full result bytes have not been recovered."
+  },
+  "build_resource_history": {
+    "minimum_free_disk_bytes": null,
+    "maximum_whole_host_disk_growth_bytes": null,
+    "minimum_available_memory_bytes": null,
+    "minimum_free_inodes": null,
+    "cgroup_memory_peak_bytes": null,
+    "cgroup_memory_events": null,
+    "status": "pending_full_terminal_result_recovery",
+    "later_status_census_is_not_build_history": true
+  },
+  "status_observation": {
+    "observed_at": "2026-11-14T21:09:58.386178+00:00",
+    "read_errors": [],
+    "unit_load_state": "not-found",
+    "unit_active_state": "inactive",
+    "unit_sub_state": "dead",
+    "main_pid_zero": true,
+    "control_pid_zero": true,
+    "cgroup_available": false,
+    "absent_unit_default_properties_used_as_build_success_evidence": false,
+    "resources": {
+      "free_bytes": 9199788032,
+      "free_inodes": 4298559,
+      "available_memory_bytes": 3636842496
+    },
+    "existing_k3s_active": true,
+    "complete_driver_result_retrieved": false,
+    "complete_build_log_retrieved": false,
+    "captured_log_tail": {
+      "bytes": 2048,
+      "sha256": "9bd3941a7e5a6588a2ba9f49f2e96f768e3f5e7b91d9b8aca12788a247b068bc",
+      "scope": "The private status observation includes this final tail only."
+    },
+    "native_output_qualification": "not_assessed_by_status_reader"
+  },
+  "host_terminal_capture_observation": {
+    "captured_at": "2026-11-14T21:11:02.865902+00:00",
+    "status": "terminal_capture_created",
+    "driver_status": "staged_libtapi_native_linker_built",
+    "driver_finished_at_present": true,
+    "selected_file_count": 32,
+    "missing_selected_files": [],
+    "receipt_consistency_errors": [],
+    "archive": {
+      "bytes": 117306,
+      "sha256": "2cf8cae41923872d79aebcd20daff9c778a914a0800ef59b2be0346619f6dea5",
+      "complete_content_retrieved": false
+    },
+    "raw_bundle": {
+      "bytes": 700539,
+      "sha256": "782da87d01eae4c9a46cd3ed8a118b46e75d0650f81a3554ad49f9f44d617cb0",
+      "complete_content_retrieved": false
+    },
+    "selected_artifact_metadata": [
+      {
+        "role": "terminal_driver_result",
+        "bytes": 49425,
+        "sha256": "19163a6bd0189f492d07118b23d0a9486a87e5d56d4a76873d364c40215b36eb",
+        "complete_content_retrieved": false
+      },
+      {
+        "role": "complete_native_build_log",
+        "bytes": 292452,
+        "sha256": "23a35f2c2a2830ef123e56d019a21376b2582dd6a2a03e595807f3117345b295",
+        "complete_content_retrieved": false
+      },
+      {
+        "role": "input_verification_report",
+        "bytes": 7487,
+        "sha256": "82fabb35431a3fc2728d6aae11e7ed15ed6ad8fe0e011e580ce088e7ba479bd1",
+        "complete_content_retrieved": false
+      },
+      {
+        "role": "complete_output_inspection_report",
+        "bytes": 14188,
+        "sha256": "5c1dd0576dffb963f765a21e599ab4d9c1df2ef9707eb126583768aded638068",
+        "complete_content_retrieved": false
+      },
+      {
+        "role": "native_registered_output_sidecar",
+        "bytes": 754,
+        "sha256": "b27d635fa6687ca397d086b41518ac741cb04e77c272e05894beba2a692923c8",
+        "complete_content_retrieved": false
+      },
+      {
+        "role": "inspection_registered_output_sidecar",
+        "bytes": 754,
+        "sha256": "b27d635fa6687ca397d086b41518ac741cb04e77c272e05894beba2a692923c8",
+        "complete_content_retrieved": false
+      },
+      {
+        "role": "native_default_store_verify_stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "complete_content_retrieved": false
+      },
+      {
+        "role": "native_default_store_verify_stderr",
+        "bytes": 318,
+        "sha256": "ada1c5835fbb940480e7a92528c725350997f1f6cfcd2d00dabf34868424abbf",
+        "complete_content_retrieved": false
+      },
+      {
+        "role": "native_loader_resolution_stdout",
+        "bytes": 1506,
+        "sha256": "9f383ad1faeff760059cd9ca5ff2a41492be0655e608d12a70ff350fe31a5f33",
+        "complete_content_retrieved": false
+      },
+      {
+        "role": "native_loader_resolution_stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "complete_content_retrieved": false
+      },
+      {
+        "role": "native_version_stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "complete_content_retrieved": false
+      },
+      {
+        "role": "native_version_stderr",
+        "bytes": 284,
+        "sha256": "d8b3aa391c3ac3677c5b7e0f39c5667d114566b0bc2ca076c378b47e9beed203",
+        "complete_content_retrieved": false
+      }
+    ],
+    "hash_provenance": "Reported by the reviewed host capture; archive and member content has not been transferred or independently rehashed.",
+    "source_manifest_content_retrieved": false,
+    "native_output_qualification": "not_assessed_by_capture"
+  },
+  "locally_verified_observation_envelopes": {
+    "status": {
+      "bytes": 6257,
+      "sha256": "1e1779f03e3aeda48c80ac3487b6633a6389f8783ec179d329dc0dceddbce473",
+      "complete_observation_retrieved": true
+    },
+    "capture": {
+      "bytes": 6224,
+      "sha256": "361697982b51aa3f09354bebb6d0f1b3a3628f3bb7ea237e8f85bbfab7bd1857",
+      "complete_observation_retrieved": true
+    }
+  },
+  "recovery_boundary": {
+    "full_archive_retrieved": false,
+    "full_result_retrieved": false,
+    "full_build_log_retrieved": false,
+    "full_registered_output_sidecar_retrieved": false,
+    "all_captured_member_hashes_independently_verified": false,
+    "independent_nar_elf_reference_and_loader_audit": "pending_full_recovery",
+    "complete_build_cgroup_and_resource_history_audit": "pending_full_recovery",
+    "next_consumer_fresh_output_verification": "not_run",
+    "transfer_blocker": "The originating browser connection became unavailable after capture-manifest retrieval. No archive chunk recovery had begun at this checkpoint."
+  },
+  "qualification": {
+    "native_linker_realization": "driver_reported_pass_full_recovery_pending",
+    "native_output_inspection": "driver_reported_pass_full_recovery_pending",
+    "native_output_independent_qualification": "pending_full_recovery_and_review",
+    "downstream_cross_toolchain_plan": "not_run",
+    "compiler_rt_build": "not_run",
+    "libsystem_build": "not_run",
+    "fixture_link": "not_run",
+    "selected_image_build": "not_run",
+    "selected_guest_execution": "not_run",
+    "burdettie_runtime_execution_in_selected_guest": "not_run",
+    "security_enforcement": "not_run",
+    "backend_control_families": 17,
+    "qualified_backend_control_families": 0,
+    "backend_control_status": "all_unavailable_unsupported",
+    "future_build_capacity_qualified": false,
+    "m1_complete": false
+  },
+  "observation_boundary": "This additive observation preserves prior failure and plan receipts. It records reported terminal success and the host capture manifest, not a completed local archive/log/output audit or a current host census after connection loss."
+}

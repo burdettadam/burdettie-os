@@ -147,15 +147,16 @@ pub extern "C" fn shim_cf_string_create_with_cstring(
     let len = bytes.len();
 
     let owned = CString::new(bytes).unwrap_or_default();
-    let owned_ptr = owned.into_raw();
 
     let obj = crate::pal_alloc().calloc(1, 32) as u64;
     if obj == 0 {
-        unsafe {
-            drop(CString::from_raw(owned_ptr));
-        }
         return 0;
     }
+
+    // This is the only immutable creation notification. The observer copies
+    // bytes while `owned` is still a live CString, never from object fields.
+    crate::cstring_observer::observe_immutable_constructor(obj, &owned);
+    let owned_ptr = owned.into_raw();
 
     unsafe {
         let p = obj as *mut u8;

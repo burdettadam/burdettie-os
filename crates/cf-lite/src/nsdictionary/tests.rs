@@ -147,6 +147,40 @@ fn empty_dictionary() {
     crate::pal_alloc().free(dict as *mut u8);
 }
 
+#[test]
+fn dictionary_class_factory_dispatch_returns_empty_immutable_dictionary() {
+    let mut rt = objc_runtime::ObjcRuntime::new();
+    crate::FoundationShims::register_nsobject_class(&mut rt);
+    crate::FoundationShims::register_nsdictionary_class(&mut rt);
+    crate::FoundationShims::register_nsmutabledictionary_class(&mut rt);
+
+    let class = nsobj::nsdictionary_class_addr();
+    // Follow the receiver's ISA just as a class message does. Calling a shim
+    // directly would miss an absent or incorrectly registered class selector.
+    let metaclass = read_field(class, 0);
+    let selector = rt.intern_selector("dictionary") as u64;
+    let method = rt
+        .lookup_method_entry(metaclass, "dictionary")
+        .expect("+[NSDictionary dictionary] must be registered");
+    assert_eq!(method.type_encoding.as_ref(), "@@:");
+    // SAFETY: the registered object-returning class method has only the two
+    // implicit Objective-C arguments (receiver and selector), checked above.
+    let factory: extern "C" fn(u64, u64) -> u64 = unsafe { std::mem::transmute(method.imp) };
+    let dict = factory(class, selector);
+
+    assert_ne!(dict, 0);
+    let isa = read_field(dict, 0);
+    assert_eq!(isa, class);
+    assert_eq!(shim_nsdictionary_count(dict, 0), 0);
+    assert_eq!(shim_nsdictionary_object_for_key(dict, 0, 42), 0);
+    assert!(rt.msg_lookup(isa, "setObject:forKey:").is_none());
+    // The mutable subclass still exposes the mutation API.
+    assert!(rt
+        .msg_lookup(nsobj::nsmutabledictionary_class_addr(), "setObject:forKey:")
+        .is_some());
+    free_dictionary(dict);
+}
+
 // ── Nil safety ─────────────────────────────────────────────────
 
 #[test]

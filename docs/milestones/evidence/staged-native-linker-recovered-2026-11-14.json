@@ -1,0 +1,686 @@
+{
+  "schema_version": 1,
+  "scope": "recovered_historical_staged_native_linker_build_and_installed_output_inspection",
+  "status": "recovered_native_build_and_installed_inspection_evidence_accepted",
+  "historical_terminal_observation": {
+    "evidence": "staged-native-linker-terminal-observation-2026-11-14.json",
+    "bytes": 10518,
+    "sha256": "3c415ab262028ce199ee7a43e08a76a3810200e4de60acba48b5d563a8dda83b",
+    "preserved_unchanged": true,
+    "prior_recovery_pending_status_is_historical": true
+  },
+  "recovery": {
+    "verified_at": "2026-11-14T23:15:38.538666+00:00",
+    "independent_review_at": "2026-11-14T23:20:18.604949+00:00",
+    "full_selected_archive_recovered": true,
+    "archive": {
+      "bytes": 117306,
+      "sha256": "2cf8cae41923872d79aebcd20daff9c778a914a0800ef59b2be0346619f6dea5"
+    },
+    "raw_bundle": {
+      "bytes": 700539,
+      "sha256": "782da87d01eae4c9a46cd3ed8a118b46e75d0650f81a3554ad49f9f44d617cb0"
+    },
+    "capture_manifest": {
+      "bytes": 6105,
+      "sha256": "f6905c68878485ac32c77a25461446f75b07b8ee8693ed85d11332f4fdae4250"
+    },
+    "local_recovery_receipt": {
+      "bytes": 5978,
+      "sha256": "0a1121b76990de5428bbae84916d414b76e69c4002f5422e4eedb4f10f119248"
+    },
+    "independent_review_receipt": {
+      "bytes": 29368,
+      "sha256": "614cdc0974232c8e31b57405f63eca9007a75c4019025a2e923efedc57c054d3"
+    },
+    "selected_file_count": 32,
+    "members": [
+      {
+        "name": "fetch-exact-revision.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "input-verification/dependency-path-info.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "input-verification/dependency-path-info.stdout",
+        "bytes": 825,
+        "sha256": "9069d0f0b7ec2e1324ed70b98ed504d48d742f0177d4e0f6cc78f8313200741b"
+      },
+      {
+        "name": "input-verification/dependency-store-verify.stderr",
+        "bytes": 163,
+        "sha256": "da5d333d548053061443da72b48bd0a48f8984c5df8ea921afe0cbdb9be0fdde"
+      },
+      {
+        "name": "input-verification/dependency-store-verify.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "input-verification/nix-version.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "input-verification/nix-version.stdout",
+        "bytes": 17,
+        "sha256": "53ceb94a7ac0970d1e56f1b33969b841080a89db8c93ef261ab464175aec1329"
+      },
+      {
+        "name": "input-verification/result.json",
+        "bytes": 7487,
+        "sha256": "82fabb35431a3fc2728d6aae11e7ed15ed6ad8fe0e011e580ce088e7ba479bd1"
+      },
+      {
+        "name": "inspect-output.log",
+        "bytes": 11712,
+        "sha256": "0ba46e5a1078dc5eacd6b2d0d9ed62b9da303127d9da5266d52974c0e25e3644"
+      },
+      {
+        "name": "libtapi-build-result.json",
+        "bytes": 9074,
+        "sha256": "19e3608980f168a45c25a1c13ed12b45702886e85d88faf10e5381a01dc9da2d"
+      },
+      {
+        "name": "libtapi-output-path-info.json",
+        "bytes": 446,
+        "sha256": "4acefa4af2c705b9336f1980cc655e189864a8873f0411134c22b67c1d3224e5"
+      },
+      {
+        "name": "libtapi-plan.json",
+        "bytes": 27244,
+        "sha256": "55c9bfc2f7445c925544e5bb2676a30a4033cedadd1b3c2df81cffb5f76f0b98"
+      },
+      {
+        "name": "metadata-result.json",
+        "bytes": 11446,
+        "sha256": "1c613297d2654b010853fda2a4fe5a46f278144cb7276a30bd1c30f5e4de581f"
+      },
+      {
+        "name": "native-linker-plan.json",
+        "bytes": 39297,
+        "sha256": "15ee24d7acfefbc78a40f809df41b7378f29c752425a4e70f016e15ddfff2f17"
+      },
+      {
+        "name": "native-plan-dry-run.log",
+        "bytes": 758,
+        "sha256": "7ff0e5f0d8a8fde0337803a453d21dfa32382532af77480bf98b641c4619948d"
+      },
+      {
+        "name": "output-inspection/native-dependency-path-info.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "output-inspection/native-dependency-path-info.stdout",
+        "bytes": 1425,
+        "sha256": "f1c61fd862716d37ee78864064bf54a181f677dcd70651dbd647a16aca583be2"
+      },
+      {
+        "name": "output-inspection/native-ld-version.stderr",
+        "bytes": 284,
+        "sha256": "d8b3aa391c3ac3677c5b7e0f39c5667d114566b0bc2ca076c378b47e9beed203"
+      },
+      {
+        "name": "output-inspection/native-ld-version.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "output-inspection/native-loader-list.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "output-inspection/native-loader-list.stdout",
+        "bytes": 1506,
+        "sha256": "9f383ad1faeff760059cd9ca5ff2a41492be0655e608d12a70ff350fe31a5f33"
+      },
+      {
+        "name": "output-inspection/native-path-info.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "output-inspection/native-path-info.stdout",
+        "bytes": 754,
+        "sha256": "b27d635fa6687ca397d086b41518ac741cb04e77c272e05894beba2a692923c8"
+      },
+      {
+        "name": "output-inspection/native-store-verify.stderr",
+        "bytes": 318,
+        "sha256": "ada1c5835fbb940480e7a92528c725350997f1f6cfcd2d00dabf34868424abbf"
+      },
+      {
+        "name": "output-inspection/native-store-verify.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "output-inspection/output-path-info.json",
+        "bytes": 754,
+        "sha256": "b27d635fa6687ca397d086b41518ac741cb04e77c272e05894beba2a692923c8"
+      },
+      {
+        "name": "output-inspection/result.json",
+        "bytes": 14188,
+        "sha256": "5c1dd0576dffb963f765a21e599ab4d9c1df2ef9707eb126583768aded638068"
+      },
+      {
+        "name": "output-path-info.json",
+        "bytes": 754,
+        "sha256": "b27d635fa6687ca397d086b41518ac741cb04e77c272e05894beba2a692923c8"
+      },
+      {
+        "name": "prepare-exclusive-worktree.log",
+        "bytes": 136,
+        "sha256": "36411322dff743fa25f5bc98f1a92d1e0297b9a7ba0c62588d6c2c29bfd3f601"
+      },
+      {
+        "name": "result.json",
+        "bytes": 49425,
+        "sha256": "19163a6bd0189f492d07118b23d0a9486a87e5d56d4a76873d364c40215b36eb"
+      },
+      {
+        "name": "staged-native-linker-build.log",
+        "bytes": 292452,
+        "sha256": "23a35f2c2a2830ef123e56d019a21376b2582dd6a2a03e595807f3117345b295"
+      },
+      {
+        "name": "verify-inputs.log",
+        "bytes": 6015,
+        "sha256": "59e6b422bf0761e82a8d7d1c218a1ee7c74061be0e37816f29497a57f98b242c"
+      }
+    ],
+    "journal_stdout": {
+      "bytes": 43279,
+      "sha256": "b3cd9d4e607141c5216f72f6f7c62b090699bd59fea5637e42f0ba2550bb2584"
+    },
+    "all_selected_member_hashes_independently_verified": true,
+    "missing_selected_files": [],
+    "receipt_consistency_errors": [],
+    "mechanical_review_checks_passed": 116,
+    "actual_receipt_validator_passed": true,
+    "validation_scope": "Retained historical records and actual consumer receipt checks; no current-host Nix queries, binary execution or tests rerun by the independent review."
+  },
+  "identity": {
+    "burdettie_revision": "dd1c5710c12bdcf23ba091eaa09c859a9a7fec2a",
+    "plan_burdettie_revision": "e5ff8bf1fc332b6fc0c08dd904a38e8de34f8af4",
+    "source": {
+      "revision": "0163b2db225b85e3bf96fc25646ea290105ac298",
+      "lock": {
+        "sha256": "00c598d3efca4bbda302fec4a43fffbfa787dc642c8c0b2c4202c65339e684d0",
+        "nixpkgs_node": "nixpkgs_3",
+        "nixpkgs_revision": "fd1462031fdee08f65fd0b4c6b64e22239a77870"
+      },
+      "submodules": [
+        [
+          "f577aafe4b9a89727968666237d20cc51d2f770d",
+          "external/corecrypto"
+        ]
+      ]
+    },
+    "sdk": {
+      "drv": "0nwq5lg8853m0rdvsncvjwyjk0dmffxd-puredarwin-oss-sdk-26.5.drv",
+      "out": "nnsb7h396vc5xmwn59kky88inslcdw1m-puredarwin-oss-sdk-26.5",
+      "identity_matches_expected": true
+    },
+    "prior_receipts": [
+      {
+        "role": "native_linker_plan",
+        "bytes": 39297,
+        "sha256": "15ee24d7acfefbc78a40f809df41b7378f29c752425a4e70f016e15ddfff2f17"
+      },
+      {
+        "role": "native_metadata_driver",
+        "bytes": 11446,
+        "sha256": "1c613297d2654b010853fda2a4fe5a46f278144cb7276a30bd1c30f5e4de581f"
+      },
+      {
+        "role": "staged_libtapi_build",
+        "bytes": 9074,
+        "sha256": "19e3608980f168a45c25a1c13ed12b45702886e85d88faf10e5381a01dc9da2d"
+      }
+    ],
+    "reviewed_private_driver_sha256": "1660629d22b0280f8a331c1486d385c42f06482b5a29ab0511dc27e9ce785118",
+    "reviewed_code": [
+      {
+        "path": "scripts/build_puredarwin_fixtures.py",
+        "sha256": "1f5a536dff89e4d276908e582af3e08d4c0e71268944a5822a4b4ae4f82be09f"
+      },
+      {
+        "path": "scripts/inspect_puredarwin_native.py",
+        "sha256": "a7d7fb6f00474fbaf537e460d86bc98414d18b676ffa27d3a3577219c6e9c585"
+      },
+      {
+        "path": "scripts/plan_puredarwin_libtapi.py",
+        "sha256": "7c18e1c623f976e52c70e81f99d8d1e566a7804ec7c9a082085f828c7640dcab"
+      },
+      {
+        "path": "scripts/plan_puredarwin_linker.py",
+        "sha256": "2c682e27e0717220ffc9e80b64685ddeedd444d0de9a7706cb45e11e83ed695a"
+      },
+      {
+        "path": "scripts/plan_puredarwin_staged_linker.py",
+        "sha256": "8712704390bb1f1727934144e4e844b286e5e78423e6144c61a5465b04fa6727"
+      },
+      {
+        "path": "scripts/puredarwin_libtapi.nix",
+        "sha256": "5daf2f02681357e00d3b5c8ef5fbcbdf279f681a44697780d5c578dee1872409"
+      },
+      {
+        "path": "scripts/puredarwin_native_linker.nix",
+        "sha256": "3f4fa3423f8ccb67145c140aff193ad4684bb37a98b805583a92630d03a19070"
+      },
+      {
+        "path": "scripts/puredarwin_staged_linker.nix",
+        "sha256": "d493034708bb62dc8191590f2e86132727219e968d655f4fa48a3b40cd6d9d3c"
+      },
+      {
+        "path": "scripts/stage_libtapi_source.py",
+        "sha256": "cec91393bc522d612336aaae950fdf0590a7f26dbc6ddcec2f2a04804fbb055b"
+      }
+    ],
+    "upstream": {
+      "drv": "pi6rmr72l49nmzlgwsrvjvf92p0y4vlf-puredarwin-native-ld-0.1.drv",
+      "out": "zps2la9dxyrrk00svjh1d5ig2lkfdlwl-puredarwin-native-ld-0.1"
+    },
+    "previous_bounded": {
+      "drv": "sq9k9yvwrp9m9zkj5lsn4x10112hp9m8-puredarwin-native-ld-0.1.drv",
+      "out": "7kz4m6aipfdn9i1lps34lkn3ljm3slwg-puredarwin-native-ld-0.1"
+    },
+    "rebound_unbounded": {
+      "drv": "bnw6afwfb0656vaxwpfb1kijxih7rcp8-puredarwin-native-ld-0.1.drv",
+      "out": "vza2yfv8wf0c2z4qmqdbw68lqhqkmmkj-puredarwin-native-ld-0.1"
+    },
+    "candidate": {
+      "drv": "z0i9acp9rl54vmr877l37xmq7x11i525-puredarwin-native-ld-0.1.drv",
+      "out": "qhdkgmj1f26029524iiv8jsrhixlbazd-puredarwin-native-ld-0.1"
+    },
+    "unchanged_recipe_fields": {
+      "bootstrap_toolchain": true,
+      "install_phase": true,
+      "native_build_inputs": true,
+      "original_build_before_job_bound": true,
+      "other_build_inputs": true,
+      "other_configure_flags": true,
+      "sdk": true,
+      "source": true
+    },
+    "changed": {
+      "libtapi_build_inputs": 1,
+      "libtapi_configure_paths": 2,
+      "ninja_commands": 1
+    },
+    "original_owner_source_preserved": true,
+    "selected_puredarwin_source_preserved": true,
+    "path_format": "Nix store basenames and package-relative suffixes only; private checkout/run paths are omitted."
+  },
+  "execution": {
+    "status": "staged_libtapi_native_linker_built",
+    "started_at": "2026-11-14T21:00:39.342641+00:00",
+    "finished_at": "2026-11-14T21:08:52.160253+00:00",
+    "total_driver_seconds": 492.817612,
+    "phases": [
+      {
+        "name": "fetch-exact-revision",
+        "status": "pass",
+        "started_at": "2026-11-14T21:00:39.864324+00:00",
+        "timeout_seconds": 90,
+        "timed_out": false,
+        "exit_code": 0,
+        "finished_at": "2026-11-14T21:00:40.980622+00:00",
+        "duration_seconds": 1.12,
+        "observed_minimum_resources": {
+          "free_bytes": 9377812480,
+          "free_inodes": 4306059,
+          "available_memory_bytes": 3612340224
+        },
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "prepare-exclusive-worktree",
+        "status": "pass",
+        "started_at": "2026-11-14T21:00:40.981227+00:00",
+        "timeout_seconds": 90,
+        "timed_out": false,
+        "exit_code": 0,
+        "finished_at": "2026-11-14T21:00:42.068670+00:00",
+        "duration_seconds": 1.09,
+        "observed_minimum_resources": {
+          "free_bytes": 9353822208,
+          "free_inodes": 4304289,
+          "available_memory_bytes": 3616727040
+        },
+        "log_sha256": "36411322dff743fa25f5bc98f1a92d1e0297b9a7ba0c62588d6c2c29bfd3f601"
+      },
+      {
+        "name": "verify-inputs",
+        "status": "pass",
+        "started_at": "2026-11-14T21:00:42.660942+00:00",
+        "timeout_seconds": 180,
+        "timed_out": false,
+        "exit_code": 0,
+        "finished_at": "2026-11-14T21:00:57.056186+00:00",
+        "duration_seconds": 14.39,
+        "observed_minimum_resources": {
+          "free_bytes": 9350672384,
+          "free_inodes": 4304279,
+          "available_memory_bytes": 3587354624
+        },
+        "log_sha256": "59e6b422bf0761e82a8d7d1c218a1ee7c74061be0e37816f29497a57f98b242c"
+      },
+      {
+        "name": "staged-native-linker-build",
+        "status": "pass",
+        "started_at": "2026-11-14T21:00:57.071686+00:00",
+        "timeout_seconds": 7200,
+        "timed_out": false,
+        "exit_code": 0,
+        "finished_at": "2026-11-14T21:08:37.065184+00:00",
+        "duration_seconds": 459.99,
+        "observed_minimum_resources": {
+          "free_bytes": 9175244800,
+          "free_inodes": 4297248,
+          "available_memory_bytes": 3280130048
+        },
+        "log_sha256": "23a35f2c2a2830ef123e56d019a21376b2582dd6a2a03e595807f3117345b295"
+      },
+      {
+        "name": "inspect-output",
+        "status": "pass",
+        "started_at": "2026-11-14T21:08:37.067390+00:00",
+        "timeout_seconds": 180,
+        "timed_out": false,
+        "exit_code": 0,
+        "finished_at": "2026-11-14T21:08:51.359809+00:00",
+        "duration_seconds": 14.29,
+        "observed_minimum_resources": {
+          "free_bytes": 9200074752,
+          "free_inodes": 4298594,
+          "available_memory_bytes": 3595325440
+        },
+        "log_sha256": "0ba46e5a1078dc5eacd6b2d0d9ed62b9da303127d9da5266d52974c0e25e3644"
+      }
+    ],
+    "realization_command_succeeded": true,
+    "realized_output_basename": "qhdkgmj1f26029524iiv8jsrhixlbazd-puredarwin-native-ld-0.1",
+    "build_command_contract": {
+      "exact_inspected_candidate_drv_output": true,
+      "direct_local_store": true,
+      "jobs": 1,
+      "cores": 1,
+      "maximum_substitution_jobs": 2,
+      "remote_builders": "",
+      "min_free_bytes": 0,
+      "keep_failed": true,
+      "print_build_logs": true,
+      "json_result": true,
+      "exclusive_new_output_link": true,
+      "actual_argv_and_historical_plan_argv_validated": true
+    },
+    "local_derivations_announced": 9,
+    "copy_or_fetch_announcements": [],
+    "warnings_retained": true,
+    "warning_diagnostic_lines": 359,
+    "warning_examples": [
+      "macro redefinition",
+      "format diagnostics",
+      "mktemp diagnostic"
+    ],
+    "fatal_or_failed_build_messages_identified": [],
+    "warning_free_claimed": false
+  },
+  "historical_installed_output_inspection": {
+    "status": "pass",
+    "scope": "linux_x86_64_staged_libtapi_native_linker",
+    "registered_output": {
+      "output_basename": "qhdkgmj1f26029524iiv8jsrhixlbazd-puredarwin-native-ld-0.1",
+      "derivation_basename": "z0i9acp9rl54vmr877l37xmq7x11i525-puredarwin-native-ld-0.1.drv",
+      "nar_hash": "sha256-4Lik7bQq3t0gLTzMQjjrQLA0RM/Zgrx8wSmWSks7eXY=",
+      "nar_size": 4831360,
+      "path_info_sha256": "b27d635fa6687ca397d086b41518ac741cb04e77c272e05894beba2a692923c8"
+    },
+    "files": [
+      {
+        "path": "bin/ld",
+        "bytes": 140,
+        "sha256": "105d138f6801bd47a82051f4c9d2fb83c1b339e766e9b88e2ba12a114d4bb147",
+        "mode": 365
+      },
+      {
+        "path": "bin/ld.real",
+        "bytes": 4607840,
+        "sha256": "9169dd7ccd20745d53fbbb7c04a4026cf9e2721d3918842a86784c946530e209",
+        "mode": 365
+      },
+      {
+        "path": "bin/strip",
+        "bytes": 222464,
+        "sha256": "f402f848b2512fc637d7e560286c710aa567e9cc1002a285996a672d80d2a4c2",
+        "mode": 365
+      }
+    ],
+    "symlinks": {},
+    "elf_files": [
+      {
+        "path": "bin/ld.real",
+        "class": 64,
+        "byte_order": "little",
+        "machine": "x86_64",
+        "type": 3
+      },
+      {
+        "path": "bin/strip",
+        "class": 64,
+        "byte_order": "little",
+        "machine": "x86_64",
+        "type": 3
+      }
+    ],
+    "references": [
+      "34dkjp1wxxh6djsvxk8nhvzp0izasds0-glibc-2.42-67",
+      "604a9ayx3kdxqlx72f5wb39gn401y38v-openssl-3.6.3",
+      "apk3lq9svmlncaipqzc4gw7a3mdcmsmc-apple-libtapi-1300.6.5",
+      "fmmhdx9k95s8iqag7zip533mbl3f27sw-bash-5.3p9",
+      "n35z8vvlr7c5k1406n5bwd0f8h2hgj1j-gcc-15.2.0-lib",
+      "nwscc0d8j1i1p1grdnjch74xzd8zyxnd-zlib-1.3.2",
+      "xphdk97kdkgyrwl42w8qv3a2gl3021hy-libxml2-2.15.3"
+    ],
+    "staged_libtapi_reference_present": true,
+    "original_libtapi_reference_absent": true,
+    "dependencies": {
+      "libtapi": {
+        "output_basename": "apk3lq9svmlncaipqzc4gw7a3mdcmsmc-apple-libtapi-1300.6.5",
+        "derivation_basename": "pzi6pfykji7lp60p9y7934rvanhqdyrh-apple-libtapi-1300.6.5.drv",
+        "nar_hash": "sha256-EXyvQDuHv90QIWHE5N3uc+AcSBOUKd634cxGkN6Ju60=",
+        "nar_size": 4940088
+      },
+      "sdk": {
+        "output_basename": "nnsb7h396vc5xmwn59kky88inslcdw1m-puredarwin-oss-sdk-26.5",
+        "derivation_basename": "0nwq5lg8853m0rdvsncvjwyjk0dmffxd-puredarwin-oss-sdk-26.5.drv",
+        "nar_hash": "sha256-uQbGCee5rNyPwpUOuwIsvcJl32ETr52Ne5W5L3GK5H4=",
+        "nar_size": 42750632
+      }
+    },
+    "default_offline_store_verification": {
+      "exit_code": 0,
+      "timed_out": false,
+      "output_limit_bytes": null,
+      "output_limit_reached": false,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "ada1c5835fbb940480e7a92528c725350997f1f6cfcd2d00dabf34868424abbf"
+    },
+    "store_verification_used_repair_or_waivers": false,
+    "static_tapi_dynamic_binding": {
+      "interpreter_store_relative": "34dkjp1wxxh6djsvxk8nhvzp0izasds0-glibc-2.42-67/lib/ld-linux-x86-64.so.2",
+      "needed": [
+        "libssl.so.3",
+        "libcrypto.so.3",
+        "libtapi.so.12git",
+        "libz.so.1",
+        "libxml2.so.16",
+        "libstdc++.so.6",
+        "libm.so.6",
+        "libgcc_s.so.1",
+        "libc.so.6"
+      ],
+      "rpath": null,
+      "runpath_store_relative_directories": [
+        "nwscc0d8j1i1p1grdnjch74xzd8zyxnd-zlib-1.3.2/lib",
+        "xphdk97kdkgyrwl42w8qv3a2gl3021hy-libxml2-2.15.3/lib",
+        "604a9ayx3kdxqlx72f5wb39gn401y38v-openssl-3.6.3/lib",
+        "apk3lq9svmlncaipqzc4gw7a3mdcmsmc-apple-libtapi-1300.6.5/lib",
+        "34dkjp1wxxh6djsvxk8nhvzp0izasds0-glibc-2.42-67/lib",
+        "n35z8vvlr7c5k1406n5bwd0f8h2hgj1j-gcc-15.2.0-lib/lib"
+      ],
+      "resolution_mode": "DT_RUNPATH",
+      "selected_library_store_relative": "apk3lq9svmlncaipqzc4gw7a3mdcmsmc-apple-libtapi-1300.6.5/lib/libtapi.so.12git",
+      "resolved_library_store_relative": "apk3lq9svmlncaipqzc4gw7a3mdcmsmc-apple-libtapi-1300.6.5/lib/libtapi.so.12git",
+      "sha256": "53984f87e367fe517d641e4e69a8029a10ee05cda4385e7e0059c5b1ccc903fa",
+      "bytes": 4910128
+    },
+    "observed_loader_resolution": {
+      "needed": "libtapi.so.12git",
+      "resolved_library_store_relative": "apk3lq9svmlncaipqzc4gw7a3mdcmsmc-apple-libtapi-1300.6.5/lib/libtapi.so.12git",
+      "sha256": "53984f87e367fe517d641e4e69a8029a10ee05cda4385e7e0059c5b1ccc903fa",
+      "registered_loader_output": {
+        "output_basename": "34dkjp1wxxh6djsvxk8nhvzp0izasds0-glibc-2.42-67",
+        "derivation_basename": "r3qyp6d20sn1ybl5mssdkj4g03gn6rwj-glibc-2.42-67.drv",
+        "nar_hash": "sha256-nB9S+oXMdCgeiDdgDp0DL9ByL2Yyo2v+khL15K8yfv8=",
+        "nar_size": 35089528
+      },
+      "command": {
+        "exit_code": 0,
+        "timed_out": false,
+        "output_limit_bytes": 65536,
+        "output_limit_reached": false,
+        "stdout_sha256": "9f383ad1faeff760059cd9ca5ff2a41492be0655e608d12a70ff350fe31a5f33",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "version_probe": {
+      "command": {
+        "exit_code": 0,
+        "timed_out": false,
+        "output_limit_bytes": 65536,
+        "output_limit_reached": false,
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_sha256": "d8b3aa391c3ac3677c5b7e0f39c5667d114566b0bc2ca076c378b47e9beed203"
+      },
+      "identity": {
+        "program": "ld",
+        "project": "ld64",
+        "version_token": "LD64_VERSION_NUM",
+        "tapi_version": "1300.6.5",
+        "tapi_full_version": "TAPI version 1300.6.5 (1300.6.5)",
+        "version_header_sha256": "137e218628b09ef6e1cb5ee0922dc2eb60eb7ada09639d4f6e2a53a2b8496e91"
+      },
+      "ld64_numeric_version_known": false,
+      "literal_version_token_preserved": true
+    },
+    "probe_bounds": {
+      "timeout_seconds": 10,
+      "per_stream_output_bytes": 65536,
+      "environment": {
+        "PATH": "/usr/bin:/bin",
+        "LC_ALL": "C"
+      },
+      "loader_override_inherited": false
+    },
+    "installed_binary_bytes_copied_locally": false,
+    "scope_limit": "Recovered reports bind the successful historical host inspection. No installed native binary is published or executed by local recovery/review; this is not a fresh current-output attestation."
+  },
+  "source_inventory_boundary": {
+    "input_and_output_inspections_report_same_inventory": true,
+    "source_inventory_sha256": "37d3807502b72b8b98100430aa5c5c6bac63d780fa9b389d04872e73ed5bb5f1",
+    "manifest_sha256": "090b54ac4da796d4a59ee24df90f598f68c66a9af7eb81991335e1f32971ca74",
+    "manifest_bytes": 3111190,
+    "source_manifest_copies_retained_on_host": 2,
+    "source_manifest_content_retrieved": false,
+    "reported_matches_successful_libtapi_build": true,
+    "scope": "Inventory hashes and summaries are recovered; the two full source-manifest contents remain host-only."
+  },
+  "resource_history": {
+    "scope": "reported per-resource sampled minima across initial,phase monitors and final checks; no complete continuous sample series",
+    "pre_dispatch_free_bytes": 9378738176,
+    "initial": {
+      "free_bytes": 9378705408,
+      "free_inodes": 4306072,
+      "available_memory_bytes": 3613749248
+    },
+    "observed_minimum": {
+      "free_bytes": 9175244800,
+      "free_inodes": 4297248,
+      "available_memory_bytes": 3280130048
+    },
+    "final": {
+      "free_bytes": 9200070656,
+      "free_inodes": 4298593,
+      "available_memory_bytes": 3619352576
+    },
+    "maximum_observed_whole_host_net_growth_bytes": 203493376,
+    "growth_limit_bytes": 536870912,
+    "minimum_free_disk_reserve_bytes": 8589934592,
+    "minimum_observed_disk_margin_above_reserve_bytes": 585310208,
+    "cgroup_peak_memory_bytes": 553099264,
+    "cgroup_limits": {
+      "cpu.max": "25000 100000",
+      "memory.high": "1342177280",
+      "memory.max": "1610612736",
+      "memory.swap.max": "0",
+      "pids.max": "128"
+    },
+    "memory_events": {
+      "low": 0,
+      "high": 0,
+      "max": 0,
+      "oom": 0,
+      "oom_kill": 0,
+      "oom_group_kill": 0,
+      "sock_throttled": 0
+    },
+    "build_phase_timeout_seconds": 7200,
+    "outer_service_timeout_seconds": 7500,
+    "journal_summary": "Consumed 2min 59ms CPU time, 478.5M memory peak, 0B memory swap peak.",
+    "measurement_distinction": "The systemd journal summary and direct driver cgroup memory.peak report different peak values. Both are preserved; they are not asserted equivalent. The larger direct value remains below configured high/max and all memory events are zero.",
+    "historical_stage_within_guards": true,
+    "broader_or_future_build_peak_qualified": false,
+    "current_host_census": false
+  },
+  "capture_observation": {
+    "captured_at": "2026-11-14T21:11:02.865902+00:00",
+    "unit_load_state": "not-found",
+    "unit_active_state": "inactive",
+    "unit_sub_state": "dead",
+    "main_pid_zero": true,
+    "control_pid_zero": true,
+    "collected_unit_defaults_used_as_success_proof": false,
+    "existing_k3s_active": true,
+    "cgroup_already_removed_at_capture": true
+  },
+  "qualification": {
+    "native_linker_realization": "historical_pass_evidence_recovered_and_reviewed",
+    "native_installed_output_inspection": "historical_pass_evidence_recovered_and_reviewed",
+    "historical_native_evidence_prerequisite_satisfied": true,
+    "next_consumer_fresh_source_output_registration_and_probe_verification": "not_run_in_this_receipt",
+    "downstream_cross_toolchain_plan": "not_run_in_this_receipt",
+    "downstream_cross_toolchain_realization": "not_run",
+    "compiler_rt_build": "not_run",
+    "libsystem_build": "not_run",
+    "fixture_link": "not_run",
+    "selected_image_build": "not_run",
+    "selected_guest_execution": "not_run",
+    "burdettie_runtime_execution_in_selected_guest": "not_run",
+    "security_enforcement": "not_run",
+    "backend_control_families": 17,
+    "qualified_backend_control_families": 0,
+    "backend_control_status": "all_unavailable_unsupported",
+    "future_build_capacity_qualified": false,
+    "m1_complete": false
+  }
+}

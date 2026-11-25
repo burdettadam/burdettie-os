@@ -1,5 +1,7 @@
 # Darwin Loader Lab — Security, Platform Support & Known Limitations
 
+> This historical lab overview does not establish production security or current platform support. Use the [current runtime limits](../README.md#scope-and-limitations) and the [M1 launch and selectable security contract](contracts/launch-policy-v1.md). A policy gate, signature metadata or successful sandbox shim is not an isolation guarantee; the required admission and backend enforcement remain separate implementation milestones.
+
 > See [FEATURES.md](FEATURES.md) for the full feature index and
 > [roadmap.md](roadmap.md) for what comes next.
 
@@ -142,3 +144,4 @@ Please include:
 
 We aim to acknowledge reports within 72 hours and to coordinate a fix and
 disclosure timeline with you. We follow a 90-day responsible disclosure window.
+

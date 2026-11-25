@@ -18,10 +18,11 @@ macho-run-plan = { workspace = true }
 macho-exec     = { workspace = true }
 macho-objc     = { workspace = true }
 macho-map      = { workspace = true }
-macho-runtime  = { workspace = true }
+# Direct paths permit opting out of workspace defaults on Rust 1.93.
+macho-runtime  = { path = "../macho-runtime", default-features = false }
 libsystem-shims = { workspace = true }
 objc-runtime   = { workspace = true }
-cf-lite        = { workspace = true }
+cf-lite        = { path = "../cf-lite", default-features = false }
 runtime-diagnostics = { workspace = true }
 platform-core  = { workspace = true }
 trust-policy   = { workspace = true }
@@ -36,8 +37,9 @@ env_logger     = { workspace = true }
 log            = { workspace = true }
 
 [features]
-default = []
-gui = ["dep:window-backend-darwin", "window-backend-darwin/guest-appkit"]
+default = ["host-dialogs"]
+host-dialogs = ["cf-lite/host-dialogs", "macho-runtime/host-dialogs"]
+gui = ["host-dialogs", "dep:window-backend-darwin", "window-backend-darwin/guest-appkit"]
 
 [target.'cfg(target_os = "macos")'.dependencies]
 platform-darwin-host = { workspace = true }
