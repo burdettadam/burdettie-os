@@ -10,6 +10,10 @@ This replaces the former PureDarwin/XNU boot target and Rust-kernel destination.
 It does not mark the Linux product, app compatibility or enforced mode complete.
 Historical M1 receipts retain their original backend, revision and scope.
 
+[ADR 0004](../adr/0004-linux-integration-boundaries.md) and the
+[executed research](../research/README.md) refine the integration boundaries
+and prototype order. They do not close the runtime, image or enforcement gates.
+
 ## Product and target decisions
 
 | Field | Current decision |
@@ -17,8 +21,9 @@ Historical M1 receipts retain their original backend, revision and scope.
 | Product | Bootable Linux-based Burdettie OS, own UI/developer workflows and owner trust; native Linux apps plus named macOS compatibility workflows |
 | First evaluation lane | Linux x86_64 with matching x86_64 Mach-O fixtures; existing ARM64/interpreter regressions remain separate evidence |
 | Kernel | Linux; no owned kernel replacement milestone |
-| Runtime backend | Current Burdettie baseline compared with a complete upstream Darling worker; adoption unselected |
-| Release image/session | Existing Linux distribution/image and desktop components; exact versions/choice require the bounded M1 experiment |
+| Runtime backend | Current Burdettie baseline compared with a complete rootless Darling core/system control, then a Rust supervisor adapter; adoption unselected |
+| Release image/session | Debian 13/mkosi and unmodified labwc with Rust SCTK shell clients selected for experiments; release image/session unselected |
+| Developer workbench | Evaluate Theia with a narrow extension and Rust CLI/service; separate trusted developer authority |
 | New active target plan | [linux-product-targets.json](linux-product-targets.json); planning data, not an executable capability manifest |
 | Reference work | PureDarwin/macOS comparisons only for a specified component or workflow; not shipping prerequisites |
 | Application candidate | Exact Stickies version/slice still requires inventory; source-owned CLI/Foundation and document fixtures provide independent reproducible work |
@@ -65,6 +70,30 @@ See [RQ-01 through RQ-09](../RESEARCH_QUESTIONS.md) for bounded experiments,
 source findings and stop conditions. A direct darlingserver adapter follows a
 working complete-runtime baseline only if it reduces maintenance. Direct Darwin
 traps and cross-ISA execution remain separately scoped.
+
+## Research checkpoint — 2026-11-25
+
+| Area | New evidence | Effect on development |
+| --- | --- | --- |
+| Darling | Current rootless/NonRoot source paths; all eight selected launcher programs compiled, six passed and two failed under observed local restrictions | Use a complete upstream core/system control before a Rust adapter; no runtime adoption yet |
+| Existing AWS host | Selected Unix-socket, memory, namespace and Landlock probes passed; disk already below the 8-GiB reserve; instance returned to stopped | Real Linux supplies the tested prerequisites; no runtime build was attempted and its service context remains unqualified |
+| PureDarwin | libDER compiled natively but two of 30 semantic expectations failed; SDK wrapper path/version mismatch reproduced | Contribute contract/regression fixes before trusted parser adoption; qualify actual SDK callers separately |
+| GUI/session/image | Existing native demos use `GuiApp`, while the separately named Linux polling path lacks dispatch; mkosi configuration parsed | Consolidate the active event loop with thread-affine ownership; test separate Rust shell clients over a reused compositor |
+| Developer tools | Native C edit/build/run and compiler diagnostics passed; Theia/LSP/DAP not run | Reuse a workbench and upstream tools; keep trusted developer authority explicit |
+
+The first source-owned CLI corpus is now fixed to `return42`, `simple_cli`,
+`constructor_test`, `pthread_basic` and `tlv_basic`, with exact source identities
+in the [Darling record](../research/2026-11-25-darling-runtime.md). Their native
+ELF controls passed. Thin x86_64 Mach-O builds and execution on both declared
+compatibility routes remain open. Foundation and a named Apple GUI workflow
+are subsequent gates, not implied by those source controls.
+
+The application/profile domain includes its compatibility server, prefix and
+entire process tree; authenticated owner policy stays outside. Compare a
+post-setup restriction barrier with an independently qualified outer launcher
+using non-root copy mode. No failed enforced launch may silently fall back to
+a weaker mode. Preserve the existing v1 inspection and generated-executable-
+memory denials, including for routes used by developer tooling.
 
 ## Application and document workflows
 
