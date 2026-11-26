@@ -12,12 +12,14 @@
     "compatibility_application_format": "Mach-O",
     "compatibility_application_architecture": "x86_64",
     "cpu_route": "same_isa",
-    "distribution": null,
+    "distribution": "debian-13-trixie",
     "kernel_version": null,
     "kernel_configuration_digest": null,
     "image_digest": null,
-    "desktop_session": null,
-    "compatibility_backend_selection": null
+    "desktop_session": "labwc_with_rust_sctk_shell_clients",
+    "compatibility_backend_selection": null,
+    "distribution_status": "prototype_candidate_not_release_selection",
+    "desktop_session_status": "prototype_not_built_or_qualified"
   },
   "backend_candidates": [
     {
@@ -31,13 +33,21 @@
       "reviewed_revision": "90af44da21d314b9acd24de1d1272e4aba8b9cc6",
       "darlingserver_revision": "3604875f2d3fa46985e914650d23ce124f99ac27",
       "role": "evaluation_candidate_not_adopted",
-      "qualification": "source_review_only"
+      "qualification": "source_review_and_host_probes_only_no_complete_runtime_build",
+      "first_control_mode": "rootless_non_setuid",
+      "first_control_components": [
+        "core",
+        "system"
+      ],
+      "adoption_gate": "complete_upstream_control_then_supervised_same_corpus_comparison"
     }
   ],
   "puredarwin": {
     "reviewed_revision": "0c1990c803c13b68cad4df3f6dc34ba4306fc789",
     "role": "selected_source_tooling_shared_tests_optional_reference_vm",
-    "shipping_kernel_dependency": false
+    "shipping_kernel_dependency": false,
+    "libder_status": "native_build_passed_two_of_thirty_semantic_expectations_failed_trust_adoption_held",
+    "sdk_status": "rendered_discovery_wrapper_mismatch_reproduced_actual_build_unqualified"
   },
   "application_candidate": {
     "name": "Stickies",
@@ -56,8 +66,37 @@
     "contract": "../contracts/launch-policy-v1.md",
     "allocation": "../contracts/LINUX_BACKEND_ALLOCATION.md",
     "status": "no_new_linux_enforcement_qualification",
-    "missing_required_controls": "refuse_enforced_launch_before_initialization"
+    "missing_required_controls": "refuse_enforced_launch_before_initialization",
+    "application_domain": "complete_runtime_per_application_profile",
+    "owner_authority": "authenticated_supervisor_outside_worker_domain"
   },
   "resource_policy": "existing_resources_and_limits_no_new_paid_infrastructure",
-  "historical_reference_manifest": "m1-targets.json"
+  "historical_reference_manifest": "m1-targets.json",
+  "integration_decision": "../adr/0004-linux-integration-boundaries.md",
+  "research_checkpoint": "../research/README.md",
+  "developer_workbench": {
+    "candidate": "eclipse_theia",
+    "role": "existing_workbench_with_burdettie_extension_and_rust_cli_service",
+    "authority": "separately_declared_trusted_developer_route",
+    "status": "not_built_or_qualified"
+  },
+  "initial_cli_corpus": {
+    "source_revision": "d264e02f379b8fd4c4205bc416ea060064ad59fd",
+    "fixtures": [
+      "return42",
+      "simple_cli",
+      "constructor_test",
+      "pthread_basic",
+      "tlv_basic"
+    ],
+    "source_identities": "../research/2026-11-25-darling-runtime.md",
+    "native_elf_source_controls": "passed_gcc14_linux",
+    "macho_compatibility_controls": "not_run"
+  },
+  "resource_research": {
+    "record": "../research/2026-11-25-aws-host.md",
+    "selected_host_prerequisites": "passed_in_recorded_ssm_process_context",
+    "runtime_build": "not_started_existing_disk_below_reserve",
+    "cleanup": "existing_instance_confirmed_stopped"
+  }
 }

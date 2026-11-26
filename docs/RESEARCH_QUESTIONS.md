@@ -1,27 +1,37 @@
 # Linux product research and decision register
 
-Updated 2026-11-25. Governed by [ADR 0003](adr/0003-linux-foundation-and-upstream-reuse.md).
+Updated 2026-11-25. Governed by [ADR 0003](adr/0003-linux-foundation-and-upstream-reuse.md)
+and [ADR 0004](adr/0004-linux-integration-boundaries.md).
 Linux, a contribution-first strategy and Rust interfaces/bridges are settled
 product decisions. This register selects implementations within that direction.
 
-Evidence in this update is source/document inspection. No new Darling build,
-integrated Linux image, application qualification or enforcement experiment is
-reported as completed. Existing receipts retain their original revisions and
-scope. Each experiment records its exact inputs, commands, output, resource
-use, unsupported behavior and pass/fail/blocked outcome.
+Evidence now includes source/document inspection and bounded executed probes:
+upstream Darling launcher tests, Linux mechanisms, PureDarwin libDER and SDK
+wrappers, native C development and mkosi configuration parsing. Their results
+and limitations are recorded below. No complete Darling runtime, integrated
+Linux image, IDE or enforced application route is qualified by those probes.
+Existing receipts retain their original revisions and scope. Each experiment
+records exact inputs, commands, output, resource use, unsupported behavior and
+pass/fail/blocked outcome.
+
+Research records: [Darling runtime](research/2026-11-25-darling-runtime.md),
+[Linux enforcement](research/2026-11-25-linux-enforcement.md),
+[PureDarwin reuse](research/2026-11-25-puredarwin-reuse.md),
+[desktop and developer tools](research/2026-11-25-linux-desktop-devtools.md),
+[existing AWS host preflight](research/2026-11-25-aws-host.md).
 
 ## Decision order
 
 | ID | Question | Priority / owner | Current disposition |
 | --- | --- | --- | --- |
-| RQ-01 | Which Darwin execution backend should ship? | First / compatibility lead | Evaluate complete upstream Darling worker against current Burdettie baseline; not adopted |
-| RQ-02 | Which framework/object model can we reuse coherently? | First / runtime lead | Component and ABI inventory required; avoid combining incompatible runtimes |
-| RQ-03 | How is owner policy enforced on Linux? | First / security and platform leads | Mechanisms identified; execution-route qualification open |
-| RQ-04 | Which Linux image and desktop foundation? | Early / platform and UI leads | Existing Linux development workflows now; release image/session unselected |
-| RQ-05 | How much developer tooling can we delegate? | Early / developer-experience lead | Upstream compiler/LSP/DAP approach selected; frontend and integration gates open |
+| RQ-01 | Which Darwin execution backend should ship? | First / compatibility lead | Rootless core/system control first; selected prerequisites passed on an existing host, but disk reserve blocked the build; not adopted |
+| RQ-02 | Which framework/object model can we reuse coherently? | First / runtime lead | Keep one coherent runtime; libDER portability passed but two semantic expectations failed, so trust-parser adoption is held |
+| RQ-03 | How is owner policy enforced on Linux? | First / security and platform leads | Per-application whole-runtime domain selected; simple executable-memory filter disproved; full enforcement open |
+| RQ-04 | Which Linux image and desktop foundation? | Early / platform and UI leads | Debian 13/mkosi and unmodified labwc/SCTK shell are prototype choices; image/session not qualified |
+| RQ-05 | How much developer tooling can we delegate? | Early / developer-experience lead | Evaluate Theia workbench and upstream tools; native C probe passed, LSP/DAP/IDE gates open |
 | RQ-06 | Which applications and CPU routes define success? | First / compatibility and product leads | x86_64 same-ISA evaluation first; exact app versions remain open |
-| RQ-07 | What first upstream contribution helps both projects? | Parallel / contribution owner | SDK discovery, native libDER tooling and shared tests are bounded candidates |
-| RQ-08 | Where do Rust interfaces reduce risk and maintenance? | Continuous / runtime lead | Audit ownership, unsafe/FFI and process boundaries before integration |
+| RQ-07 | What first upstream contribution helps both projects? | Parallel / contribution owner | SDK wrapper mismatch reproduced; libDER regressions/contract clarification precede adoption; no submissions |
+| RQ-08 | Where do Rust interfaces reduce risk and maintenance? | Continuous / runtime lead | Thread-affine GUI driver/proxy and whole-runtime process boundary identified; implementation review remains open |
 | RQ-09 | Can we maintain and distribute the selected dependency set? | Before adoption / release lead | Per-component provenance, licensing and upgrade/patch cost review required |
 
 ## RQ-01 — Darwin execution over Linux
@@ -42,18 +52,45 @@ pass. The pinned server is `3604875f2d3fa46985e914650d23ce124f99ac27`.
 [README](https://github.com/darlinghq/darling/blob/90af44da21d314b9acd24de1d1272e4aba8b9cc6/README.md),
 [architecture configuration](https://github.com/darlinghq/darling/blob/90af44da21d314b9acd24de1d1272e4aba8b9cc6/CMakeLists.txt).
 
+**New evidence.** Current source has rootless, non-root copy and relocatable
+unprivileged-install paths. Do not assume a new privileged launcher is needed.
+Eight upstream launcher test programs compiled locally; six passed and two
+failed under observed local Unix-socket/namespace-ioctl restrictions.
+These are host-level tests, not a complete runtime or application result.
+[Detailed source and execution record](research/2026-11-25-darling-runtime.md).
+
+A second, compiler-free probe on the existing AWS development host produced
+positive Unix stream/datagram round trips, self `process_vm_readv`,
+`PR_SET_PTRACER_ANY`, `NS_GET_USERNS` and namespace-creation observations. A
+minimal Landlock ABI 8 child also allowed one file and denied another with
+`EACCES`. These outcomes distinguish restrictions of the local research
+environment from prerequisites available on another host; they do not qualify
+Darling or a shipping security boundary. Disk preflight found 5,231,730,688
+bytes free, below the 8 GiB reserve, so no build, dependency installation,
+download or volume expansion was performed.
+[Host context and limits](research/2026-11-25-aws-host.md).
+
 **Experiment A: complete upstream worker first.** Pin upstream and submodules,
-check build/install capacity, and run its normal loader/library/server path on
-Linux with a matching host and guest architecture. Establish an upstream
-control run before adding a Rust Burdettie supervisor adapter. Use existing
-source-owned C/Foundation fixtures and one named developer workload chosen
-before testing. Compare the same declared behavior with our current runtime.
+check build/install capacity, and start with the upstream core/system build
+and matching x86_64 CLI fixtures. Establish the complete loader/library/server
+control route before adding a Rust Burdettie supervisor adapter. Defer the
+full framework build until this baseline works; then add Foundation and one
+named developer workload. Compare the same declared behavior with our current
+runtime. A restricted research host is not evidence that the upstream runtime
+needs replacement. The next gate is a complete upstream run in a declared
+environment with adequate existing capacity, preserving the resource bounds.
 
 Pass requires reproducible inputs, expected output/errors, allocation/file/
 thread behavior, truthful exit status, crash containment and termination/reaping
 of the entire worker process tree. Record startup, memory and build costs.
 If the fixed corpus requires broad private upstream changes, stop and record
 the blocker; do not expand the experiment into another compatibility stack.
+
+After the control run, compare rootless setup with a restriction/activation
+barrier against an existing outer launcher with Darling's non-root copy mode.
+Both need the whole-runtime domain and grant boundaries described in RQ-03.
+Non-root copy mode is not itself a sandbox or a fallback that may silently
+weaken an enforced request.
 
 **Experiment B: direct adapter only if justified by A.** Darling's generated C
 RPC client can be used in both its Darwin libraries and ELF loader, making a
@@ -104,6 +141,19 @@ Portable Swift Foundation APIs do not establish macOS Objective-C binary ABI
 compatibility. [Linux dispatch](https://github.com/swiftlang/swift-corelibs-libdispatch/blob/20b4c8b2e168a20a661edf8ce9c2bcc6dc79793b/README.md),
 [corelibs Foundation scope](https://github.com/swiftlang/swift-corelibs-foundation/blob/0c2951a362addd219d6496517fe366feb79d0bda/README.md).
 
+**Executed portable component probe.** The existing libDER C sources compiled
+and ran on Linux, including sanitizer runs. Of 30 semantic expectations, 28
+passed and two failed: BIT STRING unused-bit canonicality and constructed
+SEQUENCE tag representation. Portability therefore does not establish a usable
+trust parser. Hold adoption in the signature/entitlement path; prepare shared
+regressions and resolve the API/encoding contract upstream before a Rust
+wrapper is promoted. No memory-safety conclusion beyond the executed corpus
+is implied. [libDER evidence](research/2026-11-25-puredarwin-reuse.md).
+
+The [AWS preflight](research/2026-11-25-aws-host.md) did not run a library or
+framework build because its free disk was below the reserved capacity. It
+does not change these libDER findings or close the coherent-framework gate.
+
 ## RQ-03 — Owner trust and Linux enforcement
 
 **Findings.** Current Darling source says its sandbox profiles are not enforced.
@@ -133,15 +183,38 @@ owner trust and resource confinement receive separate results. Capability-based
 IPC remains an implementation question; an in-process typed handle alone does
 not constrain arbitrary guest machine code.
 
+**Boundary decision.** One application/profile trust domain includes its
+compatibility server, prefix, launchd, workers, descendants and helpers. Keep
+the authenticated owner supervisor and authoritative policy outside that
+domain. Share immutable runtime inputs, not an owner-wide mutable server or
+prefix. Rootless namespaces and a same-UID socket check do not express
+different application grants. Test distinct credentials or an equally
+qualified process/LSM boundary, server-mediated requests and cross-domain
+access. Writable overlays must not shadow admitted executable providers.
+[ADR 0004](adr/0004-linux-integration-boundaries.md).
+
+**Executed mechanism probes.** An additional seccomp filter denied one raw
+syscall in a child and grandchild while allowing a control operation. Landlock,
+Darling memory operations, named Unix sockets, cgroup delegation and a user
+systemd manager were unavailable or blocked in the local restricted workspace. Namespace
+creation succeeded, which does not qualify isolation. A small filter denied
+RWX mappings and RW-to-RX protection changes but still allowed writable and
+executable aliases of one memfd. No generated instructions were executed.
+This disproves those two checks as a complete v1 generated-code denial; it
+does not test systemd's complete implementation. The next prototype must
+cover file/descriptor aliases and admitted loader transitions as well as direct
+mapping calls. [Probe record](research/2026-11-25-linux-enforcement.md).
+
 ## RQ-04 — Linux image and desktop
 
-**Finding.** We can keep existing Linux development workflows while selecting a
-release image. Compare existing distribution packaging/image tooling, including
-NixOS's image/module workflow and a conventional distribution assembled with
-mkosi. Neither is selected here. Prefer the existing kernel/driver/session
-ecosystem; do not create another package manager, init system or compositor to
-satisfy the Rust preference. [NixOS manual](https://nixos.org/manual/nixos/stable/),
-[mkosi](https://github.com/systemd/mkosi).
+**Prototype choice.** Evaluate Debian 13 x86_64 assembled with mkosi, following
+the existing Debian integration family, plus an unmodified labwc compositor
+and a separate Rust SCTK layer-shell client for our panel/launcher. The release
+image/session remains open. NixOS remains a contender for its image/module and
+generation/recovery workflows; measure actual runtime packaging and upgrade
+cost before selecting it. Prefer the existing kernel/driver/session ecosystem;
+do not create another package manager, init system or compositor to satisfy
+the Rust preference. [Research comparison](research/2026-11-25-linux-desktop-devtools.md).
 
 **Experiment.** Pin one minimal Linux VM configuration, boot the Burdettie
 session, run native and compatibility workers, preserve a document across a
@@ -150,12 +223,27 @@ cost, update/recovery behavior, upstream package availability and policy control
 support before choosing the release base. A Docker desktop demo does not close
 boot/image or hardware acceptance.
 
-Use the existing [winit/softbuffer backend](../crates/window-backend-linux/src/lib.rs)
-under an established Wayland session first. Evaluate an existing desktop/toolkit
-against our UI requirements before considering a new compositor. Qualification
-covers resize, input/IME, clipboard, file dialogs, graphics and shutdown. A
-compositor does not provide AppKit semantics; portals do not alone prove Linux
-confinement. The exact desktop/toolkit and hardware matrix remain open.
+The active native demo path is the host-backed
+[`window-backend-darwin::GuiApp`](../crates/window-backend-darwin/src/lib.rs),
+which has an application event handler. The separately named
+[`WinitBackend`](../crates/window-backend-linux/src/lib.rs) polling path lacks
+an event producer/pump; do not treat it as the qualified Linux path. Consolidate
+event-loop ownership before expanding GUI infrastructure. Ordinary winit
+windows, desktop layer-shell clients and the compositor are separate roles.
+
+Qualification covers panel anchoring/space, launch/focus, multiple windows,
+resize, input/IME, clipboard, file dialogs, accessibility and shutdown. Verify
+privileged shell protocol access separately from restricted application
+access. Labwc's feature scope and contribution policy constrain this prototype;
+a workflow outside that scope can change the compositor choice without
+justifying our own compositor. A compositor does not provide AppKit semantics;
+portals do not alone prove Linux confinement.
+
+**Executed image-tool probe.** Pinned mkosi accepted a Debian trixie x86_64
+bootable-disk configuration and returned its dependency list. Package
+resolution, a frozen snapshot/tools tree, image construction and boot were not
+tested; required image/VM tools were absent. Configuration parsing does not
+close the image/session gate. [Record and reproducer](research/2026-11-25-linux-desktop-devtools.md#executed-mkosi-configuration-probe).
 
 ## RQ-05 — Our developer experience over upstream tools
 
@@ -171,12 +259,28 @@ compiler/debugger stack.
 [Swift platforms](https://www.swift.org/platform-support/),
 [existing build frontend](../crates/burdettie-xcode-tools/src/xcodebuild.rs).
 
-**Experiment.** One owned Rust project and one C project produce accurate
+**Frontend direction.** Evaluate Theia's existing workbench and extension
+interfaces before implementing another editor, terminal, project tree or
+extension host. Keep Burdettie import/target/build actions accessible through a
+narrow Rust CLI/service and a portable extension where useful. Check the exact
+extension API and upstream-tool versions; installability is not feature
+qualification. Theia workspace trust is not the OS authority boundary. Keep
+the initial native IDE/debugger experiment in an explicit trusted development
+route rather than weakening launch-policy-v1 for Electron/JIT or inspection.
+[Workbench comparison](research/2026-11-25-linux-desktop-devtools.md#4-reuse-the-workbench-as-well-as-the-compilers).
+
+**Executed baseline.** GCC 14.2 built and ran a native ELF64 x86_64 C fixture,
+then produced changed output after a source edit/rebuild. Invalid input yielded
+a structured error with source position. Rust, LSP, DAP and Swift tools were
+absent in the inspected host paths, so no IDE or debugging pass is claimed.
+[Native probe](research/2026-11-25-linux-desktop-devtools.md#5-executed-native-compiler-probe-and-remaining-gates).
+
+**Next experiment.** One owned Rust project and one C project produce accurate
 diagnostics, build Linux ELF, run tests, stop at a breakpoint and inspect a
 variable using reused tools. Add a portable SwiftPM project with a matched
 Swift/SourceKit-LSP/debugger toolchain as a separately qualified route. Decide
-whether an existing editor integration or a standalone frontend best serves our
-UX. Native debugging does not qualify debugging interpreted Mach-O code. See
+whether an extension in an existing IDE or a composed Theia product best serves
+our UX. Native debugging does not qualify debugging interpreted Mach-O code. See
 [the developer plan](XCODE_PUBLIC_COMPATIBILITY_PLAN.md).
 
 ## RQ-06 — Application and architecture contract
@@ -201,10 +305,15 @@ library contributions. [M1 contract](milestones/M1_PLATFORM_SECURITY.md).
 
 ## RQ-07 — First upstream contribution
 
-The strongest researched starting points are consistent PureDarwin SDK
-discovery, a Linux-host libDER package/regression corpus, SBPL host diagnostics
-and a shared framework fixture. The exact wrapper version mismatch and their
-test gates are recorded in [UPSTREAM_STRATEGY](UPSTREAM_STRATEGY.md).
+The SDK wrapper mismatch is now reproduced narrowly: a fixture path override
+named `MacOSX26.5.sdk` is reported by `--show-sdk-path`, while
+`xcrun --show-sdk-version` still reports 11.3. This is a rendered shell-wrapper
+test, with no SDK or complete Nix build. LibDER has a Linux build and
+two failed semantic expectations, moving regressions/contract clarification
+ahead of adopting it. SBPL diagnostics and shared framework fixtures remain
+additional candidates. Scope and gates are recorded in
+[UPSTREAM_STRATEGY](UPSTREAM_STRATEGY.md) and the
+[PureDarwin evidence](research/2026-11-25-puredarwin-reuse.md).
 
 Before implementation, check current upstream history and open work, reproduce
 the issue in the intended path, select the actual maintainer destination and
@@ -223,6 +332,13 @@ the newly exposed parser/IPC boundary when it addresses real untrusted inputs.
 Do not mirror upstream implementations with redundant Rust code or redundant
 tests. [Rust FFI guidance](https://doc.rust-lang.org/nomicon/ffi.html).
 
+**Concrete GUI boundary.** Keep winit's event loop on its owning thread and
+use a typed command/EventLoopProxy interface for cross-thread work. The
+current blanket unsafe `Send + Sync` on a backend containing that loop should
+not become the model for new interfaces. Prefer foreign pointers inside the
+worker that owns the upstream runtime, with bounded messages across the Rust
+supervisor boundary. [Source findings](research/2026-11-25-linux-desktop-devtools.md#1-the-actual-gui-paths-differ-from-the-crate-names).
+
 ## RQ-09 — Maintainability and distribution
 
 Before adopting an implementation, record its component licenses, source
@@ -233,6 +349,14 @@ Do not assume a process boundary automatically resolves distribution terms.
 No proprietary SDK/application redistribution is authorized by an open-source
 component's license. [Darling licensing](https://github.com/darlinghq/darling/blob/90af44da21d314b9acd24de1d1272e4aba8b9cc6/README.md),
 [PureDarwin notices](https://github.com/PureDarwin/PureDarwin/blob/0c1990c803c13b68cad4df3f6dc34ba4306fc789/NOTICE).
+
+Contribution fit is part of selection: labwc currently rejects AI-generated
+contribution content, SCTK asks for general modular client changes, Theia
+requires an Eclipse Contributor Agreement, and PureDarwin distinguishes
+AI-assisted code from ordinary human-authored project communications. No
+submission or agreement is implied by a reuse experiment. Review the current
+component rules before preparing a contribution; do not solve an out-of-scope
+feature by assuming an indefinite private fork. [Contribution strategy](UPSTREAM_STRATEGY.md).
 
 Pass: a reproducible component set with understood obligations, a manageable
 patch queue and a demonstrated upstream update. Fail/blocked is an explicit

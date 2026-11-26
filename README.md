@@ -10,6 +10,8 @@ The product goal is a bootable Linux-based system with Burdettie's own UI and de
 
 PureDarwin is a source, tooling and test partner. Reuse selected portable components and evaluate coherent upstream compatibility implementations for larger gaps. Darling is an evaluation candidate, not an adopted backend. The [research register](docs/RESEARCH_QUESTIONS.md), [upstream strategy](docs/UPSTREAM_STRATEGY.md) and [M1 Linux plan](docs/milestones/M1_PLATFORM_SECURITY.md) define the next experiments. A PureDarwin VM is optional reference infrastructure; its build/boot work is not on the shipping path.
 
+[ADR 0004](docs/adr/0004-linux-integration-boundaries.md) now defines the integration boundaries: a complete runtime domain per application/profile, Rust owner authority outside it, thread-affine GUI ownership, separate shell clients over a reused compositor, and a reused developer workbench. The [executed research records](docs/research/README.md) explain the prototype choices and remaining gates. Their host/library/tool probes do not qualify an Apple application, release image or enforced launch.
+
 [Quick start](#quick-start) · [Architecture](#architecture) · [Engineering highlights](#engineering-highlights) · [Validation](#validation) · [Documentation](#documentation)
 
 ## Start here
@@ -136,6 +138,8 @@ Source files, fixture generators, and documented expectations belong in version 
 | Guide | Contents |
 | --- | --- |
 | [Linux product decision](docs/adr/0003-linux-foundation-and-upstream-reuse.md) | Accepted Linux foundation, Rust interfaces and upstream reuse; supersedes the XNU/Rust-kernel transition. |
+| [Integration boundaries](docs/adr/0004-linux-integration-boundaries.md) | Per-app runtime authority, GUI ownership, reused desktop/workbench and explicit prototype order. |
+| [Executed research](docs/research/README.md) | Pinned sources, probe outcomes, contribution candidates and current architecture diagram. |
 | [M1 platform and security contracts](docs/milestones/M1_PLATFORM_SECURITY.md) | Linux baseline, target/backend selection, shared launch contract and alpha acceptance. |
 | [Research questions](docs/RESEARCH_QUESTIONS.md) | Sourced findings, remaining decisions, bounded experiments and exit criteria. |
 | [Upstream strategy](docs/UPSTREAM_STRATEGY.md) | Reuse/contribution routing, first candidates and dependency/patch records. |

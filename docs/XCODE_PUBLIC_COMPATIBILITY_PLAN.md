@@ -3,7 +3,7 @@
 ## Goal and decision
 
 Build a useful Xcode-like developer experience on Linux by integrating existing
-compilers, build systems, language servers, and debuggers. Burdettie owns the
+workbench, compilers, build systems, language servers, and debuggers. Burdettie owns the
 project experience, Rust interfaces and bridges, target selection, and trust
 policy. Reimplementing those upstream tools in Rust is not a delivery goal.
 
@@ -20,6 +20,12 @@ existing code and tests while qualifying reusable backends. Follow the
 [research register](RESEARCH_QUESTIONS.md) for unresolved decisions. The
 integration milestones below are planned work, not claims of implemented IDE,
 language-server, debugger, or cross-compilation support.
+
+[ADR 0004](adr/0004-linux-integration-boundaries.md) selects workbench reuse
+and an explicit trusted developer boundary. Evaluate Eclipse Theia with a
+small Burdettie extension and Rust CLI/service; its implementation remains
+unqualified. The [desktop/developer research](research/2026-11-25-linux-desktop-devtools.md)
+records source findings, contribution constraints and the native C probe.
 
 ## Two explicit target profiles
 
@@ -47,6 +53,7 @@ write equivalent tools:
 
 | Capability | Reuse first | Burdettie responsibility |
 |---|---|---|
+| Editor, terminal, project tree and extension host | Eclipse Theia as the first workbench candidate; standard extensions where compatible | Own project/target experience through a narrow extension and Rust CLI/service, without a Rust-only frontend requirement |
 | Rust build, test, and dependency resolution | Cargo and rustc | Project actions, target selection, diagnostics, and policy around tool execution |
 | C/C++ compilation and linking | Clang/LLVM and an appropriate existing linker; retain a project's existing build system where possible | Translate supported project inputs and expose explicit compiler, sysroot, and target configuration |
 | Swift source development on Linux | A supported Swift toolchain and Swift Package Manager | A bounded Linux package workflow and clear supported-platform reporting |
@@ -110,6 +117,17 @@ established by these command-line implementations.
 
 ## Delivery sequence and acceptance gates
 
+### Developer authority
+
+Use a separately declared trusted developer route for the initial IDE
+experiment. Workspace build scripts, extensions, terminals and debug adapters
+can execute code; workbench workspace-trust settings do not implement Linux
+confinement. Debugging and JIT-capable workbench processes must not silently
+weaken the existing application contract's deny-only inspection or generated-
+executable-memory controls. A confined developer route would need its own
+reviewed capability contract and negative tests. See
+[ADR 0004](adr/0004-linux-integration-boundaries.md).
+
 ### 1. Qualify a native Linux development loop
 
 Use the Linux x86_64 evaluation profile selected in ADR 0003 and record its
@@ -123,17 +141,24 @@ build behavior. The existing `.pbxproj` C fixture can exercise the adapter
 path separately. Do not require a Darwin SDK or imported Apple tools for this
 native milestone.
 
+The research's native GCC C source-control probe passed build/run, edit/rebuild,
+ELF target inspection and a structured invalid-source diagnostic. It did not
+run Cargo, the project importer, an IDE, LSP or DAP; those acceptance steps
+remain open.
+
 ### 2. Qualify navigation and debugging
 
-Choose an editor/IDE integration surface before building a custom frontend.
+Evaluate the existing Theia workbench and extension interfaces first.
 Use a small project to prove diagnostics, completion, and go-to-definition
 through the selected LSP server. Use `lldb-dap` to prove launch, breakpoint,
 step, variable inspection, and clean termination for a native Linux program.
 Record any ptrace/container restrictions required by the test environment.
 
-The product may later provide its own shell around these services. Editor
-reuse versus a new Burdettie UI remains a research decision, not a reason to
-delay the reusable developer loop.
+Keep Burdettie project import, target selection and build/run results available
+through a narrow CLI/service and suitable extension APIs. Theia's exact API
+coverage, required extensions and distribution cost need qualification before
+adoption. Small upstream-native frontend extensions are consistent with using
+Rust for the interfaces and bridges.
 
 ### 3. Extend project import only for a named workflow
 
@@ -222,8 +247,8 @@ distribution requirements explicit.
 - Linux distribution, toolchain packaging and supported version combinations,
   plus qualification of shipping architectures beyond the x86_64 evaluation
   profile.
-- Existing editor integration versus a custom IDE frontend, and which LSP/DAP
-  capabilities the first release must expose.
+- Theia versus another maintained workbench, its extension API/version fit,
+  and which LSP/DAP capabilities the first release must expose.
 - Build backend and `.pbxproj` lowering strategy; the exact supported project,
   product, and setting subset.
 - Which Swift Linux package and dependencies provide a useful first target.
